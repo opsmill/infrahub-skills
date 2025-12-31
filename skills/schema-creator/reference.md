@@ -49,11 +49,46 @@ Complete reference for Infrahub schema properties.
 | `unique` | No | Enforce uniqueness (default: false) |
 | `default_value` | No | Default when not specified |
 | `choices` | No | For Dropdown: list of `{name, color, description}` |
-| `regex` | No | Validation pattern |
-| `min_length` / `max_length` | No | Text length constraints |
-| `min_value` / `max_value` | No | Numeric constraints |
 | `enum` | No | List of allowed values |
+| `parameters` | No | Nested object for kind-specific constraints (see Attribute Parameters below) |
 | `read_only` | No | Prevent modifications |
+
+## Attribute Parameters
+
+Only certain attribute kinds support parameters. Parameters must be nested under the `parameters` key:
+
+| Kind | Parameter | Default | Description |
+|------|-----------|---------|-------------|
+| `Number` | `min_value` | None | Minimum allowed value |
+| `Number` | `max_value` | None | Maximum allowed value |
+| `Number` | `excluded_values` | None | List of disallowed values |
+| `NumberPool` | `start_range` | 1 | Start of the number pool range |
+| `NumberPool` | `end_range` | 9223372036854775807 | End of the number pool range |
+| `Text` | `regex` | None | Validation pattern |
+| `Text` | `min_length` | None | Minimum string length |
+| `Text` | `max_length` | None | Maximum string length |
+| `TextArea` | `regex` | None | Validation pattern |
+| `TextArea` | `min_length` | None | Minimum string length |
+| `TextArea` | `max_length` | None | Maximum string length |
+
+**Example:**
+
+```yaml
+attributes:
+  - name: vlan_id
+    kind: Number
+    parameters:
+      min_value: 1
+      max_value: 4094
+  - name: hostname
+    kind: Text
+    parameters:
+      regex: "^[a-z][a-z0-9-]+$"
+      min_length: 3
+      max_length: 63
+```
+
+**Note:** When schema strict mode is enabled, Infrahub validates that `min_value < max_value` and `min_length < max_length`.
 
 ## Relationship Kinds
 

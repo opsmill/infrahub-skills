@@ -127,8 +127,11 @@ Renaming requires including the internal UUID temporarily. The safer approach is
 - [ ] `description` is under 128 characters
 - [ ] `choices` is provided for `Dropdown` kind
 - [ ] `default_value` matches the attribute kind
-- [ ] `regex` is valid regular expression syntax
-- [ ] Numeric constraints (`min_value`, `max_value`) are valid numbers
+- [ ] `parameters` is only used with supported kinds: `Number`, `NumberPool`, `Text`, `TextArea`
+- [ ] For `Number`: `parameters.min_value` < `parameters.max_value` (if both set)
+- [ ] For `NumberPool`: `parameters.start_range` < `parameters.end_range`
+- [ ] For `Text`/`TextArea`: `parameters.min_length` < `parameters.max_length` (if both set)
+- [ ] For `Text`/`TextArea`: `parameters.regex` is valid regular expression syntax
 
 ### Relationship Validation
 

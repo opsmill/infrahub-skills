@@ -40,6 +40,43 @@ nodes:
         default_value: active
 ```
 
+## Attributes with Parameters
+
+Attributes that support validation parameters (`Number`, `NumberPool`, `Text`, `TextArea`):
+
+```yaml
+---
+version: "1.0"
+nodes:
+  - name: Server
+    namespace: Infrastructure
+    human_friendly_id:
+      - "hostname__value"
+    attributes:
+      - name: hostname
+        kind: Text
+        unique: true
+        parameters:
+          regex: "^[a-z][a-z0-9-]+$"
+          min_length: 3
+          max_length: 63
+      - name: rack_position
+        kind: Number
+        parameters:
+          min_value: 1
+          max_value: 48
+      - name: cpu_cores
+        kind: Number
+        parameters:
+          min_value: 1
+          excluded_values: [13]
+      - name: description
+        kind: TextArea
+        optional: true
+        parameters:
+          max_length: 1000
+```
+
 ## Node with Relationships
 
 Parent-child relationship between Device and Interface:
@@ -357,8 +394,9 @@ nodes:
     attributes:
       - name: vlan_id
         kind: Number
-        min_value: 1
-        max_value: 4094
+        parameters:
+          min_value: 1
+          max_value: 4094
       - name: name
         kind: Text
       - name: description
