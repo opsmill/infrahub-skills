@@ -190,3 +190,4 @@ Child-side of Component/Parent should have `optional: false` to enforce the cont
 
 1. Ensure that every node has an human friendly ID so items can be created idempotently.
 2. Ensure that each relationship has an identifier on it that matches it's peer's identifier.
+3. Prefer creating the schemas in a top level directory called `schemas`.
