@@ -1,0 +1,14 @@
+{
+  "name": "infrahub",
+  "version": "1.0.0",
+  "description": "A Claude Code plugin to support developing on top of Infrahub.",
+  "author": {
+    "name": "Solution Engineering and Architecture",
+    "email": "customer-success@opsmill.com"
+  },
+  "keywords": [
+    "opsmill",
+    "infrahub",
+    "schema"
+  ]
+}
