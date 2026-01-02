@@ -223,6 +223,108 @@ Child-side of Component/Parent should have `optional: false` to enforce the cont
 
 ### General
 
-1. Ensure that every node has an human friendly ID so items can be created idempotently.
-2. Ensure that each relationship has an identifier on it that matches it's peer's identifier.
-3. Prefer creating the schemas in a top level directory called `schemas`.
+1. Ensure that every node has a human friendly ID so items can be created idempotently.
+2. Ensure that each relationship has an identifier on it that matches its peer's identifier.
+3. Prefer creating schemas in a top-level directory called `schemas/`.
+
+### Schema File Organization
+
+Organize schema files based on complexity and team ownership:
+
+#### Single File (Small Projects)
+Use one file when:
+- Total schema is under ~200 lines
+- Single team owns all schema definitions
+- Few nodes with simple relationships
+
+```
+schemas/
+└── schema.yml
+```
+
+#### Split by Domain (Medium Projects)
+Split into separate files when:
+- Schema exceeds ~200 lines
+- Distinct functional domains exist (network, organization, IPAM)
+- Different teams own different domains
+- You want to load domains independently
+
+```
+schemas/
+├── base.yml           # Core generics and shared definitions
+├── organization.yml   # Sites, teams, contacts
+├── network.yml        # Devices, interfaces, circuits
+└── ipam.yml           # Prefixes, addresses, VLANs
+```
+
+#### Split by Domain Folders (Large Projects)
+Use folders when:
+- Each domain has multiple related files
+- Domains have their own extensions
+- Complex inheritance hierarchies exist
+- Multiple teams collaborate on schemas
+
+```
+schemas/
+├── base/
+│   ├── generics.yml       # Shared generics
+│   └── core.yml           # Core node types
+├── organization/
+│   ├── locations.yml      # Regions, sites, rooms
+│   └── contacts.yml       # Teams, people
+├── network/
+│   ├── devices.yml        # Device types
+│   ├── interfaces.yml     # Interface types
+│   └── circuits.yml       # Circuit definitions
+├── ipam/
+│   ├── addressing.yml     # Prefixes, addresses
+│   └── vlans.yml          # VLANs, VLAN groups
+└── extensions/
+    └── custom.yml         # Organization-specific extensions
+```
+
+### When to Split a Schema File
+
+Split an existing file when:
+- **File exceeds 200-300 lines** - becomes hard to navigate
+- **Multiple namespaces** - each namespace can be its own file
+- **Independent loading needed** - some domains are optional
+- **Team boundaries** - different teams own different parts
+- **Reusability** - a domain (like IPAM) could be shared across projects
+
+### File Naming Conventions
+
+- Use lowercase with underscores: `network_devices.yml`
+- Match filename to primary namespace: `organization.yml` for `Organization` namespace
+- Use descriptive names: `ipam_addressing.yml` not `ip.yml`
+- Keep extensions in a separate folder: `extensions/custom.yml`
+
+### Loading Multiple Schema Files
+
+Load schema files in dependency order:
+
+```bash
+# Load base schemas first (generics and core types)
+infrahubctl schema load schemas/base.yml
+
+# Then load dependent schemas
+infrahubctl schema load schemas/organization.yml
+infrahubctl schema load schemas/network.yml
+infrahubctl schema load schemas/ipam.yml
+
+# Finally load extensions
+infrahubctl schema load schemas/extensions/custom.yml
+```
+
+Or load all at once (Infrahub resolves dependencies):
+
+```bash
+infrahubctl schema load schemas/
+```
+
+### Cross-File References
+
+When splitting schemas, ensure referenced types exist:
+- Generics must be loaded before nodes that inherit from them
+- Relationship peers must exist when the schema is loaded
+- Use `extensions` to add to nodes defined in other files
