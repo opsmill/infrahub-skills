@@ -10,5 +10,6 @@
     "opsmill",
     "infrahub",
     "schema"
-  ]
+  ],
+  "repository": "https://github.com/opsmill/infrahub-skills"
 }
