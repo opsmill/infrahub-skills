@@ -1,11 +1,11 @@
 ---
 name: infrahub-schema-creator
-description: Create, validate, and modify Infrahub schemas for infrastructure data management. Use when designing infrastructure data models, creating schema nodes with attributes and relationships, validating schema definitions, or planning schema migrations.
+description: Create, validate, and modify Infrahub schema(s). Use when designing data models, creating schema nodes with attributes and relationships, validating schema definitions, or planning schema migrations for Infrahub.
 ---
 
 # Infrahub Schema Creator
 
-Create, validate, and modify Infrahub schemas for infrastructure data management.
+Create, validate, and modify Infrahub schema(s) for infrastructure data management.
 
 ## Description
 
@@ -13,7 +13,7 @@ This skill assists with designing and implementing Infrahub schemas. Infrahub is
 
 ## Capabilities
 
-- Create new Infrahub schemas from natural language requirements
+- Create new Infrahub schema from natural language requirements
 - Design nodes with appropriate attributes and relationships
 - Create generics for shared properties and inheritance
 - Validate schemas against Infrahub conventions
