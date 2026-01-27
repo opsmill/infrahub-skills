@@ -85,12 +85,24 @@ Create, validate, and modify Infrahub schemas for infrastructure data management
 | `validation.md` | Validation commands and migration guide |
 | `examples.md` | Ready-to-use schema templates |
 
+## Automatic Detection
+
+The plugin automatically detects Infrahub projects on session start by looking for:
+- `.infrahub.yml` or `infrahub.toml` configuration files
+- Schema files with `version: "1.0"` and `nodes:` or `generics:` keys
+
+When an Infrahub project is detected, Claude is automatically instructed to use the schema-creator skill for relevant tasks.
+
 ## Project Structure
 
 ```
 .
 ├── .claude-plugin/
 │   └── plugin.json              # Plugin manifest
+├── hooks/
+│   └── hooks.json               # Hook definitions
+├── hooks-handlers/
+│   └── session-start.sh         # Infrahub project detection script
 ├── skills/
 │   └── schema-creator/
 │       ├── SKILL.md             # Skill definition
