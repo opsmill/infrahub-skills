@@ -12,6 +12,10 @@ This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub)
 .
 ├── .claude-plugin/
 │   └── plugin.json              # Plugin manifest (required)
+├── hooks/
+│   └── hooks.json               # Hook definitions (SessionStart detection)
+├── hooks-handlers/
+│   └── session-start.sh         # Detects Infrahub projects and activates skills
 ├── skills/
 │   └── schema-creator/
 │       ├── SKILL.md             # Main skill definition
