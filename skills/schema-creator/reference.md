@@ -1,330 +1,339 @@
-# Schema Reference
+# Infrahub Schema Property Reference
 
-Complete reference for Infrahub schema properties.
+Complete reference for all schema properties. JSON Schema validation available at:
+`https://schema.infrahub.app/infrahub/schema/latest.json`
+
+## Top-Level Schema File
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `version` | string | **Yes** | - | Schema version, always `"1.0"` |
+| `generics` | list | No | `[]` | List of GenericSchema definitions |
+| `nodes` | list | No | `[]` | List of NodeSchema definitions |
+| `extensions` | object | No | `{}` | SchemaExtension block for extending existing nodes |
+
+---
 
 ## Node Properties
 
-| Property | Required | Description |
-|----------|----------|-------------|
-| `name` | Yes | PascalCase, 2-32 chars, pattern: `^[A-Z][a-zA-Z0-9]+$` |
-| `namespace` | Yes | PascalCase, 3-32 chars, pattern: `^[A-Z][a-z0-9]+$` |
-| `description` | No | Max 128 chars |
-| `label` | No | Human-readable name, max 64 chars |
-| `icon` | No | Material Design Icons ref (e.g., `mdi:server`) |
-| `branch` | No | `aware` (default), `agnostic`, or `local` |
-| `inherit_from` | No | List of generic kinds to inherit from |
-| `human_friendly_id` | No | List of attribute paths for readable IDs |
-| `uniqueness_constraints` | No | Multi-field uniqueness rules |
-| `display_label` | No | Jinja2 template for display |
-| `order_by` | No | Default sorting fields |
-| `default_filter` | No | Default query filter field |
-| `include_in_menu` | No | Show in UI sidebar (default: true) |
-| `menu_placement` | No | Menu location path |
-| `hierarchical` | No | Enable parent-child structures |
-| `attributes` | No | List of attribute definitions |
-| `relationships` | No | List of relationship definitions |
+Properties for entries in the `nodes:` list. **Required: `name`, `namespace`.**
 
-## Attribute Kinds
+### Identity & Display
 
-| Category | Kinds |
-|----------|-------|
-| **Text** | `Text`, `TextArea`, `Email`, `URL`, `Password`, `HashedPassword`, `File`, `MacAddress`, `Color` |
-| **Numeric** | `Number`, `NumberPool`, `Bandwidth` |
-| **Network** | `IPHost`, `IPNetwork` |
-| **Boolean** | `Boolean`, `Checkbox` |
-| **Temporal** | `DateTime` |
-| **Selection** | `Dropdown` (requires `choices`) |
-| **Complex** | `List`, `JSON`, `Any` |
-| **System** | `ID` |
+| Property | Type | Default | Constraints | Description |
+|----------|------|---------|-------------|-------------|
+| `name` | string | *required* | 2-32 chars, `^[A-Z][a-zA-Z0-9]+$` | Node name (PascalCase) |
+| `namespace` | string | *required* | 3-32 chars, `^[A-Z][a-z0-9]+$` | Namespace (first letter uppercase only) |
+| `description` | string | null | Max 128 chars | Short description |
+| `label` | string | null | Max 64 chars | Human-friendly display name (auto-generated if omitted) |
+| `icon` | string | null | Valid Iconify value | Icon identifier (e.g., `mdi:server`, `mingcute:location-line`) |
+| `display_label` | string | null | - | Attribute name or Jinja2 template (e.g., `"{{ manufacturer__name__value }} {{ name__value }}"`) |
+| `human_friendly_id` | list[string] | null | - | Attribute/relationship paths forming human-readable ID (e.g., `["parent__name__value", "name__value"]`) |
+| `order_by` | list[string] | null | - | Default sort order (e.g., `["name__value"]`) |
 
-## Attribute Properties
+### Menu & Visibility
 
-| Property | Required | Description |
-|----------|----------|-------------|
-| `name` | Yes | snake_case, 3-32 chars |
-| `kind` | Yes | Attribute type from list above |
-| `label` | No | Human-readable name |
-| `description` | No | Max 128 chars |
-| `optional` | No | Allow null values (default: false) |
-| `unique` | No | Enforce uniqueness (default: false) |
-| `default_value` | No | Default when not specified |
-| `choices` | No | For Dropdown: list of `{name, color, description}` |
-| `enum` | No | List of allowed values |
-| `parameters` | No | Nested object for kind-specific constraints (see Attribute Parameters below) |
-| `read_only` | No | Prevent modifications |
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `include_in_menu` | boolean | null | Whether to show in navigation menu |
+| `menu_placement` | string | null | Kind of parent generic to group under in menu |
+| `documentation` | string | null | URL to documentation |
 
-## Attribute Parameters
+### Inheritance & Hierarchy
 
-Only certain attribute kinds support parameters. Parameters must be nested under the `parameters` key:
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `inherit_from` | list[string] | `[]` | Generic kinds to inherit from (e.g., `["DcimGenericDevice"]`) |
+| `parent` | string | null | Expected parent kind in hierarchy (set to `null` or `""` for root) |
+| `children` | string | null | Expected child kind in hierarchy |
+| `hierarchy` | string | null | Internal - hierarchy name (auto-set) |
 
-| Kind | Parameter | Default | Description |
-|------|-----------|---------|-------------|
-| `Number` | `min_value` | None | Minimum allowed value |
-| `Number` | `max_value` | None | Maximum allowed value |
-| `Number` | `excluded_values` | None | List of disallowed values |
-| `NumberPool` | `start_range` | 1 | Start of the number pool range |
-| `NumberPool` | `end_range` | 9223372036854775807 | End of the number pool range |
-| `Text` | `regex` | None | Validation pattern |
-| `Text` | `min_length` | None | Minimum string length |
-| `Text` | `max_length` | None | Maximum string length |
-| `TextArea` | `regex` | None | Validation pattern |
-| `TextArea` | `min_length` | None | Minimum string length |
-| `TextArea` | `max_length` | None | Maximum string length |
+### Constraints
 
-**Example:**
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `uniqueness_constraints` | list[list[string]] | null | Multi-element uniqueness. Use `__value` for attributes, bare name for relationships. E.g., `[["rack", "name__value"]]` |
+| `branch` | enum | `"aware"` | Branch support: `aware`, `agnostic`, `local` |
 
-```yaml
-attributes:
-  - name: vlan_id
-    kind: Number
-    parameters:
-      min_value: 1
-      max_value: 4094
-  - name: hostname
-    kind: Text
-    parameters:
-      regex: "^[a-z][a-z0-9-]+$"
-      min_length: 3
-      max_length: 63
-```
+### Advanced
 
-**Note:** When schema strict mode is enabled, Infrahub validates that `min_value < max_value` and `min_length < max_length`.
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `state` | enum | `"present"` | `present` or `absent` (for removing nodes) |
+| `generate_profile` | boolean | `true` | Auto-generate a Profile schema |
+| `generate_template` | boolean | `false` | Auto-generate a Template schema |
 
-## Relationship Kinds
-
-| Kind | Purpose | Use Case |
-|------|---------|----------|
-| `Generic` | Flexible connection | Default, no special behavior |
-| `Attribute` | Inline display | Related entity properties shown inline |
-| `Component` | Composition | Parent contains children, cascade delete option |
-| `Parent` | Hierarchical | Child belongs to parent (mandatory) |
-| `Group` | Membership | System-managed groupings |
-| `Profile` | Configuration | Template/profile assignments |
-
-## Relationship Properties
-
-| Property | Required | Description |
-|----------|----------|-------------|
-| `name` | Yes | snake_case, 3-32 chars |
-| `peer` | Yes | Target node/generic kind |
-| `kind` | No | Relationship type (default: `Generic`) |
-| `cardinality` | No | `one` or `many` (default: `many`) |
-| `optional` | No | Allow null (default: false) |
-| `identifier` | No | Unique relationship ID for bidirectional |
-| `direction` | No | `bidirectional`, `outbound`, `inbound` |
-| `on_delete` | No | `no-action` or `cascade` |
-| `min_count` / `max_count` | No | Cardinality constraints |
+---
 
 ## Generic Properties
 
-Generics share most properties with nodes, plus:
+Generics use **all the same properties as nodes**, plus:
 
-| Property | Description |
-|----------|-------------|
-| `used_by` | List of node kinds using this generic |
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `hierarchical` | boolean | `false` | Enable hierarchical mode (for location-style trees) |
+| `used_by` | list[string] | `[]` | Internal - nodes referencing this generic |
 
-Nodes inherit from generics via `inherit_from`. Properties can be overridden at the node level.
+**Generics do NOT have**: `inherit_from`, `parent`, `children`.
 
-## Naming Conventions
+---
 
-1. **Nodes & Generics**: PascalCase (e.g., `NetworkDevice`, `PhysicalInterface`)
-2. **Namespaces**: PascalCase, domain-based (e.g., `Network`, `Organization`, `Infrastructure`)
-3. **Attributes**: snake_case (e.g., `hostname`, `ip_address`, `serial_number`)
-4. **Relationships**: snake_case, descriptive (e.g., `interfaces`, `primary_site`, `assigned_device`)
+## Attribute Types
 
-## When to Use Generics
+| Kind | Description | Special Properties |
+|------|-------------|--------------------|
+| `Text` | Standard text | `regex`, `min_length`, `max_length` (via `parameters`) |
+| `TextArea` | Multi-line text | Same as Text |
+| `Number` | Integer | `min_value`, `max_value`, `excluded_values` (via `parameters`) |
+| `Boolean` | True/false | - |
+| `Checkbox` | Boolean variant | - |
+| `DateTime` | Date and time | - |
+| `Dropdown` | Selection list | Requires `choices` |
+| `IPHost` | IP host (e.g., 192.168.1.1/24) | - |
+| `IPNetwork` | IP network (e.g., 192.168.0.0/24) | - |
+| `MacAddress` | MAC address | - |
+| `Email` | Email address | - |
+| `URL` | URL | - |
+| `Password` | Encrypted password | - |
+| `HashedPassword` | Pre-hashed password | - |
+| `JSON` | JSON data | - |
+| `Any` | Any type | - |
+| `List` | List of values | - |
+| `File` | File reference | - |
+| `Bandwidth` | Bandwidth value | - |
+| `Color` | Hex color | - |
 
-Use generics when:
-- Multiple nodes share common attributes or relationships
-- You need polymorphic relationships (one relationship targeting multiple node types)
-- Creating type hierarchies (e.g., `Interface` generic with `PhysicalInterface`, `LogicalInterface` nodes)
+**Deprecated**: `String` (use `Text`), `NumberPool` (special internal use)
 
-## Relationship Modeling Patterns
+## Attribute Properties
 
-### Component/Parent Pairs
+| Property | Type | Default | Constraints | Description |
+|----------|------|---------|-------------|-------------|
+| `name` | string | *required* | 3-32 chars, `^[a-z0-9\_]+$` | Attribute name (snake_case) |
+| `kind` | string | *required* | Valid AttributeKind | Attribute type (see table above) |
+| `label` | string | null | Max 32 chars | Display label (auto-generated if omitted) |
+| `description` | string | null | Max 128 chars | Help text |
+| `default_value` | any | null | - | Default value |
+| `unique` | boolean | `false` | - | Must be globally unique for this model |
+| `optional` | boolean | **`false`** | - | **Attributes are mandatory by default** |
+| `read_only` | boolean | `false` | - | Cannot be modified |
+| `order_weight` | integer | null | - | Display order (lower = first) |
+| `enum` | list | null | - | List of valid values |
+| `choices` | list[DropdownChoice] | null | - | Dropdown choices (for `Dropdown` kind) |
+| `allow_override` | enum | `"any"` | `"none"` or `"any"` | Profile override behavior |
+| `state` | enum | `"present"` | `present` or `absent` | Use `absent` to remove |
+| `deprecation` | string | null | Max 128 chars | Deprecation message |
 
-Use for containment relationships (Device has Interfaces):
+### Attribute Parameters (kind-specific)
+
+**Text/TextArea parameters:**
+```yaml
+- name: hostname
+  kind: Text
+  parameters:
+    regex: "^[a-zA-Z0-9-]+$"
+    min_length: 3
+    max_length: 64
+```
+
+**Number parameters:**
+```yaml
+- name: vlan_id
+  kind: Number
+  parameters:
+    min_value: 1
+    max_value: 4094
+    excluded_values: "1,4094"    # Comma-separated values or ranges: "100,150-200,300-400"
+```
+
+### Computed Attributes
 
 ```yaml
-# Parent side (Device)
-relationships:
-  - name: interfaces
-    peer: NetworkInterface
-    kind: Component
-    cardinality: many
-    identifier: "device__interfaces"
-
-# Child side (Interface)
-relationships:
-  - name: device
-    peer: NetworkDevice
-    kind: Parent
-    cardinality: one
-    optional: false
-    identifier: "device__interfaces"
+- name: computed_field
+  kind: Text
+  read_only: true
+  computed_attribute:
+    kind: Jinja2                 # Options: User, Jinja2, TransformPython
+    jinja2_template: "{% if asset_tag__value %}[{{ asset_tag__value }}](https://example.com){% else %}N/A{% endif %}"
 ```
 
-### Bidirectional Relationships
-
-Set matching `identifier` on both sides:
+### Dropdown Choices
 
 ```yaml
-# On Device
-- name: site
-  peer: OrganizationSite
-  identifier: "site__devices"
-
-# On Site
-- name: devices
-  peer: NetworkDevice
-  identifier: "site__devices"
+- name: status
+  kind: Dropdown
+  default_value: active
+  choices:
+    - name: active               # Internal value (required)
+      label: Active              # Display text (optional)
+      description: "Operational" # Help text (optional)
+      color: "#00FF00"           # Hex color (optional)
+    - name: planned
+      label: Planned
+      color: "#0000FF"
 ```
 
-### Hierarchical Structures
+---
 
-Enable `hierarchical: true` on the node for tree structures.
+## Relationship Properties
 
-## Human-Friendly IDs (HFID)
+| Property | Type | Default | Constraints | Description |
+|----------|------|---------|-------------|-------------|
+| `name` | string | *required* | 3-32 chars, `^[a-z0-9\_]+$` | Relationship name (snake_case) |
+| `peer` | string | *required* | `^[A-Z][a-zA-Z0-9]+$` | Target kind (e.g., `DcimDeviceType`) |
+| `kind` | enum | `"Generic"` | See table below | Relationship type |
+| `label` | string | null | Max 32 chars | Display label |
+| `description` | string | null | Max 128 chars | Help text |
+| `identifier` | string | null | Max 128 chars, `^[a-z0-9\_]+$` | Must match on both sides of bidirectional relationships |
+| `cardinality` | enum | **`"many"`** | `"one"` or `"many"` | How many related objects |
+| `optional` | boolean | **`true`** | - | **Relationships are optional by default** |
+| `direction` | enum | `"bidirectional"` | `bidirectional`, `outbound`, `inbound` | Relationship direction |
+| `on_delete` | enum | null | `"no-action"` or `"cascade"` | Delete behavior |
+| `order_weight` | integer | null | - | Display order |
+| `min_count` | integer | 0 | - | Minimum related objects |
+| `max_count` | integer | 0 | - | Maximum related objects (0 = unlimited) |
+| `read_only` | boolean | `false` | - | Cannot be modified |
+| `allow_override` | enum | `"any"` | `"none"` or `"any"` | Profile override behavior |
+| `state` | enum | `"present"` | `present` or `absent` | Use `absent` to remove |
+| `common_parent` | string | null | - | Peer must share same parent |
+| `common_relatives` | list[string] | null | - | Peers must share same relatives |
+| `deprecation` | string | null | Max 128 chars | Deprecation message |
 
-Design readable identifiers using attribute paths:
+### Relationship Kinds
+
+| Kind | Use Case | Typical Pattern |
+|------|----------|-----------------|
+| `Generic` | Standard relationship between independent objects | Default. No special semantics. |
+| `Attribute` | "Belongs to" style, displayed inline | `Device -> DeviceType`, `Device -> Rack` |
+| `Component` | Parent owns children | `Device -> Interfaces` (parent side, `cardinality: many`) |
+| `Parent` | Child points to parent | `Interface -> Device` (child side, `cardinality: one`) |
+| `Group` | Group membership | Special group relationships |
+| `Hierarchy` | Internal for hierarchical locations | Auto-managed by `hierarchical: true` |
+
+### Component/Parent Pattern
+
+Always define both sides with matching `identifier`:
 
 ```yaml
-human_friendly_id:
-  - "hostname__value"           # Single attribute
-  - "site__name__value"         # Through relationship
-  - "rack__name__value"         # Multiple for compound IDs
+# On the parent (Device):
+- name: interfaces
+  peer: DcimInterface
+  kind: Component
+  cardinality: many
+  identifier: "device__interface"
+
+# On the child (Interface):
+- name: device
+  peer: DcimGenericDevice
+  kind: Parent
+  cardinality: one
+  identifier: "device__interface"
 ```
 
-## Common Pitfalls
+---
 
-### YAML Boolean Quoting
+## Extensions
 
-Quote values that look like booleans:
+Add attributes/relationships to nodes defined in other schema files:
 
 ```yaml
-# Wrong - YAML interprets as boolean
-choices:
-  - name: on
-
-# Correct
-choices:
-  - name: "on"
+extensions:
+  nodes:
+    - kind: OrganizationProvider     # Existing node kind to extend
+      attributes:                    # New attributes to add
+        - name: website
+          kind: URL
+          optional: true
+      relationships:                 # New relationships to add
+        - name: sites
+          peer: LocationSite
+          cardinality: many
+          optional: true
 ```
 
-### Missing Relationship Identifiers
+### NodeExtensionSchema Properties
 
-Always set `identifier` for bidirectional relationships to ensure consistency.
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `kind` | string | **Yes** | Kind of existing node to extend |
+| `attributes` | list | No | New attributes to add |
+| `relationships` | list | No | New relationships to add |
+| `inherit_from` | list[string] | No | Additional generics to inherit |
 
-### Optional on Parent Relationships
+---
 
-Child-side of Component/Parent should have `optional: false` to enforce the containment relationship.
+## Menu Configuration
 
-## Best Practices
+Menus are defined in separate YAML files:
 
-### General
-
-1. Ensure that every node has a human friendly ID so items can be created idempotently.
-2. Ensure that each relationship has an identifier on it that matches its peer's identifier.
-3. Prefer creating schemas in a top-level directory called `schemas/`.
-
-### Schema File Organization
-
-Organize schema files based on complexity and team ownership:
-
-#### Single File (Small Projects)
-Use one file when:
-- Total schema is under ~200 lines
-- Single team owns all schema definitions
-- Few nodes with simple relationships
-
-```
-schemas/
-└── schema.yml
-```
-
-#### Split by Domain (Medium Projects)
-Split into separate files when:
-- Schema exceeds ~200 lines
-- Distinct functional domains exist (network, organization, IPAM)
-- Different teams own different domains
-- You want to load domains independently
-
-```
-schemas/
-├── base.yml           # Core generics and shared definitions
-├── organization.yml   # Sites, teams, contacts
-├── network.yml        # Devices, interfaces, circuits
-└── ipam.yml           # Prefixes, addresses, VLANs
+```yaml
+---
+apiVersion: infrahub.app/v1
+kind: Menu
+spec:
+  data:
+    - namespace: Dcim
+      name: DeviceManagement
+      label: Device Management
+      icon: "mdi:server"
+      children:
+        data:
+          - namespace: Dcim
+            name: Devices
+            label: Devices
+            kind: DcimGenericDevice    # Links to a node kind
+            icon: "mdi:server"
 ```
 
-#### Split by Domain Folders (Large Projects)
-Use folders when:
-- Each domain has multiple related files
-- Domains have their own extensions
-- Complex inheritance hierarchies exist
-- Multiple teams collaborate on schemas
+### Menu Item Properties
 
-```
-schemas/
-├── base/
-│   ├── generics.yml       # Shared generics
-│   └── core.yml           # Core node types
-├── organization/
-│   ├── locations.yml      # Regions, sites, rooms
-│   └── contacts.yml       # Teams, people
-├── network/
-│   ├── devices.yml        # Device types
-│   ├── interfaces.yml     # Interface types
-│   └── circuits.yml       # Circuit definitions
-├── ipam/
-│   ├── addressing.yml     # Prefixes, addresses
-│   └── vlans.yml          # VLANs, VLAN groups
-└── extensions/
-    └── custom.yml         # Organization-specific extensions
-```
+| Property | Type | Description |
+|----------|------|-------------|
+| `namespace` | string | Namespace for the menu item |
+| `name` | string | Unique name |
+| `label` | string | Display text |
+| `icon` | string | MDI/Iconify icon |
+| `kind` | string | Optional - node kind for leaf items |
+| `children.data` | list | Nested sub-menu items |
 
-### When to Split a Schema File
+---
 
-Split an existing file when:
-- **File exceeds 200-300 lines** - becomes hard to navigate
-- **Multiple namespaces** - each namespace can be its own file
-- **Independent loading needed** - some domains are optional
-- **Team boundaries** - different teams own different parts
-- **Reusability** - a domain (like IPAM) could be shared across projects
+## Built-in Types
 
-### File Naming Conventions
+These types are built into Infrahub and can be referenced without defining them:
 
-- Use lowercase with underscores: `network_devices.yml`
-- Match filename to primary namespace: `organization.yml` for `Organization` namespace
-- Use descriptive names: `ipam_addressing.yml` not `ip.yml`
-- Keep extensions in a separate folder: `extensions/custom.yml`
+| Type | Description |
+|------|-------------|
+| `BuiltinTag` | Tag system (use in `tags` relationships) |
+| `BuiltinIPAddress` | Base IP address (inherit from for IPAM) |
+| `BuiltinIPPrefix` | Base IP prefix (inherit from for IPAM) |
+| `CoreArtifactTarget` | Artifact generation target |
 
-### Loading Multiple Schema Files
+---
 
-Load schema files in dependency order:
+## order_weight Convention
 
-```bash
-# Load base schemas first (generics and core types)
-infrahubctl schema load schemas/base.yml
+| Range | Purpose |
+|-------|---------|
+| 900-999 | Primary relationships (manufacturer, rack, device_type) |
+| 1000-1099 | Primary identifying attributes (name, model) |
+| 1100-1499 | Secondary attributes (serial, part_number, description) |
+| 1500-1999 | Tertiary attributes (optional fields, settings) |
+| 2000-2999 | Advanced/computed/metadata fields |
+| 3000+ | Tags and generic relationships (always last) |
 
-# Then load dependent schemas
-infrahubctl schema load schemas/organization.yml
-infrahubctl schema load schemas/network.yml
-infrahubctl schema load schemas/ipam.yml
+---
 
-# Finally load extensions
-infrahubctl schema load schemas/extensions/custom.yml
-```
+## Naming Constraints Summary
 
-Or load all at once (Infrahub resolves dependencies):
-
-```bash
-infrahubctl schema load schemas/
-```
-
-### Cross-File References
-
-When splitting schemas, ensure referenced types exist:
-- Generics must be loaded before nodes that inherit from them
-- Relationship peers must exist when the schema is loaded
-- Use `extensions` to add to nodes defined in other files
+| Element | Convention | Pattern | Length |
+|---------|-----------|---------|--------|
+| Node name | PascalCase | `^[A-Z][a-zA-Z0-9]+$` | 2-32 |
+| Namespace | First upper, rest lower | `^[A-Z][a-z0-9]+$` | 3-32 |
+| Attribute name | snake_case | `^[a-z0-9\_]+$` | 3-32 |
+| Relationship name | snake_case | `^[a-z0-9\_]+$` | 3-32 |
+| Identifier | snake_case | `^[a-z0-9\_]+$` | max 128 |
+| Kind (auto) | Namespace + Name | - | - |
+| Description | Free text | - | max 128 |
+| Label (attr/rel) | Free text | - | max 32 |
+| Label (node) | Free text | - | max 64 |

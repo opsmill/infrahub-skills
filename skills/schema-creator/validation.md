@@ -1,262 +1,271 @@
-# Schema Validation Guide
-
-Commands and practices for validating and loading Infrahub schemas.
+# Schema Validation & Migration Guide
 
 ## Validation Commands
 
-### Check Schema Before Loading
+### Check Schema (Dry Run)
 
-Always validate schemas before applying them:
+Validate schema files without loading them:
 
 ```bash
-infrahubctl schema check --branch <branch-name> schema.yml
+# Check a directory of schemas
+infrahubctl schema check schemas/
+
+# Check specific files
+infrahubctl schema check schemas/base/dcim.yml schemas/base/location.yml
+
+# Check against a specific branch
+infrahubctl schema check schemas/ --branch develop
 ```
 
-This command:
-- Validates YAML syntax
-- Checks naming conventions
-- Verifies relationship references
-- Identifies constraint violations
+This will:
+1. Parse YAML files
+2. Validate against the Infrahub schema spec (Pydantic models)
+3. Show validation errors if any
+4. Show a diff of what would change vs current schema in Infrahub
 
 ### Load Schema
 
-After validation passes:
+Load schemas into a running Infrahub instance:
 
 ```bash
-infrahubctl schema load --branch <branch-name> schema.yml
+# Load all schemas from directory
+infrahubctl schema load schemas/
+
+# Load to a specific branch
+infrahubctl schema load schemas/ --branch feature-branch
+
+# Load and wait for convergence
+infrahubctl schema load schemas/ --wait 30
 ```
 
-## Recommended Workflow
+### Using invoke tasks (project-specific)
 
-### 1. Create a Branch
-
-Always make schema changes in a branch:
+If the project has `tasks.py`:
 
 ```bash
-infrahubctl branch create my-schema-branch
+uv run invoke load-schema
 ```
 
-### 2. Validate Changes
+## Project Configuration
 
-```bash
-infrahubctl schema check --branch my-schema-branch schema.yml
-```
-
-### 3. Load to Branch
-
-```bash
-infrahubctl schema load --branch my-schema-branch schema.yml
-```
-
-### 4. Test in Branch
-
-- Create test data using the new schema
-- Verify relationships work correctly
-- Test queries and filters
-
-### 5. Merge to Main
-
-```bash
-infrahubctl branch merge my-schema-branch
-```
-
-## Schema Migrations
-
-### Adding Elements
-
-Simply add new nodes, attributes, or relationships to the schema file and reload.
-
-### Removing Elements
-
-Use `state: absent` to mark elements for removal:
+The `.infrahub.yml` file defines what gets loaded:
 
 ```yaml
-attributes:
-  - name: deprecated_field
-    kind: Text
-    state: absent
+---
+schemas:
+  - schemas              # Loads all .yml/.yaml/.json files recursively
+
+menus:
+  - menus/menu-full.yml
+
+objects:
+  - objects              # Data files to populate
+
+queries:
+  - name: query_name
+    file_path: queries/query.gql
+
+check_definitions:
+  - name: check_name
+    class_name: CheckClassName
+    file_path: checks/check.py
 ```
-
-```yaml
-relationships:
-  - name: old_relationship
-    peer: SomeNode
-    state: absent
-```
-
-```yaml
-nodes:
-  - name: DeprecatedNode
-    namespace: Legacy
-    state: absent
-```
-
-### Modifying Elements
-
-Most properties can be updated by changing the value and reloading. However, some properties cannot be changed:
-
-**Cannot be modified:**
-- `branch` on nodes, attributes, or relationships
-- `direction` on relationships
-- `hierarchical` on relationships
-
-### Renaming Elements
-
-Renaming requires including the internal UUID temporarily. The safer approach is to:
-
-1. Add the new element
-2. Migrate data
-3. Remove the old element with `state: absent`
-
-## Validation Checklist
-
-### Node Validation
-
-- [ ] `name` is PascalCase, 2-32 characters
-- [ ] `namespace` is PascalCase, 3-32 characters
-- [ ] `description` is under 128 characters
-- [ ] `label` is under 64 characters
-- [ ] `icon` uses valid Material Design Icons format (`mdi:icon-name`)
-- [ ] `branch` is one of: `aware`, `agnostic`, `local`
-- [ ] `inherit_from` references existing generics with full kind (e.g., `NetworkInterface`)
-
-### Attribute Validation
-
-- [ ] `name` is snake_case, 3-32 characters
-- [ ] `kind` is a valid attribute type
-- [ ] `description` is under 128 characters
-- [ ] `choices` is provided for `Dropdown` kind
-- [ ] `default_value` matches the attribute kind
-- [ ] `parameters` is only used with supported kinds: `Number`, `NumberPool`, `Text`, `TextArea`
-- [ ] For `Number`: `parameters.min_value` < `parameters.max_value` (if both set)
-- [ ] For `NumberPool`: `parameters.start_range` < `parameters.end_range`
-- [ ] For `Text`/`TextArea`: `parameters.min_length` < `parameters.max_length` (if both set)
-- [ ] For `Text`/`TextArea`: `parameters.regex` is valid regular expression syntax
-
-### Relationship Validation
-
-- [ ] `name` is snake_case, 3-32 characters
-- [ ] `peer` references an existing node or generic kind
-- [ ] `cardinality` is either `one` or `many`
-- [ ] `direction` is one of: `bidirectional`, `outbound`, `inbound`
-- [ ] `identifier` matches on both sides of bidirectional relationships
-- [ ] `on_delete` is either `no-action` or `cascade`
-- [ ] Component/Parent pairs are correctly configured
-
-### Generic Validation
-
-- [ ] Same rules as nodes apply
-- [ ] `used_by` references valid node kinds (if specified)
 
 ## Common Validation Errors
 
-### "Invalid node name"
+### "Unknown field"
+The JSON schema has `additionalProperties: false`. Any typo causes this:
 
-Node names must be PascalCase and match `^[A-Z][a-zA-Z0-9]+$`.
-
-```yaml
-# Wrong
-- name: network_device
-- name: networkDevice
-- name: NETWORKDEVICE
-
-# Correct
-- name: NetworkDevice
+```
+# BAD - typo in property name
+- name: MyNode
+  namspace: Dcim         # Should be "namespace"
 ```
 
-### "Invalid attribute name"
+### "Name must match pattern"
+Names have strict regex patterns:
 
-Attribute names must be snake_case and match `^[a-z0-9_]+$`.
+```
+# Node name: ^[A-Z][a-zA-Z0-9]+$
+- name: my_node          # BAD - must start with uppercase, no underscores
+- name: MyNode           # GOOD
 
-```yaml
-# Wrong
-- name: hostName
-- name: HostName
-- name: host-name
+# Namespace: ^[A-Z][a-z0-9]+$
+- namespace: DCIM        # BAD - only first letter uppercase
+- namespace: Dcim        # GOOD
 
-# Correct
-- name: hostname
-- name: host_name
+# Attribute name: ^[a-z0-9\_]+$
+- name: MyAttribute      # BAD - must be lowercase
+- name: my_attribute     # GOOD
 ```
 
-### "Unknown peer"
+### "Name too short/long"
+```
+# Node name: 2-32 chars
+- name: X                # BAD - too short
 
-The relationship peer must reference an existing node or generic using the full kind (namespace + name).
+# Namespace: 3-32 chars
+- namespace: DC          # BAD - too short
 
-```yaml
-# Wrong (missing namespace)
-peer: Device
-
-# Correct
-peer: NetworkDevice
+# Attribute/Relationship name: 3-32 chars
+- name: id               # BAD - too short, use "obj_id" or similar
 ```
 
-### "Duplicate identifier"
+### "Peer not found"
+Relationship peer must reference the full kind (namespace + name):
 
-Each relationship identifier must be unique within the schema, used only by the two sides of a bidirectional relationship.
+```
+# BAD
+- peer: DeviceType       # Missing namespace
 
-### "Missing choices for Dropdown"
-
-Dropdown attributes require a `choices` list:
-
-```yaml
-- name: status
-  kind: Dropdown
-  choices:
-    - name: active
-    - name: inactive
+# GOOD
+- peer: DcimDeviceType
 ```
 
-## Strict Mode
+### "Identifier mismatch"
+Bidirectional relationships need matching identifiers:
 
-Infrahub has a strict mode (`INFRAHUB_SCHEMA_STRICT_MODE`) that enforces additional validators by default:
+```yaml
+# On Device:
+- name: interfaces
+  peer: DcimInterface
+  identifier: "device__interface"    # Must match
 
-- Relationship parent constraints
-- Numeric parameter validation
+# On Interface:
+- name: device
+  peer: DcimGenericDevice
+  identifier: "device__interface"    # Must match
+```
 
-Disable with environment variable if needed for development:
+### "Uniqueness constraint references unknown field"
+Use `__value` suffix for attributes in constraints:
+
+```yaml
+# BAD
+uniqueness_constraints:
+  - ["name", "rack"]
+
+# GOOD
+uniqueness_constraints:
+  - ["name__value", "rack"]    # __value for attributes, bare name for relationships
+```
+
+## Schema Migration Strategies
+
+### Adding a New Attribute
+
+Just add it to the schema. If `optional: false`, existing data will need a value:
+
+```yaml
+# Safe: add as optional first
+- name: new_field
+  kind: Text
+  optional: true
+
+# Later: make mandatory after data is populated
+- name: new_field
+  kind: Text
+  optional: false
+  default_value: "unknown"
+```
+
+### Removing an Attribute
+
+Use `state: absent`:
+
+```yaml
+- name: old_field
+  kind: Text
+  state: absent
+```
+
+### Renaming an Attribute
+
+Two-step migration:
+1. Add new attribute (optional), keep old one
+2. Migrate data from old to new
+3. Remove old attribute with `state: absent`
+
+### Adding a New Node
+
+Just add the node definition. No migration needed.
+
+### Adding a Relationship
+
+Add the relationship to the schema. For bidirectional relationships, add both sides with matching `identifier`.
+
+### Changing Attribute Type
+
+Some type changes require `validate_constraint` checks. The safest approach:
+1. Add new attribute with new type
+2. Migrate data
+3. Remove old attribute
+
+### Making an Optional Field Mandatory
+
+```yaml
+# Step 1: Ensure all data has values (via data migration or default)
+# Step 2: Update schema
+- name: field
+  kind: Text
+  optional: false
+  default_value: "default"    # Provides fallback for existing data
+```
+
+## Branch-Based Schema Changes
+
+Infrahub supports schema changes on branches:
 
 ```bash
-export INFRAHUB_SCHEMA_STRICT_MODE=false
+# Create a branch for schema work
+# (via Infrahub UI or API)
+
+# Check schema against the branch
+infrahubctl schema check schemas/ --branch schema-updates
+
+# Load schema to the branch
+infrahubctl schema load schemas/ --branch schema-updates
+
+# Test and validate on branch, then merge via Infrahub UI
 ```
 
-## Testing Schema Changes
+### Branch Support Types
 
-### GraphQL Mutation Test
+| Type | Behavior |
+|------|----------|
+| `aware` | Data is branch-aware (default). Changes on branches are isolated. |
+| `agnostic` | Same data across all branches. Changes are global. |
+| `local` | Data is local to the branch where created. |
 
-After loading a schema, test creating data:
+## Pre-Validation Checklist
 
-```graphql
-mutation {
-  NetworkDeviceCreate(data: {
-    hostname: {value: "test-device-01"}
-    model: {value: "Test Model"}
-  }) {
-    ok
-    object { id }
-  }
-}
+Before running `infrahubctl schema check`, verify:
+
+- [ ] Every schema file starts with `version: "1.0"`
+- [ ] All node/generic names are PascalCase
+- [ ] All namespaces start with uppercase, rest lowercase
+- [ ] All attribute/relationship names are snake_case, 3+ chars
+- [ ] All relationship `peer` values use full kind (namespace + name)
+- [ ] All bidirectional relationships have matching `identifier` on both sides
+- [ ] All Component relationships have a matching Parent on the other node
+- [ ] All hierarchical nodes inherit from a generic with `hierarchical: true`
+- [ ] Root hierarchical nodes have `parent: null`
+- [ ] All `Dropdown` attributes have `choices` defined
+- [ ] `human_friendly_id` is set on nodes that will be user-facing
+- [ ] `uniqueness_constraints` use `__value` suffix for attributes
+- [ ] No deprecated fields used (`display_labels`, `default_filter`, `String` kind)
+- [ ] The `$schema` comment is present for IDE validation
+
+## IDE Integration
+
+Add this comment to the top of every schema file for IDE autocompletion:
+
+```yaml
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
 ```
 
-### Query Test
-
-Verify queries work correctly:
-
-```graphql
-query {
-  NetworkDevice {
-    edges {
-      node {
-        hostname { value }
-        interfaces {
-          edges {
-            node {
-              name { value }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-```
+This enables:
+- Property name autocompletion
+- Type validation
+- Inline error highlighting
+- Documentation tooltips
