@@ -4,7 +4,7 @@ This file provides context for Claude when working with this Infrahub plugin pro
 
 ## Project Overview
 
-This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub), the infrastructure data management platform by OpsMill. The plugin provides skills to help users design, create, validate, and modify Infrahub schemas.
+This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub), the infrastructure data management platform by OpsMill. The plugin provides skills covering the full Infrahub development lifecycle: schema design, data population, validation checks, generators, transforms, and menu customization.
 
 ## Directory Structure
 
@@ -17,11 +17,16 @@ This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub)
 ├── hooks-handlers/
 │   └── session-start.sh         # Detects Infrahub projects and activates skills
 ├── skills/
-│   └── schema-creator/
-│       ├── SKILL.md             # Main skill definition
-│       ├── reference.md         # Schema property reference
-│       ├── validation.md        # Validation and migration guide
-│       └── examples.md          # Example schema templates
+│   ├── common/                  # Shared references and rules
+│   │   ├── graphql-queries.md   # GraphQL query writing reference
+│   │   ├── infrahub-yml-reference.md  # .infrahub.yml config reference
+│   │   └── rules/              # Shared rules (git integration, caching)
+│   ├── schema-creator/          # Schema design skill
+│   ├── object-creator/          # Data population skill
+│   ├── check-creator/           # Validation check skill
+│   ├── generator-creator/       # Generator automation skill
+│   ├── transform-creator/       # Data transform skill
+│   └── menu-creator/            # Navigation menu skill
 ├── CLAUDE.md                    # This file - project context
 ├── README.md                    # User documentation
 └── LICENSE                      # MIT License
@@ -29,15 +34,26 @@ This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub)
 
 ## Skills
 
-### Schema Creator (`infrahub-schema-creator`)
+| Skill | Directory | Description |
+|-------|-----------|-------------|
+| `infrahub-schema-creator` | `skills/schema-creator/` | Schema nodes, generics, attributes, relationships |
+| `infrahub-object-creator` | `skills/object-creator/` | YAML data files for infrastructure objects |
+| `infrahub-check-creator` | `skills/check-creator/` | Python validation checks for proposed changes |
+| `infrahub-generator-creator` | `skills/generator-creator/` | Design-driven automation (create objects from designs) |
+| `infrahub-transform-creator` | `skills/transform-creator/` | Data transforms (Python/Jinja2 to JSON/text/CSV) |
+| `infrahub-menu-creator` | `skills/menu-creator/` | Custom navigation menus for the web UI |
 
-Located in `skills/schema-creator/`. Helps users create and manage Infrahub schemas.
+Each skill directory contains:
+- `SKILL.md` - Entry point with overview, capabilities, rule categories
+- `examples.md` - Ready-to-use patterns (most skills)
+- `reference.md` - Property/format reference (schema-creator, object-creator)
+- `rules/` - Individual rules organized by category prefix with `_sections.md` index
 
-**Files:**
-- `SKILL.md` - Entry point with overview, capabilities, and quick start
-- `reference.md` - Complete reference for nodes, attributes, relationships, generics
-- `validation.md` - Commands for validating/loading schemas, migration strategies
-- `examples.md` - Ready-to-use schema templates (IPAM, VLANs, datacenter, etc.)
+## Shared Resources (`skills/common/`)
+
+- `graphql-queries.md` - GraphQL query syntax for checks, generators, transforms
+- `infrahub-yml-reference.md` - .infrahub.yml project configuration
+- `rules/` - Cross-cutting rules (git integration, display label caching)
 
 ## Development Guidelines
 
@@ -47,26 +63,32 @@ Located in `skills/schema-creator/`. Helps users create and manage Infrahub sche
 2. Add a `SKILL.md` file with required YAML frontmatter:
    ```yaml
    ---
-   name: my-skill-name
+   name: infrahub-my-skill
    description: Brief description of what this skill does
+   license: MIT
+   metadata:
+     author: infrahub
+     version: 1.0.0
    ---
    ```
-3. Include sections: Description, Capabilities, When to Use
-4. Add supporting `.md` files for detailed reference content
-5. Keep `SKILL.md` under 500 lines; use linked files for extended content
+3. Include sections: Overview, When to Use, Rule Categories, Supporting References
+4. Add a `rules/` directory with `_sections.md` and `_template.md`
+5. Add supporting `.md` files for detailed reference content
+6. Keep `SKILL.md` under 500 lines; use linked files for extended content
+7. Reference `../common/` for shared resources
 
-### Modifying Schema Creator
+### Adding New Rules
 
-- Keep best practices in `reference.md`
-- Add new examples to `examples.md`
-- Update validation commands in `validation.md`
-- Ensure `SKILL.md` links to all supporting files
+- Skill-specific rules go in `skills/<skill>/rules/` with the category prefix from `_sections.md`
+- Cross-cutting rules (apply to multiple skills) go in `skills/common/rules/`
+- Follow the template format in `rules/_template.md`
 
 ## Conventions
 
 - Use semantic versioning for plugin versions
-- Skills require YAML frontmatter with `name` and `description`
-- Skill names: lowercase with hyphens (e.g., `infrahub-schema-creator`)
+- Skills require YAML frontmatter with `name`, `description`, `license`, and `metadata`
+- Skill names: `infrahub-` prefix with lowercase hyphens (e.g., `infrahub-schema-creator`)
+- Directory names: drop the `infrahub-` prefix (e.g., `schema-creator/`)
 - Keep documentation current with Infrahub schema format changes
 
 ## Resources

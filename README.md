@@ -64,26 +64,109 @@ Create, validate, and modify Infrahub schemas for infrastructure data management
 
 **Capabilities:**
 - Create new schemas from natural language requirements
-- Design nodes with attributes and relationships
-- Create generics for shared properties and inheritance
-- Validate schemas against Infrahub conventions
-- Plan schema migrations and updates
-- Generate human-friendly IDs and uniqueness constraints
+- Design nodes with attributes, relationships, and generics
+- Set up hierarchical location trees and component/parent patterns
+- Configure display properties (human_friendly_id, display_label)
+- Validate schemas and plan migrations
 
-**Example prompts:**
-- "Create an Infrahub schema for network devices with hostname and IP address"
-- "Design a schema with Sites that contain Racks and Devices"
-- "Create an Interface generic with Physical and Logical implementations"
-- "How do I extend an existing schema to add new attributes?"
-- "What are the best practices for Infrahub schema design?"
+**Documentation:** `skills/schema-creator/` -- SKILL.md, reference.md, examples.md, validation.md, rules/
 
-**Documentation files:**
-| File | Description |
-|------|-------------|
-| `SKILL.md` | Main skill definition and quick start |
-| `reference.md` | Complete schema property reference |
-| `validation.md` | Validation commands and migration guide |
-| `examples.md` | Ready-to-use schema templates |
+---
+
+### Object Creator
+
+**Name:** `infrahub-object-creator`
+
+Create and manage Infrahub object data files for populating infrastructure data.
+
+**Capabilities:**
+- Create YAML data files for devices, locations, organizations, modules
+- Set up hierarchical data (location trees, tenant groups)
+- Reference related objects across files
+- Manage component children (interfaces, modules, bays)
+- Organize files for correct dependency load order
+
+**Documentation:** `skills/object-creator/` -- SKILL.md, reference.md, examples.md, rules/
+
+---
+
+### Check Creator
+
+**Name:** `infrahub-check-creator`
+
+Create validation checks that run in proposed change pipelines.
+
+**Capabilities:**
+- Write Python validation logic (InfrahubCheck class)
+- Create GraphQL queries for data fetching
+- Build global and targeted checks
+- Register checks in .infrahub.yml
+- Debug check failures
+
+**Documentation:** `skills/check-creator/` -- SKILL.md, examples.md, rules/
+
+---
+
+### Generator Creator
+
+**Name:** `infrahub-generator-creator`
+
+Create design-driven generators that automatically create infrastructure objects.
+
+**Capabilities:**
+- Build generators that create objects from design definitions
+- Implement idempotent create-or-update workflows (allow_upsert)
+- Set up target groups and GraphQL queries
+- Configure automatic cleanup of stale objects
+- Register generators in .infrahub.yml
+
+**Documentation:** `skills/generator-creator/` -- SKILL.md, examples.md, rules/
+
+---
+
+### Transform Creator
+
+**Name:** `infrahub-transform-creator`
+
+Create data transforms that convert Infrahub data into different formats.
+
+**Capabilities:**
+- Build Python transforms (InfrahubTransform class)
+- Create Jinja2 template-based transforms
+- Generate device configs, CSV reports, inventory exports
+- Connect transforms to artifacts for automated output
+- Hybrid Python + Jinja2 patterns
+
+**Documentation:** `skills/transform-creator/` -- SKILL.md, examples.md, rules/
+
+---
+
+### Menu Creator
+
+**Name:** `infrahub-menu-creator`
+
+Create custom navigation menus for the Infrahub web interface.
+
+**Capabilities:**
+- Design navigation menus with nested hierarchies
+- Organize node types into logical groups
+- Configure icons (MDI icon set) and labels
+- Link menu items to schema node list views
+
+**Documentation:** `skills/menu-creator/` -- SKILL.md, rules/
+
+---
+
+### Common References
+
+Shared documentation and rules referenced by all skills.
+
+**Contents:**
+- `graphql-queries.md` -- GraphQL query writing reference
+- `infrahub-yml-reference.md` -- .infrahub.yml project configuration
+- `rules/` -- Shared rules (git integration, caching gotchas)
+
+**Location:** `skills/common/`
 
 ## Automatic Detection
 
@@ -91,7 +174,7 @@ The plugin automatically detects Infrahub projects on session start by looking f
 - `.infrahub.yml` or `infrahub.toml` configuration files
 - Schema files with `version: "1.0"` and `nodes:` or `generics:` keys
 
-When an Infrahub project is detected, Claude is automatically instructed to use the schema-creator skill for relevant tasks.
+When detected, Claude is instructed to use the appropriate skills for relevant tasks.
 
 ## Project Structure
 
@@ -104,11 +187,16 @@ When an Infrahub project is detected, Claude is automatically instructed to use 
 ├── hooks-handlers/
 │   └── session-start.sh         # Infrahub project detection script
 ├── skills/
-│   └── schema-creator/
-│       ├── SKILL.md             # Skill definition
-│       ├── reference.md         # Schema reference
-│       ├── validation.md        # Validation guide
-│       └── examples.md          # Example schemas
+│   ├── common/                  # Shared references and rules
+│   │   ├── graphql-queries.md
+│   │   ├── infrahub-yml-reference.md
+│   │   └── rules/
+│   ├── schema-creator/          # Schema design skill
+│   ├── object-creator/          # Data population skill
+│   ├── check-creator/           # Validation check skill
+│   ├── generator-creator/       # Generator automation skill
+│   ├── transform-creator/       # Data transform skill
+│   └── menu-creator/            # Navigation menu skill
 ├── CLAUDE.md                    # Project context
 ├── README.md                    # This file
 └── LICENSE                      # MIT License
