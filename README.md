@@ -10,7 +10,7 @@ Add the OpsMill Claude marketplace, then install the plugin. Run these commands 
 
 ```bash
 # Add the OpsMill marketplace
-/plugin marketplace add opsmill/opsmill-claude-marketplace
+/plugin marketplace add opsmill/claude-marketplace
 
 # Install the Infrahub plugin from the marketplace
 /plugin install infrahub@opsmill
@@ -24,7 +24,7 @@ Or add to your `~/.claude/settings.json`:
     "opsmill": {
       "source": {
         "source": "github",
-        "repo": "opsmill/opsmill-claude-marketplace"
+        "repo": "opsmill/claude-marketplace"
       }
     }
   },
