@@ -1,7 +1,7 @@
 ---
 name: infrahub-check-creator
 description: Create and manage Infrahub check definitions. Use when writing validation logic, creating Python checks that run in proposed change pipelines, or building data quality guards for Infrahub.
-license: MIT
+license: Apache-2.0
 metadata:
   author: infrahub
   version: 1.0.0
