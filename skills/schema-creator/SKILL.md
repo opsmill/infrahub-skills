@@ -1,10 +1,6 @@
 ---
 name: infrahub-schema-creator
 description: Create, validate, and modify Infrahub schemas. Use when designing data models, creating schema nodes with attributes and relationships, validating schema definitions, or planning schema migrations for Infrahub.
-license: Apache-2.0
-metadata:
-  author: infrahub
-  version: 1.0.0
 ---
 
 ## Overview

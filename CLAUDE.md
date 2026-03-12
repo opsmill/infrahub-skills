@@ -65,10 +65,6 @@ Each skill directory contains:
    ---
    name: infrahub-my-skill
    description: Brief description of what this skill does
-   license: Apache-2.0
-   metadata:
-     author: infrahub
-     version: 1.0.0
    ---
    ```
 3. Include sections: Overview, When to Use, Rule Categories, Supporting References
@@ -86,7 +82,7 @@ Each skill directory contains:
 ## Conventions
 
 - Use semantic versioning for plugin versions
-- Skills require YAML frontmatter with `name`, `description`, `license`, and `metadata`
+- Skills require YAML frontmatter with `name` and `description`
 - Skill names: `infrahub-` prefix with lowercase hyphens (e.g., `infrahub-schema-creator`)
 - Directory names: drop the `infrahub-` prefix (e.g., `schema-creator/`)
 - Keep documentation current with Infrahub schema format changes
