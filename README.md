@@ -6,11 +6,40 @@ The skills are written in plain Markdown with lightweight YAML frontmatter and a
 
 ## Installation
 
+### Copy Skills into Your Repository
+
+The simplest and most universal approach — works with any AI tool. Copy the `skills/` directory into your project so the AI assistant can discover the files directly:
+
+```bash
+# Clone the skills repository
+git clone https://github.com/opsmill/infrahub-skills.git
+
+# Copy all skills into your Infrahub project
+cp -r infrahub-skills/skills /path/to/your-infrahub-project/
+
+# Clean up
+rm -rf infrahub-skills
+```
+
+Or copy only the skills you need:
+
+```bash
+# Example: copy just schema and object creator skills
+mkdir -p /path/to/your-infrahub-project/skills
+cp -r infrahub-skills/skills/schema-creator /path/to/your-infrahub-project/skills/
+cp -r infrahub-skills/skills/object-creator /path/to/your-infrahub-project/skills/
+cp -r infrahub-skills/skills/common /path/to/your-infrahub-project/skills/
+```
+
+> **Note:** Always include `skills/common/` when copying individual skills — it contains shared references (GraphQL queries, `.infrahub.yml` format, git integration rules) that all skills depend on.
+
 ### Claude Code (Plugin)
+
+If you prefer the plugin approach, the skills are automatically available across all your Infrahub projects without copying files into each one.
 
 #### Option 1: Via OpsMill Marketplace (Recommended)
 
-Add the OpsMill Claude marketplace, then install the plugin. Run these commands inside Claude Code:
+Run these commands inside Claude Code:
 
 ```bash
 # Add the OpsMill marketplace
@@ -44,10 +73,10 @@ Clone and install directly from the repository:
 
 ```bash
 # Clone the repository
-git clone https://github.com/opsmill/infrahub-claude-plugin.git
+git clone https://github.com/opsmill/infrahub-skills.git
 
 # Install the plugin (run inside Claude Code)
-/plugin install ./infrahub-claude-plugin
+/plugin install ./infrahub-skills
 ```
 
 #### Option 3: Local Path
@@ -55,7 +84,7 @@ git clone https://github.com/opsmill/infrahub-claude-plugin.git
 If you have the plugin locally, run inside Claude Code:
 
 ```bash
-/plugin install /path/to/infrahub-claude-plugin
+/plugin install /path/to/infrahub-skills
 ```
 
 ## Skills
@@ -174,42 +203,63 @@ Shared documentation and rules referenced by all skills.
 
 ## Using with Other AI Tools
 
-The skill content in this repository is plain Markdown — any AI coding assistant that supports custom instructions or context files can benefit from it. The YAML frontmatter in each `SKILL.md` is Claude Code-specific metadata; other tools can ignore or strip it.
+These skills follow the [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) format — each skill is a directory with a `SKILL.md` entry point (with `name` and `description` frontmatter) plus supporting reference files. Any AI coding tool that supports skills can use them directly.
 
-Clone the repository and point your tool at the relevant skill files as described below.
+For tools that don't support skills natively, copy the `skills/` directory into your project and point the tool at the relevant files.
 
 ### GitHub Copilot
 
-Copilot supports both a single repo-wide file and per-path instruction files with YAML frontmatter.
+Copy the `skills/` directory into your repo, then reference the skills from a Copilot instructions file:
 
-- **Repo-wide:** Copy the content of the relevant `SKILL.md` files (without the frontmatter) into `.github/copilot-instructions.md`.
-- **Per-path (recommended):** Create `.github/instructions/infrahub-<skill>.instructions.md` files using Copilot's frontmatter format, then paste in the skill content:
+```bash
+cp -r skills/ /path/to/your-infrahub-project/skills/
+```
 
-  ```markdown
-  ---
-  applyTo: '**/*.py,**/*.yml,**/*.yaml'
-  ---
-  <!-- skill content here -->
-  ```
+Create `.github/instructions/infrahub.instructions.md` to point Copilot at the skills:
+
+```markdown
+---
+applyTo: '**/*.py,**/*.yml,**/*.yaml'
+---
+For Infrahub development guidance, refer to the skill files in skills/.
+```
 
 See [GitHub Copilot custom instructions docs](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions).
 
 ### Cursor
 
-Cursor uses `.cursor/rules/*.mdc` files (the old `.cursorrules` format is deprecated). The `.mdc` format is YAML frontmatter + Markdown, which maps directly to the skill files here.
+Copy the `skills/` directory into your repo, then create a Cursor rule to reference them:
 
-Copy each skill's content into `.cursor/rules/infrahub-<skill>.mdc`, replacing the Claude-specific frontmatter with Cursor's:
+```bash
+cp -r skills/ /path/to/your-infrahub-project/skills/
+```
+
+Create `.cursor/rules/infrahub.mdc`:
 
 ```markdown
 ---
-description: Infrahub schema design guidance
-globs: ["**/*.yml", "**/*.yaml"]
+description: Infrahub development guidance
+globs: ["**/*.py", "**/*.yml", "**/*.yaml"]
 alwaysApply: false
 ---
-<!-- skill content here -->
+For Infrahub development guidance, refer to the skill files in skills/.
 ```
 
 See [Cursor Rules docs](https://cursor.com/docs/context/rules).
+
+### Windsurf
+
+Copy the `skills/` directory into your repo. Windsurf will pick up the Markdown files as context. You can also reference them from `.windsurfrules` at your project root.
+
+See [Windsurf Rules docs](https://docs.windsurf.com/windsurf/customize#rules).
+
+### Other AI Tools
+
+For any AI coding tool:
+
+1. Copy the `skills/` directory into your project
+2. If the tool supports skills natively, it should discover the `SKILL.md` files automatically
+3. Otherwise, point the tool's context or instructions configuration at the relevant `SKILL.md` files — each one references supporting files (`reference.md`, `examples.md`, `rules/`) for detailed guidance
 
 ---
 
