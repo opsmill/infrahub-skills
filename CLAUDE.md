@@ -29,7 +29,7 @@ This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub)
 │   └── menu-creator/            # Navigation menu skill
 ├── CLAUDE.md                    # This file - project context
 ├── README.md                    # User documentation
-└── LICENSE                      # MIT License
+└── LICENSE                      # Apache 2.0 License
 ```
 
 ## Skills
@@ -65,7 +65,7 @@ Each skill directory contains:
    ---
    name: infrahub-my-skill
    description: Brief description of what this skill does
-   license: MIT
+   license: Apache-2.0
    metadata:
      author: infrahub
      version: 1.0.0

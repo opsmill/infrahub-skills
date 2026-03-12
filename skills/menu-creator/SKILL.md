@@ -1,7 +1,7 @@
 ---
 name: infrahub-menu-creator
 description: Create and manage Infrahub custom menus. Use when designing navigation menus, organizing node types in the UI, or customizing the Infrahub web interface sidebar.
-license: MIT
+license: Apache-2.0
 metadata:
   author: infrahub
   version: 1.0.0

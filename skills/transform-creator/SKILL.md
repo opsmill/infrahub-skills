@@ -1,7 +1,7 @@
 ---
 name: infrahub-transform-creator
 description: Create and manage Infrahub transforms. Use when building data transformations, config generation, or any workflow that converts Infrahub data into a different format (JSON, text, CSV, device configs) using Python or Jinja2 templates.
-license: MIT
+license: Apache-2.0
 metadata:
   author: infrahub
   version: 1.0.0

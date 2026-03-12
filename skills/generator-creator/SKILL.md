@@ -1,7 +1,7 @@
 ---
 name: infrahub-generator-creator
 description: Create and manage Infrahub generators. Use when building design-driven automation that creates infrastructure objects from templates, topology definitions, or any design-to-implementation workflow in Infrahub.
-license: MIT
+license: Apache-2.0
 metadata:
   author: infrahub
   version: 1.0.0

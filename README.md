@@ -1,10 +1,14 @@
-# Infrahub Claude Code Plugin
+# Infrahub AI Skills
 
-A Claude Code plugin for developing with [Infrahub](https://github.com/opsmill/infrahub), the infrastructure data management platform by OpsMill.
+AI skills for developing with [Infrahub](https://github.com/opsmill/infrahub), the infrastructure data management platform by OpsMill. These skills provide structured guidance — covering schema design, data population, validation checks, generators, transforms, and menu customization — to any AI coding assistant that supports custom instructions or context files.
+
+The skills are written in plain Markdown with lightweight YAML frontmatter and are easy to adapt to whichever AI tool you use.
 
 ## Installation
 
-### Option 1: Via OpsMill Marketplace (Recommended)
+### Claude Code (Plugin)
+
+#### Option 1: Via OpsMill Marketplace (Recommended)
 
 Add the OpsMill Claude marketplace, then install the plugin. Run these commands inside Claude Code:
 
@@ -34,7 +38,7 @@ Or add to your `~/.claude/settings.json`:
 }
 ```
 
-### Option 2: Via Git
+#### Option 2: Via Git
 
 Clone and install directly from the repository:
 
@@ -46,7 +50,7 @@ git clone https://github.com/opsmill/infrahub-claude-plugin.git
 /plugin install ./infrahub-claude-plugin
 ```
 
-### Option 3: Local Path
+#### Option 3: Local Path
 
 If you have the plugin locally, run inside Claude Code:
 
@@ -168,9 +172,50 @@ Shared documentation and rules referenced by all skills.
 
 **Location:** `skills/common/`
 
-## Automatic Detection
+## Using with Other AI Tools
 
-The plugin automatically detects Infrahub projects on session start by looking for:
+The skill content in this repository is plain Markdown — any AI coding assistant that supports custom instructions or context files can benefit from it. The YAML frontmatter in each `SKILL.md` is Claude Code-specific metadata; other tools can ignore or strip it.
+
+Clone the repository and point your tool at the relevant skill files as described below.
+
+### GitHub Copilot
+
+Copilot supports both a single repo-wide file and per-path instruction files with YAML frontmatter.
+
+- **Repo-wide:** Copy the content of the relevant `SKILL.md` files (without the frontmatter) into `.github/copilot-instructions.md`.
+- **Per-path (recommended):** Create `.github/instructions/infrahub-<skill>.instructions.md` files using Copilot's frontmatter format, then paste in the skill content:
+
+  ```markdown
+  ---
+  applyTo: '**/*.py,**/*.yml,**/*.yaml'
+  ---
+  <!-- skill content here -->
+  ```
+
+See [GitHub Copilot custom instructions docs](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions).
+
+### Cursor
+
+Cursor uses `.cursor/rules/*.mdc` files (the old `.cursorrules` format is deprecated). The `.mdc` format is YAML frontmatter + Markdown, which maps directly to the skill files here.
+
+Copy each skill's content into `.cursor/rules/infrahub-<skill>.mdc`, replacing the Claude-specific frontmatter with Cursor's:
+
+```markdown
+---
+description: Infrahub schema design guidance
+globs: ["**/*.yml", "**/*.yaml"]
+alwaysApply: false
+---
+<!-- skill content here -->
+```
+
+See [Cursor Rules docs](https://cursor.com/docs/context/rules).
+
+---
+
+## Automatic Detection (Claude Code only)
+
+The Claude Code plugin automatically detects Infrahub projects on session start by looking for:
 - `.infrahub.yml` or `infrahub.toml` configuration files
 - Schema files with `version: "1.0"` and `nodes:` or `generics:` keys
 
@@ -199,7 +244,7 @@ When detected, Claude is instructed to use the appropriate skills for relevant t
 │   └── menu-creator/            # Navigation menu skill
 ├── CLAUDE.md                    # Project context
 ├── README.md                    # This file
-└── LICENSE                      # MIT License
+└── LICENSE                      # Apache 2.0 License
 ```
 
 ## Resources
@@ -211,4 +256,4 @@ When detected, Claude is instructed to use the appropriate skills for relevant t
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+Apache License 2.0 - see [LICENSE](LICENSE) for details.
