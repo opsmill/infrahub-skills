@@ -46,7 +46,8 @@ Find all schema files (directories/files listed under `schemas:` in `.infrahub.y
 ### 2.3 Attribute checks
 - Attributes default to `optional: false` — flag new attributes without `optional: true` or `default_value` (INFO level, since this may be intentional)
 - Dropdown `choices` must be objects with `name` field (not bare strings)
-- Check for deprecated field names: `display_labels` (should be `display_label`), `String` kind (should be `Text`), `default_filter` (should be `human_friendly_id`)
+- Check for deprecated field names: `String` kind (should be `Text`), `default_filter` (should be `human_friendly_id`)
+- For `display_labels` deprecation, see dedicated section 2.9 below
 
 ### 2.4 Relationship checks
 - `peer` field must use full kind (Namespace + Name), not just name
@@ -77,6 +78,19 @@ Find all schema files (directories/files listed under `schemas:` in `.infrahub.y
 ### 2.8 Extensions
 - Cross-file relationships should use `extensions` block
 - Check `extensions` block structure is correct
+
+### 2.9 Deprecated `display_labels` migration (HIGH)
+- Scan all schema files for any node or generic containing the `display_labels` key (plural, list format)
+- Severity: **HIGH** — deprecated since Infrahub v1.5, will be removed in a future release
+- For each occurrence, output:
+  - The file path and node/generic name
+  - The current `display_labels` value (the list)
+  - The exact `display_label` replacement (Jinja2 template string)
+- Conversion: wrap each list item in `{{ }}`, join with spaces into a single string
+  - Example: `display_labels: ["name__value"]` → `display_label: "{{ name__value }}"`
+  - Example: `display_labels: ["form_factor__value", "sfp_type__value"]` → `display_label: "{{ form_factor__value }} {{ sfp_type__value }}"`
+- See [rules/schema-display-labels-deprecated.md](rules/schema-display-labels-deprecated.md) for full migration patterns
+- Validation: `infrahubctl schema check <path/to/schema/files>`
 
 ---
 

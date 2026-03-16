@@ -29,7 +29,7 @@ When invoked, the auditor:
 | Priority | Category | What It Checks |
 |----------|----------|----------------|
 | CRITICAL | Project Structure | `.infrahub.yml` exists, required sections present, file paths valid |
-| CRITICAL | Schema Validation | Naming conventions, relationship setup, peer kinds, identifiers |
+| CRITICAL | Schema Validation | Naming conventions, relationship setup, peer kinds, identifiers, deprecated field migration (`display_labels` → `display_label`) |
 | CRITICAL | Object Validation | YAML structure, apiVersion/kind, value types, relationship references |
 | CRITICAL | Python Components | Check/generator/transform classes inherit correctly, required methods exist |
 | HIGH | Cross-Reference Integrity | Query names match between `.infrahub.yml` and Python `query` attributes, target groups referenced consistently |

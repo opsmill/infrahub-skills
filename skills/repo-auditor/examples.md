@@ -66,10 +66,36 @@ Below is a sample `AUDIT_REPORT.md` showing the expected format and types of fin
 **Finding**: Node `InfraVLAN` has no `human_friendly_id` defined
 **Fix**: Add `human_friendly_id: ["vlan_id__value"]`
 
-### MEDIUM: Deprecated field name
+### HIGH: Deprecated `display_labels` field
 **File**: `schemas/device.yml` line 15
-**Finding**: Using `display_labels` (deprecated) — should be `display_label`
-**Fix**: Rename field to `display_label`
+**Finding**: Node `InfraDevice` uses deprecated `display_labels` (plural, list format). This field was deprecated in Infrahub v1.5 and will be removed in a future release.
+
+**Current value:**
+```yaml
+display_labels:
+  - "name__value"
+```
+
+**Fix** — replace with `display_label` (singular, Jinja2 template string):
+```yaml
+display_label: "{{ name__value }}"
+```
+
+### HIGH: Deprecated `display_labels` with multiple attributes
+**File**: `schemas/optics.yml` line 22
+**Finding**: Node `InfraOptic` uses deprecated `display_labels` with multiple list items.
+
+**Current value:**
+```yaml
+display_labels:
+  - "form_factor__value"
+  - "sfp_type__value"
+```
+
+**Fix** — wrap each item in `{{ }}` and join with spaces:
+```yaml
+display_label: "{{ form_factor__value }} {{ sfp_type__value }}"
+```
 
 ---
 
