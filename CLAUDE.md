@@ -26,7 +26,8 @@ This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub)
 │   ├── check-creator/           # Validation check skill
 │   ├── generator-creator/       # Generator automation skill
 │   ├── transform-creator/       # Data transform skill
-│   └── menu-creator/            # Navigation menu skill
+│   ├── menu-creator/            # Navigation menu skill
+│   └── repo-auditor/            # Repository audit skill
 ├── CLAUDE.md                    # This file - project context
 ├── README.md                    # User documentation
 └── LICENSE                      # Apache 2.0 License
@@ -42,6 +43,7 @@ This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub)
 | `infrahub-generator-creator` | `skills/generator-creator/` | Design-driven automation (create objects from designs) |
 | `infrahub-transform-creator` | `skills/transform-creator/` | Data transforms (Python/Jinja2 to JSON/text/CSV) |
 | `infrahub-menu-creator` | `skills/menu-creator/` | Custom navigation menus for the web UI |
+| `infrahub-repo-auditor` | `skills/repo-auditor/` | Audit repository against all rules and best practices |
 
 Each skill directory contains:
 - `SKILL.md` - Entry point with overview, capabilities, rule categories
