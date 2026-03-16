@@ -4,7 +4,7 @@ This file provides context for Claude when working with this Infrahub plugin pro
 
 ## Project Overview
 
-This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub), the infrastructure data management platform by OpsMill. The plugin provides skills covering the full Infrahub development lifecycle: schema design, data population, validation checks, generators, transforms, and menu customization.
+This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub), the infrastructure data management platform by OpsMill. The plugin provides skills covering the full Infrahub development lifecycle: schema design, data population, validation checks, generators, transforms, menu customization, and MCP-based data analysis.
 
 ## Directory Structure
 
@@ -26,7 +26,8 @@ This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub)
 │   ├── check-creator/           # Validation check skill
 │   ├── generator-creator/       # Generator automation skill
 │   ├── transform-creator/       # Data transform skill
-│   └── menu-creator/            # Navigation menu skill
+│   ├── menu-creator/            # Navigation menu skill
+│   └── analyst/                 # MCP-based data analysis skill
 ├── CLAUDE.md                    # This file - project context
 ├── README.md                    # User documentation
 └── LICENSE                      # Apache 2.0 License
@@ -42,6 +43,7 @@ This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub)
 | `infrahub-generator-creator` | `skills/generator-creator/` | Design-driven automation (create objects from designs) |
 | `infrahub-transform-creator` | `skills/transform-creator/` | Data transforms (Python/Jinja2 to JSON/text/CSV) |
 | `infrahub-menu-creator` | `skills/menu-creator/` | Custom navigation menus for the web UI |
+| `infrahub-analyst` | `skills/analyst/` | MCP-based live data analysis, correlation, and operational Q&A |
 
 Each skill directory contains:
 - `SKILL.md` - Entry point with overview, capabilities, rule categories

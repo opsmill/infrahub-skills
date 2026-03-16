@@ -1,7 +1,7 @@
 {
   "name": "infrahub",
   "version": "2.0.0",
-  "description": "A Claude Code plugin to support developing on top of Infrahub. Includes skills for schemas, objects, checks, generators, transforms, and menus.",
+  "description": "A Claude Code plugin to support developing on top of Infrahub. Includes skills for schemas, objects, checks, generators, transforms, menus, and data analysis.",
   "author": {
     "name": "Solution Engineering and Architecture",
     "email": "customer-success@opsmill.com"
@@ -16,7 +16,10 @@
     "transforms",
     "menus",
     "infrastructure",
-    "data-center"
+    "data-center",
+    "analysis",
+    "correlation",
+    "mcp"
   ],
   "repository": "https://github.com/opsmill/infrahub-skills"
 }
