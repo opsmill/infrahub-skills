@@ -39,6 +39,20 @@ The Infrahub server is not running, not reachable at the configured address, or 
 
 ### Fix
 
+**Step 0: Detect the Python environment**
+
+`infrahubctl` must be invoked within the correct Python environment. Determine the right prefix before running any commands. See [connectivity-python-environment.md](connectivity-python-environment.md) for the full detection rule.
+
+Quick reference — use the first that succeeds:
+
+```bash
+uv run infrahubctl info      # Try first if pyproject.toml has [tool.uv]
+poetry run infrahubctl info   # Try next if pyproject.toml has [tool.poetry]
+infrahubctl info              # Try last (direct PATH)
+```
+
+Once determined, prefix **all** `infrahubctl` commands below accordingly (e.g., `uv run infrahubctl schema check`).
+
 **Step 1: Verify connectivity**
 
 ```bash

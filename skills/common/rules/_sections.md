@@ -6,6 +6,6 @@ These rules apply across multiple Infrahub skills (generators, checks, transform
 
 2. **Protocols (protocols-)** -- CRITICAL. Protocol files are generated code (`infrahubctl protocols generate`), never edit directly, regenerate after schema changes, supports local schema directory.
 
-3. **Connectivity (connectivity-)** -- HIGH. Server reachability via `infrahubctl info`, offline vs online command awareness, environment variable requirements.
+3. **Connectivity (connectivity-)** -- HIGH. Python environment detection (`uv run` / `poetry run` / direct), server reachability via `infrahubctl info`, offline vs online command awareness, environment variable requirements.
 
 4. **Caching (caching-)** -- MEDIUM. Display label caching with parent relationships, batch loading timing issues, no-op mutation workarounds.
