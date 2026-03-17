@@ -8,6 +8,16 @@ tags: testing, infrahubctl, commands
 
 **Impact: LOW (reference)**
 
+### Prerequisites
+
+All commands below require a running Infrahub server. Verify connectivity first:
+
+```bash
+infrahubctl info
+```
+
+See [Server Connectivity Check](../../common/rules/connectivity-server-check.md) for troubleshooting.
+
 ### Commands
 
 ```bash

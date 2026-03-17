@@ -1,5 +1,7 @@
 # Schema Validation & Migration Guide
 
+> **Server Required**: `infrahubctl schema check` and `infrahubctl schema load` both require a running Infrahub server. Run `infrahubctl info` first to verify connectivity. See [Server Connectivity Check](../common/rules/connectivity-server-check.md).
+
 ## Validation Commands
 
 ### Check Schema (Dry Run)
@@ -241,6 +243,7 @@ infrahubctl schema load schemas/ --branch schema-updates
 
 Before running `infrahubctl schema check`, verify:
 
+- [ ] Server is reachable (`infrahubctl info` succeeds)
 - [ ] Every schema file starts with `version: "1.0"`
 - [ ] All node/generic names are PascalCase
 - [ ] All namespaces start with uppercase, rest lowercase
