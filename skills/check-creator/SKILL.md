@@ -1,6 +1,5 @@
 ---
 name: infrahub-check-creator
-version: 0.1.0
 description: Create and manage Infrahub check definitions. Use when writing validation logic, creating Python checks that run in proposed change pipelines, or building data quality guards for Infrahub.
 ---
 
