@@ -1,6 +1,9 @@
 ---
 name: infrahub-repo-auditor
 description: Audit an Infrahub repository against all best practices and rules. Use when reviewing a project for compliance, onboarding to an existing repo, or before deployment to catch issues early.
+metadata:
+  version: 1.1.0
+  author: OpsMill
 ---
 
 ## Overview
