@@ -28,6 +28,8 @@ This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub)
 │   ├── transform-creator/       # Data transform skill
 │   ├── menu-creator/            # Navigation menu skill
 │   └── repo-auditor/            # Repository audit skill
+├── evaluations/                   # Skill evaluation scenarios
+│   └── schema-creator.json      # Schema-creator evals (skill-creator format)
 ├── .github/
 │   └── .release-manifest.json   # Centralized version tracking
 ├── CLAUDE.md                    # This file - project context
@@ -53,7 +55,8 @@ Each skill directory contains:
 - `examples.md` - Ready-to-use patterns (most skills)
 - `reference.md` - Property/format reference (schema-creator, object-creator)
 - `rules/` - Individual rules organized by category prefix with `_sections.md` index
-- `evals/evals.json` - Evaluation scenarios (skill-creator format, run via `/skill-creator`)
+
+Evaluation scenarios live in the root `evaluations/` directory (one file per skill, e.g., `evaluations/schema-creator.json`), run via `/skill-creator`.
 
 ## Shared Resources (`skills/common/`)
 

@@ -14,6 +14,15 @@
         "human_friendly_id is defined on both nodes",
         "display_label is a singular Jinja2 string (e.g., \"{{ name__value }}\"), NOT display_labels as a plural list",
         "Schema starts with version: \"1.0\""
+      ],
+      "assertions": [
+        {"name": "attr-min-length", "check": "VLAN id attribute renamed to >= 3 chars (e.g., vlan_id)"},
+        {"name": "dropdown-for-status", "check": "Status uses kind: Dropdown with choice objects, not kind: Text"},
+        {"name": "no-deprecated-string", "check": "Attribute kinds use 'Text' not the deprecated 'String'"},
+        {"name": "full-kind-references", "check": "VLANGroup peer reference uses full kind 'IpamVlanGroup'"},
+        {"name": "human-friendly-id", "check": "human_friendly_id is defined on both VLAN and VLANGroup nodes"},
+        {"name": "display-label-singular", "check": "Uses display_label (singular Jinja2 string), not deprecated display_labels"},
+        {"name": "schema-version", "check": "Schema starts with version: '1.0'"}
       ]
     },
     {
@@ -28,6 +37,14 @@
         "All relationship identifiers match between the two sides of each pair — no mismatched identifiers",
         "All peer references use full namespace+name kind (e.g., CircuitProvider, CircuitCircuitEndpoint, not just 'Provider')",
         "human_friendly_id is defined on Circuit and Provider nodes"
+      ],
+      "assertions": [
+        {"name": "attribute-kind-relationships", "check": "Circuit-to-Provider uses kind: Attribute with matching identifiers"},
+        {"name": "endpoint-device-relationship", "check": "CircuitEndpoint-to-Device uses kind: Attribute with matching identifiers"},
+        {"name": "two-endpoint-relationships", "check": "Circuit has two endpoint relationships (side_a/side_z) pointing to CircuitCircuitEndpoint"},
+        {"name": "matching-identifiers", "check": "All relationship identifiers match between both sides of each pair"},
+        {"name": "full-kind-references", "check": "All peer references use full namespace+name kind"},
+        {"name": "human-friendly-id", "check": "human_friendly_id on Circuit and Provider nodes"}
       ]
     },
     {
@@ -43,6 +60,15 @@
         "display_label is used as a singular Jinja2 string, NOT the deprecated display_labels (plural list)",
         "Schema starts with version: \"1.0\"",
         "Parent/children chain is correct: Region->Site->Room->Rack"
+      ],
+      "assertions": [
+        {"name": "hierarchical-generic", "check": "A generic is defined with hierarchical: true"},
+        {"name": "inherit-from-generic", "check": "All location nodes inherit_from the hierarchical generic using its full kind"},
+        {"name": "root-no-parent", "check": "Root node (Region) has parent set to empty string or null"},
+        {"name": "human-friendly-id", "check": "human_friendly_id is set on each node"},
+        {"name": "display-label-singular", "check": "Uses display_label (singular Jinja2 string), not deprecated display_labels"},
+        {"name": "schema-version", "check": "Schema starts with version: '1.0'"},
+        {"name": "correct-hierarchy-chain", "check": "Parent/children chain: Region->Site->Room->Rack"}
       ]
     }
   ]
