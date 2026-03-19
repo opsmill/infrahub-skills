@@ -1,6 +1,9 @@
 ---
 name: infrahub-analyst
 description: Analyze and correlate Infrahub data using the MCP server. Use when querying live infrastructure data to answer operational questions, detect drift, correlate node types, investigate service impact, check maintenance windows, or produce ad-hoc reports — without writing pipeline code.
+metadata:
+  version: 1.1.0
+  author: OpsMill
 ---
 
 ## Overview
