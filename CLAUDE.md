@@ -8,7 +8,7 @@ This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub)
 
 ## Directory Structure
 
-```
+```bash
 .
 ├── .claude-plugin/
 │   └── plugin.json              # Plugin manifest (required)
@@ -29,7 +29,12 @@ This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub)
 │   ├── menu-creator/            # Navigation menu skill
 │   ├── analyst/                 # MCP-based data analysis skill
 │   └── repo-auditor/            # Repository audit skill
+├── evaluations/                   # Skill evaluation scenarios
+│   └── schema-creator.json      # Schema-creator evals (skill-creator format)
+├── .github/
+│   └── .release-manifest.json   # Centralized version tracking
 ├── CLAUDE.md                    # This file - project context
+├── CHANGELOG.md                 # Version history (Keep-a-Changelog format)
 ├── README.md                    # User documentation
 └── LICENSE                      # Apache 2.0 License
 ```
@@ -48,10 +53,13 @@ This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub)
 | `infrahub-repo-auditor` | `skills/repo-auditor/` | Audit repository against all rules and best practices |
 
 Each skill directory contains:
+
 - `SKILL.md` - Entry point with overview, capabilities, rule categories
 - `examples.md` - Ready-to-use patterns (most skills)
 - `reference.md` - Property/format reference (schema-creator, object-creator)
 - `rules/` - Individual rules organized by category prefix with `_sections.md` index
+
+Evaluation scenarios live in the root `evaluations/` directory (one file per skill, e.g., `evaluations/schema-creator.json`), run via `/skill-creator`.
 
 ## Shared Resources (`skills/common/`)
 
@@ -65,12 +73,17 @@ Each skill directory contains:
 
 1. Create a new directory in `skills/` (e.g., `skills/my-skill/`)
 2. Add a `SKILL.md` file with required YAML frontmatter:
+
    ```yaml
    ---
    name: infrahub-my-skill
    description: Brief description of what this skill does
+   metadata:
+     version: 1.1.0
+     author: OpsMill
    ---
    ```
+
 3. Include sections: Overview, When to Use, Rule Categories, Supporting References
 4. Add a `rules/` directory with `_sections.md` and `_template.md`
 5. Add supporting `.md` files for detailed reference content
@@ -86,10 +99,15 @@ Each skill directory contains:
 ## Conventions
 
 - Use semantic versioning for plugin versions
-- Skills require YAML frontmatter with `name` and `description`
+- All skills share a unified version matching `plugin.json` — when bumping, update all three locations together:
+  1. `.claude-plugin/plugin.json` (`version` field)
+  2. `.github/.release-manifest.json` (`version` field)
+  3. Every `skills/*/SKILL.md` (`metadata.version` in frontmatter)
+- Skills require YAML frontmatter with `name`, `description`, and `metadata` (version + author)
 - Skill names: `infrahub-` prefix with lowercase hyphens (e.g., `infrahub-schema-creator`)
 - Directory names: drop the `infrahub-` prefix (e.g., `schema-creator/`)
 - Keep documentation current with Infrahub schema format changes
+- Document notable changes in `CHANGELOG.md` using Keep-a-Changelog format
 
 ## Resources
 

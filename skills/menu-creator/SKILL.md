@@ -1,6 +1,9 @@
 ---
 name: infrahub-menu-creator
 description: Create and manage Infrahub custom menus. Use when designing navigation menus, organizing node types in the UI, or customizing the Infrahub web interface sidebar.
+metadata:
+  version: 1.1.0
+  author: OpsMill
 ---
 
 ## Overview
