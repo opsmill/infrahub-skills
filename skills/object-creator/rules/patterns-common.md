@@ -6,7 +6,7 @@ tags: patterns, flat-list, parent-child, devices, git-repo
 
 ## Common Object Patterns
 
-**Impact: LOW (reference patterns)**
+Impact: LOW (reference patterns)
 
 ### Flat List (No Relationships)
 

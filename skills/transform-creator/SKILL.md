@@ -1,14 +1,24 @@
 ---
 name: infrahub-transform-creator
-description: Create and manage Infrahub transforms. Use when building data transformations, config generation, or any workflow that converts Infrahub data into a different format (JSON, text, CSV, device configs) using Python or Jinja2 templates.
+description: >-
+  Create and manage Infrahub transforms. Use when building
+  data transformations, config generation, or any workflow
+  that converts Infrahub data into a different format
+  (JSON, text, CSV, device configs) using Python or Jinja2
+  templates.
 metadata:
   version: 1.1.0
   author: OpsMill
 ---
 
+# Infrahub Transform Creator
+
 ## Overview
 
-Expert guidance for creating Infrahub transforms. Transforms convert Infrahub data into different formats -- JSON, text, CSV, device configs, or any text-based output -- using Python classes or Jinja2 templates.
+Expert guidance for creating Infrahub transforms.
+Transforms convert Infrahub data into different formats
+-- JSON, text, CSV, device configs, or any text-based
+output -- using Python classes or Jinja2 templates.
 
 ## When to Use
 
@@ -21,25 +31,25 @@ Expert guidance for creating Infrahub transforms. Transforms convert Infrahub da
 
 ## Rule Categories
 
-| Priority | Category | Prefix | Description |
-|----------|----------|--------|-------------|
-| CRITICAL | Transform Types | `types-` | Python vs Jinja2, when to use which |
-| CRITICAL | Python Transform | `python-` | InfrahubTransform class, transform() method, return types |
-| CRITICAL | Jinja2 Transform | `jinja2-` | Template syntax, data variable, netutils filters |
-| HIGH | Hybrid | `hybrid-` | Python data prep + Jinja2 rendering pattern |
-| HIGH | Artifacts | `artifacts-` | Connecting transforms to output files, content types, targets |
-| HIGH | API Reference | `api-` | Class attributes, instance properties, methods |
-| MEDIUM | Patterns | `patterns-` | Data extraction utilities, CSV output, shared common.py |
-| LOW | Testing | `testing-` | infrahubctl transform/render commands |
+| Priority | Category  | Prefix       | Description               |
+| -------- | --------- | ------------ | ------------------------- |
+| CRITICAL | Types     | `types-`     | Python vs Jinja2 choice   |
+| CRITICAL | Python    | `python-`    | InfrahubTransform class   |
+| CRITICAL | Jinja2    | `jinja2-`    | Template syntax, filters  |
+| HIGH     | Hybrid    | `hybrid-`    | Python + Jinja2 combined  |
+| HIGH     | Artifacts | `artifacts-` | Output files, targets     |
+| HIGH     | API Ref   | `api-`       | Class attrs, methods      |
+| MEDIUM   | Patterns  | `patterns-`  | Utilities, CSV, shared    |
+| LOW      | Testing   | `testing-`   | Transform/render commands |
 
 ## Transform Basics
 
 Two types of transforms:
 
-| Type | Output | Entry Point |
-|------|--------|-------------|
+| Type       | Output            | Entry Point                     |
+| ---------- | ----------------- | ------------------------------- |
 | **Python** | JSON/dict or text | `InfrahubTransform.transform()` |
-| **Jinja2** | Text | `.j2` template file |
+| **Jinja2** | Text              | `.j2` template file             |
 
 ```python
 from infrahub_sdk.transforms import InfrahubTransform
@@ -54,9 +64,14 @@ class MyTransform(InfrahubTransform):
 
 ## Supporting References
 
-- **[examples.md](./examples.md)** -- Complete transform patterns (Python, Jinja2, hybrid, CSV)
-- **[../common/graphql-queries.md](../common/graphql-queries.md)** -- GraphQL query writing reference
-- **[../common/infrahub-yml-reference.md](../common/infrahub-yml-reference.md)** -- .infrahub.yml project configuration
-- **[../common/rules/](../common/rules/)** -- Shared rules (git integration, caching gotchas) that apply across all skills
-- **[../schema-creator/SKILL.md](../schema-creator/SKILL.md)** -- Schema definitions transforms work with
-- **[rules/](./rules/)** -- Individual rules organized by category prefix
+- **[examples.md](./examples.md)** -- Complete transform
+  patterns (Python, Jinja2, hybrid, CSV)
+- **[../common/graphql-queries.md](../common/graphql-queries.md)**
+  -- GraphQL query writing reference
+- **[infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**
+  -- .infrahub.yml project configuration
+- **[../common/rules/](../common/rules/)** -- Shared rules
+  (git integration, caching) across all skills
+- **[../schema-creator/SKILL.md](../schema-creator/SKILL.md)**
+  -- Schema definitions transforms work with
+- **[rules/](./rules/)** -- Individual rules by category

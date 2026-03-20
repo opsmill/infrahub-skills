@@ -6,9 +6,11 @@ tags: hybrid, python, jinja2, FileSystemLoader, platform-specific
 
 ## Hybrid Python + Jinja2 Pattern
 
-**Impact: HIGH**
+**Impact:** HIGH
 
-For complex scenarios, use Python to prepare data and Jinja2 to render it. This is the most common pattern for device configuration generation.
+For complex scenarios, use Python to prepare data and
+Jinja2 to render it. This is the most common pattern
+for device configuration generation.
 
 ### Example: Platform-Specific Config
 
@@ -52,8 +54,11 @@ class Spine(InfrahubTransform):
 ### Key Points
 
 - **`self.root_directory`** provides the repo root path for template loading
-- **`jinja2_convenience_function()`** adds netutils filters to the Jinja2 environment
-- **Platform-specific templates** selected dynamically based on query data
-- **Registered as a `python_transform`** in `.infrahub.yml` (not `jinja2_transform`)
+- **`jinja2_convenience_function()`** adds netutils
+  filters to the Jinja2 environment
+- **Platform-specific templates** selected dynamically
+  based on query data
+- **Registered as a `python_transform`** in
+  `.infrahub.yml` (not `jinja2_transform`)
 
 Reference: [examples.md](../examples.md) for complete hybrid examples.

@@ -6,14 +6,16 @@ tags: values, attributes, dropdown, text, number, boolean
 
 ## Attribute Value Mapping
 
-**Impact: CRITICAL**
+Impact: CRITICAL
 
-Schema attribute types map directly to YAML values. The most common mistake is using a Dropdown `label` instead of `name`.
+Schema attribute types map directly to YAML values. The
+most common mistake is using a Dropdown `label` instead
+of `name`.
 
 ### Type Mapping
 
 | Schema Kind | YAML Value | Example |
-|------------|------------|---------|
+| ----------- | ---------- | ------- |
 | Text | string | `name: "My Device"` |
 | Number | integer | `rack_u_position: 33` |
 | Boolean | true/false | `is_full_depth: true` |

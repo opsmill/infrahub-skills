@@ -6,9 +6,13 @@ tags: relationship, component, parent, identifier
 
 ## Component/Parent Pairs Must Match
 
-**Impact: CRITICAL**
+Impact: CRITICAL
 
-Component and Parent relationships are paired. The Component side (parent owns children) must be `cardinality: many`, the Parent side (child points to parent) must be `cardinality: one`. Both must share the same `identifier`.
+Component and Parent relationships are paired. The
+Component side (parent owns children) must be
+`cardinality: many`, the Parent side (child points to
+parent) must be `cardinality: one`. Both must share
+the same `identifier`.
 
 **Incorrect:**
 
@@ -45,6 +49,7 @@ Component and Parent relationships are paired. The Component side (parent owns c
 ```
 
 **Rule summary:**
+
 - Component side: `kind: Component`, `cardinality: many`
 - Parent side: `kind: Parent`, `cardinality: one`
 - Both: same `identifier`

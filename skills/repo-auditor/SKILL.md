@@ -1,46 +1,62 @@
 ---
 name: infrahub-repo-auditor
-description: Audit an Infrahub repository against all best practices and rules. Use when reviewing a project for compliance, onboarding to an existing repo, or before deployment to catch issues early.
+description: >-
+  Audit an Infrahub repository against all best practices
+  and rules. Use when reviewing a project for compliance,
+  onboarding to an existing repo, or before deployment to
+  catch issues early.
 metadata:
   version: 1.1.0
   author: OpsMill
 ---
 
+# Infrahub Repo Auditor
+
 ## Overview
 
-Comprehensive audit of an Infrahub repository against all rules and best practices from the infrahub-skills plugin. Produces a structured report covering schemas, objects, checks, generators, transforms, menus, `.infrahub.yml` configuration, and deployment readiness.
+Comprehensive audit of an Infrahub repository against
+all rules and best practices from the infrahub-skills
+plugin. Produces a structured report covering schemas,
+objects, checks, generators, transforms, menus,
+`.infrahub.yml` configuration, and deployment readiness.
 
 ## When to Use
 
-- Before deploying a repository to Infrahub (pre-flight check)
+- Before deploying a repository to Infrahub
 - When onboarding to an existing Infrahub project
 - After significant refactoring to catch regressions
 - As a periodic quality gate in development workflows
-- When troubleshooting issues with schema loading, object sync, or pipeline failures
+- When troubleshooting schema loading, object sync,
+  or pipeline failures
 
 ## How It Works
 
 When invoked, the auditor:
 
-1. **Discovers** the project structure (`.infrahub.yml`, schemas, objects, checks, generators, transforms, menus)
-2. **Validates** each component against the rules defined in the infrahub-skills plugin
-3. **Cross-references** between components (e.g., query names match between Python files and `.infrahub.yml`)
+1. **Discovers** the project structure
+   (`.infrahub.yml`, schemas, objects, checks,
+   generators, transforms, menus)
+2. **Validates** each component against the rules
+   defined in the infrahub-skills plugin
+3. **Cross-references** between components (e.g.,
+   query names match between Python files and
+   `.infrahub.yml`)
 4. **Generates** a markdown report with findings organized by severity
 
 ## Audit Categories
 
 | Priority | Category | What It Checks |
-|----------|----------|----------------|
-| CRITICAL | Project Structure | `.infrahub.yml` exists, required sections present, file paths valid |
-| CRITICAL | Schema Validation | Naming conventions, relationship setup, peer kinds, identifiers, deprecated field migration (`display_labels` → `display_label`) |
-| CRITICAL | Object Validation | YAML structure, apiVersion/kind, value types, relationship references |
-| CRITICAL | Python Components | Check/generator/transform classes inherit correctly, required methods exist |
-| HIGH | Cross-Reference Integrity | Query names match between `.infrahub.yml` and Python `query` attributes, target groups referenced consistently |
-| HIGH | Relationship Consistency | Bidirectional identifiers match, Component/Parent cardinality correct |
-| HIGH | Registration Completeness | All Python files registered, all queries declared, all transforms linked to artifacts |
-| MEDIUM | Best Practices | `human_friendly_id` on nodes, `display_label` set, load order correct, `order_weight` ranges |
-| MEDIUM | Deployment Readiness | Git status clean, bootstrap files outside `objects/`, no uncommitted changes |
-| LOW | Patterns & Style | Common patterns followed, code organization, file naming conventions |
+| -------- | -------- | -------------- |
+| CRITICAL | Project Structure | `.infrahub.yml` exists, paths valid |
+| CRITICAL | Schema Validation | Naming, relationships, deprecated fields |
+| CRITICAL | Object Validation | YAML structure, value types, refs |
+| CRITICAL | Python Components | Class inheritance, required methods |
+| HIGH | Cross-References | Query names match, target groups |
+| HIGH | Relationships | Bidirectional IDs, cardinality |
+| HIGH | Registration | All files registered, no orphans |
+| MEDIUM | Best Practices | human_friendly_id, display_label |
+| MEDIUM | Deployment | Git status, bootstrap placement |
+| LOW | Patterns & Style | Code organization, naming |
 
 ## Running the Audit
 
@@ -91,13 +107,21 @@ The report is written to `AUDIT_REPORT.md` in the project root with this structu
 
 The auditor checks rules from all skills:
 
-- **[../schema-creator/](../schema-creator/)** -- Naming, relationships, attributes, hierarchy, display, extensions, uniqueness, migration
-- **[../object-creator/](../object-creator/)** -- Format, values, children, ranges, organization
-- **[../check-creator/](../check-creator/)** -- Architecture, Python class, API, registration, patterns
-- **[../generator-creator/](../generator-creator/)** -- Architecture, Python class, tracking, API, registration
-- **[../transform-creator/](../transform-creator/)** -- Types, Python/Jinja2, hybrid, artifacts, API
-- **[../menu-creator/](../menu-creator/)** -- Format, item properties, hierarchy, icons, schema integration
-- **[../common/](../common/)** -- Git integration, display label caching, `.infrahub.yml` reference, GraphQL queries
+- **[../schema-creator/](../schema-creator/)** -- Naming,
+  relationships, attributes, hierarchy, display,
+  extensions, uniqueness, migration
+- **[../object-creator/](../object-creator/)** -- Format,
+  values, children, ranges, organization
+- **[../check-creator/](../check-creator/)** --
+  Architecture, Python class, API, registration
+- **[../generator-creator/](../generator-creator/)** --
+  Architecture, Python class, tracking, API
+- **[../transform-creator/](../transform-creator/)** --
+  Types, Python/Jinja2, hybrid, artifacts, API
+- **[../menu-creator/](../menu-creator/)** -- Format,
+  item properties, hierarchy, icons
+- **[../common/](../common/)** -- Git integration,
+  caching, `.infrahub.yml` reference, GraphQL
 
 ## Rules
 

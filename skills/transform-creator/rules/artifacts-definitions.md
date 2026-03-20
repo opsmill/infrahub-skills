@@ -6,7 +6,7 @@ tags: artifacts, content-type, targets, CoreArtifactTarget
 
 ## Artifact Definitions
 
-**Impact: HIGH**
+**Impact:** HIGH
 
 Artifacts connect transforms to output files attached to target objects.
 
@@ -25,12 +25,12 @@ artifact_definitions:
 
 ### Content Types
 
-| Content Type | Use Case |
-|-------------|----------|
-| `text/plain` | Device configs, scripts |
-| `application/json` | Structured data, API payloads |
-| `text/csv` | Cable matrices, inventory reports |
-| `text/yaml` | YAML config files |
+| Content Type       | Use Case                          |
+| ------------------ | --------------------------------- |
+| `text/plain`       | Device configs, scripts           |
+| `application/json` | Structured data, API payloads     |
+| `text/csv`         | Cable matrices, inventory reports |
+| `text/yaml`        | YAML config files                 |
 
 ### Target Requirements
 
@@ -47,9 +47,11 @@ generics:
 
 ### Key Rules
 
-- **`transformation` must match** the transform `name` in `python_transforms` or `jinja2_transforms`
+- **`transformation` must match** the transform `name`
+  in `python_transforms` or `jinja2_transforms`
 - **`targets`** references a group whose members get artifacts generated
 - **`parameters`** maps target object attributes to query variables
 - **`content_type`** must match what the transform actually outputs
 
-Reference: [../common/infrahub-yml-reference.md](../../common/infrahub-yml-reference.md)
+Reference:
+[infrahub-yml-reference.md](../../common/infrahub-yml-reference.md)

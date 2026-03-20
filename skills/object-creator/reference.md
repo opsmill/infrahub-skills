@@ -4,19 +4,24 @@
 
 ```yaml
 ---
-apiVersion: infrahub.app/v1       # Required. Always this value.
-version: "1.0"                     # Optional. Version string.
-kind: Object                       # Required. Always "Object" for data files.
+# Required. Always this value.
+apiVersion: infrahub.app/v1
+# Optional. Version string.
+version: "1.0"
+# Required. Always "Object" for data files.
+kind: Object
 spec:
-  kind: <NodeKind>                 # Required. Schema node kind (e.g., DcimDellServer).
-  data:                            # Required. List of object instances.
+  # Required. Schema node kind (e.g., DcimDellServer).
+  kind: <NodeKind>
+  # Required. List of object instances.
+  data:
     - <field>: <value>
 ```
 
 ## Value Types by Schema Attribute Kind
 
 | Schema Attribute Kind | YAML Value Type | Example |
-|----------------------|-----------------|---------|
+| --- | --- | --- |
 | `Text` | string | `name: "My Device"` |
 | `TextArea` | string (multiline ok) | `description: "Long text"` |
 | `Number` | integer | `rack_u_position: 33` |
@@ -44,14 +49,17 @@ manufacturer: Dell
 # Target has human_friendly_id: [model__value]
 device_type: PowerEdge R960
 
-# Target has human_friendly_id: [parent__shortname__value, name__value]
+# Target has human_friendly_id:
+#   [parent__shortname__value, name__value]
 rack: ["room-shortname", "rack-name"]
 
-# Target has human_friendly_id: [manufacturer__name__value, name__value]
+# Target has human_friendly_id:
+#   [manufacturer__name__value, name__value]
 platform: [Juniper, JunOS]
 ```
 
-**Rule**: Single-element `human_friendly_id` = scalar value. Multi-element = list of values.
+**Rule**: Single-element `human_friendly_id` = scalar
+value. Multi-element = list of values.
 
 ### cardinality: many (Inline Data)
 
@@ -93,22 +101,26 @@ When nesting children inline:
 
 ```yaml
 <relationship_name>:
-  kind: <ChildNodeKind>           # Required when multiple child types possible
-  parameters:                      # Optional
-    expand_range: true             # Enable interface range expansion
+  # Required when multiple child types possible
+  kind: <ChildNodeKind>
+  # Optional
+  parameters:
+    # Enable interface range expansion
+    expand_range: true
   data:
     - <child_field>: <value>
 ```
 
 | Field | Required | Description |
-|-------|----------|-------------|
-| `kind` | Sometimes | Child node kind. Required for hierarchical children and when the relationship peer is a Generic. |
+| --- | --- | --- |
+| `kind` | Sometimes | Child node kind. Required for hierarchy/Generic. |
 | `parameters` | No | Processing parameters (e.g., `expand_range`) |
 | `data` | Yes | List of child object instances |
 
 ## Interface Range Expansion
 
-When `expand_range: true` is set in parameters, interface names with `[N-M]` syntax are expanded:
+When `expand_range: true` is set in parameters,
+interface names with `[N-M]` syntax are expanded:
 
 ```yaml
 interfaces:
@@ -116,15 +128,18 @@ interfaces:
   parameters:
     expand_range: true
   data:
-    - name: Ethernet1/[1-4]       # Creates Ethernet1/1, Ethernet1/2, Ethernet1/3, Ethernet1/4
+    # Creates Ethernet1/1 through Ethernet1/4
+    - name: Ethernet1/[1-4]
       role: customer
       status: active
-    - name: et-0/0/[0-3]          # Creates et-0/0/0, et-0/0/1, et-0/0/2, et-0/0/3
+    # Creates et-0/0/0 through et-0/0/3
+    - name: et-0/0/[0-3]
       role: leaf
       status: active
 ```
 
-All attributes on the template entry are copied to each expanded interface.
+All attributes on the template entry are copied to
+each expanded interface.
 
 ## Special Object Types
 
@@ -135,7 +150,8 @@ spec:
   kind: CoreRepository
   data:
     - name: my-repo
-      location: "/upstream"        # Git remote URL or path
+      # Git remote URL or path
+      location: "/upstream"
       default_branch: "main"
 ```
 
@@ -151,38 +167,56 @@ spec:
 
 ## File Loading Behavior
 
-- Files in the `objects/` directory (as specified in `.infrahub.yml`) are loaded recursively
+- Files in the `objects/` directory (as specified in
+  `.infrahub.yml`) are loaded recursively
 - Files are sorted by filename within each directory
-- Use numeric prefixes (`01_`, `02_`) to control load order
-- Multiple YAML documents per file (separated by `---`) are processed in order
+- Use numeric prefixes (`01_`, `02_`) to control
+  load order
+- Multiple YAML documents per file (separated by
+  `---`) are processed in order
 - Subdirectories are processed alphabetically
 
 ## Dependency Resolution
 
-Objects reference each other by `human_friendly_id`. The referenced object must exist (or be defined earlier in the same batch) when the referencing object is loaded.
+Objects reference each other by `human_friendly_id`.
+The referenced object must exist (or be defined
+earlier in the same batch) when the referencing
+object is loaded.
 
 **Dependency chain example:**
-```
+
+```text
 Manufacturers (no deps)
   -> Device Types (depend on Manufacturers)
     -> Module Bay Templates (depend on Device Types)
 Locations (hierarchy, self-contained)
   -> Devices (depend on Device Types + Locations)
-    -> Module Installations (depend on Devices + Bay Templates + Module Types)
+    -> Module Installations
+       (depend on Devices + Bay Templates
+        + Module Types)
 ```
 
 ## Matching human_friendly_id
 
-To reference a target object, you need to know its `human_friendly_id` from the schema:
+To reference a target object, you need to know its
+`human_friendly_id` from the schema:
 
-| Schema Node | human_friendly_id | How to Reference |
-|-------------|-------------------|-----------------|
-| `OrganizationManufacturer` | `[name__value]` | `manufacturer: Dell` |
-| `DcimDeviceType` | `[model__value]` | `device_type: PowerEdge R960` |
-| `DcimModuleType` | `[model__value]` | `module_type: Dell-KRT01-800W` |
-| `LocationRack` | `[parent__shortname__value, name__value]` | `rack: ["room-shortname", "Rack-A"]` |
-| `LocationRoom` | `[parent__name__value, name__value]` | (usually via hierarchical nesting) |
-| `DcimModuleBayTemplate` | `[device_type__model__value, name__value]` | `bay: ["PowerEdge R960", "PSU1"]` |
-| `DcimPlatform` | `[manufacturer__name__value, name__value]` | `platform: [Juniper, JunOS]` |
-| `DcimGenericDevice` (any device) | `[name__value]` | `device: my-server-01` |
-| `OrganizationTenant` | `[name__value]` | `tenant: Engineering` |
+**Single-element** (`human_friendly_id` has one field):
+
+| Node | Field | Example |
+| --- | --- | --- |
+| `OrganizationManufacturer` | `name__value` | `manufacturer: Dell` |
+| `DcimDeviceType` | `model__value` | `device_type: R960` |
+| `DcimModuleType` | `model__value` | `module_type: Dell-KRT01` |
+| `DcimGenericDevice` | `name__value` | `device: my-server-01` |
+| `OrganizationTenant` | `name__value` | `tenant: Engineering` |
+
+**Multi-element** (`human_friendly_id` has two
+fields -- use a list):
+
+| Node | Fields | Example |
+| --- | --- | --- |
+| `LocationRack` | parent shortname, name | `rack: ["rm", "Rack-A"]` |
+| `LocationRoom` | parent name, name | (hierarchical nesting) |
+| `DcimModuleBayTemplate` | device_type model, name | `bay: ["R960", "PSU1"]` |
+| `DcimPlatform` | manufacturer name, name | `platform: [Juniper, JunOS]` |

@@ -6,9 +6,11 @@ tags: children, components, interfaces, modules
 
 ## Component Children Nesting
 
-**Impact: HIGH**
+Impact: HIGH
 
-For Component relationships (interfaces, modules), nest children inline under the relationship name with `kind` specified.
+For Component relationships (interfaces, modules), nest
+children inline under the relationship name with `kind`
+specified.
 
 **Incorrect -- missing kind on component children:**
 
@@ -54,6 +56,8 @@ spec:
           - name: IT
 ```
 
-Note: Non-hierarchical component children don't always require `kind` if the schema relationship unambiguously identifies the child type.
+Note: Non-hierarchical component children don't always
+require `kind` if the schema relationship unambiguously
+identifies the child type.
 
 Reference: [Infrahub Object Docs](https://docs.infrahub.app)

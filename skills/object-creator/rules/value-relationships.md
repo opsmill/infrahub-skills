@@ -6,9 +6,11 @@ tags: values, relationships, human_friendly_id, references
 
 ## Relationship Reference Mapping
 
-**Impact: CRITICAL**
+Impact: CRITICAL
 
-Reference related objects by their `human_friendly_id`. The format depends on whether the target's `human_friendly_id` has one or multiple elements.
+Reference related objects by their `human_friendly_id`.
+The format depends on whether the target's
+`human_friendly_id` has one or multiple elements.
 
 ### Single-Element human_friendly_id (scalar)
 
@@ -17,7 +19,7 @@ When the target has `human_friendly_id: [name__value]`:
 ```yaml
 data:
   - name: "PowerEdge R660xs"
-    manufacturer: Dell                # Scalar -- matches OrganizationManufacturer by name
+    manufacturer: Dell                # Scalar -- matches by name
 ```
 
 ### Multi-Element human_friendly_id (list)
@@ -60,6 +62,8 @@ data:
       - cisco_leaf
 ```
 
-**Key rule**: The value you provide must match the target node's `human_friendly_id`. Scalar for single-element, list for multi-element.
+**Key rule**: The value you provide must match the target
+node's `human_friendly_id`. Scalar for single-element,
+list for multi-element.
 
 Reference: [Infrahub Object Docs](https://docs.infrahub.app)

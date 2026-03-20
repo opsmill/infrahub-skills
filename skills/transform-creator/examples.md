@@ -6,7 +6,8 @@ Real-world examples extracted from production Infrahub repositories.
 
 ## 1. Python Transform with Jinja2 Rendering (Spine Config)
 
-A Python transform that prepares data and renders a platform-specific Jinja2 template.
+A Python transform that prepares data and renders a
+platform-specific Jinja2 template.
 
 ### Query: `queries/config/spine.gql`
 
@@ -137,8 +138,12 @@ class Spine(InfrahubTransform):
                 for session in profile.get("sessions", []):
                     bgp["neighbors"].append({
                         "name": session.get("name", ""),
-                        "remote_ip": session.get("remote_ip", {}).get("address", ""),
-                        "remote_as": session.get("remote_as", {}).get("asn", ""),
+                        "remote_ip": session.get(
+                            "remote_ip", {}
+                        ).get("address", ""),
+                        "remote_as": session.get(
+                            "remote_as", {}
+                        ).get("asn", ""),
                     })
 
         config = {
@@ -179,7 +184,8 @@ artifact_definitions:
 
 ## 2. CSV Cable Matrix Transform
 
-A Python transform that generates a CSV cable documentation from topology data.
+A Python transform that generates CSV cable
+documentation from topology data.
 
 ### Transform: `transforms/topology_cabling.py`
 
@@ -217,16 +223,27 @@ class TopologyCabling(InfrahubTransform):
                 remote_endpoint = None
                 for ep in endpoints:
                     ep_node = ep.get("node", {})
-                    ep_device = ep_node.get("device", {}).get("node", {}).get("name", {}).get("value")
+                    ep_device = (
+                        ep_node.get("device", {})
+                        .get("node", {})
+                        .get("name", {})
+                        .get("value")
+                    )
                     ep_intf = ep_node.get("name", {}).get("value")
-                    if ep_device != source_device or ep_intf != source_interface:
+                    if (ep_device != source_device
+                            or ep_intf != source_interface):
                         remote_endpoint = ep_node
                         break
 
                 if not remote_endpoint:
                     continue
 
-                remote_device = remote_endpoint.get("device", {}).get("node", {}).get("name", {}).get("value")
+                remote_device = (
+                    remote_endpoint.get("device", {})
+                    .get("node", {})
+                    .get("name", {})
+                    .get("value")
+                )
                 remote_interface = remote_endpoint.get("name", {}).get("value")
 
                 # Deduplicate connections
@@ -246,7 +263,7 @@ class TopologyCabling(InfrahubTransform):
         return "\n".join(csv_rows)
 ```
 
-### Config: `.infrahub.yml`
+### CSV Cable Matrix Config: `.infrahub.yml`
 
 ```yaml
 python_transforms:
@@ -270,7 +287,7 @@ artifact_definitions:
 
 A pure Jinja2 transform for generating ContainerLab topology files.
 
-### Config: `.infrahub.yml`
+### ContainerLab Config: `.infrahub.yml`
 
 ```yaml
 queries:
@@ -302,7 +319,8 @@ topology:
 {% for device in data.TopologyDataCenter.edges[0].node.devices.edges %}
     {{ device.node.name.value }}:
       kind: linux
-      image: {{ device.node.device_type.node.platform.node.containerlab_image.value }}
+{%- set img = device.node.device_type.node.platform -%}
+      image: {{ img.node.containerlab_image.value }}
 {% endfor %}
   links:
 {% for device in data.TopologyDataCenter.edges[0].node.devices.edges %}
@@ -310,7 +328,8 @@ topology:
 {% if intf.node.connector is defined and intf.node.connector.node %}
     - endpoints:
         - "{{ device.node.name.value }}:{{ intf.node.name.value }}"
-        - "{{ intf.node.connector.node.remote_device }}:{{ intf.node.connector.node.remote_interface }}"
+{%- set peer = intf.node.connector.node -%}
+        - "{{ peer.remote_device }}:{{ peer.remote_interface }}"
 {% endif %}
 {% endfor %}
 {% endfor %}
@@ -339,7 +358,7 @@ class SimpleTransform(InfrahubTransform):
         }
 ```
 
-### Config: `.infrahub.yml`
+### Minimal Transform Config: `.infrahub.yml`
 
 ```yaml
 queries:
@@ -448,7 +467,7 @@ def get_interface_roles(interfaces: list | None) -> dict:
 
 ## Complete File Structure
 
-```
+```text
 project/
   .infrahub.yml
   transforms/

@@ -5,11 +5,15 @@
 
 ## What It Checks
 
-Ensures all project files are properly registered in `.infrahub.yml` and no orphan files exist.
+Ensures all project files are properly registered in
+`.infrahub.yml` and no orphan files exist.
 
 ## Checks
 
-1. All Python files containing `InfrahubCheck`, `InfrahubGenerator`, or `InfrahubTransform` subclasses are registered in the appropriate `.infrahub.yml` section
+1. All Python files containing `InfrahubCheck`,
+   `InfrahubGenerator`, or `InfrahubTransform`
+   subclasses are registered in the appropriate
+   `.infrahub.yml` section
 2. All `.gql` files are referenced by a `queries` entry
 3. All Jinja2 templates (`.j2` files) are referenced by a `jinja2_transforms` entry
 4. Schema files are under a path listed in `schemas:`

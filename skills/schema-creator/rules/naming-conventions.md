@@ -6,13 +6,15 @@ tags: naming, namespace, node, attribute, kind
 
 ## Naming Conventions and Kind Derivation
 
-**Impact: CRITICAL**
+Impact: CRITICAL
 
-Infrahub enforces strict naming patterns via JSON schema validation. Violations cause immediate validation errors.
+Infrahub enforces strict naming patterns via JSON schema
+validation. Violations cause immediate validation errors.
 
 ### Namespace
 
-Pattern: `^[A-Z][a-z0-9]+$` (first letter uppercase, rest lowercase). Min 3, max 32 chars.
+Pattern: `^[A-Z][a-z0-9]+$` (first letter uppercase,
+rest lowercase). Min 3, max 32 chars.
 
 **Incorrect:**
 
@@ -73,7 +75,7 @@ Pattern: `^[a-z0-9_]+$` (snake_case). Min 3, max 32 chars.
 
 Kind = Namespace + Name. This is how you reference nodes everywhere.
 
-```
+```text
 Dcim + DeviceType = DcimDeviceType
 Location + Rack = LocationRack
 Organization + Manufacturer = OrganizationManufacturer

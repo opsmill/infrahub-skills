@@ -25,8 +25,11 @@ spec:
 ```
 
 **Key points:**
-- No relationships, so each item is just a `name` attribute
-- Load order: these have no dependencies, so they go first (prefix `01_`)
+
+- No relationships, so each item is just a `name`
+  attribute
+- Load order: these have no dependencies, so they
+  go first (prefix `01_`)
 
 ---
 
@@ -56,15 +59,21 @@ spec:
 ```
 
 **Key points:**
-- `tenants` is a Component relationship on TenantGroup
-- Children are nested inline under `data:` (no `kind` needed since only one type of tenant exists)
-- The parent and all its children are created atomically
+
+- `tenants` is a Component relationship on
+  TenantGroup
+- Children are nested inline under `data:` (no
+  `kind` needed since only one type of tenant
+  exists)
+- The parent and all its children are created
+  atomically
 
 ---
 
 ## 3. Groups (CoreStandardGroup)
 
-Groups are standalone objects that devices reference via `member_of_groups`.
+Groups are standalone objects that devices reference
+via `member_of_groups`.
 
 ```yaml
 ---
@@ -86,14 +95,19 @@ spec:
 ```
 
 **Key points:**
-- Groups should be created early (before devices that reference them)
-- Devices reference groups via `member_of_groups` list
+
+- Groups should be created early (before devices
+  that reference them)
+- Devices reference groups via `member_of_groups`
+  list
 
 ---
 
 ## 4. Device Types (Referencing Manufacturers)
 
-Device types reference manufacturers by `human_friendly_id` (which is `name` for manufacturers).
+Device types reference manufacturers by
+`human_friendly_id` (which is `name` for
+manufacturers).
 
 ```yaml
 ---
@@ -138,8 +152,12 @@ spec:
 ```
 
 **Key points:**
-- `manufacturer: Dell` references `OrganizationManufacturer` by its `human_friendly_id` (`[name__value]`)
-- Dropdown values use `name` not `label`: `airflow: front-to-rear` (not "Front to Rear")
+
+- `manufacturer: Dell` references
+  `OrganizationManufacturer` by its
+  `human_friendly_id` (`[name__value]`)
+- Dropdown values use `name` not `label`:
+  `airflow: front-to-rear` (not "Front to Rear")
 - Manufacturers must be loaded before device types
 
 ---
@@ -183,14 +201,18 @@ spec:
 ```
 
 **Key points:**
-- `module_category` is a Dropdown -- use the choice `name` value
+
+- `module_category` is a Dropdown -- use the choice
+  `name` value
 - `manufacturer` references by `human_friendly_id`
 
 ---
 
 ## 6. Module Bay Templates
 
-Bay templates define available slots on a device type. They reference device types by `human_friendly_id` (which is `[model__value]`).
+Bay templates define available slots on a device
+type. They reference device types by
+`human_friendly_id` (which is `[model__value]`).
 
 ```yaml
 ---
@@ -233,15 +255,20 @@ spec:
 ```
 
 **Key points:**
-- `device_type: PowerEdge R660xs` references `DcimDeviceType` by model
-- Bay templates must be created after device types but before module installations
-- The `name` + `device_type` pair forms the `human_friendly_id` for this template
+
+- `device_type: PowerEdge R660xs` references
+  `DcimDeviceType` by model
+- Bay templates must be created after device types
+  but before module installations
+- The `name` + `device_type` pair forms the
+  `human_friendly_id` for this template
 
 ---
 
 ## 7. Hierarchical Location Tree
 
-Locations nest inline from Region down to Rack, specifying `kind` at each level.
+Locations nest inline from Region down to Rack,
+specifying `kind` at each level.
 
 ```yaml
 ---
@@ -283,14 +310,20 @@ spec:
 ```
 
 **Key points:**
-- `children.kind` is always required (specifies which hierarchical child type)
-- The full tree is created atomically from one `spec` block
-- `shortname` is critical -- it's used in `human_friendly_id` for rooms and racks
-- Multiple regions can be defined as separate items in the top-level `data` list
+
+- `children.kind` is always required (specifies
+  which hierarchical child type)
+- The full tree is created atomically from one
+  `spec` block
+- `shortname` is critical -- it's used in
+  `human_friendly_id` for rooms and racks
+- Multiple regions can be defined as separate items
+  in the top-level `data` list
 
 ### Deeper Location Hierarchy (bundle-dc pattern)
 
-When schemas define more location levels (Region > Country > Metro > Building):
+When schemas define more location levels
+(Region > Country > Metro > Building):
 
 ```yaml
 ---
@@ -335,7 +368,8 @@ spec:
 
 ## 8. Devices (With Type and Location References)
 
-Devices reference device types and racks by `human_friendly_id`.
+Devices reference device types and racks by
+`human_friendly_id`.
 
 ```yaml
 ---
@@ -365,16 +399,26 @@ spec:
 ```
 
 **Key points:**
-- `device_type: PowerEdge R660xs` -- scalar because DcimDeviceType has single-element `human_friendly_id` (`[model__value]`)
-- `rack: ["01-4", "TEST-RACK1"]` -- list because LocationRack has multi-element `human_friendly_id` (`[parent__shortname__value, name__value]`)
-- `rack_face` and `status` are Dropdowns -- use the `name` value
-- `warranty_expire_date` is a DateTime, formatted as ISO string
+
+- `device_type: PowerEdge R660xs` -- scalar because
+  DcimDeviceType has single-element
+  `human_friendly_id` (`[model__value]`)
+- `rack: ["01-4", "TEST-RACK1"]` -- list because
+  LocationRack has multi-element
+  `human_friendly_id`
+  (`[parent__shortname__value, name__value]`)
+- `rack_face` and `status` are Dropdowns -- use
+  the `name` value
+- `warranty_expire_date` is a DateTime, formatted
+  as ISO string
 
 ---
 
 ## 9. Multiple Document Types in One File
 
-A single file can contain multiple YAML documents (separated by `---`), each targeting a different node kind.
+A single file can contain multiple YAML documents
+(separated by `---`), each targeting a different
+node kind.
 
 ```yaml
 ---
@@ -420,7 +464,9 @@ spec:
 ```
 
 **Key points:**
-- Each `---` separated document has its own `apiVersion`, `kind`, and `spec`
+
+- Each `---` separated document has its own
+  `apiVersion`, `kind`, and `spec`
 - Each `spec.kind` targets exactly one node kind
 - Documents are processed in order within the file
 
@@ -428,7 +474,8 @@ spec:
 
 ## 10. Devices with Inline Interfaces
 
-Devices can include interfaces as inline Component children.
+Devices can include interfaces as inline Component
+children.
 
 ```yaml
 ---
@@ -460,15 +507,20 @@ spec:
 ```
 
 **Key points:**
-- `platform: [Juniper, JunOS]` -- list because DcimPlatform has `human_friendly_id: [manufacturer__name__value, name__value]`
-- `interfaces.kind: InterfacePhysical` -- required because the relationship peer may be a Generic
+
+- `platform: [Juniper, JunOS]` -- list because
+  DcimPlatform has `human_friendly_id`:
+  `[manufacturer__name__value, name__value]`
+- `interfaces.kind: InterfacePhysical` -- required
+  because the relationship peer may be a Generic
 - `member_of_groups` -- simple list of group names
 
 ---
 
 ## 11. Devices with Interface Range Expansion
 
-Use `expand_range: true` to auto-generate sequential interfaces.
+Use `expand_range: true` to auto-generate sequential
+interfaces.
 
 ```yaml
 ---
@@ -517,16 +569,21 @@ spec:
 ```
 
 **Key points:**
-- `parameters.expand_range: true` goes on the relationship block, NOT on individual interfaces
+
+- `parameters.expand_range: true` goes on the
+  relationship block, NOT on individual interfaces
 - Range syntax: `[N-M]` in the interface name
-- All attributes from the template entry are copied to each expanded interface
-- Non-range interfaces (like `mgmt0`, `fxp0`) in the same block are not affected
+- All attributes from the template entry are copied
+  to each expanded interface
+- Non-range interfaces (like `mgmt0`, `fxp0`) in
+  the same block are not affected
 
 ---
 
 ## 12. Module Installations (Occupied Slots)
 
-Module installations connect devices to module types via bay templates.
+Module installations connect devices to module types
+via bay templates.
 
 ```yaml
 ---
@@ -539,8 +596,8 @@ spec:
     - device: TEST-R660xs-1
       slot_name: PSU1
       bay:
-        - PowerEdge R660xs              # device_type model (first element of bay's human_friendly_id)
-        - PSU1                           # bay name (second element)
+        - PowerEdge R660xs              # device_type model
+        - PSU1                           # bay name
       module_type: Dell-KRT01-800W       # References DcimModuleType by model
       status: active
 
@@ -572,16 +629,25 @@ spec:
 ```
 
 **Key points:**
-- `device: TEST-R660xs-1` -- references the device by name (`human_friendly_id: [name__value]`)
-- `bay` is a list: `[device_type_model, bay_name]` matching `DcimModuleBayTemplate`'s `human_friendly_id: [device_type__model__value, name__value]`
-- `module_type: Dell-KRT01-800W` -- references `DcimModuleType` by model
-- Requires: devices, bay templates, and module types all loaded first
+
+- `device: TEST-R660xs-1` -- references the device
+  by name (`human_friendly_id: [name__value]`)
+- `bay` is a list: `[device_type_model, bay_name]`
+  matching `DcimModuleBayTemplate`'s
+  `human_friendly_id`:
+  `[device_type__model__value, name__value]`
+- `module_type: Dell-KRT01-800W` -- references
+  `DcimModuleType` by model
+- Requires: devices, bay templates, and module
+  types all loaded first
 
 ---
 
 ## 13. Empty/Vacant Slots
 
-Track unoccupied module bays -- same structure as installations but with `status: empty` and no `module_type`.
+Track unoccupied module bays -- same structure as
+installations but with `status: empty` and no
+`module_type`.
 
 ```yaml
 ---
@@ -613,9 +679,14 @@ spec:
 ```
 
 **Key points:**
-- No `module_type` field -- the slot is tracked as vacant
-- Useful for inventory visibility: "which slots are available?"
-- Typically in a separate file (e.g., `07_empty_slots.yml`) loaded after occupied installations
+
+- No `module_type` field -- the slot is tracked
+  as vacant
+- Useful for inventory visibility: "which slots
+  are available?"
+- Typically in a separate file
+  (e.g., `07_empty_slots.yml`) loaded after
+  occupied installations
 
 ---
 
@@ -643,14 +714,17 @@ spec:
 ```
 
 **Key points:**
-- IPv4 and IPv6 prefixes use the `IPNetwork` attribute kind
+
+- IPv4 and IPv6 prefixes use the `IPNetwork`
+  attribute kind
 - CIDR notation is required
 
 ---
 
 ## 15. Git Repository
 
-Special `CoreRepository` object for Infrahub's git integration.
+Special `CoreRepository` object for Infrahub's git
+integration.
 
 ```yaml
 apiVersion: infrahub.app/v1
@@ -664,31 +738,39 @@ spec:
 ```
 
 **Key points:**
+
 - `location` is the git remote URL or path
-- Typically in a subdirectory like `objects/git-repo/`
-- The `---` document separator is optional for the first document in a file
+- Typically in a subdirectory like
+  `objects/git-repo/`
+- The `---` document separator is optional for
+  the first document in a file
 
 ---
 
 ## Complete File Organization Example
 
-```
+```text
 objects/
-  01_manufacturers.yml          # OrganizationManufacturer (no deps)
-  02_organizations.yml          # OrganizationTenantGroup + Tenants (no deps)
-  03_device_types.yml           # DcimDeviceType (depends on manufacturers)
-  04_module_types.yml           # DcimModuleType (depends on manufacturers)
-  04a_module_bay_templates.yml  # DcimModuleBayTemplate (depends on device types)
-  05_locations.yml              # LocationRegion tree (self-contained hierarchy)
-  06_devices.yml                # DcimDellServer, DcimSwitch, etc. (depends on types + locations)
-  06_module_installations.yml   # DcimModuleInstallation (depends on devices + bays + module types)
-  07_empty_slots.yml            # DcimModuleInstallation with status: empty (depends on devices + bays)
+  01_manufacturers.yml
+  02_organizations.yml
+  03_device_types.yml
+  04_module_types.yml
+  04a_module_bay_templates.yml
+  05_locations.yml
+  06_devices.yml
+  06_module_installations.yml
+  07_empty_slots.yml
   git-repo/
-    local-dev.yml               # CoreRepository (independent, subdirectory)
+    local-dev.yml
 ```
 
 **Loading order:**
-1. Files are sorted by filename within each directory
-2. Subdirectories are processed alphabetically after files
-3. Numeric prefixes (`01_`, `02_`) enforce correct dependency order
-4. Use letter suffixes (`04a_`) to insert between existing numbers
+
+1. Files are sorted by filename within each
+   directory
+2. Subdirectories are processed alphabetically
+   after files
+3. Numeric prefixes (`01_`, `02_`) enforce correct
+   dependency order
+4. Use letter suffixes (`04a_`) to insert between
+   existing numbers

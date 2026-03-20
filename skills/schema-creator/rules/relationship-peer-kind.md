@@ -6,9 +6,11 @@ tags: relationship, peer, kind
 
 ## Peer Must Reference Full Kind
 
-**Impact: CRITICAL**
+Impact: CRITICAL
 
-The `peer` field on a relationship must use the full kind (Namespace + Name), not just the name. Using just the name causes a "peer not found" validation error.
+The `peer` field on a relationship must use the full
+kind (Namespace + Name), not just the name. Using just
+the name causes a "peer not found" validation error.
 
 **Incorrect:**
 
@@ -30,6 +32,7 @@ relationships:
     cardinality: one
 ```
 
-This applies everywhere a kind is referenced: `peer`, `inherit_from`, `parent`, `children`, `menu_placement`.
+This applies everywhere a kind is referenced: `peer`,
+`inherit_from`, `parent`, `children`, `menu_placement`.
 
 Reference: [Infrahub Schema Docs](https://docs.infrahub.app)

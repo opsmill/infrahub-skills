@@ -6,13 +6,13 @@ tags: patterns, data-cleaning, batch-creation, local-store
 
 ## Common Generator Patterns
 
-**Impact: MEDIUM**
+Impact: MEDIUM
 
 ### Data Cleaning Helper
 
 ```python
 def clean_data(data):
-    """Recursively unwrap value/node/edges from GraphQL response."""
+    """Recursively unwrap value/node/edges."""
     if isinstance(data, dict):
         result = {}
         for key, value in data.items():
@@ -20,16 +20,23 @@ def clean_data(data):
                 if set(value.keys()) == {"value"}:
                     result[key] = value["value"]
                 elif "node" in value:
-                    result[key] = clean_data(value["node"])
+                    result[key] = clean_data(
+                        value["node"]
+                    )
                 elif "edges" in value:
-                    result[key] = clean_data(value["edges"])
+                    result[key] = clean_data(
+                        value["edges"]
+                    )
                 else:
                     result[key] = clean_data(value)
             else:
                 result[key] = clean_data(value)
         return result
     if isinstance(data, list):
-        return [clean_data(item.get("node", item)) for item in data]
+        return [
+            clean_data(item.get("node", item))
+            for item in data
+        ]
     return data
 ```
 
@@ -45,7 +52,10 @@ async def generate(self, data: dict) -> None:
             device = await self.client.create(
                 kind="DcimDevice",
                 data={
-                    "name": f"{topology_name}-{role}-{i:02d}",
+                    "name": (
+                        f"{topology_name}"
+                        f"-{role}-{i:02d}"
+                    ),
                     "role": role,
                     "status": "active",
                 }
@@ -57,17 +67,22 @@ async def generate(self, data: dict) -> None:
 
 ```python
 async def generate(self, data: dict) -> None:
-    site = await self.client.create(kind="LocationBuilding", data={"name": "PAR-1"})
+    site = await self.client.create(
+        kind="LocationBuilding",
+        data={"name": "PAR-1"},
+    )
     await site.save(allow_upsert=True)
 
     device = await self.client.create(
         kind="DcimDevice",
         data={
             "name": "spine-01",
-            "location": site,  # Pass the SDK object directly
+            # Pass the SDK object directly
+            "location": site,
         }
     )
     await device.save(allow_upsert=True)
 ```
 
-Reference: [examples.md](../examples.md) for complete generator examples.
+Reference: [examples.md](../examples.md) for complete
+generator examples.

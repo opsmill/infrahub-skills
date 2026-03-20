@@ -6,9 +6,10 @@ tags: registration, config, infrahub-yml, targets, parameters
 
 ## Generator Registration in .infrahub.yml
 
-**Impact: HIGH**
+Impact: HIGH
 
-Generators must be registered in `.infrahub.yml` with query name, target group, and parameter mapping.
+Generators must be registered in `.infrahub.yml` with
+query name, target group, and parameter mapping.
 
 ### Configuration
 
@@ -20,28 +21,35 @@ queries:
 generator_definitions:
   - name: create_dc
     file_path: generators/generate_dc.py
-    query: topology_dc                     # Must match query name
-    targets: topologies_dc                 # CoreGeneratorGroup name
+    # Must match query name
+    query: topology_dc
+    # CoreGeneratorGroup name
+    targets: topologies_dc
     class_name: DCTopologyGenerator
     parameters:
-      name: name__value                    # Maps $name to target's name attribute
+      # Maps $name to target's name attribute
+      name: name__value
 ```
 
 ### Field Reference
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `name` | Yes | Unique generator identifier |
-| `file_path` | Yes | Path to Python file |
-| `query` | Yes | Query name (must match `queries` entry) |
-| `targets` | Yes | CoreGeneratorGroup name |
-| `class_name` | Yes | Python class name |
-| `parameters` | Yes | Maps query variables to target attributes |
+| Field        | Required | Description                           |
+| ------------ | -------- | ------------------------------------- |
+| `name`       | Yes      | Unique generator identifier           |
+| `file_path`  | Yes      | Path to Python file                   |
+| `query`      | Yes      | Query name (must match queries entry) |
+| `targets`    | Yes      | CoreGeneratorGroup name               |
+| `class_name` | Yes      | Python class name                     |
+| `parameters` | Yes      | Maps query variables to attributes    |
 
 ### Critical Rules
 
-- **`query` must match** the query `name` in the `queries` section
-- **`targets`** references a `CoreGeneratorGroup` -- create the group first
-- **`parameters`** maps GraphQL `$variable` names to target object attribute paths (e.g., `name__value`)
+- `query` must match the query `name` in the `queries`
+  section
+- `targets` references a `CoreGeneratorGroup` -- create
+  the group first
+- `parameters` maps GraphQL `$variable` names to target
+  object attribute paths (e.g., `name__value`)
 
-Reference: [../common/infrahub-yml-reference.md](../../common/infrahub-yml-reference.md)
+Reference:
+[../common/infrahub-yml-reference.md](../../common/infrahub-yml-reference.md)

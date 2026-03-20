@@ -6,47 +6,50 @@ tags: item, name, namespace, label, kind, path, icon, children
 
 ## Menu Item Properties
 
-**Impact: CRITICAL**
+Impact: CRITICAL
 
 Every menu item has required and optional properties.
 
 ### Property Reference
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `name` | string | Yes | Unique identifier for the menu item |
-| `namespace` | string | Yes | Organizational grouping (e.g., `Dcim`, `Location`) |
-| `label` | string | No | Display text shown in the UI |
-| `kind` | string | No | Links to a schema node kind (e.g., `DcimServer`) |
-| `path` | string | No | Direct URL path (alternative to `kind`) |
-| `icon` | string | No | Icon from MDI library (e.g., `mdi:server`) |
-| `order_weight` | integer | No | Sort position (lower = higher in list) |
-| `parent` | string | No | Reference to parent menu item |
-| `children` | object | No | Nested menu items under a `data` key |
+| Property       | Type    | Required | Description              |
+| -------------- | ------- | -------- | ------------------------ |
+| `name`         | string  | Yes      | Unique identifier        |
+| `namespace`    | string  | Yes      | Organizational grouping  |
+| `label`        | string  | No       | Display text in the UI   |
+| `kind`         | string  | No       | Links to a schema node   |
+| `path`         | string  | No       | Direct URL path          |
+| `icon`         | string  | No       | MDI library icon         |
+| `order_weight` | integer | No       | Sort position            |
+| `parent`       | string  | No       | Parent menu item ref     |
+| `children`     | object  | No       | Nested items under `data`|
 
 ### kind vs path
 
-Use **`kind`** to link to a schema node's list view (auto-resolves the URL):
+Use `kind` to link to a schema node's list view
+(auto-resolves the URL):
 
 ```yaml
 - namespace: Dcim
   name: Servers
-  kind: DcimServer              # Auto-links to /objects/DcimServer
+  kind: DcimServer        # Auto-links to /objects/DcimServer
 ```
 
-Use **`path`** for custom URLs (only when `kind` doesn't apply):
+Use `path` for custom URLs (only when `kind` does
+not apply):
 
 ```yaml
 - namespace: Custom
   name: Dashboard
-  path: /dashboard              # Direct URL
+  path: /dashboard        # Direct URL
 ```
 
-**Never use both `kind` and `path` on the same item.**
+Never use both `kind` and `path` on the same item.
 
 ### Items Without kind or path
 
-A menu item without `kind` or `path` serves as a **group header** (non-clickable):
+A menu item without `kind` or `path` serves as a
+group header (non-clickable):
 
 ```yaml
 - namespace: Dcim
@@ -59,4 +62,5 @@ A menu item without `kind` or `path` serves as a **group header** (non-clickable
       - ...
 ```
 
-Reference: [Infrahub Menu Docs](https://docs.infrahub.app)
+Reference:
+[Infrahub Menu Docs](https://docs.infrahub.app)

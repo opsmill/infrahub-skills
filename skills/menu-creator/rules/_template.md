@@ -6,20 +6,22 @@ tags: tag1, tag2
 
 ## Rule Title Here
 
-**Impact: MEDIUM**
+Impact: MEDIUM
 
-Brief explanation of the rule and why it matters for Infrahub menu creation.
+Brief explanation of the rule and why it matters
+for Infrahub menu creation.
 
-**Incorrect:**
+### Incorrect
 
 ```yaml
 # Bad example
 ```
 
-**Correct:**
+### Correct
 
 ```yaml
 # Good example
 ```
 
-Reference: [Infrahub Menu Docs](https://docs.infrahub.app)
+Reference:
+[Infrahub Menu Docs](https://docs.infrahub.app)

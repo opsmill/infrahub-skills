@@ -1,6 +1,10 @@
 # Schema Validation & Migration Guide
 
-> **Server Required**: `infrahubctl schema check` and `infrahubctl schema load` both require a running Infrahub server. Run `infrahubctl info` first to verify connectivity. See [Server Connectivity Check](../common/rules/connectivity-server-check.md).
+> **Server Required**: `infrahubctl schema check` and
+> `infrahubctl schema load` both require a running
+> Infrahub server. Run `infrahubctl info` first to
+> verify connectivity. See
+> [Server Connectivity Check](../common/rules/connectivity-server-check.md).
 
 ## Validation Commands
 
@@ -20,6 +24,7 @@ infrahubctl schema check schemas/ --branch develop
 ```
 
 This will:
+
 1. Parse YAML files
 2. Validate against the Infrahub schema spec (Pydantic models)
 3. Show validation errors if any
@@ -76,18 +81,20 @@ check_definitions:
 ## Common Validation Errors
 
 ### "Unknown field"
+
 The JSON schema has `additionalProperties: false`. Any typo causes this:
 
-```
+```text
 # BAD - typo in property name
 - name: MyNode
   namspace: Dcim         # Should be "namespace"
 ```
 
 ### "Name must match pattern"
+
 Names have strict regex patterns:
 
-```
+```text
 # Node name: ^[A-Z][a-zA-Z0-9]+$
 - name: my_node          # BAD - must start with uppercase, no underscores
 - name: MyNode           # GOOD
@@ -102,7 +109,8 @@ Names have strict regex patterns:
 ```
 
 ### "Name too short/long"
-```
+
+```text
 # Node name: 2-32 chars
 - name: X                # BAD - too short
 
@@ -114,9 +122,10 @@ Names have strict regex patterns:
 ```
 
 ### "Peer not found"
+
 Relationship peer must reference the full kind (namespace + name):
 
-```
+```text
 # BAD
 - peer: DeviceType       # Missing namespace
 
@@ -125,6 +134,7 @@ Relationship peer must reference the full kind (namespace + name):
 ```
 
 ### "Identifier mismatch"
+
 Bidirectional relationships need matching identifiers:
 
 ```yaml
@@ -140,6 +150,7 @@ Bidirectional relationships need matching identifiers:
 ```
 
 ### "Uniqueness constraint references unknown field"
+
 Use `__value` suffix for attributes in constraints:
 
 ```yaml
@@ -184,6 +195,7 @@ Use `state: absent`:
 ### Renaming an Attribute
 
 Two-step migration:
+
 1. Add new attribute (optional), keep old one
 2. Migrate data from old to new
 3. Remove old attribute with `state: absent`
@@ -194,11 +206,13 @@ Just add the node definition. No migration needed.
 
 ### Adding a Relationship
 
-Add the relationship to the schema. For bidirectional relationships, add both sides with matching `identifier`.
+Add the relationship to the schema. For bidirectional
+relationships, add both sides with matching `identifier`.
 
 ### Changing Attribute Type
 
 Some type changes require `validate_constraint` checks. The safest approach:
+
 1. Add new attribute with new type
 2. Migrate data
 3. Remove old attribute
@@ -234,8 +248,8 @@ infrahubctl schema load schemas/ --branch schema-updates
 ### Branch Support Types
 
 | Type | Behavior |
-|------|----------|
-| `aware` | Data is branch-aware (default). Changes on branches are isolated. |
+| ---- | -------- |
+| `aware` | Branch-aware (default). Changes isolated. |
 | `agnostic` | Same data across all branches. Changes are global. |
 | `local` | Data is local to the branch where created. |
 
@@ -268,6 +282,7 @@ Add this comment to the top of every schema file for IDE autocompletion:
 ```
 
 This enables:
+
 - Property name autocompletion
 - Type validation
 - Inline error highlighting

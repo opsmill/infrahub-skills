@@ -6,23 +6,24 @@ tags: format, apiVersion, kind, spec, structure
 
 ## Object File Structure
 
-**Impact: CRITICAL**
+Impact: CRITICAL
 
-Every object file must follow the exact YAML structure. Missing or misplaced fields cause silent failures.
+Every object file must follow the exact YAML structure.
+Missing or misplaced fields cause silent failures.
 
 ### Required Fields
 
 | Field | Value | Description |
-|-------|-------|-------------|
+| ----- | ----- | ----------- |
 | `apiVersion` | `infrahub.app/v1` | Always this value |
 | `kind` | `Object` | Always `Object` for data files |
-| `spec.kind` | Node kind | Schema node these objects are instances of (e.g., `DcimDellServer`) |
+| `spec.kind` | Node kind | Schema node type (e.g., `DcimDellServer`) |
 | `spec.data` | list | List of object instances |
 
 ### Optional Fields
 
 | Field | Description |
-|-------|-------------|
+| ----- | ----------- |
 | `version` | `"1.0"` -- Optional version string |
 
 **Incorrect:**
@@ -57,7 +58,9 @@ spec:
 
 ### One Kind per Document
 
-Each `spec` block targets a single node kind. To create objects of different kinds, use separate YAML documents (separated by `---`) or separate files.
+Each `spec` block targets a single node kind. To create
+objects of different kinds, use separate YAML documents
+(separated by `---`) or separate files.
 
 ```yaml
 ---

@@ -6,16 +6,20 @@ tags: types, python, jinja2, choosing
 
 ## Transform Types Overview
 
-**Impact: CRITICAL**
+**Impact:** CRITICAL
 
 Choose the right transform type based on your output needs.
 
 ### Comparison
 
-| Type | Output | Use Case | Entry Point | Registration |
-|------|--------|----------|-------------|-------------|
-| **Python** | JSON/dict or text | Complex logic, computations, API mashups | `InfrahubTransform.transform()` | `python_transforms` |
-| **Jinja2** | Text | Template-based rendering (device configs) | `.j2` template file | `jinja2_transforms` |
+| Type       | Output       | Entry Point   |
+| ---------- | ------------ | ------------- |
+| **Python** | JSON or text | `transform()` |
+| **Jinja2** | Text         | `.j2` file    |
+
+Register Python transforms under `python_transforms`
+and Jinja2 transforms under `jinja2_transforms` in
+`.infrahub.yml`.
 
 ### When to Use Python
 
@@ -35,12 +39,13 @@ Choose the right transform type based on your output needs.
 ### When to Use Both (Hybrid)
 
 - Python prepares/cleans the data, Jinja2 renders it
-- Platform-specific template selection (e.g., `arista_eos.j2` vs `cisco_nxos.j2`)
+- Platform-specific template selection
+  (e.g., `arista_eos.j2` vs `cisco_nxos.j2`)
 - Complex data extraction with template-based output
 
 ### File Organization
 
-```
+```text
 transforms/
   __init__.py
   common.py                      # Shared utilities

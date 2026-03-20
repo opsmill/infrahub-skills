@@ -6,9 +6,12 @@ tags: validation, errors, debugging, additionalProperties
 
 ## Common Validation Errors and Fixes
 
-**Impact: LOW (but saves debugging time)**
+Impact: LOW (but saves debugging time)
 
-The Infrahub JSON schema uses `additionalProperties: false`, meaning any typo in property names causes a validation error. Here are the most common errors and fixes.
+The Infrahub JSON schema uses
+`additionalProperties: false`, meaning any typo in
+property names causes a validation error. Here are the
+most common errors and fixes.
 
 ### "Unknown field"
 
@@ -22,19 +25,27 @@ A typo in a property name:
 
 ### "Name must match pattern"
 
-Naming convention violation. See the [naming-conventions](./naming-conventions.md) rule.
+Naming convention violation. See the
+[naming-conventions](./naming-conventions.md) rule.
 
 ### "Peer not found"
 
-Missing namespace in peer reference. See the [relationship-peer-kind](./relationship-peer-kind.md) rule.
+Missing namespace in peer reference. See the
+[relationship-peer-kind](./relationship-peer-kind.md)
+rule.
 
 ### "Identifier mismatch"
 
-Bidirectional relationship identifiers don't match. See the [relationship-identifiers](./relationship-identifiers.md) rule.
+Bidirectional relationship identifiers don't match.
+See the
+[relationship-identifiers](./relationship-identifiers.md)
+rule.
 
 ### "Uniqueness constraint references unknown field"
 
-Wrong format in constraints. See the [uniqueness-constraints](./uniqueness-constraints.md) rule.
+Wrong format in constraints. See the
+[uniqueness-constraints](./uniqueness-constraints.md)
+rule.
 
 ### Pre-Validation Checklist
 
