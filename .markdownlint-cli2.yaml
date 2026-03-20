@@ -32,6 +32,9 @@ config:
   # MD033/no-inline-html - Inline HTML (disabled for MDX React components)
   MD033: false
 
+  # MD041/first-line-heading - First line in a file should be a top-level heading
+  MD041: false
+
   # MD060/table-column-style - Table column style
   MD060:
     column_style: "leading_and_trailing"
