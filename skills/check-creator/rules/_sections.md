@@ -25,6 +25,4 @@
    before logging, shared utility functions (common.py),
    scoped validation for performance on large datasets.
 
-6. **Testing (testing-)** -- LOW. infrahubctl check
-   commands, listing checks, running against specific
-   branches.
+6. **Testing (testing-)** -- HIGH. Resources Testing Framework (YAML-driven pytest tests: smoke, unit, integration), infrahubctl check commands. Always create tests alongside new checks.

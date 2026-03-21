@@ -31,16 +31,16 @@ output -- using Python classes or Jinja2 templates.
 
 ## Rule Categories
 
-| Priority | Category  | Prefix       | Description               |
-| -------- | --------- | ------------ | ------------------------- |
-| CRITICAL | Types     | `types-`     | Python vs Jinja2 choice   |
-| CRITICAL | Python    | `python-`    | InfrahubTransform class   |
-| CRITICAL | Jinja2    | `jinja2-`    | Template syntax, filters  |
-| HIGH     | Hybrid    | `hybrid-`    | Python + Jinja2 combined  |
-| HIGH     | Artifacts | `artifacts-` | Output files, targets     |
-| HIGH     | API Ref   | `api-`       | Class attrs, methods      |
-| MEDIUM   | Patterns  | `patterns-`  | Utilities, CSV, shared    |
-| LOW      | Testing   | `testing-`   | Transform/render commands |
+| Priority | Category | Prefix | Description |
+|----------|----------|--------|-------------|
+| CRITICAL | Transform Types | `types-` | Python vs Jinja2, when to use which |
+| CRITICAL | Python Transform | `python-` | InfrahubTransform class, transform() method, return types |
+| CRITICAL | Jinja2 Transform | `jinja2-` | Template syntax, data variable, netutils filters |
+| HIGH | Hybrid | `hybrid-` | Python data prep + Jinja2 rendering pattern |
+| HIGH | Artifacts | `artifacts-` | Connecting transforms to output files, content types, targets |
+| HIGH | API Reference | `api-` | Class attributes, instance properties, methods |
+| MEDIUM | Patterns | `patterns-` | Data extraction utilities, CSV output, shared common.py |
+| HIGH | Testing | `testing-` | Resources Testing Framework, infrahubctl transform/render commands |
 
 ## Transform Basics
 

@@ -462,6 +462,119 @@ check_definitions:
 
 ---
 
+## 4. Test Definitions for Checks
+
+YAML-driven tests using the [Resources Testing Framework](../common/rules/testing-resource-framework.md). Always create tests alongside new checks.
+
+### `tests/test_checks.yml`
+
+```yaml
+---
+version: "1.0"
+infrahub_tests:
+  # Global check: Rack Unit Collision
+  - resource: Check
+    resource_name: check_rack_unit_collision
+    tests:
+      - name: smoke_rack_collision
+        spec:
+          kind: check-smoke
+
+      - name: unit_rack_collision_no_overlap
+        spec:
+          kind: check-unit-process
+          directory: fixtures/rack_collision_pass
+        expect: PASS
+
+      - name: unit_rack_collision_overlap
+        spec:
+          kind: check-unit-process
+          directory: fixtures/rack_collision_fail
+        expect: FAIL
+
+  # Minimal check: Tag Naming
+  - resource: Check
+    resource_name: check_tag_naming
+    tests:
+      - name: smoke_tag_naming
+        spec:
+          kind: check-smoke
+
+      - name: unit_tag_naming_valid
+        spec:
+          kind: check-unit-process
+          directory: fixtures/check_tag_naming
+        expect: PASS
+
+      - name: unit_tag_naming_invalid
+        spec:
+          kind: check-unit-process
+          directory: fixtures/check_tag_naming_invalid
+        expect: FAIL
+```
+
+### Fixture: `tests/fixtures/rack_collision_pass/input.json`
+
+```json
+{
+  "DcimGenericDevice": {
+    "edges": [
+      {
+        "node": {
+          "id": "device-1",
+          "__typename": "DcimDevice",
+          "display_label": "spine-01",
+          "name": { "value": "spine-01" },
+          "rack_u_position": { "value": 40 },
+          "rack_face": { "value": "front" },
+          "rack": { "node": { "id": "rack-1", "display_label": "Rack A1", "name": { "value": "rack-a1" } } },
+          "device_type": { "node": { "id": "dt-1", "model": { "value": "7050X" }, "u_height": { "value": 1 }, "is_full_depth": { "value": true } } }
+        }
+      },
+      {
+        "node": {
+          "id": "device-2",
+          "__typename": "DcimDevice",
+          "display_label": "spine-02",
+          "name": { "value": "spine-02" },
+          "rack_u_position": { "value": 39 },
+          "rack_face": { "value": "front" },
+          "rack": { "node": { "id": "rack-1", "display_label": "Rack A1", "name": { "value": "rack-a1" } } },
+          "device_type": { "node": { "id": "dt-1", "model": { "value": "7050X" }, "u_height": { "value": 1 }, "is_full_depth": { "value": true } } }
+        }
+      }
+    ]
+  }
+}
+```
+
+### Fixture: `tests/fixtures/check_tag_naming/input.json`
+
+```json
+{
+  "BuiltinTag": {
+    "edges": [
+      { "node": { "id": "tag-1", "name": { "value": "production" } } },
+      { "node": { "id": "tag-2", "name": { "value": "spine-role" } } }
+    ]
+  }
+}
+```
+
+### Fixture: `tests/fixtures/check_tag_naming_invalid/input.json`
+
+```json
+{
+  "BuiltinTag": {
+    "edges": [
+      { "node": { "id": "tag-1", "name": { "value": "Invalid_Tag!" } } }
+    ]
+  }
+}
+```
+
+---
+
 ## Complete File Structure
 
 ```text
@@ -480,4 +593,15 @@ project/
       spine.gql
     validation/
       loadbalancer_validation.gql
+  tests/
+    test_checks.yml              # Test definitions (smoke + unit)
+    fixtures/
+      rack_collision_pass/
+        input.json
+      rack_collision_fail/
+        input.json
+      check_tag_naming/
+        input.json
+      check_tag_naming_invalid/
+        input.json
 ```

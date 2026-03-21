@@ -469,6 +469,140 @@ def get_interface_roles(interfaces: list | None) -> dict:
 
 ---
 
+## 6. Test Definitions for Transforms
+
+YAML-driven tests using the [Resources Testing Framework](../common/rules/testing-resource-framework.md). Always create tests alongside new transforms.
+
+### `tests/test_transforms.yml`
+
+```yaml
+---
+version: "1.0"
+infrahub_tests:
+  # Python transform: Spine config
+  - resource: PythonTransform
+    resource_name: spine
+    tests:
+      - name: smoke_spine
+        spec:
+          kind: python-transform-smoke
+
+      - name: unit_spine
+        spec:
+          kind: python-transform-unit-process
+          directory: fixtures/spine_transform
+          output: output.txt
+        expect: PASS
+
+  # Python transform: Simple
+  - resource: PythonTransform
+    resource_name: simple_transform
+    tests:
+      - name: smoke_simple
+        spec:
+          kind: python-transform-smoke
+
+      - name: unit_simple
+        spec:
+          kind: python-transform-unit-process
+          directory: fixtures/simple_transform
+        expect: PASS
+
+  # Python transform: CSV Cable Matrix
+  - resource: PythonTransform
+    resource_name: topology_cabling
+    tests:
+      - name: smoke_cabling
+        spec:
+          kind: python-transform-smoke
+
+      - name: unit_cabling
+        spec:
+          kind: python-transform-unit-process
+          directory: fixtures/topology_cabling
+          output: output.csv
+        expect: PASS
+
+  # Jinja2 transform: ContainerLab Topology
+  - resource: Jinja2Transform
+    resource_name: topology_clab
+    tests:
+      - name: smoke_clab
+        spec:
+          kind: jinja2-transform-smoke
+
+      - name: unit_clab_render
+        spec:
+          kind: jinja2-transform-unit-render
+          directory: fixtures/clab_topology
+          output: output.yml
+        expect: PASS
+```
+
+### Fixture: `tests/fixtures/simple_transform/input.json`
+
+```json
+{
+  "DcimDevice": {
+    "edges": [
+      {
+        "node": {
+          "name": { "value": "spine-01" },
+          "status": { "value": "active" }
+        }
+      }
+    ]
+  }
+}
+```
+
+### Fixture: `tests/fixtures/clab_topology/input.json`
+
+```json
+{
+  "TopologyDataCenter": {
+    "edges": [
+      {
+        "node": {
+          "name": { "value": "dc-topology-01" },
+          "devices": {
+            "edges": [
+              {
+                "node": {
+                  "name": { "value": "spine-01" },
+                  "device_type": {
+                    "node": {
+                      "platform": {
+                        "node": { "containerlab_image": { "value": "ceos:latest" } }
+                      }
+                    }
+                  },
+                  "interfaces": { "edges": [] }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+### Fixture: `tests/fixtures/clab_topology/output.yml`
+
+```yaml
+name: dc-topology-01
+topology:
+  nodes:
+    spine-01:
+      kind: linux
+      image: ceos:latest
+  links:
+```
+
+---
+
 ## Complete File Structure
 
 ```text
@@ -496,4 +630,18 @@ project/
     topology/
       clab.gql
       cabling.gql
+  tests/
+    test_transforms.yml          # Test definitions (smoke + unit)
+    fixtures/
+      spine_transform/
+        input.json
+        output.txt
+      simple_transform/
+        input.json
+      clab_topology/
+        input.json
+        output.yml
+      topology_cabling/
+        input.json
+        output.csv
 ```
