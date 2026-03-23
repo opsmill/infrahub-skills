@@ -182,7 +182,7 @@ jobs:
       - name: Consolidate outputs
         run: |
           mkdir -p eval-results
-          for dir in artifacts/eval-*/eval-results/; do
+          for dir in artifacts/eval-*/; do
             if [ -d "$dir" ]; then
               cp -rn "$dir"/* eval-results/ 2>/dev/null || true
             fi
