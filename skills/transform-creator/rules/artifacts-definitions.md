@@ -47,7 +47,7 @@ generics:
 
 ### Key Rules
 
-- **`transformation` must match** the transform `name`
+- **`transformation` must match** the Transformation `name`
   in `python_transforms` or `jinja2_transforms`
 - **`targets`** references a group whose members get artifacts generated
 - **`parameters`** maps target object attributes to query variables

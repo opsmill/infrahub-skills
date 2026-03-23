@@ -44,8 +44,7 @@ Impact: HIGH
 1. `collect_data()` -- executes the GraphQL query
 2. Unpacks the `"data"` key from the response
 3. Calls your `validate(data)` method
-4. Counts ERROR-level logs -- if zero errors, check
-   passes
+4. Counts ERROR-level logs -- if zero errors, check passes
 
 Reference:
 [Infrahub SDK Docs](https://docs.infrahub.app)

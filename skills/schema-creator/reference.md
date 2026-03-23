@@ -25,7 +25,7 @@ Properties for entries in the `nodes:` list.
 | Property | Type | Default | Constraints | Description |
 | -------- | ---- | ------- | ----------- | ----------- |
 | `name` | string | *required* | 2-32, PascalCase | Node name |
-| `namespace` | string | *required* | 3-32, Ucfirst | Namespace |
+| `namespace` | string | *required* | 3-32, First upper | Namespace |
 | `description` | string | null | Max 128 chars | Short desc |
 | `label` | string | null | Max 64 chars | Display name |
 | `icon` | string | null | Iconify value | e.g., `mdi:server` |

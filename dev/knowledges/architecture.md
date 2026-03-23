@@ -24,7 +24,7 @@ Markdown documents.
 ```text
 Plugin (plugin.json)
 ├── Hooks (hooks/hooks.json)
-│   └── SessionStart → session-start.sh
+│   └── SessionStart → hooks-handlers/session-start.sh
 │       └── Detects .infrahub.yml, infrahub.toml,
 │           schema files
 │

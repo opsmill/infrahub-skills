@@ -6,7 +6,7 @@ Real-world examples extracted from production Infrahub repositories.
 
 ## 1. Python Transform with Jinja2 Rendering (Spine Config)
 
-A Python transform that prepares data and renders a
+A Python Transformation that prepares data and renders a
 platform-specific Jinja2 template.
 
 ### Query: `queries/config/spine.gql`
@@ -184,7 +184,7 @@ artifact_definitions:
 
 ## 2. CSV Cable Matrix Transform
 
-A Python transform that generates CSV cable
+A Python Transformation that generates CSV cable
 documentation from topology data.
 
 ### Transform: `transforms/topology_cabling.py`
@@ -328,8 +328,12 @@ topology:
 {% if intf.node.connector is defined and intf.node.connector.node %}
     - endpoints:
         - "{{ device.node.name.value }}:{{ intf.node.name.value }}"
-{%- set peer = intf.node.connector.node -%}
-        - "{{ peer.remote_device }}:{{ peer.remote_interface }}"
+{%- set cable = intf.node.connector.node -%}
+{%- for ep in cable.connected_endpoints.edges %}
+{%- if ep.node.device.node.name.value != device.node.name.value or ep.node.name.value != intf.node.name.value %}
+        - "{{ ep.node.device.node.name.value }}:{{ ep.node.name.value }}"
+{%- endif %}
+{%- endfor %}
 {% endif %}
 {% endfor %}
 {% endfor %}

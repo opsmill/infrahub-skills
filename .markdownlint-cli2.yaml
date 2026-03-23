@@ -43,3 +43,4 @@ config:
 ignores:
   - "docs/docs/release-notes/**"
   - "**/AGENTS.md"
+  - "*-workspace/**"

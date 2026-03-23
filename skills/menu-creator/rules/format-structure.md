@@ -46,8 +46,6 @@ menus:
 
 - Include the `$schema` comment for IDE validation
 - One menu file per project typically
-- The menu replaces the auto-generated sidebar
-  navigation
+- The menu replaces the auto-generated sidebar navigation
 
-Reference:
-[infrahub-yml-reference.md](../../common/infrahub-yml-reference.md)
+Reference: [infrahub-yml-reference.md](../../common/infrahub-yml-reference.md)

@@ -30,7 +30,7 @@ interfaces:
   parameters:
     expand_range: true                # Set on the relationship block
   data:
-    - name: Ethernet1/[1-4]           # Expands to 1/1..1/4
+    - name: Ethernet1/[1-4]           # Expands to 1/1 through 1/4
       role: customer
       status: active
 ```

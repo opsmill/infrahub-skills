@@ -79,14 +79,14 @@ specifically designed to catch:
 ## .infrahub.yml
 
 The project configuration file. Registers checks,
-generators, transforms, and other artifacts with the
-Infrahub server. Reference:
+Generators, Transformations, and other artifacts with
+the Infrahub server. Reference:
 `skills/common/infrahub-yml-reference.md`.
 
 ## GraphQL Queries
 
-Checks, generators, and transforms all use GraphQL to
-fetch data from Infrahub. The query syntax has
+Checks, Generators, and Transformations all use
+GraphQL to fetch data from Infrahub. The query syntax has
 Infrahub-specific conventions. Reference:
 `skills/common/graphql-queries.md`.
 

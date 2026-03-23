@@ -63,4 +63,4 @@ behavior exists. Loading the parent objects first and child
 objects second reduces (but doesn't eliminate) the issue.
 
 Reference:
-[Infrahub Display Label Docs](https://docs.infrahub.app)
+[Infrahub Display Label Docs](https://docs.infrahub.app/topics/schema/#display_label)

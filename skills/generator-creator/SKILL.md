@@ -1,7 +1,7 @@
 ---
 name: infrahub-generator-creator
 description: >-
-  Create and manage Infrahub generators. Use when building
+  Create and manage Infrahub Generators. Use when building
   design-driven automation that creates infrastructure objects
   from templates, topology definitions, or any
   design-to-implementation workflow in Infrahub.
@@ -14,7 +14,7 @@ metadata:
 
 ## Overview
 
-Expert guidance for creating Infrahub generators. Generators
+Expert guidance for creating Infrahub Generators. Generators
 query data from Infrahub via GraphQL and create new nodes and
 relationships based on the result -- enabling design-driven
 automation where a "design" object automatically creates
@@ -63,7 +63,7 @@ class MyGenerator(InfrahubGenerator):
 
 ## Supporting References
 
-- **[examples.md](./examples.md)** -- Complete generator
+- **[examples.md](./examples.md)** -- Complete Generator
   patterns (POP topology, network segment, minimal)
 - **[../common/graphql-queries.md](../common/graphql-queries.md)**
   -- GraphQL query writing reference
@@ -72,6 +72,6 @@ class MyGenerator(InfrahubGenerator):
 - **[../common/rules/](../common/rules/)** -- Shared rules
   (git integration, caching gotchas)
 - **[../schema-creator/SKILL.md](../schema-creator/SKILL.md)**
-  -- Schema definitions generators work with
+  -- Schema definitions Generators work with
 - **[rules/](./rules/)** -- Individual rules organized by
   category prefix

@@ -43,6 +43,19 @@ The key insight: SKILL.md should tell the AI *what to
 do and where to look*, not contain everything.
 Individual rule files and references hold the details.
 
+## Prerequisites
+
+- Access to this repository and permission to create
+  branches/PRs
+- Familiarity with core Infrahub concepts (schemas,
+  nodes, generics, relationships) — see
+  [infrahub-concepts.md](../knowledges/infrahub-concepts.md)
+- A text editor with YAML/Markdown support
+- Access to Claude Code (or another AI assistant that
+  supports skills) for testing
+- Basic understanding of the skill format — review
+  the [Skill Anatomy](#skill-anatomy) section below
+
 ## Steps
 
 ### 1. Create the Skill Directory
@@ -222,3 +235,56 @@ quality.
   (skills section + project structure)
 - Update `CHANGELOG.md`
 - Update `AGENTS.md` quick reference table
+
+### 8. Verification
+
+Confirm the skill works before submitting for review.
+
+**Test skill triggering:**
+
+1. Open a project with the plugin installed
+2. Describe a task that should activate the skill
+3. Verify the AI reads your SKILL.md and follows the
+   workflow
+
+**Verify output correctness:**
+
+1. Run the skill against a realistic prompt
+2. Check the output against the rules in your
+   `rules/` directory
+3. Validate any generated YAML with
+   `infrahubctl schema check` (for schema skills) or
+   equivalent tooling
+
+**Run evaluations** (see [Step 6](#6-write-evaluations)):
+
+```bash
+python scripts/run_evals.py \
+  --eval-file evaluations/my-skill.json
+```
+
+Review the generated report in `eval-results/`.
+
+**Required files checklist:**
+
+- [ ] `skills/my-skill/SKILL.md` with correct
+  frontmatter
+- [ ] `skills/my-skill/rules/_sections.md`
+- [ ] At least one rule file in `rules/`
+- [ ] `evaluations/my-skill.json` with test scenarios
+- [ ] `CLAUDE.md` updated with the new skill
+- [ ] `README.md` updated (skills section + project
+  structure)
+- [ ] `CHANGELOG.md` updated
+- [ ] `AGENTS.md` quick reference table updated
+  (see [Step 7](#7-register-in-documentation))
+
+**Validate version consistency:**
+
+Verify the `metadata.version` in your SKILL.md
+matches the versions in:
+
+- `.claude-plugin/plugin.json`
+- `.github/.release-manifest.json`
+
+All three must be identical.

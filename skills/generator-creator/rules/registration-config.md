@@ -35,7 +35,7 @@ generator_definitions:
 
 | Field        | Required | Description                           |
 | ------------ | -------- | ------------------------------------- |
-| `name`       | Yes      | Unique generator identifier           |
+| `name`       | Yes      | Unique Generator identifier           |
 | `file_path`  | Yes      | Path to Python file                   |
 | `query`      | Yes      | Query name (must match queries entry) |
 | `targets`    | Yes      | CoreGeneratorGroup name               |

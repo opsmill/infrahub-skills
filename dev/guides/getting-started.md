@@ -1,5 +1,17 @@
 # Getting Started
 
+This guide walks you through installing and using
+Infrahub skills with your AI coding assistant. By the
+end, you will have the skills available in your
+project and be able to invoke them to generate
+schemas, data files, checks, and other Infrahub
+artifacts following best practices.
+
+Infrahub skills give AI assistants domain-specific
+knowledge about Infrahub's data model, conventions,
+and common pitfalls — producing higher-quality output
+than general-purpose prompting alone.
+
 ## Prerequisites
 
 - An AI coding assistant that supports skills
@@ -168,3 +180,50 @@ These skills are plain Markdown — any AI tool that
 reads files from your project can use them. See the
 [README](../../README.md) for specific setup
 instructions for GitHub Copilot, Cursor, and Windsurf.
+
+## Verification
+
+Confirm skills are installed and discoverable:
+
+1. Check the skills directory exists in your project:
+
+   ```bash
+   ls skills/*/SKILL.md
+   ```
+
+   You should see one `SKILL.md` per skill (e.g.,
+   `skills/schema-creator/SKILL.md`).
+
+2. Test a skill invocation — ask your AI assistant:
+
+   ```text
+   Create a simple Infrahub schema with a Device node
+   that has a name and status attribute.
+   ```
+
+   The assistant should activate `infrahub:schema-creator`
+   and produce a YAML schema starting with
+   `version: "1.0"` containing a `nodes:` list.
+
+3. For Claude Code plugin installs, verify detection:
+
+   ```bash
+   # In a directory with .infrahub.yml
+   claude
+   ```
+
+   The SessionStart hook should report that Infrahub
+   skills are available.
+
+## Related Resources
+
+- [Agent Skills specification](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)
+  — The format these skills follow
+- [Infrahub documentation](https://docs.infrahub.app/)
+  — Official Infrahub docs
+- [README](../../README.md) — Project overview and
+  setup for different AI tools
+- [Adding a New Skill](./adding-a-skill.md)
+  — Guide for contributing new skills
+- [Running Evaluations](./running-evals.md)
+  — How to test skill quality

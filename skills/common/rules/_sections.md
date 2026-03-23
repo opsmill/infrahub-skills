@@ -1,7 +1,7 @@
 # Common Rules - Rule Sections
 
 These rules apply across multiple Infrahub skills
-(generators, checks, transforms, object loading). They
+(Generators, checks, Transformations, object loading). They
 capture shared gotchas and best practices that are not
 specific to any single workflow.
 

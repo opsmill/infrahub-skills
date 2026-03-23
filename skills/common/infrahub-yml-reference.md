@@ -2,7 +2,7 @@
 
 The `.infrahub.yml` file is the central manifest that
 connects your Git repository to Infrahub. It declares all
-schemas, data, queries, checks, transforms, generators,
+schemas, data, queries, checks, Transformations, Generators,
 menus, and artifacts.
 
 ## Complete Structure
@@ -49,7 +49,7 @@ jinja2_transforms:
     template_path: "templates/config.j2"
     description: "Optional description"
 
-# Artifact definitions (connects transforms to outputs)
+# artifact definitions (connects Transformations to outputs)
 artifact_definitions:
   - name: my_artifact           # Unique identifier
     artifact_name: "Human Readable Name"

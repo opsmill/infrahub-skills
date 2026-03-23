@@ -28,4 +28,4 @@
    inter-object references.
 
 7. **Testing (testing-)** -- LOW. infrahubctl generator
-   commands, listing and running generators locally.
+   commands, listing and running Generators locally.

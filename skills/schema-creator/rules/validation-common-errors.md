@@ -31,21 +31,17 @@ Naming convention violation. See the
 ### "Peer not found"
 
 Missing namespace in peer reference. See the
-[relationship-peer-kind](./relationship-peer-kind.md)
-rule.
+[relationship-peer-kind](./relationship-peer-kind.md) rule.
 
 ### "Identifier mismatch"
 
-Bidirectional relationship identifiers don't match.
-See the
-[relationship-identifiers](./relationship-identifiers.md)
-rule.
+Bidirectional relationship identifiers don't match. See the
+[relationship-identifiers](./relationship-identifiers.md) rule.
 
 ### "Uniqueness constraint references unknown field"
 
 Wrong format in constraints. See the
-[uniqueness-constraints](./uniqueness-constraints.md)
-rule.
+[uniqueness-constraints](./uniqueness-constraints.md) rule.
 
 ### Pre-Validation Checklist
 

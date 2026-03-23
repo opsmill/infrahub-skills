@@ -14,7 +14,7 @@ validation. Violations cause immediate validation errors.
 ### Namespace
 
 Pattern: `^[A-Z][a-z0-9]+$` (first letter uppercase,
-rest lowercase). Min 3, max 32 chars.
+rest lowercase letters or digits). Min 3, max 32 chars.
 
 **Incorrect:**
 

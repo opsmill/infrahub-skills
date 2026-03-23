@@ -17,8 +17,8 @@ Choose the right transform type based on your output needs.
 | **Python** | JSON or text | `transform()` |
 | **Jinja2** | Text         | `.j2` file    |
 
-Register Python transforms under `python_transforms`
-and Jinja2 transforms under `jinja2_transforms` in
+Register Python Transformations under `python_transforms`
+and Jinja2 Transformations under `jinja2_transforms` in
 `.infrahub.yml`.
 
 ### When to Use Python
