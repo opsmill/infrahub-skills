@@ -1,0 +1,71 @@
+---
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Extract version from tag
+        id: tag
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Validate plugin.json version matches tag
+        run: |
+          PLUGIN_VERSION=$(jq -r .version .claude-plugin/plugin.json)
+          TAG_VERSION="${{ steps.tag.outputs.version }}"
+          if [ "$PLUGIN_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Version mismatch: plugin.json=$PLUGIN_VERSION, tag=v$TAG_VERSION"
+            exit 1
+          fi
+
+      - name: Validate release-manifest version matches tag
+        run: |
+          MANIFEST_VERSION=$(jq -r .version .github/.release-manifest.json)
+          TAG_VERSION="${{ steps.tag.outputs.version }}"
+          if [ "$MANIFEST_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Version mismatch: release-manifest.json=$MANIFEST_VERSION, tag=v$TAG_VERSION"
+            exit 1
+          fi
+
+      - name: Validate SKILL.md versions match tag
+        run: |
+          TAG_VERSION="${{ steps.tag.outputs.version }}"
+          MISMATCHED=""
+          for f in skills/*/SKILL.md; do
+            SKILL_VERSION=$(sed -n '/^metadata:/,/^[^ ]/{ s/^  version: //p }' "$f")
+            if [ "$SKILL_VERSION" != "$TAG_VERSION" ]; then
+              MISMATCHED="$MISMATCHED\n  $f (has $SKILL_VERSION)"
+            fi
+          done
+          if [ -n "$MISMATCHED" ]; then
+            echo "::error::SKILL.md version mismatches:$MISMATCHED"
+            exit 1
+          fi
+
+      - name: Generate skills list
+        id: skills
+        run: |
+          {
+            echo "list<<EOF"
+            jq -r '.skills[]' .github/.release-manifest.json | sed 's/^/- /'
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Update release with skills list
+        uses: softprops/action-gh-release@v2
+        with:
+          append_body: true
+          body: |
+            ### Skills included
+            ${{ steps.skills.outputs.list }}

@@ -1,0 +1,59 @@
+---
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Detect which files changed to conditionally run downstream jobs
+  # ---------------------------------------------------------------------------
+  files-changed:
+    runs-on: ubuntu-latest
+    outputs:
+      markdown: ${{ steps.changes.outputs.markdown_all }}
+      yaml: ${{ steps.changes.outputs.yaml_all }}
+      skills: ${{ steps.changes.outputs.skills_all }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: opsmill/paths-filter@v3
+        id: changes
+        with:
+          filters: .github/file-filters.yml
+
+  # ---------------------------------------------------------------------------
+  # Lint Markdown files
+  # ---------------------------------------------------------------------------
+  markdown-lint:
+    needs: files-changed
+    if: needs.files-changed.outputs.markdown == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: DavidAnson/markdownlint-cli2-action@v22
+
+  # ---------------------------------------------------------------------------
+  # Lint YAML files
+  # ---------------------------------------------------------------------------
+  yaml-lint:
+    needs: files-changed
+    if: needs.files-changed.outputs.yaml == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: pip install yamllint
+      - run: yamllint -c .yamllint.yml .
+
+  # ---------------------------------------------------------------------------
+  # Run skill evaluations (reusable workflow)
+  # ---------------------------------------------------------------------------
+  skill-evals:
+    needs: files-changed
+    if: needs.files-changed.outputs.skills == 'true'
+    uses: ./.github/workflows/skill-evals.yml
+    secrets: inherit

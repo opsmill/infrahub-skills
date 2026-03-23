@@ -1,0 +1,80 @@
+---
+# -------------------------------------------------------------------
+# Group labels — categorize by area of the repository
+# -------------------------------------------------------------------
+- name: "group/skills"
+  color: "0075ca"
+  description: "Skill definitions and rules"
+- name: "group/ci"
+  color: "e4e669"
+  description: "CI/CD workflows and scripts"
+- name: "group/docs"
+  color: "0e8a16"
+  description: "Documentation and guides"
+- name: "group/evaluations"
+  color: "d876e3"
+  description: "Eval scenarios and grading scripts"
+- name: "group/common"
+  color: "006b75"
+  description: "Shared references and cross-cutting rules"
+- name: "group/plugin"
+  color: "1d76db"
+  description: "Plugin manifest and hooks"
+
+# -------------------------------------------------------------------
+# Type labels — categorize by nature of the change
+# -------------------------------------------------------------------
+- name: "type/feature"
+  color: "a2eeef"
+  description: "New feature or skill"
+- name: "type/bug"
+  color: "d73a4a"
+  description: "Something isn't working"
+- name: "type/housekeeping"
+  color: "fef2c0"
+  description: "Maintenance, cleanup, refactoring"
+- name: "type/documentation"
+  color: "0075ca"
+  description: "Documentation improvements"
+
+# -------------------------------------------------------------------
+# Effort labels
+# -------------------------------------------------------------------
+- name: "effort/small"
+  color: "c5def5"
+  description: "Small effort (< 1 hour)"
+- name: "effort/medium"
+  color: "bfd4f2"
+  description: "Medium effort (1-4 hours)"
+- name: "effort/large"
+  color: "b4c6e7"
+  description: "Large effort (> 4 hours)"
+
+# -------------------------------------------------------------------
+# Priority labels
+# -------------------------------------------------------------------
+- name: "priority/critical"
+  color: "b60205"
+  description: "Critical priority — release blocker"
+- name: "priority/high"
+  color: "d93f0b"
+  description: "High priority"
+- name: "priority/medium"
+  color: "fbca04"
+  description: "Medium priority"
+- name: "priority/low"
+  color: "0e8a16"
+  description: "Low priority"
+
+# -------------------------------------------------------------------
+# State labels
+# -------------------------------------------------------------------
+- name: "state/blocked"
+  color: "b60205"
+  description: "Blocked by external dependency"
+- name: "state/needs-review"
+  color: "fbca04"
+  description: "Ready for review"
+- name: "state/wip"
+  color: "ededed"
+  description: "Work in progress"
