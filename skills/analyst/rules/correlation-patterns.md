@@ -6,17 +6,23 @@ tags: correlation, diffing, joining, policy
 
 ## Data Correlation Patterns
 
-**Impact: HIGH**
+Impact: HIGH
 
-Correlation is the core step of compliance analysis: taking data returned from one or more MCP queries and comparing it against a policy to find violations. These patterns cover the most common correlation techniques.
+Correlation is the core step of compliance analysis:
+taking data returned from one or more MCP queries
+and comparing it against a policy to find violations.
+These patterns cover the most common correlation
+techniques.
 
 ---
 
 ### Pattern 1: Membership Check (Allow-list)
 
-Verify each item in "current state" is present in an approved set.
+Verify each item in "current state" is present in
+an approved set.
 
-**Use case:** VLANs on interfaces must be from the approved VLAN list.
+**Use case:** VLANs on interfaces must be from the
+approved VLAN list.
 
 ```python
 # Build approved set from policy query
@@ -45,9 +51,11 @@ for edge in state_response["DcimInterface"]["edges"]:
 
 ### Pattern 2: Attribute Pattern Match (Regex)
 
-Verify object names or attributes conform to a naming convention.
+Verify object names or attributes conform to a
+naming convention.
 
-**Use case:** Device names must match `^[a-z]{3}[0-9]{2}-[a-z]+-[0-9]{2}$`.
+**Use case:** Device names must match
+`^[a-z]{3}[0-9]{2}-[a-z]+-[0-9]{2}$`.
 
 ```python
 import re
@@ -70,9 +78,11 @@ for edge in response["DcimDevice"]["edges"]:
 
 ### Pattern 3: Relationship Count Threshold
 
-Verify objects have the required number of related objects.
+Verify objects have the required number of related
+objects.
 
-**Use case:** Spine devices must have at least 2 active BGP sessions.
+**Use case:** Spine devices must have at least 2
+active BGP sessions.
 
 ```python
 violations = []
@@ -95,9 +105,11 @@ for edge in response["DcimDevice"]["edges"]:
 
 ### Pattern 4: Presence Check (Required Relationship)
 
-Verify a required relationship is present (not null/empty).
+Verify a required relationship is present
+(not null/empty).
 
-**Use case:** All devices must have a platform assigned.
+**Use case:** All devices must have a platform
+assigned.
 
 ```python
 violations = []
@@ -116,9 +128,11 @@ for edge in response["DcimDevice"]["edges"]:
 
 ### Pattern 5: Cross-Node ID Join
 
-Correlate two node types using a shared identifier (e.g., IP address, ASN, name).
+Correlate two node types using a shared identifier
+(e.g., IP address, ASN, name).
 
-**Use case:** Every BGP session must have a matching IP address in IPAM.
+**Use case:** Every BGP session must have a matching
+IP address in IPAM.
 
 ```python
 # Build IP set from IPAM
@@ -146,9 +160,11 @@ for edge in bgp_response["NetworkBgpSession"]["edges"]:
 
 ### Pattern 6: Symmetric Relationship Check
 
-Verify bidirectional relationships exist (e.g., BGP sessions must have a reverse).
+Verify bidirectional relationships exist
+(e.g., BGP sessions must have a reverse).
 
-**Use case:** For every session A→B there must be a session B→A.
+**Use case:** For every session A->B there must be
+a session B->A.
 
 ```python
 # Build set of (local_device, remote_device) tuples
@@ -174,7 +190,8 @@ for (local, remote) in sessions:
 
 ### Pattern 7: Design-to-Reality Diff
 
-Compare expected objects (from a design/template) against realized objects.
+Compare expected objects (from a design/template)
+against realized objects.
 
 ```python
 # Expected from design
@@ -197,7 +214,8 @@ extra   = realized_names - expected_names      # realized, not in design
 
 ### Grouping Violations by Site or Device
 
-When reporting, group violations to make findings actionable:
+When reporting, group violations to make findings
+actionable:
 
 ```python
 from collections import defaultdict
@@ -212,4 +230,5 @@ for site, items in sorted(by_site.items()):
         print(f"  ✗ {item['name']} — {item['reason']}")
 ```
 
-Reference: [Infrahub Check Examples](../../check-creator/examples.md)
+Reference:
+[Infrahub Check Examples](../../check-creator/examples.md)

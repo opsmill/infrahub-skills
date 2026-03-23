@@ -6,9 +6,10 @@ tags: tag1, tag2
 
 ## Rule Title Here
 
-**Impact: MEDIUM**
+Impact: MEDIUM
 
-Brief explanation of the rule and why it matters for Infrahub compliance analysis.
+Brief explanation of the rule and why it matters
+for Infrahub compliance analysis.
 
 **Incorrect:**
 
@@ -22,4 +23,5 @@ Brief explanation of the rule and why it matters for Infrahub compliance analysi
 # Good example
 ```
 
-Reference: [Infrahub Docs](https://docs.infrahub.app)
+Reference:
+[Infrahub Docs](https://docs.infrahub.app)

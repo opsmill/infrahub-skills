@@ -229,10 +229,14 @@ SKILL.md, rules/
 
 **Name:** `infrahub-analyst`
 
-Analyze and correlate live Infrahub data using the MCP server to answer operational questions on demand.
+Analyze and correlate live Infrahub data using the
+MCP server to answer operational questions on demand.
 
 **Capabilities:**
-- Answer operational questions interactively ("which devices are in tonight's maintenance window?")
+
+- Answer operational questions interactively
+  ("which devices are in tonight's maintenance
+  window?")
 - Correlate data across multiple node types (services, BGP sessions, prefixes, devices)
 - Investigate service impact and blast radius before a change
 - Detect drift between design intent and realized objects
