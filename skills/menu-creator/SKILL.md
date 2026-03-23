@@ -59,6 +59,37 @@ spec:
 `apiVersion`, `kind: Menu`, and `spec.data` are always
 required. Each menu item needs `name` and `namespace`.
 
+## Workflow
+
+Follow these steps when creating a menu:
+
+1. **Gather requirements** — Ask what schema nodes
+   exist, how they should be grouped, and whether
+   the user wants flat or hierarchical navigation.
+2. **Read relevant rules** — Read `rules/format-structure.md`
+   for the required YAML structure, `rules/item-properties.md`
+   for item fields, and `rules/hierarchy-nesting.md`
+   if nesting is needed. Read `rules/icons-reference.md`
+   to pick appropriate MDI icons.
+3. **Generate the menu YAML** — Start with the
+   `$schema` comment and `apiVersion`/`kind`/`spec`
+   structure. Apply rules from step 2.
+4. **Add registration and schema guidance** — Every
+   menu file output must include:
+   - A YAML comment block showing how to register
+     the file in `.infrahub.yml` under the `menus:`
+     key (see `rules/format-structure.md`)
+   - A YAML comment block advising to set
+     `include_in_menu: false` on every schema node
+     that appears in the custom menu, to prevent
+     duplicate sidebar entries
+     (see `rules/schema-integration.md`)
+
+   Include these as comments at the top of the file,
+   before the `---` document separator. This ensures
+   the user sees the guidance alongside the menu
+   definition.
+
 ## Supporting References
 
 - **[infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**

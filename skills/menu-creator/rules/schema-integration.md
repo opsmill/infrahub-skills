@@ -14,19 +14,24 @@ to prevent duplicate menu entries.
 ### Set include_in_menu: false
 
 When you use a custom menu, set
-`include_in_menu: false` on all schema nodes:
+`include_in_menu: false` on all schema nodes that
+appear in the menu. Without this, Infrahub generates
+auto-menu entries alongside your custom menu,
+creating duplicates.
+
+Always include this advice as a YAML comment at the
+top of the menu file so the user sees it:
 
 ```yaml
-# In schema files
-nodes:
-  - name: Server
-    namespace: Dcim
-    include_in_menu: false   # Controlled by custom menu
-    # ...
+# To prevent duplicate menu entries, set
+# include_in_menu: false on schema nodes that
+# appear in this menu:
+#
+#   nodes:
+#     - name: Server
+#       namespace: Dcim
+#       include_in_menu: false
 ```
-
-Without this, Infrahub generates auto-menu entries
-alongside your custom menu, creating duplicates.
 
 ### kind Auto-Resolution
 
