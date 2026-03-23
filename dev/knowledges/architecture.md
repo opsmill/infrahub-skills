@@ -51,7 +51,8 @@ Plugin (plugin.json)
 │       └── rules/            ← Shared rules
 │
 └── Evaluations (evaluations/)
-    └── schema-creator.json   ← Test scenarios
+    ├── schema-creator.json   ← Test scenarios
+    └── menu-creator.json     ← Test scenarios
 ```
 
 ## Progressive Disclosure Model
