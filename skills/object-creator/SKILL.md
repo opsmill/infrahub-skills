@@ -6,9 +6,14 @@ metadata:
   author: OpsMill
 ---
 
+# Object Creator
+
 ## Overview
 
-Expert guidance for creating Infrahub object (data) files. Objects are YAML files that populate schema nodes with actual infrastructure data -- devices, locations, organizations, modules, and more.
+Expert guidance for creating Infrahub object (data) files.
+Objects are YAML files that populate schema nodes with actual
+infrastructure data -- devices, locations, organizations,
+modules, and more.
 
 ## When to Use
 
@@ -22,13 +27,13 @@ Expert guidance for creating Infrahub object (data) files. Objects are YAML file
 ## Rule Categories
 
 | Priority | Category | Prefix | Description |
-|----------|----------|--------|-------------|
-| CRITICAL | File Format | `format-` | apiVersion, kind: Object, spec structure, required fields |
-| CRITICAL | Value Mapping | `value-` | How attributes, dropdowns, and relationship references map to schema types |
-| HIGH | Children | `children-` | Hierarchical nesting, component nesting, kind specification |
-| MEDIUM | Range Expansion | `range-` | Sequential interface expansion with expand_range |
-| MEDIUM | File Organization | `organization-` | Naming conventions, load order, multi-document files |
-| LOW | Common Patterns | `patterns-` | Flat lists, parent-child, devices, empty slots, git repos |
+| -------- | -------- | ------ | ----------- |
+| CRITICAL | File Format | `format-` | apiVersion, kind, spec structure |
+| CRITICAL | Value Mapping | `value-` | Attributes, dropdowns, references |
+| HIGH | Children | `children-` | Hierarchy/component nesting |
+| MEDIUM | Range | `range-` | Sequential interface expansion |
+| MEDIUM | Organization | `organization-` | Naming, load order, multi-doc |
+| LOW | Patterns | `patterns-` | Flat lists, devices, git repos |
 
 ## Object File Basics
 
@@ -42,13 +47,21 @@ spec:
     - <attribute>: <value>  # List of object instances
 ```
 
-`apiVersion`, `kind: Object`, `spec.kind`, and `spec.data` are always required. Each `spec` block targets a single node kind.
+`apiVersion`, `kind: Object`, `spec.kind`, and `spec.data`
+are always required. Each `spec` block targets a single
+node kind.
 
 ## Supporting References
 
-- **[reference.md](./reference.md)** -- Object file format specification
-- **[examples.md](./examples.md)** -- 15 complete object patterns from production repos
-- **[../common/infrahub-yml-reference.md](../common/infrahub-yml-reference.md)** -- .infrahub.yml project configuration
-- **[../common/rules/](../common/rules/)** -- Shared rules (git integration, caching gotchas) that apply across all skills
-- **[../schema-creator/SKILL.md](../schema-creator/SKILL.md)** -- Schema definitions these objects conform to
-- **[rules/](./rules/)** -- Individual rules organized by category prefix
+- **[reference.md](./reference.md)** -- Object file format
+  specification
+- **[examples.md](./examples.md)** -- 15 complete object
+  patterns from production repos
+- **[../common/infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**
+  -- .infrahub.yml project configuration
+- **[../common/rules/](../common/rules/)** -- Shared rules
+  (git integration, caching) across all skills
+- **[../schema-creator/SKILL.md](../schema-creator/SKILL.md)**
+  -- Schema definitions these objects conform to
+- **[rules/](./rules/)** -- Individual rules by category
+  prefix

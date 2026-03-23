@@ -6,9 +6,10 @@ tags: tag1, tag2
 
 ## Rule Title Here
 
-**Impact: MEDIUM**
+**Impact:** MEDIUM
 
-Brief explanation of the rule and why it matters for Infrahub transform creation.
+Brief explanation of the rule and why it matters
+for Infrahub Transformation creation.
 
 **Incorrect:**
 
@@ -22,4 +23,4 @@ Brief explanation of the rule and why it matters for Infrahub transform creation
 # Good example
 ```
 
-Reference: [Infrahub Transform Docs](https://docs.infrahub.app)
+Reference: [Infrahub Transformation Docs](https://docs.infrahub.app)

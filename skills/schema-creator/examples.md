@@ -1,10 +1,13 @@
 # Infrahub Schema Examples
 
-Real-world schema patterns extracted from production Infrahub deployments. Use these as templates for common infrastructure modeling scenarios.
+Real-world schema patterns extracted from production
+Infrahub deployments. Use these as templates for common
+infrastructure modeling scenarios.
 
 ## Organization Schema (Simplest Pattern)
 
-A generic base with simple nodes inheriting from it. Good starting point for any domain.
+A generic base with simple nodes inheriting from it.
+Good starting point for any domain.
 
 ```yaml
 ---
@@ -83,6 +86,7 @@ nodes:
 ```
 
 **Key patterns:**
+
 - Generic defines shared `name`, `description`, `tags`
 - Nodes inherit and add specific relationships
 - Component/Parent pair with matching `identifier`
@@ -240,6 +244,7 @@ nodes:
 ```
 
 **Key patterns:**
+
 - Generic has `hierarchical: true`
 - Region has `parent: null` (root)
 - Each level specifies `parent` and `children`
@@ -353,7 +358,10 @@ generics:
         kind: Text
         computed_attribute:
           kind: Jinja2
-          jinja2_template: "{% if asset_tag__value %}[{{ asset_tag__value }}](https://www.dell.com/support/contents/en-us/category/product-support/self-support-knowledgebase/locate-service-tag){% else %}N/A{% endif %}"
+          jinja2_template: >-
+            {% if asset_tag__value %}
+            {{ asset_tag__value }}
+            {% else %}N/A{% endif %}
         optional: false
         read_only: true
         order_weight: 2100
@@ -430,6 +438,7 @@ nodes:
 ```
 
 **Key patterns:**
+
 - `GenericDevice` defines all shared device attributes
 - `GenericDellDevice` adds vendor-specific computed attributes
 - `DellServer` uses **multiple inheritance** to combine both generics
@@ -560,6 +569,7 @@ nodes:
 ```
 
 **Key patterns:**
+
 - `ModuleBayTemplate` -> `DeviceType` via Parent/Component
 - `ModuleInstallation` -> `Device` via Parent/Component
 - `uniqueness_constraints` ensure one module per slot per device
@@ -648,7 +658,9 @@ nodes:
 ```
 
 **Key patterns:**
-- Inherits from `BuiltinIPAddress` / `BuiltinIPPrefix` (provides address/prefix fields)
+
+- Inherits from `BuiltinIPAddress` / `BuiltinIPPrefix`
+  (provides address/prefix fields)
 - `regex` validation on FQDN attribute
 - `identifier` on gateway relationship (same peer type as other IP relationships)
 - `uniqueness_constraints` combines attribute with namespace relationship
@@ -725,6 +737,7 @@ extensions:
 ```
 
 **Key patterns:**
+
 - `extensions.nodes` adds to existing nodes without modifying their schema file
 - Each extension references existing node by `kind`
 - New relationships/attributes are added to the existing node's definition
@@ -836,6 +849,7 @@ nodes:
 ```
 
 **Key patterns:**
+
 - Separate generics for L2 and L3 behavior (composition over inheritance)
 - Physical interfaces combine all three generics
 - Virtual interfaces can selectively include/exclude generics

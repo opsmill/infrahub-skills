@@ -6,7 +6,7 @@ tags: patterns, flat-menu, commented-items, generic-links
 
 ## Common Menu Patterns
 
-**Impact: LOW (reference patterns)**
+Impact: LOW (reference patterns)
 
 ### Flat Menu (No Nesting)
 
@@ -43,7 +43,7 @@ spec:
 - namespace: Location
   name: AllLocations
   label: All Locations
-  kind: LocationGeneric          # Shows all location types in one view
+  kind: LocationGeneric    # Shows all types in one view
   icon: "mdi:map-marker"
 ```
 
@@ -67,4 +67,5 @@ children:
     #   icon: mdi:ethernet
 ```
 
-Reference: [Infrahub Menu Docs](https://docs.infrahub.app)
+Reference:
+[Infrahub Menu Docs](https://docs.infrahub.app)

@@ -5,11 +5,14 @@
 
 ## What It Checks
 
-Validates that Python classes for checks, generators, and transforms inherit from the correct base class and implement required methods.
+Validates that Python classes for checks, generators,
+and transforms inherit from the correct base class and
+implement required methods.
 
 ## Checks
 
-### Checks
+### Check Classes
+
 1. Class inherits from `InfrahubCheck`
 2. Implements `validate(self, data: dict)` (sync or async)
 3. Has `query` class attribute
@@ -17,12 +20,14 @@ Validates that Python classes for checks, generators, and transforms inherit fro
 5. Uses `self.log_error()` for failure conditions
 
 ### Generators
+
 1. Class inherits from `InfrahubGenerator`
 2. Implements `async generate(self, data: dict)`
 3. Calls `save(allow_upsert=True)` on created objects
 4. Handles empty data gracefully
 
 ### Transforms
+
 1. Class inherits from `InfrahubTransform`
 2. Implements `transform(self, data: dict)` (sync or async)
 3. Has `query` class attribute

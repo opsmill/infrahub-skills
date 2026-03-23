@@ -6,9 +6,10 @@ tags: jinja2, template, data-variable, netutils
 
 ## Jinja2 Transform Templates
 
-**Impact: CRITICAL**
+**Impact:** CRITICAL
 
-Jinja2 transforms render a template using GraphQL query data. No Python code needed.
+Jinja2 transforms render a template using GraphQL
+query data. No Python code needed.
 
 ### Template Structure
 
@@ -49,9 +50,11 @@ jinja2_transforms:
 ### Jinja2 Features
 
 - Standard Jinja2 filters and syntax
-- **Netutils** filters available (via `netutils.utils.jinja2_convenience_function()`)
+- **Netutils** filters available
+  (via `netutils.utils.jinja2_convenience_function()`)
 - Can import other templates from the repository
-- Both dot notation (`d.name.value`) and bracket notation (`d["name"]["value"]`) work
+- Both dot notation (`d.name.value`) and bracket
+  notation (`d["name"]["value"]`) work
 
 ### Key Rules
 

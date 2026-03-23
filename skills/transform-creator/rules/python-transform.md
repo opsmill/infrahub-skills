@@ -6,9 +6,11 @@ tags: python, InfrahubTransform, transform, return-types
 
 ## Python Transform Class
 
-**Impact: CRITICAL**
+**Impact:** CRITICAL
 
-Python transforms inherit from `InfrahubTransform` and implement a `transform()` method that returns the transformed data.
+Python transforms inherit from `InfrahubTransform` and
+implement a `transform()` method that returns the
+transformed data.
 
 ### Basic Structure
 
@@ -34,10 +36,10 @@ class MyTransform(InfrahubTransform):
 
 ### Return Types
 
-| Return Type | Content Type | Use Case |
-|-------------|-------------|----------|
-| `dict` | `application/json` | Structured data, API payloads |
-| `str` | `text/plain` | Device configs, scripts, CSV |
+| Return Type | Content Type       | Use Case                      |
+| ----------- | ------------------ | ----------------------------- |
+| `dict`      | `application/json` | Structured data, API payloads |
+| `str`       | `text/plain`       | Device configs, scripts, CSV  |
 
 ### Registration in .infrahub.yml
 

@@ -6,9 +6,12 @@ tags: display, human_friendly_id, identity
 
 ## Always Set human_friendly_id on Nodes
 
-**Impact: HIGH**
+Impact: HIGH
 
-`human_friendly_id` determines how objects are identified in the UI and how they're referenced from object data files. Without it, objects can only be referenced by internal UUID.
+`human_friendly_id` determines how objects are identified
+in the UI and how they're referenced from object data
+files. Without it, objects can only be referenced by
+internal UUID.
 
 **Incorrect -- no human_friendly_id:**
 
@@ -37,10 +40,10 @@ nodes:
 
 ### Single vs Multi-Element
 
-| Elements | Object Reference Style | Example |
-|----------|----------------------|---------|
+| Elements | Reference Style | Example |
+| -------- | --------------- | ------- |
 | 1 element | Scalar | `device_type: PowerEdge R960` |
-| 2+ elements | List | `rack: ["room-shortname", "Rack-A"]` |
+| 2+ elements | List | `rack: ["room-short", "Rack-A"]` |
 
 ### Examples
 

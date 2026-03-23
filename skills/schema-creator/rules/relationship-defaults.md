@@ -6,16 +6,18 @@ tags: relationship, defaults, cardinality, optional
 
 ## Relationship Default Values
 
-**Impact: CRITICAL**
+Impact: CRITICAL
 
-Relationship defaults are different from attribute defaults. Getting these wrong leads to unexpected behavior.
+Relationship defaults are different from attribute
+defaults. Getting these wrong leads to unexpected
+behavior.
 
 | Property | Default | Notes |
-|----------|---------|-------|
-| `cardinality` | `many` | Explicitly set `one` for single references |
-| `optional` | `true` | Unlike attributes (which default to mandatory) |
+| -------- | ------- | ----- |
+| `cardinality` | `many` | Explicitly set `one` for singles |
+| `optional` | `true` | Unlike attrs (mandatory default) |
 | `direction` | `bidirectional` | Rarely needs changing |
-| `kind` | `Generic` | Set explicitly for Component, Parent, Attribute |
+| `kind` | `Generic` | Set for Component, Parent, Attr |
 
 **Common mistake -- forgetting cardinality defaults to many:**
 
@@ -35,10 +37,12 @@ Relationship defaults are different from attribute defaults. Getting these wrong
   cardinality: one
 ```
 
-**Key contrast with attributes:** Attributes are `optional: false` by default (mandatory). Relationships are `optional: true` by default.
+**Key contrast with attributes:** Attributes are
+`optional: false` by default (mandatory). Relationships
+are `optional: true` by default.
 
 | Type | Default `optional` |
-|------|-------------------|
+| ---- | ------------------ |
 | Attributes | `false` (mandatory) |
 | Relationships | `true` (optional) |
 

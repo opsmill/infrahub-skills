@@ -6,9 +6,10 @@ tags: children, hierarchy, locations, nesting
 
 ## Hierarchical Children Nesting
 
-**Impact: HIGH**
+Impact: HIGH
 
-For hierarchical nodes (location trees), nest children inline with the `kind` field specified on each level.
+For hierarchical nodes (location trees), nest children
+inline with the `kind` field specified on each level.
 
 **Incorrect -- missing kind on children:**
 

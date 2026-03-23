@@ -6,11 +6,14 @@ tags: attribute, optional, dropdown, choices, deprecated
 
 ## Attribute Defaults, Dropdowns, and Deprecated Fields
 
-**Impact: HIGH**
+Impact: HIGH
 
 ### Attributes Are Mandatory by Default
 
-Unlike relationships (which default to optional), attributes default to `optional: false`. If you add a new attribute without `optional: true`, all existing objects will need a value.
+Unlike relationships (which default to optional),
+attributes default to `optional: false`. If you add a
+new attribute without `optional: true`, all existing
+objects will need a value.
 
 **Incorrect -- adding a new required attribute without a default:**
 
@@ -35,7 +38,8 @@ Unlike relationships (which default to optional), attributes default to `optiona
 
 ### Dropdown Choices Format
 
-Each choice needs at minimum a `name` field. `label`, `description`, `color` are optional.
+Each choice needs at minimum a `name` field. `label`,
+`description`, `color` are optional.
 
 **Incorrect:**
 
@@ -61,12 +65,14 @@ Each choice needs at minimum a `name` field. `label`, `description`, `color` are
       color: "#0000FF"
 ```
 
-When referencing dropdown values in object files, use the `name` value (not `label`): `status: active` not `status: Active`.
+When referencing dropdown values in object files, use
+the `name` value (not `label`): `status: active` not
+`status: Active`.
 
 ### Deprecated Fields to Avoid
 
 | Deprecated | Use Instead |
-|-----------|-------------|
+| ---------- | ----------- |
 | `display_labels` | `display_label` |
 | `default_filter` | `human_friendly_id` |
 | `String` (attribute kind) | `Text` |

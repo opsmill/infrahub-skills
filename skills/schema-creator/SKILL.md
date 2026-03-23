@@ -1,14 +1,23 @@
 ---
 name: infrahub-schema-creator
-description: Create, validate, and modify Infrahub schemas. Use when designing data models, creating schema nodes with attributes and relationships, validating schema definitions, or planning schema migrations for Infrahub.
+description: >-
+  Create, validate, and modify Infrahub schemas. Use when
+  designing data models, creating schema nodes with
+  attributes and relationships, validating schema
+  definitions, or planning schema migrations for Infrahub.
 metadata:
   version: 1.1.0
   author: OpsMill
 ---
 
+# Infrahub Schema Creator
+
 ## Overview
 
-Expert guidance for designing and building Infrahub schemas. Schemas are YAML files defining nodes (concrete types), generics (abstract base types), attributes, relationships, and extensions.
+Expert guidance for designing and building Infrahub
+schemas. Schemas are YAML files defining nodes (concrete
+types), generics (abstract base types), attributes,
+relationships, and extensions.
 
 ## When to Use
 
@@ -22,15 +31,15 @@ Expert guidance for designing and building Infrahub schemas. Schemas are YAML fi
 ## Rule Categories
 
 | Priority | Category | Prefix | Description |
-|----------|----------|--------|-------------|
-| CRITICAL | Naming | `naming-` | Namespace, node, attribute naming patterns and kind derivation |
-| CRITICAL | Relationships | `relationship-` | Identifier matching, peer references, component/parent pairs, defaults |
-| HIGH | Attributes | `attribute-` | Mandatory defaults, dropdown choices, deprecated fields |
-| HIGH | Hierarchy | `hierarchy-` | Hierarchical generics, parent/children setup |
-| HIGH | Display | `display-` | human_friendly_id, order_weight conventions |
-| MEDIUM | Extensions | `extension-` | Cross-file relationships via extensions block |
-| MEDIUM | Uniqueness | `uniqueness-` | Constraint format with __value suffix |
-| MEDIUM | Migration | `migration-` | Adding/removing attributes, state: absent |
+| -------- | -------- | ------ | ----------- |
+| CRITICAL | Naming | `naming-` | Namespace, node, attribute naming |
+| CRITICAL | Relationships | `relationship-` | IDs, peers, component/parent |
+| HIGH | Attributes | `attribute-` | Defaults, dropdowns, deprecated |
+| HIGH | Hierarchy | `hierarchy-` | Hierarchical generics, parent/children |
+| HIGH | Display | `display-` | human_friendly_id, order_weight |
+| MEDIUM | Extensions | `extension-` | Cross-file via extensions block |
+| MEDIUM | Uniqueness | `uniqueness-` | Constraint format, __value suffix |
+| MEDIUM | Migration | `migration-` | Add/remove attributes, state: absent |
 | LOW | Validation | `validation-` | Common errors, pre-check checklist |
 
 ## Schema File Basics
@@ -49,13 +58,20 @@ extensions:    # Add attributes/relationships to existing nodes from other files
     - ...
 ```
 
-Always include the `$schema` comment for IDE validation. Only `version` is required at the top level.
+Always include the `$schema` comment for IDE validation.
+Only `version` is required at the top level.
 
 ## Supporting References
 
-- **[reference.md](./reference.md)** -- Complete property tables for nodes, generics, attributes, and relationships
-- **[examples.md](./examples.md)** -- Full schema patterns extracted from production repos
-- **[validation.md](./validation.md)** -- `infrahubctl` commands, migration strategies, pre-validation checklist
-- **[../common/infrahub-yml-reference.md](../common/infrahub-yml-reference.md)** -- .infrahub.yml project configuration
-- **[../common/rules/](../common/rules/)** -- Shared rules (git integration, caching gotchas) that apply across all skills
-- **[rules/](./rules/)** -- Individual rules organized by category prefix
+- **[reference.md](./reference.md)** -- Complete property
+  tables for nodes, generics, attributes, relationships
+- **[examples.md](./examples.md)** -- Full schema patterns
+  from production repos
+- **[validation.md](./validation.md)** -- `infrahubctl`
+  commands, migration strategies, pre-validation checklist
+- **[../common/infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**
+  -- .infrahub.yml project configuration
+- **[../common/rules/](../common/rules/)** -- Shared rules
+  (git integration, caching) across all skills
+- **[rules/](./rules/)** -- Individual rules by category
+  prefix

@@ -6,9 +6,12 @@ tags: hierarchy, parent, children, generic, location
 
 ## Setting Up Hierarchical Nodes
 
-**Impact: HIGH**
+Impact: HIGH
 
-Hierarchical nodes (like location trees) require three things: a generic with `hierarchical: true`, nodes with `parent`/`children` fields, and inheritance from that generic.
+Hierarchical nodes (like location trees) require three
+things: a generic with `hierarchical: true`, nodes with
+`parent`/`children` fields, and inheritance from that
+generic.
 
 ### Step 1: Generic with hierarchical: true
 
@@ -71,6 +74,7 @@ nodes:
 ```
 
 **Key rules:**
+
 - Root nodes: `parent: null`
 - Leaf nodes: `children: null` (or omit)
 - Use full kind for `parent` and `children` values: `LocationSite` not `Site`

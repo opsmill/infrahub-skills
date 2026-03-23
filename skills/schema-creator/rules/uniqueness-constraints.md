@@ -6,9 +6,12 @@ tags: uniqueness, constraints, validation
 
 ## Uniqueness Constraint Format
 
-**Impact: MEDIUM**
+Impact: MEDIUM
 
-Uniqueness constraints use `__value` suffix for attributes but bare names for relationships. Getting this wrong causes a "references unknown field" validation error.
+Uniqueness constraints use `__value` suffix for
+attributes but bare names for relationships. Getting
+this wrong causes a "references unknown field"
+validation error.
 
 **Incorrect:**
 
@@ -28,8 +31,8 @@ uniqueness_constraints:
 ### Format Rules
 
 | Field Type | Format | Example |
-|-----------|--------|---------|
-| Attribute | `attribute_name__value` | `name__value`, `model__value` |
+| ---------- | ------ | ------- |
+| Attribute | `attribute_name__value` | `name__value` |
 | Relationship | bare name | `rack`, `device_type`, `manufacturer` |
 
 ### Example: Unique Device Name per Rack

@@ -1,14 +1,25 @@
 # Infrahub AI Skills
 
-AI skills for developing with [Infrahub](https://github.com/opsmill/infrahub), the infrastructure data management platform by OpsMill. These skills provide structured guidance — covering schema design, data population, validation checks, generators, transforms, and menu customization — to any AI coding assistant that supports custom instructions or context files.
+AI skills for developing with
+[Infrahub](https://github.com/opsmill/infrahub),
+the infrastructure data management platform by OpsMill.
+These skills provide structured guidance — covering schema
+design, data population, validation checks, generators,
+transforms, and menu customization — to any AI coding
+assistant that supports custom instructions or context files.
 
-The skills are written in plain Markdown with lightweight YAML frontmatter and are easy to adapt to whichever AI tool you use.
+The skills are written in plain Markdown with lightweight
+YAML frontmatter and are easy to adapt to whichever AI
+tool you use.
 
 ## Installation
 
 ### Copy Skills into Your Repository
 
-The simplest and most universal approach — works with any AI tool. Copy the `skills/` directory into your project so the AI assistant can discover the files directly:
+The simplest and most universal approach — works with
+any AI tool. Copy the `skills/` directory into your
+project so the AI assistant can discover the files
+directly:
 
 ```bash
 # Clone the skills repository
@@ -31,11 +42,16 @@ cp -r infrahub-skills/skills/object-creator /path/to/your-infrahub-project/skill
 cp -r infrahub-skills/skills/common /path/to/your-infrahub-project/skills/
 ```
 
-> **Note:** Always include `skills/common/` when copying individual skills — it contains shared references (GraphQL queries, `.infrahub.yml` format, git integration rules) that all skills depend on.
+> **Note:** Always include `skills/common/` when copying
+> individual skills — it contains shared references
+> (GraphQL queries, `.infrahub.yml` format, git
+> integration rules) that all skills depend on.
 
 ### Claude Code (Plugin)
 
-If you prefer the plugin approach, the skills are automatically available across all your Infrahub projects without copying files into each one.
+If you prefer the plugin approach, the skills are
+automatically available across all your Infrahub projects
+without copying files into each one.
 
 #### Option 1: Via OpsMill Marketplace (Recommended)
 
@@ -93,16 +109,20 @@ If you have the plugin locally, run inside Claude Code:
 
 **Name:** `infrahub-schema-creator`
 
-Create, validate, and modify Infrahub schemas for infrastructure data management.
+Create, validate, and modify Infrahub schemas for
+infrastructure data management.
 
 **Capabilities:**
+
 - Create new schemas from natural language requirements
 - Design nodes with attributes, relationships, and generics
 - Set up hierarchical location trees and component/parent patterns
 - Configure display properties (human_friendly_id, display_label)
 - Validate schemas and plan migrations
 
-**Documentation:** `skills/schema-creator/` -- SKILL.md, reference.md, examples.md, validation.md, rules/
+**Documentation:** `skills/schema-creator/` --
+SKILL.md, reference.md, examples.md, validation.md,
+rules/
 
 ---
 
@@ -110,16 +130,19 @@ Create, validate, and modify Infrahub schemas for infrastructure data management
 
 **Name:** `infrahub-object-creator`
 
-Create and manage Infrahub object data files for populating infrastructure data.
+Create and manage Infrahub object data files for
+populating infrastructure data.
 
 **Capabilities:**
+
 - Create YAML data files for devices, locations, organizations, modules
 - Set up hierarchical data (location trees, tenant groups)
 - Reference related objects across files
 - Manage component children (interfaces, modules, bays)
 - Organize files for correct dependency load order
 
-**Documentation:** `skills/object-creator/` -- SKILL.md, reference.md, examples.md, rules/
+**Documentation:** `skills/object-creator/` --
+SKILL.md, reference.md, examples.md, rules/
 
 ---
 
@@ -127,16 +150,19 @@ Create and manage Infrahub object data files for populating infrastructure data.
 
 **Name:** `infrahub-check-creator`
 
-Create validation checks that run in proposed change pipelines.
+Create validation checks that run in proposed change
+pipelines.
 
 **Capabilities:**
+
 - Write Python validation logic (InfrahubCheck class)
 - Create GraphQL queries for data fetching
 - Build global and targeted checks
 - Register checks in .infrahub.yml
 - Debug check failures
 
-**Documentation:** `skills/check-creator/` -- SKILL.md, examples.md, rules/
+**Documentation:** `skills/check-creator/` --
+SKILL.md, examples.md, rules/
 
 ---
 
@@ -144,16 +170,19 @@ Create validation checks that run in proposed change pipelines.
 
 **Name:** `infrahub-generator-creator`
 
-Create design-driven generators that automatically create infrastructure objects.
+Create design-driven generators that automatically
+create infrastructure objects.
 
 **Capabilities:**
+
 - Build generators that create objects from design definitions
 - Implement idempotent create-or-update workflows (allow_upsert)
 - Set up target groups and GraphQL queries
 - Configure automatic cleanup of stale objects
 - Register generators in .infrahub.yml
 
-**Documentation:** `skills/generator-creator/` -- SKILL.md, examples.md, rules/
+**Documentation:** `skills/generator-creator/` --
+SKILL.md, examples.md, rules/
 
 ---
 
@@ -161,16 +190,19 @@ Create design-driven generators that automatically create infrastructure objects
 
 **Name:** `infrahub-transform-creator`
 
-Create data transforms that convert Infrahub data into different formats.
+Create data transforms that convert Infrahub data into
+different formats.
 
 **Capabilities:**
+
 - Build Python transforms (InfrahubTransform class)
 - Create Jinja2 template-based transforms
 - Generate device configs, CSV reports, inventory exports
 - Connect transforms to artifacts for automated output
 - Hybrid Python + Jinja2 patterns
 
-**Documentation:** `skills/transform-creator/` -- SKILL.md, examples.md, rules/
+**Documentation:** `skills/transform-creator/` --
+SKILL.md, examples.md, rules/
 
 ---
 
@@ -178,15 +210,18 @@ Create data transforms that convert Infrahub data into different formats.
 
 **Name:** `infrahub-menu-creator`
 
-Create custom navigation menus for the Infrahub web interface.
+Create custom navigation menus for the Infrahub web
+interface.
 
 **Capabilities:**
+
 - Design navigation menus with nested hierarchies
 - Organize node types into logical groups
 - Configure icons (MDI icon set) and labels
 - Link menu items to schema node list views
 
-**Documentation:** `skills/menu-creator/` -- SKILL.md, rules/
+**Documentation:** `skills/menu-creator/` --
+SKILL.md, rules/
 
 ---
 
@@ -215,6 +250,7 @@ Analyze and correlate live Infrahub data using the MCP server to answer operatio
 Shared documentation and rules referenced by all skills.
 
 **Contents:**
+
 - `graphql-queries.md` -- GraphQL query writing reference
 - `infrahub-yml-reference.md` -- .infrahub.yml project configuration
 - `rules/` -- Shared rules (git integration, caching gotchas)
@@ -223,19 +259,28 @@ Shared documentation and rules referenced by all skills.
 
 ## Using with Other AI Tools
 
-These skills follow the [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) format — each skill is a directory with a `SKILL.md` entry point (with `name` and `description` frontmatter) plus supporting reference files. Any AI coding tool that supports skills can use them directly.
+These skills follow the
+[Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)
+format — each skill is a directory with a `SKILL.md`
+entry point (with `name` and `description` frontmatter)
+plus supporting reference files. Any AI coding tool that
+supports skills can use them directly.
 
-For tools that don't support skills natively, copy the `skills/` directory into your project and point the tool at the relevant files.
+For tools that don't support skills natively, copy the
+`skills/` directory into your project and point the tool
+at the relevant files.
 
 ### GitHub Copilot
 
-Copy the `skills/` directory into your repo, then reference the skills from a Copilot instructions file:
+Copy the `skills/` directory into your repo, then
+reference the skills from a Copilot instructions file:
 
 ```bash
 cp -r skills/ /path/to/your-infrahub-project/skills/
 ```
 
-Create `.github/instructions/infrahub.instructions.md` to point Copilot at the skills:
+Create `.github/instructions/infrahub.instructions.md`
+to point Copilot at the skills:
 
 ```markdown
 ---
@@ -248,7 +293,8 @@ See [GitHub Copilot custom instructions docs](https://docs.github.com/en/copilot
 
 ### Cursor
 
-Copy the `skills/` directory into your repo, then create a Cursor rule to reference them:
+Copy the `skills/` directory into your repo, then
+create a Cursor rule to reference them:
 
 ```bash
 cp -r skills/ /path/to/your-infrahub-project/skills/
@@ -269,7 +315,10 @@ See [Cursor Rules docs](https://cursor.com/docs/context/rules).
 
 ### Windsurf
 
-Copy the `skills/` directory into your repo. Windsurf will pick up the Markdown files as context. You can also reference them from `.windsurfrules` at your project root.
+Copy the `skills/` directory into your repo. Windsurf
+will pick up the Markdown files as context. You can also
+reference them from `.windsurfrules` at your project
+root.
 
 See [Windsurf Rules docs](https://docs.windsurf.com/windsurf/customize#rules).
 
@@ -278,22 +327,30 @@ See [Windsurf Rules docs](https://docs.windsurf.com/windsurf/customize#rules).
 For any AI coding tool:
 
 1. Copy the `skills/` directory into your project
-2. If the tool supports skills natively, it should discover the `SKILL.md` files automatically
-3. Otherwise, point the tool's context or instructions configuration at the relevant `SKILL.md` files — each one references supporting files (`reference.md`, `examples.md`, `rules/`) for detailed guidance
+2. If the tool supports skills natively, it should
+   discover the `SKILL.md` files automatically
+3. Otherwise, point the tool's context or instructions
+   configuration at the relevant `SKILL.md` files —
+   each one references supporting files
+   (`reference.md`, `examples.md`, `rules/`) for
+   detailed guidance
 
 ---
 
 ## Automatic Detection (Claude Code only)
 
-The Claude Code plugin automatically detects Infrahub projects on session start by looking for:
+The Claude Code plugin automatically detects Infrahub
+projects on session start by looking for:
+
 - `.infrahub.yml` or `infrahub.toml` configuration files
 - Schema files with `version: "1.0"` and `nodes:` or `generics:` keys
 
-When detected, Claude is instructed to use the appropriate skills for relevant tasks.
+When detected, Claude is instructed to use the
+appropriate skills for relevant tasks.
 
 ## Project Structure
 
-```
+```text
 .
 ├── .claude-plugin/
 │   └── plugin.json              # Plugin manifest

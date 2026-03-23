@@ -1,0 +1,792 @@
+#!/usr/bin/env python3
+"""
+Skill evaluation runner for CI/CD and local use.
+
+Runs evaluation prompts with and without skill context using the Claude CLI,
+grades schema outputs programmatically against assertions, and generates
+benchmark reports (JSON + Markdown).
+
+Usage:
+    python scripts/run_evals.py
+    python scripts/run_evals.py --eval-file evaluations/schema-creator.json
+    python scripts/run_evals.py --output-dir eval-results --model claude-sonnet-4-6
+"""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import time
+import textwrap
+from datetime import datetime, timezone
+from pathlib import Path
+
+try:
+    import yaml
+except ImportError:
+    print("PyYAML is required: pip install pyyaml")
+    sys.exit(1)
+
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+SKILL_PATHS = {
+    "infrahub-schema-creator": "skills/schema-creator/SKILL.md",
+}
+
+
+# ---------------------------------------------------------------------------
+# Claude CLI runner
+# ---------------------------------------------------------------------------
+
+def run_claude_prompt(prompt: str, output_path: Path, with_skill: bool,
+                      skill_path: str | None = None,
+                      model: str | None = None) -> dict:
+    """Run a single prompt via ``claude -p`` and return timing metadata."""
+    output_path.mkdir(parents=True, exist_ok=True)
+    schema_file = output_path / "schema.yml"
+
+    if with_skill and skill_path:
+        full_prompt = textwrap.dedent(f"""\
+            Read the skill at {skill_path} and follow its workflow and rules to accomplish this task.
+
+            Task: {prompt}
+
+            Save ONLY the final schema YAML file to: {schema_file}
+        """)
+    else:
+        full_prompt = textwrap.dedent(f"""\
+            Do NOT read any files from the skills/ directory.
+            Use only your general knowledge of Infrahub.
+
+            Task: {prompt}
+
+            Save ONLY the final schema YAML file to: {schema_file}
+        """)
+
+    cmd = [
+        "claude",
+        "-p", full_prompt,
+        "--output-format", "json",
+        "--max-turns", "25",
+    ]
+    if model:
+        cmd.extend(["--model", model])
+
+    env = {**os.environ, "CLAUDE_CODE_ENTRYPOINT": "cli"}
+    start = time.time()
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True,
+            timeout=300, cwd=str(REPO_ROOT), env=env,
+        )
+    except subprocess.TimeoutExpired:
+        timing = {"total_tokens": 0, "duration_ms": 300_000,
+                  "total_duration_seconds": 300.0, "error": "timeout"}
+        with open(output_path / "timing.json", "w") as f:
+            json.dump(timing, f, indent=2)
+        return timing
+    duration = time.time() - start
+
+    total_tokens = 0
+    cost_usd = 0.0
+    try:
+        out = json.loads(result.stdout)
+        total_tokens = out.get("num_tokens", 0) or 0
+        cost_usd = out.get("session_cost", 0.0) or 0.0
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    timing = {
+        "total_tokens": total_tokens,
+        "duration_ms": int(duration * 1000),
+        "total_duration_seconds": round(duration, 1),
+        "cost_usd": cost_usd,
+        "returncode": result.returncode,
+    }
+    with open(output_path / "timing.json", "w") as f:
+        json.dump(timing, f, indent=2)
+    return timing
+
+
+# ---------------------------------------------------------------------------
+# Programmatic schema graders
+# ---------------------------------------------------------------------------
+
+def _all_nodes(schema: dict) -> list[dict]:
+    return schema.get("nodes", [])
+
+
+def _all_generics(schema: dict) -> list[dict]:
+    return schema.get("generics", [])
+
+
+def _all_attrs(node: dict) -> list[dict]:
+    return node.get("attributes", [])
+
+
+def _all_rels(node: dict) -> list[dict]:
+    return node.get("relationships", [])
+
+
+def _full_kind(node: dict) -> str:
+    ns = node.get("namespace", "")
+    name = node.get("name", "")
+    return f"{ns}{name}"
+
+
+def check_attr_min_length(schema: dict, **_) -> tuple[bool, str]:
+    """All attribute names must be >= 3 characters."""
+    short = []
+    for node in _all_nodes(schema) + _all_generics(schema):
+        for attr in _all_attrs(node):
+            if len(attr.get("name", "")) < 3:
+                short.append(f"{_full_kind(node)}.{attr['name']}")
+    if short:
+        return False, f"Short attribute names found: {', '.join(short)}"
+    return True, "All attribute names >= 3 characters"
+
+
+def check_dropdown_for_status(schema: dict, **_) -> tuple[bool, str]:
+    """Status attribute uses kind: Dropdown with choices."""
+    for node in _all_nodes(schema):
+        for attr in _all_attrs(node):
+            if attr.get("name") == "status":
+                if attr.get("kind") != "Dropdown":
+                    return False, f"{_full_kind(node)}.status uses kind: {attr.get('kind')}, expected Dropdown"
+                if not attr.get("choices"):
+                    return False, f"{_full_kind(node)}.status has no choices defined"
+                return True, f"{_full_kind(node)}.status uses Dropdown with {len(attr['choices'])} choices"
+    return False, "No status attribute found"
+
+
+def check_no_deprecated_string(schema: dict, **_) -> tuple[bool, str]:
+    """No attribute should use the deprecated 'String' kind."""
+    found = []
+    for node in _all_nodes(schema) + _all_generics(schema):
+        for attr in _all_attrs(node):
+            if attr.get("kind") == "String":
+                found.append(f"{_full_kind(node)}.{attr['name']}")
+    if found:
+        return False, f"Deprecated 'String' kind used: {', '.join(found)}"
+    return True, "All attributes use 'Text' (not deprecated 'String')"
+
+
+def check_full_kind_references(schema: dict, **_) -> tuple[bool, str]:
+    """All peer references use full Namespace+Name kind."""
+    defined_kinds = set()
+    for node in _all_nodes(schema) + _all_generics(schema):
+        defined_kinds.add(_full_kind(node))
+
+    short = []
+    for node in _all_nodes(schema) + _all_generics(schema):
+        for rel in _all_rels(node):
+            peer = rel.get("peer", "")
+            if not peer:
+                continue
+            # Skip well-known external kinds
+            if peer.startswith("Builtin") or peer.startswith("Infra"):
+                continue
+            # A peer is "short" if it matches a node name but not the full kind
+            names_only = {n.get("name", "") for n in _all_nodes(schema) + _all_generics(schema)}
+            if peer in names_only and peer not in defined_kinds:
+                short.append(f"{_full_kind(node)}.{rel['name']} -> {peer}")
+    if short:
+        return False, f"Short peer references: {', '.join(short)}"
+    return True, "All peer references use full Namespace+Name kind"
+
+
+def check_human_friendly_id(schema: dict, **_) -> tuple[bool, str]:
+    """human_friendly_id is defined on all nodes."""
+    missing = []
+    for node in _all_nodes(schema):
+        if not node.get("human_friendly_id"):
+            # Check if inherited from a generic
+            inherits = node.get("inherit_from", [])
+            if inherits:
+                for generic in _all_generics(schema):
+                    if _full_kind(generic) in inherits and generic.get("human_friendly_id"):
+                        break
+                else:
+                    missing.append(_full_kind(node))
+            else:
+                missing.append(_full_kind(node))
+    if missing:
+        return False, f"Missing human_friendly_id: {', '.join(missing)}"
+    return True, "human_friendly_id defined on all nodes"
+
+
+def check_display_label_singular(schema: dict, **_) -> tuple[bool, str]:
+    """Uses display_label (singular), not deprecated display_labels (plural)."""
+    bad = []
+    for node in _all_nodes(schema) + _all_generics(schema):
+        if "display_labels" in node:
+            bad.append(_full_kind(node))
+    if bad:
+        return False, f"Deprecated display_labels (plural) found on: {', '.join(bad)}"
+    # Check at least one node or generic has display_label
+    has_label = any(
+        "display_label" in n
+        for n in _all_nodes(schema) + _all_generics(schema)
+    )
+    if not has_label:
+        return False, "No display_label found on any node or generic"
+    return True, "Uses display_label (singular Jinja2 string)"
+
+
+def check_schema_version(schema: dict, **_) -> tuple[bool, str]:
+    """Schema starts with version: '1.0'."""
+    version = schema.get("version")
+    if version == "1.0":
+        return True, "version: '1.0'"
+    return False, f"version is '{version}', expected '1.0'"
+
+
+def check_matching_identifiers(schema: dict, **_) -> tuple[bool, str]:
+    """All relationship identifier pairs match between both sides."""
+    # Build a map of identifier -> list of (node_kind, rel_name)
+    id_map: dict[str, list[tuple[str, str]]] = {}
+    for node in _all_nodes(schema) + _all_generics(schema):
+        for rel in _all_rels(node):
+            ident = rel.get("identifier")
+            if ident:
+                kind = _full_kind(node)
+                id_map.setdefault(ident, []).append((kind, rel.get("name", "")))
+
+    # Each identifier should appear at least twice (both sides)
+    orphans = []
+    for ident, usages in id_map.items():
+        if len(usages) < 2:
+            # Skip if peer is external (not defined in this schema)
+            rel_node_kind = usages[0][0]
+            for node in _all_nodes(schema) + _all_generics(schema):
+                if _full_kind(node) == rel_node_kind:
+                    for rel in _all_rels(node):
+                        if rel.get("identifier") == ident:
+                            peer = rel.get("peer", "")
+                            defined = {_full_kind(n) for n in _all_nodes(schema) + _all_generics(schema)}
+                            if peer not in defined:
+                                break  # External peer, skip
+                    else:
+                        orphans.append(f"{ident} (only on {usages[0][0]}.{usages[0][1]})")
+                    break
+
+    if orphans:
+        return False, f"Orphan identifiers (only one side defined): {', '.join(orphans)}"
+    return True, "All relationship identifiers match between both sides"
+
+
+def check_hierarchical_generic(schema: dict, **_) -> tuple[bool, str]:
+    """A generic is defined with hierarchical: true."""
+    for generic in _all_generics(schema):
+        if generic.get("hierarchical") is True:
+            return True, f"{_full_kind(generic)} has hierarchical: true"
+    return False, "No generic with hierarchical: true found"
+
+
+def check_inherit_from_generic(schema: dict, **_) -> tuple[bool, str]:
+    """All nodes inherit_from the hierarchical generic using its full kind."""
+    hier_kind = None
+    for generic in _all_generics(schema):
+        if generic.get("hierarchical") is True:
+            hier_kind = _full_kind(generic)
+            break
+    if not hier_kind:
+        return False, "No hierarchical generic found"
+
+    missing = []
+    for node in _all_nodes(schema):
+        inherits = node.get("inherit_from", [])
+        if hier_kind not in inherits:
+            missing.append(_full_kind(node))
+    if missing:
+        return False, f"Nodes not inheriting from {hier_kind}: {', '.join(missing)}"
+    return True, f"All nodes inherit from {hier_kind}"
+
+
+def check_root_no_parent(schema: dict, **_) -> tuple[bool, str]:
+    """Root node has parent set to empty string or null."""
+    for node in _all_nodes(schema):
+        parent = node.get("parent")
+        if parent is None or parent == "" or parent == "null":
+            return True, f"{_full_kind(node)} has parent: {repr(parent)}"
+    return False, "No root node with parent null or empty string found"
+
+
+def check_correct_hierarchy_chain(schema: dict, **_) -> tuple[bool, str]:
+    """Parent/children chain: Region->Site->Room->Rack."""
+    nodes_by_name = {}
+    for node in _all_nodes(schema):
+        name_lower = node.get("name", "").lower()
+        nodes_by_name[name_lower] = node
+
+    expected = [("region", "site"), ("site", "room"), ("room", "rack")]
+    issues = []
+    for parent_name, child_name in expected:
+        parent_node = nodes_by_name.get(parent_name)
+        child_node = nodes_by_name.get(child_name)
+        if not parent_node:
+            issues.append(f"Node '{parent_name}' not found")
+            continue
+        if not child_node:
+            issues.append(f"Node '{child_name}' not found")
+            continue
+
+        children_val = parent_node.get("children", "")
+        child_kind = _full_kind(child_node)
+        if children_val:
+            # Normalize to a comparable token: could be a string or a list
+            if isinstance(children_val, list):
+                children_tokens = [str(v) for v in children_val]
+            else:
+                children_tokens = [str(children_val)]
+            if child_kind not in children_tokens:
+                issues.append(f"{_full_kind(parent_node)}.children does not reference {child_kind}")
+
+        parent_val = child_node.get("parent", "")
+        parent_kind = _full_kind(parent_node)
+        if parent_val:
+            if isinstance(parent_val, list):
+                parent_tokens = [str(v) for v in parent_val]
+            else:
+                parent_tokens = [str(parent_val)]
+            if parent_kind not in parent_tokens:
+                issues.append(f"{_full_kind(child_node)}.parent does not reference {parent_kind}")
+
+    if issues:
+        return False, "; ".join(issues)
+    return True, "Region->Site->Room->Rack hierarchy is correct"
+
+
+def check_two_endpoint_relationships(schema: dict, **_) -> tuple[bool, str]:
+    """Circuit has two endpoint relationships (side_a/side_z)."""
+    for node in _all_nodes(schema):
+        if node.get("name", "").lower() == "circuit":
+            endpoint_rels = []
+            for rel in _all_rels(node):
+                name = rel.get("name", "").lower()
+                if "endpoint" in name or "side" in name:
+                    endpoint_rels.append(rel.get("name"))
+            if len(endpoint_rels) >= 2:
+                return True, f"Circuit has {len(endpoint_rels)} endpoint relationships: {', '.join(endpoint_rels)}"
+            elif len(endpoint_rels) == 1:
+                return False, f"Circuit has only 1 endpoint relationship: {endpoint_rels[0]} (expected 2 for side_a/side_z)"
+            else:
+                return False, "Circuit has no endpoint relationships"
+    return False, "No Circuit node found"
+
+
+def check_attribute_kind_relationships(schema: dict, **_) -> tuple[bool, str]:
+    """Circuit-to-Provider uses kind: Attribute with matching identifiers."""
+    for node in _all_nodes(schema):
+        if node.get("name", "").lower() == "circuit":
+            for rel in _all_rels(node):
+                peer = rel.get("peer", "").lower()
+                if "provider" in peer:
+                    kind = rel.get("kind")
+                    if kind == "Attribute":
+                        return True, f"Circuit.{rel['name']} -> {rel['peer']} uses kind: Attribute"
+                    return False, f"Circuit.{rel['name']} -> {rel['peer']} uses kind: {kind}, expected Attribute"
+    return False, "No Circuit-to-Provider relationship found"
+
+
+def check_endpoint_device_relationship(schema: dict, **_) -> tuple[bool, str]:
+    """CircuitEndpoint-to-Device uses kind: Attribute with matching identifiers."""
+    for node in _all_nodes(schema):
+        name = node.get("name", "").lower()
+        if "endpoint" in name:
+            for rel in _all_rels(node):
+                if "device" in rel.get("name", "").lower() or "device" in rel.get("peer", "").lower():
+                    kind = rel.get("kind")
+                    if kind == "Attribute":
+                        return True, f"{_full_kind(node)}.{rel['name']} uses kind: Attribute"
+                    return False, f"{_full_kind(node)}.{rel['name']} uses kind: {kind}, expected Attribute"
+    return False, "No Endpoint-to-Device relationship found"
+
+
+# Map assertion names to check functions
+ASSERTION_CHECKS = {
+    "attr-min-length": check_attr_min_length,
+    "dropdown-for-status": check_dropdown_for_status,
+    "no-deprecated-string": check_no_deprecated_string,
+    "full-kind-references": check_full_kind_references,
+    "human-friendly-id": check_human_friendly_id,
+    "display-label-singular": check_display_label_singular,
+    "schema-version": check_schema_version,
+    "matching-identifiers": check_matching_identifiers,
+    "hierarchical-generic": check_hierarchical_generic,
+    "inherit-from-generic": check_inherit_from_generic,
+    "root-no-parent": check_root_no_parent,
+    "correct-hierarchy-chain": check_correct_hierarchy_chain,
+    "two-endpoint-relationships": check_two_endpoint_relationships,
+    "attribute-kind-relationships": check_attribute_kind_relationships,
+    "endpoint-device-relationship": check_endpoint_device_relationship,
+}
+
+
+def grade_schema(schema_path: Path, assertions: list[dict]) -> dict:
+    """Grade a schema YAML file against a list of assertions."""
+    try:
+        with open(schema_path) as f:
+            schema = yaml.safe_load(f)
+    except Exception as e:
+        return {
+            "expectations": [
+                {"text": a.get("check", "<missing check>"), "passed": False, "evidence": f"Failed to load schema: {e}"}
+                for a in assertions
+            ],
+            "summary": {"passed": 0, "failed": len(assertions), "total": len(assertions), "pass_rate": 0.0},
+        }
+
+    expectations = []
+    passed_count = 0
+    for assertion in assertions:
+        name = assertion["name"]
+        check_fn = ASSERTION_CHECKS.get(name)
+        if check_fn:
+            ok, evidence = check_fn(schema)
+        else:
+            ok, evidence = False, f"No check function for assertion '{name}'"
+
+        expectations.append({"text": assertion["check"], "passed": ok, "evidence": evidence})
+        if ok:
+            passed_count += 1
+
+    total = len(assertions)
+    return {
+        "expectations": expectations,
+        "summary": {
+            "passed": passed_count,
+            "failed": total - passed_count,
+            "total": total,
+            "pass_rate": round(passed_count / total, 3) if total else 0.0,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Report generation
+# ---------------------------------------------------------------------------
+
+def build_benchmark(eval_results: list[dict], skill_name: str, model: str) -> dict:
+    """Build benchmark.json from eval results."""
+    runs = []
+    with_rates, without_rates = [], []
+    with_times, without_times = [], []
+    with_tokens, without_tokens = [], []
+
+    for er in eval_results:
+        for config in ("with_skill", "without_skill"):
+            grading = er[config]["grading"]
+            # Skip without_skill if baseline was not run (empty expectations)
+            if config == "without_skill" and not grading.get("expectations"):
+                continue
+            timing = er[config]["timing"]
+            run = {
+                "eval_id": er["eval_id"],
+                "eval_name": er["eval_name"],
+                "configuration": config,
+                "run_number": 1,
+                "result": {
+                    "pass_rate": grading["summary"]["pass_rate"],
+                    "passed": grading["summary"]["passed"],
+                    "failed": grading["summary"]["failed"],
+                    "total": grading["summary"]["total"],
+                    "time_seconds": timing.get("total_duration_seconds", 0),
+                    "tokens": timing.get("total_tokens", 0),
+                    "tool_calls": 0,
+                    "errors": 0,
+                },
+                "expectations": grading["expectations"],
+                "notes": [],
+            }
+            runs.append(run)
+
+            rate = grading["summary"]["pass_rate"]
+            t = timing.get("total_duration_seconds", 0)
+            tok = timing.get("total_tokens", 0)
+            if config == "with_skill":
+                with_rates.append(rate)
+                with_times.append(t)
+                with_tokens.append(tok)
+            else:
+                without_rates.append(rate)
+                without_times.append(t)
+                without_tokens.append(tok)
+
+    def _stats(vals):
+        if not vals:
+            return {"mean": 0, "stddev": 0, "min": 0, "max": 0}
+        n = len(vals)
+        mean = sum(vals) / n
+        if n > 1:
+            var = sum((v - mean) ** 2 for v in vals) / (n - 1)
+            std = var ** 0.5
+        else:
+            std = 0
+        return {"mean": round(mean, 3), "stddev": round(std, 3),
+                "min": round(min(vals), 3), "max": round(max(vals), 3)}
+
+    ws, wos = _stats(with_rates), _stats(without_rates)
+
+    return {
+        "metadata": {
+            "skill_name": skill_name,
+            "skill_path": SKILL_PATHS.get(skill_name, ""),
+            "executor_model": model,
+            "analyzer_model": model,
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "evals_run": [er["eval_id"] for er in eval_results],
+            "runs_per_configuration": 1,
+        },
+        "runs": runs,
+        "run_summary": {
+            "with_skill": {
+                "pass_rate": _stats(with_rates),
+                "time_seconds": _stats(with_times),
+                "tokens": _stats(with_tokens),
+            },
+            "without_skill": {
+                "pass_rate": _stats(without_rates),
+                "time_seconds": _stats(without_times),
+                "tokens": _stats(without_tokens),
+            },
+            "delta": {
+                "pass_rate": f"{ws['mean'] - wos['mean']:+.2f}",
+                "time_seconds": f"{_stats(with_times)['mean'] - _stats(without_times)['mean']:+.1f}",
+                "tokens": f"{_stats(with_tokens)['mean'] - _stats(without_tokens)['mean']:+.0f}",
+            },
+        },
+        "notes": [],
+    }
+
+
+def generate_markdown_report(benchmark: dict) -> str:
+    """Generate a Markdown report from benchmark data."""
+    meta = benchmark["metadata"]
+    summary = benchmark["run_summary"]
+    ws = summary["with_skill"]
+    wos = summary["without_skill"]
+    delta = summary["delta"]
+
+    lines = [
+        f"# Skill Evaluation Report: {meta['skill_name']}",
+        "",
+        f"**Model:** {meta['executor_model']}",
+        f"**Date:** {meta['timestamp']}",
+        f"**Evals:** {len(meta['evals_run'])}",
+        "",
+        "## Summary",
+        "",
+        "| Metric | With Skill | Without Skill | Delta |",
+        "|--------|-----------|--------------|-------|",
+        f"| Pass Rate | {ws['pass_rate']['mean']*100:.1f}% | {wos['pass_rate']['mean']*100:.1f}% | {delta['pass_rate']} |",
+        f"| Time | {ws['time_seconds']['mean']:.1f}s | {wos['time_seconds']['mean']:.1f}s | {delta['time_seconds']}s |",
+        f"| Tokens | {ws['tokens']['mean']:.0f} | {wos['tokens']['mean']:.0f} | {delta['tokens']} |",
+        "",
+        "## Per-Eval Results",
+        "",
+    ]
+
+    for run in benchmark["runs"]:
+        if run["configuration"] != "with_skill":
+            continue
+        eval_name = run.get("eval_name", f"Eval {run['eval_id']}")
+        # Find matching baseline
+        baseline = next(
+            (r for r in benchmark["runs"]
+             if r["eval_id"] == run["eval_id"] and r["configuration"] == "without_skill"),
+            None,
+        )
+
+        lines.append(f"### {eval_name}")
+        lines.append("")
+        lines.append(f"| Assertion | With Skill | Without Skill |")
+        lines.append(f"|-----------|-----------|--------------|")
+
+        for i, exp in enumerate(run["expectations"]):
+            ws_icon = "PASS" if exp["passed"] else "FAIL"
+            wos_icon = "—"
+            if baseline and i < len(baseline["expectations"]):
+                wos_icon = "PASS" if baseline["expectations"][i]["passed"] else "FAIL"
+            lines.append(f"| {exp['text'][:60]} | {ws_icon} | {wos_icon} |")
+        lines.append("")
+
+    if benchmark.get("notes"):
+        lines.append("## Notes")
+        lines.append("")
+        for note in benchmark["notes"]:
+            lines.append(f"- {note}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main():
+    parser = argparse.ArgumentParser(description="Run skill evaluations")
+    parser.add_argument(
+        "--eval-file", type=Path, default=None,
+        help="Path to eval JSON file (default: all files in evaluations/)",
+    )
+    parser.add_argument(
+        "--output-dir", type=Path, default=Path("eval-results"),
+        help="Directory to store results (default: eval-results)",
+    )
+    parser.add_argument(
+        "--model", type=str, default=None,
+        help="Model to use for claude -p (default: CLI default)",
+    )
+    parser.add_argument(
+        "--skip-baseline", action="store_true",
+        help="Skip running without-skill baseline",
+    )
+    args = parser.parse_args()
+
+    # Discover eval files
+    if args.eval_file:
+        eval_files = [args.eval_file]
+    else:
+        eval_dir = REPO_ROOT / "evaluations"
+        eval_files = sorted(eval_dir.glob("*.json"))
+
+    if not eval_files:
+        print("No evaluation files found.")
+        sys.exit(1)
+
+    output_base = REPO_ROOT / args.output_dir
+    output_base.mkdir(parents=True, exist_ok=True)
+
+    all_results = []
+
+    for eval_file in eval_files:
+        print(f"\n{'='*60}")
+        print(f"Processing: {eval_file.name}")
+        print(f"{'='*60}")
+
+        with open(eval_file) as f:
+            eval_data = json.load(f)
+
+        skill_name = eval_data["skill_name"]
+        skill_path = SKILL_PATHS.get(skill_name)
+        if not skill_path:
+            print(f"  WARNING: No skill path for '{skill_name}', skipping")
+            continue
+
+        for ev in eval_data["evals"]:
+            eval_id = ev["id"]
+            eval_name = ev.get("prompt", "")[:40].replace(" ", "-").lower()
+            eval_name = f"eval-{eval_id}"
+            eval_dir = output_base / skill_name / eval_name
+
+            print(f"\n  Eval {eval_id}: {ev['prompt'][:80]}...")
+
+            # Run with skill
+            print(f"    Running with skill...")
+            ws_dir = eval_dir / "with_skill" / "outputs"
+            ws_timing = run_claude_prompt(
+                ev["prompt"], ws_dir, with_skill=True,
+                skill_path=skill_path, model=args.model,
+            )
+            print(f"    Done ({ws_timing['total_duration_seconds']}s, {ws_timing['total_tokens']} tokens)")
+
+            # Run without skill
+            wos_timing = {"total_tokens": 0, "duration_ms": 0, "total_duration_seconds": 0}
+            if not args.skip_baseline:
+                print(f"    Running without skill (baseline)...")
+                wos_dir = eval_dir / "without_skill" / "outputs"
+                wos_timing = run_claude_prompt(
+                    ev["prompt"], wos_dir, with_skill=False, model=args.model,
+                )
+                print(f"    Done ({wos_timing['total_duration_seconds']}s, {wos_timing['total_tokens']} tokens)")
+
+            # Grade outputs
+            assertions = ev.get("assertions", [])
+            ws_schema = eval_dir / "with_skill" / "outputs" / "schema.yml"
+            wos_schema = eval_dir / "without_skill" / "outputs" / "schema.yml"
+
+            print(f"    Grading...")
+            ws_grading = grade_schema(ws_schema, assertions) if ws_schema.exists() else {
+                "expectations": [{"text": a.get("check", "<missing check>"), "passed": False, "evidence": "No schema file produced"} for a in assertions],
+                "summary": {"passed": 0, "failed": len(assertions), "total": len(assertions), "pass_rate": 0.0},
+            }
+
+            wos_grading = {"expectations": [], "summary": {"passed": 0, "failed": 0, "total": 0, "pass_rate": 0.0}}
+            if not args.skip_baseline and wos_schema.exists():
+                wos_grading = grade_schema(wos_schema, assertions)
+            elif not args.skip_baseline:
+                wos_grading = {
+                    "expectations": [{"text": a.get("check", "<missing check>"), "passed": False, "evidence": "No schema file produced"} for a in assertions],
+                    "summary": {"passed": 0, "failed": len(assertions), "total": len(assertions), "pass_rate": 0.0},
+                }
+
+            # Save grading
+            with open(eval_dir / "with_skill" / "grading.json", "w") as f:
+                json.dump(ws_grading, f, indent=2)
+            if not args.skip_baseline:
+                (eval_dir / "without_skill").mkdir(parents=True, exist_ok=True)
+                with open(eval_dir / "without_skill" / "grading.json", "w") as f:
+                    json.dump(wos_grading, f, indent=2)
+
+            ws_pass = ws_grading["summary"]["pass_rate"]
+            wos_pass = wos_grading["summary"]["pass_rate"]
+            print(f"    With skill: {ws_grading['summary']['passed']}/{ws_grading['summary']['total']} ({ws_pass*100:.0f}%)")
+            if not args.skip_baseline:
+                print(f"    Without skill: {wos_grading['summary']['passed']}/{wos_grading['summary']['total']} ({wos_pass*100:.0f}%)")
+
+            all_results.append({
+                "eval_id": eval_id,
+                "eval_name": eval_name,
+                "skill_name": skill_name,
+                "with_skill": {"grading": ws_grading, "timing": ws_timing},
+                "without_skill": {"grading": wos_grading, "timing": wos_timing},
+            })
+
+    # Generate benchmark
+    model_label = args.model or "default"
+    for eval_file in eval_files:
+        with open(eval_file) as f:
+            skill_name = json.load(f)["skill_name"]
+
+        skill_results = [r for r in all_results if r.get("skill_name") == skill_name]
+        if not skill_results:
+            continue
+
+        benchmark = build_benchmark(skill_results, skill_name, model_label)
+        benchmark_path = output_base / skill_name
+        benchmark_path.mkdir(parents=True, exist_ok=True)
+
+        with open(benchmark_path / "benchmark.json", "w") as f:
+            json.dump(benchmark, f, indent=2)
+
+        report = generate_markdown_report(benchmark)
+        with open(benchmark_path / "report.md", "w") as f:
+            f.write(report)
+
+        # Also write to the top-level output dir for easy artifact access
+        with open(output_base / "benchmark.json", "w") as f:
+            json.dump(benchmark, f, indent=2)
+        with open(output_base / "report.md", "w") as f:
+            f.write(report)
+
+        print(f"\n{'='*60}")
+        print(f"RESULTS: {skill_name}")
+        print(f"{'='*60}")
+        print(report)
+
+    # Exit with failure if any with_skill pass rate is below threshold
+    has_failure = False
+    for r in all_results:
+        if r["with_skill"]["grading"]["summary"]["pass_rate"] < 0.5:
+            print(f"\nFAILURE: Eval {r['eval_id']} with-skill pass rate below 50%")
+            has_failure = True
+    if has_failure:
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

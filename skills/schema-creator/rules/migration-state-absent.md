@@ -6,7 +6,7 @@ tags: migration, state, absent, adding, removing
 
 ## Schema Migration Patterns
 
-**Impact: MEDIUM**
+Impact: MEDIUM
 
 Schema changes on live data require careful migration strategies.
 
@@ -63,4 +63,5 @@ Safest approach:
 2. Migrate data
 3. Remove old attribute with `state: absent`
 
-Reference: [validation.md](../validation.md) for `infrahubctl` commands and branch-based schema changes.
+Reference: [validation.md](../validation.md) for
+`infrahubctl` commands and branch-based schema changes.

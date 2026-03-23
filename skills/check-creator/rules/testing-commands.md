@@ -6,17 +6,20 @@ tags: testing, infrahubctl, commands
 
 ## Testing Checks
 
-**Impact: LOW (reference)**
+Impact: LOW (reference)
 
 ### Prerequisites
 
-All commands below require a running Infrahub server. Verify connectivity first:
+All commands below require a running Infrahub server.
+Verify connectivity first:
 
 ```bash
 infrahubctl info
 ```
 
-See [Server Connectivity Check](../../common/rules/connectivity-server-check.md) for troubleshooting.
+See
+[Server Connectivity Check](../../common/rules/connectivity-server-check.md)
+for troubleshooting.
 
 ### Commands
 
@@ -28,14 +31,18 @@ infrahubctl check --list
 infrahubctl check my_check_name
 
 # Run against a specific branch
-infrahubctl check my_check_name --branch=feature-branch
+infrahubctl check my_check_name \
+    --branch=feature-branch
 ```
 
 ### Debugging Tips
 
 - Check logs for `ERROR` entries to see what failed
-- Use `log_info()` liberally during development to trace data flow
+- Use `log_info()` liberally during development to
+  trace data flow
 - Test against a branch first before running on main
-- Global checks run on every proposed change -- keep them efficient
+- Global checks run on every proposed change -- keep
+  them efficient
 
-Reference: [Infrahub CLI Docs](https://docs.infrahub.app)
+Reference:
+[Infrahub CLI Docs](https://docs.infrahub.app)

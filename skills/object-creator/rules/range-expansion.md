@@ -6,9 +6,10 @@ tags: range, expansion, interfaces, sequential
 
 ## Interface Range Expansion
 
-**Impact: MEDIUM**
+Impact: MEDIUM
 
-For interfaces with sequential names, use range syntax with `expand_range: true` to avoid repetitive entries.
+For interfaces with sequential names, use range syntax
+with `expand_range: true` to avoid repetitive entries.
 
 **Incorrect -- expand_range on individual items:**
 
@@ -29,7 +30,7 @@ interfaces:
   parameters:
     expand_range: true                # Set on the relationship block
   data:
-    - name: Ethernet1/[1-4]           # Expands to Ethernet1/1, Ethernet1/2, Ethernet1/3, Ethernet1/4
+    - name: Ethernet1/[1-4]           # Expands to 1/1 through 1/4
       role: customer
       status: active
 ```
@@ -37,8 +38,8 @@ interfaces:
 ### Range Syntax
 
 | Pattern | Expands To |
-|---------|-----------|
-| `Ethernet1/[1-4]` | Ethernet1/1, Ethernet1/2, Ethernet1/3, Ethernet1/4 |
+| ------- | ---------- |
+| `Ethernet1/[1-4]` | Ethernet1/1 through Ethernet1/4 |
 | `et-0/0/[0-31]` | et-0/0/0 through et-0/0/31 |
 | `GigE[1-48]` | GigE1 through GigE48 |
 

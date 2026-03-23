@@ -6,7 +6,7 @@ tags: tag1, tag2
 
 ## Rule Title Here
 
-**Impact: MEDIUM**
+Impact: MEDIUM
 
 Brief explanation of the rule and why it matters for Infrahub object creation.
 

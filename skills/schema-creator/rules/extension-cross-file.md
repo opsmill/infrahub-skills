@@ -6,13 +6,19 @@ tags: extension, cross-file, modular
 
 ## Extensions for Cross-File Relationships
 
-**Impact: MEDIUM**
+Impact: MEDIUM
 
-When schema file A defines `OrganizationTenant` and schema file B defines `LocationRack`, use the `extensions` block to add a relationship from Rack to Tenant without modifying file A.
+When schema file A defines `OrganizationTenant` and
+schema file B defines `LocationRack`, use the
+`extensions` block to add a relationship from Rack to
+Tenant without modifying file A.
 
 **Incorrect -- modifying the original schema file to add a cross-dependency:**
 
-If you add the relationship directly to `organization.yml`, that file now depends on `location.yml` existing, creating a circular dependency risk.
+If you add the relationship directly to
+`organization.yml`, that file now depends on
+`location.yml` existing, creating a circular
+dependency risk.
 
 **Correct -- using extensions block:**
 
@@ -47,6 +53,7 @@ nodes:
 ```
 
 **When to use extensions:**
+
 - Adding relationships to nodes you don't own (e.g., BuiltinTag, CoreRepository)
 - Keeping schema files focused on their domain
 - Avoiding circular dependencies between schema files

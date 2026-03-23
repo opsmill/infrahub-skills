@@ -6,7 +6,7 @@ Below is a sample `AUDIT_REPORT.md` showing the expected format and types of fin
 
 ---
 
-```markdown
+````markdown
 # Infrahub Repository Audit Report
 
 **Date**: 2026-03-16
@@ -58,8 +58,11 @@ Below is a sample `AUDIT_REPORT.md` showing the expected format and types of fin
 
 ### CRITICAL: Bidirectional identifier mismatch
 **File**: `schemas/network.yml` line 52 and `schemas/device.yml` line 30
-**Finding**: Relationship `interfaces` uses identifier `device__interfaces` but the other side `device` uses identifier `interface__device`
-**Fix**: Use the same identifier on both sides. Convention: `device__interfaces`
+**Finding**: Relationship `interfaces` uses identifier
+`device__interfaces` but the other side `device` uses
+identifier `interface__device`
+**Fix**: Use the same identifier on both sides.
+Convention: `device__interfaces`
 
 ### MEDIUM: Missing human_friendly_id
 **File**: `schemas/network.yml` line 10
@@ -68,7 +71,10 @@ Below is a sample `AUDIT_REPORT.md` showing the expected format and types of fin
 
 ### HIGH: Deprecated `display_labels` field
 **File**: `schemas/device.yml` line 15
-**Finding**: Node `InfraDevice` uses deprecated `display_labels` (plural, list format). This field was deprecated in Infrahub v1.5 and will be removed in a future release.
+**Finding**: Node `InfraDevice` uses deprecated
+`display_labels` (plural, list format). This field was
+deprecated in Infrahub v1.5 and will be removed in a
+future release.
 
 **Current value:**
 ```yaml
@@ -76,14 +82,16 @@ display_labels:
   - "name__value"
 ```
 
-**Fix** — replace with `display_label` (singular, Jinja2 template string):
+**Fix** — replace with `display_label` (singular, Jinja2
+template string):
 ```yaml
 display_label: "{{ name__value }}"
 ```
 
-### HIGH: Deprecated `display_labels` with multiple attributes
+### HIGH: Deprecated `display_labels` with multiple attrs
 **File**: `schemas/optics.yml` line 22
-**Finding**: Node `InfraOptic` uses deprecated `display_labels` with multiple list items.
+**Finding**: Node `InfraOptic` uses deprecated
+`display_labels` with multiple list items.
 
 **Current value:**
 ```yaml
@@ -92,7 +100,8 @@ display_labels:
   - "sfp_type__value"
 ```
 
-**Fix** — wrap each item in `{{ }}` and join with spaces:
+**Fix** — wrap each item in `{{ }}` and join with
+spaces:
 ```yaml
 display_label: "{{ form_factor__value }} {{ sfp_type__value }}"
 ```
@@ -116,12 +125,14 @@ display_label: "{{ form_factor__value }} {{ sfp_type__value }}"
 
 ### CRITICAL: Generator missing allow_upsert
 **File**: `generators/generate_dc.py` line 42
-**Finding**: `await obj.save()` called without `allow_upsert=True` — will fail on re-run
+**Finding**: `await obj.save()` called without
+`allow_upsert=True` — will fail on re-run
 **Fix**: Change to `await obj.save(allow_upsert=True)`
 
 ### MEDIUM: Check not including __typename in query
 **File**: `checks/validate_leaf.py` → `queries/leaf_check.gql`
-**Finding**: GraphQL query does not include `__typename` field — error messages won't identify object type
+**Finding**: GraphQL query does not include `__typename`
+field — error messages won't identify object type
 **Fix**: Add `__typename` to the query's selected fields
 
 ---
@@ -130,12 +141,15 @@ display_label: "{{ form_factor__value }} {{ sfp_type__value }}"
 
 ### HIGH: Query name mismatch
 **File**: `transforms/spine.py` line 5 → `.infrahub.yml` line 18
-**Finding**: Python class has `query = "spine_config"` but `.infrahub.yml` registers query as `spine_cfg`
+**Finding**: Python class has `query = "spine_config"`
+but `.infrahub.yml` registers query as `spine_cfg`
 **Fix**: Align the names — use `spine_config` in both places
 
 ### HIGH: Artifact references non-existent transform
 **File**: `.infrahub.yml` line 35
-**Finding**: `artifact_definitions[0].transformation: "leaf_config"` does not match any registered transform name
+**Finding**:
+`artifact_definitions[0].transformation: "leaf_config"`
+does not match any registered transform name
 **Fix**: Register the transform or fix the name
 
 ---
@@ -144,7 +158,9 @@ display_label: "{{ form_factor__value }} {{ sfp_type__value }}"
 
 ### HIGH: Orphan Python file
 **File**: `checks/validate_spine.py`
-**Finding**: Contains `class ValidateSpine(InfrahubCheck)` but is not registered in `check_definitions`
+**Finding**: Contains
+`class ValidateSpine(InfrahubCheck)` but is not
+registered in `check_definitions`
 **Fix**: Add entry to `check_definitions` in `.infrahub.yml`
 
 ---
@@ -153,13 +169,19 @@ display_label: "{{ form_factor__value }} {{ sfp_type__value }}"
 
 ### MEDIUM: No order_weight on attributes
 **File**: `schemas/device.yml`
-**Finding**: Node `InfraDevice` has 8 attributes but none specify `order_weight` — UI will display in arbitrary order
-**Fix**: Add `order_weight` values (1000-1999 for core attributes, 2000-2999 for secondary)
+**Finding**: Node `InfraDevice` has 8 attributes but
+none specify `order_weight` — UI will display in
+arbitrary order
+**Fix**: Add `order_weight` values (1000-1999 for core
+attributes, 2000-2999 for secondary)
 
 ### MEDIUM: Potential generic candidate
 **Files**: `schemas/device.yml`, `schemas/firewall.yml`, `schemas/switch.yml`
-**Finding**: 3 nodes share identical attributes: `name`, `description`, `status`, `role` — consider a shared generic
-**Fix**: Create a generic (e.g., `InfraNetworkDevice`) with shared attributes
+**Finding**: 3 nodes share identical attributes: `name`,
+`description`, `status`, `role` — consider a shared
+generic
+**Fix**: Create a generic (e.g., `InfraNetworkDevice`)
+with shared attributes
 
 ### LOW: Object file naming
 **File**: `objects/vlans.yml`
@@ -183,8 +205,8 @@ display_label: "{{ form_factor__value }} {{ sfp_type__value }}"
 
 | Query Name | .gql File | Used By | Type |
 |-----------|-----------|---------|------|
-| topology_dc | queries/topology/dc.gql | create_dc (generator) | generator |
-| spine_config | queries/config/spine.gql | spine (transform) | python_transform |
-| leaf_check | queries/checks/leaf.gql | validate_leaf (check) | check |
-| topology_simulator | queries/topology/sim.gql | topology_clab (jinja2) | jinja2_transform |
-```
+| topology_dc | queries/topology/dc.gql | create_dc | generator |
+| spine_config | queries/config/spine.gql | spine | python_transform |
+| leaf_check | queries/checks/leaf.gql | validate_leaf | check |
+| topology_simulator | queries/topology/sim.gql | topology_clab | jinja2 |
+````

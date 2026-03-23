@@ -6,9 +6,12 @@ tags: relationship, identifier, bidirectional
 
 ## Bidirectional Relationships Need Matching Identifiers
 
-**Impact: CRITICAL**
+Impact: CRITICAL
 
-When two nodes reference each other, both sides of the relationship MUST share the same `identifier` string. Mismatched identifiers create duplicate relationships instead of one bidirectional link.
+When two nodes reference each other, both sides of the
+relationship MUST share the same `identifier` string.
+Mismatched identifiers create duplicate relationships
+instead of one bidirectional link.
 
 **Incorrect:**
 
@@ -46,6 +49,8 @@ When two nodes reference each other, both sides of the relationship MUST share t
   identifier: "device__modules"      # MUST match the other side
 ```
 
-**Convention:** Use `snake_case` with `__` separator: `"parent__children"`, `"rack__devices"`, `"tenant__racks"`.
+**Convention:** Use `snake_case` with `__` separator:
+`"parent__children"`, `"rack__devices"`,
+`"tenant__racks"`.
 
 Reference: [Infrahub Schema Docs](https://docs.infrahub.app)

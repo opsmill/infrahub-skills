@@ -6,9 +6,11 @@ tags: tag1, tag2
 
 ## Rule Title Here
 
-**Impact: MEDIUM**
+Impact: MEDIUM
 
-Brief explanation of the rule and why it matters across multiple Infrahub workflows (generators, checks, transforms, object loading, etc.).
+Brief explanation of the rule and why it matters across
+multiple Infrahub workflows (generators, checks, transforms,
+object loading, etc.).
 
 ### Symptoms
 
@@ -26,6 +28,7 @@ Explain the underlying reason.
 
 ### Prevention
 
-Guidance on how to avoid hitting this issue in the first place.
+Guidance on how to avoid hitting this issue in the first
+place.
 
 Reference: [Infrahub Docs](https://docs.infrahub.app)

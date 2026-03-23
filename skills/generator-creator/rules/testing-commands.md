@@ -6,17 +6,19 @@ tags: testing, infrahubctl, commands
 
 ## Testing Generators
 
-**Impact: LOW (reference)**
+Impact: LOW (reference)
 
 ### Prerequisites
 
-All commands below require a running Infrahub server. Verify connectivity first:
+All commands below require a running Infrahub server.
+Verify connectivity first:
 
 ```bash
 infrahubctl info
 ```
 
-See [Server Connectivity Check](../../common/rules/connectivity-server-check.md) for troubleshooting.
+See [Server Connectivity Check](../../common/rules/connectivity-server-check.md)
+for troubleshooting.
 
 ### Commands
 
@@ -25,7 +27,8 @@ See [Server Connectivity Check](../../common/rules/connectivity-server-check.md)
 infrahubctl generator --list
 
 # Run a generator locally
-infrahubctl generator create_dc --branch=my-branch name=dc-topology-1
+infrahubctl generator create_dc \
+  --branch=my-branch name=dc-topology-1
 
 # Generators also run automatically:
 # - When target objects change in proposed changes
@@ -34,9 +37,14 @@ infrahubctl generator create_dc --branch=my-branch name=dc-topology-1
 
 ### Debugging Tips
 
-- Use `self.logger` inside `generate()` for operation tracking
-- Test with a small design first (1-2 elements) before scaling
-- Check that target `CoreGeneratorGroup` exists and has members
-- Verify query variables match `parameters` mapping in `.infrahub.yml`
+- Use `self.logger` inside `generate()` for operation
+  tracking
+- Test with a small design first (1-2 elements) before
+  scaling
+- Check that target `CoreGeneratorGroup` exists and has
+  members
+- Verify query variables match `parameters` mapping in
+  `.infrahub.yml`
 
-Reference: [Infrahub CLI Docs](https://docs.infrahub.app)
+Reference:
+[Infrahub CLI Docs](https://docs.infrahub.app)

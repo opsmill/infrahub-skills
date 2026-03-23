@@ -6,7 +6,7 @@ tags: patterns, data-extraction, csv, common-py
 
 ## Common Transform Patterns
 
-**Impact: MEDIUM**
+**Impact:** MEDIUM
 
 ### Data Extraction Utilities
 
@@ -53,7 +53,9 @@ class CableMatrix(InfrahubTransform):
 
 ### Shared Utilities Pattern
 
-Extract common data extraction into `transforms/common.py` and import across transform files:
+Extract common data extraction into
+`transforms/common.py` and import across transform
+files:
 
 ```python
 # transforms/spine.py

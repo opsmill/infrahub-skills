@@ -6,27 +6,28 @@ tags: organization, naming, load-order, dependencies
 
 ## File Organization and Load Order
 
-**Impact: MEDIUM**
+Impact: MEDIUM
 
-Objects must be loaded in dependency order. A device can't reference a rack that hasn't been created yet.
+Objects must be loaded in dependency order. A device can't
+reference a rack that hasn't been created yet.
 
 ### Naming Convention
 
 Use numeric prefixes for load order:
 
-```
+```text
 objects/
-  01_manufacturers.yml          # Base data first (no dependencies)
+  01_manufacturers.yml          # Base data (no deps)
   02_organizations.yml          # Groups/tenants
-  03_device_types.yml           # Types (depend on manufacturers)
-  04_module_types.yml           # Module types (depend on manufacturers)
-  04a_module_bay_templates.yml  # Bay templates (depend on device types)
+  03_device_types.yml           # Types (need mfgs)
+  04_module_types.yml           # Module types
+  04a_module_bay_templates.yml  # Bay templates
   05_locations.yml              # Location hierarchy
-  06_devices.yml                # Devices (depend on types, locations)
-  06_module_installations.yml   # Module installs (depend on devices, bays, types)
-  07_empty_slots.yml            # Empty slots (depend on devices, bays)
+  06_devices.yml                # Devices
+  06_module_installations.yml   # Module installs
+  07_empty_slots.yml            # Empty slots
   git-repo/
-    local-dev.yml               # Git repo config for local development
+    local-dev.yml               # Git repo config
 ```
 
 ### Dependency Order
@@ -62,22 +63,27 @@ spec:
 
 ### Bootstrap Files Must Live Outside `objects/`
 
-When `.infrahub.yml` specifies `objects: - objects`, Infrahub auto-imports **every** YAML file in that directory during git sync. Files that define infrastructure config (like `CoreRepository` or `CoreReadOnlyRepository` definitions) will be imported as objects, which can cause validation errors or circular dependencies.
+When `.infrahub.yml` specifies `objects: - objects`,
+Infrahub auto-imports **every** YAML file in that directory
+during git sync. Files that define infrastructure config
+(like `CoreRepository` or `CoreReadOnlyRepository`
+definitions) will be imported as objects, which can cause
+validation errors or circular dependencies.
 
 **Incorrect -- bootstrap file inside objects/:**
 
-```
+```text
 objects/
   git-repo/
-    local-dev.yml          # CoreReadOnlyRepository definition
-  01_manufacturers.yml     # Will ALL be auto-imported during sync
+    local-dev.yml          # CoreReadOnlyRepository def
+  01_manufacturers.yml     # Will ALL be auto-imported
 ```
 
 **Correct -- bootstrap files in a separate directory:**
 
-```
+```text
 bootstrap/
-  local-dev-repo.yml       # Loaded manually, never auto-imported
+  local-dev-repo.yml       # Loaded manually, never auto
 objects/
   01_manufacturers.yml     # Only real data objects here
 ```
@@ -89,4 +95,7 @@ objects:
   - objects              # Loads all files in the objects/ directory recursively
 ```
 
-Reference: [../common/infrahub-yml-reference.md](../../common/infrahub-yml-reference.md) | See also: [deployment-git-integration.md](../../common/rules/deployment-git-integration.md)
+Reference:
+[../common/infrahub-yml-reference.md](../../common/infrahub-yml-reference.md)
+| See also:
+[deployment-git-integration.md](../../common/rules/deployment-git-integration.md)

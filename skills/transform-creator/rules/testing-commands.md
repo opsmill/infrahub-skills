@@ -6,17 +6,20 @@ tags: testing, infrahubctl, commands, rest-api
 
 ## Testing Transforms
 
-**Impact: LOW (reference)**
+**Impact:** LOW (reference)
 
 ### Prerequisites
 
-All commands below require a running Infrahub server. Verify connectivity first:
+All commands below require a running Infrahub server.
+Verify connectivity first:
 
 ```bash
 infrahubctl info
 ```
 
-See [Server Connectivity Check](../../common/rules/connectivity-server-check.md) for troubleshooting.
+See
+[Server Connectivity Check](../../common/rules/connectivity-server-check.md)
+for troubleshooting.
 
 ### Commands
 
@@ -39,7 +42,8 @@ infrahubctl render my_jinja_transform device=spine-01
 
 - Test Python transforms with `infrahubctl transform` to see raw output
 - Test Jinja2 templates with `infrahubctl render` to see rendered text
-- Check that `query` class attribute matches the query `name` in `.infrahub.yml`
+- Check that `query` class attribute matches the
+  query `name` in `.infrahub.yml`
 - Use `print()` in `transform()` during development for data inspection
 
 Reference: [Infrahub CLI Docs](https://docs.infrahub.app)

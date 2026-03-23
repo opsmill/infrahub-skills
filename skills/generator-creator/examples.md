@@ -1,12 +1,14 @@
 # Infrahub Generator Examples
 
-Real-world examples extracted from production Infrahub repositories.
+Real-world examples extracted from production Infrahub
+repositories.
 
 ---
 
 ## 1. POP Topology Generator
 
-Creates network infrastructure for a colocation center from a topology design object.
+Creates network infrastructure for a colocation center from
+a topology design object.
 
 ### Query: `queries/topology/pop.gql`
 
@@ -64,8 +66,12 @@ query device($name: String!) {
                     device_type {
                       node {
                         id
-                        manufacturer { node { name { value } } }
-                        platform { node { id } }
+                        manufacturer {
+                          node { name { value } }
+                        }
+                        platform {
+                          node { id }
+                        }
                       }
                     }
                   }
@@ -89,9 +95,11 @@ from .common import TopologyCreator, clean_data
 
 class PopTopologyGenerator(InfrahubGenerator):
     async def generate(self, data: dict) -> None:
-        # Clean the GraphQL response (unwrap value/node/edges)
+        # Clean the GraphQL response
         cleaned_data = clean_data(data)
-        topology = cleaned_data["TopologyColocationCenter"][0]
+        topology = cleaned_data[
+            "TopologyColocationCenter"
+        ][0]
 
         # Initialize the topology creator helper
         creator = TopologyCreator(
@@ -112,12 +120,16 @@ class PopTopologyGenerator(InfrahubGenerator):
         if topology.get("management_subnet"):
             subnets.append({
                 "type": "Management",
-                "prefix_id": topology["management_subnet"]["id"],
+                "prefix_id": topology[
+                    "management_subnet"
+                ]["id"],
             })
         if topology.get("technical_subnet"):
             subnets.append({
                 "type": "Loopback",
-                "prefix_id": topology["technical_subnet"]["id"],
+                "prefix_id": topology[
+                    "technical_subnet"
+                ]["id"],
             })
         await creator.create_address_pools(subnets)
 
@@ -145,7 +157,8 @@ queries:
 generator_definitions:
   - name: create_pop
     file_path: generators/generate_pop.py
-    targets: topologies_pop              # CoreGeneratorGroup containing topology objects
+    # CoreGeneratorGroup containing topology objects
+    targets: topologies_pop
     query: topology_pop
     class_name: PopTopologyGenerator
     parameters:
@@ -156,7 +169,8 @@ generator_definitions:
 
 ## 2. Network Segment Generator
 
-Creates VxLAN/VLAN configuration from a service network segment definition.
+Creates VxLAN/VLAN configuration from a service network
+segment definition.
 
 ### Query: `queries/segment/segment.gql`
 
@@ -233,7 +247,10 @@ class NetworkSegmentGenerator(InfrahubGenerator):
         # Get leaf devices from the deployment topology
         deployment = segment.get("deployment", {})
         devices = deployment.get("devices", [])
-        leaf_devices = [d for d in devices if d.get("role") == "leaf"]
+        leaf_devices = [
+            d for d in devices
+            if d.get("role") == "leaf"
+        ]
 
         # Create VLAN object
         vlan = await self.client.create(
@@ -298,12 +315,16 @@ class WidgetGenerator(InfrahubGenerator):
         for i in range(1, count + 1):
             resource = await self.client.create(
                 kind="MyResource",
-                data={"name": f"{widget_name}-resource-{i:02d}"}
+                data={
+                    "name": (
+                        f"{widget_name}-resource-{i:02d}"
+                    ),
+                },
             )
             await resource.save(allow_upsert=True)
 ```
 
-### Config: `.infrahub.yml`
+### Minimal Config: `.infrahub.yml`
 
 ```yaml
 queries:
@@ -324,7 +345,9 @@ generator_definitions:
 
 ## 4. Generator with convert_query_response
 
-When `convert_query_response: true`, the GraphQL response is converted to SDK `InfrahubNode` objects accessible via `self.nodes`:
+When `convert_query_response: true`, the GraphQL response is
+converted to SDK `InfrahubNode` objects accessible via
+`self.nodes`:
 
 ```python
 from infrahub_sdk.generator import InfrahubGenerator
@@ -342,7 +365,7 @@ class TypedGenerator(InfrahubGenerator):
         for i in range(1, count + 1):
             resource = await self.client.create(
                 kind="MyResource",
-                data={"name": f"{name}-{i:02d}"}
+                data={"name": f"{name}-{i:02d}"},
             )
             await resource.save(allow_upsert=True)
 ```
@@ -354,7 +377,8 @@ generator_definitions:
     query: widget_query
     targets: widgets
     class_name: TypedGenerator
-    convert_query_response: true         # Enable SDK object conversion
+    # Enable SDK object conversion
+    convert_query_response: true
     parameters:
       name: name__value
 ```
@@ -363,15 +387,15 @@ generator_definitions:
 
 ## Complete File Structure
 
-```
+```text
 project/
   .infrahub.yml
   generators/
     __init__.py
-    common.py                    # TopologyCreator, clean_data, batch helpers
-    generate_dc.py               # DC topology generator
-    generate_pop.py              # POP topology generator
-    generate_segment.py          # Network segment generator
+    common.py              # TopologyCreator, clean_data
+    generate_dc.py         # DC topology generator
+    generate_pop.py        # POP topology generator
+    generate_segment.py    # Network segment generator
   queries/
     topology/
       dc.gql
