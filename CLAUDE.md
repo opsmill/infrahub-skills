@@ -4,11 +4,11 @@ This file provides context for Claude when working with this Infrahub plugin pro
 
 ## Project Overview
 
-This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub), the infrastructure data management platform by OpsMill. The plugin provides skills covering the full Infrahub development lifecycle: schema design, data population, validation checks, generators, transforms, and menu customization.
+This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub), the infrastructure data management platform by OpsMill. The plugin provides skills covering the full Infrahub development lifecycle: schema design, data population, validation checks, generators, transforms, menu customization, and MCP-based data analysis.
 
 ## Directory Structure
 
-```
+```bash
 .
 ├── .claude-plugin/
 │   └── plugin.json              # Plugin manifest (required)
@@ -27,6 +27,7 @@ This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub)
 │   ├── generator-creator/       # Generator automation skill
 │   ├── transform-creator/       # Data transform skill
 │   ├── menu-creator/            # Navigation menu skill
+│   ├── analyst/                 # MCP-based data analysis skill
 │   └── repo-auditor/            # Repository audit skill
 ├── evaluations/                   # Skill evaluation scenarios
 │   └── schema-creator.json      # Schema-creator evals (skill-creator format)
@@ -48,9 +49,11 @@ This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub)
 | `infrahub-generator-creator` | `skills/generator-creator/` | Design-driven automation (create objects from designs) |
 | `infrahub-transform-creator` | `skills/transform-creator/` | Data transforms (Python/Jinja2 to JSON/text/CSV) |
 | `infrahub-menu-creator` | `skills/menu-creator/` | Custom navigation menus for the web UI |
+| `infrahub-analyst` | `skills/analyst/` | MCP-based live data analysis, correlation, and operational Q&A |
 | `infrahub-repo-auditor` | `skills/repo-auditor/` | Audit repository against all rules and best practices |
 
 Each skill directory contains:
+
 - `SKILL.md` - Entry point with overview, capabilities, rule categories
 - `examples.md` - Ready-to-use patterns (most skills)
 - `reference.md` - Property/format reference (schema-creator, object-creator)
@@ -70,6 +73,7 @@ Evaluation scenarios live in the root `evaluations/` directory (one file per ski
 
 1. Create a new directory in `skills/` (e.g., `skills/my-skill/`)
 2. Add a `SKILL.md` file with required YAML frontmatter:
+
    ```yaml
    ---
    name: infrahub-my-skill
@@ -79,6 +83,7 @@ Evaluation scenarios live in the root `evaluations/` directory (one file per ski
      author: OpsMill
    ---
    ```
+
 3. Include sections: Overview, When to Use, Rule Categories, Supporting References
 4. Add a `rules/` directory with `_sections.md` and `_template.md`
 5. Add supporting `.md` files for detailed reference content

@@ -7,6 +7,7 @@
     "infrahub-generator-creator",
     "infrahub-transform-creator",
     "infrahub-menu-creator",
-    "infrahub-repo-auditor"
+    "infrahub-repo-auditor",
+    "infrahub-analyst"
   ]
 }

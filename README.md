@@ -190,6 +190,26 @@ Create custom navigation menus for the Infrahub web interface.
 
 ---
 
+### Analyst
+
+**Name:** `infrahub-analyst`
+
+Analyze and correlate live Infrahub data using the MCP server to answer operational questions on demand.
+
+**Capabilities:**
+- Answer operational questions interactively ("which devices are in tonight's maintenance window?")
+- Correlate data across multiple node types (services, BGP sessions, prefixes, devices)
+- Investigate service impact and blast radius before a change
+- Detect drift between design intent and realized objects
+- Audit data quality (naming, IP space, missing attributes)
+- Produce one-off reports for stakeholders
+
+**Requires:** Infrahub MCP server connected to Claude
+
+**Documentation:** `skills/analyst/` -- SKILL.md, examples.md, rules/
+
+---
+
 ### Common References
 
 Shared documentation and rules referenced by all skills.
@@ -291,7 +311,8 @@ When detected, Claude is instructed to use the appropriate skills for relevant t
 │   ├── check-creator/           # Validation check skill
 │   ├── generator-creator/       # Generator automation skill
 │   ├── transform-creator/       # Data transform skill
-│   └── menu-creator/            # Navigation menu skill
+│   ├── menu-creator/            # Navigation menu skill
+│   └── analyst/                 # MCP-based data analysis skill
 ├── CLAUDE.md                    # Project context
 ├── README.md                    # This file
 └── LICENSE                      # Apache 2.0 License
