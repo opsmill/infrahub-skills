@@ -741,152 +741,77 @@ def grade_schema(schema_path: Path, assertions: list[dict]) -> dict:
 def build_benchmark(eval_results: list[dict], skill_name: str, model: str) -> dict:
     """Build benchmark.json from eval results."""
     runs = []
-    with_rates, without_rates = [], []
-    with_times, without_times = [], []
-    with_tokens, without_tokens = [], []
+    rates, times, tokens = [], [], []
 
     for er in eval_results:
-        for config in ("with_skill", "without_skill"):
-            grading = er[config]["grading"]
-            # Skip without_skill if baseline was not run (empty expectations)
-            if config == "without_skill" and not grading.get("expectations"):
-                continue
-            timing = er[config]["timing"]
-            run = {
-                "eval_id": er["eval_id"],
-                "eval_name": er["eval_name"],
-                "configuration": config,
-                "run_number": 1,
-                "result": {
-                    "pass_rate": grading["summary"]["pass_rate"],
-                    "passed": grading["summary"]["passed"],
-                    "failed": grading["summary"]["failed"],
-                    "total": grading["summary"]["total"],
-                    "time_seconds": timing.get("total_duration_seconds", 0),
-                    "tokens": timing.get("total_tokens", 0),
-                    "tool_calls": 0,
-                    "errors": 0,
-                },
-                "expectations": grading["expectations"],
-                "notes": [],
-            }
-            runs.append(run)
-
-            rate = grading["summary"]["pass_rate"]
-            t = timing.get("total_duration_seconds", 0)
-            tok = timing.get("total_tokens", 0)
-            if config == "with_skill":
-                with_rates.append(rate)
-                with_times.append(t)
-                with_tokens.append(tok)
-            else:
-                without_rates.append(rate)
-                without_times.append(t)
-                without_tokens.append(tok)
+        grading = er["grading"]
+        timing = er.get("timing", {})
+        run = {
+            "eval_id": er["eval_id"],
+            "eval_name": er["eval_name"],
+            "result": {
+                "pass_rate": grading["summary"]["pass_rate"],
+                "passed": grading["summary"]["passed"],
+                "failed": grading["summary"]["failed"],
+                "total": grading["summary"]["total"],
+                "time_seconds": timing.get("total_duration_seconds", 0),
+                "tokens": timing.get("total_tokens", 0),
+            },
+            "expectations": grading["expectations"],
+        }
+        runs.append(run)
+        rates.append(grading["summary"]["pass_rate"])
+        times.append(timing.get("total_duration_seconds", 0))
+        tokens.append(timing.get("total_tokens", 0))
 
     def _stats(vals):
         if not vals:
-            return {"mean": 0, "stddev": 0, "min": 0, "max": 0}
+            return {"mean": 0, "stddev": 0}
         n = len(vals)
         mean = sum(vals) / n
-        if n > 1:
-            var = sum((v - mean) ** 2 for v in vals) / (n - 1)
-            std = var ** 0.5
-        else:
-            std = 0
-        return {"mean": round(mean, 3), "stddev": round(std, 3),
-                "min": round(min(vals), 3), "max": round(max(vals), 3)}
-
-    ws, wos = _stats(with_rates), _stats(without_rates)
+        std = (sum((v - mean) ** 2 for v in vals) / (n - 1)) ** 0.5 if n > 1 else 0
+        return {"mean": round(mean, 3), "stddev": round(std, 3)}
 
     return {
         "metadata": {
             "skill_name": skill_name,
-            "skill_path": SKILL_PATHS.get(skill_name, ""),
             "executor_model": model,
-            "analyzer_model": model,
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "evals_run": [er["eval_id"] for er in eval_results],
-            "runs_per_configuration": 1,
         },
         "runs": runs,
-        "run_summary": {
-            "with_skill": {
-                "pass_rate": _stats(with_rates),
-                "time_seconds": _stats(with_times),
-                "tokens": _stats(with_tokens),
-            },
-            "without_skill": {
-                "pass_rate": _stats(without_rates),
-                "time_seconds": _stats(without_times),
-                "tokens": _stats(without_tokens),
-            },
-            "delta": {
-                "pass_rate": f"{ws['mean'] - wos['mean']:+.2f}",
-                "time_seconds": f"{_stats(with_times)['mean'] - _stats(without_times)['mean']:+.1f}",
-                "tokens": f"{_stats(with_tokens)['mean'] - _stats(without_tokens)['mean']:+.0f}",
-            },
+        "summary": {
+            "pass_rate": _stats(rates),
+            "time_seconds": _stats(times),
+            "tokens": _stats(tokens),
         },
-        "notes": [],
     }
 
 
 def generate_markdown_report(benchmark: dict) -> str:
     """Generate a Markdown report from benchmark data."""
     meta = benchmark["metadata"]
-    summary = benchmark["run_summary"]
-    ws = summary["with_skill"]
-    wos = summary["without_skill"]
-    delta = summary["delta"]
+    summary = benchmark["summary"]
 
     lines = [
-        f"# Skill Evaluation Report: {meta['skill_name']}",
+        f"# Skill Eval: {meta['skill_name']}",
         "",
-        f"**Model:** {meta['executor_model']}",
-        f"**Date:** {meta['timestamp']}",
-        f"**Evals:** {len(meta['evals_run'])}",
-        "",
-        "## Summary",
-        "",
-        "| Metric | With Skill | Without Skill | Delta |",
-        "|--------|-----------|--------------|-------|",
-        f"| Pass Rate | {ws['pass_rate']['mean']*100:.1f}% | {wos['pass_rate']['mean']*100:.1f}% | {delta['pass_rate']} |",
-        f"| Time | {ws['time_seconds']['mean']:.1f}s | {wos['time_seconds']['mean']:.1f}s | {delta['time_seconds']}s |",
-        f"| Tokens | {ws['tokens']['mean']:.0f} | {wos['tokens']['mean']:.0f} | {delta['tokens']} |",
-        "",
-        "## Per-Eval Results",
+        f"**Model:** {meta['executor_model']}  "
+        f"**Date:** {meta['timestamp']}  "
+        f"**Pass Rate:** {summary['pass_rate']['mean']*100:.0f}%",
         "",
     ]
 
     for run in benchmark["runs"]:
-        if run["configuration"] != "with_skill":
-            continue
-        eval_name = run.get("eval_name", f"Eval {run['eval_id']}")
-        # Find matching baseline
-        baseline = next(
-            (r for r in benchmark["runs"]
-             if r["eval_id"] == run["eval_id"] and r["configuration"] == "without_skill"),
-            None,
-        )
-
-        lines.append(f"### {eval_name}")
-        lines.append("")
-        lines.append(f"| Assertion | With Skill | Without Skill |")
-        lines.append(f"|-----------|-----------|--------------|")
-
-        for i, exp in enumerate(run["expectations"]):
-            ws_icon = "PASS" if exp["passed"] else "FAIL"
-            wos_icon = "—"
-            if baseline and i < len(baseline["expectations"]):
-                wos_icon = "PASS" if baseline["expectations"][i]["passed"] else "FAIL"
-            lines.append(f"| {exp['text'][:60]} | {ws_icon} | {wos_icon} |")
+        eval_name = run.get("eval_name", f"eval-{run['eval_id']}")
+        r = run["result"]
+        status = "✅" if r["pass_rate"] == 1.0 else "⚠️" if r["pass_rate"] >= 0.5 else "❌"
+        lines.append(f"### {status} {eval_name} — {r['passed']}/{r['total']}")
         lines.append("")
 
-    if benchmark.get("notes"):
-        lines.append("## Notes")
-        lines.append("")
-        for note in benchmark["notes"]:
-            lines.append(f"- {note}")
+        for exp in run["expectations"]:
+            icon = "✅" if exp["passed"] else "❌"
+            lines.append(f"- {icon} {exp['text'][:80]}")
         lines.append("")
 
     return "\n".join(lines)
