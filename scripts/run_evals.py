@@ -405,6 +405,256 @@ def check_endpoint_device_relationship(schema: dict, **_) -> tuple[bool, str]:
     return False, "No Endpoint-to-Device relationship found"
 
 
+# ---------------------------------------------------------------------------
+# Menu-creator assertion checks
+# ---------------------------------------------------------------------------
+
+def _menu_items(doc: dict) -> list[dict]:
+    """Return top-level menu items from spec.data."""
+    return doc.get("spec", {}).get("data", []) or []
+
+
+def _all_menu_leaves(doc: dict) -> list[dict]:
+    """Recursively collect all leaf menu items (items with a 'kind' key)."""
+    leaves = []
+    def _walk(items):
+        for item in (items or []):
+            if item.get("kind"):
+                leaves.append(item)
+            children = item.get("children", {})
+            if isinstance(children, dict):
+                _walk(children.get("data", []))
+            elif isinstance(children, list):
+                _walk(children)
+    _walk(_menu_items(doc))
+    return leaves
+
+
+def _all_menu_items_recursive(doc: dict) -> list[dict]:
+    """Recursively collect all menu items at every level."""
+    items = []
+    def _walk(item_list):
+        for item in (item_list or []):
+            items.append(item)
+            children = item.get("children", {})
+            if isinstance(children, dict):
+                _walk(children.get("data", []))
+            elif isinstance(children, list):
+                _walk(children)
+    _walk(_menu_items(doc))
+    return items
+
+
+def check_apiversion_and_kind(doc: dict, **_) -> tuple[bool, str]:
+    api = doc.get("apiVersion")
+    kind = doc.get("kind")
+    if api == "infrahub.app/v1" and kind == "Menu":
+        return True, "apiVersion: infrahub.app/v1 and kind: Menu"
+    return False, f"apiVersion: {api}, kind: {kind}"
+
+
+def check_spec_data_structure(doc: dict, **_) -> tuple[bool, str]:
+    spec = doc.get("spec")
+    if not isinstance(spec, dict):
+        return False, "No spec key or spec is not a dict"
+    data = spec.get("data")
+    if not isinstance(data, list):
+        return False, f"spec.data is {type(data).__name__}, expected list"
+    if len(data) == 0:
+        return False, "spec.data is empty"
+    return True, f"spec.data is a list with {len(data)} items"
+
+
+def check_name_and_namespace(doc: dict, **_) -> tuple[bool, str]:
+    missing = []
+    for item in _all_menu_items_recursive(doc):
+        label = item.get("label", item.get("name", "?"))
+        if not item.get("name"):
+            missing.append(f"{label} missing name")
+        if not item.get("namespace"):
+            missing.append(f"{label} missing namespace")
+    if missing:
+        return False, f"Issues: {', '.join(missing)}"
+    return True, "All items have name and namespace"
+
+
+def check_kind_for_schema_links(doc: dict, **_) -> tuple[bool, str]:
+    leaves = _all_menu_leaves(doc)
+    if not leaves:
+        return False, "No leaf items with kind found"
+    for item in leaves:
+        if item.get("path") and not item.get("kind"):
+            return False, f"Item {item.get('name')} uses path instead of kind"
+    return True, f"{len(leaves)} items use kind for schema links"
+
+
+def check_mdi_icons(doc: dict, **_) -> tuple[bool, str]:
+    bad = []
+    for item in _all_menu_items_recursive(doc):
+        icon = item.get("icon", "")
+        if not icon:
+            bad.append(f"{item.get('name', '?')} has no icon")
+        elif not icon.startswith("mdi:"):
+            bad.append(f"{item.get('name', '?')} icon '{icon}' missing mdi: prefix")
+    if bad:
+        return False, f"Icon issues: {', '.join(bad)}"
+    return True, "All icons use mdi: prefix"
+
+
+def check_labels_present(doc: dict, **_) -> tuple[bool, str]:
+    missing = []
+    for item in _all_menu_items_recursive(doc):
+        if not item.get("label"):
+            missing.append(item.get("name", "?"))
+    if missing:
+        return False, f"Missing label on: {', '.join(missing)}"
+    return True, "All items have labels"
+
+
+def check_group_headers_no_kind(doc: dict, **_) -> tuple[bool, str]:
+    groups = [i for i in _menu_items(doc)
+              if i.get("children") and not i.get("kind") and not i.get("path")]
+    if not groups:
+        return False, "No top-level group headers without kind/path found"
+    bad = [g.get("name", "?") for g in _menu_items(doc)
+           if g.get("children") and (g.get("kind") or g.get("path"))]
+    if bad:
+        return False, f"Group headers with kind/path: {', '.join(bad)}"
+    return True, f"{len(groups)} group headers without kind/path"
+
+
+def check_children_data_wrapper(doc: dict, **_) -> tuple[bool, str]:
+    for item in _all_menu_items_recursive(doc):
+        children = item.get("children")
+        if children is None:
+            continue
+        if isinstance(children, list):
+            return False, f"Item {item.get('name', '?')} has children as a list, expected children.data wrapper"
+        if isinstance(children, dict) and "data" in children:
+            continue
+        return False, f"Item {item.get('name', '?')} has children but no data key"
+    return True, "All children use children.data wrapper"
+
+
+def check_leaf_items_have_kind(doc: dict, **_) -> tuple[bool, str]:
+    leaves = _all_menu_leaves(doc)
+    if not leaves:
+        # Check if there are any items without children that also lack kind
+        for item in _all_menu_items_recursive(doc):
+            if not item.get("children") and not item.get("kind"):
+                return False, f"Leaf item {item.get('name', '?')} has no kind"
+        return False, "No leaf items found"
+    return True, f"{len(leaves)} leaf items have kind"
+
+
+def check_correct_grouping(doc: dict, **_) -> tuple[bool, str]:
+    groups = {}
+    for item in _menu_items(doc):
+        label = (item.get("label") or item.get("name") or "").lower()
+        children = item.get("children", {})
+        child_list = children.get("data", []) if isinstance(children, dict) else children if isinstance(children, list) else []
+        child_kinds = [c.get("kind", "").lower() for c in child_list]
+        groups[label] = child_kinds
+
+    infra_kinds = groups.get("infrastructure", [])
+    org_kinds = groups.get("organization", [])
+
+    issues = []
+    for expected in ["dcimserver", "dcimswitch", "dcimpdu"]:
+        if not any(expected in k for k in infra_kinds):
+            issues.append(f"{expected} not under Infrastructure")
+    for expected in ["organizationmanufacturer", "organizationprovider"]:
+        if not any(expected in k for k in org_kinds):
+            issues.append(f"{expected} not under Organization")
+
+    if issues:
+        return False, "; ".join(issues)
+    return True, "Correct grouping: infra and org items under right headers"
+
+
+def check_all_nodes_present(doc: dict, **_) -> tuple[bool, str]:
+    expected = {"DcimServer", "DcimSwitch", "DcimPdu",
+                "OrganizationManufacturer", "OrganizationProvider"}
+    found = set()
+    for item in _all_menu_items_recursive(doc):
+        kind = item.get("kind", "")
+        if kind in expected:
+            found.add(kind)
+    missing = expected - found
+    if missing:
+        return False, f"Missing nodes: {', '.join(sorted(missing))}"
+    return True, f"All {len(expected)} nodes present"
+
+
+def check_contextual_icons(doc: dict, **_) -> tuple[bool, str]:
+    for item in _all_menu_items_recursive(doc):
+        icon = item.get("icon", "")
+        if not icon.startswith("mdi:"):
+            return False, f"{item.get('name', '?')} icon missing mdi: prefix"
+    # If all have mdi: icons, consider them contextual (basic check)
+    items = _all_menu_items_recursive(doc)
+    if not items:
+        return False, "No menu items found"
+    return True, f"All {len(items)} items have mdi: icons"
+
+
+def check_generic_kind_link(doc: dict, **_) -> tuple[bool, str]:
+    for item in _all_menu_items_recursive(doc):
+        kind = item.get("kind", "")
+        if "generic" in kind.lower() or kind == "LocationGeneric":
+            return True, f"Item {item.get('name', '?')} uses kind: {kind}"
+    return False, "No menu item with kind referencing a Generic"
+
+
+def check_location_children(doc: dict, **_) -> tuple[bool, str]:
+    location_types = {"region", "site", "room", "rack"}
+    found = set()
+    for item in _all_menu_items_recursive(doc):
+        kind = (item.get("kind") or "").lower()
+        name = (item.get("name") or "").lower()
+        for loc in location_types:
+            if loc in kind or loc in name:
+                found.add(loc)
+    missing = location_types - found
+    if missing:
+        return False, f"Missing location children: {', '.join(sorted(missing))}"
+    return True, "All location types present as children"
+
+
+def check_separate_devices_section(doc: dict, **_) -> tuple[bool, str]:
+    for item in _menu_items(doc):
+        label = (item.get("label") or item.get("name") or "").lower()
+        kind = (item.get("kind") or "").lower()
+        children = item.get("children", {})
+        child_list = children.get("data", []) if isinstance(children, dict) else children if isinstance(children, list) else []
+        child_kinds = [(c.get("kind") or "").lower() for c in child_list]
+        if "device" in label or "device" in kind or any("device" in k for k in child_kinds):
+            # Check it's not under a locations group
+            if "location" not in label:
+                return True, f"Devices found in separate section: {item.get('label', item.get('name'))}"
+    return False, "No separate devices section found"
+
+
+def check_include_in_menu_false(doc: dict, raw_text: str = "", **_) -> tuple[bool, str]:
+    # This advice would normally be in the text output, not in the YAML.
+    # Check if it appears as a YAML comment in the output file.
+    if "include_in_menu" in raw_text:
+        return True, "include_in_menu mentioned in output"
+    return False, "No mention of include_in_menu in output"
+
+
+def check_infrahub_yml_registration(doc: dict, raw_text: str = "", **_) -> tuple[bool, str]:
+    if ".infrahub.yml" in raw_text or "infrahub.yml" in raw_text:
+        return True, ".infrahub.yml registration mentioned in output"
+    return False, "No mention of .infrahub.yml registration in output"
+
+
+def check_schema_comment(doc: dict, raw_text: str = "", **_) -> tuple[bool, str]:
+    if "$schema" in raw_text or "yaml-language-server" in raw_text:
+        return True, "$schema comment found in raw YAML"
+    return False, "No $schema or yaml-language-server comment found"
+
+
 # Map assertion names to check functions
 ASSERTION_CHECKS = {
     "attr-min-length": check_attr_min_length,
@@ -422,14 +672,33 @@ ASSERTION_CHECKS = {
     "two-endpoint-relationships": check_two_endpoint_relationships,
     "attribute-kind-relationships": check_attribute_kind_relationships,
     "endpoint-device-relationship": check_endpoint_device_relationship,
+    # Menu-creator assertions
+    "apiversion-and-kind": check_apiversion_and_kind,
+    "spec-data-structure": check_spec_data_structure,
+    "name-and-namespace": check_name_and_namespace,
+    "kind-for-schema-links": check_kind_for_schema_links,
+    "mdi-icons": check_mdi_icons,
+    "labels-present": check_labels_present,
+    "group-headers-no-kind": check_group_headers_no_kind,
+    "children-data-wrapper": check_children_data_wrapper,
+    "leaf-items-have-kind": check_leaf_items_have_kind,
+    "correct-grouping": check_correct_grouping,
+    "all-nodes-present": check_all_nodes_present,
+    "contextual-icons": check_contextual_icons,
+    "generic-kind-link": check_generic_kind_link,
+    "location-children": check_location_children,
+    "separate-devices-section": check_separate_devices_section,
+    "include-in-menu-false": check_include_in_menu_false,
+    "infrahub-yml-registration": check_infrahub_yml_registration,
+    "schema-comment": check_schema_comment,
 }
 
 
 def grade_schema(schema_path: Path, assertions: list[dict]) -> dict:
-    """Grade a schema YAML file against a list of assertions."""
+    """Grade a YAML output file against a list of assertions."""
     try:
-        with open(schema_path) as f:
-            schema = yaml.safe_load(f)
+        raw_text = schema_path.read_text()
+        schema = yaml.safe_load(raw_text)
     except Exception as e:
         return {
             "expectations": [
@@ -445,7 +714,7 @@ def grade_schema(schema_path: Path, assertions: list[dict]) -> dict:
         name = assertion["name"]
         check_fn = ASSERTION_CHECKS.get(name)
         if check_fn:
-            ok, evidence = check_fn(schema)
+            ok, evidence = check_fn(schema, raw_text=raw_text)
         else:
             ok, evidence = False, f"No check function for assertion '{name}'"
 
@@ -472,152 +741,77 @@ def grade_schema(schema_path: Path, assertions: list[dict]) -> dict:
 def build_benchmark(eval_results: list[dict], skill_name: str, model: str) -> dict:
     """Build benchmark.json from eval results."""
     runs = []
-    with_rates, without_rates = [], []
-    with_times, without_times = [], []
-    with_tokens, without_tokens = [], []
+    rates, times, tokens = [], [], []
 
     for er in eval_results:
-        for config in ("with_skill", "without_skill"):
-            grading = er[config]["grading"]
-            # Skip without_skill if baseline was not run (empty expectations)
-            if config == "without_skill" and not grading.get("expectations"):
-                continue
-            timing = er[config]["timing"]
-            run = {
-                "eval_id": er["eval_id"],
-                "eval_name": er["eval_name"],
-                "configuration": config,
-                "run_number": 1,
-                "result": {
-                    "pass_rate": grading["summary"]["pass_rate"],
-                    "passed": grading["summary"]["passed"],
-                    "failed": grading["summary"]["failed"],
-                    "total": grading["summary"]["total"],
-                    "time_seconds": timing.get("total_duration_seconds", 0),
-                    "tokens": timing.get("total_tokens", 0),
-                    "tool_calls": 0,
-                    "errors": 0,
-                },
-                "expectations": grading["expectations"],
-                "notes": [],
-            }
-            runs.append(run)
-
-            rate = grading["summary"]["pass_rate"]
-            t = timing.get("total_duration_seconds", 0)
-            tok = timing.get("total_tokens", 0)
-            if config == "with_skill":
-                with_rates.append(rate)
-                with_times.append(t)
-                with_tokens.append(tok)
-            else:
-                without_rates.append(rate)
-                without_times.append(t)
-                without_tokens.append(tok)
+        grading = er["grading"]
+        timing = er.get("timing", {})
+        run = {
+            "eval_id": er["eval_id"],
+            "eval_name": er["eval_name"],
+            "result": {
+                "pass_rate": grading["summary"]["pass_rate"],
+                "passed": grading["summary"]["passed"],
+                "failed": grading["summary"]["failed"],
+                "total": grading["summary"]["total"],
+                "time_seconds": timing.get("total_duration_seconds", 0),
+                "tokens": timing.get("total_tokens", 0),
+            },
+            "expectations": grading["expectations"],
+        }
+        runs.append(run)
+        rates.append(grading["summary"]["pass_rate"])
+        times.append(timing.get("total_duration_seconds", 0))
+        tokens.append(timing.get("total_tokens", 0))
 
     def _stats(vals):
         if not vals:
-            return {"mean": 0, "stddev": 0, "min": 0, "max": 0}
+            return {"mean": 0, "stddev": 0}
         n = len(vals)
         mean = sum(vals) / n
-        if n > 1:
-            var = sum((v - mean) ** 2 for v in vals) / (n - 1)
-            std = var ** 0.5
-        else:
-            std = 0
-        return {"mean": round(mean, 3), "stddev": round(std, 3),
-                "min": round(min(vals), 3), "max": round(max(vals), 3)}
-
-    ws, wos = _stats(with_rates), _stats(without_rates)
+        std = (sum((v - mean) ** 2 for v in vals) / (n - 1)) ** 0.5 if n > 1 else 0
+        return {"mean": round(mean, 3), "stddev": round(std, 3)}
 
     return {
         "metadata": {
             "skill_name": skill_name,
-            "skill_path": SKILL_PATHS.get(skill_name, ""),
             "executor_model": model,
-            "analyzer_model": model,
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "evals_run": [er["eval_id"] for er in eval_results],
-            "runs_per_configuration": 1,
         },
         "runs": runs,
-        "run_summary": {
-            "with_skill": {
-                "pass_rate": _stats(with_rates),
-                "time_seconds": _stats(with_times),
-                "tokens": _stats(with_tokens),
-            },
-            "without_skill": {
-                "pass_rate": _stats(without_rates),
-                "time_seconds": _stats(without_times),
-                "tokens": _stats(without_tokens),
-            },
-            "delta": {
-                "pass_rate": f"{ws['mean'] - wos['mean']:+.2f}",
-                "time_seconds": f"{_stats(with_times)['mean'] - _stats(without_times)['mean']:+.1f}",
-                "tokens": f"{_stats(with_tokens)['mean'] - _stats(without_tokens)['mean']:+.0f}",
-            },
+        "summary": {
+            "pass_rate": _stats(rates),
+            "time_seconds": _stats(times),
+            "tokens": _stats(tokens),
         },
-        "notes": [],
     }
 
 
 def generate_markdown_report(benchmark: dict) -> str:
     """Generate a Markdown report from benchmark data."""
     meta = benchmark["metadata"]
-    summary = benchmark["run_summary"]
-    ws = summary["with_skill"]
-    wos = summary["without_skill"]
-    delta = summary["delta"]
+    summary = benchmark["summary"]
 
     lines = [
-        f"# Skill Evaluation Report: {meta['skill_name']}",
+        f"# Skill Eval: {meta['skill_name']}",
         "",
-        f"**Model:** {meta['executor_model']}",
-        f"**Date:** {meta['timestamp']}",
-        f"**Evals:** {len(meta['evals_run'])}",
-        "",
-        "## Summary",
-        "",
-        "| Metric | With Skill | Without Skill | Delta |",
-        "|--------|-----------|--------------|-------|",
-        f"| Pass Rate | {ws['pass_rate']['mean']*100:.1f}% | {wos['pass_rate']['mean']*100:.1f}% | {delta['pass_rate']} |",
-        f"| Time | {ws['time_seconds']['mean']:.1f}s | {wos['time_seconds']['mean']:.1f}s | {delta['time_seconds']}s |",
-        f"| Tokens | {ws['tokens']['mean']:.0f} | {wos['tokens']['mean']:.0f} | {delta['tokens']} |",
-        "",
-        "## Per-Eval Results",
+        f"**Model:** {meta['executor_model']}  "
+        f"**Date:** {meta['timestamp']}  "
+        f"**Pass Rate:** {summary['pass_rate']['mean']*100:.0f}%",
         "",
     ]
 
     for run in benchmark["runs"]:
-        if run["configuration"] != "with_skill":
-            continue
-        eval_name = run.get("eval_name", f"Eval {run['eval_id']}")
-        # Find matching baseline
-        baseline = next(
-            (r for r in benchmark["runs"]
-             if r["eval_id"] == run["eval_id"] and r["configuration"] == "without_skill"),
-            None,
-        )
-
-        lines.append(f"### {eval_name}")
-        lines.append("")
-        lines.append(f"| Assertion | With Skill | Without Skill |")
-        lines.append(f"|-----------|-----------|--------------|")
-
-        for i, exp in enumerate(run["expectations"]):
-            ws_icon = "PASS" if exp["passed"] else "FAIL"
-            wos_icon = "—"
-            if baseline and i < len(baseline["expectations"]):
-                wos_icon = "PASS" if baseline["expectations"][i]["passed"] else "FAIL"
-            lines.append(f"| {exp['text'][:60]} | {ws_icon} | {wos_icon} |")
+        eval_name = run.get("eval_name", f"eval-{run['eval_id']}")
+        r = run["result"]
+        status = "✅" if r["pass_rate"] == 1.0 else "⚠️" if r["pass_rate"] >= 0.5 else "❌"
+        lines.append(f"### {status} {eval_name} — {r['passed']}/{r['total']}")
         lines.append("")
 
-    if benchmark.get("notes"):
-        lines.append("## Notes")
-        lines.append("")
-        for note in benchmark["notes"]:
-            lines.append(f"- {note}")
+        for exp in run["expectations"]:
+            icon = "✅" if exp["passed"] else "❌"
+            lines.append(f"- {icon} {exp['text'][:80]}")
         lines.append("")
 
     return "\n".join(lines)

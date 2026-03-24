@@ -126,6 +126,7 @@ The viewer has two tabs:
 | Skill | Eval File | Scenarios |
 | ----- | --------- | --------- |
 | infrahub-schema-creator | `evaluations/schema-creator.json` | 3 (VLAN management, circuit management, location hierarchy) |
+| infrahub-menu-creator | `evaluations/menu-creator.json` | 3 (flat menu, hierarchical menu, generic kind with include_in_menu) |
 
 Other skills don't have evals yet — adding them is a
 good contribution. Focus on skills with the most

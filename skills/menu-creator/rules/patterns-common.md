@@ -13,6 +13,15 @@ Impact: LOW (reference patterns)
 For simple projects with few node types:
 
 ```yaml
+# yaml-language-server:
+#   $schema=https://schema.infrahub.app/infrahub/menu/latest.json
+#
+# Register this file in .infrahub.yml:
+#   menus:
+#     - menus/menu.yml
+#
+# Set include_in_menu: false on schema nodes in this
+# menu to prevent duplicate sidebar entries.
 ---
 apiVersion: infrahub.app/v1
 kind: Menu

@@ -37,15 +37,24 @@ spec:
 
 ### .infrahub.yml Registration
 
+The menu file must be registered in `.infrahub.yml`
+under the `menus:` key. Always include this as a
+YAML comment in the output file so the user knows:
+
 ```yaml
-menus:
-  - menus/menu-full.yml
+# Register this file in .infrahub.yml:
+#
+#   menus:
+#     - menus/menu-full.yml
 ```
 
 ### Key Rules
 
 - Include the `$schema` comment for IDE validation
+- Include `.infrahub.yml` registration comment
+- Include `include_in_menu: false` advice comment
 - One menu file per project typically
-- The menu replaces the auto-generated sidebar navigation
+- The menu replaces the auto-generated sidebar
+  navigation
 
 Reference: [infrahub-yml-reference.md](../../common/infrahub-yml-reference.md)
