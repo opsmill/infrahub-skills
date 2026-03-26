@@ -109,7 +109,7 @@ Each skill lives in `skills/<name>/` with a `SKILL.md` entry point, reference do
 - Claude Code, GitHub Copilot, Cursor, Windsurf, or any AI tool that supports custom context or instruction files
 - A running Infrahub instance, for loading and testing generated resources ([Infrahub installation docs](https://docs.infrahub.app/))
 - `infrahubctl`, for loading schemas, objects, and running generators ([infrahubctl docs](https://docs.infrahub.app/python-sdk/infrahubctl))
-- Analyst skill only: an Infrahub MCP server configured and connected to your AI tool
+- Analyst skill only: an Infrahub MCP server configured and connected to your AI tool ([setup guide](https://docs.infrahub.app/integrations/mcp))
 
 ---
 
