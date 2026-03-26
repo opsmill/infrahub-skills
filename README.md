@@ -1,15 +1,10 @@
 # Infrahub AI Skills
 
-AI skills for developing with
-[Infrahub](https://github.com/opsmill/infrahub).
-Install the plugin, open your Infrahub project, and
-start building — Claude (or any AI coding assistant)
-automatically uses the right skill for each task.
+AI skills for developing with [Infrahub](https://github.com/opsmill/infrahub). Install the skills, open your Infrahub project, and start building — your AI coding assistant automatically uses the right skill for each task.
 
 ```bash
-# Claude Code — install once, works across all your Infrahub projects
-/plugin marketplace add opsmill/claude-marketplace
-/plugin install infrahub@opsmill
+# Install all Infrahub skills into your project
+npx skills add opsmill/infrahub-skills
 ```
 
 Once installed, open any Infrahub project and start working — try *"describe what this schema does"* to explore, or *"add a status attribute to Device"* to make a change.
@@ -18,7 +13,7 @@ Once installed, open any Infrahub project and start working — try *"describe w
 
 ## What You Can Do With It
 
-- **Start immediately in any Infrahub project** — the plugin detects `.infrahub.yml`, `infrahub.toml`, or schema files automatically on session start and loads the appropriate skills without any manual configuration step.
+- **Start immediately in any Infrahub project** — the skills detect `.infrahub.yml`, `infrahub.toml`, or schema files and load the appropriate guidance without any manual configuration step.
 - **Build a working schema from a description** — describe your data model in plain terms and the Schema Creator produces valid Infrahub schema YAML with appropriate node types, attribute kinds, and relationships, without requiring manual study of the schema format first.
 - **Generate automation logic from a plain description** — describe what you want to automate (for example, "create a BGP session for each spine-leaf pair in my fabric design") and the Generator Creator produces a working `InfrahubGenerator` implementation for that specific case.
 - **Get working configuration templates for your data model** — describe the output format you need and the Transform Creator produces a transform and Jinja2 template that reads from your specific schema, rather than a generic placeholder example.
@@ -44,7 +39,7 @@ For targeted changes, skip the ceremony. Describe what you want and the agent ha
 - *"Create a check that validates every device has a primary IP"* — the agent uses **check-creator**, writes the Python class and GraphQL query, and registers it in `.infrahub.yml`.
 - *"Add a menu section for IP address management"* — the agent uses **menu-creator** and produces the YAML with correct icon references and hierarchy.
 
-This is the fastest path for well-scoped work: adding attributes, writing a check, populating objects, creating a transform. No planning step needed. It's also how most people start — install the plugin, describe what you need, and iterate from there.
+This is the fastest path for well-scoped work: adding attributes, writing a check, populating objects, creating a transform. No planning step needed. It's also how most people start — install the skills, describe what you need, and iterate from there.
 
 ### Speckit Mode — Plan, Then Build
 
@@ -81,13 +76,13 @@ Speckit integration is set up in the [infrahub-template](https://github.com/opsm
 ## Who This Is For
 
 **Evaluating Infrahub**
-Someone exploring Infrahub who wants to see what their specific use case looks like in practice — not a generic demo, but their actual data model or automation workflow. The plugin accepts a description of the use case and produces real Infrahub resources from it, so the evaluation is grounded in something that actually runs rather than documentation examples. It can also explain how Infrahub handles a particular requirement and what the tradeoffs are between different approaches.
+Someone exploring Infrahub who wants to see what their specific use case looks like in practice — not a generic demo, but their actual data model or automation workflow. The skills accept a description of the use case and produce real Infrahub resources from it, so the evaluation is grounded in something that actually runs rather than documentation examples. They can also explain how Infrahub handles a particular requirement and what the tradeoffs are between different approaches.
 
 **Building with Infrahub**
-A team actively building out an Infrahub implementation — defining schemas, writing generators, creating configuration transforms. The plugin covers each part of the build lifecycle and applies Infrahub's patterns to the specific resources being built. Speckit Mode is useful for multi-part tasks where the correct structure isn't obvious upfront.
+A team actively building out an Infrahub implementation — defining schemas, writing generators, creating configuration transforms. The skills cover each part of the build lifecycle and apply Infrahub's patterns to the specific resources being built. Speckit Mode is useful for multi-part tasks where the correct structure isn't obvious upfront.
 
 **Extending an existing Infrahub implementation**
-A team already running Infrahub who needs to continue extending it — adding schema nodes, modifying generators, integrating with external data sources. The plugin works with existing implementation context and handles the Infrahub side of integrations, including producing `infrahub-sync` diffconfigs for sources like spreadsheets or external CMDBs.
+A team already running Infrahub who needs to continue extending it — adding schema nodes, modifying generators, integrating with external data sources. The skills work with existing implementation context and handle the Infrahub side of integrations, including producing `infrahub-sync` diffconfigs for sources like spreadsheets or external CMDBs.
 
 ---
 
@@ -110,7 +105,7 @@ Each skill lives in `skills/<name>/` with a `SKILL.md` entry point, reference do
 
 ## Prerequisites
 
-- Claude Code, GitHub Copilot, Cursor, Windsurf, or any AI tool that supports custom context or instruction files
+- An AI coding assistant that supports skills or custom context files (Claude Code, GitHub Copilot, Cursor, Windsurf, Amp, Cline, Codex, or similar)
 - A running Infrahub instance, for loading and testing generated resources ([Infrahub installation docs](https://docs.infrahub.app/))
 - `infrahubctl`, for loading schemas, objects, and running generators ([infrahubctl docs](https://docs.infrahub.app/python-sdk/infrahubctl))
 - Analyst skill only: an Infrahub MCP server configured and connected to your AI tool ([setup guide](https://docs.infrahub.app/integrations/mcp))
@@ -119,38 +114,30 @@ Each skill lives in `skills/<name>/` with a `SKILL.md` entry point, reference do
 
 ## Installation
 
-### Claude Code (Recommended)
+### npx (Recommended)
 
-Install via the OpsMill marketplace — the skills are available across all your Infrahub projects without copying files:
+The `npx skills` CLI automatically installs skills for whichever AI tools you have configured:
+
+```bash
+npx skills add opsmill/infrahub-skills
+```
+
+This detects your installed AI tools (Claude Code, GitHub Copilot, Cursor, Amp, Cline, Codex, and others) and installs the skills in the correct format for each one. Use `--yes` to skip the interactive skill selection prompt and install all skills.
+
+### Claude Code Plugin
+
+If you use Claude Code, you can also install as a plugin via the OpsMill marketplace:
 
 ```bash
 /plugin marketplace add opsmill/claude-marketplace
 /plugin install infrahub@opsmill
 ```
 
-Or add directly to `~/.claude/settings.json`:
-
-```json
-{
-  "extraKnownMarketplaces": {
-    "opsmill": {
-      "source": {
-        "source": "github",
-        "repo": "opsmill/claude-marketplace"
-      }
-    }
-  },
-  "enabledPlugins": {
-    "infrahub@opsmill": true
-  }
-}
-```
-
 The plugin auto-detects Infrahub projects on session start by looking for `.infrahub.yml`, `infrahub.toml`, or schema files with `version: "1.0"` and `nodes:`/`generics:` keys.
 
-### Copy Into Your Project
+### Manual Copy
 
-Works with any AI tool. Copy the `skills/` directory into your project so the assistant discovers the files directly:
+Copy the `skills/` directory into your project so the assistant discovers the files directly:
 
 ```bash
 git clone https://github.com/opsmill/infrahub-skills.git
@@ -160,11 +147,11 @@ rm -rf infrahub-skills
 
 Always include `skills/common/` — it contains shared references that all skills depend on.
 
-### Other AI Tools
+### Tool-Specific Setup
 
-The skills follow the [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) format — each skill is a directory with a `SKILL.md` entry point plus supporting files. Any tool that supports this format can use them directly.
+After installing skills (via `npx` or manual copy), some tools benefit from additional configuration:
 
-**GitHub Copilot** — copy `skills/` into your repo, then create `.github/instructions/infrahub.instructions.md`:
+**GitHub Copilot** — create `.github/instructions/infrahub.instructions.md`:
 
 ```markdown
 ---
@@ -175,7 +162,7 @@ For Infrahub development guidance, refer to the skill files in skills/.
 
 See [GitHub Copilot custom instructions docs](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions).
 
-**Cursor** — copy `skills/` into your repo, then create `.cursor/rules/infrahub.mdc`:
+**Cursor** — create `.cursor/rules/infrahub.mdc`:
 
 ```markdown
 ---
@@ -188,7 +175,7 @@ For Infrahub development guidance, refer to the skill files in skills/.
 
 See [Cursor Rules docs](https://cursor.com/docs/rules).
 
-**Windsurf** — copy `skills/` into your repo. Windsurf picks up Markdown files as context. Optionally reference them from `.windsurfrules`. See [Windsurf Memories & Rules docs](https://docs.windsurf.com/windsurf/cascade/memories).
+**Windsurf** — Windsurf picks up Markdown files as context automatically. Optionally reference them from `.windsurfrules`. See [Windsurf Memories & Rules docs](https://docs.windsurf.com/windsurf/cascade/memories).
 
 ---
 
