@@ -43,6 +43,7 @@ Plugin (plugin.json)
 │   ├── generator-creator/
 │   ├── transform-creator/
 │   ├── menu-creator/
+│   ├── analyst/
 │   ├── repo-auditor/
 │   │
 │   └── common/               ← Cross-cutting refs

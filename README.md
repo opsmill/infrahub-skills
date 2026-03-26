@@ -124,9 +124,9 @@ For tools that need explicit configuration:
 
 **GitHub Copilot** — copy `skills/` into your repo, then create `.github/instructions/infrahub.instructions.md` pointing at the skill files. See [Copilot custom instructions docs](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions).
 
-**Cursor** — copy `skills/` into your repo, then create `.cursor/rules/infrahub.mdc` referencing the skills. See [Cursor Rules docs](https://cursor.com/docs/context/rules).
+**Cursor** — copy `skills/` into your repo, then create `.cursor/rules/infrahub.mdc` referencing the skills. See [Cursor Rules docs](https://cursor.com/docs/rules).
 
-**Windsurf** — copy `skills/` into your repo. Windsurf picks up Markdown files as context. Optionally reference them from `.windsurfrules`. See [Windsurf Rules docs](https://docs.windsurf.com/windsurf/customize#rules).
+**Windsurf** — copy `skills/` into your repo. Windsurf picks up Markdown files as context. Optionally reference them from `.windsurfrules`. See [Windsurf Memories & Rules docs](https://docs.windsurf.com/windsurf/cascade/memories).
 
 ## Project Structure
 
