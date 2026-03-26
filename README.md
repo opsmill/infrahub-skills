@@ -156,8 +156,6 @@ rm -rf infrahub-skills
 
 Always include `skills/common/` — it contains shared references that all skills depend on.
 
-> **Note:** The plugin produces files — schema YAML, Python generators, transform templates, check classes — that you then load into a running Infrahub instance using `infrahubctl` or the Infrahub UI. It does not connect to or modify a running instance directly, except when using the Analyst skill with an MCP server configured.
-
 ### Other AI Tools
 
 The skills follow the [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) format — each skill is a directory with a `SKILL.md` entry point plus supporting files. Any tool that supports this format can use them directly.
