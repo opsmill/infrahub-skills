@@ -10,6 +10,20 @@ AI skills for developing with [Infrahub](https://github.com/opsmill/infrahub). I
 
 Once installed, open any Infrahub project and start working — try *"describe what this schema does"* to explore, or *"add a status attribute to Device"* to make a change.
 
+---
+
+## What You Can Do With It
+
+- **Start immediately in any Infrahub project** — the plugin detects `.infrahub.yml`, `infrahub.toml`, or schema files automatically on session start and loads the appropriate skills without any manual configuration step.
+- **Build a working schema from a description** — describe your data model in plain terms and the Schema Creator produces valid Infrahub schema YAML with appropriate node types, attribute kinds, and relationships, without requiring manual study of the schema format first.
+- **Generate automation logic from a plain description** — describe what you want to automate (for example, "create a BGP session for each spine-leaf pair in my fabric design") and the Generator Creator produces a working `InfrahubGenerator` implementation for that specific case.
+- **Get working configuration templates for your data model** — describe the output format you need and the Transform Creator produces a transform and Jinja2 template that reads from your specific schema, rather than a generic placeholder example.
+- **Write CI pipeline checks without SDK expertise** — describe what a proposed change should or should not allow and the Check Creator produces a working `InfrahubCheck` implementation with the correct GraphQL queries and `.infrahub.yml` registration.
+- **Work through design decisions before building** — Speckit Mode walks through the task with you, explains what it plans to build and why, and produces a step-by-step breakdown for review before any code is generated.
+- **Query and analyze a live Infrahub instance** — the Analyst skill connects to a running instance via MCP and answers operational questions directly: cross-node correlation, drift detection, blast-radius analysis, and data quality audits.
+
+---
+
 ## How It Works
 
 The skills give your AI agent domain-specific knowledge about Infrahub: schema design, data modeling, validation checks, generators, transforms, and menu customization. When you make a request inside an Infrahub project, the agent picks the appropriate skill and applies Infrahub conventions automatically — correct naming, relationship patterns, `.infrahub.yml` registration, and so on.
@@ -58,6 +72,21 @@ Speckit integration is set up in the [infrahub-template](https://github.com/opsm
 | Stand up a complete new domain (schema + objects + checks + generators) | Speckit |
 | Refactor relationships across multiple schema files | Speckit |
 
+---
+
+## Who This Is For
+
+**Evaluating Infrahub**
+Someone exploring Infrahub who wants to see what their specific use case looks like in practice — not a generic demo, but their actual data model or automation workflow. The plugin accepts a description of the use case and produces real Infrahub resources from it, so the evaluation is grounded in something that actually runs rather than documentation examples. It can also explain how Infrahub handles a particular requirement and what the tradeoffs are between different approaches.
+
+**Building with Infrahub**
+A team actively building out an Infrahub implementation — defining schemas, writing generators, creating configuration transforms. The plugin covers each part of the build lifecycle and applies Infrahub's patterns to the specific resources being built. Speckit Mode is useful for multi-part tasks where the correct structure isn't obvious upfront.
+
+**Extending an existing Infrahub implementation**
+A team already running Infrahub who needs to continue extending it — adding schema nodes, modifying generators, integrating with external data sources. The plugin works with existing implementation context and handles the Infrahub side of integrations, including producing `infrahub-sync` diffconfigs for sources like spreadsheets or external CMDBs.
+
+---
+
 ## Skills
 
 | Skill | What it does |
@@ -72,6 +101,17 @@ Speckit integration is set up in the [infrahub-template](https://github.com/opsm
 | **repo-auditor** | Audit your repository against Infrahub best practices |
 
 Each skill lives in `skills/<name>/` with a `SKILL.md` entry point, reference docs, examples, and modular rules. Shared references (GraphQL patterns, `.infrahub.yml` format, git integration) are in `skills/common/`.
+
+---
+
+## Prerequisites
+
+- Claude Code, GitHub Copilot, Cursor, Windsurf, or any AI tool that supports custom context or instruction files
+- A running Infrahub instance, for loading and testing generated resources ([Infrahub installation docs](https://docs.infrahub.app/))
+- `infrahubctl`, for loading schemas, objects, and running generators ([infrahubctl docs](https://docs.infrahub.app/python-sdk/infrahubctl))
+- Analyst skill only: an Infrahub MCP server configured and connected to your AI tool
+
+---
 
 ## Installation
 
@@ -116,17 +156,39 @@ rm -rf infrahub-skills
 
 Always include `skills/common/` — it contains shared references that all skills depend on.
 
+> **Note:** The plugin produces files — schema YAML, Python generators, transform templates, check classes — that you then load into a running Infrahub instance using `infrahubctl` or the Infrahub UI. It does not connect to or modify a running instance directly, except when using the Analyst skill with an MCP server configured.
+
 ### Other AI Tools
 
 The skills follow the [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) format — each skill is a directory with a `SKILL.md` entry point plus supporting files. Any tool that supports this format can use them directly.
 
-For tools that need explicit configuration:
+**GitHub Copilot** — copy `skills/` into your repo, then create `.github/instructions/infrahub.instructions.md`:
 
-**GitHub Copilot** — copy `skills/` into your repo, then create `.github/instructions/infrahub.instructions.md` pointing at the skill files. See [Copilot custom instructions docs](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions).
+```markdown
+---
+applyTo: '**/*.py,**/*.yml,**/*.yaml'
+---
+For Infrahub development guidance, refer to the skill files in skills/.
+```
 
-**Cursor** — copy `skills/` into your repo, then create `.cursor/rules/infrahub.mdc` referencing the skills. See [Cursor Rules docs](https://cursor.com/docs/rules).
+See [GitHub Copilot custom instructions docs](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions).
+
+**Cursor** — copy `skills/` into your repo, then create `.cursor/rules/infrahub.mdc`:
+
+```markdown
+---
+description: Infrahub development guidance
+globs: ["**/*.py", "**/*.yml", "**/*.yaml"]
+alwaysApply: false
+---
+For Infrahub development guidance, refer to the skill files in skills/.
+```
+
+See [Cursor Rules docs](https://cursor.com/docs/rules).
 
 **Windsurf** — copy `skills/` into your repo. Windsurf picks up Markdown files as context. Optionally reference them from `.windsurfrules`. See [Windsurf Memories & Rules docs](https://docs.windsurf.com/windsurf/cascade/memories).
+
+---
 
 ## Project Structure
 
@@ -153,13 +215,24 @@ For tools that need explicit configuration:
 └── LICENSE                      # Apache 2.0
 ```
 
+---
+
 ## Resources
 
 - [Infrahub Documentation](https://docs.infrahub.app/)
+- [Infrahub Schema Guide](https://docs.infrahub.app/guides/create-schema)
 - [Infrahub Template](https://github.com/opsmill/infrahub-template) — project template with speckit pre-configured
 - [Schema Library](https://github.com/opsmill/schema-library)
 - [GitHub Spec Kit](https://github.com/github/spec-kit) — spec-driven development framework
 - [OpsMill](https://opsmill.com/)
+
+---
+
+## About Infrahub
+
+[Infrahub](https://github.com/opsmill/infrahub) is an open source infrastructure data management and automation platform (Apache 2.0), developed by [OpsMill](https://opsmill.com). It gives infrastructure and network teams a unified, schema-driven source of truth for all infrastructure data — devices, topology, IP space, configuration — with built-in version control, a generator framework for automation, and native integrations with Git, Ansible, Terraform, and CI/CD pipelines.
+
+---
 
 ## License
 
