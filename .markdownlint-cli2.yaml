@@ -10,11 +10,7 @@ config:
   default: true
 
   # MD013/line-length - Line length
-  MD013:
-    line_length: 80
-    code_blocks: false
-    tables: false
-    headings: false
+  MD013: false
 
   # MD024/no-duplicate-heading - Multiple headings with the same content
   # Allow duplicate headings in different sections (e.g., tabs)

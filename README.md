@@ -1,6 +1,10 @@
 # Infrahub AI Skills
 
-AI skills for developing with [Infrahub](https://github.com/opsmill/infrahub). Install the plugin, open your Infrahub project, and start building — Claude (or any AI coding assistant) automatically uses the right skill for each task.
+AI skills for developing with
+[Infrahub](https://github.com/opsmill/infrahub).
+Install the plugin, open your Infrahub project, and
+start building — Claude (or any AI coding assistant)
+automatically uses the right skill for each task.
 
 ```bash
 # Claude Code — install once, works across all your Infrahub projects
@@ -48,7 +52,7 @@ For complex or multi-step work — designing a new schema node with relationship
 
 The speckit workflow forces the agent to reason before it builds. You write a natural-language spec describing what you want, the agent produces a plan validated against Infrahub skills, breaks it into discrete tasks, and then implements each one using the correct skill. This matters for complex work because a schema node with incorrect relationship cardinality or a generator missing `allow_upsert` will cost you debugging time later — the planning step catches those issues upfront.
 
-```
+```text
 /speckit.specify  →  /speckit.plan  →  /speckit.tasks  →  /speckit.implement
 ```
 
@@ -62,7 +66,7 @@ Speckit integration is set up in the [infrahub-template](https://github.com/opsm
 **When to use which mode:**
 
 | Scenario | Mode |
-|----------|------|
+| -------- | ---- |
 | Add an attribute to an existing node | Direct |
 | Write a validation check | Direct |
 | Create a new menu section | Direct |
@@ -90,7 +94,7 @@ A team already running Infrahub who needs to continue extending it — adding sc
 ## Skills
 
 | Skill | What it does |
-|-------|-------------|
+| ----- | ------------ |
 | **schema-creator** | Describe your use case and get best-practice schema design — nodes, generics, attributes, relationships, hierarchies, and migrations |
 | **object-creator** | Create YAML data files for infrastructure objects with correct references and load order |
 | **check-creator** | Write Python validation checks (`InfrahubCheck`) for proposed change pipelines |
@@ -190,7 +194,7 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 
 ## Project Structure
 
-```
+```text
 .
 ├── .claude-plugin/
 │   └── plugin.json              # Plugin manifest
