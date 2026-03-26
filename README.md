@@ -18,7 +18,7 @@ Once installed, open any Infrahub project and start working — try *"describe w
 - **Generate automation logic from a plain description** — describe what you want to automate (for example, "create a BGP session for each spine-leaf pair in my fabric design") and the Generator Creator produces a working `InfrahubGenerator` implementation for that specific case.
 - **Get working configuration templates for your data model** — describe the output format you need and the Transform Creator produces a transform and Jinja2 template that reads from your specific schema, rather than a generic placeholder example.
 - **Write Infrahub CI pipeline checks without SDK expertise** — describe what a proposed change should or should not allow and the Check Creator produces a working `InfrahubCheck` implementation with the correct GraphQL queries and `.infrahub.yml` registration.
-- **Work through design decisions before building** — Speckit Mode walks through the task with you, explains what it plans to build and why, and produces a step-by-step breakdown for review before any code is generated.
+- **Work through design decisions before building** — pair the skills with a spec-driven development (SDD) framework to plan before you build: capture requirements, validate the design against Infrahub conventions, and break the work into discrete tasks before any code is generated.
 - **Query and analyze a live Infrahub instance** — the Analyst skill connects to a running instance via MCP and answers operational questions directly: cross-node correlation, drift detection, blast-radius analysis, and data quality audits.
 
 ---
@@ -41,35 +41,33 @@ For targeted changes, skip the ceremony. Describe what you want and the agent ha
 
 This is the fastest path for well-scoped work: adding attributes, writing a check, populating objects, creating a transform. No planning step needed. It's also how most people start — install the skills, describe what you need, and iterate from there.
 
-### Speckit Mode — Plan, Then Build
+### Spec-Driven Development — Plan, Then Build
 
-For complex or multi-step work — designing a new schema node with relationships to existing models, building a generator chain, or standing up an entire new domain — use [GitHub Spec Kit](https://github.com/github/spec-kit) to plan first, then let the agent execute against the plan.
+For anything beyond a simple, self-contained change — designing a new schema node with relationships, building a generator chain, or standing up an entire new domain — you should use a spec-driven development (SDD) framework to plan first, then let the agent execute against the plan.
 
-The speckit workflow forces the agent to reason before it builds. You write a natural-language spec describing what you want, the agent produces a plan validated against Infrahub skills, breaks it into discrete tasks, and then implements each one using the correct skill. This matters for complex work because a schema node with incorrect relationship cardinality or a generator missing `allow_upsert` will cost you debugging time later — the planning step catches those issues upfront.
+The SDD workflow forces the agent to reason before it builds. You write a natural-language spec describing what you want, the agent produces a plan validated against Infrahub skills, breaks it into discrete tasks, and then implements each one using the correct skill. This matters because a schema node with incorrect relationship cardinality or a generator missing `allow_upsert` will cost you debugging time later — the planning step catches those issues upfront.
 
-```text
-/speckit.specify  →  /speckit.plan  →  /speckit.tasks  →  /speckit.implement
-```
+A typical SDD workflow looks like:
 
-1. **Specify** — describe the feature. The agent selects the appropriate workflow template (schema, objects, checks, generators, transforms, or menus) and captures requirements.
-2. **Plan** — the agent creates an implementation plan, validates design artifacts against Infrahub skills, and checks compliance with the project constitution.
-3. **Tasks** — the plan is broken into discrete tasks, each annotated with which skill to use. Parallelizable tasks are marked so the agent can work efficiently.
+1. **Specify** — describe the feature. The agent captures requirements and selects the appropriate workflow (schema, objects, checks, generators, transforms, or menus).
+2. **Plan** — the agent creates an implementation plan and validates design artifacts against Infrahub skills.
+3. **Tasks** — the plan is broken into discrete tasks, each annotated with which skill to use.
 4. **Implement** — the agent executes each task, invoking the correct Infrahub skill for each one.
 
-Speckit integration is set up in the [infrahub-template](https://github.com/opsmill/infrahub-template) repository. If you initialized your project from that template, the `.specify/` directory is already configured with Infrahub-specific templates and a constitution that routes tasks to skills. If not, see the template repo's README for setup instructions.
+Any SDD framework that supports spec → plan → task → implement workflows will work. The [infrahub-template](https://github.com/opsmill/infrahub-template) repository includes a pre-configured SDD setup you can use as a starting point.
 
-**When to use which mode:**
+**When to use which approach:**
 
-| Scenario | Mode |
-| -------- | ---- |
+| Scenario | Approach |
+| -------- | -------- |
 | Add an attribute to an existing node | Direct |
 | Write a validation check | Direct |
 | Create a new menu section | Direct |
 | Populate a batch of objects from a spreadsheet | Direct |
-| Design a new schema node with relationships | Speckit |
-| Build a cascading generator chain | Speckit |
-| Stand up a complete new domain (schema + objects + checks + generators) | Speckit |
-| Refactor relationships across multiple schema files | Speckit |
+| Design a new schema node with relationships | Spec-driven |
+| Build a cascading generator chain | Spec-driven |
+| Stand up a complete new domain (schema + objects + checks + generators) | Spec-driven |
+| Refactor relationships across multiple schema files | Spec-driven |
 
 ---
 
@@ -79,7 +77,7 @@ Speckit integration is set up in the [infrahub-template](https://github.com/opsm
 Someone exploring Infrahub who wants to see what their specific use case looks like in practice — not a generic demo, but their actual data model or automation workflow. The skills accept a description of the use case and produce real Infrahub resources from it, so the evaluation is grounded in something that actually runs rather than documentation examples. They can also explain how Infrahub handles a particular requirement and what the tradeoffs are between different approaches.
 
 **Building with Infrahub**
-A team actively building out an Infrahub implementation — defining schemas, writing generators, creating configuration transforms. The skills cover each part of the build lifecycle and apply Infrahub's patterns to the specific resources being built. Speckit Mode is useful for multi-part tasks where the correct structure isn't obvious upfront.
+A team actively building out an Infrahub implementation — defining schemas, writing generators, creating configuration transforms. The skills cover each part of the build lifecycle and apply Infrahub's patterns to the specific resources being built. Pairing with an SDD framework is especially useful for multi-part tasks where the correct structure isn't obvious upfront.
 
 **Extending an existing Infrahub implementation**
 A team already running Infrahub who needs to continue extending it — adding schema nodes, modifying generators, integrating with external data sources. The skills work with existing implementation context and handle the Infrahub side of integrations, including producing `infrahub-sync` diffconfigs for sources like spreadsheets or external CMDBs.
@@ -210,9 +208,8 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 
 - [Infrahub Documentation](https://docs.infrahub.app/)
 - [Infrahub Schema Guide](https://docs.infrahub.app/guides/create-schema)
-- [Infrahub Template](https://github.com/opsmill/infrahub-template) — project template with speckit pre-configured
+- [Infrahub Template](https://github.com/opsmill/infrahub-template) — project template with SDD pre-configured
 - [Schema Library](https://github.com/opsmill/schema-library)
-- [GitHub Spec Kit](https://github.com/github/spec-kit) — spec-driven development framework
 - [OpsMill](https://opsmill.com/)
 
 ---
