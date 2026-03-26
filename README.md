@@ -208,7 +208,7 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 
 - [Infrahub Documentation](https://docs.infrahub.app/)
 - [Infrahub Schema Guide](https://docs.infrahub.app/guides/create-schema)
-- [Infrahub Template](https://github.com/opsmill/infrahub-template) — project template with SDD pre-configured
+- [Infrahub Template](https://github.com/opsmill/infrahub-template) — project template for getting started with Infrahub
 - [Schema Library](https://github.com/opsmill/schema-library)
 - [OpsMill](https://opsmill.com/)
 
