@@ -4,131 +4,36 @@ name: Skill Evaluations
 on:
   workflow_call:
     inputs:
-      model:
-        description: "Model to use for evaluations"
+      preset:
+        description: "Skillgrade preset (smoke, reliable, regression)"
         required: false
         type: string
-        default: "sonnet"
+        default: "smoke"
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN:
         required: true
   workflow_dispatch:
     inputs:
-      model:
-        description: "Model to use for evaluations"
+      preset:
+        description: "Skillgrade preset (smoke, reliable, regression)"
         required: false
-        default: "sonnet"
+        default: "smoke"
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
-  issues: write
-  actions: read
-  id-token: write
 
 jobs:
   # ---------------------------------------------------------------------------
-  # 1. Build the eval matrix dynamically from evaluations/*.json
+  # Run skillgrade per skill (parallel matrix)
   # ---------------------------------------------------------------------------
-  setup:
+  eval:
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.build.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Build eval matrix
-        id: build
-        run: |
-          python3 -c "
-          import json, glob
-
-          matrix = []
-          for eval_file in sorted(glob.glob('evaluations/*.json')):
-              with open(eval_file) as f:
-                  data = json.load(f)
-              for ev in data['evals']:
-                  matrix.append({
-                      'eval_id': ev['id'],
-                      'prompt': ev['prompt'],
-                      'skill_name': data['skill_name'],
-                  })
-
-          print(json.dumps({'include': matrix}))
-          " > /tmp/matrix.json
-          echo "matrix=$(cat /tmp/matrix.json)" >> "$GITHUB_OUTPUT"
-
-  # ---------------------------------------------------------------------------
-  # 2. Run each eval prompt via claude-code-action (parallel matrix)
-  # ---------------------------------------------------------------------------
-  run-eval:
-    needs: setup
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Prepare output directory
-        env:
-          SKILL_NAME: ${{ matrix.skill_name }}
-          EVAL_ID: ${{ matrix.eval_id }}
-        run: |
-          mkdir -p "eval-results/${SKILL_NAME}/eval-${EVAL_ID}/outputs"
-
-      - name: Build prompt
-        id: prompt
-        env:
-          EVAL_PROMPT: ${{ matrix.prompt }}
-          EVAL_SKILL_NAME: ${{ matrix.skill_name }}
-          EVAL_ID: ${{ matrix.eval_id }}
-          WORKSPACE: ${{ github.workspace }}
-        run: |
-          OUTPUT_DIR="${WORKSPACE}/eval-results/${EVAL_SKILL_NAME}/eval-${EVAL_ID}/outputs"
-          SKILL_DIR="skills/${EVAL_SKILL_NAME#infrahub-}"
-
-          {
-            MSG="Read the skill at ${SKILL_DIR}/SKILL.md"
-            MSG="$MSG and follow its workflow and rules to accomplish this task."
-            printf '%s\n' "$MSG"
-            printf '\n%s %s\n' "Task:" "$EVAL_PROMPT"
-            printf '\n%s %s/output.yml\n' "Save ONLY the final YAML file to:" "$OUTPUT_DIR"
-          } > /tmp/eval_prompt.txt
-
-          {
-            echo "prompt<<EOF"
-            cat /tmp/eval_prompt.txt
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Run eval with Claude
-        uses: anthropics/claude-code-action@v1
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: ${{ steps.prompt.outputs.prompt }}
-          claude_args: |
-            --model ${{ inputs.model || 'sonnet' }}
-            --max-turns 25
-            --allowedTools "Read,Write,Edit,Glob,Grep,Bash"
-
-      - name: Upload eval output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: eval-${{ matrix.skill_name }}-${{ matrix.eval_id }}
-          path: eval-results/
-          retention-days: 30
-
-  # ---------------------------------------------------------------------------
-  # 3. Grade all outputs and generate the report
-  # ---------------------------------------------------------------------------
-  grade-and-report:
-    needs: run-eval
-    runs-on: ubuntu-latest
-    if: always()
+      matrix:
+        skill: [schema-creator, menu-creator]
     steps:
       - uses: actions/checkout@v6
 
@@ -136,72 +41,95 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install dependencies
-        run: pip install pyyaml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-      - name: Download all eval outputs
-        uses: actions/download-artifact@v4
+      - name: Install dependencies
+        run: |
+          pip install pyyaml
+          npm i -g skillgrade
+
+      - name: Run skillgrade
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          cd skills/${{ matrix.skill }}
+          skillgrade \
+            --${{ inputs.preset || 'smoke' }} \
+            --ci \
+            --provider=local \
+            --output=../../eval-results/${{ matrix.skill }}
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-${{ matrix.skill }}
+          path: eval-results/
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Collect results and post PR comment
+  # ---------------------------------------------------------------------------
+  report:
+    needs: eval
+    runs-on: ubuntu-latest
+    if: always() && github.event.pull_request != null
+    steps:
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts/
           pattern: eval-*
 
-      - name: Consolidate outputs
-        run: |
-          mkdir -p eval-results
-          for dir in artifacts/eval-*/; do
-            if [ -d "$dir" ]; then
-              cp -rn "$dir"/* eval-results/ 2>/dev/null || true
-            fi
-          done
-          echo "=== Consolidated eval results ==="
-          find eval-results -type f | sort
-
-      - name: Grade outputs and generate report
-        run: |
-          for eval_file in evaluations/*.json; do
-            skill_name=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['skill_name'])" "$eval_file")
-            python3 scripts/grade_evals.py \
-              --eval-file "$eval_file" \
-              --results-dir "eval-results/${skill_name}" \
-              --output-dir "eval-report/${skill_name}"
-          done
-
       - name: Post evaluation summary as PR comment
-        if: github.event.pull_request != null
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const path = require('path');
-            const reportDir = 'eval-report';
-            if (!fs.existsSync(reportDir)) {
-              console.log('No report directory found, skipping PR comment');
+
+            const artifactsDir = 'artifacts';
+            if (!fs.existsSync(artifactsDir)) {
+              console.log('No artifacts found, skipping PR comment');
               return;
             }
+
             const reports = [];
-            for (const entry of fs.readdirSync(reportDir, { withFileTypes: true })) {
-              if (entry.isDirectory()) {
-                const reportPath = path.join(reportDir, entry.name, 'report.md');
-                if (fs.existsSync(reportPath)) {
-                  reports.push(fs.readFileSync(reportPath, 'utf8'));
+            for (const entry of fs.readdirSync(artifactsDir,
+                {withFileTypes: true})) {
+              if (!entry.isDirectory()) continue;
+              const resultDir = path.join(artifactsDir, entry.name);
+              // Walk for .md report files
+              const walk = (dir) => {
+                for (const f of fs.readdirSync(dir, {withFileTypes: true})) {
+                  const full = path.join(dir, f.name);
+                  if (f.isDirectory()) walk(full);
+                  else if (f.name.endsWith('.md'))
+                    reports.push(fs.readFileSync(full, 'utf8'));
                 }
-              }
+              };
+              walk(resultDir);
             }
+
             if (reports.length === 0) {
               console.log('No reports found, skipping PR comment');
               return;
             }
-            const report = reports.join('\n\n---\n\n');
 
             const marker = '<!-- skill-eval-report -->';
-            const body = `${marker}\n${report}`;
+            const body =
+              `${marker}\n# Skill Evaluation Results\n\n` +
+              reports.join('\n\n---\n\n');
 
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-            });
-            const existing = comments.find(c => c.body.includes(marker));
+            const {data: comments} =
+              await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+              });
+            const existing =
+              comments.find(c => c.body.includes(marker));
 
             if (existing) {
               await github.rest.issues.updateComment({
@@ -224,5 +152,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: skill-eval-report
-          path: eval-report/
+          path: artifacts/
           retention-days: 30

@@ -21,7 +21,8 @@
 "group/evaluations":
   - changed-files:
       - any-glob-to-any-file:
-          - "evaluations/**"
+          - "skills/*/eval.yaml"
+          - "skills/*/graders/**"
 
 "group/plugin":
   - changed-files:

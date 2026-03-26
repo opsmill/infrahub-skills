@@ -185,33 +185,34 @@ Add the skill name to the `skills` array in
 ### 6. Write Evaluations
 
 Create evaluation scenarios in
-`evaluations/my-skill.json` to test the skill produces
-correct output. This file follows the skill-creator
-eval format:
+`skills/my-skill/eval.yaml` and deterministic grader
+scripts in `skills/my-skill/graders/` to test the
+skill produces correct output.
 
-```json
-{
-  "skill_name": "infrahub-my-skill",
-  "evals": [
-    {
-      "id": 1,
-      "prompt": "A realistic user request",
-      "expected_output": "What correct output looks like",
-      "files": [],
-      "expectations": [
-        "Specific verifiable outcome 1",
-        "Specific verifiable outcome 2"
-      ],
-      "assertions": [
-        {
-          "name": "descriptive-name",
-          "check": "What to verify programmatically"
-        }
-      ]
-    }
-  ]
-}
+```yaml
+skill_name: infrahub-my-skill
+
+tasks:
+  - id: basic-scenario
+    prompt: >-
+      A realistic user request with specific names,
+      namespaces, and field types.
+    expected_output: >-
+      What correct output looks like.
+    grader: graders/basic-scenario.sh
+
+  - id: advanced-scenario
+    prompt: >-
+      A more complex request covering relationships
+      or edge cases.
+    expected_output: >-
+      What correct output looks like.
+    grader: graders/advanced-scenario.sh
 ```
+
+Each grader script in `graders/` reads the model
+output on stdin and prints `{"pass": true}` or
+`{"pass": false, "reason": "..."}` to stdout.
 
 **Writing good eval prompts**: Make them realistic —
 the kind of thing an actual user would type, with
@@ -220,13 +221,16 @@ Not abstract requests like "create a schema" but
 concrete ones like "Create an Infrahub schema for a
 VLAN management system with...".
 
-**Writing good assertions**: Each assertion should be
-objectively verifiable. Use descriptive names that
-explain what's being tested at a glance (e.g.,
-`dropdown-for-status` not `check-1`).
+**Writing good assertions**: Each grader should be
+objectively deterministic. Use descriptive file names
+that explain what's being tested at a glance (e.g.,
+`dropdown-for-status.sh` not `check-1.sh`).
 
-Run evals with `/skill-creator` to iterate on skill
-quality.
+Run evals with skillgrade to iterate on quality:
+
+```bash
+cd skills/my-skill && skillgrade --smoke
+```
 
 ### 7. Register in Documentation
 
@@ -259,11 +263,10 @@ Confirm the skill works before submitting for review.
 **Run evaluations** (see [Step 6](#6-write-evaluations)):
 
 ```bash
-python scripts/run_evals.py \
-  --eval-file evaluations/my-skill.json
+cd skills/my-skill && skillgrade --smoke
 ```
 
-Review the generated report in `eval-results/`.
+Review results with `skillgrade preview`.
 
 **Required files checklist:**
 
@@ -271,7 +274,8 @@ Review the generated report in `eval-results/`.
   frontmatter
 - [ ] `skills/my-skill/rules/_sections.md`
 - [ ] At least one rule file in `rules/`
-- [ ] `evaluations/my-skill.json` with test scenarios
+- [ ] `skills/my-skill/eval.yaml` with test tasks
+- [ ] `skills/my-skill/graders/` with grader scripts
 - [ ] `CLAUDE.md` updated with the new skill
 - [ ] `README.md` updated (skills section + project
   structure)
