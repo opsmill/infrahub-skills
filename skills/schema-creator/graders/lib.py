@@ -442,7 +442,7 @@ def run_checks(
     Returns
     -------
     dict with keys:
-        - ``score`` (float 0.0–1.0)
+        - ``score`` (float 0.0-1.0)
         - ``details`` (str summary)
         - ``checks`` (list of ``{"name", "passed", "message"}``)
 
