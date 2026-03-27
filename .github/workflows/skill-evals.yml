@@ -10,7 +10,7 @@ on:
         type: string
         default: "smoke"
     secrets:
-      CLAUDE_CODE_OAUTH_TOKEN:
+      ANTHROPIC_API_KEY:
         required: true
   workflow_dispatch:
     inputs:
@@ -48,7 +48,7 @@ jobs:
 
       - name: Run skillgrade
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           skillgrade \
             --${{ inputs.preset || 'smoke' }} \
