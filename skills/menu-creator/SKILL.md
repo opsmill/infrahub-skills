@@ -90,8 +90,26 @@ Follow these steps when creating a menu:
    the user sees the guidance alongside the menu
    definition.
 
+## MCP Server Integration
+
+When the Infrahub MCP server is connected, use it to
+discover available kinds for menu items:
+
+- **List schema kinds** — call
+  `mcp__infrahub__infrahub_list_schema` to see all
+  available node kinds, ensuring menu items reference
+  valid kinds
+- **Verify kind existence** — before adding a menu
+  item with a `kind` property, confirm the kind exists
+  in the live instance
+
+See [../common/mcp-tools-reference.md](../common/mcp-tools-reference.md)
+for tool definitions and usage patterns.
+
 ## Supporting References
 
+- **[../common/mcp-tools-reference.md](../common/mcp-tools-reference.md)**
+  -- MCP tool reference for live instance queries
 - **[infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
 - **[common/rules/](../common/rules/)**

@@ -51,12 +51,34 @@ spec:
 are always required. Each `spec` block targets a single
 node kind.
 
+## MCP Server Integration
+
+When the Infrahub MCP server is connected, use it to
+validate object data before creating YAML files:
+
+- **Verify schema kinds** — call
+  `mcp__infrahub__infrahub_list_schema` to confirm the
+  exact kind name for `spec.kind`
+- **Check existing objects** — call
+  `mcp__infrahub__infrahub_get` or
+  `mcp__infrahub__infrahub_query` to see what data
+  already exists, avoiding duplicates
+- **Discover relationship targets** — query the live
+  instance to find valid reference targets (e.g.,
+  existing locations, device types) for relationship
+  fields
+
+See [../common/mcp-tools-reference.md](../common/mcp-tools-reference.md)
+for tool definitions and usage patterns.
+
 ## Supporting References
 
 - **[reference.md](./reference.md)** -- Object file format
   specification
 - **[examples.md](./examples.md)** -- 15 complete object
   patterns from production repos
+- **[../common/mcp-tools-reference.md](../common/mcp-tools-reference.md)**
+  -- MCP tool reference for live instance queries
 - **[../common/infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
 - **[../common/rules/](../common/rules/)** -- Shared rules

@@ -62,10 +62,30 @@ class MyTransform(InfrahubTransform):
         return {"hostname": device["name"]["value"]}
 ```
 
+## MCP Server Integration
+
+When the Infrahub MCP server is connected, use it to
+understand data shapes before building transforms:
+
+- **Sample query results** — call
+  `mcp__infrahub__infrahub_query` to see actual
+  response shapes, helping design the transform logic
+  or Jinja2 template
+- **Discover available kinds** — call
+  `mcp__infrahub__infrahub_list_schema` to find the
+  right node types for transform queries
+- **Validate output expectations** — compare live data
+  against expected transform output format
+
+See [../common/mcp-tools-reference.md](../common/mcp-tools-reference.md)
+for tool definitions and usage patterns.
+
 ## Supporting References
 
 - **[examples.md](./examples.md)** -- Complete transform
   patterns (Python, Jinja2, hybrid, CSV)
+- **[../common/mcp-tools-reference.md](../common/mcp-tools-reference.md)**
+  -- MCP tool reference for live instance queries
 - **[../common/graphql-queries.md](../common/graphql-queries.md)**
   -- GraphQL query writing reference
 - **[infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**

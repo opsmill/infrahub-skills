@@ -158,6 +158,9 @@ query MaintenanceDevices {
 - **[examples.md](./examples.md)** — Analysis
   patterns (naming, VLAN, BGP, maintenance,
   service impact)
+- **[../common/mcp-tools-reference.md](../common/mcp-tools-reference.md)**
+  — MCP tool definitions, response structure, branch
+  handling
 - **[../common/graphql-queries.md](../common/graphql-queries.md)**
   — GraphQL query writing reference
 - **[../common/infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**

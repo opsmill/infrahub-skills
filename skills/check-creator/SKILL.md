@@ -71,10 +71,30 @@ class MyCheck(InfrahubCheck):
             )
 ```
 
+## MCP Server Integration
+
+When the Infrahub MCP server is connected, use it to
+understand the data a check will validate:
+
+- **Sample live data** — call
+  `mcp__infrahub__infrahub_query` to see actual data
+  shapes and edge cases before writing validation logic
+- **Discover schema kinds** — call
+  `mcp__infrahub__infrahub_list_schema` to find the
+  correct kind names for GraphQL queries
+- **Test query patterns** — run candidate queries
+  interactively via MCP before committing them to
+  `.gql` files
+
+See [../common/mcp-tools-reference.md](../common/mcp-tools-reference.md)
+for tool definitions and usage patterns.
+
 ## Supporting References
 
 - **[examples.md](./examples.md)** -- Complete check
   patterns (global, targeted, minimal)
+- **[../common/mcp-tools-reference.md](../common/mcp-tools-reference.md)**
+  -- MCP tool reference for live instance queries
 - **[../common/graphql-queries.md](../common/graphql-queries.md)**
   -- GraphQL query writing reference
 - **[../common/infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**

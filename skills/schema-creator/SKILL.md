@@ -61,6 +61,24 @@ extensions:    # Add attributes/relationships to existing nodes from other files
 Always include the `$schema` comment for IDE validation.
 Only `version` is required at the top level.
 
+## MCP Server Integration
+
+When the Infrahub MCP server is connected, use it to
+inform schema design:
+
+- **Discover existing schemas** — call
+  `mcp__infrahub__infrahub_list_schema` to see what
+  node kinds already exist before creating new ones
+- **Inspect live data** — call
+  `mcp__infrahub__infrahub_query` to check whether
+  objects of a given kind exist, helping decide whether
+  to extend an existing node or create a new one
+- **Validate naming** — query existing schemas to
+  ensure new namespaces and node names do not conflict
+
+See [../common/mcp-tools-reference.md](../common/mcp-tools-reference.md)
+for tool definitions and usage patterns.
+
 ## Supporting References
 
 - **[reference.md](./reference.md)** -- Complete property
@@ -69,6 +87,8 @@ Only `version` is required at the top level.
   from production repos
 - **[validation.md](./validation.md)** -- `infrahubctl`
   commands, migration strategies, pre-validation checklist
+- **[../common/mcp-tools-reference.md](../common/mcp-tools-reference.md)**
+  -- MCP tool reference for live instance queries
 - **[../common/infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
 - **[../common/rules/](../common/rules/)** -- Shared rules
