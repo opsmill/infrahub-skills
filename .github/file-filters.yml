@@ -7,8 +7,8 @@ skill_files: &skill_files
   - "skills/**"
 
 eval_files: &eval_files
-  - "evaluations/**"
-  - "scripts/**"
+  - "eval.yaml"
+  - "graders/**"
 
 plugin_files: &plugin_files
   - ".claude-plugin/**"

@@ -50,9 +50,11 @@ Plugin (plugin.json)
 │       ├── infrahub-yml-reference.md
 │       └── rules/            ← Shared rules
 │
-└── Evaluations (evaluations/)
-    ├── schema-creator.json   ← Test scenarios
-    └── menu-creator.json     ← Test scenarios
+├── eval.yaml                             ← skillgrade config (all skills)
+│
+└── graders/                              ← Deterministic grader scripts
+    ├── schema-creator/                   ← schema-creator graders
+    └── menu-creator/                     ← menu-creator graders
 ```
 
 ## Progressive Disclosure Model
@@ -102,23 +104,28 @@ task, keeping context focused.
 ## Evaluation System
 
 Evaluations test that skills produce correct output.
-They use the skill-creator eval format
-(`evaluations/<skill-name>.json`) with:
+Each skill that has evals carries them alongside its
+other files:
 
-- **Prompts** — Realistic user requests that exercise
-  the skill
-- **Expected output** — Description of what correct
-  output looks like
-- **Expectations** — Human-readable list of verifiable
-  outcomes
-- **Assertions** — Machine-checkable criteria with
-  descriptive names
+- **`eval.yaml`** — Single skillgrade configuration at
+  project root defining all tasks with prompts,
+  expected output descriptions, and grader script paths
+- **`graders/`** — Deterministic Python scripts
+  organized per skill that read model output and emit
+  skillgrade JSON
 
-Run evals with the `/skill-creator` skill to iterate
-on quality. The eval workflow: run prompts with and
-without the skill, grade outputs against assertions,
-compare in the eval viewer, and refine the skill
-based on feedback.
+Run evals locally with skillgrade:
+
+```bash
+skillgrade --smoke
+```
+
+CI runs `skillgrade --ci --provider=local --threshold=0.8`
+per skill in a matrix, failing if the pass rate drops
+below the threshold. The eval workflow: run prompts,
+grade outputs with graders, view results with
+`skillgrade preview`, and refine the skill based on
+failures.
 
 ## Design Decisions
 

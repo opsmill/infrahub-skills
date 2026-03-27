@@ -1,0 +1,331 @@
+version: "1"
+
+defaults:
+  agent: claude
+  provider: local
+  trials: 5
+  timeout: 300
+  threshold: 0.8
+
+tasks:
+  # --- Menu Creator --- #
+  - name: flat-menu
+    instruction: |
+      Read the skill at .agents/skills/menu-creator/SKILL.md and follow its workflow and rules.
+
+      Task: Create an Infrahub menu for a small data center project. I have these schema
+      nodes: DcimDevice, DcimInterface, LocationSite, and OrganizationManufacturer. I just
+      want a simple flat menu with all four items visible in the sidebar, no nesting needed.
+
+      Save ONLY the final YAML file to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/menu-creator/check_flat_menu.py
+        weight: 1.0
+    expected_output: >-
+      A flat menu YAML file with apiVersion: infrahub.app/v1, kind: Menu,
+      spec.data containing four items. Each item has name, namespace,
+      label, kind pointing to the schema node, and an appropriate mdi:
+      icon.
+    expectations:
+      - "File starts with apiVersion: infrahub.app/v1 and kind: Menu"
+      - All items are under spec.data as a list
+      - Each menu item has both name and namespace properties
+      - >-
+        Each item uses kind (not path) to link to the schema node
+        (e.g., kind: DcimDevice)
+      - >-
+        Icons use the mdi: prefix (e.g., mdi:server, mdi:ethernet,
+        mdi:map-marker, mdi:factory)
+      - Each item has a human-readable label property
+    assertions:
+      - name: apiversion-and-kind
+        check: >-
+          File has apiVersion: infrahub.app/v1 and kind: Menu
+      - name: spec-data-structure
+        check: Items are nested under spec.data as a YAML list
+      - name: name-and-namespace
+        check: >-
+          Every menu item has both name and namespace properties
+      - name: kind-for-schema-links
+        check: >-
+          Items use kind property (not path) to reference schema nodes
+      - name: mdi-icons
+        check: >-
+          All icons use the mdi: prefix with appropriate icon names
+      - name: labels-present
+        check: Each item has a label property with human-readable text
+
+  - name: hierarchical-menu
+    instruction: |
+      Read the skill at .agents/skills/menu-creator/SKILL.md and follow its workflow and rules.
+
+      Task: I need a hierarchical Infrahub menu for a network management project. I want
+      two top-level groups: 'Infrastructure' (containing DcimServer, DcimSwitch, DcimPdu)
+      and 'Organization' (containing OrganizationManufacturer, OrganizationProvider). The
+      top-level groups should be non-clickable headers with icons, and only the leaf items
+      should link to schema nodes.
+
+      Save ONLY the final YAML file to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/menu-creator/check_hierarchical.py
+        weight: 1.0
+    expected_output: >-
+      A menu YAML with two top-level group headers (no kind property)
+      each containing children.data with leaf items that have kind
+      properties. The children.data wrapper must be present — children
+      directly containing a list is incorrect.
+    expectations:
+      - >-
+        Two top-level items under spec.data that act as group headers
+        (no kind or path property)
+      - >-
+        Children are wrapped in children.data (not children directly
+        containing a list)
+      - Leaf items use kind to link to schema nodes
+      - Group headers have icon and label but no kind
+      - >-
+        All five schema nodes appear as leaf items under the correct
+        group
+      - >-
+        Icons are contextually appropriate (e.g., mdi:server for
+        servers, mdi:factory for manufacturers)
+    assertions:
+      - name: group-headers-no-kind
+        check: >-
+          Top-level group items have no kind or path property
+          (non-clickable headers)
+      - name: children-data-wrapper
+        check: >-
+          Children use children.data wrapper, not children directly
+          as a list
+      - name: leaf-items-have-kind
+        check: Leaf items use kind to link to their schema nodes
+      - name: correct-grouping
+        check: >-
+          Server/Switch/PDU under Infrastructure,
+          Manufacturer/Provider under Organization
+      - name: all-nodes-present
+        check: >-
+          All five schema nodes (DcimServer, DcimSwitch, DcimPdu,
+          OrganizationManufacturer, OrganizationProvider) appear
+      - name: contextual-icons
+        check: Icons are contextually appropriate for each item type
+
+  - name: generic-kind-menu
+    instruction: |
+      Read the skill at .agents/skills/menu-creator/SKILL.md and follow its workflow and rules.
+
+      Task: I have an Infrahub project with a location hierarchy (LocationRegion,
+      LocationSite, LocationRoom, LocationRack) and some device nodes (DcimDevice,
+      DcimInterface). I want a menu that has a 'Locations' group linking to the
+      LocationGeneric so users see all location types in one view, plus individual
+      location type entries nested under it. Devices should be a separate top-level item.
+      Also, what do I need to change in my schema so I don't get duplicate menu entries?
+
+      Save ONLY the final YAML file to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/menu-creator/check_generic_kind.py
+        weight: 1.0
+    expected_output: >-
+      A menu YAML with a Locations group that has a kind: LocationGeneric
+      link plus children for each location type, and a separate Devices
+      section. Should also mention setting include_in_menu: false on
+      schema nodes and registering the menu file in .infrahub.yml.
+    expectations:
+      - >-
+        Locations group uses kind: LocationGeneric to show all location
+        types in one view
+      - >-
+        Individual location types (Region, Site, Room, Rack) appear as
+        children under the Locations group
+      - Devices section is separate from Locations
+      - >-
+        Mentions setting include_in_menu: false on schema nodes to
+        prevent duplicate entries
+      - >-
+        Mentions registering the menu file in .infrahub.yml under
+        menus section
+      - File includes the $schema comment for IDE validation
+    assertions:
+      - name: generic-kind-link
+        check: >-
+          A menu item uses kind: LocationGeneric to show all location
+          types
+      - name: location-children
+        check: >-
+          Individual location types (Region, Site, Room, Rack) appear
+          as nested children
+      - name: separate-devices-section
+        check: Devices are in a separate section from Locations
+      - name: include-in-menu-false
+        check: "Advises setting include_in_menu: false on schema nodes"
+      - name: infrahub-yml-registration
+        check: Mentions registering the menu file in .infrahub.yml
+      - name: schema-comment
+        check: Includes the yaml-language-server $schema comment
+
+  # --- Schema Creator --- #
+  - name: vlan-management
+    instruction: |
+      Read the skill at .agents/skills/schema-creator/SKILL.md and follow its workflow and rules.
+
+      Task: Create an Infrahub schema for a VLAN management system. I need a VLAN node
+      with an id attribute (just the VLAN number), a name, a status that should be a
+      dropdown (active/reserved/deprecated), and a role field. VLANs belong to a VLANGroup
+      which just has a name. Use namespace 'Ipam'.
+
+      Save ONLY the final schema YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/schema-creator/check_vlan.py
+        weight: 1.0
+    # -- skill-creator metadata (ignored by skillgrade) --
+    expected_output: >-
+      A schema with correct attribute types (Dropdown not Text for status,
+      Number for VLAN ID), attribute names >= 3 chars (not 'id'), proper
+      kind references, and order_weight conventions.
+    expectations:
+      - >-
+        The VLAN id attribute is renamed to meet the 3-char minimum
+        (e.g., 'vlan_id' or 'vid'), since 'id' is only 2 characters
+      - "Status is kind: Dropdown with choice objects, NOT kind: Text"
+      - "Attribute kind uses 'Text' not the deprecated 'String'"
+      - >-
+        VLANGroup peer reference uses full kind 'IpamVlanGroup'
+        (not just 'VlanGroup')
+      - "human_friendly_id is defined on both nodes"
+      - >-
+        display_label is a singular Jinja2 string, NOT display_labels
+        as a plural list
+      - 'Schema starts with version: "1.0"'
+    assertions:
+      - name: attr-min-length
+        check: "VLAN id attribute renamed to >= 3 chars (e.g., vlan_id)"
+      - name: dropdown-for-status
+        check: >-
+          Status uses kind: Dropdown with choice objects, not kind: Text
+      - name: no-deprecated-string
+        check: "Attribute kinds use 'Text' not the deprecated 'String'"
+      - name: full-kind-references
+        check: >-
+          VLANGroup peer reference uses full kind 'IpamVlanGroup'
+      - name: human-friendly-id
+        check: >-
+          human_friendly_id is defined on both VLAN and VLANGroup nodes
+      - name: display-label-singular
+        check: >-
+          Uses display_label (singular Jinja2 string), not deprecated
+          display_labels
+      - name: schema-version
+        check: "Schema starts with version: '1.0'"
+
+  - name: circuit-management
+    instruction: |
+      Read the skill at .agents/skills/schema-creator/SKILL.md and follow its workflow and rules.
+
+      Task: Create an Infrahub schema for a circuit management system. A Circuit connects
+      two endpoints (side A and side Z). Each CircuitEndpoint is installed in a specific
+      Device. A Provider offers multiple Circuits. Use namespace 'Circuit'. Don't forget
+      to make relationships properly bidirectional with matching identifiers on both sides.
+
+      Save ONLY the final schema YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/schema-creator/check_circuit.py
+        weight: 1.0
+    expected_output: >-
+      A schema with multiple bidirectional relationship pairs, all with
+      matching identifiers. The two circuit endpoints should use Attribute
+      kind (not Component/Parent since endpoints are peers of the circuit,
+      not children).
+    expectations:
+      - >-
+        Circuit-to-Provider relationship uses kind: Attribute (not
+        Component/Parent) with matching identifiers on both sides
+      - >-
+        CircuitEndpoint-to-Device relationship uses kind: Attribute
+        with matching identifiers on both sides
+      - >-
+        Circuit has two endpoint relationships (side_a and side_z or
+        similar) each pointing to CircuitCircuitEndpoint
+      - >-
+        All relationship identifiers match between the two sides of
+        each pair — no mismatched identifiers
+      - >-
+        All peer references use full namespace+name kind (e.g.,
+        CircuitProvider, CircuitCircuitEndpoint, not just 'Provider')
+      - "human_friendly_id is defined on Circuit and Provider nodes"
+    assertions:
+      - name: attribute-kind-relationships
+        check: >-
+          Circuit-to-Provider uses kind: Attribute with matching
+          identifiers
+      - name: endpoint-device-relationship
+        check: >-
+          CircuitEndpoint-to-Device uses kind: Attribute with matching
+          identifiers
+      - name: two-endpoint-relationships
+        check: >-
+          Circuit has two endpoint relationships (side_a/side_z)
+          pointing to CircuitCircuitEndpoint
+      - name: matching-identifiers
+        check: >-
+          All relationship identifiers match between both sides of
+          each pair
+      - name: full-kind-references
+        check: "All peer references use full namespace+name kind"
+      - name: human-friendly-id
+        check: "human_friendly_id on Circuit and Provider nodes"
+
+  - name: location-hierarchy
+    instruction: |
+      Read the skill at .agents/skills/schema-creator/SKILL.md and follow its workflow and rules.
+
+      Task: Create an Infrahub schema for a location hierarchy: Region > Site > Room > Rack.
+      Each level has a name and shortname. Objects should be easily identifiable in the UI.
+      Use namespace 'Location'.
+
+      Save ONLY the final schema YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/schema-creator/check_location.py
+        weight: 1.0
+    expected_output: >-
+      A hierarchical schema using a generic with hierarchical: true,
+      proper parent/children chain, human_friendly_id, and display_label
+      (not deprecated display_labels).
+    expectations:
+      - "A generic is defined with hierarchical: true"
+      - >-
+        All location nodes inherit_from the hierarchical generic using
+        its full kind
+      - Root node (Region) has parent set to empty string or null
+      - "human_friendly_id is set on each node"
+      - >-
+        display_label is used as a singular Jinja2 string, NOT the
+        deprecated display_labels (plural list)
+      - 'Schema starts with version: "1.0"'
+      - "Parent/children chain is correct: Region->Site->Room->Rack"
+    assertions:
+      - name: hierarchical-generic
+        check: "A generic is defined with hierarchical: true"
+      - name: inherit-from-generic
+        check: >-
+          All location nodes inherit_from the hierarchical generic
+          using its full kind
+      - name: root-no-parent
+        check: >-
+          Root node (Region) has parent set to empty string or null
+      - name: human-friendly-id
+        check: "human_friendly_id is set on each node"
+      - name: display-label-singular
+        check: >-
+          Uses display_label (singular Jinja2 string), not deprecated
+          display_labels
+      - name: schema-version
+        check: "Schema starts with version: '1.0'"
+      - name: correct-hierarchy-chain
+        check: "Parent/children chain: Region->Site->Room->Rack"

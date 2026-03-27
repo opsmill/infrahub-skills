@@ -3,54 +3,118 @@
 ## Overview
 
 Evaluations test that skills produce correct output.
-Each skill can have an eval file in
-`evaluations/<skill-name>.json` that defines test
-scenarios with prompts, expected outputs, and
-assertions.
+All skills share a single `eval.yaml` at the project
+root, with grader scripts organized under `graders/<skill>/`.
+Evals are run with [skillgrade](https://github.com/mgechev/skillgrade),
+which replaces the previous custom eval runner.
 
-The eval workflow uses the `/skill-creator` skill,
-which handles running test prompts, grading outputs,
-and showing results in a browser-based viewer.
+## Installation
 
-## Eval File Format
-
-```json
-{
-  "skill_name": "infrahub-schema-creator",
-  "evals": [
-    {
-      "id": 1,
-      "prompt": "Create an Infrahub schema...",
-      "expected_output": "A schema with correct types",
-      "files": [],
-      "expectations": [
-        "VLAN id attribute is renamed",
-        "Status uses kind: Dropdown"
-      ],
-      "assertions": [
-        {
-          "name": "attr-min-length",
-          "check": "VLAN id renamed to >= 3 chars"
-        },
-        {
-          "name": "dropdown-for-status",
-          "check": "Status uses kind: Dropdown"
-        }
-      ]
-    }
-  ]
-}
+```bash
+npm i -g skillgrade
 ```
 
-### Fields
+## Running Evals Locally
 
-| Field | Purpose |
-| ----- | ------- |
-| `prompt` | The user request — make it realistic and specific |
-| `expected_output` | Human-readable description of what correct output looks like |
-| `files` | Input files to include (usually empty for Infrahub skills) |
-| `expectations` | Human-readable list of verifiable outcomes |
-| `assertions` | Machine-checkable criteria with descriptive names |
+Run evals from the project root:
+
+```bash
+# Quick smoke test (5 trials) — fastest feedback loop
+skillgrade --smoke
+
+# Reliable run (15 trials) — for iterating on a skill
+skillgrade --reliable
+
+# Regression run (30 trials) — for pre-release validation
+skillgrade --regression
+```
+
+### Presets
+
+| Flag | Trials | Use When |
+| ---- | ------ | -------- |
+| `--smoke` | 5 | Quick check during active development |
+| `--reliable` | 15 | Confirming a fix or improvement |
+| `--regression` | 30 | Pre-release or PR gate |
+
+### CI Mode
+
+CI runs each skill with:
+
+```bash
+skillgrade --ci --provider=local --threshold=0.8
+```
+
+This runs from the project root against the single
+`eval.yaml`. It exits non-zero if the pass rate falls
+below 0.8, which is what the CI quality gate checks.
+
+## Viewing Results
+
+```bash
+# Show results in the terminal
+skillgrade preview
+
+# Open results in the browser
+skillgrade preview browser
+```
+
+## eval.yaml Format
+
+The root `eval.yaml` defines all tasks to run:
+
+```yaml
+skill_name: infrahub-my-skill  # matches SKILL.md frontmatter name
+
+tasks:
+  - id: basic-scenario
+    prompt: >-
+      A realistic user request with specific names,
+      namespaces, and field types.
+    expected_output: >-
+      Human-readable description of what correct
+      output looks like.
+    grader: graders/my-skill/basic-scenario.sh  # path to deterministic grader
+
+  - id: advanced-scenario
+    prompt: >-
+      A more complex request with relationships
+      and cross-references.
+    expected_output: >-
+      Expected output description.
+    grader: graders/my-skill/advanced-scenario.sh
+```
+
+## Writing Grader Scripts
+
+Graders live in `graders/<skill-name>/` and
+are deterministic shell scripts that inspect the
+model's output and emit a JSON result.
+
+A grader receives the model output on stdin and must
+print a JSON object to stdout:
+
+```bash
+#!/usr/bin/env bash
+# graders/my-skill/basic-scenario.sh
+output=$(cat)
+
+# Check for required patterns
+if echo "$output" | grep -q 'kind: Dropdown'; then
+  echo '{"pass": true, "reason": "Status uses Dropdown kind"}'
+else
+  echo '{"pass": false, "reason": "Status does not use Dropdown kind"}'
+fi
+```
+
+**Keep graders deterministic.** They should not call
+external services or depend on timing. Parse the
+output text and check for the presence or absence of
+specific patterns.
+
+**Use descriptive file names.** The grader filename
+appears in results (`dropdown-for-status.sh` is more
+readable than `check1.sh`).
 
 ## Writing Good Eval Prompts
 
@@ -81,52 +145,29 @@ the skill's guidance.
 nice" is not an assertion. "Status uses kind: Dropdown
 with choice objects" is.
 
-**Use descriptive names.** The name appears in the
-eval viewer and benchmark reports. Someone scanning
-results should understand what `dropdown-for-status`
-checks without reading the full description.
+**Use descriptive names.** The grader filename appears
+in results. Someone scanning results should understand
+what `dropdown-for-status.sh` checks without reading
+the full script.
 
 **Focus on what the skill uniquely provides.** If a
 model would get something right even without the
 skill, testing it isn't very informative. Test the
 things the skill's rules specifically address.
 
-## Running Evals
+## Iteration Loop
 
-### Using /skill-creator
-
-1. Open this repository in Claude Code
-2. Invoke `/skill-creator` and tell it you want to
-   evaluate an existing skill
-3. Point it to the skill directory and the eval file
-4. It will run each prompt with and without the skill,
-   grade outputs, and open the eval viewer
-
-### The Eval Viewer
-
-The viewer has two tabs:
-
-- **Outputs** — Click through each test case, see the
-  prompt, output, and formal grades. Leave feedback
-  in the textbox.
-- **Benchmark** — Quantitative comparison: pass rates,
-  timing, and token usage for with-skill vs.
-  without-skill runs.
-
-### Iteration Loop
-
-1. Run evals, review in viewer, identify issues
+1. Run evals, review output with `skillgrade preview`
 2. Improve the skill (rules, examples, descriptions)
-3. Re-run evals into a new iteration directory
-4. Compare with previous iteration in the viewer
-5. Repeat until satisfied
+3. Re-run evals and compare pass rates
+4. Repeat until satisfied
 
 ## Existing Evals
 
-| Skill | Eval File | Scenarios |
-| ----- | --------- | --------- |
-| infrahub-schema-creator | `evaluations/schema-creator.json` | 3 (VLAN management, circuit management, location hierarchy) |
-| infrahub-menu-creator | `evaluations/menu-creator.json` | 3 (flat menu, hierarchical menu, generic kind with include_in_menu) |
+| Skill | Eval File | Tasks |
+| ----- | --------- | ----- |
+| infrahub-schema-creator | `eval.yaml` (tasks: vlan-management, circuit-management, location-hierarchy) | 3 |
+| infrahub-menu-creator | `eval.yaml` (tasks: flat-menu, hierarchical-menu, generic-kind-menu) | 3 |
 
 Other skills don't have evals yet — adding them is a
 good contribution. Focus on skills with the most

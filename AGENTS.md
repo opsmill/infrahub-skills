@@ -47,9 +47,11 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 ### Key Directories
 
 - `skills/` — Skill definitions with rules, examples, and references
+- `eval.yaml` — skillgrade eval config (all skills)
+- `graders/` — Deterministic grader scripts per skill
 - `skills/common/` — Shared references and cross-cutting rules
 - `hooks/` — Hook definitions for Infrahub project detection
-- `evaluations/` — Skill evaluation scenarios (skill-creator format)
+- `scripts/` — Utility scripts (e.g., `sync-versions.sh`)
 - `dev/` — Development guides, domain knowledge, and AI commands
 - `.claude-plugin/` — Plugin manifest
 
