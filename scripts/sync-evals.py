@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate evaluations/*.json from skills/*/eval.yaml.
+"""Generate evaluations/*.json from the root eval.yaml.
 
 eval.yaml is the single source of truth. This script exports the
 skill-creator-compatible JSON format used by /skill-creator evals.
@@ -20,8 +20,9 @@ except ImportError:
     sys.exit(1)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SKILLS_DIR = REPO_ROOT / "skills"
+EVAL_YAML = REPO_ROOT / "eval.yaml"
 EVALS_DIR = REPO_ROOT / "evaluations"
+SKILLS_DIR = REPO_ROOT / "skills"
 
 
 def extract_prompt(instruction: str) -> str:
@@ -30,7 +31,6 @@ def extract_prompt(instruction: str) -> str:
     Strips the skill-reading preamble and the output-save suffix,
     returning just the task description.
     """
-    # Extract text between "Task: " and "Save ONLY"
     match = re.search(
         r"Task:\s*(.+?)(?:\n\s*\n\s*Save ONLY|\Z)",
         instruction,
@@ -38,65 +38,72 @@ def extract_prompt(instruction: str) -> str:
     )
     if match:
         return match.group(1).strip()
-    # Fallback: return the full instruction stripped of preamble
     return instruction.strip()
 
 
-def convert_eval_yaml(eval_path: Path, skill_name: str) -> dict:
-    """Convert a single eval.yaml to skill-creator JSON format."""
-    with open(eval_path) as f:
-        data = yaml.safe_load(f)
-
-    evals = []
-    for idx, task in enumerate(data.get("tasks", []), start=1):
-        prompt = extract_prompt(task.get("instruction", ""))
-
-        entry = {
-            "id": idx,
-            "prompt": prompt,
-            "expected_output": task.get("expected_output", ""),
-            "files": [],
-            "expectations": task.get("expectations", []),
-            "assertions": task.get("assertions", []),
-        }
-        evals.append(entry)
-
-    return {"skill_name": skill_name, "evals": evals}
+def _skill_name_from_instruction(instruction: str) -> str | None:
+    """Extract the skill directory name from the instruction preamble."""
+    match = re.search(r"skills/([^/]+)/SKILL\.md", instruction)
+    return match.group(1) if match else None
 
 
 def main() -> None:
     EVALS_DIR.mkdir(exist_ok=True)
 
-    converted = 0
-    for skill_dir in sorted(SKILLS_DIR.iterdir()):
-        eval_yaml = skill_dir / "eval.yaml"
-        if not eval_yaml.exists():
-            continue
+    if not EVAL_YAML.exists():
+        print(f"No eval.yaml found at {EVAL_YAML}")
+        sys.exit(1)
 
+    with open(EVAL_YAML) as f:
+        data = yaml.safe_load(f)
+
+    # Group tasks by skill
+    skills: dict[str, list[dict]] = {}
+    for task in data.get("tasks", []):
+        instruction = task.get("instruction", "")
+        skill_dir = _skill_name_from_instruction(instruction)
+        if not skill_dir:
+            continue
+        skills.setdefault(skill_dir, []).append(task)
+
+    converted = 0
+    for skill_dir, tasks in sorted(skills.items()):
         # Derive skill name from SKILL.md frontmatter
-        skill_md = skill_dir / "SKILL.md"
-        skill_name = f"infrahub-{skill_dir.name}"
+        skill_md = SKILLS_DIR / skill_dir / "SKILL.md"
+        skill_name = f"infrahub-{skill_dir}"
         if skill_md.exists():
             text = skill_md.read_text()
             match = re.search(r"^name:\s*(.+)$", text, re.MULTILINE)
             if match:
                 skill_name = match.group(1).strip()
 
-        result = convert_eval_yaml(eval_yaml, skill_name)
-        out_path = EVALS_DIR / f"{skill_dir.name}.json"
+        evals = []
+        for idx, task in enumerate(tasks, start=1):
+            prompt = extract_prompt(task.get("instruction", ""))
+            entry = {
+                "id": idx,
+                "prompt": prompt,
+                "expected_output": task.get("expected_output", ""),
+                "files": [],
+                "expectations": task.get("expectations", []),
+                "assertions": task.get("assertions", []),
+            }
+            evals.append(entry)
+
+        result = {"skill_name": skill_name, "evals": evals}
+        out_path = EVALS_DIR / f"{skill_dir}.json"
 
         with open(out_path, "w") as f:
             json.dump(result, f, indent=2)
             f.write("\n")
 
-        n = len(result["evals"])
-        print(f"  {skill_name} -> {out_path.name} ({n} evals)")
+        print(f"  {skill_name} -> {out_path.name} ({len(evals)} evals)")
         converted += 1
 
     if converted:
-        print(f"\nSynced {converted} eval file(s) to {EVALS_DIR}/")
+        print(f"\nSynced {converted} skill(s) to {EVALS_DIR}/")
     else:
-        print("No eval.yaml files found under skills/")
+        print("No tasks found in eval.yaml")
 
 
 if __name__ == "__main__":

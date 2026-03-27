@@ -1,4 +1,4 @@
-"""Tests for skills/menu-creator/graders/lib.py.
+"""Tests for graders/menu-creator/lib.py.
 
 Covers >= 8 check functions against both good and bad menu YAML.
 """
@@ -19,7 +19,7 @@ import yaml
 # ---------------------------------------------------------------------------
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-_LIB_PATH = _REPO_ROOT / "skills" / "menu-creator" / "graders" / "lib.py"
+_LIB_PATH = _REPO_ROOT / "graders" / "menu-creator" / "lib.py"
 _spec = importlib.util.spec_from_file_location("menu_creator_graders_lib", _LIB_PATH)
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
@@ -49,7 +49,7 @@ check_schema_comment = _mod.check_schema_comment
 load_output = _mod.load_output
 run_checks = _mod.run_checks
 
-_GRADERS_DIR = _REPO_ROOT / "skills" / "menu-creator" / "graders"
+_GRADERS_DIR = _REPO_ROOT / "graders" / "menu-creator"
 
 
 # ---------------------------------------------------------------------------

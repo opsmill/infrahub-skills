@@ -50,11 +50,11 @@ Plugin (plugin.json)
 │       ├── infrahub-yml-reference.md
 │       └── rules/            ← Shared rules
 │
-└── Evaluations (per-skill, alongside each skill)
-    ├── skills/schema-creator/eval.yaml   ← skillgrade config
-    ├── skills/schema-creator/graders/    ← grader scripts
-    ├── skills/menu-creator/eval.yaml     ← skillgrade config
-    └── skills/menu-creator/graders/      ← grader scripts
+├── eval.yaml                             ← skillgrade config (all skills)
+│
+└── graders/                              ← Deterministic grader scripts
+    ├── schema-creator/                   ← schema-creator graders
+    └── menu-creator/                     ← menu-creator graders
 ```
 
 ## Progressive Disclosure Model
@@ -107,17 +107,17 @@ Evaluations test that skills produce correct output.
 Each skill that has evals carries them alongside its
 other files:
 
-- **`eval.yaml`** — skillgrade configuration defining
-  tasks with prompts, expected output descriptions,
-  and grader script paths
-- **`graders/`** — Deterministic shell scripts that
-  read model output on stdin and emit
-  `{"pass": true|false}` JSON
+- **`eval.yaml`** — Single skillgrade configuration at
+  project root defining all tasks with prompts,
+  expected output descriptions, and grader script paths
+- **`graders/`** — Deterministic Python scripts
+  organized per skill that read model output and emit
+  skillgrade JSON
 
 Run evals locally with skillgrade:
 
 ```bash
-cd skills/schema-creator && skillgrade --smoke
+skillgrade --smoke
 ```
 
 CI runs `skillgrade --ci --provider=local --threshold=0.8`

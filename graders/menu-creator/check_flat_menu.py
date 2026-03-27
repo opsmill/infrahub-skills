@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Grader script for eval scenario: hierarchical menu.
+"""Grader script for eval scenario: flat menu.
 
 Checks assertion names:
-    group-headers-no-kind, children-data-wrapper, leaf-items-have-kind,
-    correct-grouping, all-nodes-present, contextual-icons
+    apiversion-and-kind, spec-data-structure, name-and-namespace,
+    kind-for-schema-links, mdi-icons, labels-present
 
 Usage::
 
-    python check_hierarchical.py <output_file>
+    python check_flat_menu.py <output_file>
 
 Prints skillgrade JSON to stdout.
 """
@@ -24,17 +24,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import run_checks
 
 CHECK_NAMES = [
-    "group-headers-no-kind",
-    "children-data-wrapper",
-    "leaf-items-have-kind",
-    "correct-grouping",
-    "all-nodes-present",
-    "contextual-icons",
+    "apiversion-and-kind",
+    "spec-data-structure",
+    "name-and-namespace",
+    "kind-for-schema-links",
+    "mdi-icons",
+    "labels-present",
 ]
 
 
 def main() -> None:
-    output_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("menu.yml")
+    output_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("output.yml")
     result = run_checks(CHECK_NAMES, output_path)
     print(json.dumps(result))
 

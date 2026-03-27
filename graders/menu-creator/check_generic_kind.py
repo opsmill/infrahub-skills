@@ -34,7 +34,7 @@ CHECK_NAMES = [
 
 
 def main() -> None:
-    output_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("menu.yml")
+    output_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("output.yml")
     result = run_checks(CHECK_NAMES, output_path)
     print(json.dumps(result))
 

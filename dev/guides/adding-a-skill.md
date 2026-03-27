@@ -184,10 +184,10 @@ Add the skill name to the `skills` array in
 
 ### 6. Write Evaluations
 
-Create evaluation scenarios in
-`skills/my-skill/eval.yaml` and deterministic grader
-scripts in `skills/my-skill/graders/` to test the
-skill produces correct output.
+Add evaluation tasks to the root `eval.yaml` and
+create deterministic grader scripts in
+`graders/my-skill/` to test the skill produces
+correct output.
 
 ```yaml
 skill_name: infrahub-my-skill
@@ -199,7 +199,7 @@ tasks:
       namespaces, and field types.
     expected_output: >-
       What correct output looks like.
-    grader: graders/basic-scenario.sh
+    grader: graders/my-skill/basic-scenario.sh
 
   - id: advanced-scenario
     prompt: >-
@@ -207,10 +207,10 @@ tasks:
       or edge cases.
     expected_output: >-
       What correct output looks like.
-    grader: graders/advanced-scenario.sh
+    grader: graders/my-skill/advanced-scenario.sh
 ```
 
-Each grader script in `graders/` reads the model
+Each grader script in `graders/my-skill/` reads the model
 output on stdin and prints `{"pass": true}` or
 `{"pass": false, "reason": "..."}` to stdout.
 
@@ -229,7 +229,7 @@ that explain what's being tested at a glance (e.g.,
 Run evals with skillgrade to iterate on quality:
 
 ```bash
-cd skills/my-skill && skillgrade --smoke
+skillgrade --smoke
 ```
 
 ### 7. Register in Documentation
@@ -263,7 +263,7 @@ Confirm the skill works before submitting for review.
 **Run evaluations** (see [Step 6](#6-write-evaluations)):
 
 ```bash
-cd skills/my-skill && skillgrade --smoke
+skillgrade --smoke
 ```
 
 Review results with `skillgrade preview`.
@@ -274,8 +274,8 @@ Review results with `skillgrade preview`.
   frontmatter
 - [ ] `skills/my-skill/rules/_sections.md`
 - [ ] At least one rule file in `rules/`
-- [ ] `skills/my-skill/eval.yaml` with test tasks
-- [ ] `skills/my-skill/graders/` with grader scripts
+- [ ] Tasks added to root `eval.yaml`
+- [ ] `graders/my-skill/` with grader scripts
 - [ ] `CLAUDE.md` updated with the new skill
 - [ ] `README.md` updated (skills section + project
   structure)

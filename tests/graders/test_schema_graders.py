@@ -1,4 +1,4 @@
-"""Tests for the thin grader scripts in skills/schema-creator/graders/.
+"""Tests for the thin grader scripts in graders/schema-creator/.
 
 Covers:
 - check_vlan.py
@@ -26,7 +26,7 @@ import yaml
 # ---------------------------------------------------------------------------
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-_GRADERS_DIR = _REPO_ROOT / "skills" / "schema-creator" / "graders"
+_GRADERS_DIR = _REPO_ROOT / "graders" / "schema-creator"
 
 
 def _run_grader(script_name: str, cwd: Path) -> dict:

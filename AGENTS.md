@@ -47,8 +47,8 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 ### Key Directories
 
 - `skills/` — Skill definitions with rules, examples, and references
-- `skills/*/eval.yaml` — skillgrade eval config per skill
-- `skills/*/graders/` — Deterministic grader scripts per skill
+- `eval.yaml` — skillgrade eval config (all skills)
+- `graders/` — Deterministic grader scripts per skill
 - `skills/common/` — Shared references and cross-cutting rules
 - `hooks/` — Hook definitions for Infrahub project detection
 - `scripts/` — Utility scripts (e.g., `sync-versions.sh`)

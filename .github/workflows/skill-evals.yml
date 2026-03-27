@@ -30,10 +30,6 @@ jobs:
   eval:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        skill: [schema-creator, menu-creator]
     steps:
       - uses: actions/checkout@v6
 
@@ -54,18 +50,17 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
-          cd skills/${{ matrix.skill }}
           skillgrade \
             --${{ inputs.preset || 'smoke' }} \
             --ci \
             --provider=local \
-            --output=../../eval-results/${{ matrix.skill }}
+            --output=eval-results
 
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eval-${{ matrix.skill }}
+          name: eval-results
           path: eval-results/
           retention-days: 30
 
@@ -80,7 +75,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts/
-          pattern: eval-*
+          pattern: eval-results
 
       - name: Post evaluation summary as PR comment
         uses: actions/github-script@v7

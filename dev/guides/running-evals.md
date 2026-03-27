@@ -3,8 +3,8 @@
 ## Overview
 
 Evaluations test that skills produce correct output.
-Each skill has an `eval.yaml` file and a `graders/`
-directory living alongside it in `skills/<skill-name>/`.
+All skills share a single `eval.yaml` at the project
+root, with grader scripts organized under `graders/<skill>/`.
 Evals are run with [skillgrade](https://github.com/mgechev/skillgrade),
 which replaces the previous custom eval runner.
 
@@ -16,17 +16,17 @@ npm i -g skillgrade
 
 ## Running Evals Locally
 
-Run evals from inside a skill's directory:
+Run evals from the project root:
 
 ```bash
 # Quick smoke test (5 trials) — fastest feedback loop
-cd skills/schema-creator && skillgrade --smoke
+skillgrade --smoke
 
 # Reliable run (15 trials) — for iterating on a skill
-cd skills/schema-creator && skillgrade --reliable
+skillgrade --reliable
 
 # Regression run (30 trials) — for pre-release validation
-cd skills/schema-creator && skillgrade --regression
+skillgrade --regression
 ```
 
 ### Presets
@@ -45,8 +45,9 @@ CI runs each skill with:
 skillgrade --ci --provider=local --threshold=0.8
 ```
 
-This exits non-zero if the pass rate falls below 0.8,
-which is what the CI quality gate checks.
+This runs from the project root against the single
+`eval.yaml`. It exits non-zero if the pass rate falls
+below 0.8, which is what the CI quality gate checks.
 
 ## Viewing Results
 
@@ -60,7 +61,7 @@ skillgrade preview browser
 
 ## eval.yaml Format
 
-Each skill's `eval.yaml` defines the tasks to run:
+The root `eval.yaml` defines all tasks to run:
 
 ```yaml
 skill_name: infrahub-my-skill  # matches SKILL.md frontmatter name
@@ -73,7 +74,7 @@ tasks:
     expected_output: >-
       Human-readable description of what correct
       output looks like.
-    grader: graders/basic-scenario.sh  # path to deterministic grader
+    grader: graders/my-skill/basic-scenario.sh  # path to deterministic grader
 
   - id: advanced-scenario
     prompt: >-
@@ -81,12 +82,12 @@ tasks:
       and cross-references.
     expected_output: >-
       Expected output description.
-    grader: graders/advanced-scenario.sh
+    grader: graders/my-skill/advanced-scenario.sh
 ```
 
 ## Writing Grader Scripts
 
-Graders live in `skills/<skill-name>/graders/` and
+Graders live in `graders/<skill-name>/` and
 are deterministic shell scripts that inspect the
 model's output and emit a JSON result.
 
@@ -95,7 +96,7 @@ print a JSON object to stdout:
 
 ```bash
 #!/usr/bin/env bash
-# graders/basic-scenario.sh
+# graders/my-skill/basic-scenario.sh
 output=$(cat)
 
 # Check for required patterns
@@ -165,8 +166,8 @@ things the skill's rules specifically address.
 
 | Skill | Eval File | Tasks |
 | ----- | --------- | ----- |
-| infrahub-schema-creator | `skills/schema-creator/eval.yaml` | 3 (VLAN management, circuit management, location hierarchy) |
-| infrahub-menu-creator | `skills/menu-creator/eval.yaml` | 3 (flat menu, hierarchical menu, generic kind with include_in_menu) |
+| infrahub-schema-creator | `eval.yaml` (tasks: vlan-management, circuit-management, location-hierarchy) | 3 |
+| infrahub-menu-creator | `eval.yaml` (tasks: flat-menu, hierarchical-menu, generic-kind-menu) | 3 |
 
 Other skills don't have evals yet — adding them is a
 good contribution. Focus on skills with the most
