@@ -53,6 +53,7 @@ jobs:
           skillgrade \
             --${{ inputs.preset || 'smoke' }} \
             --ci \
+            --provider=local \
             --output=eval-results
 
       - name: Upload results
