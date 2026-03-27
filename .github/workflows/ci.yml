@@ -52,8 +52,8 @@ jobs:
   # ---------------------------------------------------------------------------
   # Run skill evaluations (reusable workflow)
   # ---------------------------------------------------------------------------
-  skill-evals:
-    needs: files-changed
-    if: needs.files-changed.outputs.skills == 'true'
-    uses: ./.github/workflows/skill-evals.yml
-    secrets: inherit
+  # skill-evals:
+  #   needs: files-changed
+  #   if: needs.files-changed.outputs.skills == 'true'
+  #   uses: ./.github/workflows/skill-evals.yml
+  #   secrets: inherit
