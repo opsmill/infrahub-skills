@@ -13,13 +13,13 @@ Once installed, open any Infrahub project and start working — try *"describe w
 
 ## What You Can Do With It
 
-- **Start immediately in any Infrahub project** — the skills detect `.infrahub.yml`, `infrahub.toml`, or schema files and load the appropriate guidance without any manual configuration step.
 - **Build a working schema from a description** — describe your data model in plain terms and the Schema Creator produces valid Infrahub schema YAML with appropriate node types, attribute kinds, and relationships, without requiring manual study of the schema format first.
 - **Generate automation logic from a plain description** — describe what you want to automate (for example, "create a BGP session for each spine-leaf pair in my fabric design") and the Generator Creator produces a working `InfrahubGenerator` implementation for that specific case.
 - **Get working configuration templates for your data model** — describe the output format you need and the Transform Creator produces a transform and Jinja2 template that reads from your specific schema, rather than a generic placeholder example.
 - **Write Infrahub CI pipeline checks without SDK expertise** — describe what a proposed change should or should not allow and the Check Creator produces a working `InfrahubCheck` implementation with the correct GraphQL queries and `.infrahub.yml` registration.
 - **Work through design decisions before building** — pair the skills with a spec-driven development (SDD) framework to plan before you build: capture requirements, validate the design against Infrahub conventions, and break the work into discrete tasks before any code is generated.
 - **Query and analyze a live Infrahub instance** — the Analyst skill connects to a running instance via MCP and answers operational questions directly: cross-node correlation, drift detection, blast-radius analysis, and data quality audits.
+- **Audit an existing Infrahub repo for best practices** — the Repo Auditor checks your repository against Infrahub conventions: schema naming, relationship identifiers, `.infrahub.yml` registration, and structural patterns — then generates a report regarding what to fix and why.
 
 ---
 
