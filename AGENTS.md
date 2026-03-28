@@ -4,7 +4,7 @@ This file provides guidance to AI coding assistants working with this repository
 
 ## Repository Overview
 
-This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub), the infrastructure data management platform by OpsMill. The plugin provides skills covering the full Infrahub development lifecycle: schema design, data population, validation checks, generators, transforms, and menu customization.
+This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub), the infrastructure data management platform by OpsMill. The plugin provides skills covering the full Infrahub development lifecycle: schema design, data population, validation checks, generators, transforms, menu customization, and live data analysis.
 
 The repository is a pure Markdown-based skills project (no Python code). Each skill is defined in its own directory under `skills/` with rules, examples, and reference documentation. Skills follow the [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) format.
 
@@ -42,6 +42,7 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 | `infrahub-generator-creator` | `skills/generator-creator/` | Design-driven automation |
 | `infrahub-transform-creator` | `skills/transform-creator/` | Data transforms (Python/Jinja2) |
 | `infrahub-menu-creator` | `skills/menu-creator/` | Custom navigation menus |
+| `infrahub-analyst` | `skills/analyst/` | Live data analysis via MCP server |
 | `infrahub-repo-auditor` | `skills/repo-auditor/` | Audit repository against best practices |
 
 ### Key Directories
