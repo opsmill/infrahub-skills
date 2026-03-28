@@ -35,7 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: DavidAnson/markdownlint-cli2-action@v22
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run rumdl check .
 
   # ---------------------------------------------------------------------------
   # Lint YAML files

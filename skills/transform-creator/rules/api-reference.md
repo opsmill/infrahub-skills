@@ -26,10 +26,10 @@ tags: api, class-attributes, properties, methods
 
 ### Key Methods
 
-| Method                       | Description                       |
-| ---------------------------- | --------------------------------- |
-| `transform(data) -> Any`     | **Implement this.** Sync or async |
-| `async collect_data()`       | Executes query (auto-called)      |
-| `async run(data=None)`       | Orchestrates and calls transform  |
+| Method                   | Description                       |
+| ------------------------ | --------------------------------- |
+| `transform(data) -> Any` | **Implement this.** Sync or async |
+| `async collect_data()`   | Executes query (auto-called)      |
+| `async run(data=None)`   | Orchestrates and calls transform  |
 
 Reference: [Infrahub SDK Docs](https://docs.infrahub.app)
