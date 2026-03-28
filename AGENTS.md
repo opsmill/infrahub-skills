@@ -35,7 +35,7 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 ### Skills
 
 | Skill | Directory | Description |
-|-------|-----------|-------------|
+| ------- | ----------- | ------------- |
 | `infrahub-schema-creator` | `skills/schema-creator/` | Schema nodes, generics, attributes, relationships |
 | `infrahub-object-creator` | `skills/object-creator/` | YAML data files for infrastructure objects |
 | `infrahub-check-creator` | `skills/check-creator/` | Python validation checks for proposed changes |
@@ -57,6 +57,7 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 ### Versioning
 
 All skills share a unified version. When bumping, update together:
+
 1. `.claude-plugin/plugin.json`
 2. `.github/.release-manifest.json`
 3. Every `skills/*/SKILL.md` frontmatter
