@@ -41,7 +41,7 @@ errors, the proposed change cannot be merged.
 | HIGH | API Reference | `api-` | Class attributes, instance properties, methods, lifecycle |
 | HIGH | Registration | `registration-` | .infrahub.yml config, query name matching, parameters |
 | MEDIUM | Patterns | `patterns-` | Error collection, shared utilities, scoped validation |
-| LOW | Testing | `testing-` | infrahubctl check commands, branch testing |
+| HIGH | Testing | `testing-` | Resources Testing Framework, infrahubctl check commands |
 
 <!-- markdownlint-enable MD013 -->
 

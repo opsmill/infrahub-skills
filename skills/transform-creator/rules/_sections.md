@@ -29,5 +29,4 @@
    utilities (common.py), CSV output pattern, shared
    functions (get_data, get_interfaces).
 
-8. **Testing (testing-)** -- LOW. infrahubctl transform
-   and render commands, REST API endpoints.
+8. **Testing (testing-)** -- HIGH. Resources Testing Framework (YAML-driven pytest tests: smoke, unit, integration), infrahubctl transform/render commands. Always create tests alongside new transforms.
