@@ -61,10 +61,30 @@ class MyGenerator(InfrahubGenerator):
         await obj.save(allow_upsert=True)
 ```
 
+## MCP Server Integration
+
+When the Infrahub MCP server is connected, use it to
+understand existing data before building generators:
+
+- **Inspect design objects** — call
+  `mcp__infrahub__infrahub_query` to see what
+  design-level objects exist and their data shape
+- **Discover schema kinds** — call
+  `mcp__infrahub__infrahub_list_schema` to confirm the
+  kinds a generator will create
+- **Verify target groups** — query existing groups to
+  confirm generator target membership before writing
+  configuration
+
+See [../common/mcp-tools-reference.md](../common/mcp-tools-reference.md)
+for tool definitions and usage patterns.
+
 ## Supporting References
 
 - **[examples.md](./examples.md)** -- Complete Generator
   patterns (POP topology, network segment, minimal)
+- **[../common/mcp-tools-reference.md](../common/mcp-tools-reference.md)**
+  -- MCP tool reference for live instance queries
 - **[../common/graphql-queries.md](../common/graphql-queries.md)**
   -- GraphQL query writing reference
 - **[../common/infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**
