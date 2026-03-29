@@ -54,4 +54,4 @@ generics:
 - **`content_type`** must match what the transform actually outputs
 
 Reference:
-[infrahub-yml-reference.md](../../common/infrahub-yml-reference.md)
+[infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md)

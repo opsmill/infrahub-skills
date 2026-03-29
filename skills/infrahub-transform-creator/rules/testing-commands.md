@@ -18,7 +18,7 @@ infrahubctl info
 ```
 
 See
-[Server Connectivity Check](../../common/rules/connectivity-server-check.md)
+[Server Connectivity Check](../../infrahub-common/rules/connectivity-server-check.md)
 for troubleshooting.
 
 ### Commands

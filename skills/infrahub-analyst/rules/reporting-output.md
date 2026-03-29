@@ -79,7 +79,7 @@ Remediation
 • Consider adding an InfrahubCheck to
   enforce naming on future proposed
   changes.
-  See: skills/check-creator/SKILL.md
+  See: skills/infrahub-check-creator/SKILL.md
 ```
 
 ---
@@ -207,7 +207,7 @@ Transform + Artifact
   → good for scheduled reports, CSV/HTML export
 ```
 
-See `../transform-creator/SKILL.md` for how to
+See `../infrahub-transform-creator/SKILL.md` for how to
 turn a compliance query into a recurring artifact.
 
 Reference:

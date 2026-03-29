@@ -69,9 +69,9 @@ Only `version` is required at the top level.
   from production repos
 - **[validation.md](./validation.md)** -- `infrahubctl`
   commands, migration strategies, pre-validation checklist
-- **[../common/infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**
+- **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
-- **[../common/rules/](../common/rules/)** -- Shared rules
+- **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
   (git integration, caching) across all skills
 - **[rules/](./rules/)** -- Individual rules by category
   prefix

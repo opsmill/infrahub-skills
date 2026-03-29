@@ -4,7 +4,7 @@
 > `infrahubctl schema load` both require a running
 > Infrahub server. Run `infrahubctl info` first to
 > verify connectivity. See
-> [Server Connectivity Check](../common/rules/connectivity-server-check.md).
+> [Server Connectivity Check](../infrahub-common/rules/connectivity-server-check.md).
 
 ## Validation Commands
 

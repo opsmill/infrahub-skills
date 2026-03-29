@@ -52,4 +52,4 @@ generator_definitions:
   object attribute paths (e.g., `name__value`)
 
 Reference:
-[../common/infrahub-yml-reference.md](../../common/infrahub-yml-reference.md)
+[../infrahub-common/infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md)

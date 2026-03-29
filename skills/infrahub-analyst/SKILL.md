@@ -44,9 +44,9 @@ Typical question patterns:
 
 For **automated, pipeline-enforced** checks that
 block proposed changes, see
-`../check-creator/SKILL.md`.
+`../infrahub-check-creator/SKILL.md`.
 For **repeatable scheduled reports** exported as
-artifacts, see `../transform-creator/SKILL.md`.
+artifacts, see `../infrahub-transform-creator/SKILL.md`.
 
 ## When to Use
 
@@ -158,13 +158,13 @@ query MaintenanceDevices {
 - **[examples.md](./examples.md)** — Analysis
   patterns (naming, VLAN, BGP, maintenance,
   service impact)
-- **[../common/graphql-queries.md](../common/graphql-queries.md)**
+- **[../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)**
   — GraphQL query writing reference
-- **[../common/infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**
+- **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   — .infrahub.yml project configuration
-- **[../check-creator/SKILL.md](../check-creator/SKILL.md)**
+- **[../infrahub-check-creator/SKILL.md](../infrahub-check-creator/SKILL.md)**
   — Automated pipeline checks (for enforcement)
-- **[../transform-creator/SKILL.md](../transform-creator/SKILL.md)**
+- **[../infrahub-transform-creator/SKILL.md](../infrahub-transform-creator/SKILL.md)**
   — Transforms for scheduled report artifacts
 - **[rules/](./rules/)** — Individual rules organized
   by category prefix

@@ -66,12 +66,12 @@ class MyTransform(InfrahubTransform):
 
 - **[examples.md](./examples.md)** -- Complete transform
   patterns (Python, Jinja2, hybrid, CSV)
-- **[../common/graphql-queries.md](../common/graphql-queries.md)**
+- **[../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)**
   -- GraphQL query writing reference
-- **[infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**
+- **[infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
-- **[../common/rules/](../common/rules/)** -- Shared rules
+- **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
   (git integration, caching) across all skills
-- **[../schema-creator/SKILL.md](../schema-creator/SKILL.md)**
+- **[../infrahub-schema-creator/SKILL.md](../infrahub-schema-creator/SKILL.md)**
   -- Schema definitions transforms work with
 - **[rules/](./rules/)** -- Individual rules by category

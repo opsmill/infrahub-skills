@@ -231,4 +231,4 @@ for site, items in sorted(by_site.items()):
 ```
 
 Reference:
-[Infrahub Check Examples](../../check-creator/examples.md)
+[Infrahub Check Examples](../../infrahub-check-creator/examples.md)

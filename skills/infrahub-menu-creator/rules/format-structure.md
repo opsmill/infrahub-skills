@@ -57,4 +57,4 @@ YAML comment in the output file so the user knows:
 - The menu replaces the auto-generated sidebar
   navigation
 
-Reference: [infrahub-yml-reference.md](../../common/infrahub-yml-reference.md)
+Reference: [infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md)

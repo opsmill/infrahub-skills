@@ -75,14 +75,14 @@ class MyCheck(InfrahubCheck):
 
 - **[examples.md](./examples.md)** -- Complete check
   patterns (global, targeted, minimal)
-- **[../common/graphql-queries.md](../common/graphql-queries.md)**
+- **[../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)**
   -- GraphQL query writing reference
-- **[../common/infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**
+- **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
-- **[../common/rules/](../common/rules/)** -- Shared rules
+- **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
   (git integration, caching gotchas) that apply across all
   skills
-- **[../schema-creator/SKILL.md](../schema-creator/SKILL.md)**
+- **[../infrahub-schema-creator/SKILL.md](../infrahub-schema-creator/SKILL.md)**
   -- Schema definitions checks validate against
 - **[rules/](./rules/)** -- Individual rules organized by
   category prefix

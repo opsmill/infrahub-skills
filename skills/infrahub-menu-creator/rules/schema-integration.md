@@ -50,4 +50,4 @@ This is preferred over `path` because it stays
 correct even if URL patterns change.
 
 Reference:
-[schema-creator](../../schema-creator/SKILL.md)
+[schema-creator](../../infrahub-schema-creator/SKILL.md)

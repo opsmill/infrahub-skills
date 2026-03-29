@@ -70,7 +70,7 @@ recurring ones.
   interfaces
 - Loopback IP must be from the approved prefix
 
-See `../check-creator/SKILL.md` to implement.
+See `../infrahub-check-creator/SKILL.md` to implement.
 
 ---
 
@@ -92,7 +92,7 @@ See `../check-creator/SKILL.md` to implement.
 - Nightly audit of naming convention violations
   as CSV
 
-See `../transform-creator/SKILL.md` to implement.
+See `../infrahub-transform-creator/SKILL.md` to implement.
 
 ---
 

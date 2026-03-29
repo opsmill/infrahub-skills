@@ -36,19 +36,19 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 
 | Skill | Directory | Description |
 | ------- | ----------- | ------------- |
-| `infrahub-schema-creator` | `skills/schema-creator/` | Schema nodes, generics, attributes, relationships |
-| `infrahub-object-creator` | `skills/object-creator/` | YAML data files for infrastructure objects |
-| `infrahub-check-creator` | `skills/check-creator/` | Python validation checks for proposed changes |
-| `infrahub-generator-creator` | `skills/generator-creator/` | Design-driven automation |
-| `infrahub-transform-creator` | `skills/transform-creator/` | Data transforms (Python/Jinja2) |
-| `infrahub-menu-creator` | `skills/menu-creator/` | Custom navigation menus |
-| `infrahub-analyst` | `skills/analyst/` | Live data analysis via MCP server |
-| `infrahub-repo-auditor` | `skills/repo-auditor/` | Audit repository against best practices |
+| `infrahub-schema-creator` | `skills/infrahub-schema-creator/` | Schema nodes, generics, attributes, relationships |
+| `infrahub-object-creator` | `skills/infrahub-object-creator/` | YAML data files for infrastructure objects |
+| `infrahub-check-creator` | `skills/infrahub-check-creator/` | Python validation checks for proposed changes |
+| `infrahub-generator-creator` | `skills/infrahub-generator-creator/` | Design-driven automation |
+| `infrahub-transform-creator` | `skills/infrahub-transform-creator/` | Data transforms (Python/Jinja2) |
+| `infrahub-menu-creator` | `skills/infrahub-menu-creator/` | Custom navigation menus |
+| `infrahub-analyst` | `skills/infrahub-analyst/` | Live data analysis via MCP server |
+| `infrahub-repo-auditor` | `skills/infrahub-repo-auditor/` | Audit repository against best practices |
 
 ### Key Directories
 
 - `skills/` — Skill definitions with rules, examples, and references
-- `skills/common/` — Shared references and cross-cutting rules
+- `skills/infrahub-common/` — Shared references and cross-cutting rules
 - `hooks/` — Hook definitions for Infrahub project detection
 - `evaluations/` — Skill evaluation scenarios (skill-creator format)
 - `dev/` — Development guides, domain knowledge, and AI commands

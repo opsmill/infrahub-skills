@@ -117,20 +117,20 @@ The report is written to `AUDIT_REPORT.md` in the project root with this structu
 
 The auditor checks rules from all skills:
 
-- **[../schema-creator/](../schema-creator/)** -- Naming,
+- **[../infrahub-schema-creator/](../infrahub-schema-creator/)** -- Naming,
   relationships, attributes, hierarchy, display,
   extensions, uniqueness, migration
-- **[../object-creator/](../object-creator/)** -- Format,
+- **[../infrahub-object-creator/](../infrahub-object-creator/)** -- Format,
   values, children, ranges, organization
-- **[../check-creator/](../check-creator/)** --
+- **[../infrahub-check-creator/](../infrahub-check-creator/)** --
   Architecture, Python class, API, registration
-- **[../generator-creator/](../generator-creator/)** --
+- **[../infrahub-generator-creator/](../infrahub-generator-creator/)** --
   Architecture, Python class, tracking, API
-- **[../transform-creator/](../transform-creator/)** --
+- **[../infrahub-transform-creator/](../infrahub-transform-creator/)** --
   Types, Python/Jinja2, hybrid, artifacts, API
-- **[../menu-creator/](../menu-creator/)** -- Format,
+- **[../infrahub-menu-creator/](../infrahub-menu-creator/)** -- Format,
   item properties, hierarchy, icons
-- **[../common/](../common/)** -- Git integration,
+- **[../infrahub-common/](../infrahub-common/)** -- Git integration,
   caching, `.infrahub.yml` reference, GraphQL
 
 ## Rules

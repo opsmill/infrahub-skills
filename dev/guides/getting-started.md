@@ -86,7 +86,7 @@ git clone \
 ### Option 4: Manual Copy
 
 Copy the `skills/` directory into your project.
-Always include `skills/common/` — it contains shared
+Always include `skills/infrahub-common/` — it contains shared
 references that all skills depend on.
 
 ```bash
@@ -195,7 +195,7 @@ Confirm skills are installed and discoverable:
    ```
 
    You should see one `SKILL.md` per skill (e.g.,
-   `skills/schema-creator/SKILL.md`).
+   `skills/infrahub-schema-creator/SKILL.md`).
 
 2. Test a skill invocation — ask your AI assistant:
 

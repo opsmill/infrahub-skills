@@ -11,7 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - 7 skills: schema-creator, object-creator,
   check-creator, generator-creator,
   transform-creator, menu-creator, repo-auditor
-- Shared rules and references in skills/common/
+- Shared rules and references in skills/infrahub-common/
 - Hook-based Infrahub project detection
 - Metadata version tracking in SKILL.md frontmatter
 - Release manifest (.github/.release-manifest.json)

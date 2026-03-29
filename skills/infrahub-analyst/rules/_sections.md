@@ -30,8 +30,8 @@
 5. **Approach Selection (approach-)** — MEDIUM.
    Decision guide for choosing between interactive
    MCP analysis (this skill), automated
-   InfrahubCheck (check-creator), or
+   InfrahubCheck (infrahub-check-creator), or
    artifact-producing Transform
-   (transform-creator). Each has different
+   (infrahub-transform-creator). Each has different
    trade-offs around automation, enforcement, and
    repeatability.

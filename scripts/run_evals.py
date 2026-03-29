@@ -32,7 +32,7 @@ except ImportError:
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 SKILL_PATHS = {
-    "infrahub-schema-creator": "skills/schema-creator/SKILL.md",
+    "infrahub-schema-creator": "skills/infrahub-schema-creator/SKILL.md",
 }
 
 

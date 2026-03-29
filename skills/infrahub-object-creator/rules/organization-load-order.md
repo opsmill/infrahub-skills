@@ -96,6 +96,6 @@ objects:
 ```
 
 Reference:
-[../common/infrahub-yml-reference.md](../../common/infrahub-yml-reference.md)
+[../infrahub-common/infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md)
 | See also:
-[deployment-git-integration.md](../../common/rules/deployment-git-integration.md)
+[deployment-git-integration.md](../../infrahub-common/rules/deployment-git-integration.md)

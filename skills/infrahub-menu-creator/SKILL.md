@@ -92,12 +92,12 @@ Follow these steps when creating a menu:
 
 ## Supporting References
 
-- **[infrahub-yml-reference.md](../common/infrahub-yml-reference.md)**
+- **[infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
-- **[common/rules/](../common/rules/)**
+- **[common/rules/](../infrahub-common/rules/)**
   -- Shared rules (git integration, caching gotchas)
   that apply across all skills
-- **[schema-creator](../schema-creator/SKILL.md)**
+- **[schema-creator](../infrahub-schema-creator/SKILL.md)**
   -- Schema node kinds that menus link to
 - **[rules/](./rules/)**
   -- Individual rules organized by category prefix

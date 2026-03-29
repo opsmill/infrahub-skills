@@ -54,4 +54,4 @@ check_definitions:
   object attributes
 
 Reference:
-[../common/infrahub-yml-reference.md](../../common/infrahub-yml-reference.md)
+[../infrahub-common/infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md)
