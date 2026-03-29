@@ -12,11 +12,11 @@ Every menu file must follow the exact YAML structure.
 
 ### Required Fields
 
-| Field       | Value              | Description                      |
-| ----------- | ------------------ | -------------------------------- |
-| `apiVersion`| `infrahub.app/v1`  | Always this value                |
-| `kind`      | `Menu`             | Always `Menu` for navigation     |
-| `spec.data` | list               | Array of top-level menu items    |
+| Field        | Value             | Description                   |
+| ------------ | ----------------- | ----------------------------- |
+| `apiVersion` | `infrahub.app/v1` | Always this value             |
+| `kind`       | `Menu`            | Always `Menu` for navigation  |
+| `spec.data`  | list              | Array of top-level menu items |
 
 ### Correct
 

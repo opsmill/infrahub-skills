@@ -32,14 +32,14 @@ hierarchy.
 
 ## Rule Categories
 
-| Priority | Category   | Prefix       | Description                     |
-| -------- | ---------- | ------------ | ------------------------------- |
-| CRITICAL | Format     | `format-`    | apiVersion, kind, spec          |
-| CRITICAL | Properties | `item-`      | name, namespace, label, kind    |
-| HIGH     | Hierarchy  | `hierarchy-` | Nesting, group headers, data    |
-| HIGH     | Icons      | `icons-`     | MDI icon reference, choices     |
-| MEDIUM   | Schema     | `schema-`    | include_in_menu, kind links     |
-| LOW      | Patterns   | `patterns-`  | Flat menu, comments, links      |
+| Priority | Category   | Prefix       | Description                  |
+| -------- | ---------- | ------------ | ---------------------------- |
+| CRITICAL | Format     | `format-`    | apiVersion, kind, spec       |
+| CRITICAL | Properties | `item-`      | name, namespace, label, kind |
+| HIGH     | Hierarchy  | `hierarchy-` | Nesting, group headers, data |
+| HIGH     | Icons      | `icons-`     | MDI icon reference, choices  |
+| MEDIUM   | Schema     | `schema-`    | include_in_menu, kind links  |
+| LOW      | Patterns   | `patterns-`  | Flat menu, comments, links   |
 
 ## Menu File Basics
 

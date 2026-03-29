@@ -135,7 +135,7 @@ index:
 ## Rule Categories
 
 | Prefix | Category | Description |
-|--------|----------|-------------|
+| -------- | ---------- | ------------- |
 | naming | Naming | Naming conventions and constraints |
 | structure | Structure | Structural requirements and patterns |
 | display | Display | UI display configuration |

@@ -155,6 +155,7 @@ After installing skills (via `npx` or manual copy), some tools benefit from addi
 ---
 applyTo: '**/*.py,**/*.yml,**/*.yaml'
 ---
+
 For Infrahub development guidance, refer to the skill files in skills/.
 ```
 
@@ -168,6 +169,7 @@ description: Infrahub development guidance
 globs: ["**/*.py", "**/*.yml", "**/*.yaml"]
 alwaysApply: false
 ---
+
 For Infrahub development guidance, refer to the skill files in skills/.
 ```
 

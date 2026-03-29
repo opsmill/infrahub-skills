@@ -59,6 +59,9 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# Rumdl
+.rumdl_cache/
+
 # Documentation build
 docs/node_modules/
 docs/.docusaurus/

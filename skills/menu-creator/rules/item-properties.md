@@ -12,17 +12,17 @@ Every menu item has required and optional properties.
 
 ### Property Reference
 
-| Property       | Type    | Required | Description              |
-| -------------- | ------- | -------- | ------------------------ |
-| `name`         | string  | Yes      | Unique identifier        |
-| `namespace`    | string  | Yes      | Organizational grouping  |
-| `label`        | string  | No       | Display text in the UI   |
-| `kind`         | string  | No       | Links to a schema node   |
-| `path`         | string  | No       | Direct URL path          |
-| `icon`         | string  | No       | MDI library icon         |
-| `order_weight` | integer | No       | Sort position            |
-| `parent`       | string  | No       | Parent menu item ref     |
-| `children`     | object  | No       | Nested items under `data`|
+| Property       | Type    | Required | Description               |
+| -------------- | ------- | -------- | ------------------------- |
+| `name`         | string  | Yes      | Unique identifier         |
+| `namespace`    | string  | Yes      | Organizational grouping   |
+| `label`        | string  | No       | Display text in the UI    |
+| `kind`         | string  | No       | Links to a schema node    |
+| `path`         | string  | No       | Direct URL path           |
+| `icon`         | string  | No       | MDI library icon          |
+| `order_weight` | integer | No       | Sort position             |
+| `parent`       | string  | No       | Parent menu item ref      |
+| `children`     | object  | No       | Nested items under `data` |
 
 ### kind vs path
 

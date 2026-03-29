@@ -300,4 +300,4 @@ empty `edges` list:
 3. Try without filters to confirm data exists
 
 Reference:
-[Infrahub GraphQL Query Reference](../graphql-queries.md)
+[Infrahub GraphQL Query Reference](../../common/graphql-queries.md)

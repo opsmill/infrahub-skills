@@ -72,34 +72,44 @@ The report is written to `AUDIT_REPORT.md` in the project root with this structu
 # Infrahub Repository Audit Report
 
 ## Summary
+
 - Total findings: N
 - Critical: N | High: N | Medium: N | Low: N | Info: N
 
 ## Project Structure
+
 ...
 
 ## Schema Audit
+
 ...
 
 ## Object Data Audit
+
 ...
 
 ## Checks Audit
+
 ...
 
 ## Generators Audit
+
 ...
 
 ## Transforms Audit
+
 ...
 
 ## Menus Audit
+
 ...
 
 ## Cross-Reference Integrity
+
 ...
 
 ## Deployment Readiness
+
 ...
 ```
 
