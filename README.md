@@ -97,7 +97,7 @@ A team already running Infrahub who needs to continue extending it — adding sc
 | **analyst** | Query and correlate live Infrahub data via the MCP server (requires MCP connection) |
 | **repo-auditor** | Audit your repository against Infrahub best practices |
 
-Each skill lives in `skills/<name>/` with a `SKILL.md` entry point, reference docs, examples, and modular rules. Shared references (GraphQL patterns, `.infrahub.yml` format, git integration) are in `skills/common/`.
+Each skill lives in `skills/infrahub-<name>/` with a `SKILL.md` entry point, reference docs, examples, and modular rules. Shared references (GraphQL patterns, `.infrahub.yml` format, git integration) are in `skills/infrahub-common/`.
 
 ---
 
@@ -143,7 +143,7 @@ cp -r infrahub-skills/skills /path/to/your-infrahub-project/
 rm -rf infrahub-skills
 ```
 
-Always include `skills/common/` — it contains shared references that all skills depend on.
+Always include `skills/infrahub-common/` — it contains shared references that all skills depend on.
 
 ### Tool-Specific Setup
 
@@ -190,15 +190,15 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 ├── hooks-handlers/
 │   └── session-start.sh         # Infrahub project detection
 ├── skills/
-│   ├── common/                  # Shared references and rules
-│   ├── schema-creator/          # Schema design
-│   ├── object-creator/          # Data population
-│   ├── check-creator/           # Validation checks
-│   ├── generator-creator/       # Design-driven generators
-│   ├── transform-creator/       # Data transforms
-│   ├── menu-creator/            # Navigation menus
-│   ├── analyst/                 # Live data analysis (MCP)
-│   └── repo-auditor/            # Best-practice audits
+│   ├── infrahub-common/          # Shared references and rules
+│   ├── infrahub-schema-creator/  # Schema design
+│   ├── infrahub-object-creator/  # Data population
+│   ├── infrahub-check-creator/   # Validation checks
+│   ├── infrahub-generator-creator/ # Design-driven generators
+│   ├── infrahub-transform-creator/ # Data transforms
+│   ├── infrahub-menu-creator/    # Navigation menus
+│   ├── infrahub-analyst/         # Live data analysis (MCP)
+│   └── infrahub-repo-auditor/    # Best-practice audits
 ├── CLAUDE.md
 ├── README.md
 └── LICENSE                      # Apache 2.0
