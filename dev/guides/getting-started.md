@@ -86,7 +86,7 @@ git clone \
 ### Option 4: Manual Copy
 
 Copy the `skills/` directory into your project.
-Always include `skills/common/` — it contains shared
+Always include `skills/infrahub-common/` — it contains shared
 references that all skills depend on.
 
 ```bash
@@ -156,7 +156,9 @@ this order:
    `infrahub:transform-creator`
 6. **Customize the UI** — Design navigation menus for
    the web interface with `infrahub:menu-creator`
-7. **Audit** — Verify your repository follows best
+7. **Analyze data** — Query and correlate live
+   Infrahub data with `infrahub:analyst`
+8. **Audit** — Verify your repository follows best
    practices with `infrahub:repo-auditor`
 
 Not every project needs every step. Schema and data
@@ -172,6 +174,7 @@ are the foundation; the rest depends on your use case.
 | `infrahub:generator-creator` | Building design-driven automation (create objects from design definitions) |
 | `infrahub:transform-creator` | Converting Infrahub data to other formats (JSON, text, CSV, device configs) |
 | `infrahub:menu-creator` | Customizing the web UI sidebar with nested navigation menus |
+| `infrahub:analyst` | Querying and correlating live Infrahub data via the MCP server |
 | `infrahub:repo-auditor` | Auditing a repository against all rules and best practices |
 
 ## Using with Non-Claude Tools
@@ -192,7 +195,7 @@ Confirm skills are installed and discoverable:
    ```
 
    You should see one `SKILL.md` per skill (e.g.,
-   `skills/schema-creator/SKILL.md`).
+   `skills/infrahub-schema-creator/SKILL.md`).
 
 2. Test a skill invocation — ask your AI assistant:
 

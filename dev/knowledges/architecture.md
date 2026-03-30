@@ -29,7 +29,7 @@ Plugin (plugin.json)
 │           schema files
 │
 ├── Skills (skills/)
-│   ├── schema-creator/
+│   ├── infrahub-schema-creator/
 │   │   ├── SKILL.md          ← Entry point
 │   │   ├── rules/            ← Modular rules
 │   │   │   ├── _sections.md  ← Category index
@@ -38,14 +38,15 @@ Plugin (plugin.json)
 │   │   ├── reference.md      ← Property/format tables
 │   │   └── validation.md     ← Validation guidance
 │   │
-│   ├── object-creator/
-│   ├── check-creator/
-│   ├── generator-creator/
-│   ├── transform-creator/
-│   ├── menu-creator/
-│   ├── repo-auditor/
+│   ├── infrahub-object-creator/
+│   ├── infrahub-check-creator/
+│   ├── infrahub-generator-creator/
+│   ├── infrahub-transform-creator/
+│   ├── infrahub-menu-creator/
+│   ├── infrahub-analyst/
+│   ├── infrahub-repo-auditor/
 │   │
-│   └── common/               ← Cross-cutting refs
+│   └── infrahub-common/      ← Cross-cutting refs
 │       ├── graphql-queries.md
 │       ├── infrahub-yml-reference.md
 │       └── rules/            ← Shared rules
@@ -75,7 +76,7 @@ Level 3: Supporting files (loaded as needed)
   ├── rules/*.md — individual rules
   ├── examples.md — complete patterns
   ├── reference.md — property tables
-  └── ../common/*.md — shared references
+  └── ../infrahub-common/*.md — shared references
 ```
 
 The description field in the frontmatter is the
@@ -152,7 +153,7 @@ large prompt) means:
 
 ### Shared Common Resources
 
-Cross-cutting concerns live in `skills/common/` to
+Cross-cutting concerns live in `skills/infrahub-common/` to
 avoid duplication. When multiple skills need GraphQL
 query guidance or `.infrahub.yml` format reference,
 they point to the same shared files.

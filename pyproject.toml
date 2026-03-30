@@ -1,0 +1,38 @@
+[project]
+name = "infrahub-skills"
+version = "0.1.0"
+description = "Claude Code plugin for Infrahub"
+requires-python = ">=3.10"
+
+[dependency-groups]
+dev = [
+    "rumdl",
+    "invoke",
+    "yamllint",
+]
+
+[tool.rumdl]
+# Disabled rules (carried from .markdownlint-cli2.yaml)
+disable = ["MD013", "MD029", "MD033", "MD041"]
+
+# Opt-in rules
+extend-enable = ["MD060"]
+
+# File exclusions (carried from .markdownlint-cli2.yaml)
+exclude = ["docs/docs/release-notes/**", "*-workspace/**"]
+
+# Per-file ignores
+[tool.rumdl.per-file-ignores]
+"**/AGENTS.md" = ["MD013", "MD024", "MD025", "MD029", "MD033", "MD041"]
+
+# MD024: allow duplicate headings among siblings only
+[tool.rumdl.MD024]
+siblings-only = true
+
+# MD025: don't treat frontmatter title as H1
+[tool.rumdl.MD025]
+front-matter-title = ""
+
+# MD060: require leading and trailing pipes
+[tool.rumdl.MD060]
+enabled = true

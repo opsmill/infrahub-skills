@@ -12,7 +12,7 @@ format.
 ## Skill Anatomy
 
 ```text
-skills/my-skill/
+skills/infrahub-my-skill/
 ├── SKILL.md              # Entry point (required)
 ├── examples.md           # Ready-to-use patterns
 ├── reference.md          # Property/format reference
@@ -61,13 +61,12 @@ Individual rule files and references hold the details.
 ### 1. Create the Skill Directory
 
 ```bash
-mkdir -p skills/my-skill/rules
+mkdir -p skills/infrahub-my-skill/rules
 ```
 
-- Directory name drops the `infrahub-` prefix
-  (e.g., `schema-creator` not
-  `infrahub-schema-creator`)
-- Skill name in frontmatter uses the full prefix
+- Directory name matches the skill name
+  (e.g., `infrahub-schema-creator`)
+- Skill name in frontmatter uses the same name
   (e.g., `infrahub-schema-creator`)
 
 ### 2. Write SKILL.md
@@ -105,7 +104,7 @@ including synonyms and adjacent concepts.
 - **Rule Categories** — Links to `rules/_sections.md`
   or directly to rule files
 - **Supporting References** — When to read
-  `examples.md`, `reference.md`, `../common/`
+  `examples.md`, `reference.md`, `../infrahub-common/`
   resources
 
 **Writing tips** (from the skill-creator best
@@ -135,7 +134,7 @@ index:
 ## Rule Categories
 
 | Prefix | Category | Description |
-|--------|----------|-------------|
+| -------- | ---------- | ------------- |
 | naming | Naming | Naming conventions and constraints |
 | structure | Structure | Structural requirements and patterns |
 | display | Display | UI display configuration |
@@ -163,7 +162,7 @@ should have:
   tables. Useful when the skill deals with structured
   formats (schema properties, YAML fields, API
   parameters).
-- **`../common/`** — Reference shared resources for
+- **`../infrahub-common/`** — Reference shared resources for
   cross-cutting concerns:
   - `graphql-queries.md` — Query syntax for checks,
     generators, transforms
@@ -270,9 +269,9 @@ Review results with `skillgrade preview`.
 
 **Required files checklist:**
 
-- [ ] `skills/my-skill/SKILL.md` with correct
+- [ ] `skills/infrahub-my-skill/SKILL.md` with correct
   frontmatter
-- [ ] `skills/my-skill/rules/_sections.md`
+- [ ] `skills/infrahub-my-skill/rules/_sections.md`
 - [ ] At least one rule file in `rules/`
 - [ ] Tasks added to root `eval.yaml`
 - [ ] `graders/my-skill/` with grader scripts

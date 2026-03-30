@@ -1,3 +1,4 @@
+---
 # yaml-disable-next-line rule:truthy
 name: Auto-label PRs
 
