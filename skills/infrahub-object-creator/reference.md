@@ -95,6 +95,53 @@ member_of_groups:
   - group_name_2
 ```
 
+## Generic Relationship References
+
+When a relationship targets a generic type (e.g.,
+`LocationGeneric`) that does **not** have a
+`human_friendly_id` defined, the standard scalar or
+list HFID reference will fail. Use an inline data
+block with an explicit `kind:` to specify the concrete
+type instead:
+
+```yaml
+# FAILS — LocationGeneric has no HFID
+location: "Acacias"
+
+# WORKS — concrete kind with upsert
+location:
+  kind: LocationSite
+  data:
+    - name: "Acacias"
+```
+
+`infrahubctl object load` uses `allow_upsert=True`,
+so the inline block finds the existing object by the
+concrete type's HFID (no duplicate created).
+
+Different objects can reference different concrete
+types through the same generic relationship:
+
+```yaml
+data:
+  # Site reference
+  - prefix: "10.0.0.0/24"
+    location:
+      kind: LocationSite
+      data:
+        - name: "Acacias"
+  # Building reference
+  - prefix: "10.1.0.0/24"
+    location:
+      kind: LocationBuilding
+      data:
+        - name: "Building H"
+```
+
+**Rule**: Always specify `kind:` when the relationship
+targets a generic type. Use only the fields needed to
+match the concrete type's `human_friendly_id`.
+
 ## Inline Children Block Structure
 
 When nesting children inline:
