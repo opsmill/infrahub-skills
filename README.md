@@ -5,10 +5,17 @@ AI skills for developing with [Infrahub](https://github.com/opsmill/infrahub). I
 ```bash
 # Install all Infrahub skills into your project
 npx skills add opsmill/infrahub-skills
+
+# You can also install the npx skills so they are available globally, and not just in your project
+https://github.com/vercel-labs/skills --global
+
+# Or you can install the skills to target a specific agent
+https://github.com/vercel-labs/skills --agent claude
 ```
 
-Once installed, open any Infrahub project and start working — try *"describe what this schema does"* to explore, or *"add a status attribute to Device"* to make a change.
+Once installed, start working on an infrahub project — try *"describe what this schema does"* to explore, or *"add a status attribute to Device"* to make a change.
 
+>Note, the `npx skills` command uses the Vercel Skills CLI. Documentation can be found [here](https://github.com/vercel-labs/skills)
 ---
 
 ## What You Can Do With It
