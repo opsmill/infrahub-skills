@@ -71,6 +71,7 @@ def run_claude_prompt(prompt: str, output_path: Path, with_skill: bool,
         "-p", full_prompt,
         "--output-format", "json",
         "--max-turns", "25",
+        "--allowedTools", "Read,Write,Edit,Glob,Grep,Bash",
     ]
     if model:
         cmd.extend(["--model", model])
@@ -447,10 +448,12 @@ def _all_menu_items_recursive(doc: dict) -> list[dict]:
 
 
 def check_apiversion_and_kind(doc: dict, **_) -> tuple[bool, str]:
+    if not isinstance(doc, dict):
+        return False, f"Document is a {type(doc).__name__}, not a dict"
     api = doc.get("apiVersion")
     kind = doc.get("kind")
-    if api == "infrahub.app/v1" and kind == "Menu":
-        return True, "apiVersion: infrahub.app/v1 and kind: Menu"
+    if api == "infrahub.app/v1" and kind in ("Menu", "Object"):
+        return True, f"apiVersion: infrahub.app/v1 and kind: {kind}"
     return False, f"apiVersion: {api}, kind: {kind}"
 
 
@@ -656,13 +659,18 @@ def check_schema_comment(doc: dict, raw_text: str = "", **_) -> tuple[bool, str]
     return False, "No $schema or yaml-language-server comment found"
 
 
+def _get_object_data(doc) -> list[dict] | None:
+    """Extract spec.data items from an object file doc. Returns None if invalid."""
+    if not isinstance(doc, dict):
+        return None
+    return doc.get("spec", {}).get("data", []) or None
+
+
 def check_generic_rel_inline_data(doc: dict, **_) -> tuple[bool, str]:
     """Check location relationships use inline data blocks with kind and data keys."""
-    if not doc:
-        return False, "Empty document"
-    data_items = doc.get("spec", {}).get("data", [])
+    data_items = _get_object_data(doc)
     if not data_items:
-        return False, "No data items in spec.data"
+        return False, "No spec.data items found (wrong structure or not a dict)"
     for item in data_items:
         loc = item.get("location")
         if loc is None:
@@ -678,9 +686,9 @@ def check_generic_rel_inline_data(doc: dict, **_) -> tuple[bool, str]:
 
 def check_no_scalar_location(doc: dict, **_) -> tuple[bool, str]:
     """Ensure no location value is a plain string scalar."""
-    if not doc:
-        return False, "Empty document"
-    data_items = doc.get("spec", {}).get("data", [])
+    data_items = _get_object_data(doc)
+    if not data_items:
+        return False, "No spec.data items found (wrong structure or not a dict)"
     for item in data_items:
         loc = item.get("location")
         if isinstance(loc, str):
@@ -692,9 +700,9 @@ def check_all_prefixes_present(doc: dict, **_) -> tuple[bool, str]:
     """Check all three expected prefixes are present."""
     expected = {"10.0.0.0/24", "10.1.0.0/24", "10.2.0.0/24"}
     found = set()
-    if not doc:
-        return False, "Empty document"
-    data_items = doc.get("spec", {}).get("data", [])
+    data_items = _get_object_data(doc)
+    if not data_items:
+        return False, "No spec.data items found (wrong structure or not a dict)"
     for item in data_items:
         p = item.get("prefix")
         if p and str(p) in expected:
@@ -707,9 +715,9 @@ def check_all_prefixes_present(doc: dict, **_) -> tuple[bool, str]:
 
 def check_null_location_handled(doc: dict, **_) -> tuple[bool, str]:
     """Check the prefix without location handles it correctly."""
-    if not doc:
-        return False, "Empty document"
-    data_items = doc.get("spec", {}).get("data", [])
+    data_items = _get_object_data(doc)
+    if not data_items:
+        return False, "No spec.data items found (wrong structure or not a dict)"
     for item in data_items:
         if str(item.get("prefix", "")) == "10.2.0.0/24":
             loc = item.get("location")
@@ -815,8 +823,8 @@ def build_benchmark(eval_results: list[dict], skill_name: str, model: str) -> di
     rates, times, tokens = [], [], []
 
     for er in eval_results:
-        grading = er["grading"]
-        timing = er.get("timing", {})
+        grading = er.get("grading") or er.get("with_skill", {}).get("grading", {})
+        timing = er.get("timing") or er.get("with_skill", {}).get("timing", {})
         run = {
             "eval_id": er["eval_id"],
             "eval_name": er["eval_name"],
