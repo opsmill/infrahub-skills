@@ -1,0 +1,47 @@
+docs/docs/skills-reference/schema-creator.mdx
+  9a0ed377245e64c4 1-36
+docs/docs/readme.mdx
+  9a0ed377245e64c4 2-4,7,9,11,13-102
+docs/docs/skills-reference/object-creator.mdx
+  9a0ed377245e64c4 1-30
+docs/docs/skills-reference/menu-creator.mdx
+  9a0ed377245e64c4 1-32
+docs/docs/how-it-works.mdx
+  9a0ed377245e64c4 1-26
+docs/docs/skills-reference/transform-creator.mdx
+  9a0ed377245e64c4 1-34
+docs/docs/skills-reference/analyst.mdx
+  9a0ed377245e64c4 1-32
+docs/docs/skills-reference/check-creator.mdx
+  9a0ed377245e64c4 1-36
+docs/docs/spec-driven-development.mdx
+  9a0ed377245e64c4 1-28
+docs/docs/skills-reference/generator-creator.mdx
+  9a0ed377245e64c4 1-36
+docs/docs/installation-setup.mdx
+  9a0ed377245e64c4 1-42
+docs/docs/skills-reference/_category_.json
+  9a0ed377245e64c4 1-5
+docs/docs/skills-reference/repo-auditor.mdx
+  9a0ed377245e64c4 1-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "1df2435c2952bebc25df4bce70c342d71334f65e",
+  "prompts": {
+    "9a0ed377245e64c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a8ea39c8-6695-4be4-bb45-8166979b3876",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Benoit Kohler",
+      "messages": [],
+      "total_additions": 469,
+      "total_deletions": 13,
+      "accepted_lines": 461,
+      "overriden_lines": 0
+    }
+  }
+}
