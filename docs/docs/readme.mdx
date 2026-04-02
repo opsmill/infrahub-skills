@@ -1,11 +1,102 @@
 ---
-title: Infrahub Skills
+title: AI Skills for Infrahub
+sidebar_position: 1
+slug: /
 ---
 
-# Infrahub Skills
+# AI Skills for Infrahub
 
-Welcome to the Infrahub Skills documentation.
+Infrahub Skills gives your AI coding assistant built-in knowledge of Infrahub's conventions, patterns, and best practices. When you ask a question or describe what you want to build, you get recommendations tailored to your specific use case — with explanations of why each approach is the right one for Infrahub. That means you build understanding alongside your implementation, not after discovering something is wrong.
 
-## Getting Started
+The skills cover the full Infrahub development lifecycle — schema design, data population, validation checks, generators, transforms, menu customization, and live data analysis. Best practices are embedded at every step: naming conventions, relationship identifiers, attribute types, and `.infrahub.yml` registration are applied automatically, so common mistakes don't compound into rework. For complex or multi-part builds, Spec-Driven Development (SDD) lets you review and interrogate the assistant's plan before a single file is produced.
 
-Add your documentation content here.
+The skills produce files — schema YAML, Python generators, transform templates, check classes — that you load into a running Infrahub instance using `infrahubctl` or the UI. Available at [github.com/opsmill/infrahub-skills](https://github.com/opsmill/infrahub-skills) — open source, Apache 2.0.
+
+```bash
+npx skills add opsmill/infrahub-skills
+```
+
+Compatible with: Claude Code, GitHub Copilot, Cursor, Windsurf, Amp, Cline, Codex, and any AI tool that supports the Agent Skills format or custom context files.
+
+## What You Can Do
+
+**Explore Infrahub without needing to be an expert first** — Ask questions about Infrahub capabilities in the context of your own repository or a demo project. Describe a use case, a current blocker, or something you're trying to model and get a direct answer — without needing to first understand what a schema, generic, relationship, or generator is. The assistant walks you through the relevant concepts as part of the answer, so you build familiarity as you go.
+
+**Design and build your data model** — Describe your data model in plain language and get a valid Infrahub schema with correct node types, attribute kinds, relationships, and generics — naming conventions and relationship rules applied automatically. For complex builds, SDD walks through requirements first and produces a plan for review before generating anything.
+
+**Build generators, transforms, and validation checks** — Describe what you want to automate, what output format you need, or what a proposed change should allow, and get working `InfrahubGenerator`, transform, or `InfrahubCheck` implementations with correct GraphQL queries and `.infrahub.yml` registration.
+
+**Integrate with external systems** — Get targeted help ingesting data from external sources — spreadsheets, CMDBs, or tools like NetBox and Nautobot — with the assistant handling the Infrahub side and researching the external system.
+
+**Query and analyze a live Infrahub instance** — The Analyst skill connects to a running instance via MCP and answers operational questions directly: cross-node correlation, drift detection, blast-radius analysis, and data quality audits — without writing queries manually.
+
+**Audit an existing repository** — Run the Repo Auditor to surface schema naming issues, missing relationship identifiers, `.infrahub.yml` registration gaps, and structural patterns that don't follow Infrahub best practices.
+
+## How to Use the Skills
+
+There are three ways to work, depending on what you're building and how much you want to hand off.
+
+### Direct Mode
+
+For targeted, well-scoped tasks, describe what you want and the assistant handles it using the right skill automatically.
+
+- *"Add a `contract_start_date` attribute to `InfraCircuit`"* — the assistant uses the Schema Creator, applies naming conventions, and updates the schema file.
+- *"Create a check that validates every device has a primary IP"* — the assistant writes the Python class, GraphQL query, and `.infrahub.yml` registration.
+- *"Add a menu section for IP address management"* — the assistant produces the YAML with correct icon references and nesting.
+
+This is the fastest path for adding attributes, writing checks, populating objects, or creating a transform.
+
+### Spec-Driven Development (SDD)
+
+For anything that spans multiple skills or involves design decisions — a new schema node with relationships, a generator chain, a complete new domain — describe the feature and the assistant produces an implementation plan before generating anything. You review the approach, adjust it, and approve before execution begins. The assistant then carries out each step, sequentially or in parallel where dependencies allow.
+
+This matters because a schema node with incorrect relationship cardinality or a generator missing `allow_upsert` will cost debugging time. The planning step catches structural issues before any file is produced.
+
+### End-to-End Execution
+
+For full-cycle workflows, the assistant can generate the files, load them into your Infrahub instance using `infrahubctl`, validate the result, and iterate if something fails — without you running commands manually. You can direct it to work on a branch or push directly to main, and it will ask for confirmation before making changes to a live instance.
+
+This requires a running Infrahub instance and `infrahubctl` available in your environment.
+
+## Who It's For
+
+### Evaluating Infrahub
+
+An engineer exploring Infrahub who wants to see what their specific use case looks like in practice — not a generic demo, but their actual data model or automation requirement. Describe the use case in plain language and the skills produce real Infrahub resources from it. The skills also explain how Infrahub handles specific requirements and what tradeoffs exist between different modeling approaches.
+
+### Building with Infrahub
+
+A team actively defining schemas, writing generators, and creating configuration transforms for a production implementation. The skills cover each part of the build lifecycle and apply Infrahub's patterns to the specific resources being built. For multi-part tasks — designing a new schema node with relationships, building a generator chain, or standing up a complete new domain — SDD forces the assistant to plan before it builds, catching structural issues before they compound.
+
+### Extending an Existing Implementation
+
+A team already running Infrahub who needs to continue adding schema nodes, modifying generators, integrating with external data sources, or onboarding new engineers faster. The skills work with existing implementation context and handle the Infrahub side of integrations — including data ingestion from spreadsheets, CMDBs, or tools like NetBox and Nautobot.
+
+## What's Included
+
+**Eight skills** — Schema Creator, Object Creator, Check Creator, Generator Creator, Transform Creator, Menu Creator, Analyst, and Repo Auditor — each with embedded rules, examples, and best-practice references for a specific part of the Infrahub development lifecycle.
+
+**Spec-Driven Development (SDD)** — a structured planning mode for complex or multi-part builds. The assistant captures requirements, validates the design against Infrahub conventions, breaks the work into discrete tasks, and implements each one using the correct skill. Works with any SDD framework that supports a spec, plan, task, and implement workflow.
+
+**Shared references** — a common library available to all skills: GraphQL query syntax, `.infrahub.yml` configuration format, YAML structure for schema and object definitions, and shared best-practice rules covering git integration, display label caching, and Python environment detection.
+
+**Auto-detection** — when installed as a Claude Code plugin, detects Infrahub projects on session start via `.infrahub.yml`, `infrahub.toml`, or schema file markers and activates the relevant skills automatically. With other AI tools, the skills are discovered because they're present in your project directory.
+
+**MCP server integration** — when Infrahub's MCP server is configured, the Analyst skill can query live instance data directly. Without MCP, the AI can still query data by constructing GraphQL API calls, though the interaction is more verbose.
+
+## Best Practices
+
+- **Use Direct Mode for well-scoped, single-skill tasks.** Adding an attribute, writing a validation check, creating a menu section — describe what you want and the assistant handles it. No planning step needed.
+- **Use SDD for anything that spans multiple skills or involves relationship design.** A schema node with incorrect relationship cardinality or a generator missing `allow_upsert` will cost debugging time; the planning step surfaces those issues before any file is produced.
+- **Review AI-generated output before loading.** The skills apply Infrahub conventions and catch common mistakes, but generated schemas, generators, and checks should be validated before loading into a production instance. Use `infrahubctl schema check` for schemas.
+- **Load generated files with `infrahubctl`.** The skills produce files that you load into Infrahub using `infrahubctl` or the UI. The AI can perform this step and iterate if loading fails, or you can run it yourself.
+- **MCP is optional but improves Analyst results.** The Analyst skill works without MCP by constructing GraphQL API calls directly, but with MCP configured the interaction is more intuitive and the data access is richer.
+
+## Get Started
+
+### Prerequisites
+
+- An AI coding assistant that supports skills or custom context files (Claude Code, GitHub Copilot, Cursor, Windsurf, or similar)
+- A running Infrahub instance — [Infrahub installation docs](https://docs.infrahub.app/guides/installation/)
+- `infrahubctl`, for loading schemas, objects, and running generators — [infrahubctl docs](https://docs.infrahub.app/infrahubctl/)
+- Analyst skill only: an Infrahub MCP server configured and connected to your AI tool
