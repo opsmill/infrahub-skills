@@ -1,0 +1,23 @@
+README.md
+  20853682b18f7221 21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "e72fb99efb81776c05d8bf5f22130f149cdb2854",
+  "prompts": {
+    "20853682b18f7221": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "934caa09-3298-4145-b5ef-a37946bfbf0c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Benoit Kohler",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
