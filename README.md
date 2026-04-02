@@ -18,7 +18,7 @@ npx skills update
 
 Once installed, start working on an infrahub project — try *"describe what this schema does"* to explore, or *"add a status attribute to Device"* to make a change.
 
->Note, the `npx skills` command uses the Vercel Skills CLI. Documentation can be found [here](https://github.com/vercel-labs/skills)
+>Note, the `npx skills` command uses the Vercel Skills CLI. See the [Vercel Skills CLI documentation](https://github.com/vercel-labs/skills) for details
 ---
 
 ## What You Can Do With It
