@@ -1,80 +1,184 @@
 ---
-# -------------------------------------------------------------------
-# Group labels — categorize by area of the repository
-# -------------------------------------------------------------------
-- name: "group/skills"
-  color: "0075ca"
-  description: "Skill definitions and rules"
+# Labels names are important as they are used by Release Drafter to decide
+# regarding where to record them in changelog or if to skip them.
+#
+# The repository labels will be automatically configured using this file and
+# the GitHub Action https://github.com/marketplace/actions/github-labeler.
+
+# ----------------------------------
+# GROUP
+# ----------------------------------
+- name: "group/backend"
+  description: "Issue related to the backend (API Server, Git Agent)"
+  color: "b60205"
+
+- name: "group/frontend"
+  description: "Issue related to the frontend (React)"
+  color: "353755"
+
+- name: "group/ux-design"
+  description: "Issue related to design or UX"
+  color: "3380ff"
+
+- name: "group/sync-engine"
+  description: "Issue related to the Synchronization engine"
+  color: "05b259"
+
 - name: "group/ci"
-  color: "e4e669"
-  description: "CI/CD workflows and scripts"
-- name: "group/docs"
-  color: "0e8a16"
-  description: "Documentation and guides"
-- name: "group/evaluations"
-  color: "d876e3"
-  description: "Eval scenarios and grading scripts"
-- name: "group/common"
-  color: "006b75"
-  description: "Shared references and cross-cutting rules"
-- name: "group/plugin"
-  color: "1d76db"
-  description: "Plugin manifest and hooks"
+  description: "Issue related to the CI pipeline"
+  color: "f25009"
 
-# -------------------------------------------------------------------
-# Type labels — categorize by nature of the change
-# -------------------------------------------------------------------
+- name: "group/helm"
+  description: "Issue related to the Helm chart"
+  color: "326ce5"
+
+- name: "group/schema"
+  description: "Issue related to some schemas"
+  color: "fbceb1"
+
+# ----------------------------------
+# TYPE INFRAHUB (default)
+# ----------------------------------
 - name: "type/feature"
+  description: "New feature or request"
   color: "a2eeef"
-  description: "New feature or skill"
+
 - name: "type/bug"
+  description: "Something isn't working as expected"
   color: "d73a4a"
-  description: "Something isn't working"
+
 - name: "type/housekeeping"
+  description: "Maintenance task"
   color: "fef2c0"
-  description: "Maintenance, cleanup, refactoring"
+
+- name: "type/tech-debt"
+  description: "Item we know we need to improve way it is implemented"
+  color: "73FA20"
+
+# ----------------------------------
+# TYPE ALL
+# ----------------------------------
+- name: "type/question"
+  description: "Question or discussion"
+  color: "d876e3"
+
 - name: "type/documentation"
+  description: "Improvements or additions to documentation"
   color: "0075ca"
-  description: "Documentation improvements"
 
-# -------------------------------------------------------------------
-# Effort labels
-# -------------------------------------------------------------------
-- name: "effort/small"
-  color: "c5def5"
-  description: "Small effort (< 1 hour)"
+- name: "type/duplicate"
+  description: "This issue or pull request already exists"
+  color: "cfd3d7"
+
+- name: "type/epic"
+  description: "Large body of work composed of multiple tasks and/or features"
+  color: "fbd39c"
+
+- name: "type/task"
+  description: "Body of work related to an epic"
+  color: "0b8e92"
+
+- name: "type/ecosystem"
+  description: "Effort related to the community, usually not part of the core project"
+  color: "0b5aa9"
+
+- name: "type/brainstorming"
+  description: "Topic for brainstorming, discussions"
+  color: "e19e0f"
+
+- name: "type/user-centric"
+  description: "Issue that would improve the overall experience of our users"
+  color: "ff8c00"
+
+- name: "type/newcomers"
+  description: "Good for newcomers"
+  color: "309c56"
+
+# ----------------------------------
+# EFFORT
+# ----------------------------------
+- name: "effort/high"
+  description: "This issue should be completed in more than a day"
+  color: "b60205"
+
 - name: "effort/medium"
-  color: "bfd4f2"
-  description: "Medium effort (1-4 hours)"
-- name: "effort/large"
-  color: "b4c6e7"
-  description: "Large effort (> 4 hours)"
+  description: "This issue should be completed in a less than a day"
+  color: "ff9f1c"
 
-# -------------------------------------------------------------------
-# Priority labels
-# -------------------------------------------------------------------
-- name: "priority/critical"
+- name: "effort/low"
+  description: "This issue should be completed in a couple of hours"
+  color: "ffcc00"
+
+# ----------------------------------
+# SEVERITY
+# ----------------------------------
+- name: "priority/1"
+  description: "This issue must be fixed/implemented ASAP, it's a blocker for a release"
   color: "b60205"
-  description: "Critical priority — release blocker"
-- name: "priority/high"
-  color: "d93f0b"
-  description: "High priority"
-- name: "priority/medium"
-  color: "fbca04"
-  description: "Medium priority"
-- name: "priority/low"
-  color: "0e8a16"
-  description: "Low priority"
 
-# -------------------------------------------------------------------
-# State labels
-# -------------------------------------------------------------------
+- name: "priority/2"
+  description: "This issue stalls work on the project or its dependents, it's a blocker for a release"
+  color: "ff9f1c"
+
+- name: "priority/3"
+  description: "Not blocking but should be fixed soon"
+  color: "ffcc00"
+
+- name: "priority/4"
+  description: "Low priority and doesn't need to be rushed"
+  color: "cfda2c"
+
+# ----------------------------------
+# STATUS
+# ----------------------------------
 - name: "state/blocked"
-  color: "b60205"
-  description: "Blocked by external dependency"
-- name: "state/needs-review"
-  color: "fbca04"
-  description: "Ready for review"
-- name: "state/wip"
-  color: "ededed"
-  description: "Work in progress"
+  description: "The issue is currently blocked and cannot be resolved."
+  color: "e34918"
+
+- name: "state/draft"
+  description: "The redaction of the issue is still a work in progress"
+  color: "dcb518"
+
+- name: "state/need-triage"
+  description: "This issue needs to be triaged"
+  color: "333333"
+
+- name: "state/need-more-info"
+  description: "This issue needs more information"
+  color: "cccccc"
+
+- name: "state/need-testing"
+  description: "This issue is ready and needs to be tested."
+  color: "cccccc"
+
+- name: "state/backlog"
+  description: "This issue is part of the backlog"
+  color: "eeeeee"
+
+- name: "state/planned"
+  description: "This issue is planned to be worked on in an upcoming release."
+  color: "eeeeee"
+
+- name: "state/not-reproducible"
+  description: "Unable to reproduce this issue."
+  color: "eeeeee"
+
+- name: "state/wont-fix"
+  description: "Issue has been closed and won't be fix/implemented."
+  color: "eeeeee"
+
+# DEPRECATED
+- name: "state/ref"
+  description: "This issue is referenced in our internal tooling"
+  color: "c9510c"
+
+# ----------------------------------
+# CI
+# ----------------------------------
+- name: "ci/skip-changelog"
+  description: "Don't include this PR in the changelog"
+  color: "c30664"
+
+- name: "cd/preview"
+  description: "Deploy preview branch"
+  color: "d77e96"

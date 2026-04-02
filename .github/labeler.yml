@@ -1,32 +1,8 @@
 ---
-# yaml-disable-next-line rule:truthy
-"group/skills":
-  - changed-files:
-      - any-glob-to-any-file:
-          - "skills/**"
-
 "group/ci":
   - changed-files:
-      - any-glob-to-any-file:
-          - ".github/**"
-          - "scripts/**"
+      - any-glob-to-any-file: [".github/**"]
 
-"group/docs":
+"type/documentation":
   - changed-files:
-      - any-glob-to-any-file:
-          - "dev/**"
-          - "docs/**"
-          - "*.md"
-
-"group/evaluations":
-  - changed-files:
-      - any-glob-to-any-file:
-          - "eval.yaml"
-          - "graders/**"
-
-"group/plugin":
-  - changed-files:
-      - any-glob-to-any-file:
-          - ".claude-plugin/**"
-          - "hooks/**"
-          - "hooks-handlers/**"
+      - any-glob-to-any-file: ["docs/**"]

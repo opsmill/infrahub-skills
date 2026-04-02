@@ -1,48 +1,39 @@
 ---
-name: Sync documentation
+name: Sync Folders
 
-on:
+"on":
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
-      - "docs/**"
-      - "dev/guides/**"
-      - "README.md"
-  workflow_dispatch:
+      - 'docs/docs/**'
+      - 'docs/sidebars.ts'
 
 jobs:
-  sync-docs:
+  sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout source repository
+        uses: actions/checkout@v6
         with:
-          path: source
+          path: source-repo
 
-      - uses: actions/checkout@v6
+      - name: Checkout target repository
+        uses: actions/checkout@v6
         with:
           repository: opsmill/infrahub-docs
           token: ${{ secrets.PAT_TOKEN }}
-          path: docs-repo
-          ref: main
+          path: target-repo
 
-      - name: Sync documentation
+      - name: Sync folders
         run: |
-          TARGET_DIR="docs-repo/docs/integrations/skills"
-          mkdir -p "$TARGET_DIR"
-          rsync -av --delete \
-            source/docs/ \
-            "$TARGET_DIR/"
-          cp source/README.md "$TARGET_DIR/index.md"
-
-      - name: Commit and push
-        working-directory: docs-repo
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --staged --quiet; then
-            echo "No changes to sync"
-            exit 0
-          fi
-          git commit -m "docs: sync infrahub-skills documentation"
-          git push
+          rm -rf target-repo/docs/docs-infrahub-skills/*
+          rm -f target-repo/docs/sidebars-infrahub-skills.ts
+          cp -r source-repo/docs/docs/* target-repo/docs/docs-infrahub-skills/
+          cp source-repo/docs/sidebars.ts target-repo/docs/sidebars-infrahub-skills.ts
+          cd target-repo
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .
+          git diff --quiet && git diff --staged --quiet || \
+            git commit -m "Sync docs from infrahub-skills repo" && git push
