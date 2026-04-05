@@ -55,9 +55,6 @@ artifacts, see `../infrahub-transform-creator/SKILL.md`.
 
 ## Project Context
 
-Infrahub config:
-!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
-
 If invoked with arguments (e.g., `/infrahub:analyst Which devices have no platform assigned?`),
 treat the arguments as the question to answer.
 
