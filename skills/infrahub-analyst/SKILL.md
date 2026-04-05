@@ -11,6 +11,7 @@ context: fork
 allowed-tools:
   - Read
   - Bash
+argument-hint: "[question about infrastructure data]"
 metadata:
   version: 1.1.0
   author: OpsMill
@@ -51,6 +52,14 @@ block proposed changes, see
 `../infrahub-check-creator/SKILL.md`.
 For **repeatable scheduled reports** exported as
 artifacts, see `../infrahub-transform-creator/SKILL.md`.
+
+## Project Context
+
+Infrahub config:
+!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
+
+If invoked with arguments (e.g., `/infrahub:analyst Which devices have no platform assigned?`),
+treat the arguments as the question to answer.
 
 ## When to Use
 

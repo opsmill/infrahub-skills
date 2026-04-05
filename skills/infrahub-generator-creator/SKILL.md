@@ -13,6 +13,7 @@ allowed-tools:
   - Edit
   - Bash
   - Grep
+argument-hint: "[generator-name] [description...]"
 metadata:
   version: 1.1.0
   author: OpsMill
@@ -27,6 +28,14 @@ query data from Infrahub via GraphQL and create new nodes and
 relationships based on the result -- enabling design-driven
 automation where a "design" object automatically creates
 downstream infrastructure.
+
+## Project Context
+
+Infrahub config:
+!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
+
+Existing generators:
+!`find . -name "*.py" -path "*/generators/*" 2>/dev/null | head -20`
 
 ## When to Use
 

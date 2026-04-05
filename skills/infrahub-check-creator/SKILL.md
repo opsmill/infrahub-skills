@@ -14,6 +14,7 @@ allowed-tools:
   - Edit
   - Bash
   - Grep
+argument-hint: "[check-name] [description...]"
 metadata:
   version: 1.1.0
   author: OpsMill
@@ -27,6 +28,17 @@ Expert guidance for creating Infrahub checks. Checks are
 user-defined validation logic (Python + GraphQL) that run as
 part of a proposed change pipeline. If a check logs any
 errors, the proposed change cannot be merged.
+
+## Project Context
+
+Infrahub config:
+!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
+
+Existing checks:
+!`find . -name "*.py" -path "*/checks/*" 2>/dev/null | head -20`
+
+Existing queries:
+!`find . -name "*.gql" -path "*/queries/*" 2>/dev/null | head -20`
 
 ## When to Use
 

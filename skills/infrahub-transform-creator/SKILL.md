@@ -15,6 +15,7 @@ allowed-tools:
   - Edit
   - Bash
   - Grep
+argument-hint: "[transform-name] [format]"
 metadata:
   version: 1.1.0
   author: OpsMill
@@ -28,6 +29,14 @@ Expert guidance for creating Infrahub transforms.
 Transforms convert Infrahub data into different formats
 -- JSON, text, CSV, device configs, or any text-based
 output -- using Python classes or Jinja2 templates.
+
+## Project Context
+
+Infrahub config:
+!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
+
+Existing transforms:
+!`find . -name "*.py" -path "*/transforms/*" -o -name "*.j2" -path "*/templates/*" 2>/dev/null | head -20`
 
 ## When to Use
 

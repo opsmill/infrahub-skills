@@ -9,6 +9,7 @@ allowed-tools:
   - Write
   - Edit
   - Bash
+argument-hint: "[kind] [object-details...]"
 metadata:
   version: 1.1.0
   author: OpsMill
@@ -22,6 +23,17 @@ Expert guidance for creating Infrahub object (data) files.
 Objects are YAML files that populate schema nodes with actual
 infrastructure data -- devices, locations, organizations,
 modules, and more.
+
+## Project Context
+
+Existing schema files:
+!`find . -name "*.yml" -path "*/schemas/*" -o -name "*schema*" -name "*.yml" 2>/dev/null | head -10`
+
+Existing object files:
+!`find . -name "*.yml" -path "*/objects/*" 2>/dev/null | head -20`
+
+If invoked with arguments (e.g., `/infrahub:object-creator DcimDevice spine-01`),
+use the first argument as the kind and remaining arguments as object details.
 
 ## When to Use
 

@@ -11,6 +11,7 @@ allowed-tools:
   - Bash
   - Grep
   - Glob
+argument-hint: "[focus-area]"
 metadata:
   version: 1.1.0
   author: OpsMill
@@ -25,6 +26,14 @@ all rules and best practices from the infrahub-skills
 plugin. Produces a structured report covering schemas,
 objects, checks, generators, transforms, menus,
 `.infrahub.yml` configuration, and deployment readiness.
+
+## Project Context
+
+Project structure:
+!`find . -maxdepth 2 -type f \( -name "*.yml" -o -name "*.yaml" -o -name "*.py" -o -name "*.gql" -o -name "*.j2" \) 2>/dev/null | head -40`
+
+Infrahub config:
+!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
 
 ## When to Use
 

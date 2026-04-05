@@ -15,6 +15,7 @@ allowed-tools:
   - Write
   - Edit
   - Bash
+argument-hint: "[namespace] [node-names...]"
 metadata:
   version: 1.1.0
   author: OpsMill
@@ -28,6 +29,17 @@ Expert guidance for designing and building Infrahub
 schemas. Schemas are YAML files defining nodes (concrete
 types), generics (abstract base types), attributes,
 relationships, and extensions.
+
+## Project Context
+
+Existing schemas in this project:
+!`find . -name "*.yml" -path "*/schemas/*" -o -name "*schema*" -name "*.yml" 2>/dev/null | head -20`
+
+Infrahub config (if present):
+!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
+
+If invoked with arguments (e.g., `/infrahub:schema-creator Ipam Vlan VlanGroup`),
+use the first argument as the namespace and remaining arguments as node names.
 
 ## When to Use
 
