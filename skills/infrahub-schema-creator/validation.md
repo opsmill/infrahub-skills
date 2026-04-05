@@ -117,7 +117,7 @@ Names have strict regex patterns:
 # Namespace: 3-32 chars
 - namespace: DC          # BAD - too short
 
-# Attribute/Relationship name: 3-32 chars
+# Attribute/Relationship name: 3-64 chars
 - name: id               # BAD - too short, use "obj_id" or similar
 ```
 

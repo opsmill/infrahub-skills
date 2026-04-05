@@ -114,9 +114,9 @@ plus:
 
 | Property | Type | Default | Constraints | Description |
 | -------- | ---- | ------- | ----------- | ----------- |
-| `name` | string | *required* | 3-32, snake_case | Attr name |
+| `name` | string | *required* | 3-64, snake_case | Attr name |
 | `kind` | string | *required* | AttributeKind | Attr type |
-| `label` | string | null | Max 32 chars | Display label |
+| `label` | string | null | Max 64 chars | Display label |
 | `description` | string | null | Max 128 chars | Help text |
 | `default_value` | any | null | - | Default value |
 | `unique` | boolean | `false` | - | Globally unique |
@@ -189,10 +189,10 @@ plus:
 
 | Property | Type | Default | Constraints | Description |
 | -------- | ---- | ------- | ----------- | ----------- |
-| `name` | string | *required* | 3-32, snake_case | Rel name |
+| `name` | string | *required* | 3-64, snake_case | Rel name |
 | `peer` | string | *required* | PascalCase | Target kind |
 | `kind` | enum | `"Generic"` | See table | Rel type |
-| `label` | string | null | Max 32 chars | Display label |
+| `label` | string | null | Max 64 chars | Display label |
 | `description` | string | null | Max 128 chars | Help text |
 | `identifier` | string | null | Max 128, snake_case | Match both sides |
 | `cardinality` | enum | **`"many"`** | `"one"`/`"many"` | Count |
@@ -342,10 +342,10 @@ referenced without defining them:
 | ------- | ---------- | ------- | ------ |
 | Node name | PascalCase | `^[A-Z][a-zA-Z0-9]+$` | 2-32 |
 | Namespace | First upper | `^[A-Z][a-z0-9]+$` | 3-32 |
-| Attr name | snake_case | `^[a-z0-9\_]+$` | 3-32 |
-| Rel name | snake_case | `^[a-z0-9\_]+$` | 3-32 |
+| Attr name | snake_case | `^[a-z0-9\_]+$` | 3-64 |
+| Rel name | snake_case | `^[a-z0-9\_]+$` | 3-64 |
 | Identifier | snake_case | `^[a-z0-9\_]+$` | max 128 |
 | Kind (auto) | NS + Name | - | - |
 | Description | Free text | - | max 128 |
-| Label (attr) | Free text | - | max 32 |
+| Label (attr) | Free text | - | max 64 |
 | Label (node) | Free text | - | max 64 |

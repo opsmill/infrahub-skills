@@ -54,7 +54,7 @@ name: ModuleBayTemplate
 
 ### Attribute and Relationship Names
 
-Pattern: `^[a-z0-9_]+$` (snake_case). Min 3, max 32 chars.
+Pattern: `^[a-z0-9_]+$` (snake_case). Min 3, max 64 chars.
 
 **Incorrect:**
 
