@@ -61,6 +61,34 @@ class MyGenerator(InfrahubGenerator):
         await obj.save(allow_upsert=True)
 ```
 
+## Workflow
+
+Follow these steps when creating a generator:
+
+1. **Identify the design pattern** — What "design"
+   object triggers generation? What objects should be
+   created from it? Read
+   [rules/architecture-components.md](./rules/architecture-components.md)
+   for the target group and generator components.
+2. **Write the GraphQL query** — Create a `.gql` file
+   that fetches the design data. Read
+   [../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)
+   for query patterns.
+3. **Implement the Python class** — Inherit from
+   `InfrahubGenerator`, implement `generate()`. Read
+   [rules/python-generate.md](./rules/python-generate.md)
+   for the class pattern and
+   [rules/api-reference.md](./rules/api-reference.md)
+   for available methods.
+4. **Make it idempotent** — Use `allow_upsert=True` so
+   re-running creates or updates without duplicates.
+   See [rules/tracking-idempotent.md](./rules/tracking-idempotent.md).
+5. **Register in .infrahub.yml** — Add under
+   `generator_definitions` with the target group. See
+   [rules/registration-config.md](./rules/registration-config.md).
+6. **Test** — Run `infrahubctl generator` to validate.
+   See [rules/testing-commands.md](./rules/testing-commands.md).
+
 ## Supporting References
 
 - **[examples.md](./examples.md)** -- Complete Generator

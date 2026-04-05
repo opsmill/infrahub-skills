@@ -71,6 +71,32 @@ class MyCheck(InfrahubCheck):
             )
 ```
 
+## Workflow
+
+Follow these steps when creating a check:
+
+1. **Understand the validation goal** — What data
+   condition should block a proposed change? Determine
+   whether this is a global check (all objects of a
+   type) or targeted (specific group). Read
+   [rules/architecture-types.md](./rules/architecture-types.md).
+2. **Write the GraphQL query** — Create a `.gql` file
+   that fetches the data to validate. Read
+   [../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)
+   for query patterns.
+3. **Implement the Python class** — Inherit from
+   `InfrahubCheck`, implement `validate()`. Read
+   [rules/python-validate.md](./rules/python-validate.md)
+   for the class pattern and
+   [rules/api-reference.md](./rules/api-reference.md)
+   for available methods.
+4. **Register in .infrahub.yml** — Add the check under
+   `check_definitions`. The query name must match the
+   Python class `query` attribute. See
+   [rules/registration-config.md](./rules/registration-config.md).
+5. **Test** — Run `infrahubctl check` to validate. See
+   [rules/testing-commands.md](./rules/testing-commands.md).
+
 ## Supporting References
 
 - **[examples.md](./examples.md)** -- Complete check
