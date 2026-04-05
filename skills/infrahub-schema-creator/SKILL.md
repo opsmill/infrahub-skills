@@ -1,10 +1,9 @@
 ---
 name: infrahub-schema-creator
 description: >-
-  Create, validate, and modify Infrahub schemas. Use when
-  designing data models, creating schema nodes with
-  attributes and relationships, validating schema
-  definitions, or planning schema migrations for Infrahub.
+  Creates, validates, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions.
+  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations.
+  DO NOT TRIGGER when: populating data objects, writing checks/generators/transforms, querying live data.
 metadata:
   version: 1.1.0
   author: OpsMill
