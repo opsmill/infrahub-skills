@@ -196,7 +196,7 @@ plus:
 | `description` | string | null | Max 128 chars | Help text |
 | `identifier` | string | null | Max 128, snake_case | Match both sides |
 | `cardinality` | enum | **`"many"`** | `"one"`/`"many"` | Count |
-| `optional` | boolean | **`false`** | - | **Required by default** |
+| `optional` | boolean | **`true`** | - | **Optional by default** |
 | `direction` | enum | `"bidirectional"` | bi/out/in | Direction |
 | `on_delete` | enum | null | no-action/cascade | Delete behavior |
 | `order_weight` | integer | null | - | Display order |

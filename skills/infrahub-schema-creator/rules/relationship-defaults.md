@@ -8,14 +8,14 @@ tags: relationship, defaults, cardinality, optional
 
 Impact: CRITICAL
 
-Relationship defaults differ from attribute defaults
-in cardinality and kind. Getting these wrong leads to
-unexpected behavior.
+Relationship defaults are different from attribute
+defaults. Getting these wrong leads to unexpected
+behavior.
 
 | Property | Default | Notes |
 | -------- | ------- | ----- |
 | `cardinality` | `many` | Explicitly set `one` for singles |
-| `optional` | `false` | Same as attrs (mandatory default) |
+| `optional` | `true` | Unlike attrs (mandatory default) |
 | `direction` | `bidirectional` | Rarely needs changing |
 | `kind` | `Generic` | Set for Component, Parent, Attr |
 
@@ -37,12 +37,13 @@ unexpected behavior.
   cardinality: one
 ```
 
-**Same default as attributes:** Both attributes and
-relationships default to `optional: false` (mandatory).
+**Key contrast with attributes:** Attributes are
+`optional: false` by default (mandatory). Relationships
+are `optional: true` by default.
 
 | Type | Default `optional` |
 | ---- | ------------------ |
 | Attributes | `false` (mandatory) |
-| Relationships | `false` (mandatory) |
+| Relationships | `true` (optional) |
 
 Reference: [Infrahub Schema Docs](https://docs.infrahub.app)
