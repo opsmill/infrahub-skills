@@ -44,7 +44,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pyyaml
-          npm i -g skillgrade
+          npm i -g skillgrade @anthropic-ai/claude-code
 
       - name: Run skillgrade
         env:
