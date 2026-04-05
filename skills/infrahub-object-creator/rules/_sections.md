@@ -8,7 +8,10 @@
 2. **Value Mapping (value-)** -- CRITICAL. How schema
    attribute types map to YAML values. Dropdown name vs
    label, relationship references by human_friendly_id
-   (scalar vs list), group membership.
+   (scalar vs list), group membership. Generic
+   relationship references using inline data blocks with
+   explicit `kind:` when the target is a generic type
+   without `human_friendly_id`.
 
 3. **Children (children-)** -- HIGH. Nesting hierarchical
    children (location trees) and component children
