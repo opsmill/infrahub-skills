@@ -5,6 +5,12 @@ description: >-
   and rules. Use when reviewing a project for compliance,
   onboarding to an existing repo, or before deployment to
   catch issues early.
+context: fork
+allowed-tools:
+  - Read
+  - Bash
+  - Grep
+  - Glob
 metadata:
   version: 1.1.0
   author: OpsMill

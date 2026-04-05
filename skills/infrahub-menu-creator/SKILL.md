@@ -5,6 +5,14 @@ description: >-
   designing navigation menus, organizing node types
   in the UI, or customizing the Infrahub web interface
   sidebar.
+paths:
+  - "menus/**/*.yml"
+  - "menus/**/*.yaml"
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
 metadata:
   version: 1.1.0
   author: OpsMill

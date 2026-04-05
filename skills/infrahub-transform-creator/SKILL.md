@@ -6,6 +6,15 @@ description: >-
   that converts Infrahub data into a different format
   (JSON, text, CSV, device configs) using Python or Jinja2
   templates.
+paths:
+  - "transforms/**/*.py"
+  - "templates/**/*.j2"
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Grep
 metadata:
   version: 1.1.0
   author: OpsMill

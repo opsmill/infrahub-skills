@@ -7,6 +7,10 @@ description: >-
   correlate node types, investigate service impact,
   check maintenance windows, or produce ad-hoc
   reports — without writing pipeline code.
+context: fork
+allowed-tools:
+  - Read
+  - Bash
 metadata:
   version: 1.1.0
   author: OpsMill

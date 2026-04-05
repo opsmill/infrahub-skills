@@ -1,6 +1,14 @@
 ---
 name: infrahub-object-creator
 description: Create and manage Infrahub object data files. Use when populating infrastructure data, creating device instances, locations, organizations, module installations, or any other data objects for an Infrahub repository.
+paths:
+  - "objects/**/*.yml"
+  - "objects/**/*.yaml"
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
 metadata:
   version: 1.1.0
   author: OpsMill

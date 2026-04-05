@@ -5,6 +5,15 @@ description: >-
   writing validation logic, creating Python checks that run
   in proposed change pipelines, or building data quality
   guards for Infrahub.
+paths:
+  - "checks/**/*.py"
+  - "queries/**/*.gql"
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Grep
 metadata:
   version: 1.1.0
   author: OpsMill

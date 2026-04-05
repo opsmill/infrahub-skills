@@ -5,6 +5,14 @@ description: >-
   design-driven automation that creates infrastructure objects
   from templates, topology definitions, or any
   design-to-implementation workflow in Infrahub.
+paths:
+  - "generators/**/*.py"
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Grep
 metadata:
   version: 1.1.0
   author: OpsMill
