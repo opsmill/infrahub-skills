@@ -86,8 +86,8 @@ plus:
 
 | Kind | Description | Special Properties |
 | ---- | ----------- | ------------------ |
-| `Text` | Standard text | `regex`, `min_length`, `max_length` |
-| `TextArea` | Multi-line text | Same as Text |
+| `Text` | Standard text | `regex`, `min_length`, `max_length` (via `parameters` block; top-level deprecated) |
+| `TextArea` | Multi-line text | Same as Text (via `parameters` block; top-level deprecated) |
 | `Number` | Integer | `min_value`, `max_value` |
 | `Boolean` | True/false | - |
 | `Checkbox` | Boolean variant | - |

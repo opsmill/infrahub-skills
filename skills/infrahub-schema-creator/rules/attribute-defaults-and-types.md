@@ -76,5 +76,8 @@ the `name` value (not `label`): `status: active` not
 | `display_labels` | `display_label` |
 | `default_filter` | `human_friendly_id` |
 | `String` (attribute kind) | `Text` |
+| `regex` (top-level) | `parameters: { regex: "..." }` |
+| `min_length` (top-level) | `parameters: { min_length: N }` |
+| `max_length` (top-level) | `parameters: { max_length: N }` |
 
 Reference: [Infrahub Schema Docs](https://docs.infrahub.app)
