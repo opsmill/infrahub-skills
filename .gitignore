@@ -72,3 +72,4 @@ docs/build/
 *.key
 credentials.json
 secrets.yaml
+.claude/
