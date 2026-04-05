@@ -11,7 +11,7 @@ tasks:
   # --- Menu Creator --- #
   - name: flat-menu
     instruction: |
-      Read the skill at .agents/skills/menu-creator/SKILL.md and follow its workflow and rules.
+      Read the skill at .agents/skills/infrahub-menu-creator/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub menu for a small data center project. I have these schema
       nodes: DcimDevice, DcimInterface, LocationSite, and OrganizationManufacturer. I just
@@ -58,7 +58,7 @@ tasks:
 
   - name: hierarchical-menu
     instruction: |
-      Read the skill at .agents/skills/menu-creator/SKILL.md and follow its workflow and rules.
+      Read the skill at .agents/skills/infrahub-menu-creator/SKILL.md and follow its workflow and rules.
 
       Task: I need a hierarchical Infrahub menu for a network management project. I want
       two top-level groups: 'Infrastructure' (containing DcimServer, DcimSwitch, DcimPdu)
@@ -115,7 +115,7 @@ tasks:
 
   - name: generic-kind-menu
     instruction: |
-      Read the skill at .agents/skills/menu-creator/SKILL.md and follow its workflow and rules.
+      Read the skill at .agents/skills/infrahub-menu-creator/SKILL.md and follow its workflow and rules.
 
       Task: I have an Infrahub project with a location hierarchy (LocationRegion,
       LocationSite, LocationRoom, LocationRack) and some device nodes (DcimDevice,
@@ -170,7 +170,7 @@ tasks:
   # --- Schema Creator --- #
   - name: vlan-management
     instruction: |
-      Read the skill at .agents/skills/schema-creator/SKILL.md and follow its workflow and rules.
+      Read the skill at .agents/skills/infrahub-schema-creator/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema for a VLAN management system. I need a VLAN node
       with an id attribute (just the VLAN number), a name, a status that should be a
@@ -224,7 +224,7 @@ tasks:
 
   - name: circuit-management
     instruction: |
-      Read the skill at .agents/skills/schema-creator/SKILL.md and follow its workflow and rules.
+      Read the skill at .agents/skills/infrahub-schema-creator/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema for a circuit management system. A Circuit connects
       two endpoints (side A and side Z). Each CircuitEndpoint is installed in a specific
@@ -282,7 +282,7 @@ tasks:
 
   - name: location-hierarchy
     instruction: |
-      Read the skill at .agents/skills/schema-creator/SKILL.md and follow its workflow and rules.
+      Read the skill at .agents/skills/infrahub-schema-creator/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema for a location hierarchy: Region > Site > Room > Rack.
       Each level has a name and shortname. Objects should be easily identifiable in the UI.
