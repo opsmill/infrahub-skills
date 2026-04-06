@@ -4,6 +4,8 @@ description: Create and manage Infrahub object data files. Use when populating i
 paths:
   - "objects/**/*.yml"
   - "objects/**/*.yaml"
+  - "data/**/*.yml"
+  - "data/**/*.yaml"
 allowed-tools:
   - Read
   - Write
