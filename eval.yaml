@@ -3,7 +3,7 @@ version: "1"
 defaults:
   agent: claude
   provider: local
-  trials: 5
+  trials: 3
   timeout: 300
   threshold: 0.8
 
@@ -230,6 +230,9 @@ tasks:
       two endpoints (side A and side Z). Each CircuitEndpoint is installed in a specific
       Device. A Provider offers multiple Circuits. Use namespace 'Circuit'. Don't forget
       to make relationships properly bidirectional with matching identifiers on both sides.
+
+      Note: CircuitEndpoints are peers of the Circuit (not children), and Providers are
+      independent entities — use Attribute-kind relationships, not Component/Parent.
 
       Save ONLY the final schema YAML to: output.yml
     graders:
