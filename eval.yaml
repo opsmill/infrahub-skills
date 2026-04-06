@@ -3,7 +3,7 @@ version: "1"
 defaults:
   agent: claude
   provider: local
-  trials: 5
+  trials: 3
   timeout: 300
   threshold: 0.8
 
@@ -124,7 +124,8 @@ tasks:
       location type entries nested under it. Devices should be a separate top-level item.
       Also, what do I need to change in my schema so I don't get duplicate menu entries?
 
-      Save ONLY the final YAML file to: output.yml
+      Follow the skill's workflow completely, including step 4 (registration and schema guidance).
+      Save the final output to: output.yml
     graders:
       - type: deterministic
         run: python graders/menu-creator/check_generic_kind.py
@@ -230,6 +231,9 @@ tasks:
       two endpoints (side A and side Z). Each CircuitEndpoint is installed in a specific
       Device. A Provider offers multiple Circuits. Use namespace 'Circuit'. Don't forget
       to make relationships properly bidirectional with matching identifiers on both sides.
+
+      Note: CircuitEndpoints are peers of the Circuit (not children), and Providers are
+      independent entities — use Attribute-kind relationships, not Component/Parent.
 
       Save ONLY the final schema YAML to: output.yml
     graders:
