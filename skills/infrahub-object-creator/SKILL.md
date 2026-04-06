@@ -73,6 +73,32 @@ spec:
 are always required. Each `spec` block targets a single
 node kind.
 
+## Workflow
+
+Follow these steps when creating object data files:
+
+1. **Read the schema** — Identify the target node kind,
+   its attributes, relationships, and whether it has
+   component children or hierarchy parents.
+2. **Plan the file structure** — Read
+   [rules/format-structure.md](./rules/format-structure.md)
+   for the required YAML structure and
+   [rules/organization-load-order.md](./rules/organization-load-order.md)
+   for file naming and load order conventions.
+3. **Map attribute values** — Set each attribute using
+   the correct value format. Read
+   [rules/value-attributes.md](./rules/value-attributes.md)
+   for attribute mapping and
+   [rules/value-relationships.md](./rules/value-relationships.md)
+   for relationship references.
+4. **Handle children** — If the node has component
+   children or hierarchy nesting, read
+   [rules/children-components.md](./rules/children-components.md)
+   and [rules/children-hierarchy.md](./rules/children-hierarchy.md).
+5. **Validate** — Check YAML syntax and ensure
+   referenced objects exist or are defined in earlier
+   load-order files.
+
 ## Supporting References
 
 - **[reference.md](./reference.md)** -- Object file format

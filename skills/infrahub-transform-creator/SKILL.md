@@ -80,6 +80,36 @@ class MyTransform(InfrahubTransform):
         return {"hostname": device["name"]["value"]}
 ```
 
+## Workflow
+
+Follow these steps when creating a transform:
+
+1. **Choose the transform type** — Python for JSON/dict
+   or complex logic, Jinja2 for text templates, hybrid
+   for both. Read
+   [rules/types-overview.md](./rules/types-overview.md).
+2. **Write the GraphQL query** — Create a `.gql` file
+   that fetches the data to transform. Read
+   [../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)
+   for query patterns.
+3. **Implement the transform** — For Python, inherit
+   from `InfrahubTransform` and implement `transform()`.
+   Read [rules/python-transform.md](./rules/python-transform.md).
+   For Jinja2, create a `.j2` template. Read
+   [rules/jinja2-template.md](./rules/jinja2-template.md).
+   For hybrid, read
+   [rules/hybrid-python-jinja2.md](./rules/hybrid-python-jinja2.md).
+4. **Connect to artifacts** — If the transform output
+   should be stored as a file, configure artifact
+   definitions. See
+   [rules/artifacts-definitions.md](./rules/artifacts-definitions.md).
+5. **Register in .infrahub.yml** — Add under
+   `python_transforms` or `jinja2_transforms`. See
+   [rules/api-reference.md](./rules/api-reference.md).
+6. **Test** — Run `infrahubctl transform` or
+   `infrahubctl render`. See
+   [rules/testing-commands.md](./rules/testing-commands.md).
+
 ## Supporting References
 
 - **[examples.md](./examples.md)** -- Complete transform

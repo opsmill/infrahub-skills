@@ -83,6 +83,33 @@ extensions:    # Add attributes/relationships to existing nodes from other files
 Always include the `$schema` comment for IDE validation.
 Only `version` is required at the top level.
 
+## Workflow
+
+Follow these steps when creating or modifying a schema:
+
+1. **Gather requirements** — Identify the node types,
+   their attributes, and how they relate to each other.
+   Ask about hierarchies, dropdowns, and display needs.
+2. **Read relevant rules** — Read
+   [rules/naming-conventions.md](./rules/naming-conventions.md)
+   for naming constraints,
+   [rules/attribute-defaults-and-types.md](./rules/attribute-defaults-and-types.md)
+   for attribute kinds and defaults, and
+   [rules/relationship-identifiers.md](./rules/relationship-identifiers.md)
+   for bidirectional relationship setup.
+3. **Build the schema YAML** — Start with the `$schema`
+   comment and `version: "1.0"`. Define generics first
+   (if any), then nodes. Apply naming, display, and
+   relationship rules from step 2.
+4. **Configure display properties** — Set
+   `human_friendly_id`, `display_label`, and
+   `order_weight` per
+   [rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md)
+   and [rules/display-order-weight.md](./rules/display-order-weight.md).
+5. **Validate** — Run `infrahubctl schema check` per
+   [validation.md](./validation.md). Fix any errors
+   using [rules/validation-common-errors.md](./rules/validation-common-errors.md).
+
 ## Supporting References
 
 - **[reference.md](./reference.md)** -- Complete property
