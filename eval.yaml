@@ -124,7 +124,8 @@ tasks:
       location type entries nested under it. Devices should be a separate top-level item.
       Also, what do I need to change in my schema so I don't get duplicate menu entries?
 
-      Save ONLY the final YAML file to: output.yml
+      Follow the skill's workflow completely, including step 4 (registration and schema guidance).
+      Save the final output to: output.yml
     graders:
       - type: deterministic
         run: python graders/menu-creator/check_generic_kind.py
