@@ -1,11 +1,9 @@
 ---
 name: infrahub-transform-creator
 description: >-
-  Create and manage Infrahub transforms. Use when building
-  data transformations, config generation, or any workflow
-  that converts Infrahub data into a different format
-  (JSON, text, CSV, device configs) using Python or Jinja2
-  templates.
+  Creates Infrahub transforms that convert data into JSON, text, CSV, or device configs using Python or Jinja2 templates.
+  TRIGGER when: building config generation, data export, format conversion, Jinja2 templates, artifact pipelines.
+  DO NOT TRIGGER when: designing schemas, writing validation checks, creating generators, querying live data.
 paths:
   - "transforms/**/*.py"
   - "templates/**/*.j2"

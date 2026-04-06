@@ -1,10 +1,9 @@
 ---
 name: infrahub-check-creator
 description: >-
-  Create and manage Infrahub check definitions. Use when
-  writing validation logic, creating Python checks that run
-  in proposed change pipelines, or building data quality
-  guards for Infrahub.
+  Creates Infrahub check definitions — Python validation logic and GraphQL queries for proposed change pipelines.
+  TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes.
+  DO NOT TRIGGER when: designing schemas, querying live data, building transforms or generators.
 paths:
   - "checks/**/*.py"
   - "queries/**/*.gql"

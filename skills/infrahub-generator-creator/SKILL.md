@@ -1,10 +1,9 @@
 ---
 name: infrahub-generator-creator
 description: >-
-  Create and manage Infrahub Generators. Use when building
-  design-driven automation that creates infrastructure objects
-  from templates, topology definitions, or any
-  design-to-implementation workflow in Infrahub.
+  Creates Infrahub Generators — design-driven automation that builds infrastructure objects from templates and topology definitions.
+  TRIGGER when: building design-to-implementation workflows, auto-creating objects from templates, topology-driven generation.
+  DO NOT TRIGGER when: designing schemas, writing data transforms, querying live data, populating static data files.
 paths:
   - "generators/**/*.py"
 allowed-tools:

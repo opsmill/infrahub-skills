@@ -1,6 +1,9 @@
 ---
 name: infrahub-object-creator
-description: Create and manage Infrahub object data files. Use when populating infrastructure data, creating device instances, locations, organizations, module installations, or any other data objects for an Infrahub repository.
+description: >-
+  Creates and manages Infrahub object data YAML files for populating infrastructure instances — devices, locations, organizations, and modules.
+  TRIGGER when: creating device instances, populating data files, defining locations or organizations, adding infrastructure objects.
+  DO NOT TRIGGER when: designing schemas, writing Python checks/generators, querying live data.
 paths:
   - "objects/**/*.yml"
   - "objects/**/*.yaml"

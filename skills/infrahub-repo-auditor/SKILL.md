@@ -1,10 +1,9 @@
 ---
 name: infrahub-repo-auditor
 description: >-
-  Audit an Infrahub repository against all best practices
-  and rules. Use when reviewing a project for compliance,
-  onboarding to an existing repo, or before deployment to
-  catch issues early.
+  Audits an Infrahub repository against best practices and rules, producing a structured compliance report.
+  TRIGGER when: reviewing repo for compliance, onboarding to existing project, pre-deployment validation, catching issues.
+  DO NOT TRIGGER when: creating schemas, writing checks/generators, querying live data, populating objects.
 context: fork
 allowed-tools:
   - Read
