@@ -1,10 +1,19 @@
 ---
 name: infrahub-check-creator
 description: >-
-  Create and manage Infrahub check definitions. Use when
-  writing validation logic, creating Python checks that run
-  in proposed change pipelines, or building data quality
-  guards for Infrahub.
+  Creates Infrahub check definitions — Python validation logic and GraphQL queries for proposed change pipelines.
+  TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes.
+  DO NOT TRIGGER when: designing schemas, querying live data, building transforms or generators.
+paths:
+  - "checks/**/*.py"
+  - "queries/**/*.gql"
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Grep
+argument-hint: "[check-name] [description...]"
 metadata:
   version: 1.1.0
   author: OpsMill
@@ -18,6 +27,17 @@ Expert guidance for creating Infrahub checks. Checks are
 user-defined validation logic (Python + GraphQL) that run as
 part of a proposed change pipeline. If a check logs any
 errors, the proposed change cannot be merged.
+
+## Project Context
+
+Infrahub config:
+!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
+
+Existing checks:
+!`find . -name "*.py" -path "*/checks/*" 2>/dev/null | head -20`
+
+Existing queries:
+!`find . -name "*.gql" -path "*/queries/*" 2>/dev/null | head -20`
 
 ## When to Use
 
@@ -70,6 +90,32 @@ class MyCheck(InfrahubCheck):
                 message="Problem description"
             )
 ```
+
+## Workflow
+
+Follow these steps when creating a check:
+
+1. **Understand the validation goal** — What data
+   condition should block a proposed change? Determine
+   whether this is a global check (all objects of a
+   type) or targeted (specific group). Read
+   [rules/architecture-types.md](./rules/architecture-types.md).
+2. **Write the GraphQL query** — Create a `.gql` file
+   that fetches the data to validate. Read
+   [../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)
+   for query patterns.
+3. **Implement the Python class** — Inherit from
+   `InfrahubCheck`, implement `validate()`. Read
+   [rules/python-validate.md](./rules/python-validate.md)
+   for the class pattern and
+   [rules/api-reference.md](./rules/api-reference.md)
+   for available methods.
+4. **Register in .infrahub.yml** — Add the check under
+   `check_definitions`. The query name must match the
+   Python class `query` attribute. See
+   [rules/registration-config.md](./rules/registration-config.md).
+5. **Test** — Run `infrahubctl check` to validate. See
+   [rules/testing-commands.md](./rules/testing-commands.md).
 
 ## Supporting References
 

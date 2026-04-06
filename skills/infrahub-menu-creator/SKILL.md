@@ -1,10 +1,18 @@
 ---
 name: infrahub-menu-creator
 description: >-
-  Create and manage Infrahub custom menus. Use when
-  designing navigation menus, organizing node types
-  in the UI, or customizing the Infrahub web interface
-  sidebar.
+  Creates Infrahub custom navigation menus for the web UI sidebar, organizing node types into logical groups.
+  TRIGGER when: designing sidebar menus, grouping node types in UI, customizing Infrahub web interface navigation.
+  DO NOT TRIGGER when: designing schemas, writing checks or transforms, populating data objects.
+paths:
+  - "menus/**/*.yml"
+  - "menus/**/*.yaml"
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+argument-hint: "[menu-structure-description]"
 metadata:
   version: 1.1.0
   author: OpsMill
@@ -18,6 +26,14 @@ Expert guidance for creating Infrahub custom menus.
 Menus control the left-side navigation in the web
 interface, organizing schema node types into a custom
 hierarchy.
+
+## Project Context
+
+Existing menu files:
+!`find . -name "*.yml" -path "*/menus/*" 2>/dev/null | head -10`
+
+Schema files (to identify available node types):
+!`find . -name "*.yml" -path "*/schemas/*" -o -name "*schema*" -name "*.yml" 2>/dev/null | head -10`
 
 ## When to Use
 

@@ -1,10 +1,18 @@
 ---
 name: infrahub-generator-creator
 description: >-
-  Create and manage Infrahub Generators. Use when building
-  design-driven automation that creates infrastructure objects
-  from templates, topology definitions, or any
-  design-to-implementation workflow in Infrahub.
+  Creates Infrahub Generators — design-driven automation that builds infrastructure objects from templates and topology definitions.
+  TRIGGER when: building design-to-implementation workflows, auto-creating objects from templates, topology-driven generation.
+  DO NOT TRIGGER when: designing schemas, writing data transforms, querying live data, populating static data files.
+paths:
+  - "generators/**/*.py"
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Grep
+argument-hint: "[generator-name] [description...]"
 metadata:
   version: 1.1.0
   author: OpsMill
@@ -19,6 +27,14 @@ query data from Infrahub via GraphQL and create new nodes and
 relationships based on the result -- enabling design-driven
 automation where a "design" object automatically creates
 downstream infrastructure.
+
+## Project Context
+
+Infrahub config:
+!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
+
+Existing generators:
+!`find . -name "*.py" -path "*/generators/*" 2>/dev/null | head -20`
 
 ## When to Use
 
@@ -60,6 +76,34 @@ class MyGenerator(InfrahubGenerator):
         )
         await obj.save(allow_upsert=True)
 ```
+
+## Workflow
+
+Follow these steps when creating a generator:
+
+1. **Identify the design pattern** — What "design"
+   object triggers generation? What objects should be
+   created from it? Read
+   [rules/architecture-components.md](./rules/architecture-components.md)
+   for the target group and generator components.
+2. **Write the GraphQL query** — Create a `.gql` file
+   that fetches the design data. Read
+   [../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)
+   for query patterns.
+3. **Implement the Python class** — Inherit from
+   `InfrahubGenerator`, implement `generate()`. Read
+   [rules/python-generate.md](./rules/python-generate.md)
+   for the class pattern and
+   [rules/api-reference.md](./rules/api-reference.md)
+   for available methods.
+4. **Make it idempotent** — Use `allow_upsert=True` so
+   re-running creates or updates without duplicates.
+   See [rules/tracking-idempotent.md](./rules/tracking-idempotent.md).
+5. **Register in .infrahub.yml** — Add under
+   `generator_definitions` with the target group. See
+   [rules/registration-config.md](./rules/registration-config.md).
+6. **Test** — Run `infrahubctl generator` to validate.
+   See [rules/testing-commands.md](./rules/testing-commands.md).
 
 ## Supporting References
 

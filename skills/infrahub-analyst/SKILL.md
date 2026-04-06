@@ -1,12 +1,14 @@
 ---
 name: infrahub-analyst
 description: >-
-  Analyze and correlate Infrahub data using the
-  MCP server. Use when querying live infrastructure
-  data to answer operational questions, detect drift,
-  correlate node types, investigate service impact,
-  check maintenance windows, or produce ad-hoc
-  reports — without writing pipeline code.
+  Analyzes and correlates live Infrahub data via the MCP server — answers operational questions, detects drift, and investigates impact.
+  TRIGGER when: querying infrastructure data, checking compliance, investigating change impact, producing ad-hoc reports.
+  DO NOT TRIGGER when: writing automated checks, building transforms, designing schemas, populating data files.
+context: fork
+allowed-tools:
+  - Read
+  - Bash
+argument-hint: "[question about infrastructure data]"
 metadata:
   version: 1.1.0
   author: OpsMill
@@ -47,6 +49,11 @@ block proposed changes, see
 `../infrahub-check-creator/SKILL.md`.
 For **repeatable scheduled reports** exported as
 artifacts, see `../infrahub-transform-creator/SKILL.md`.
+
+## Project Context
+
+If invoked with arguments (e.g., `/infrahub:analyst Which devices have no platform assigned?`),
+treat the arguments as the question to answer.
 
 ## When to Use
 
