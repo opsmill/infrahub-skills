@@ -65,9 +65,9 @@ mkdir -p skills/infrahub-my-skill/rules
 ```
 
 - Directory name matches the skill name
-  (e.g., `infrahub-schema-creator`)
+  (e.g., `infrahub-managing-schemas`)
 - Skill name in frontmatter uses the same name
-  (e.g., `infrahub-schema-creator`)
+  (e.g., `infrahub-managing-schemas`)
 
 ### 2. Write SKILL.md
 

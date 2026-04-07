@@ -8,7 +8,7 @@ benchmark reports (JSON + Markdown).
 
 Usage:
     python scripts/run_evals.py
-    python scripts/run_evals.py --eval-file evaluations/schema-creator.json
+    python scripts/run_evals.py --eval-file evaluations/managing-schemas.json
     python scripts/run_evals.py --output-dir eval-results --model claude-sonnet-4-6
 """
 
@@ -32,8 +32,8 @@ except ImportError:
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 SKILL_PATHS = {
-    "infrahub-schema-creator": "skills/schema-creator/SKILL.md",
-    "infrahub-object-creator": "skills/infrahub-object-creator/SKILL.md",
+    "infrahub-managing-schemas": "skills/infrahub-managing-schemas/SKILL.md",
+    "infrahub-managing-objects": "skills/infrahub-managing-objects/SKILL.md",
 }
 
 

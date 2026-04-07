@@ -8,9 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
-- 7 skills: schema-creator, object-creator,
-  check-creator, generator-creator,
-  transform-creator, menu-creator, repo-auditor
+- 7 skills: managing-schemas, managing-objects,
+  managing-checks, managing-generators,
+  managing-transforms, managing-menus, auditing-repo
 - Shared rules and references in skills/infrahub-common/
 - Hook-based Infrahub project detection
 - Metadata version tracking in SKILL.md frontmatter
