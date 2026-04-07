@@ -1,0 +1,37 @@
+docs/docs/skills-reference/schema-creator.mdx
+  86de3d2bf3b00d46 3
+docs/docs/skills-reference/object-creator.mdx
+  86de3d2bf3b00d46 3
+docs/docs/skills-reference/analyst.mdx
+  86de3d2bf3b00d46 3
+docs/docs/skills-reference/transform-creator.mdx
+  86de3d2bf3b00d46 3
+docs/docs/skills-reference/menu-creator.mdx
+  86de3d2bf3b00d46 3
+docs/docs/skills-reference/check-creator.mdx
+  86de3d2bf3b00d46 3
+docs/docs/skills-reference/repo-auditor.mdx
+  86de3d2bf3b00d46 3
+docs/docs/skills-reference/generator-creator.mdx
+  86de3d2bf3b00d46 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "f33259824a2c88ee66fbcaaf657d194705eb367a",
+  "prompts": {
+    "86de3d2bf3b00d46": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f1129399-46d6-4ce6-9c5a-483c36ab9ba8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Benoit Kohler",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 8,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  }
+}
