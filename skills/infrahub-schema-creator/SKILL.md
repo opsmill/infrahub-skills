@@ -123,5 +123,3 @@ Follow these steps when creating or modifying a schema:
   (git integration, caching) across all skills
 - **[rules/](./rules/)** -- Individual rules by category
   prefix
-
-<!-- ci: trigger skill-evals matrix test -->
