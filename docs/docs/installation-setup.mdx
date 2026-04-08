@@ -3,40 +3,164 @@ title: Installation & Setup
 sidebar_position: 2
 ---
 
-# Installation & Setup
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
-## Overview
+Infrahub Skills can be installed into any AI tool that supports skills or custom context files. Installation takes one command for most setups — install into a specific Infrahub repository to work in that project, or install globally to use the skills across all your projects.
 
 ## Prerequisites
 
-### AI Coding Assistant
-
-### Infrahub Instance
-
-### infrahubctl
-
-### Infrahub MCP Server (Analyst Skill Only)
+- **AI coding assistant** — any tool that supports the Agent Skills format or reads custom context files: Claude Code, GitHub Copilot, Cursor, Windsurf, Amp, Cline, Codex, and others
+- **Infrahub instance** — version 1.7 or later (earlier versions may work but are not tested). See the [Infrahub installation docs](/) for setup instructions
+- **infrahubctl** — required for loading generated schemas, objects, and running generators. See the [infrahubctl docs](/infrahubctl)
+- **Infrahub MCP server** (optional) — required only for the [Analyst](./skills-reference/analyst.mdx) skill, beneficial but not required for other skills. See the [MCP server docs](/mcp)
 
 ## Installation
 
-### npx (Recommended)
+<Tabs>
+<TabItem value="npx" label="npx (Recommended)" default>
 
-### Claude Code Plugin — Marketplace
+The `npx` installer detects which AI tools you have configured and installs the skills in the correct format for each one automatically.
 
-### Manual Copy
+```bash
+npx skills add opsmill/infrahub-skills
+```
 
-## Tool-Specific Configuration
+The installer determines whether to install the skills in the current project directory or globally. If installing per-project, run the command from your Infrahub project root.
+
+</TabItem>
+<TabItem value="plugin" label="Claude Code Plugin">
+
+Install from the Claude Code plugin marketplace for a global installation that works across all Infrahub projects:
+
+```bash
+/plugin marketplace add opsmill/claude-marketplace
+/plugin install infrahub@opsmill
+```
+
+The plugin auto-detects Infrahub projects on session start by looking for `.infrahub.yml`, `infrahub.toml`, or schema file markers in the project directory.
+
+</TabItem>
+<TabItem value="manual" label="Manual Copy">
+
+For any tool that reads files from the project directory:
+
+```bash
+git clone https://github.com/opsmill/infrahub-skills.git
+cp -r infrahub-skills/skills /path/to/your-project/
+rm -rf infrahub-skills
+```
+
+:::warning
+Always include `skills/infrahub-common/` — it contains shared references that all skills depend on. Omitting it will cause skills to produce incomplete or incorrect output.
+:::
+
+</TabItem>
+</Tabs>
+
+## Tool-specific configuration
+
+After installing via npx or manual copy, some tools benefit from a small configuration file to activate the skills more reliably. These tools will use the skills without these files, but adding them improves consistency.
 
 ### GitHub Copilot
 
+Create `.github/instructions/infrahub.instructions.md` in your project root:
+
+```markdown
+---
+applyTo: "**"
+---
+
+Use the skills in the `skills/` directory when working on Infrahub schemas,
+objects, checks, generators, transforms, or menus. Each skill's SKILL.md
+file describes when and how to use it.
+```
+
 ### Cursor
+
+Create `.cursor/rules/infrahub.mdc` in your project root:
+
+```markdown
+---
+description: Infrahub development skills for schemas, objects, checks, generators, transforms, and menus
+globs: "**/*.{yml,yaml,py,gql,j2}"
+alwaysApply: false
+---
+
+Use the skills in the `skills/` directory when working on Infrahub resources.
+Each skill's SKILL.md file describes when and how to use it.
+```
 
 ### Windsurf
 
-### Claude Code (Plugin)
+Windsurf reads Markdown files from the project automatically. Optionally, reference the skills from `.windsurfrules`:
 
-## MCP Server Setup (Analyst Skill Only)
+```markdown
+For Infrahub development tasks, use the skills in the `skills/` directory.
+Each skill's SKILL.md file describes when and how to use it.
+```
 
-## Verifying the Installation
+### Claude Code (plugin)
+
+No additional configuration required after plugin install. The session hook fires on project open and provides context about available skills automatically.
+
+## MCP server setup (Analyst skill)
+
+The [Analyst](./skills-reference/analyst.mdx) skill uses the Infrahub MCP server to query live data from a running instance. All other skills work without it.
+
+See the [Infrahub MCP server docs](/mcp) for setup instructions.
+
+:::tip
+Without MCP, the AI can still query Infrahub data by constructing GraphQL API calls directly. The interaction is more verbose, but functional.
+:::
+
+## Verifying the installation
+
+1. **Check the files are present** — confirm that `skills/*/SKILL.md` files exist in your project directory (or globally, depending on your install method).
+
+2. **Test skill activation** — open the project in your AI tool and ask:
+
+   > What Infrahub skills do you have available?
+
+   The AI should list the installed skills.
+
+3. **Test skill output** — ask the AI to create a simple schema:
+
+   > Create a Device node with a name and status attribute.
+
+   If the skills are active, the output should:
+   - Start with `version: "1.0"`
+   - Use `kind: Dropdown` for the status field with choice objects
+   - Include `human_friendly_id` and `display_label`
+
+   Without the skills, most AI assistants produce a simpler or incorrect schema that misses these conventions.
 
 ## Upgrading
+
+<Tabs>
+<TabItem value="npx-upgrade" label="npx" default>
+
+```bash
+npx skills update
+```
+
+</TabItem>
+<TabItem value="plugin-upgrade" label="Claude Code Plugin">
+
+```bash
+/plugin update infrahub@opsmill
+```
+
+</TabItem>
+<TabItem value="manual-upgrade" label="Manual">
+
+Pull the latest from GitHub and re-copy:
+
+```bash
+git clone https://github.com/opsmill/infrahub-skills.git
+cp -r infrahub-skills/skills /path/to/your-project/
+rm -rf infrahub-skills
+```
+
+</TabItem>
+</Tabs>

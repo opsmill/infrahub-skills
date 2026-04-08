@@ -3,30 +3,39 @@ title: Menu Creator
 sidebar_position: 6
 ---
 
-# Menu Creator
+The Menu Creator produces YAML menu definition files that customize the Infrahub web UI sidebar. Menus can be flat or deeply nested, with group headers, icons, and ordering. The skill generates syntactically correct menu YAML and handles the nesting structure that is easy to get wrong by hand.
 
-## Overview
+## When to use
 
-## When to Use
+- Replacing Infrahub's auto-generated sidebar navigation with a custom structure
+- Grouping schema nodes into logical sections (e.g., "IP Management", "Network Topology", "Inventory")
+- Adding nested sub-menus and section headers
+- Controlling the ordering of menu items
 
-## What It Produces
+## What it produces
 
-## Example Prompts
+- YAML file with `apiVersion`, `kind: Menu`, and a `spec.data` block containing the menu tree
+- Loaded into Infrahub alongside schema and object files
 
-## Key Rules Enforced
+## Example prompts
 
-### spec.data Wrapping
+- "Create a menu with sections for Network Topology, IP Management, and Inventory — each with relevant schema nodes nested underneath"
+- "Build a flat menu that lists Device, Interface, Site, and Rack in that order"
+- "Add a nested sub-menu under Network Topology for BGP with entries for BGP Sessions and BGP Peers"
 
-### children.data Wrapping
+## Key rules enforced
 
-### kind vs path
-
-### Group Headers
-
-### include_in_menu: false
-
-### Icon Format
-
-### order_weight
+- **`spec.data` wrapping** — the top-level menu items must be in `spec.data`; a common mistake is writing `spec:` followed by a list directly
+- **`children.data` wrapping** — nested items must use `children.data:` not `children:` directly; this is the most common nesting mistake
+- **`kind` vs `path`** — each item uses either `kind:` (links to a schema node's list view) or `path:` (links to a custom URL), never both
+- **Group headers** — section headers with no link (no `kind` or `path`) are valid and used for visual grouping
+- **Icon format** — icons use the Material Design Icons format with `mdi:` prefix (e.g., `mdi:server`, `mdi:ip-network`)
+- **`order_weight`** — integer controlling item display order; lower numbers appear first
 
 ## Loading
+
+Load a menu file into a running Infrahub instance:
+
+```bash
+infrahubctl menu load <menu-file>
+```

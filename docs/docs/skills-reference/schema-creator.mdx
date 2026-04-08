@@ -3,34 +3,66 @@ title: Schema Creator
 sidebar_position: 1
 ---
 
-# Schema Creator
+The Schema Creator produces valid Infrahub schema YAML from natural language descriptions. It applies Infrahub's naming conventions, relationship rules, attribute type requirements, and display property patterns automatically — without requiring manual study of the schema format.
 
-## Overview
+## When to use
 
-## When to Use
+- Creating a new schema node from a description
+- Adding attributes or relationships to an existing node
+- Designing a generic (abstract base type) with inheriting nodes
+- Creating hierarchical node types (location trees, organizational hierarchies)
+- Modifying an existing schema to add new fields or fix convention violations
+- Validating a schema against best practices before loading
 
-## What It Produces
+## What it produces
 
-## Example Prompts
+- Schema YAML file starting with `version: "1.0"` containing `nodes:` and/or `generics:`
+- Each node includes: namespace, name, attributes (with kinds and defaults), relationships (with identifiers, cardinality, peer references), `human_friendly_id`, `display_label`, and `order_weight`
+- Output is ready to validate with `infrahubctl schema check` and load with `infrahubctl schema load`
 
-## Key Rules Enforced
+## Example prompts
 
-### Naming Conventions
+- "Create a schema for VLAN management with an id attribute, a name, a status dropdown, and a role field"
+- "Add a `contract_start_date` attribute to `InfraCircuit`"
+- "Design a location hierarchy with Region, Site, and Rack as hierarchical generics"
+- "Create a Device generic with Platform and Role as dropdowns, and model specific device types (Router, Switch, Firewall) inheriting from it"
 
-### Attribute Types
+## Key rules enforced
 
-### Relationship Identifiers
+- **Naming conventions** — namespace is PascalCase and meaningful (e.g., `Infra`, `Ipam`, `Dcim`); node names are PascalCase; attribute names are snake_case with minimum 3 characters
+- **Attribute types** — uses `Text` (not deprecated `String`); `Dropdown` for status/role fields with choices defined; `Number`, `Boolean`, `DateTime` as appropriate
+- **Relationship identifiers** — both sides of every relationship share the same identifier string; mismatched identifiers are the most common source of schema errors
+- **Relationship peer references** — uses full namespace+name (e.g., `IpamVlanGroup`) not short names
+- **human_friendly_id** — included for every node so objects are identifiable in the UI and through the API
+- **display_label** — Jinja2 template set for every node for dropdown and reference rendering
+- **order_weight** — integer set on attributes to control display order in the UI
+- **Hierarchy setup** — for hierarchical generics: `hierarchical: true`, `parent` and `children` relationships configured correctly
 
-### Relationship Peer References
+## Common mistakes it catches
 
-### human_friendly_id
+| Mistake | What the skill does instead |
+|---------|---------------------------|
+| Using `String` instead of `Text` | Uses `Text` — `String` is deprecated |
+| Attribute names shorter than 3 characters | Uses descriptive names (e.g., `vlan_id` not `id`) |
+| `display_labels` (plural) | Uses `display_label` (singular) |
+| Mismatched relationship identifiers | Sets the same identifier on both sides |
+| Short kind references in peers | Uses full namespace+name (e.g., `IpamVlanGroup` not `VlanGroup`) |
+| Missing `human_friendly_id` | Includes it on every node |
 
-### display_label
+## Validating and loading
 
-### order_weight
+Validate a generated schema before loading it into Infrahub:
 
-### Hierarchy Setup
+```bash
+infrahubctl schema check <schema-file>
+```
 
-## Common Mistakes It Catches
+Load the schema into a running instance:
 
-## Validating and Loading
+```bash
+infrahubctl schema load <schema-file>
+```
+
+:::tip
+Schema changes on an existing instance may require a migration. See the [schema topic guide](/topics/schema) for details on how Infrahub handles schema evolution.
+:::

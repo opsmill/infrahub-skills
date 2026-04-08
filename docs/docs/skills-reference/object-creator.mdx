@@ -3,28 +3,57 @@ title: Object Creator
 sidebar_position: 2
 ---
 
-# Object Creator
+The Object Creator produces YAML data files for Infrahub infrastructure objects — devices, locations, organizations, interfaces, modules, and any custom node type. It applies the correct file structure, value mappings, and load order so files are ready to load into a running Infrahub instance.
 
-## Overview
+## When to use
 
-## When to Use
+- Creating initial data files for a new Infrahub instance
+- Populating objects from a spreadsheet, CSV, or description
+- Creating a batch of devices, interfaces, or IP addresses with consistent structure
+- Generating test or demo data for a schema
+- Adding new infrastructure objects to an existing instance
 
-## What It Produces
+## What it produces
 
-## Example Prompts
+- YAML files with `apiVersion`, `kind: Object`, and a `spec` block
+- Each file covers one or more objects of the same node type
+- Supports multi-document YAML files (multiple objects in one file separated by `---`)
+- Supports `expand_range: true` for sequential interface/object generation (e.g., `eth0` through `eth47`)
+- Output respects load order: schemas must be loaded before objects
 
-## Key Rules Enforced
+## Example prompts
 
-### File Structure
+- "Create object files for 3 spine switches and 6 leaf switches with loopback interfaces"
+- "Populate 5 locations: 2 regions, 2 sites within each region, and a rack in each site"
+- "Generate 48 interfaces on a device named `spine-01` using expand_range"
+- "Create organization objects for Cisco, Juniper, and Arista as manufacturers"
 
-### Value Mapping
+## Key rules enforced
 
-### Children and Hierarchy
+- **File structure** — `apiVersion`, `kind: Object`, `spec` with `nodes` list; missing any of these causes load failure
+- **Value mapping** — Text values wrapped in `value:` key; Dropdown fields use the choice name not the label; relationship references use the node's `human_friendly_id` value
+- **Children and hierarchy** — child objects (e.g., interfaces on a device) use the correct nesting structure with `kind:` specified
+- **Load order** — objects referencing other objects (e.g., interfaces referencing a device) must be in the right file or the right order within a multi-document file
+- **Numeric file prefixes** — files are named with numeric prefixes (e.g., `01_organizations.yml`, `02_locations.yml`) to enforce load order
 
-### Load Order
+## Common mistakes it catches
 
-### Numeric File Prefixes
-
-## Common Mistakes It Catches
+| Mistake | What the skill does instead |
+|---------|---------------------------|
+| Missing `value:` wrapper on text attributes | Wraps all text values in `value:` |
+| Using Dropdown label instead of name | Uses the choice name (e.g., `"active"` not `"Active"`) |
+| Relationship references that don't match `human_friendly_id` | Uses the correct identifier value |
+| Incorrect nesting for child objects | Applies the correct `children` structure with `kind:` |
+| Load order violations | Orders files and documents so dependencies are satisfied |
 
 ## Loading
+
+Load object files into a running Infrahub instance:
+
+```bash
+infrahubctl object load <file>
+```
+
+:::warning
+Load schemas before objects. Objects that reference node types not yet in the schema will fail to load.
+:::

@@ -3,34 +3,50 @@ title: Generator Creator
 sidebar_position: 4
 ---
 
-# Generator Creator
+The Generator Creator produces Python generators that query Infrahub for design objects and automatically create or update the infrastructure objects derived from them. Generators are idempotent: re-running them updates existing objects rather than creating duplicates. The skill generates the Python class, GraphQL query, and `.infrahub.yml` registration.
 
-## Overview
+## When to use
 
-## When to Use
+- Auto-creating devices, interfaces, and IP addresses from a fabric design object
+- Generating BGP sessions from a topology design
+- Creating any set of objects that should be derived from a design definition and kept in sync with it
+- Any scenario where "given this design, create these objects" needs to run repeatedly as the design evolves
 
-## What It Produces
+## What it produces
 
-### Target Group
+Three components:
 
-### GraphQL Query
+1. **Target group** — a `CoreGeneratorGroup` that defines which design objects trigger the generator
+2. **GraphQL query** (`.gql`) — fetches the design object(s) the generator will act on
+3. **Python class** (`InfrahubGenerator` subclass) — implements the `async generate()` method, uses `self.client.create()` with `allow_upsert=True`
 
-### Python Class (InfrahubGenerator)
+## Example prompts
 
-## Example Prompts
+- "Create a generator that takes a fabric design object and creates all spine and leaf devices with their loopback interfaces"
+- "Write a generator that creates BGP sessions between all spine-leaf pairs defined in a topology design"
+- "Generate IP address assignments for all interfaces based on a design's IP allocation scheme"
 
-## Key Rules Enforced
+## Key rules enforced
 
-### allow_upsert=True
+- **`allow_upsert=True`** — always set on `self.client.create()` calls; without it, re-running the generator creates duplicates instead of updating existing objects
+- **`delete_unused_nodes=True`** — enables automatic cleanup of objects that were created by the generator but are no longer in the design; prevents orphaned objects from accumulating over time
+- **Target group** — generator must reference a `CoreGeneratorGroup`; this is what connects design objects to the generator execution
+- **Async `generate()` method** — the method signature must be `async def generate(self, data):`
+- **GraphQL query naming** — query name must match the `query` class attribute
 
-### delete_unused_nodes=True
+## Common mistakes it catches
 
-### Target Group
+| Mistake | What the skill does instead |
+|---------|---------------------------|
+| Missing `allow_upsert=True` | Always includes it — prevents duplicate creation on re-run |
+| Missing `delete_unused_nodes=True` | Always includes it — prevents orphaned objects |
+| Sync `generate()` method | Uses `async def generate(self, data):` |
+| Missing target group configuration | Generates the `CoreGeneratorGroup` definition |
 
-### Async generate() Method
+## Running generators
 
-### GraphQL Query Naming
+Generators run automatically when a design object in their target group changes. To run a generator manually:
 
-## Common Mistakes It Catches
-
-## Running Generators
+```bash
+infrahubctl generator run <generator-name>
+```

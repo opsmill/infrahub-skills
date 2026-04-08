@@ -3,34 +3,50 @@ title: Check Creator
 sidebar_position: 3
 ---
 
-# Check Creator
+The Check Creator produces Python validation checks that run in Infrahub's proposed change pipeline. Each check consists of three components: a GraphQL query file, a Python class inheriting from `InfrahubCheck`, and a `.infrahub.yml` registration entry. The skill generates all three and ensures they are correctly wired together.
 
-## Overview
+## When to use
 
-## When to Use
+- Enforcing naming conventions on devices, interfaces, or other nodes when a change is proposed
+- Validating that required relationships are populated (e.g., every device has a primary IP)
+- Blocking changes that would violate design intent (e.g., a BGP session referencing a decommissioned device)
+- Any validation that should block a proposed change from merging
 
-## What It Produces
+## What it produces
 
-### GraphQL Query File
+Three files that must be used together:
 
-### Python Class (InfrahubCheck)
+1. **GraphQL query file** (`.gql`) — fetches the data the check needs. Named to match the `query` attribute in the Python class.
+2. **Python class** (`InfrahubCheck` subclass) — implements the `validate()` method. Uses `self.log_error()` to flag violations (which blocks the change) and `self.log_info()` for informational messages (which does not block).
+3. **`.infrahub.yml` entry** — registers the check under `check_definitions` with the class name, query name, and any parameters.
 
-### .infrahub.yml Entry
+## Example prompts
 
-## Example Prompts
+- "Create a check that validates every device has a primary IP assigned"
+- "Write a check that enforces the naming convention `<site>-<role>-<number>` for all device names"
+- "Create a check that blocks any proposed change that removes a BGP session from an active device"
 
-## Key Rules Enforced
+## Key rules enforced
 
-### Three-Component Structure
+- **Three-component structure** — all three files are always generated together; missing any one causes the check to fail at runtime
+- **`log_error()` vs `log_info()`** — `log_error()` blocks the proposed change; `log_info()` does not. The skill uses the correct one based on the intent described
+- **GraphQL query naming** — the query name in the `.gql` file must match the `query` class attribute exactly
+- **Parameter mapping** — if the check accepts parameters (e.g., to parameterize a naming pattern), the parameters are declared in both the Python class and the `.infrahub.yml` registration
+- **Error collection before logging** — errors are collected across all objects first, then logged together, rather than short-circuiting on the first error
 
-### log_error() vs log_info()
+## Common mistakes it catches
 
-### GraphQL Query Naming
+| Mistake | What the skill does instead |
+|---------|---------------------------|
+| Using `log_error()` when `log_info()` was intended | Matches the log method to the described intent |
+| Query name mismatch between `.gql` and Python class | Uses the same name in both |
+| Missing `.infrahub.yml` registration | Generates the registration entry alongside the check |
+| Short-circuiting on first error | Collects all errors before logging |
 
-### Parameter Mapping
+## Running checks
 
-### Error Collection Before Logging
+Checks run automatically in the proposed change pipeline when a change is submitted to Infrahub. To test a check locally:
 
-## Common Mistakes It Catches
-
-## Running Checks
+```bash
+infrahubctl check run <check-name>
+```

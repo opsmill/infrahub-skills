@@ -3,30 +3,45 @@ title: Analyst
 sidebar_position: 7
 ---
 
-# Analyst
-
-## Overview
+The Analyst skill queries and analyzes data from a live Infrahub instance using the Infrahub MCP server. It answers operational questions that span multiple node types — correlating data, detecting drift, tracing service impact, auditing data quality — without requiring the user to write GraphQL queries manually.
 
 ## Requirements
 
-## When to Use
+The Analyst skill requires the **Infrahub MCP server** to be configured and connected to your AI tool. See the [MCP server docs](/mcp) for setup instructions.
 
-## Types of Analysis
+:::tip
+Without MCP, the AI can still query Infrahub data by constructing GraphQL API calls directly. The interaction is more verbose and less intuitive, but functional.
+:::
 
-### Compliance
+## When to use
 
-### Service Impact
+- Answering ad-hoc operational questions about live infrastructure data
+- Cross-referencing two or more node types to find relationships or gaps
+- Investigating the blast radius of a change before executing it
+- Auditing data quality (missing fields, stale records, naming violations)
+- Exploring schema structure and data before writing a generator or check
+- Producing one-time or on-demand reports
 
-### Maintenance Windows
+## Types of analysis
 
-### Drift Detection
+| Analysis type | Example question |
+|--------------|-----------------|
+| **Compliance** | "Are all devices following the naming convention `<site>-<role>-<number>`?" |
+| **Service impact** | "Which services are hosted on devices in Rack A-03?" |
+| **Maintenance windows** | "Which devices are in a maintenance window, and what BGP sessions depend on them?" |
+| **Drift detection** | "Which realized devices differ from their topology design object?" |
+| **Capacity** | "Which racks are over 80% utilized?" |
+| **Inventory gaps** | "Which devices have no platform or OS version recorded?" |
+| **Change impact** | "What BGP sessions, services, and IP allocations depend on this prefix?" |
 
-### Capacity
+## How it works
 
-### Inventory Gaps
-
-### Change Impact
-
-## How It Works
+The skill uses MCP tools (`infrahub_query`, `infrahub_list_schema`, `infrahub_get`) to fetch data from the running instance. For multi-step analysis, queries run sequentially or in combination — data is joined in the AI's context, not in the database. The skill reports findings with counts, lists of affected objects, and suggested next steps.
 
 ## Analyst vs. Check Creator vs. Transform Creator
+
+| Use Analyst when... | Use Check Creator when... | Use Transform Creator when... |
+|-------------------|-------------------------|------------------------------|
+| Answering a one-time question | Enforcing a rule in the pipeline | Producing a repeatable scheduled report |
+| Interactive, exploratory analysis | Blocking changes that violate policy | Generating artifacts (configs, exports) |
+| No pipeline integration needed | Automated enforcement required | Output needs to be stored as a versioned artifact |
