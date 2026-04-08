@@ -10,7 +10,7 @@ The key benefit: structural mistakes — wrong relationship cardinality, missing
 ## When to use SDD vs. direct mode
 
 | Direct Mode | SDD |
-|------------|-----|
+| ------------ | ----- |
 | Adding an attribute to an existing node | Designing a new schema node with relationships |
 | Writing a single validation check | Building a generator chain |
 | Creating a menu section | Standing up a complete new domain (schema + objects + checks + generators) |
@@ -224,6 +224,7 @@ check_definitions:
 ### Result
 
 From a single natural-language description, the SDD workflow produced:
+
 - A schema with correct naming, Dropdown status, matching relationship identifiers, and uniqueness constraints
 - Seed data files with proper references
 - A working validation check registered in `.infrahub.yml`

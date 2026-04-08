@@ -13,7 +13,7 @@ A skill is a directory containing a `SKILL.md` entry point, modular rule files, 
 - **SKILL.md body** (loaded on activation) — overview, workflow steps, and pointers to supporting files. Tells the AI what to do and where to look next.
 - **Supporting files** (loaded on demand) — individual rule files organized by category, `examples.md`, `reference.md`. The AI reads only the files relevant to the current task.
 
-```
+```text
 skills/infrahub-schema-creator/
 ├── SKILL.md              # Entry point — overview and workflow
 ├── examples.md           # Concrete schema examples
@@ -32,7 +32,7 @@ The AI infers whether a skill is relevant by matching the user's request against
 
 Users can also invoke skills directly by name in Claude Code:
 
-```
+```text
 /infrahub:schema-creator
 /infrahub:object-creator
 /infrahub:check-creator
@@ -76,7 +76,7 @@ This progressive loading means a simple task like "add an attribute to this node
 ## Supported AI tools
 
 | AI Tool | Installation Method | Auto-detection | Direct Skill Invocation |
-|---------|-------------------|----------------|------------------------|
+| --------- | ------------------- | ---------------- | ------------------------ |
 | Claude Code (plugin) | `/plugin install infrahub@opsmill` | Yes (session hook) | Yes (`/infrahub:schema-creator`, etc.) |
 | Claude Code (npx) | `npx skills add` | No | Yes |
 | GitHub Copilot | `npx skills add` | No | No — passive only |

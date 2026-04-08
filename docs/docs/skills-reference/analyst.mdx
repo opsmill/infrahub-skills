@@ -25,7 +25,7 @@ Without MCP, the AI can still query Infrahub data by constructing GraphQL API ca
 ## Types of analysis
 
 | Analysis type | Example question |
-|--------------|-----------------|
+| -------------- | ----------------- |
 | **Compliance** | "Are all devices following the naming convention `<site>-<role>-<number>`?" |
 | **Service impact** | "Which services are hosted on devices in Rack A-03?" |
 | **Maintenance windows** | "Which devices are in a maintenance window, and what BGP sessions depend on them?" |
@@ -41,7 +41,7 @@ The skill uses MCP tools (`infrahub_query`, `infrahub_list_schema`, `infrahub_ge
 ## Analyst vs. Check Creator vs. Transform Creator
 
 | Use Analyst when... | Use Check Creator when... | Use Transform Creator when... |
-|-------------------|-------------------------|------------------------------|
+| ------------------- | ------------------------- | ------------------------------ |
 | Answering a one-time question | Enforcing a rule in the pipeline | Producing a repeatable scheduled report |
 | Interactive, exploratory analysis | Blocking changes that violate policy | Generating artifacts (configs, exports) |
 | No pipeline integration needed | Automated enforcement required | Output needs to be stored as a versioned artifact |

@@ -37,7 +37,7 @@ Three components:
 ## Common mistakes it catches
 
 | Mistake | What the skill does instead |
-|---------|---------------------------|
+| --------- | --------------------------- |
 | Missing `allow_upsert=True` | Always includes it — prevents duplicate creation on re-run |
 | Missing `delete_unused_nodes=True` | Always includes it — prevents orphaned objects |
 | Sync `generate()` method | Uses `async def generate(self, data):` |
