@@ -29,7 +29,7 @@ Plugin (plugin.json)
 │           schema files
 │
 ├── Skills (skills/)
-│   ├── infrahub-schema-creator/
+│   ├── infrahub-managing-schemas/
 │   │   ├── SKILL.md          ← Entry point
 │   │   ├── rules/            ← Modular rules
 │   │   │   ├── _sections.md  ← Category index
@@ -38,13 +38,13 @@ Plugin (plugin.json)
 │   │   ├── reference.md      ← Property/format tables
 │   │   └── validation.md     ← Validation guidance
 │   │
-│   ├── infrahub-object-creator/
-│   ├── infrahub-check-creator/
-│   ├── infrahub-generator-creator/
-│   ├── infrahub-transform-creator/
-│   ├── infrahub-menu-creator/
-│   ├── infrahub-analyst/
-│   ├── infrahub-repo-auditor/
+│   ├── infrahub-managing-objects/
+│   ├── infrahub-managing-checks/
+│   ├── infrahub-managing-generators/
+│   ├── infrahub-managing-transforms/
+│   ├── infrahub-managing-menus/
+│   ├── infrahub-analyzing-data/
+│   ├── infrahub-auditing-repo/
 │   │
 │   └── infrahub-common/      ← Cross-cutting refs
 │       ├── graphql-queries.md
@@ -54,8 +54,8 @@ Plugin (plugin.json)
 ├── eval.yaml                             ← skillgrade config (all skills)
 │
 └── graders/                              ← Deterministic grader scripts
-    ├── schema-creator/                   ← schema-creator graders
-    └── menu-creator/                     ← menu-creator graders
+    ├── managing-schemas/                  ← managing-schemas graders
+    └── managing-menus/                   ← managing-menus graders
 ```
 
 ## Progressive Disclosure Model
@@ -65,7 +65,7 @@ manage AI context window efficiently:
 
 ```text
 Level 1: Metadata (always loaded, ~100 words)
-  ├── name: "infrahub-schema-creator"
+  ├── name: "infrahub-managing-schemas"
   └── description: "Create and validate..."
          ↓ triggers activation
 Level 2: SKILL.md body (loaded on activation)

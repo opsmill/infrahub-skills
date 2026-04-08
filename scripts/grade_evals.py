@@ -7,7 +7,7 @@ against assertions from the eval definition, and generates benchmark reports.
 
 Usage:
     python scripts/grade_evals.py \
-        --eval-file evaluations/schema-creator.json \
+        --eval-file evaluations/managing-schemas.json \
         --results-dir eval-results \
         --output-dir eval-report
 """

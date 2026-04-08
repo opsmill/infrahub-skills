@@ -11,7 +11,7 @@ tasks:
   # --- Menu Creator --- #
   - name: flat-menu
     instruction: |
-      Read the skill at .agents/skills/infrahub-menu-creator/SKILL.md and follow its workflow and rules.
+      Read the skill at .agents/skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub menu for a small data center project. I have these schema
       nodes: DcimDevice, DcimInterface, LocationSite, and OrganizationManufacturer. I just
@@ -20,7 +20,7 @@ tasks:
       Save ONLY the final YAML file to: output.yml
     graders:
       - type: deterministic
-        run: python graders/menu-creator/check_flat_menu.py
+        run: python graders/managing-menus/check_flat_menu.py
         weight: 1.0
     expected_output: >-
       A flat menu YAML file with apiVersion: infrahub.app/v1, kind: Menu,
@@ -58,7 +58,7 @@ tasks:
 
   - name: hierarchical-menu
     instruction: |
-      Read the skill at .agents/skills/infrahub-menu-creator/SKILL.md and follow its workflow and rules.
+      Read the skill at .agents/skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
 
       Task: I need a hierarchical Infrahub menu for a network management project. I want
       two top-level groups: 'Infrastructure' (containing DcimServer, DcimSwitch, DcimPdu)
@@ -69,7 +69,7 @@ tasks:
       Save ONLY the final YAML file to: output.yml
     graders:
       - type: deterministic
-        run: python graders/menu-creator/check_hierarchical.py
+        run: python graders/managing-menus/check_hierarchical.py
         weight: 1.0
     expected_output: >-
       A menu YAML with two top-level group headers (no kind property)
@@ -115,7 +115,7 @@ tasks:
 
   - name: generic-kind-menu
     instruction: |
-      Read the skill at .agents/skills/infrahub-menu-creator/SKILL.md and follow its workflow and rules.
+      Read the skill at .agents/skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
 
       Task: I have an Infrahub project with a location hierarchy (LocationRegion,
       LocationSite, LocationRoom, LocationRack) and some device nodes (DcimDevice,
@@ -128,7 +128,7 @@ tasks:
       Save the final output to: output.yml
     graders:
       - type: deterministic
-        run: python graders/menu-creator/check_generic_kind.py
+        run: python graders/managing-menus/check_generic_kind.py
         weight: 1.0
     expected_output: >-
       A menu YAML with a Locations group that has a kind: LocationGeneric
@@ -171,7 +171,7 @@ tasks:
   # --- Schema Creator --- #
   - name: vlan-management
     instruction: |
-      Read the skill at .agents/skills/infrahub-schema-creator/SKILL.md and follow its workflow and rules.
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema for a VLAN management system. I need a VLAN node
       with an id attribute (just the VLAN number), a name, a status that should be a
@@ -181,7 +181,7 @@ tasks:
       Save ONLY the final schema YAML to: output.yml
     graders:
       - type: deterministic
-        run: python graders/schema-creator/check_vlan.py
+        run: python graders/managing-schemas/check_vlan.py
         weight: 1.0
     # -- skill-creator metadata (ignored by skillgrade) --
     expected_output: >-
@@ -225,7 +225,7 @@ tasks:
 
   - name: circuit-management
     instruction: |
-      Read the skill at .agents/skills/infrahub-schema-creator/SKILL.md and follow its workflow and rules.
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema for a circuit management system. A Circuit connects
       two endpoints (side A and side Z). Each CircuitEndpoint is installed in a specific
@@ -238,7 +238,7 @@ tasks:
       Save ONLY the final schema YAML to: output.yml
     graders:
       - type: deterministic
-        run: python graders/schema-creator/check_circuit.py
+        run: python graders/managing-schemas/check_circuit.py
         weight: 1.0
     expected_output: >-
       A schema with multiple bidirectional relationship pairs, all with
@@ -286,7 +286,7 @@ tasks:
 
   - name: location-hierarchy
     instruction: |
-      Read the skill at .agents/skills/infrahub-schema-creator/SKILL.md and follow its workflow and rules.
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema for a location hierarchy: Region > Site > Room > Rack.
       Each level has a name and shortname. Objects should be easily identifiable in the UI.
@@ -295,7 +295,7 @@ tasks:
       Save ONLY the final schema YAML to: output.yml
     graders:
       - type: deterministic
-        run: python graders/schema-creator/check_location.py
+        run: python graders/managing-schemas/check_location.py
         weight: 1.0
     expected_output: >-
       A hierarchical schema using a generic with hierarchical: true,

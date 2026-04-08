@@ -1,0 +1,40 @@
+{
+  "skill_name": "infrahub-managing-objects",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create an Infrahub object file for IP prefixes (kind: IpamPrefix). Each prefix has attributes: prefix (IPNetwork), status (Dropdown: active/reserved/available), and description (Text). Each prefix has a relationship called 'location' that targets LocationGeneric (a generic type that does NOT have human_friendly_id defined). LocationSite is a concrete type that inherits from LocationGeneric and has human_friendly_id: [\"name__value\"]. Create the object file with these prefixes:\n- 10.0.0.0/24, status: active, description: 'Management network', location: site named 'Acacias'\n- 10.1.0.0/24, status: reserved, description: 'Guest network', location: site named 'CheneBourg'\n- 10.2.0.0/24, status: active, description: 'Server network', no location",
+      "expected_output": "A valid Infrahub object YAML file that correctly references LocationSite through the LocationGeneric relationship using inline data blocks with kind: LocationSite",
+      "files": [],
+      "expectations": [
+        "Location references use inline data blocks with kind: LocationSite, not direct scalar HFID references",
+        "The object file has correct apiVersion: infrahub.app/v1 and kind: Object structure",
+        "Prefixes without a location do not include a location field or have it set to null",
+        "The inline data block contains only the name field needed for HFID matching",
+        "All three prefixes are present with correct attributes"
+      ],
+      "assertions": [
+        {
+          "name": "generic-rel-inline-data",
+          "check": "Location relationships use inline data blocks with kind: LocationSite and data: list, not scalar HFID references"
+        },
+        {
+          "name": "apiversion-and-kind",
+          "check": "File has apiVersion: infrahub.app/v1 and kind: Object"
+        },
+        {
+          "name": "no-scalar-location",
+          "check": "No location field is a plain string scalar (would fail against LocationGeneric)"
+        },
+        {
+          "name": "all-prefixes-present",
+          "check": "All three prefixes (10.0.0.0/24, 10.1.0.0/24, 10.2.0.0/24) are present"
+        },
+        {
+          "name": "null-location-handled",
+          "check": "The prefix without a location either omits the field or sets it to null/empty"
+        }
+      ]
+    }
+  ]
+}

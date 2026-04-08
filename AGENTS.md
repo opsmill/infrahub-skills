@@ -36,14 +36,14 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 
 | Skill | Directory | Description |
 | ------- | ----------- | ------------- |
-| `infrahub-schema-creator` | `skills/infrahub-schema-creator/` | Schema nodes, generics, attributes, relationships |
-| `infrahub-object-creator` | `skills/infrahub-object-creator/` | YAML data files for infrastructure objects |
-| `infrahub-check-creator` | `skills/infrahub-check-creator/` | Python validation checks for proposed changes |
-| `infrahub-generator-creator` | `skills/infrahub-generator-creator/` | Design-driven automation |
-| `infrahub-transform-creator` | `skills/infrahub-transform-creator/` | Data transforms (Python/Jinja2) |
-| `infrahub-menu-creator` | `skills/infrahub-menu-creator/` | Custom navigation menus |
-| `infrahub-analyst` | `skills/infrahub-analyst/` | Live data analysis via MCP server |
-| `infrahub-repo-auditor` | `skills/infrahub-repo-auditor/` | Audit repository against best practices |
+| `infrahub-managing-schemas` | `skills/infrahub-managing-schemas/` | Schema nodes, generics, attributes, relationships |
+| `infrahub-managing-objects` | `skills/infrahub-managing-objects/` | YAML data files for infrastructure objects |
+| `infrahub-managing-checks` | `skills/infrahub-managing-checks/` | Python validation checks for proposed changes |
+| `infrahub-managing-generators` | `skills/infrahub-managing-generators/` | Design-driven automation |
+| `infrahub-managing-transforms` | `skills/infrahub-managing-transforms/` | Data transforms (Python/Jinja2) |
+| `infrahub-managing-menus` | `skills/infrahub-managing-menus/` | Custom navigation menus |
+| `infrahub-analyzing-data` | `skills/infrahub-analyzing-data/` | Live data analysis via MCP server |
+| `infrahub-auditing-repo` | `skills/infrahub-auditing-repo/` | Audit repository against best practices |
 
 ### Key Directories
 
