@@ -173,6 +173,29 @@
   color: "c9510c"
 
 # ----------------------------------
+# CHANGES (version bump triggers)
+# ----------------------------------
+- name: "changes/major"
+  description: "Bump major version (breaking change)"
+  color: "b60205"
+
+- name: "changes/minor"
+  description: "Bump minor version (new feature)"
+  color: "ff9f1c"
+
+- name: "changes/patch"
+  description: "Bump patch version (bug fix)"
+  color: "cfda2c"
+
+- name: "type/refactoring"
+  description: "Code refactoring or improvement"
+  color: "a2eeef"
+
+- name: "type/breaking-change"
+  description: "Breaking change requiring major version bump"
+  color: "b60205"
+
+# ----------------------------------
 # CI
 # ----------------------------------
 - name: "ci/skip-changelog"
