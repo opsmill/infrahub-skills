@@ -5,7 +5,7 @@ description: >-
   DO NOT TRIGGER directly — loaded automatically by other Infrahub skills when they need shared references.
 user-invocable: false
 metadata:
-  version: 1.1.0
+  version: 0.0.1
   author: OpsMill
 ---
 
