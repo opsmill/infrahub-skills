@@ -13,6 +13,9 @@ permissions:
 
 jobs:
   sync-versions:
+    # Skip when auto-bump already handled the sync
+    if: >-
+      !startsWith(github.event.head_commit.message, 'chore(release):')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
