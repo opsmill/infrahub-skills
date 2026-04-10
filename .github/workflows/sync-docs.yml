@@ -1,10 +1,12 @@
 ---
-name: Sync Folders
+# yamllint disable rule:truthy rule:truthy rule:line-length
+name: Sync Docs Folders
 
-"on":
+on:
+  workflow_dispatch:
   push:
     branches:
-      - main
+      - stable
     paths:
       - 'docs/docs/**'
       - 'docs/sidebars.ts'
