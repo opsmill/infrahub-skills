@@ -76,13 +76,13 @@ Run `/speckit.plan`. The AI reads `spec.md` and the Infrahub skills to produce `
 
 > **Plan Summary**
 >
-> 1. **Schema** (Schema Creator) — Define `IpamVLAN` and `IpamVLANGroup` nodes in the `Ipam` namespace.
+> 1. **Schema** (Schema Manager) — Define `IpamVLAN` and `IpamVLANGroup` nodes in the `Ipam` namespace.
 >    - `IpamVLAN`: attributes `name` (Text), `vlan_id` (Number), `status` (Dropdown), `role` (Text, optional). Relationship to `IpamVLANGroup` (many-to-one).
 >    - `IpamVLANGroup`: attribute `name` (Text). Relationship back to `IpamVLAN` (one-to-many).
 >    - Both nodes get `human_friendly_id` and `display_label`.
 >    - Uniqueness constraint on VLAN: `[vlan_id__value, group]`.
-> 2. **Object data** (Object Creator) — Seed two VLAN groups and sample VLANs.
-> 3. **Validation check** (Check Creator) — Python check querying VLANs per group, flagging duplicates. Register in `.infrahub.yml`.
+> 2. **Object data** (Object Manager) — Seed two VLAN groups and sample VLANs.
+> 3. **Validation check** (Check Manager) — Python check querying VLANs per group, flagging duplicates. Register in `.infrahub.yml`.
 >
 > **Dependencies:** Schema must be loaded before objects. Check depends on schema being present.
 
@@ -111,7 +111,7 @@ Run `/speckit.tasks`. The AI breaks the plan into discrete steps in `tasks.md`:
 
 Run `/speckit.implement`. The AI executes each task using the appropriate Infrahub skill.
 
-**Task 1 output** — `schemas/vlan_management.yml` (via Schema Creator):
+**Task 1 output** — `schemas/vlan_management.yml` (via Schema Manager):
 
 ```yaml
 version: "1.0"
@@ -187,7 +187,7 @@ nodes:
         identifier: "group__vlans"
 ```
 
-**Task 4 output** — `checks/check_vlan_id_uniqueness/check.py` (via Check Creator):
+**Task 4 output** — `checks/check_vlan_id_uniqueness/check.py` (via Check Manager):
 
 ```python
 from infrahub_sdk.checks import InfrahubCheck

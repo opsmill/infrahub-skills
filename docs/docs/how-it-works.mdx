@@ -14,7 +14,7 @@ A skill is a directory containing a `SKILL.md` entry point, modular rule files, 
 - **Supporting files** (loaded on demand) — individual rule files organized by category, `examples.md`, `reference.md`. The AI reads only the files relevant to the current task.
 
 ```text
-skills/infrahub-schema-creator/
+skills/infrahub-managing-schemas/
 ├── SKILL.md              # Entry point — overview and workflow
 ├── examples.md           # Concrete schema examples
 ├── reference.md          # Attribute types, relationship kinds
@@ -28,14 +28,14 @@ skills/infrahub-schema-creator/
 
 ## How skills are triggered
 
-The AI infers whether a skill is relevant by matching the user's request against each skill's description. When a user asks "create a schema for VLAN management," the AI recognizes this matches the Schema Creator skill, activates it, and reads its `SKILL.md` to understand how to proceed.
+The AI infers whether a skill is relevant by matching the user's request against each skill's description. When a user asks "create a schema for VLAN management," the AI recognizes this matches the Schema Manager skill, activates it, and reads its `SKILL.md` to understand how to proceed.
 
 Users can also invoke skills directly by name in Claude Code:
 
 ```text
-/infrahub:schema-creator
-/infrahub:object-creator
-/infrahub:check-creator
+/infrahub:managing-schemas
+/infrahub:managing-objects
+/infrahub:managing-checks
 ```
 
 For tools other than Claude Code, skill activation is passive — the AI finds skill files through its normal file context and applies them when the request is relevant. No explicit invocation is needed.
@@ -77,7 +77,7 @@ This progressive loading means a simple task like "add an attribute to this node
 
 | AI Tool | Installation Method | Auto-detection | Direct Skill Invocation |
 | --------- | ------------------- | ---------------- | ------------------------ |
-| Claude Code (plugin) | `/plugin install infrahub@opsmill` | Yes (session hook) | Yes (`/infrahub:schema-creator`, etc.) |
+| Claude Code (plugin) | `/plugin install infrahub@opsmill` | Yes (session hook) | Yes (`/infrahub:managing-schemas`, etc.) |
 | Claude Code (npx) | `npx skills add` | No | Yes |
 | GitHub Copilot | `npx skills add` | No | No — passive only |
 | Cursor | `npx skills add` | No | No — passive only |
@@ -88,4 +88,4 @@ This progressive loading means a simple task like "add an attribute to this node
 
 **Auto-detection** means the tool automatically recognizes an Infrahub project and activates skills without the user explicitly asking. This is a Claude Code plugin feature via the session start hook.
 
-**Direct skill invocation** means the user can call a skill by name (e.g., `/infrahub:schema-creator`). This is a Claude Code feature. All other tools are passive — they read skill content as context when the request is relevant. For passive tools, describe what you want and the AI applies the right skill automatically.
+**Direct skill invocation** means the user can call a skill by name (e.g., `/infrahub:managing-schemas`). This is a Claude Code feature. All other tools are passive — they read skill content as context when the request is relevant. For passive tools, describe what you want and the AI applies the right skill automatically.

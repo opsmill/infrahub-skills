@@ -23,7 +23,7 @@ Produce YAML data files for infrastructure objects — devices, locations, organ
 
 ### Query and analyze a live instance
 
-The Analyst skill connects to a running Infrahub instance via MCP and answers operational questions directly: cross-node correlation, drift detection, blast-radius analysis, and data quality audits — without writing GraphQL queries manually.
+The Data Analyzer skill connects to a running Infrahub instance via MCP and answers operational questions directly: cross-node correlation, drift detection, blast-radius analysis, and data quality audits — without writing GraphQL queries manually.
 
 ### Audit your repository
 
@@ -51,14 +51,14 @@ For full lifecycle workflows. The AI generates files, loads them with `infrahubc
 
 | Skill | What it does |
 | ------- | ------------- |
-| [Schema Creator](./skills-reference/schema-creator.mdx) | Creates and validates Infrahub schema YAML from natural language |
-| [Object Creator](./skills-reference/object-creator.mdx) | Produces YAML data files for infrastructure objects |
-| [Check Creator](./skills-reference/check-creator.mdx) | Builds Python validation checks for proposed change pipelines |
-| [Generator Creator](./skills-reference/generator-creator.mdx) | Creates design-driven generators that auto-create infrastructure objects |
-| [Transform Creator](./skills-reference/transform-creator.mdx) | Builds Python or Jinja2 transforms for config generation and data export |
-| [Menu Creator](./skills-reference/menu-creator.mdx) | Designs custom navigation menus for the Infrahub web UI |
-| [Analyst](./skills-reference/analyst.mdx) | Queries and analyzes live Infrahub data via MCP |
-| [Repo Auditor](./skills-reference/repo-auditor.mdx) | Audits a repository against Infrahub best practices |
+| [Schema Manager](./skills-reference/managing-schemas.mdx) | Creates and validates Infrahub schema YAML from natural language |
+| [Object Manager](./skills-reference/managing-objects.mdx) | Produces YAML data files for infrastructure objects |
+| [Check Manager](./skills-reference/managing-checks.mdx) | Builds Python validation checks for proposed change pipelines |
+| [Generator Manager](./skills-reference/managing-generators.mdx) | Creates design-driven generators that auto-create infrastructure objects |
+| [Transform Manager](./skills-reference/managing-transforms.mdx) | Builds Python or Jinja2 transforms for config generation and data export |
+| [Menu Manager](./skills-reference/managing-menus.mdx) | Designs custom navigation menus for the Infrahub web UI |
+| [Data Analyzer](./skills-reference/analyzing-data.mdx) | Queries and analyzes live Infrahub data via MCP |
+| [Repo Auditor](./skills-reference/auditing-repo.mdx) | Audits a repository against Infrahub best practices |
 
 A shared reference library (`infrahub-common`) provides GraphQL query syntax, `.infrahub.yml` configuration format, and YAML structure conventions to all skills.
 
@@ -79,4 +79,4 @@ See [Installation & Setup](./installation-setup.mdx) for tool-specific configura
 - **Get started** — [Installation & Setup](./installation-setup.mdx)
 - **Understand the architecture** — [How It Works](./how-it-works.mdx)
 - **Plan a complex build** — [Spec-Driven Development](./spec-driven-development.mdx)
-- **Explore individual skills** — [Skills Reference](./skills-reference/schema-creator.mdx)
+- **Explore individual skills** — [Skills Reference](./skills-reference/managing-schemas.mdx)
