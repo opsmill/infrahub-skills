@@ -1,0 +1,27 @@
+.github/workflows/version-sync.yml
+  951e315efb6ec0b7 38
+scripts/sync-versions.sh
+  951e315efb6ec0b7 25-30
+.github/workflows/release.yml
+  951e315efb6ec0b7 41-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.6",
+  "base_commit_sha": "40e452cf59550fd23eb75ef149762213ad55b10b",
+  "prompts": {
+    "951e315efb6ec0b7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1ca7aeb7-7506-4e9c-8d03-9056791b19bc",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Benoit Kohler",
+      "messages": [],
+      "total_additions": 16,
+      "total_deletions": 1,
+      "accepted_lines": 16,
+      "overriden_lines": 0
+    }
+  }
+}
