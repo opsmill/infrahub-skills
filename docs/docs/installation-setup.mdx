@@ -11,9 +11,9 @@ Infrahub Skills can be installed into any AI tool that supports skills or custom
 ## Prerequisites
 
 - **AI coding assistant** — any tool that supports the Agent Skills format or reads custom context files: Claude Code, GitHub Copilot, Cursor, Windsurf, Amp, Cline, Codex, and others
-- **Infrahub instance** — version 1.7 or later (earlier versions may work but are not tested). See the [Infrahub installation docs](/) for setup instructions
-- **infrahubctl** — required for loading generated schemas, objects, and running generators. See the [infrahubctl docs](/infrahubctl)
-- **Infrahub MCP server** (optional) — required only for the [Data Analyzer](./skills-reference/analyzing-data.mdx) skill, beneficial but not required for other skills. See the [MCP server docs](/mcp)
+- **Infrahub instance** — version 1.7 or later (earlier versions may work but are not tested). See the [Infrahub installation docs](https://docs.infrahub.app/) for setup instructions
+- **infrahubctl** — required for loading generated schemas, objects, and running generators. See the [infrahubctl docs](https://docs.infrahub.app/infrahubctl)
+- **Infrahub MCP server** (optional) — required only for the [Data Analyzer](./skills-reference/analyzing-data.mdx) skill, beneficial but not required for other skills. See the [MCP server docs](https://docs.infrahub.app/mcp)
 
 ## Installation
 
@@ -108,7 +108,7 @@ No additional configuration required after plugin install. The session hook fire
 
 The [Data Analyzer](./skills-reference/analyzing-data.mdx) skill uses the Infrahub MCP server to query live data from a running instance. All other skills work without it.
 
-See the [Infrahub MCP server docs](/mcp) for setup instructions.
+See the [Infrahub MCP server docs](https://docs.infrahub.app/mcp) for setup instructions.
 
 :::tip
 Without MCP, the AI can still query Infrahub data by constructing GraphQL API calls directly. The interaction is more verbose, but functional.
