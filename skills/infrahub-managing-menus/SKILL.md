@@ -14,7 +14,7 @@ allowed-tools:
   - Bash
 argument-hint: "[menu-structure-description]"
 metadata:
-  version: 1.2.0
+  version: 1.2.1
   author: OpsMill
 ---
 

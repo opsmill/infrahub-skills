@@ -15,7 +15,7 @@ allowed-tools:
   - Grep
 argument-hint: "[check-name] [description...]"
 metadata:
-  version: 1.2.0
+  version: 1.2.1
   author: OpsMill
 ---
 

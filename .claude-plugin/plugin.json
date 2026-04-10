@@ -1,6 +1,6 @@
 {
   "name": "infrahub",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "A Claude Code plugin to support developing on top of Infrahub. Includes skills for schemas, objects, checks, generators, transforms, menus, and data analysis.",
   "author": {
     "name": "Solution Engineering and Architecture",
