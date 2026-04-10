@@ -90,6 +90,62 @@ GraphQL to fetch data from Infrahub. The query syntax has
 Infrahub-specific conventions. Reference:
 `skills/infrahub-common/graphql-queries.md`.
 
+## Metadata: Source, Owner, and Protection
+
+Every attribute and relationship value in Infrahub
+carries metadata that tracks lineage, ownership, and
+protection.
+
+### Source
+
+**"Where did this data come from?"**
+
+Source is purely informational — it records the origin
+of a data point. It can be an `Account` or a
+`Repository`. Source has **no access-control
+implications**. It does not restrict who can edit the
+data. Use it for lineage tracking (e.g., marking data
+as imported from a spreadsheet sync or an external
+system).
+
+### Owner
+
+**"Who is responsible for this data?"**
+
+Owner designates who manages a data point. It can be
+a `Group`, an `Account`, or a `Repository`. Owner is
+the field that controls **write access** when
+protection is enabled.
+
+### is_protected
+
+When `is_protected` is `true` on a value, **only the
+owner** (and admin accounts) can modify that specific
+attribute. Non-owner users and systems cannot update
+protected fields.
+
+`is_protected` relates exclusively to **owner**, not
+source. Source remains a lineage label regardless of
+protection status.
+
+### Common Patterns
+
+| Scenario | Source | Owner | is_protected |
+| -------- | ------ | ----- | ------------ |
+| One-time import, then human-maintained | Sync tool (lineage) | Human team/group | `true` — only owner group can edit |
+| Continuously synced from external system | Sync tool | Sync tool | `true` — prevents manual overrides |
+| Manually created data | Creating user | Team/group responsible | `true` or `false` depending on policy |
+| Reference/seed data nobody should edit | Admin account | Admin account | `true` |
+
+### Key Misconception
+
+Source does **not** control who can modify data.
+A common mistake is assuming that setting source on
+synced data will prevent humans from editing it —
+only owner + `is_protected: true` enforces that.
+Conversely, setting source on imported data does not
+prevent the owner from freely editing it afterward.
+
 ## Proposed Changes
 
 Infrahub uses a branch-based workflow. A proposed
