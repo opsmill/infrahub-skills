@@ -4,7 +4,7 @@ requires-python = ">=3.10"
 
 [[package]]
 name = "infrahub-skills"
-version = "0.1.0"
+version = "1.2.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]
@@ -18,9 +18,9 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "invoke" },
+    { name = "invoke", specifier = ">=2.2.0" },
     { name = "rumdl" },
-    { name = "yamllint" },
+    { name = "yamllint", specifier = ">=1.37.1" },
 ]
 
 [[package]]
