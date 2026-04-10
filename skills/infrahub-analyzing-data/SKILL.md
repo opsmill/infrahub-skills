@@ -10,7 +10,7 @@ allowed-tools:
   - Bash
 argument-hint: "[question about infrastructure data]"
 metadata:
-  version: 0.0.2
+  version: 1.2.0
   author: OpsMill
 ---
 

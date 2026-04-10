@@ -35,7 +35,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add skills/*/SKILL.md .github/.release-manifest.json
+          git add skills/*/SKILL.md .github/.release-manifest.json pyproject.toml
           if git diff --staged --quiet; then
             echo "All versions already in sync"
             exit 0

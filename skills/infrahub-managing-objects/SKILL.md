@@ -16,7 +16,7 @@ allowed-tools:
   - Bash
 argument-hint: "[kind] [object-details...]"
 metadata:
-  version: 0.0.2
+  version: 1.2.0
   author: OpsMill
 ---
 
