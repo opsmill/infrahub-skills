@@ -14,7 +14,7 @@ allowed-tools:
   - Grep
 argument-hint: "[generator-name] [description...]"
 metadata:
-  version: 0.0.1
+  version: 0.0.2
   author: OpsMill
 ---
 
