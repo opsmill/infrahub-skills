@@ -2,7 +2,7 @@
 # Configuration for release-drafter/release-drafter.
 # Generates categorized release notes from merged PRs.
 
-name-template: "v$RESOLVED_VERSION"
+name-template: "Version $RESOLVED_VERSION"
 tag-template: "v$RESOLVED_VERSION"
 
 template: |
