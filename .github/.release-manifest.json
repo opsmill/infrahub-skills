@@ -1,13 +1,13 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.1",
   "skills": [
-    "infrahub-schema-creator",
-    "infrahub-object-creator",
-    "infrahub-check-creator",
-    "infrahub-generator-creator",
-    "infrahub-transform-creator",
-    "infrahub-menu-creator",
-    "infrahub-repo-auditor",
-    "infrahub-analyst"
+    "infrahub-managing-schemas",
+    "infrahub-managing-objects",
+    "infrahub-managing-checks",
+    "infrahub-managing-generators",
+    "infrahub-managing-transforms",
+    "infrahub-managing-menus",
+    "infrahub-auditing-repo",
+    "infrahub-analyzing-data"
   ]
 }

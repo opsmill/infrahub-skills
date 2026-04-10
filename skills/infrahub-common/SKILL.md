@@ -1,15 +1,11 @@
 ---
 name: infrahub-common
 description: >-
-  Shared references and cross-cutting rules used by all
-  Infrahub skills. Contains GraphQL query syntax, .infrahub.yml
-  configuration format, and common rules for git integration,
-  display label caching, and Python environment setup.
-  DO NOT TRIGGER directly — loaded automatically by other
-  Infrahub skills when they need shared references.
+  Shared references and cross-cutting rules for all Infrahub skills — GraphQL syntax, .infrahub.yml format, and common patterns.
+  DO NOT TRIGGER directly — loaded automatically by other Infrahub skills when they need shared references.
 user-invocable: false
 metadata:
-  version: 1.1.0
+  version: 1.2.1
   author: OpsMill
 ---
 

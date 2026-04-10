@@ -20,6 +20,11 @@ yaml_all: &yaml_all
 markdown_all: &markdown_all
   - "**/*.{md,mdx}"
 
+skills_all: &skills_all
+  - "skills/**"
+  - "graders/**"
+  - "eval.yaml"
+
 documentation_all:
   - *doc_files
   - *markdown_all

@@ -25,11 +25,72 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # Discover skills from eval.yaml (no hardcoded list)
+  # ---------------------------------------------------------------------------
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.parse.outputs.matrix }}
+      has-skills: ${{ steps.parse.outputs.has-skills }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Parse skill groups from eval.yaml
+        id: parse
+        run: |
+          MATRIX=$(python -c "
+          import yaml, json
+
+          with open('eval.yaml') as f:
+              config = yaml.safe_load(f)
+
+          # Group task names by skill (extracted from grader paths)
+          skill_tasks = {}
+          for task in config.get('tasks', []):
+              task_name = task.get('name', '')
+              for g in task.get('graders', []):
+                  parts = g.get('run', '').split('/')
+                  if len(parts) >= 3 and 'graders' in parts[0]:
+                      skill = parts[1]
+                      skill_tasks.setdefault(skill, []).append(task_name)
+                      break
+
+          # Build matrix: each entry has skill name + comma-separated eval names
+          include = []
+          for skill in sorted(skill_tasks):
+              include.append({
+                  'skill': skill,
+                  'evals': ','.join(skill_tasks[skill]),
+              })
+          print(json.dumps({'include': include}))
+          ")
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          SKILL_COUNT=$(echo "$MATRIX" | python -c "import sys,json; print(len(json.load(sys.stdin)['include']))")
+          if [ "$SKILL_COUNT" -gt 0 ]; then
+            echo "has-skills=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-skills=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Discovered $SKILL_COUNT skill(s): $MATRIX"
+
+  # ---------------------------------------------------------------------------
   # Run skillgrade per skill (parallel matrix)
   # ---------------------------------------------------------------------------
   eval:
+    needs: discover
+    if: needs.discover.outputs.has-skills == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    strategy:
+      matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
+      fail-fast: false
     steps:
       - uses: actions/checkout@v6
 
@@ -44,9 +105,9 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pyyaml
-          npm i -g skillgrade
+          npm i -g skillgrade @anthropic-ai/claude-code
 
-      - name: Run skillgrade
+      - name: Run skillgrade (${{ matrix.skill }})
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
@@ -54,13 +115,14 @@ jobs:
             --${{ inputs.preset || 'smoke' }} \
             --ci \
             --provider=local \
+            --eval="${{ matrix.evals }}" \
             --output=eval-results
 
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eval-results
+          name: eval-results-${{ matrix.skill }}
           path: eval-results/
           retention-days: 30
 
@@ -75,7 +137,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts/
-          pattern: eval-results
+          pattern: eval-results-*
 
       - name: Post evaluation summary as PR comment
         uses: actions/github-script@v7
@@ -95,7 +157,6 @@ jobs:
                 {withFileTypes: true})) {
               if (!entry.isDirectory()) continue;
               const resultDir = path.join(artifactsDir, entry.name);
-              // Walk for .md report files
               const walk = (dir) => {
                 for (const f of fs.readdirSync(dir, {withFileTypes: true})) {
                   const full = path.join(dir, f.name);

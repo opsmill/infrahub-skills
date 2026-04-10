@@ -19,6 +19,7 @@ jobs:
       markdown: ${{ steps.changes.outputs.markdown_all }}
       yaml: ${{ steps.changes.outputs.yaml_all }}
       skills: ${{ steps.changes.outputs.skills_all }}
+      documentation: ${{ steps.changes.outputs.documentation_all }}
     steps:
       - uses: actions/checkout@v6
       - uses: opsmill/paths-filter@v3.0.2
@@ -51,10 +52,29 @@ jobs:
       - run: yamllint -c .yamllint.yml .
 
   # ---------------------------------------------------------------------------
+  # Build documentation (Docusaurus)
+  # ---------------------------------------------------------------------------
+  docs-build:
+    needs: files-changed
+    if: needs.files-changed.outputs.documentation == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+      - run: npm ci
+        working-directory: docs
+      - run: npm run build
+        working-directory: docs
+
+  # ---------------------------------------------------------------------------
   # Run skill evaluations (reusable workflow)
   # ---------------------------------------------------------------------------
-  # skill-evals:
-  #   needs: files-changed
-  #   if: needs.files-changed.outputs.skills == 'true'
-  #   uses: ./.github/workflows/skill-evals.yml
-  #   secrets: inherit
+  skill-evals:
+    needs: files-changed
+    if: needs.files-changed.outputs.skills == 'true'
+    uses: ./.github/workflows/skill-evals.yml
+    secrets: inherit

@@ -1,14 +1,14 @@
 [project]
 name = "infrahub-skills"
-version = "0.1.0"
+version = "1.2.1"
 description = "Claude Code plugin for Infrahub"
 requires-python = ">=3.10"
 
 [dependency-groups]
 dev = [
     "rumdl",
-    "invoke",
-    "yamllint",
+    "invoke>=2.2.0",
+    "yamllint>=1.37.1",
 ]
 
 [tool.rumdl]
