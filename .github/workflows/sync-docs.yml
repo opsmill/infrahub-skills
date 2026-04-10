@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: opsmill/infrahub-docs
-          token: ${{ secrets.PAT_TOKEN }}
+          token: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}
           path: target-repo
 
       - name: Sync folders
