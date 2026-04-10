@@ -58,7 +58,7 @@ const config: Config = {
       items: [
         {
           type: "docSidebar",
-          sidebarId: "InfrahubSkillsSidebar",
+          sidebarId: "AISkillsSidebar",
           position: "left",
           label: "Infrahub Skills",
         },
