@@ -1,0 +1,25 @@
+.github/workflows/auto-bump.yml
+  740a92d170098496 125
+.github/workflows/release-drafter.yml
+  740a92d170098496 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "cde7df0ffacb4a57a1c3895286d409b0630cc606",
+  "prompts": {
+    "740a92d170098496": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "13ad61ee-0549-497d-86c2-2e935cececfd",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Benoit Kohler",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
