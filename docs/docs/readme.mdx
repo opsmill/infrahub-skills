@@ -1,11 +1,82 @@
 ---
 title: Infrahub Skills
+sidebar_position: 1
 ---
 
-# Infrahub Skills
+Infrahub Skills is an open-source AI skills package that gives your AI coding assistant built-in knowledge of Infrahub's data model, conventions, and workflow patterns. Instead of learning the platform from documentation alone, describe what you want to build in plain language and the skills produce valid, best-practice Infrahub resources — schemas, object data, generators, transforms, checks, and menus — ready to load into a running instance.
 
-Welcome to the Infrahub Skills documentation.
+The skills cover the full Infrahub development lifecycle. Each skill embeds the rules, examples, and references the AI needs for a specific task, and loads only the context required — so the assistant stays focused and accurate without exhausting its context window.
 
-## Getting Started
+## What you can do with it
 
-Add your documentation content here.
+### Design and build your data model
+
+Describe your data model in plain language and the skills produce a valid Infrahub schema — node types, attribute kinds, relationships, generics, display properties — without requiring manual study of the schema format. Naming conventions, relationship identifiers, and attribute type rules are applied at the point of generation.
+
+### Build generators, transforms, and checks
+
+Create Python generators that auto-create infrastructure objects from design definitions. Write Python or Jinja2 transforms that convert Infrahub data to device configs, reports, or other formats. Build validation checks that run in proposed change pipelines — with Infrahub-specific conventions handled automatically.
+
+### Populate and manage data
+
+Produce YAML data files for infrastructure objects — devices, locations, organizations, interfaces — with correct file structure, value mappings, and load order. Generate batches of objects from descriptions or seed data for new instances.
+
+### Query and analyze a live instance
+
+The Data Analyzer skill connects to a running Infrahub instance via MCP and answers operational questions directly: cross-node correlation, drift detection, blast-radius analysis, and data quality audits — without writing GraphQL queries manually.
+
+### Audit your repository
+
+Run a comprehensive audit of an Infrahub repository against all best practices. The Repo Auditor checks schema files, object files, Python components, `.infrahub.yml` registration, and project structure — then reports what to fix and why.
+
+### Customize the UI
+
+Design custom navigation menus for the Infrahub web interface — sidebar structure, section groupings, icons, and ordering — from a plain language description.
+
+## Three ways to work
+
+### Direct mode
+
+For well-scoped, single-skill tasks. Describe what you need and the AI matches it to the right skill automatically. Best for adding an attribute, creating a check, populating a batch of objects, or any task that maps to a single skill.
+
+### Spec-Driven Development (SDD)
+
+For complex or multi-part builds. The AI reasons through requirements with you first — capturing what needs to be built, validating the approach against Infrahub conventions, and laying out a task plan for review. Nothing is generated until you approve the plan. Best for designing new schema domains, building generator chains, or any task that involves design decisions across multiple skills. See [Spec-Driven Development](./spec-driven-development.mdx) for details.
+
+### End-to-end execution
+
+For full lifecycle workflows. The AI generates files, loads them with `infrahubctl`, validates the result, and iterates if something fails — all in a single session.
+
+## Skills included
+
+| Skill | What it does |
+| ------- | ------------- |
+| [Schema Manager](./skills-reference/managing-schemas.mdx) | Creates and validates Infrahub schema YAML from natural language |
+| [Object Manager](./skills-reference/managing-objects.mdx) | Produces YAML data files for infrastructure objects |
+| [Check Manager](./skills-reference/managing-checks.mdx) | Builds Python validation checks for proposed change pipelines |
+| [Generator Manager](./skills-reference/managing-generators.mdx) | Creates design-driven generators that auto-create infrastructure objects |
+| [Transform Manager](./skills-reference/managing-transforms.mdx) | Builds Python or Jinja2 transforms for config generation and data export |
+| [Menu Manager](./skills-reference/managing-menus.mdx) | Designs custom navigation menus for the Infrahub web UI |
+| [Data Analyzer](./skills-reference/analyzing-data.mdx) | Queries and analyzes live Infrahub data via MCP |
+| [Repo Auditor](./skills-reference/auditing-repo.mdx) | Audits a repository against Infrahub best practices |
+
+A shared reference library (`infrahub-common`) provides GraphQL query syntax, `.infrahub.yml` configuration format, and YAML structure conventions to all skills.
+
+## Compatibility
+
+Infrahub Skills works with any AI tool that supports the Agent Skills format or reads custom context files from the project directory:
+
+- **Claude Code** — full support including auto-detection and direct skill invocation
+- **GitHub Copilot** — passive skill activation from project context
+- **Cursor** — passive skill activation from project context
+- **Windsurf** — passive skill activation from project context
+- **Amp, Cline, Codex** — passive skill activation from project context
+
+See [Installation & Setup](./installation-setup.mdx) for tool-specific configuration.
+
+## Next steps
+
+- **Get started** — [Installation & Setup](./installation-setup.mdx)
+- **Understand the architecture** — [How It Works](./how-it-works.mdx)
+- **Plan a complex build** — [Spec-Driven Development](./spec-driven-development.mdx)
+- **Explore individual skills** — [Skills Reference](./skills-reference/managing-schemas.mdx)

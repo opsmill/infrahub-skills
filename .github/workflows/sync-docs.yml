@@ -27,10 +27,10 @@ jobs:
 
       - name: Sync folders
         run: |
-          rm -rf target-repo/docs/docs-infrahub-skills/*
-          rm -f target-repo/docs/sidebars-infrahub-skills.ts
-          cp -r source-repo/docs/docs/* target-repo/docs/docs-infrahub-skills/
-          cp source-repo/docs/sidebars.ts target-repo/docs/sidebars-infrahub-skills.ts
+          rm -rf target-repo/docs/docs-ai-skills/*
+          rm -f target-repo/docs/sidebars-ai-skills.ts
+          cp -r source-repo/docs/docs/* target-repo/docs/docs-ai-skills/
+          cp source-repo/docs/sidebars.ts target-repo/docs/sidebars-ai-skills.ts
           cd target-repo
           git config user.name github-actions
           git config user.email github-actions@github.com
