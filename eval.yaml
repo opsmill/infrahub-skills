@@ -333,3 +333,149 @@ tasks:
         check: "Schema starts with version: '1.0'"
       - name: correct-hierarchy-chain
         check: "Parent/children chain: Region->Site->Room->Rack"
+
+  # --- Execution Discipline --- #
+  # These tasks target the execution-* rules in
+  # skills/infrahub-common/rules/. They are designed to expose
+  # failure modes (speculative additions, drive-by edits, silent
+  # assumptions) that the existing pattern-matching graders in
+  # managing-schemas/managing-menus cannot detect.
+
+  - name: execution-scope-minimal-schema
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Create an Infrahub schema with a single Router node in namespace 'Dcim'. It should have just one attribute: 'name' of kind Text. That's all I need.
+
+      Save ONLY the final YAML file to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/execution-discipline/check_scope_minimal.py
+        weight: 1.0
+    expected_output: >-
+      A minimal schema with one Router node and one 'name'
+      attribute. Required Infrahub properties (human_friendly_id,
+      display_label) are fine. No speculative extras -- no
+      status, description, tags, extra nodes, or relationships.
+    expectations:
+      - Exactly one node (Router) in namespace Dcim
+      - Exactly one user-defined attribute ('name', kind Text)
+      - >-
+        No speculative attributes like description, status,
+        tags, notes, created_at
+      - No additional nodes or generics
+      - No relationships
+    assertions:
+      - name: scope-discipline
+        check: >-
+          Output contains only the requested Router node and
+          'name' attribute, with no speculative additions
+
+  - name: execution-surgical-schema-edit
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Here is an existing schema file I want you to modify:
+
+      ```yaml
+      ---
+      version: "1.0"
+      nodes:
+        - name: Device
+          namespace: Dcim
+          human_friendly_id: ["name__value"]
+          display_label: "{{ name__value }}"
+          attributes:
+            - name: name
+              kind: Text
+              order_weight: 100
+            - name: status
+              kind: Text
+              optional: true
+              order_weight: 200
+      ```
+
+      Add a new attribute 'description' to the Device node, with kind Text and optional true. Do not make any other changes to the file.
+
+      Save the updated schema to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/execution-discipline/check_surgical_edit.py
+        weight: 1.0
+    expected_output: >-
+      The original schema plus a 'description' attribute on
+      Device (kind Text, optional true). Everything else --
+      including the 'status' attribute that uses kind Text
+      instead of the best-practice Dropdown -- must be left
+      exactly as provided. No drive-by fixes, no renames, no
+      reordering, no new nodes.
+    expectations:
+      - A 'description' attribute is added to Device (kind Text, optional true)
+      - >-
+        The 'status' attribute is still kind Text -- NOT
+        "fixed" to Dropdown as a drive-by, since the prompt
+        did not ask for that
+      - The 'name' attribute is unchanged (same kind, same order_weight)
+      - No new nodes, generics, or relationships
+      - Node namespace, human_friendly_id, display_label unchanged
+    assertions:
+      - name: description-added
+        check: "description attribute added to Device correctly"
+      - name: status-unchanged
+        check: >-
+          status attribute still uses kind: Text (no drive-by
+          fix to Dropdown)
+      - name: name-unchanged
+        check: "'name' attribute unchanged"
+      - name: no-extra-nodes
+        check: "No additional nodes added"
+      - name: no-extra-generics
+        check: "No generics added"
+      - name: no-extra-relationships
+        check: "No relationships added"
+      - name: namespace-unchanged
+        check: "Node namespace unchanged"
+      - name: hfid-unchanged
+        check: "human_friendly_id unchanged"
+      - name: display-label-unchanged
+        check: "display_label unchanged"
+
+  - name: execution-surface-namespace-choice
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Create an Infrahub schema for a 'Switch' node that has a 'name' attribute of kind Text. I didn't tell you which namespace to use -- if you need to make a structural assumption (like picking a namespace), note what you chose and why in rationale.md, and invite me to redirect if I'd prefer something different.
+
+      Save the schema YAML to: output.yml
+      Save your rationale to: rationale.md
+    graders:
+      - type: deterministic
+        run: python graders/execution-discipline/check_surface_assumptions.py
+        weight: 1.0
+    expected_output: >-
+      A schema with a Switch node (name attribute), using some
+      reasonable namespace. Plus a rationale.md that explicitly
+      names the chosen namespace and invites the user to
+      redirect / change it if they'd prefer a different one.
+    expectations:
+      - output.yml has a Switch node with a 'name' attribute
+      - rationale.md exists and is non-trivial
+      - >-
+        rationale.md names the namespace chosen in output.yml
+        (not just the word "namespace" generically)
+      - >-
+        rationale.md invites the user to redirect / change /
+        override the choice
+    assertions:
+      - name: schema-has-switch
+        check: "output.yml contains a Switch node"
+      - name: rationale-exists
+        check: "rationale.md exists and is non-trivial"
+      - name: rationale-names-namespace
+        check: >-
+          rationale.md explicitly documents the namespace chosen
+          in output.yml
+      - name: rationale-invites-redirect
+        check: >-
+          rationale.md invites the user to redirect / change
+          the namespace choice
