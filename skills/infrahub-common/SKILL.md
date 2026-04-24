@@ -21,6 +21,8 @@ Infrahub skills. It is not meant to be invoked directly.
 - **`infrahub-yml-reference.md`** — `.infrahub.yml`
   configuration file format and field reference
 - **`rules/`** — Cross-cutting rules shared across skills:
+  - Execution discipline: surface assumptions, stay in
+    scope, edit surgically, verify before done
   - Caching display labels in queries
   - Python environment and connectivity checks
   - Git integration and deployment patterns
