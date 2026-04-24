@@ -77,6 +77,21 @@ class MyGenerator(InfrahubGenerator):
         await obj.save(allow_upsert=True)
 ```
 
+## Working Discipline
+
+Apply the shared execution rules in
+[../infrahub-common/rules/](../infrahub-common/rules/) to every
+task: surface assumptions about the design kind, target
+group, and idempotency keys before coding
+(`execution-surface-assumptions.md`), create only the
+objects the design actually implies — speculative extras
+break idempotency (`execution-scope-discipline.md`), edit
+existing generators surgically
+(`execution-surgical-edits.md`), and verify by regenerating
+protocols, confirming imports resolve, and running
+`infrahubctl generator` before declaring done
+(`execution-verify-before-done.md`).
+
 ## Workflow
 
 Follow these steps when creating a generator:
@@ -114,7 +129,7 @@ Follow these steps when creating a generator:
 - **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
 - **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
-  (git integration, caching gotchas)
+  (execution discipline, git integration, caching gotchas)
 - **[../infrahub-managing-schemas/SKILL.md](../infrahub-managing-schemas/SKILL.md)**
   -- Schema definitions Generators work with
 - **[rules/](./rules/)** -- Individual rules organized by

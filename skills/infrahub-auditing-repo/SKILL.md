@@ -43,6 +43,19 @@ Infrahub config:
 - When troubleshooting schema loading, object sync,
   or pipeline failures
 
+## Working Discipline
+
+Apply the shared execution rules in
+[../infrahub-common/rules/](../infrahub-common/rules/),
+adapted for this read-only audit: surface assumptions
+about audit scope — whole repo vs a focus area — before
+scanning (`execution-surface-assumptions.md`); report
+findings, do not auto-fix them
+(`execution-scope-discipline.md`); and verify each
+finding by citing the file, line, and specific rule it
+violates — vague "might be wrong" items are not findings
+(`execution-verify-before-done.md`).
+
 ## How It Works
 
 When invoked, the auditor:
@@ -144,8 +157,9 @@ The auditor checks rules from all skills:
   Types, Python/Jinja2, hybrid, artifacts, API
 - **[../infrahub-managing-menus/](../infrahub-managing-menus/)** -- Format,
   item properties, hierarchy, icons
-- **[../infrahub-common/](../infrahub-common/)** -- Git integration,
-  caching, `.infrahub.yml` reference, GraphQL
+- **[../infrahub-common/](../infrahub-common/)** -- Execution
+  discipline, git integration, caching, `.infrahub.yml`
+  reference, GraphQL
 
 ## Rules
 

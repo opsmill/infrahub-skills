@@ -82,6 +82,18 @@ extensions:    # Add attributes/relationships to existing nodes from other files
 Always include the `$schema` comment for IDE validation.
 Only `version` is required at the top level.
 
+## Working Discipline
+
+Apply the shared execution rules in
+[../infrahub-common/rules/](../infrahub-common/rules/) to every
+task: surface structural assumptions before generating
+(`execution-surface-assumptions.md`), produce only what was
+asked for (`execution-scope-discipline.md`), edit existing
+schemas surgically — renames ripple into peer nodes,
+protocols, and data files (`execution-surgical-edits.md`) —
+and verify with `infrahubctl schema check` before declaring
+done (`execution-verify-before-done.md`).
+
 ## Workflow
 
 Follow these steps when creating or modifying a schema:
@@ -120,6 +132,7 @@ Follow these steps when creating or modifying a schema:
 - **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
 - **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
-  (git integration, caching) across all skills
+  (execution discipline, git integration, caching) across
+  all skills
 - **[rules/](./rules/)** -- Individual rules by category
   prefix

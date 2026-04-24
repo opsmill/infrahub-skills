@@ -91,6 +91,20 @@ class MyCheck(InfrahubCheck):
             )
 ```
 
+## Working Discipline
+
+Apply the shared execution rules in
+[../infrahub-common/rules/](../infrahub-common/rules/) to every
+task: surface assumptions about global vs targeted,
+severity, and query scope before coding
+(`execution-surface-assumptions.md`), implement only the
+validation asked for (`execution-scope-discipline.md`),
+edit existing checks surgically
+(`execution-surgical-edits.md`), and verify by
+regenerating protocols, confirming imports resolve, and
+running `infrahubctl check` before declaring done
+(`execution-verify-before-done.md`).
+
 ## Workflow
 
 Follow these steps when creating a check:
@@ -126,8 +140,8 @@ Follow these steps when creating a check:
 - **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
 - **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
-  (git integration, caching gotchas) that apply across all
-  skills
+  (execution discipline, git integration, caching gotchas)
+  that apply across all skills
 - **[../infrahub-managing-schemas/SKILL.md](../infrahub-managing-schemas/SKILL.md)**
   -- Schema definitions checks validate against
 - **[rules/](./rules/)** -- Individual rules organized by

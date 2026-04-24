@@ -76,6 +76,18 @@ spec:
 are always required. Each `spec` block targets a single
 node kind.
 
+## Working Discipline
+
+Apply the shared execution rules in
+[../infrahub-common/rules/](../infrahub-common/rules/) to every
+task: surface structural assumptions before generating
+(`execution-surface-assumptions.md`), produce only the
+objects requested — no "example" extras that become real
+once loaded (`execution-scope-discipline.md`), edit existing
+data files surgically (`execution-surgical-edits.md`), and
+verify with `infrahubctl object load --dry-run` before
+declaring done (`execution-verify-before-done.md`).
+
 ## Workflow
 
 Follow these steps when creating object data files:
@@ -100,7 +112,11 @@ Follow these steps when creating object data files:
    and [rules/children-hierarchy.md](./rules/children-hierarchy.md).
 5. **Validate** — Check YAML syntax and ensure
    referenced objects exist or are defined in earlier
-   load-order files.
+   load-order files. Then run
+   `infrahubctl object load --dry-run <file>` against a
+   scratch branch to confirm the file parses and peer
+   references resolve — see
+   [../infrahub-common/rules/execution-verify-before-done.md](../infrahub-common/rules/execution-verify-before-done.md).
 
 ## Supporting References
 
@@ -111,7 +127,8 @@ Follow these steps when creating object data files:
 - **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
 - **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
-  (git integration, caching) across all skills
+  (execution discipline, git integration, caching) across
+  all skills
 - **[../infrahub-managing-schemas/SKILL.md](../infrahub-managing-schemas/SKILL.md)**
   -- Schema definitions these objects conform to
 - **[rules/](./rules/)** -- Individual rules by category

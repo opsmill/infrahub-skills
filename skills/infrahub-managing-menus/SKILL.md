@@ -75,6 +75,20 @@ spec:
 `apiVersion`, `kind: Menu`, and `spec.data` are always
 required. Each menu item needs `name` and `namespace`.
 
+## Working Discipline
+
+Apply the shared execution rules in
+[../infrahub-common/rules/](../infrahub-common/rules/) to every
+task: surface assumptions about grouping, hierarchy depth,
+and which schema nodes belong in the menu before
+generating (`execution-surface-assumptions.md`), include
+only the items the user asked for
+(`execution-scope-discipline.md`), edit existing menu
+files surgically (`execution-surgical-edits.md`), and
+verify the YAML parses and the referenced schema kinds
+exist before declaring done
+(`execution-verify-before-done.md`).
+
 ## Workflow
 
 Follow these steps when creating a menu:
@@ -105,14 +119,21 @@ Follow these steps when creating a menu:
    before the `---` document separator. This ensures
    the user sees the guidance alongside the menu
    definition.
+5. **Validate** — Confirm the YAML parses and that every
+   `kind:` in the menu references a real schema node
+   kind (cross-check against files in `schemas/`). If
+   `infrahubctl menu load` is available in the
+   environment, run it as a dry-run against a scratch
+   branch. See
+   [../infrahub-common/rules/execution-verify-before-done.md](../infrahub-common/rules/execution-verify-before-done.md).
 
 ## Supporting References
 
 - **[infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
 - **[common/rules/](../infrahub-common/rules/)**
-  -- Shared rules (git integration, caching gotchas)
-  that apply across all skills
+  -- Shared rules (execution discipline, git integration,
+  caching gotchas) that apply across all skills
 - **[managing-schemas](../infrahub-managing-schemas/SKILL.md)**
   -- Schema node kinds that menus link to
 - **[rules/](./rules/)**

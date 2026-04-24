@@ -78,6 +78,22 @@ class MyTransform(InfrahubTransform):
         return {"hostname": device["name"]["value"]}
 ```
 
+## Working Discipline
+
+Apply the shared execution rules in
+[../infrahub-common/rules/](../infrahub-common/rules/) to every
+task: surface assumptions about output format, target
+artifact, and Python vs Jinja2 choice before coding
+(`execution-surface-assumptions.md`), render only the
+output the user asked for — no speculative fields
+(`execution-scope-discipline.md`), edit existing transforms
+and templates surgically
+(`execution-surgical-edits.md`), and verify by
+regenerating protocols, confirming imports resolve, and
+running `infrahubctl transform` or `infrahubctl render`
+before declaring done
+(`execution-verify-before-done.md`).
+
 ## Workflow
 
 Follow these steps when creating a transform:
@@ -117,7 +133,8 @@ Follow these steps when creating a transform:
 - **[infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
 - **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
-  (git integration, caching) across all skills
+  (execution discipline, git integration, caching) across
+  all skills
 - **[../infrahub-managing-schemas/SKILL.md](../infrahub-managing-schemas/SKILL.md)**
   -- Schema definitions transforms work with
 - **[rules/](./rules/)** -- Individual rules by category

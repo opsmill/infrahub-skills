@@ -137,6 +137,22 @@ query MaintenanceDevices {
 }
 ```
 
+## Working Discipline
+
+Apply the shared execution rules in
+[../infrahub-common/rules/](../infrahub-common/rules/),
+adapted for read-oriented analysis: surface assumptions
+about the question's scope, branch, and time window
+before querying (`execution-surface-assumptions.md`);
+answer the question asked — not a broader drive-by
+report (`execution-scope-discipline.md`); when using MCP
+create/update tools for remediation, edit surgically and
+on a branch (`execution-surgical-edits.md`); and verify
+each query returned the expected shape before reasoning
+from it — an empty result is only meaningful if the
+query was actually correct
+(`execution-verify-before-done.md`).
+
 ## Typical Analysis Workflow
 
 ```text
@@ -167,6 +183,9 @@ query MaintenanceDevices {
   service impact)
 - **[../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)**
   — GraphQL query writing reference
+- **[../infrahub-common/rules/](../infrahub-common/rules/)**
+  — Shared rules (execution discipline, git integration,
+  caching) across all skills
 - **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   — .infrahub.yml project configuration
 - **[../infrahub-managing-checks/SKILL.md](../infrahub-managing-checks/SKILL.md)**
