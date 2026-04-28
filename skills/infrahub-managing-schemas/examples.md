@@ -790,6 +790,7 @@ generics:
         identifier: device__interface
         kind: Parent
         cardinality: one
+        optional: false
         order_weight: 1025
 
   # Layer 2 mixin
