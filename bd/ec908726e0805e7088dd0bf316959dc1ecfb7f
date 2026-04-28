@@ -1,0 +1,68 @@
+skills/infrahub-managing-schemas/rules/relationship-component-parent.md
+  920d646cb31601cf 4,15-17,33,51,58-86
+skills/infrahub-managing-schemas/rules/validation-common-errors.md
+  920d646cb31601cf 41-62,79-82
+skills/infrahub-managing-schemas/SKILL.md
+  920d646cb31601cf 57-58,60-61,112-152
+skills/infrahub-managing-schemas/rules/extension-object-template.md
+  920d646cb31601cf 1-44,46-133
+skills/infrahub-managing-schemas/rules/_sections.md
+  920d646cb31601cf 11-13,17-19,27-30,34-38
+skills/infrahub-managing-schemas/rules/relationship-identifiers.md
+  920d646cb31601cf 31,50
+skills/infrahub-managing-schemas/rules/relationship-on-delete.md
+  920d646cb31601cf 1-111
+skills/infrahub-managing-schemas/rules/extension-artifact-target.md
+  920d646cb31601cf 1-117
+skills/infrahub-managing-checks/SKILL.md
+  920d646cb31601cf 73-74,76-77,79-80,87,97-104
+skills/infrahub-managing-schemas/examples.md
+  920d646cb31601cf 793
+skills/infrahub-managing-schemas/rules/attribute-branch-agnostic.md
+  920d646cb31601cf 1-111
+skills/infrahub-managing-checks/rules/registration-config.md
+  920d646cb31601cf 4,11-74,101,109-115,117-132
+skills/infrahub-managing-schemas/rules/display-menu-placement.md
+  920d646cb31601cf 1-148
+skills/infrahub-common/infrahub-yml-reference.md
+  920d646cb31601cf 120-128
+skills/infrahub-managing-schemas/rules/relationship-defaults.md
+  920d646cb31601cf 49-57
+skills/infrahub-managing-schemas/reference.md
+  920d646cb31601cf 240
+skills/infrahub-managing-schemas/rules/attribute-computed-jinja2.md
+  920d646cb31601cf 1-159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "bdec908726e0805e7088dd0bf316959dc1ecfb7f",
+  "prompts": {
+    "920d646cb31601cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a5ccd028-0116-4000-aeb4-00aa4b3d3e1b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Benoit Kohler",
+      "messages": [],
+      "total_additions": 1323,
+      "total_deletions": 323,
+      "accepted_lines": 1026,
+      "overriden_lines": 1
+    },
+    "aba5d67d3c65334f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc16f685-4388-4d77-9198-f8a3a12c4c46",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Benoit Kohler",
+      "messages": [],
+      "total_additions": 255,
+      "total_deletions": 100,
+      "accepted_lines": 17,
+      "overriden_lines": 69
+    }
+  }
+}
