@@ -4,7 +4,7 @@ defaults:
   agent: claude
   provider: local
   trials: 3
-  timeout: 300
+  timeout: 180
   threshold: 0.8
 
 tasks:
@@ -335,6 +335,7 @@ tasks:
         check: "Parent/children chain: Region->Site->Room->Rack"
 
   - name: parent-relationships
+    trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
@@ -388,6 +389,7 @@ tasks:
         check: human_friendly_id defined on each node
 
   - name: computed-jinja2-name
+    trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
@@ -435,6 +437,7 @@ tasks:
         check: "Attribute kinds use 'Text' not deprecated 'String'"
 
   - name: service-cascade
+    trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
@@ -493,6 +496,7 @@ tasks:
         check: human_friendly_id defined on user-facing nodes
 
   - name: device-artifact-target
+    trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
@@ -550,6 +554,7 @@ tasks:
 
   # --- Check Creator --- #
   - name: global-check-registration
+    trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-managing-checks/SKILL.md and follow its workflow and rules.
 
@@ -604,6 +609,7 @@ tasks:
         check: Each check_definitions entry has name and file_path
 
   - name: targeted-check-registration
+    trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-managing-checks/SKILL.md and follow its workflow and rules.
 

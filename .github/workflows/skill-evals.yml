@@ -87,7 +87,7 @@ jobs:
     needs: discover
     if: needs.discover.outputs.has-skills == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     strategy:
       matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
       fail-fast: false
@@ -115,6 +115,7 @@ jobs:
             --${{ inputs.preset || 'smoke' }} \
             --ci \
             --provider=local \
+            --parallel=2 \
             --eval="${{ matrix.evals }}" \
             --output=eval-results
 
