@@ -115,7 +115,7 @@ jobs:
             --${{ inputs.preset || 'smoke' }} \
             --ci \
             --provider=local \
-            --parallel=2 \
+            --parallel=5 \
             --eval="${{ matrix.evals }}" \
             --output=eval-results
 
