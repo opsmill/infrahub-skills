@@ -8,36 +8,51 @@
 # ----------------------------------
 # GROUP
 # ----------------------------------
-- name: "group/backend"
-  description: "Issue related to the backend (API Server, Git Agent)"
-  color: "b60205"
-
-- name: "group/frontend"
-  description: "Issue related to the frontend (React)"
-  color: "353755"
-
-- name: "group/ux-design"
-  description: "Issue related to design or UX"
-  color: "3380ff"
-
-- name: "group/sync-engine"
-  description: "Issue related to the Synchronization engine"
-  color: "05b259"
-
 - name: "group/ci"
   description: "Issue related to the CI pipeline"
   color: "f25009"
 
-- name: "group/helm"
-  description: "Issue related to the Helm chart"
-  color: "326ce5"
+# ----------------------------------
+# SKILL (per-skill auto-labels via .github/labeler.yml)
+# ----------------------------------
+- name: "skill/analyzing-data"
+  description: "Changes to the infrahub-analyzing-data skill"
+  color: "5319e7"
 
-- name: "group/schema"
-  description: "Issue related to some schemas"
-  color: "fbceb1"
+- name: "skill/auditing-repo"
+  description: "Changes to the infrahub-auditing-repo skill"
+  color: "5319e7"
+
+- name: "skill/common"
+  description: "Changes to the infrahub-common skill"
+  color: "5319e7"
+
+- name: "skill/managing-checks"
+  description: "Changes to the infrahub-managing-checks skill"
+  color: "5319e7"
+
+- name: "skill/managing-generators"
+  description: "Changes to the infrahub-managing-generators skill"
+  color: "5319e7"
+
+- name: "skill/managing-menus"
+  description: "Changes to the infrahub-managing-menus skill"
+  color: "5319e7"
+
+- name: "skill/managing-objects"
+  description: "Changes to the infrahub-managing-objects skill"
+  color: "5319e7"
+
+- name: "skill/managing-schemas"
+  description: "Changes to the infrahub-managing-schemas skill"
+  color: "5319e7"
+
+- name: "skill/managing-transforms"
+  description: "Changes to the infrahub-managing-transforms skill"
+  color: "5319e7"
 
 # ----------------------------------
-# TYPE INFRAHUB (default)
+# TYPE
 # ----------------------------------
 - name: "type/feature"
   description: "New feature or request"
@@ -55,9 +70,6 @@
   description: "Item we know we need to improve way it is implemented"
   color: "73FA20"
 
-# ----------------------------------
-# TYPE ALL
-# ----------------------------------
 - name: "type/question"
   description: "Question or discussion"
   color: "d876e3"
@@ -94,6 +106,14 @@
   description: "Good for newcomers"
   color: "309c56"
 
+- name: "type/refactoring"
+  description: "Code refactoring or improvement"
+  color: "a2eeef"
+
+- name: "type/breaking-change"
+  description: "Breaking change requiring major version bump"
+  color: "b60205"
+
 # ----------------------------------
 # EFFORT
 # ----------------------------------
@@ -110,7 +130,7 @@
   color: "ffcc00"
 
 # ----------------------------------
-# SEVERITY
+# PRIORITY
 # ----------------------------------
 - name: "priority/1"
   description: "This issue must be fixed/implemented ASAP, it's a blocker for a release"
@@ -129,7 +149,7 @@
   color: "cfda2c"
 
 # ----------------------------------
-# STATUS
+# STATE
 # ----------------------------------
 - name: "state/blocked"
   description: "The issue is currently blocked and cannot be resolved."
@@ -167,11 +187,6 @@
   description: "Issue has been closed and won't be fix/implemented."
   color: "eeeeee"
 
-# DEPRECATED
-- name: "state/ref"
-  description: "This issue is referenced in our internal tooling"
-  color: "c9510c"
-
 # ----------------------------------
 # CHANGES (version bump triggers)
 # ----------------------------------
@@ -186,14 +201,6 @@
 - name: "changes/patch"
   description: "Bump patch version (bug fix)"
   color: "cfda2c"
-
-- name: "type/refactoring"
-  description: "Code refactoring or improvement"
-  color: "a2eeef"
-
-- name: "type/breaking-change"
-  description: "Breaking change requiring major version bump"
-  color: "b60205"
 
 # ----------------------------------
 # CI
