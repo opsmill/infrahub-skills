@@ -1,0 +1,23 @@
+eval.yaml
+  920d646cb31601cf 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "89361ca96155c69a6d8df31c6c4558817cf85ffd",
+  "prompts": {
+    "920d646cb31601cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a5ccd028-0116-4000-aeb4-00aa4b3d3e1b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Benoit Kohler",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
