@@ -8,13 +8,15 @@
 2. **Relationships (relationship-)** — CRITICAL.
    Bidirectional identifier matching, peer references,
    Component/Parent pairing, cardinality and optional
-   defaults. Incorrect relationships cause silent
-   data model bugs.
+   defaults, `on_delete` cascade vs no-action.
+   Incorrect relationships cause silent data model
+   bugs and orphaned objects on delete.
 
 3. **Attributes (attribute-)** — HIGH.
    Mandatory-by-default behavior, Dropdown choices
-   format, deprecated field names. Misunderstanding
-   defaults leads to unexpected required fields.
+   format, computed Jinja2 attributes (`read_only`
+   plus `optional: false` combo), branch-agnostic
+   identity fields, deprecated field names.
 
 4. **Hierarchy (hierarchy-)** — HIGH. Setting up
    hierarchical generics and nodes with parent/children
@@ -22,14 +24,18 @@
    parent-child taxonomy.
 
 5. **Display (display-)** — HIGH. human_friendly_id,
-   display_label, and order_weight configuration.
-   Controls how objects are identified and displayed
-   in the UI and object references.
+   display_label, order_weight, and menu placement
+   (`include_in_menu: false`, `menu_placement:`).
+   Controls how objects are identified, ordered, and
+   surfaced in the UI sidebar.
 
 6. **Extensions (extension-)** — MEDIUM. Adding
    attributes/relationships to nodes defined in other
-   schema files. Enables modular schema design across
-   multiple files.
+   schema files. Capability flags applied at the node
+   level: artifact targets
+   (`inherit_from: CoreArtifactTarget`) and Object
+   Templates (`generate_template: true`) — independent
+   features, kept in separate rule files.
 
 7. **Uniqueness (uniqueness-)** — MEDIUM. Uniqueness
    constraint format with __value suffix for

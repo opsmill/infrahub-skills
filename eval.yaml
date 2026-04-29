@@ -333,3 +333,336 @@ tasks:
         check: "Schema starts with version: '1.0'"
       - name: correct-hierarchy-chain
         check: "Parent/children chain: Region->Site->Room->Rack"
+
+  - name: parent-relationships
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Create an Infrahub schema for a rack-and-device inventory. A Rack contains many
+      Devices, and each Device must belong to exactly one Rack — a device cannot exist
+      without its rack. Each Rack belongs to exactly one Site. Use namespace 'Dcim'.
+
+      The Component (parent owns children) and Parent (child points to parent) relationships
+      must satisfy the server-side validation: cardinality, optional, and the rule that a
+      node cannot have more than one Parent relationship.
+
+      Save ONLY the final schema YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_parent_relationships.py
+        weight: 1.0
+    expected_output: >-
+      A schema with Component/Parent relationship pairs where the Parent
+      side has cardinality: one and optional: false explicitly set, no
+      node has more than one kind: Parent relationship, and identifiers
+      match between both sides of each pair.
+    expectations:
+      - >-
+        Each kind: Parent relationship has both cardinality: one AND
+        optional: false explicitly set
+      - >-
+        No node declares more than one relationship with kind: Parent
+        (server validates this)
+      - >-
+        Component/Parent pairs share matching identifiers on both sides
+      - >-
+        All peer references use the full kind (DcimRack, DcimSite, not
+        just Rack/Site)
+      - "human_friendly_id is defined on each node"
+      - 'Schema starts with version: "1.0"'
+    assertions:
+      - name: schema-version
+        check: "Schema starts with version: '1.0'"
+      - name: parent-rel-optional-false
+        check: >-
+          Every kind: Parent relationship has optional: false and
+          cardinality: one
+      - name: parent-rel-single
+        check: "No node has more than one kind: Parent relationship"
+      - name: matching-identifiers
+        check: >-
+          Component/Parent identifier pairs match on both sides
+      - name: full-kind-references
+        check: All peer references use full Namespace+Name kind
+      - name: human-friendly-id
+        check: human_friendly_id defined on each node
+
+  - name: computed-jinja2-name
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Create an Infrahub schema for a BGP autonomous-system catalog. An AutonomousSystem
+      node has an asn (number) and a description. The display name should NOT be entered by
+      the user — it must be auto-derived from the ASN as 'AS<asn>' (e.g., 'AS65000') using a
+      Jinja2 computed attribute. The derived name is used as the display label and as part
+      of human_friendly_id, so it must always be populated. Use namespace 'Routing'.
+
+      Save ONLY the final schema YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_computed_jinja2.py
+        weight: 1.0
+    expected_output: >-
+      A schema where the name attribute uses computed_attribute with
+      kind: Jinja2 and a non-empty jinja2_template, paired with
+      read_only: true (always required) and optional: false (because
+      the value is load-bearing — used as display_label and in
+      human_friendly_id).
+    expectations:
+      - >-
+        The name attribute uses computed_attribute with kind: Jinja2
+        and a jinja2_template that derives from asn__value
+      - >-
+        read_only: true is set (mandatory whenever computed_attribute
+        is present — Infrahub validates this)
+      - >-
+        optional: false because the value is load-bearing (display
+        label + human_friendly_id)
+      - "Attribute kinds use 'Text' not the deprecated 'String'"
+      - >-
+        All peer references (if any) use the full namespace+name kind
+      - 'Schema starts with version: "1.0"'
+    assertions:
+      - name: schema-version
+        check: "Schema starts with version: '1.0'"
+      - name: computed-jinja2-readonly
+        check: >-
+          Every computed_attribute pairs with read_only: true
+      - name: computed-jinja2-kind
+        check: >-
+          computed_attribute uses kind: Jinja2 with a jinja2_template
+      - name: no-deprecated-string
+        check: "Attribute kinds use 'Text' not deprecated 'String'"
+
+  - name: service-cascade
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Create an Infrahub schema for a load-balancer VIP service. A VIPService has a
+      name (Text) and references a frontend IP (IpamIPAddress). The VIPService owns a list
+      of HealthCheck objects — health checks have no meaning on their own and should be
+      deleted when their VIPService is deleted. The frontend IP, however, is shared
+      infrastructure: deleting a VIPService must NOT delete its IP. Use namespace 'ServiceLB'.
+
+      Save ONLY the final schema YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_service_cascade.py
+        weight: 1.0
+    expected_output: >-
+      A schema where the VIPService → HealthCheck Component relationship
+      sets on_delete: cascade explicitly (so health checks are removed
+      when the parent VIP is deleted), and the VIPService → IP
+      relationship either omits on_delete or sets on_delete: no-action
+      (so the shared IP is preserved). Any kind: Parent relationship has
+      optional: false.
+    expectations:
+      - >-
+        At least one relationship sets on_delete: cascade — the owned
+        HealthCheck children whose existence has no meaning without the
+        VIPService
+      - >-
+        The IP-address reference does NOT set on_delete: cascade
+        (no-action or omitted, since the IP is shared infrastructure)
+      - >-
+        Any kind: Parent relationship has optional: false and
+        cardinality: one
+      - >-
+        Component/Parent identifier pairs match on both sides
+      - >-
+        All peer references use the full namespace+name kind
+        (e.g., IpamIPAddress, not IPAddress)
+      - "human_friendly_id is defined on user-facing nodes"
+      - 'Schema starts with version: "1.0"'
+    assertions:
+      - name: schema-version
+        check: "Schema starts with version: '1.0'"
+      - name: on-delete-cascade-present
+        check: >-
+          At least one relationship sets on_delete: cascade for owned
+          children
+      - name: parent-rel-optional-false
+        check: >-
+          Any kind: Parent relationship has optional: false and
+          cardinality: one
+      - name: matching-identifiers
+        check: Component/Parent identifier pairs match on both sides
+      - name: full-kind-references
+        check: All peer references use full Namespace+Name kind
+      - name: human-friendly-id
+        check: human_friendly_id defined on user-facing nodes
+
+  - name: device-artifact-target
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Create an Infrahub schema for a network-device inventory. Define a generic
+      GenericDevice (with shared attributes like hostname and role) and a concrete Device
+      node that inherits from it. The concrete Device should:
+
+        - Be eligible for rendered configuration artifacts (so artifact definitions in
+          .infrahub.yml can attach to it).
+        - Be cloneable from the UI as a starter for new devices (one template per role —
+          leaf, spine, edge — speeds onboarding).
+
+      The two capabilities are independent features and should be applied to the concrete
+      Device, not to the generic. Use namespace 'Dcim'.
+
+      Save ONLY the final schema YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_artifact_target.py
+        weight: 1.0
+    expected_output: >-
+      A schema with the GenericDevice generic carrying the shared
+      attributes, and a concrete Device node that both inherits from
+      CoreArtifactTarget AND sets generate_template: true. Neither flag
+      appears on the generic.
+    expectations:
+      - >-
+        The concrete Device node inherits from CoreArtifactTarget so
+        artifacts can attach to instances
+      - >-
+        The concrete Device node sets generate_template: true so users
+        can clone it as a starter
+      - >-
+        Neither CoreArtifactTarget inheritance nor generate_template
+        appears on the GenericDevice generic (generics cannot be
+        artifact targets and are not instantiable as templates)
+      - >-
+        The Device inherits from the GenericDevice generic using its
+        full kind (DcimGenericDevice)
+      - "human_friendly_id is defined on the concrete Device node"
+      - 'Schema starts with version: "1.0"'
+    assertions:
+      - name: schema-version
+        check: "Schema starts with version: '1.0'"
+      - name: core-artifact-target-concrete
+        check: >-
+          CoreArtifactTarget is inherited by the concrete Device, never
+          by the generic
+      - name: generate-template-concrete-only
+        check: >-
+          generate_template: true appears on the concrete Device, never
+          on the generic
+      - name: human-friendly-id
+        check: human_friendly_id defined on the concrete Device
+
+  # --- Check Creator --- #
+  - name: global-check-registration
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-checks/SKILL.md and follow its workflow and rules.
+
+      Task: I need to register a global Infrahub check that detects rack unit collisions
+      across all racks. The check class is RackUnitCollisionCheck and lives in
+      checks/rack_unit_collision.py. It runs against a GraphQL query named rack_devices
+      stored at queries/rack_devices.gql.
+
+      Produce ONLY the `.infrahub.yml` snippet that registers both the GraphQL query and
+      the check definition correctly. Do not include schema, generator, or transform
+      sections — just queries: and check_definitions:.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-checks/check_global_registration.py
+        weight: 1.0
+    expected_output: >-
+      A `.infrahub.yml` snippet with a `queries:` section listing
+      rack_devices, and a `check_definitions:` entry for the check.
+      The check_definitions entry must NOT contain a `query:` field
+      (Pydantic extra="forbid" rejects it) — the query is bound from
+      the Python class's `query = "rack_devices"` attribute.
+    expectations:
+      - >-
+        Top-level `queries:` section declares the rack_devices query
+        with file_path queries/rack_devices.gql
+      - >-
+        `check_definitions:` has an entry for the check with name,
+        file_path, and class_name
+      - >-
+        The check_definitions entry does NOT contain a `query:` field
+        (this is the central rule — `query` is rejected by the
+        Pydantic model on check_definitions, unlike
+        generator_definitions which does require it)
+      - >-
+        Only allowed fields appear under check_definitions: name,
+        file_path, class_name, targets, parameters
+    assertions:
+      - name: check-definitions-present
+        check: check_definitions has at least one entry
+      - name: no-query-field-in-check-def
+        check: >-
+          No check_definitions entry contains a `query:` field
+      - name: only-allowed-fields-in-check-def
+        check: >-
+          check_definitions entries use only name, file_path,
+          class_name, targets, parameters
+      - name: queries-section-present
+        check: "Top-level queries: section is present"
+      - name: check-def-required-fields
+        check: Each check_definitions entry has name and file_path
+
+  - name: targeted-check-registration
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-checks/SKILL.md and follow its workflow and rules.
+
+      Task: Register a targeted Infrahub check called LeafValidation that runs once per
+      leaf device. The class is in checks/leaf.py, the GraphQL query is leaf_config stored
+      at queries/leaf.gql and takes a $device variable. The targets group is leaf_devices,
+      and the GraphQL $device variable should be bound to the target's name.
+
+      Produce ONLY the `.infrahub.yml` snippet that registers both the query and the check
+      correctly. Do not include schema, generator, or transform sections — just queries:
+      and check_definitions:.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-checks/check_targeted_registration.py
+        weight: 1.0
+    expected_output: >-
+      A `.infrahub.yml` snippet with `queries:` declaring leaf_config
+      and `check_definitions:` declaring leaf_validation with targets:
+      leaf_devices and parameters mapping the $device variable. The
+      check_definitions entry must NOT contain a `query:` field; the
+      query is bound on the Python class via `query = "leaf_config"`.
+    expectations:
+      - >-
+        Top-level `queries:` section declares leaf_config with
+        file_path queries/leaf.gql
+      - >-
+        check_definitions entry has name, file_path, class_name, AND
+        targets: leaf_devices AND parameters mapping device to
+        name__value
+      - >-
+        The check_definitions entry does NOT contain a `query:` field
+        (rejected by Pydantic extra="forbid"; differs from
+        generator_definitions which requires it)
+      - >-
+        parameters maps `device: name__value` so the GraphQL $device
+        variable is bound to the target's name attribute
+    assertions:
+      - name: check-definitions-present
+        check: check_definitions has at least one entry
+      - name: no-query-field-in-check-def
+        check: >-
+          No check_definitions entry contains a `query:` field
+      - name: only-allowed-fields-in-check-def
+        check: >-
+          check_definitions entries use only name, file_path,
+          class_name, targets, parameters
+      - name: queries-section-present
+        check: "Top-level queries: section declares leaf_config"
+      - name: check-def-required-fields
+        check: Each check_definitions entry has name and file_path
+      - name: targeted-has-targets-and-parameters
+        check: >-
+          Targeted check_definitions entry declares both targets and
+          parameters

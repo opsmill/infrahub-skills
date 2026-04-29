@@ -38,6 +38,28 @@ Missing namespace in peer reference. See the
 Bidirectional relationship identifiers don't match. See the
 [relationship-identifiers](./relationship-identifiers.md) rule.
 
+### "Relationship of type parent must not be optional"
+
+A relationship with `kind: Parent` has `optional: true`
+(or no explicit value — relationships default to
+optional). Set `optional: false` on the Parent side.
+See [relationship-component-parent](./relationship-component-parent.md).
+
+### "Relationship of type parent must be cardinality=one"
+
+A `kind: Parent` relationship has `cardinality: many`
+or no explicit cardinality (which defaults to
+`many`). Set `cardinality: one`. See
+[relationship-component-parent](./relationship-component-parent.md).
+
+### "Only one relationship of type parent is allowed"
+
+A node has more than one relationship with
+`kind: Parent`. Pick the canonical owner; model the
+others as `kind: Attribute` or `kind: Generic`
+references. See
+[relationship-component-parent](./relationship-component-parent.md).
+
 ### "Uniqueness constraint references unknown field"
 
 Wrong format in constraints. See the
@@ -54,6 +76,10 @@ Before running `infrahubctl schema check`, verify:
 - [ ] All `peer` values use full kind (namespace + name)
 - [ ] All bidirectional relationships have matching `identifier`
 - [ ] All Component relationships have a matching Parent
+- [ ] Every `kind: Parent` relationship has
+  `cardinality: one` and `optional: false`
+- [ ] No node has more than one `kind: Parent`
+  relationship
 - [ ] All hierarchical nodes inherit from a `hierarchical: true` generic
 - [ ] Root hierarchical nodes have `parent: null`
 - [ ] All Dropdown attributes have `choices` defined

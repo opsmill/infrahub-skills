@@ -237,6 +237,7 @@ Always define both sides with matching `identifier`:
   peer: DcimGenericDevice
   kind: Parent
   cardinality: one
+  optional: false              # Required on every kind: Parent
   identifier: "device__interface"
 ```
 

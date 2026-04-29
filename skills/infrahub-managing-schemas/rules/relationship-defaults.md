@@ -46,4 +46,13 @@ are `optional: true` by default.
 | Attributes | `false` (mandatory) |
 | Relationships | `true` (optional) |
 
+**Exception — `kind: Parent` rejects `optional: true`:**
+The server validates that any relationship with
+`kind: Parent` has `optional: false`. The default is
+wrong here, so you must set it explicitly. Leaving it
+unset (or `true`) fails schema check with
+`Relationship of type parent must not be optional`.
+See
+[relationship-component-parent.md](./relationship-component-parent.md).
+
 Reference: [Infrahub Schema Docs](https://docs.infrahub.app)

@@ -83,7 +83,7 @@
     },
     {
       "id": 3,
-      "prompt": "I have an Infrahub project with a location hierarchy (LocationRegion,\nLocationSite, LocationRoom, LocationRack) and some device nodes (DcimDevice,\nDcimInterface). I want a menu that has a 'Locations' group linking to the\nLocationGeneric so users see all location types in one view, plus individual\nlocation type entries nested under it. Devices should be a separate top-level item.\nAlso, what do I need to change in my schema so I don't get duplicate menu entries?",
+      "prompt": "I have an Infrahub project with a location hierarchy (LocationRegion,\nLocationSite, LocationRoom, LocationRack) and some device nodes (DcimDevice,\nDcimInterface). I want a menu that has a 'Locations' group linking to the\nLocationGeneric so users see all location types in one view, plus individual\nlocation type entries nested under it. Devices should be a separate top-level item.\nAlso, what do I need to change in my schema so I don't get duplicate menu entries?\n\nFollow the skill's workflow completely, including step 4 (registration and schema guidance).\nSave the final output to: output.yml",
       "expected_output": "A menu YAML with a Locations group that has a kind: LocationGeneric link plus children for each location type, and a separate Devices section. Should also mention setting include_in_menu: false on schema nodes and registering the menu file in .infrahub.yml.",
       "files": [],
       "expectations": [

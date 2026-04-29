@@ -71,6 +71,31 @@ jobs:
         working-directory: docs
 
   # ---------------------------------------------------------------------------
+  # Verify evaluations/*.json is in sync with eval.yaml
+  # ---------------------------------------------------------------------------
+  evals-sync:
+    needs: files-changed
+    if: needs.files-changed.outputs.yaml == 'true' || needs.files-changed.outputs.skills == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install PyYAML
+        run: pip install pyyaml
+      - name: Regenerate evaluations/*.json
+        run: python scripts/sync-evals.py
+      - name: Fail if evaluations/ is out of sync with eval.yaml
+        run: |
+          if ! git diff --quiet evaluations/; then
+            echo "::error::evaluations/*.json is out of sync with eval.yaml."
+            echo "Run 'python scripts/sync-evals.py' locally and commit the result."
+            git diff evaluations/
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
   # Run skill evaluations (reusable workflow)
   # ---------------------------------------------------------------------------
   skill-evals:

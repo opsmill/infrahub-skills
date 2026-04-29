@@ -54,11 +54,11 @@ use the first argument as the namespace and remaining arguments as node names.
 | Priority | Category | Prefix | Description |
 | -------- | -------- | ------ | ----------- |
 | CRITICAL | Naming | `naming-` | Namespace, node, attribute naming |
-| CRITICAL | Relationships | `relationship-` | IDs, peers, component/parent |
-| HIGH | Attributes | `attribute-` | Defaults, dropdowns, deprecated |
+| CRITICAL | Relationships | `relationship-` | IDs, peers, component/parent, on_delete |
+| HIGH | Attributes | `attribute-` | Defaults, dropdowns, computed Jinja2, branch-agnostic, deprecated |
 | HIGH | Hierarchy | `hierarchy-` | Hierarchical generics, parent/children |
-| HIGH | Display | `display-` | human_friendly_id, order_weight |
-| MEDIUM | Extensions | `extension-` | Cross-file via extensions block |
+| HIGH | Display | `display-` | human_friendly_id, order_weight, menu placement |
+| MEDIUM | Extensions | `extension-` | Cross-file via extensions block, artifact targets |
 | MEDIUM | Uniqueness | `uniqueness-` | Constraint format, __value suffix |
 | MEDIUM | Migration | `migration-` | Add/remove attributes, state: absent |
 | LOW | Validation | `validation-` | Common errors, pre-check checklist |
@@ -108,6 +108,47 @@ Follow these steps when creating or modifying a schema:
 5. **Validate** — Run `infrahubctl schema check` per
    [validation.md](./validation.md). Fix any errors
    using [rules/validation-common-errors.md](./rules/validation-common-errors.md).
+
+## Production Patterns Worth Knowing
+
+These patterns recur across the OpsMill reference
+schemas (`opsmill/schema-library`,
+`opsmill/infrahub-demo-dc`,
+`opsmill/infrahub-solution-ai-dc`) and are easy to
+miss when building from scratch:
+
+- **Computed Jinja2 attributes** — `computed_attribute`
+  always pairs with `read_only: true`; choose
+  `optional` based on whether the value is
+  load-bearing (display label, hfid, uniqueness) or
+  informational. See
+  [rules/attribute-computed-jinja2.md](./rules/attribute-computed-jinja2.md).
+- **Cascade vs no-action deletes** — `on_delete:`
+  is independent of `kind: Component`; pick
+  `cascade` only for owned children whose existence
+  has no meaning without the parent. See
+  [rules/relationship-on-delete.md](./rules/relationship-on-delete.md).
+- **Menu visibility** — when the project ships menu
+  files in `.infrahub.yml`, set `include_in_menu:
+  false` on every node and generic; otherwise hide
+  abstract bases and use `menu_placement: <FullKind>`
+  to group subtypes. See
+  [rules/display-menu-placement.md](./rules/display-menu-placement.md).
+- **Branch-agnostic identity** — `branch: agnostic`
+  on attributes that must be globally unique (AS
+  numbers, service names, customer IDs). See
+  [rules/attribute-branch-agnostic.md](./rules/attribute-branch-agnostic.md).
+- **Artifact targets** — `inherit_from:
+  CoreArtifactTarget` lets a node receive rendered
+  artifacts. Apply to concrete nodes, not generics.
+  See
+  [rules/extension-artifact-target.md](./rules/extension-artifact-target.md).
+- **Object Templates** — `generate_template: true`
+  enables clone-from-template UX. Independent of
+  artifact targets; use only when users should
+  duplicate the object as a starter for new
+  instances. See
+  [rules/extension-object-template.md](./rules/extension-object-template.md).
 
 ## Supporting References
 
