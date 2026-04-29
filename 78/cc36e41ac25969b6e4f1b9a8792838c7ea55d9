@@ -1,0 +1,25 @@
+.github/workflows/skill-evals.yml
+  920d646cb31601cf 90,118
+eval.yaml
+  920d646cb31601cf 7,338,392,440,499,557,612
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "78cc36e41ac25969b6e4f1b9a8792838c7ea55d9",
+  "prompts": {
+    "920d646cb31601cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a5ccd028-0116-4000-aeb4-00aa4b3d3e1b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Benoit Kohler",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 2,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    }
+  }
+}
