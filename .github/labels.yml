@@ -1,0 +1,214 @@
+---
+# Labels names are important as they are used by Release Drafter to decide
+# regarding where to record them in changelog or if to skip them.
+#
+# The repository labels will be automatically configured using this file and
+# the GitHub Action https://github.com/marketplace/actions/github-labeler.
+
+# ----------------------------------
+# GROUP
+# ----------------------------------
+- name: "group/ci"
+  description: "Issue related to the CI pipeline"
+  color: "f25009"
+
+# ----------------------------------
+# SKILL (per-skill auto-labels via .github/labeler.yml)
+# ----------------------------------
+- name: "skill/analyzing-data"
+  description: "Changes to the infrahub-analyzing-data skill"
+  color: "5319e7"
+
+- name: "skill/auditing-repo"
+  description: "Changes to the infrahub-auditing-repo skill"
+  color: "5319e7"
+
+- name: "skill/common"
+  description: "Changes to the infrahub-common skill"
+  color: "5319e7"
+
+- name: "skill/managing-checks"
+  description: "Changes to the infrahub-managing-checks skill"
+  color: "5319e7"
+
+- name: "skill/managing-generators"
+  description: "Changes to the infrahub-managing-generators skill"
+  color: "5319e7"
+
+- name: "skill/managing-menus"
+  description: "Changes to the infrahub-managing-menus skill"
+  color: "5319e7"
+
+- name: "skill/managing-objects"
+  description: "Changes to the infrahub-managing-objects skill"
+  color: "5319e7"
+
+- name: "skill/managing-schemas"
+  description: "Changes to the infrahub-managing-schemas skill"
+  color: "5319e7"
+
+- name: "skill/managing-transforms"
+  description: "Changes to the infrahub-managing-transforms skill"
+  color: "5319e7"
+
+# ----------------------------------
+# TYPE
+# ----------------------------------
+- name: "type/feature"
+  description: "New feature or request"
+  color: "a2eeef"
+
+- name: "type/bug"
+  description: "Something isn't working as expected"
+  color: "d73a4a"
+
+- name: "type/housekeeping"
+  description: "Maintenance task"
+  color: "fef2c0"
+
+- name: "type/tech-debt"
+  description: "Item we know we need to improve way it is implemented"
+  color: "73FA20"
+
+- name: "type/question"
+  description: "Question or discussion"
+  color: "d876e3"
+
+- name: "type/documentation"
+  description: "Improvements or additions to documentation"
+  color: "0075ca"
+
+- name: "type/duplicate"
+  description: "This issue or pull request already exists"
+  color: "cfd3d7"
+
+- name: "type/epic"
+  description: "Large body of work composed of multiple tasks and/or features"
+  color: "fbd39c"
+
+- name: "type/task"
+  description: "Body of work related to an epic"
+  color: "0b8e92"
+
+- name: "type/ecosystem"
+  description: "Effort related to the community, usually not part of the core project"
+  color: "0b5aa9"
+
+- name: "type/brainstorming"
+  description: "Topic for brainstorming, discussions"
+  color: "e19e0f"
+
+- name: "type/user-centric"
+  description: "Issue that would improve the overall experience of our users"
+  color: "ff8c00"
+
+- name: "type/newcomers"
+  description: "Good for newcomers"
+  color: "309c56"
+
+- name: "type/refactoring"
+  description: "Code refactoring or improvement"
+  color: "a2eeef"
+
+- name: "type/breaking-change"
+  description: "Breaking change requiring major version bump"
+  color: "b60205"
+
+# ----------------------------------
+# EFFORT
+# ----------------------------------
+- name: "effort/high"
+  description: "This issue should be completed in more than a day"
+  color: "b60205"
+
+- name: "effort/medium"
+  description: "This issue should be completed in a less than a day"
+  color: "ff9f1c"
+
+- name: "effort/low"
+  description: "This issue should be completed in a couple of hours"
+  color: "ffcc00"
+
+# ----------------------------------
+# PRIORITY
+# ----------------------------------
+- name: "priority/1"
+  description: "This issue must be fixed/implemented ASAP, it's a blocker for a release"
+  color: "b60205"
+
+- name: "priority/2"
+  description: "This issue stalls work on the project or its dependents, it's a blocker for a release"
+  color: "ff9f1c"
+
+- name: "priority/3"
+  description: "Not blocking but should be fixed soon"
+  color: "ffcc00"
+
+- name: "priority/4"
+  description: "Low priority and doesn't need to be rushed"
+  color: "cfda2c"
+
+# ----------------------------------
+# STATE
+# ----------------------------------
+- name: "state/blocked"
+  description: "The issue is currently blocked and cannot be resolved."
+  color: "e34918"
+
+- name: "state/draft"
+  description: "The redaction of the issue is still a work in progress"
+  color: "dcb518"
+
+- name: "state/need-triage"
+  description: "This issue needs to be triaged"
+  color: "333333"
+
+- name: "state/need-more-info"
+  description: "This issue needs more information"
+  color: "cccccc"
+
+- name: "state/need-testing"
+  description: "This issue is ready and needs to be tested."
+  color: "cccccc"
+
+- name: "state/backlog"
+  description: "This issue is part of the backlog"
+  color: "eeeeee"
+
+- name: "state/planned"
+  description: "This issue is planned to be worked on in an upcoming release."
+  color: "eeeeee"
+
+- name: "state/not-reproducible"
+  description: "Unable to reproduce this issue."
+  color: "eeeeee"
+
+- name: "state/wont-fix"
+  description: "Issue has been closed and won't be fix/implemented."
+  color: "eeeeee"
+
+# ----------------------------------
+# CHANGES (version bump triggers)
+# ----------------------------------
+- name: "changes/major"
+  description: "Bump major version (breaking change)"
+  color: "b60205"
+
+- name: "changes/minor"
+  description: "Bump minor version (new feature)"
+  color: "ff9f1c"
+
+- name: "changes/patch"
+  description: "Bump patch version (bug fix)"
+  color: "cfda2c"
+
+# ----------------------------------
+# CI
+# ----------------------------------
+- name: "ci/skip-changelog"
+  description: "Don't include this PR in the changelog"
+  color: "c30664"
+
+- name: "cd/preview"
+  description: "Deploy preview branch"
+  color: "d77e96"
