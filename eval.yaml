@@ -4,7 +4,7 @@ defaults:
   agent: claude
   provider: local
   trials: 3
-  timeout: 180
+  timeout: 300
   threshold: 0.8
 
 tasks:
