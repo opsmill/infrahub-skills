@@ -1,6 +1,6 @@
 [project]
 name = "infrahub-skills"
-version = "1.2.1"
+version = "1.2.2"
 description = "Claude Code plugin for Infrahub"
 requires-python = ">=3.10"
 
