@@ -95,6 +95,22 @@ human_friendly_id:
   - hostname__value
 ```
 
+### Decision Rule (Design Time)
+
+Before finalizing any node, ask: *"Will instances of
+this node ever appear as members of a group used as
+`targets:` of an `artifact_definition` or
+`generator_definition`?"* If yes,
+`CoreArtifactTarget` belongs in `inherit_from` from
+day one. Adding it later forces a schema migration on
+already-loaded data; adding it upfront costs nothing.
+
+This rule is the schema-side of the contract enforced
+by
+[../../infrahub-managing-transforms/rules/artifacts-definitions.md](../../infrahub-managing-transforms/rules/artifacts-definitions.md)
+and checked statically by
+[../../infrahub-auditing-repo/rules/artifact-target-inheritance.md](../../infrahub-auditing-repo/rules/artifact-target-inheritance.md).
+
 ### Antipatterns
 
 **`CoreArtifactTarget` on a generic:** generics are
