@@ -394,6 +394,155 @@ def check_endpoint_device_relationship(schema: dict, **_: Any) -> tuple[bool, st
     return False, "No Endpoint-to-Device relationship found"
 
 
+def check_parent_rel_optional_false(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Every relationship with kind: Parent must have optional: false and cardinality: one.
+
+    Server-validated by `_validate_parents_one_schema` — the schema fails to
+    load if a Parent relationship is optional or has cardinality != one.
+    """
+    all_items = _all_nodes(schema) + _all_generics(schema)
+    bad: list[str] = []
+    found_any = False
+    for node in all_items:
+        for rel in _all_rels(node):
+            if rel.get("kind") != "Parent":
+                continue
+            found_any = True
+            ref = f"{_full_kind(node)}.{rel.get('name', '')}"
+            if rel.get("optional", True) is not False:
+                bad.append(f"{ref} missing optional: false")
+            if rel.get("cardinality") != "one":
+                bad.append(f"{ref} cardinality is {rel.get('cardinality')!r}, expected 'one'")
+    if not found_any:
+        return False, "No kind: Parent relationship found"
+    if bad:
+        return False, "; ".join(bad)
+    return True, "All kind: Parent relationships have optional: false and cardinality: one"
+
+
+def check_parent_rel_single(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Each node has at most one relationship with kind: Parent."""
+    all_items = _all_nodes(schema) + _all_generics(schema)
+    bad: list[str] = []
+    for node in all_items:
+        parents = [rel for rel in _all_rels(node) if rel.get("kind") == "Parent"]
+        if len(parents) > 1:
+            names = ", ".join(p.get("name", "?") for p in parents)
+            bad.append(f"{_full_kind(node)} has {len(parents)} Parent rels: {names}")
+    if bad:
+        return False, "; ".join(bad)
+    return True, "Every node has at most one kind: Parent relationship"
+
+
+def check_computed_jinja2_readonly(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Every attribute with computed_attribute must have read_only: true.
+
+    Required pairing — the system populates the value on every save, so
+    user writes must be blocked. Infrahub validates this at schema load.
+    """
+    all_items = _all_nodes(schema) + _all_generics(schema)
+    bad: list[str] = []
+    found_any = False
+    for node in all_items:
+        for attr in _all_attrs(node):
+            if "computed_attribute" not in attr:
+                continue
+            found_any = True
+            ref = f"{_full_kind(node)}.{attr.get('name', '')}"
+            if attr.get("read_only") is not True:
+                bad.append(f"{ref} missing read_only: true")
+    if not found_any:
+        return False, "No computed_attribute found"
+    if bad:
+        return False, "; ".join(bad)
+    return True, "All computed_attribute fields have read_only: true"
+
+
+def check_computed_jinja2_kind(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Every computed_attribute uses kind: Jinja2 with a non-empty template."""
+    all_items = _all_nodes(schema) + _all_generics(schema)
+    bad: list[str] = []
+    found_any = False
+    for node in all_items:
+        for attr in _all_attrs(node):
+            comp = attr.get("computed_attribute")
+            if not comp:
+                continue
+            found_any = True
+            ref = f"{_full_kind(node)}.{attr.get('name', '')}"
+            if comp.get("kind") != "Jinja2":
+                bad.append(f"{ref} computed_attribute.kind is {comp.get('kind')!r}, expected 'Jinja2'")
+            if not comp.get("jinja2_template"):
+                bad.append(f"{ref} missing jinja2_template")
+    if not found_any:
+        return False, "No computed_attribute found"
+    if bad:
+        return False, "; ".join(bad)
+    return True, "All computed_attribute entries use kind: Jinja2 with a template"
+
+
+def check_on_delete_cascade_present(schema: dict, **_: Any) -> tuple[bool, str]:
+    """At least one relationship sets on_delete: cascade.
+
+    Used in evals where the prompt describes owned children whose existence
+    has no meaning without the parent. Cascade is opt-in; defaults to
+    no-action.
+    """
+    all_items = _all_nodes(schema) + _all_generics(schema)
+    cascading: list[str] = []
+    for node in all_items:
+        for rel in _all_rels(node):
+            if rel.get("on_delete") == "cascade":
+                cascading.append(f"{_full_kind(node)}.{rel.get('name', '')}")
+    if cascading:
+        return True, f"Found cascade on: {', '.join(cascading)}"
+    return False, "No relationship sets on_delete: cascade"
+
+
+def check_generate_template_concrete_only(schema: dict, **_: Any) -> tuple[bool, str]:
+    """generate_template: true must only appear on concrete nodes, never generics.
+
+    Generics are not instantiable, so the Object Template clone UX is
+    meaningless on them.
+    """
+    bad_generics: list[str] = []
+    for generic in _all_generics(schema):
+        if generic.get("generate_template") is True:
+            bad_generics.append(_full_kind(generic))
+    if bad_generics:
+        return False, f"generate_template: true on generics: {', '.join(bad_generics)}"
+
+    flagged_nodes = [
+        _full_kind(node) for node in _all_nodes(schema) if node.get("generate_template") is True
+    ]
+    if not flagged_nodes:
+        return False, "No node sets generate_template: true"
+    return True, f"generate_template: true on concrete nodes only: {', '.join(flagged_nodes)}"
+
+
+def check_core_artifact_target_concrete(schema: dict, **_: Any) -> tuple[bool, str]:
+    """CoreArtifactTarget is inherited only by concrete nodes, not by generics.
+
+    Generics cannot be artifact targets — artifacts attach to instances.
+    """
+    bad_generics: list[str] = []
+    for generic in _all_generics(schema):
+        inherits = generic.get("inherit_from", []) or []
+        if "CoreArtifactTarget" in inherits:
+            bad_generics.append(_full_kind(generic))
+    if bad_generics:
+        return False, f"CoreArtifactTarget on generics: {', '.join(bad_generics)}"
+
+    inheriting_nodes = [
+        _full_kind(node)
+        for node in _all_nodes(schema)
+        if "CoreArtifactTarget" in (node.get("inherit_from", []) or [])
+    ]
+    if not inheriting_nodes:
+        return False, "No node inherits from CoreArtifactTarget"
+    return True, f"CoreArtifactTarget inherited by concrete nodes only: {', '.join(inheriting_nodes)}"
+
+
 # ---------------------------------------------------------------------------
 # Check registry
 # ---------------------------------------------------------------------------
@@ -414,6 +563,13 @@ CHECKS: dict[str, Any] = {
     "two-endpoint-relationships": check_two_endpoint_relationships,
     "attribute-kind-relationships": check_attribute_kind_relationships,
     "endpoint-device-relationship": check_endpoint_device_relationship,
+    "parent-rel-optional-false": check_parent_rel_optional_false,
+    "parent-rel-single": check_parent_rel_single,
+    "computed-jinja2-readonly": check_computed_jinja2_readonly,
+    "computed-jinja2-kind": check_computed_jinja2_kind,
+    "on-delete-cascade-present": check_on_delete_cascade_present,
+    "generate-template-concrete-only": check_generate_template_concrete_only,
+    "core-artifact-target-concrete": check_core_artifact_target_concrete,
 }
 
 

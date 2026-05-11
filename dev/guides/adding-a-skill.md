@@ -231,6 +231,21 @@ Run evals with skillgrade to iterate on quality:
 skillgrade --smoke
 ```
 
+After editing `eval.yaml`, regenerate the JSON
+projection used by the `/skill-creator` evals
+runner:
+
+```bash
+python scripts/sync-evals.py
+```
+
+Commit the regenerated `evaluations/*.json` files
+alongside the `eval.yaml` change.
+
+For the per-rule eval workflow (the more common
+case once a skill exists), see
+[adding-a-rule.md](./adding-a-rule.md).
+
 ### 7. Register in Documentation
 
 - Add the skill to the table in `CLAUDE.md`
@@ -275,6 +290,8 @@ Review results with `skillgrade preview`.
 - [ ] At least one rule file in `rules/`
 - [ ] Tasks added to root `eval.yaml`
 - [ ] `graders/my-skill/` with grader scripts
+- [ ] `python scripts/sync-evals.py` run and the
+  regenerated `evaluations/*.json` committed
 - [ ] `CLAUDE.md` updated with the new skill
 - [ ] `README.md` updated (skills section + project
   structure)

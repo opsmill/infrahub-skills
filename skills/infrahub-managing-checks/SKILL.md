@@ -70,18 +70,21 @@ Existing queries:
 Every check has three components:
 
 1. **GraphQL query** (`.gql` file) -- fetches the data to
-   validate
+   validate, and is registered under the top-level
+   `queries:` section of `.infrahub.yml`
 2. **Python class** -- inherits from `InfrahubCheck`,
-   implements `validate()`
+   sets `query = "<query_name>"`, implements
+   `validate()`
 3. **Configuration** -- declared in `.infrahub.yml` under
-   `check_definitions`
+   `check_definitions` (which does **not** take a
+   `query:` field — see below)
 
 ```python
 from infrahub_sdk.checks import InfrahubCheck
 
 
 class MyCheck(InfrahubCheck):
-    query = "my_query"  # Must match query name
+    query = "my_query"  # Must match queries[].name in .infrahub.yml
 
     def validate(self, data: dict) -> None:
         # Validation logic here
@@ -90,6 +93,15 @@ class MyCheck(InfrahubCheck):
                 message="Problem description"
             )
 ```
+
+> **Where the query is bound:** the Python class
+> (`query = "..."`), not `check_definitions`. The
+> repository config model uses `extra="forbid"`, so
+> putting `query:` under `check_definitions:` makes
+> the whole repo config fail validation. This is the
+> #1 confusion vs. `generator_definitions:`, which
+> *does* take a top-level `query:`. See
+> [rules/registration-config.md](./rules/registration-config.md).
 
 ## Workflow
 

@@ -28,6 +28,7 @@ instead of one bidirectional link.
   peer: DcimGenericDevice
   kind: Parent
   cardinality: one
+  optional: false
   identifier: "module__device"       # WRONG - doesn't match!
 ```
 
@@ -46,6 +47,7 @@ instead of one bidirectional link.
   peer: DcimGenericDevice
   kind: Parent
   cardinality: one
+  optional: false                    # Required on every kind: Parent
   identifier: "device__modules"      # MUST match the other side
 ```
 
