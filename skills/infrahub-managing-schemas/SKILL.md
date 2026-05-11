@@ -4,11 +4,6 @@ description: >-
   Creates, validates, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions.
   TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations.
   DO NOT TRIGGER when: populating data objects, writing checks/generators/transforms, querying live data.
-paths:
-  - "schemas/**/*.yml"
-  - "schemas/**/*.yaml"
-  - "*schema*.yml"
-  - "*schema*.yaml"
 allowed-tools:
   - Read
   - Write

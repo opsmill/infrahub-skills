@@ -4,9 +4,6 @@ description: >-
   Creates Infrahub custom navigation menus for the web UI sidebar, organizing node types into logical groups.
   TRIGGER when: designing sidebar menus, grouping node types in UI, customizing Infrahub web interface navigation.
   DO NOT TRIGGER when: designing schemas, writing checks or transforms, populating data objects.
-paths:
-  - "menus/**/*.yml"
-  - "menus/**/*.yaml"
 allowed-tools:
   - Read
   - Write

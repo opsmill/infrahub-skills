@@ -4,8 +4,6 @@ description: >-
   Creates Infrahub Generators — design-driven automation that builds infrastructure objects from templates and topology definitions.
   TRIGGER when: building design-to-implementation workflows, auto-creating objects from templates, topology-driven generation.
   DO NOT TRIGGER when: designing schemas, writing data transforms, querying live data, populating static data files.
-paths:
-  - "generators/**/*.py"
 allowed-tools:
   - Read
   - Write

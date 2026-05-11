@@ -4,9 +4,6 @@ description: >-
   Creates Infrahub check definitions — Python validation logic and GraphQL queries for proposed change pipelines.
   TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes.
   DO NOT TRIGGER when: designing schemas, querying live data, building transforms or generators.
-paths:
-  - "checks/**/*.py"
-  - "queries/**/*.gql"
 allowed-tools:
   - Read
   - Write
