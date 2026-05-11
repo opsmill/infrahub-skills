@@ -82,6 +82,29 @@ extensions:    # Add attributes/relationships to existing nodes from other files
 Always include the `$schema` comment for IDE validation.
 Only `version` is required at the top level.
 
+## Designing for Downstream Consumers
+
+A schema node rarely lives alone. Before finalizing it, walk
+through how it will be used by other parts of Infrahub and add
+the inheritance / configuration that those features require:
+
+| If the node will... | Add to the schema | See |
+| ------------------- | ----------------- | --- |
+| Be a target of an artifact (group member referenced by an `artifact_definition`) | `inherit_from: [..., CoreArtifactTarget]` | [rules/inherit-from-core-generics.md](./rules/inherit-from-core-generics.md) |
+| Be a target of a generator (group member referenced by a `generator_definition`) | `inherit_from: [..., CoreArtifactTarget]` | [rules/inherit-from-core-generics.md](./rules/inherit-from-core-generics.md) |
+| Appear in a custom sidebar menu | `include_in_menu: false` (so the auto-menu entry doesn't duplicate the manual one) | [../infrahub-managing-menus/rules/schema-integration.md](../infrahub-managing-menus/rules/schema-integration.md) |
+| Be displayed with a stable name across UI lists and APIs | `human_friendly_id` and `display_labels` | [rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md) |
+
+This audit is the difference between a schema that "validates"
+and a schema that "actually works in the broader project."
+Skipping it costs little at design time but forces a schema
+migration once the downstream feature is wired up — at which
+point the data is already loaded.
+
+When the task spans multiple skills (schemas + transforms,
+schemas + menus, etc.), load both skills' rules together rather
+than treating the boundaries as exclusive.
+
 ## Workflow
 
 Follow these steps when creating or modifying a schema:
@@ -100,12 +123,17 @@ Follow these steps when creating or modifying a schema:
    comment and `version: "1.0"`. Define generics first
    (if any), then nodes. Apply naming, display, and
    relationship rules from step 2.
-4. **Configure display properties** — Set
+4. **Audit downstream consumers** — Walk the table in
+   "Designing for Downstream Consumers" above. If any
+   node will become an artifact/generator target, add
+   `CoreArtifactTarget` to its `inherit_from` now, per
+   [rules/inherit-from-core-generics.md](./rules/inherit-from-core-generics.md).
+5. **Configure display properties** — Set
    `human_friendly_id`, `display_label`, and
    `order_weight` per
    [rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md)
    and [rules/display-order-weight.md](./rules/display-order-weight.md).
-5. **Validate** — Run `infrahubctl schema check` per
+6. **Validate** — Run `infrahubctl schema check` per
    [validation.md](./validation.md). Fix any errors
    using [rules/validation-common-errors.md](./rules/validation-common-errors.md).
 
