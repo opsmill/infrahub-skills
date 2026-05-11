@@ -1,0 +1,23 @@
+skills/infrahub-auditing-repo/rules/artifact-target-inheritance.md
+  s_8a859f7c6caf7d::t_76b194d7a8fe04 1-64
+skills/infrahub-managing-schemas/rules/extension-artifact-target.md
+  s_8a859f7c6caf7d::t_cf6f511397785e 98-113
+skills/infrahub-managing-schemas/SKILL.md
+  s_8a859f7c6caf7d::t_c9db5225bfebd0 85-109,128-134,139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "aeed241d6b7a64af94e7d7acf16801a00ce07945",
+  "prompts": {},
+  "sessions": {
+    "s_8a859f7c6caf7d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53b4ca83-5888-4437-81ec-0d7c497790c4",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
