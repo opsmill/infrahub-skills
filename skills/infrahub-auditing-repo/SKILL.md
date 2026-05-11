@@ -12,7 +12,7 @@ allowed-tools:
   - Glob
 argument-hint: "[focus-area]"
 metadata:
-  version: 1.2.3
+  version: 1.2.4
   author: OpsMill
 ---
 
