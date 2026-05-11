@@ -4,6 +4,7 @@ description: >-
   Analyzes and correlates live Infrahub data via the MCP server — answers operational questions, detects drift, and investigates impact.
   TRIGGER when: querying infrastructure data, checking compliance, investigating change impact, producing ad-hoc reports.
   DO NOT TRIGGER when: writing automated checks, building transforms, designing schemas, populating data files.
+  ALWAYS pass the user's question verbatim as args — this skill runs in a forked context and cannot see the parent conversation. Invoking without args will fail.
 context: fork
 allowed-tools:
   - Read
@@ -52,8 +53,18 @@ artifacts, see `../infrahub-managing-transforms/SKILL.md`.
 
 ## Project Context
 
-If invoked with arguments (e.g., `/infrahub:analyzing-data Which devices have no platform assigned?`),
-treat the arguments as the question to answer.
+This skill runs in a forked subagent context and has no visibility into the
+parent conversation. The user's question MUST be passed via arguments.
+
+- If invoked with arguments (e.g., `/infrahub:analyzing-data Which devices have no platform assigned?`),
+  treat the arguments as the question to answer.
+- If invoked with **no arguments**, do **not** guess, do **not** use any example
+  question from this file, and do **not** proceed. Return immediately with:
+
+  > **Error:** No question was passed to `infrahub-analyzing-data`. This skill
+  > runs in a forked context and requires the user's question as args. Re-invoke
+  > with the question, e.g.
+  > `Skill(skill="infrahub-analyzing-data", args="<the user's question>")`.
 
 ## When to Use
 
