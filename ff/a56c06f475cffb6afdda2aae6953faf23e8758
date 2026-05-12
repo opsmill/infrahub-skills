@@ -1,0 +1,22 @@
+.github/workflows/version-sync.yml
+  s_d166438ce926ae::t_5edf2abec6de4b 2,6-8,17-18,20-21,26-27
+.github/workflows/auto-bump.yml
+  s_d166438ce926ae::t_45bcd13a0d6f4d 97-102,107-110
+  s_d166438ce926ae::t_7801c57ac430bc 38-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "ffa56c06f475cffb6afdda2aae6953faf23e8758",
+  "prompts": {},
+  "sessions": {
+    "s_d166438ce926ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba7a6d4a-e6ff-414d-be1f-13f80faaa3c2",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
