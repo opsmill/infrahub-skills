@@ -35,7 +35,12 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
-  # Bump: calculate next version, update files, commit, tag
+  # Bump: calculate next version, update files, commit
+  #
+  # Tag creation is deferred to release publication. When a maintainer
+  # publishes the draft maintained by release-drafter, GitHub creates the
+  # tag against the release's targetCommitish (main HEAD at that moment),
+  # guaranteeing the tag includes every PR merged up to publish time.
   # ---------------------------------------------------------------------------
   bump:
     needs: guard
@@ -44,7 +49,6 @@ jobs:
     outputs:
       version: ${{ steps.next.outputs.next-version }}
       changed: ${{ steps.compare.outputs.changed }}
-      tag_exists: ${{ steps.compare.outputs.tag_exists }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -64,15 +68,6 @@ jobs:
           NEXT="${{ steps.next.outputs.next-version }}"
           echo "Current: $CURRENT"
           echo "Next:    $NEXT"
-
-          # Check if tag already exists
-          if git rev-parse "v${NEXT}" >/dev/null 2>&1; then
-            echo "Tag v${NEXT} already exists"
-            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Tag v${NEXT} does not exist"
-            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
-          fi
 
           if [ "$CURRENT" = "$NEXT" ]; then
             echo "No version change needed"
@@ -99,21 +94,20 @@ jobs:
           VERSION="${{ steps.next.outputs.next-version }}"
           git config user.name "opsmill-bot"
           git config user.email "opsmill-bot@users.noreply.github.com"
-          git add -A
+          # Stage only files version-sync is allowed to touch — avoids
+          # picking up stray files dropped by third-party tools.
+          git add .claude-plugin/plugin.json \
+                  skills/*/SKILL.md \
+                  pyproject.toml \
+                  .github/.release-manifest.json
           git commit -m "chore(release): bump to v${VERSION}"
           git push origin main
 
-      - name: Create annotated tag
-        if: steps.compare.outputs.tag_exists == 'false'
-        run: |
-          VERSION="${{ steps.next.outputs.next-version }}"
-          git config user.name "opsmill-bot"
-          git config user.email "opsmill-bot@users.noreply.github.com"
-          git tag -a "v${VERSION}" -m "Release v${VERSION}"
-          git push origin "v${VERSION}"
-
   # ---------------------------------------------------------------------------
-  # Release draft: create/update a draft GitHub release
+  # Release draft: create/update a draft GitHub release.
+  # The draft's tag (`v${VERSION}`) is materialized by GitHub only when the
+  # maintainer publishes the draft — guaranteeing the tag points at HEAD at
+  # publish time, with every subsequent PR included.
   # ---------------------------------------------------------------------------
   release-draft:
     needs: bump

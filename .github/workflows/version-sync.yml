@@ -1,11 +1,12 @@
 ---
+# yamllint disable rule:truthy
 name: Version sync
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Auto bump version"]
+    types: [completed]
     branches: [main]
-    paths:
-      - ".claude-plugin/plugin.json"
   workflow_dispatch:
 
 permissions:
@@ -13,14 +14,17 @@ permissions:
 
 jobs:
   sync-versions:
-    # Skip when auto-bump already handled the sync
+    # Only run after auto-bump succeeds (or when manually dispatched).
+    # Acts as a safety net for direct plugin.json edits that bypass auto-bump.
     if: >-
-      !startsWith(github.event.head_commit.message, 'chore(release):')
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+          token: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}
 
       - name: Extract version from plugin.json
         id: version
