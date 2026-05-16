@@ -174,6 +174,101 @@ def check_has_title(text: str, **_: Any) -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
+# Routing decision checks
+# ---------------------------------------------------------------------------
+
+
+# Sub-repos that should NOT be named as the primary routing target when the
+# user has expressed doubt. Listed in the routing-default-to-main eval.
+_SUB_REPO_NAMES = (
+    "opsmill/infrahub-sdk-python",
+    "opsmill/infrahub-ansible",
+    "opsmill/infrahub-vscode",
+    "opsmill/nornir-infrahub",
+    "opsmill/infrahub-helm",
+    "opsmill/infrahub-mcp",
+    "opsmill/schema-library",
+    "opsmill/infrahub-backup",
+    "opsmill/infrahub-sync",
+    "opsmill/infrahub-skills",
+)
+
+
+def check_routes_to_main(text: str, **_: Any) -> tuple[bool, str]:
+    """Fail if the output does not name opsmill/infrahub as the target."""
+    if "opsmill/infrahub" not in text:
+        return False, "Output does not mention opsmill/infrahub"
+    # Reject if a sub-repo is named while opsmill/infrahub is not
+    # established as the primary target.
+    sub_mentioned = next((r for r in _SUB_REPO_NAMES if r in text), None)
+    # Heuristic: if the output mentions opsmill/infrahub on a line that
+    # uses "target", "file", "route", "open", "report" — accept it.
+    primary_pattern = re.compile(
+        r"opsmill/infrahub\b[^-]",
+    )
+    if not primary_pattern.search(text):
+        return False, "opsmill/infrahub appears only as a prefix of a sub-repo name"
+    if sub_mentioned:
+        # Acceptable only if the sub-repo is named as a non-target reference,
+        # e.g., "could be Ansible or SDK". Reject if it is named as the
+        # routing target.
+        target_for_sub = re.compile(
+            r"(?:file|route|target|open|report)\s+(?:it\s+)?(?:in|to|against)\s+"
+            + re.escape(sub_mentioned),
+            re.IGNORECASE,
+        )
+        if target_for_sub.search(text):
+            return False, f"Routes to sub-repo {sub_mentioned} instead of main"
+    return True, "Routes to opsmill/infrahub"
+
+
+def check_cites_uncertainty(text: str, **_: Any) -> tuple[bool, str]:
+    """Fail if the rationale does not cite user doubt/ambiguity."""
+    keywords = (
+        "doubt",
+        "uncertain",
+        "ambig",
+        "unclear",
+        "not sure",
+        "unsure",
+        "unknown",
+    )
+    lower = text.lower()
+    if any(kw in lower for kw in keywords):
+        return True, "Mentions user uncertainty"
+    return False, "Does not cite user doubt/ambiguity"
+
+
+# ---------------------------------------------------------------------------
+# Template-fidelity checks
+# ---------------------------------------------------------------------------
+
+
+def check_uses_gh_api_for_template(text: str, **_: Any) -> tuple[bool, str]:
+    """Fail if the plan does not reference fetching the template via gh."""
+    has_gh_api = re.search(r"gh\s+api\b", text)
+    has_template_path = re.search(
+        r"\.github/ISSUE_TEMPLATE/bug_report\.ya?ml",
+        text,
+    )
+    if has_gh_api and has_template_path:
+        return True, "Plan fetches bug_report.yml via gh api"
+    missing = []
+    if not has_gh_api:
+        missing.append("`gh api` invocation")
+    if not has_template_path:
+        missing.append("ISSUE_TEMPLATE/bug_report.yml path")
+    return False, f"Missing: {', '.join(missing)}"
+
+
+def check_references_target_repo(text: str, **_: Any) -> tuple[bool, str]:
+    """Fail if the plan does not reference opsmill/infrahub."""
+    if "opsmill/infrahub" in text:
+        return True, "References opsmill/infrahub"
+    return False, "Does not reference target repo opsmill/infrahub"
+
+
+# ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
 
@@ -185,6 +280,10 @@ CHECKS = {
     "no-user-paths": check_no_user_paths,
     "has-environment-section": check_has_environment_section,
     "has-title": check_has_title,
+    "routes-to-main": check_routes_to_main,
+    "cites-uncertainty": check_cites_uncertainty,
+    "uses-gh-api-for-template": check_uses_gh_api_for_template,
+    "references-target-repo": check_references_target_repo,
 }
 
 

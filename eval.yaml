@@ -753,6 +753,10 @@ tasks:
       decision in ≤3 sentences. Do NOT render the issue itself — just the routing decision.
 
       Save ONLY the routing paragraph to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-issues/check_route_to_main.py
+        weight: 1.0
     expected_output: >-
       The routing decision should name `opsmill/infrahub` as the
       target repo, citing the default-to-main rule because the user
@@ -769,6 +773,13 @@ tasks:
         Decision explicitly cites user uncertainty as the reason
       - >-
         Mentions the default-to-main / re-routing rationale
+    assertions:
+      - name: routes-to-main
+        check: Names `opsmill/infrahub` as the routing target (not a sub-repo)
+      - name: cites-uncertainty
+        check: >-
+          Explanation cites user doubt/uncertainty/ambiguity as the
+          routing rationale
 
   - name: template-fidelity
     instruction: |
@@ -780,6 +791,10 @@ tasks:
       template-fetch plan.
 
       Save ONLY the plan to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-issues/check_template_fidelity.py
+        weight: 1.0
     expected_output: >-
       A short plan listing a `gh api` command to fetch the
       `.github/ISSUE_TEMPLATE/bug_report.yml` file from
@@ -797,3 +812,10 @@ tasks:
       - >-
         Plan states the generic templates/bug.md fallback is NOT
         used when the repo ships its own template
+    assertions:
+      - name: uses-gh-api-for-template
+        check: >-
+          Plan invokes `gh api` for the bug_report.yml path under
+          `.github/ISSUE_TEMPLATE/`
+      - name: references-target-repo
+        check: Plan references opsmill/infrahub as the target repo
