@@ -666,3 +666,134 @@ tasks:
         check: >-
           Targeted check_definitions entry declares both targets and
           parameters
+
+  # --- Issue Reporter --- #
+  - name: bug-sanitization
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-issues/SKILL.md and follow its workflow and rules.
+
+      Task: A user is reporting a bug in the Infrahub Python SDK. Here is the raw context they shared:
+
+      "I'm running infrahub-sdk version 1.5.2 against an Infrahub server (version 1.4.0) on my Mac.
+      When I call InfrahubClient.create() with an empty list of payloads, it raises a TypeError
+      instead of returning an empty result.
+
+      My config is at /Users/alice/work/acme-corp/infrahub-config.yml, and I'm connecting to
+      https://infrahub.acme.corp at 10.50.12.7. Here's my GitHub token I was using for testing:
+      ghp_abcdefghijklmnopqrstuvwxyz1234567890ABC. Python is 3.12.1, macOS 14 arm64."
+
+      Render a complete, sanitized GitHub issue body in Markdown that this user could file
+      against opsmill/infrahub-sdk-python. The body MUST:
+      - Include a title line as the first non-blank line (as a `#` heading or `Title:` line).
+      - Include an Environment section with versions and OS.
+      - Redact all sensitive details (IPs, internal hostnames, user paths, tokens) using
+        placeholders like <internal-ip>, <internal-host>, <internal-url>, <path>, or by
+        omitting tokens entirely.
+
+      Do NOT submit this anywhere — just render it. Save ONLY the final Markdown to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-issues/check_bug_sanitization.py
+        weight: 1.0
+    expected_output: >-
+      A Markdown issue body starting with a title line (e.g.,
+      `# SDK: InfrahubClient.create raises on empty list payload`),
+      containing an Environment section with versions (infrahub-sdk
+      1.5.2, infrahub-server 1.4.0, Python 3.12.1) and OS (macOS 14
+      arm64). All sensitive context — the internal hostname
+      `infrahub.acme.corp`, the IP `10.50.12.7`, the user path
+      `/Users/alice/work/acme-corp/...`, and the GitHub token —
+      must be redacted with placeholders or omitted entirely.
+    expectations:
+      - Output begins with a single title line as a Markdown heading
+      - >-
+        Title follows the form `<area>: <imperative summary>` and is
+        ≤72 characters
+      - >-
+        Environment section lists product versions (infrahub-sdk,
+        infrahub-server), OS, and Python version
+      - >-
+        No raw IPs from the user's environment appear (10.50.12.7
+        must be redacted or omitted)
+      - >-
+        No internal hostnames appear (infrahub.acme.corp must be
+        redacted)
+      - >-
+        No user filesystem paths appear (/Users/alice/... must be
+        redacted)
+      - >-
+        The GitHub token must be entirely removed or replaced with
+        an explicit placeholder, never partially redacted
+    assertions:
+      - name: has-title
+        check: First non-blank line is a Markdown heading or `Title:` line
+      - name: has-environment-section
+        check: An Environment / Versions section exists
+      - name: no-leaked-ips
+        check: No real IPv4 addresses outside documentation prefixes appear
+      - name: no-internal-hostnames
+        check: >-
+          No hostnames with internal TLDs (.corp, .local, .internal,
+          etc.) appear
+      - name: no-tokens
+        check: No GitHub/AWS/Slack/JWT-style token patterns appear
+      - name: no-user-paths
+        check: No /Users/<name> or /home/<name> paths appear
+
+  - name: route-to-main-on-doubt
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-issues/SKILL.md and follow its workflow and rules.
+
+      Task: A user reports: "Something weird is happening — my schema loads fine in the UI
+      but my Ansible playbook can't find one of the nodes. I'm not sure if it's a schema
+      problem, an Ansible problem, or something with my SDK. I'm not sure where to file this."
+
+      Decide which opsmill/* repository this issue should be filed against. Output a single
+      paragraph that names the target repo (as `opsmill/<repo>`) and explains the routing
+      decision in ≤3 sentences. Do NOT render the issue itself — just the routing decision.
+
+      Save ONLY the routing paragraph to: output.md
+    expected_output: >-
+      The routing decision should name `opsmill/infrahub` as the
+      target repo, citing the default-to-main rule because the user
+      explicitly expressed doubt about which component is at fault.
+      The explanation should mention that the main repo can re-route
+      to a sub-repo more easily than the reverse, and that ambiguous
+      symptoms across schema/SDK/Ansible suggest a platform-layer
+      issue.
+    expectations:
+      - >-
+        Routing target is `opsmill/infrahub` (the main repo), not a
+        sub-repo
+      - >-
+        Decision explicitly cites user uncertainty as the reason
+      - >-
+        Mentions the default-to-main / re-routing rationale
+
+  - name: template-fidelity
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-issues/SKILL.md and follow its workflow and rules.
+
+      Task: A user wants to file a bug against opsmill/infrahub. Before composing the issue
+      body, list the commands you would run to fetch the repo's bug_report.yml issue template
+      and explain which template you would use. Do NOT compose the issue itself — just the
+      template-fetch plan.
+
+      Save ONLY the plan to: output.md
+    expected_output: >-
+      A short plan listing a `gh api` command to fetch the
+      `.github/ISSUE_TEMPLATE/bug_report.yml` file from
+      `opsmill/infrahub`, with a note that the YAML form fields
+      will be followed when composing the issue. The plan should
+      acknowledge that opsmill/infrahub ships its own bug template
+      and so the skill's generic fallback should NOT be used.
+    expectations:
+      - >-
+        Plan uses `gh api repos/opsmill/infrahub/contents/.github/ISSUE_TEMPLATE/bug_report.yml`
+        or an equivalent
+      - >-
+        Plan acknowledges opsmill/infrahub has its own bug_report
+        template
+      - >-
+        Plan states the generic templates/bug.md fallback is NOT
+        used when the repo ships its own template
