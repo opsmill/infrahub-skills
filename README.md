@@ -106,6 +106,7 @@ A team already running Infrahub who needs to continue extending it — adding sc
 | **managing-menus** | Define custom navigation menus for the Infrahub web UI |
 | **analyzing-data** | Query and correlate live Infrahub data via the MCP server (requires MCP connection) |
 | **auditing-repo** | Audit your repository against Infrahub best practices |
+| **reporting-issues** | Route a bug or feature request to the right Infrahub-ecosystem repo (SDK, Ansible, VS Code, MCP, etc.) and prepare a sanitized draft for review |
 
 Each skill lives in `skills/infrahub-<name>/` with a `SKILL.md` entry point, reference docs, examples, and modular rules. Shared references (GraphQL patterns, `.infrahub.yml` format, git integration) are in `skills/infrahub-common/`. Skills use gerund-form names following the [Agent Skills best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
 
@@ -208,7 +209,8 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 │   ├── infrahub-managing-transforms/ # Data transforms
 │   ├── infrahub-managing-menus/    # Navigation menus
 │   ├── infrahub-analyzing-data/    # Live data analysis (MCP)
-│   └── infrahub-auditing-repo/     # Best-practice audits
+│   ├── infrahub-auditing-repo/     # Best-practice audits
+│   └── infrahub-reporting-issues/  # Ecosystem issue reporting
 ├── CLAUDE.md
 ├── README.md
 └── LICENSE                      # Apache 2.0
