@@ -121,18 +121,6 @@ def test_load_output_py_returns_none_tree_on_syntax_error(tmp_path):
     assert "def f" in raw
 
 
-# Pull the check functions out of CHECKS as they're added
-check_relationship_hfid_form = _mod.CHECKS.get("relationship-hfid-form-correct")
-check_no_bare_string_relationship = _mod.CHECKS.get("no-bare-string-relationship")
-check_no_overpacked_hfid = _mod.CHECKS.get("no-overpacked-hfid-list")
-
-
-RELATIONSHIP_FIELDS = {
-    "device_type", "manufacturer", "platform", "site", "location",
-    "device", "connected_to",
-}
-
-
 SRC_GOOD_HFID = """
 async def f(self):
     await self.client.create(
@@ -203,3 +191,21 @@ def test_no_overpacked_hfid_passes_on_good():
     tree = ast.parse(SRC_GOOD_HFID)
     ok, msg = _mod.CHECKS["no-overpacked-hfid-list"](tree)
     assert ok
+
+
+SRC_EMPTY_HFID = """
+async def f(self):
+    await self.client.create(
+        kind="DcimDevice",
+        data={
+            "device_type": {"hfid": []},
+        },
+    )
+"""
+
+
+def test_no_overpacked_hfid_fails_on_empty_hfid():
+    tree = ast.parse(SRC_EMPTY_HFID)
+    ok, msg = _mod.CHECKS["no-overpacked-hfid-list"](tree)
+    assert not ok
+    assert "device_type" in msg

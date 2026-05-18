@@ -8,7 +8,7 @@ tags: python, client, create, hfid, relationship, id
 
 Impact: CRITICAL
 
-The SDK accepts three explicit forms for relationship fields in
+The SDK accepts four explicit forms for relationship fields in
 the ``data=`` dict of ``client.create()``. Mixing them up — or
 passing a bare string — is the most common source of "Unable to
 find the node" errors at runtime.
@@ -117,5 +117,9 @@ await self.client.create(
    prefer ``{"hfid": [...]}``.
 4. If you have an SDK object in scope (from ``client.get`` or
    ``client.create``), pass it directly — Form D.
+
+The same forms apply to **every** relationship in the generator,
+not only the examples above. If a relationship field doesn't fit
+forms A-D, it is shape-wrong — fix it.
 
 Reference: [Infrahub Generator Docs](https://docs.infrahub.app)

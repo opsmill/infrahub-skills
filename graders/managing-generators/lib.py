@@ -174,6 +174,13 @@ def is_name_or_attribute(node: ast.AST) -> bool:
 # schema. The check inspects only these keys in the ``data=`` dict.
 # Attribute-style scalar fields (name, status, description, etc.) are
 # intentionally excluded so a bare ``"name": "x"`` doesn't fail.
+#
+# Maintenance note: this set is an allowlist of known base-schema
+# relationship names. Generators referencing relationships outside this
+# set (e.g. custom schema additions) will silently pass these checks
+# even if shape is wrong. Extend this set when new relationship names
+# enter the corpus, or invert to detect-by-value-shape if false
+# negatives become a problem.
 _RELATIONSHIP_KEYS = {
     "device_type", "manufacturer", "platform", "site", "location",
     "device", "interface", "connected_to", "endpoint_a", "endpoint_z",
@@ -242,13 +249,12 @@ def check_no_bare_string_relationship(
 def check_no_overpacked_hfid_list(
     tree: ast.Module | None, **_: Any
 ) -> tuple[bool, str]:
-    """Single-component HFID targets must not receive a multi-string HFID list.
+    """Single-component HFID targets must receive an HFID list of length 1.
 
     Heuristic: for the relationships that resolve to single-component HFIDs in
     Infrahub's base schema (DcimDeviceType, DcimPlatform, OrganizationManufacturer
     referenced via device_type/platform/manufacturer), the HFID list must be
-    length 1.
-    """
+    exactly one element."""
     SINGLE_COMPONENT_RELATIONSHIPS = {
         "device_type", "manufacturer", "platform", "site", "location",
         "role", "tenant", "provider",
@@ -267,8 +273,8 @@ def check_no_overpacked_hfid_list(
             if key not in SINGLE_COMPONENT_RELATIONSHIPS:
                 continue
             hfid_ok, elts = is_hfid_dict(value)
-            if hfid_ok and elts is not None and len(elts) > 1:
-                bad.append(f"{key} got HFID list of length {len(elts)}")
+            if hfid_ok and elts is not None and len(elts) != 1:
+                bad.append(f"{key} got HFID list of length {len(elts)} (expected 1)")
 
     if bad:
         return False, f"Over-packed HFID list: {', '.join(bad)}"
