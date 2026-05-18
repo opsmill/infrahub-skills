@@ -14,7 +14,7 @@ validation. Violations cause immediate validation errors.
 ### Namespace
 
 Pattern: `^[A-Z][a-z0-9]+$` (first letter uppercase,
-rest lowercase letters or digits). Min 3, max 32 chars.
+rest lowercase letters or digits). Min 3, max 64 chars.
 
 **Incorrect:**
 
@@ -70,6 +70,14 @@ Pattern: `^[a-z0-9_]+$` (snake_case). Min 3, max 64 chars.
 - name: my_attribute
 - name: rack_u_position
 ```
+
+Name / namespace patterns are enforced at both
+`schema check` (JSON-Schema lint) and `schema load`
+(server Pydantic). See
+[validation-string-limits](./validation-string-limits.md)
+for the matching caps on `label`, `description`,
+`identifier`, and `deprecation` — those are only
+caught at `schema load` time.
 
 ### Kind Derivation
 

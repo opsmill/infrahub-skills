@@ -520,6 +520,45 @@ def check_generate_template_concrete_only(schema: dict, **_: Any) -> tuple[bool,
     return True, f"generate_template: true on concrete nodes only: {', '.join(flagged_nodes)}"
 
 
+def check_string_limits(schema: dict, **_: Any) -> tuple[bool, str]:
+    """All schema string fields fit Infrahub's load-time max_length caps.
+
+    Server-validated via Pydantic Field(max_length=...) on the generated
+    schema models. Violations only fire at `infrahubctl schema load` time,
+    not at `infrahubctl schema check`, so editors and offline lints miss
+    them. Verified against infrahub-v1.9.4.
+    """
+    # field -> max_length (per generated Pydantic models)
+    NODE_LIMITS = {"name": 32, "namespace": 64, "label": 64, "description": 128}
+    ATTR_LIMITS = {"name": 64, "label": 64, "description": 128, "deprecation": 128}
+    REL_LIMITS = {
+        "name": 64,
+        "label": 64,
+        "description": 128,
+        "identifier": 128,
+        "deprecation": 128,
+    }
+
+    def _check(ref: str, obj: dict, limits: dict[str, int], issues: list[str]) -> None:
+        for field, cap in limits.items():
+            value = obj.get(field)
+            if isinstance(value, str) and len(value) > cap:
+                issues.append(f"{ref}.{field}={len(value)} (max {cap})")
+
+    issues: list[str] = []
+    for node in _all_nodes(schema) + _all_generics(schema):
+        ref = _full_kind(node) or "<unnamed>"
+        _check(ref, node, NODE_LIMITS, issues)
+        for attr in _all_attrs(node):
+            _check(f"{ref}.{attr.get('name', '?')}", attr, ATTR_LIMITS, issues)
+        for rel in _all_rels(node):
+            _check(f"{ref}.{rel.get('name', '?')}", rel, REL_LIMITS, issues)
+
+    if issues:
+        return False, "Over-limit string fields: " + "; ".join(issues)
+    return True, "All string fields within max_length caps"
+
+
 def check_core_artifact_target_concrete(schema: dict, **_: Any) -> tuple[bool, str]:
     """CoreArtifactTarget is inherited only by concrete nodes, not by generics.
 
@@ -570,6 +609,7 @@ CHECKS: dict[str, Any] = {
     "on-delete-cascade-present": check_on_delete_cascade_present,
     "generate-template-concrete-only": check_generate_template_concrete_only,
     "core-artifact-target-concrete": check_core_artifact_target_concrete,
+    "string-limits": check_string_limits,
 }
 
 
