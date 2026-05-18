@@ -780,3 +780,37 @@ tasks:
         check: No .add() call receives a list as its argument
       - name: members-add-iterates
         check: .add() is invoked inside a for loop or multiple times explicitly
+
+  - name: generator-natural-key-preflight
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write a Python script that creates an IpamPrefix '10.250.10.0/24'
+      from user input. The prefix may already have been seeded by an earlier
+      bootstrap run. Handle the collision gracefully — either pre-flight check
+      for an existing prefix (and exit with a clear message) or save with
+      allow_upsert=True. Do not let a raw server-side uniqueness error escape.
+
+      Save ONLY the final Python script to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_natural_key_preflight.py
+        weight: 1.0
+    expected_output: >-
+      A Python script that either uses client.get with the natural key
+      before calling client.create, or passes allow_upsert=True to save().
+    expectations:
+      - "Calls client.create(kind='IpamPrefix', ...)"
+      - >-
+        Either calls client.get(kind='IpamPrefix', ...) before create,
+        or passes allow_upsert=True to save()
+      - "No bare client.create + save() without one of the two patterns"
+    assertions:
+      - name: preflight-or-upsert
+        check: >-
+          Either client.get(kind='IpamPrefix', ...) precedes create, OR
+          save(allow_upsert=True) is called.
+      - name: no-raw-create-without-handler
+        check: >-
+          client.create has either a preflight get OR allow_upsert=True.

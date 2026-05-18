@@ -339,3 +339,61 @@ def test_members_add_iterates_fails_on_no_loop():
     tree = ast.parse(SRC_BAD_ADD_LIST_LITERAL)
     ok, msg = _mod.CHECKS["members-add-iterates"](tree)
     assert not ok
+
+
+def test_members_add_iterates_fails_on_different_paths():
+    """Two .add() calls on different attribute paths shouldn't be treated as iteration."""
+    src = """
+async def generate(self):
+    group.members.add(d1)
+    other.peers.add(d2)
+"""
+    tree = ast.parse(src)
+    ok, msg = _mod.CHECKS["members-add-iterates"](tree)
+    assert not ok, f"Should not pass — different paths, no loop. Got: {msg}"
+
+
+# Task 6 — Natural-key preflight tests
+
+SRC_PREFLIGHT = """
+from infrahub_sdk.exceptions import NodeNotFound
+
+async def create_prefix(client, user_prefix):
+    try:
+        existing = await client.get(kind="IpamPrefix", prefix__value=user_prefix)
+        return existing
+    except NodeNotFound:
+        pass
+    prefix = await client.create(kind="IpamPrefix", data={"prefix": user_prefix})
+    await prefix.save()
+"""
+
+SRC_UPSERT = """
+async def create_prefix(client, user_prefix):
+    prefix = await client.create(kind="IpamPrefix", data={"prefix": user_prefix})
+    await prefix.save(allow_upsert=True)
+"""
+
+SRC_UNSAFE = """
+async def create_prefix(client, user_prefix):
+    prefix = await client.create(kind="IpamPrefix", data={"prefix": user_prefix})
+    await prefix.save()
+"""
+
+
+def test_preflight_or_upsert_passes_on_preflight():
+    tree = ast.parse(SRC_PREFLIGHT)
+    ok, _ = _mod.CHECKS["preflight-or-upsert"](tree)
+    assert ok
+
+
+def test_preflight_or_upsert_passes_on_upsert():
+    tree = ast.parse(SRC_UPSERT)
+    ok, _ = _mod.CHECKS["preflight-or-upsert"](tree)
+    assert ok
+
+
+def test_preflight_or_upsert_fails_on_unsafe():
+    tree = ast.parse(SRC_UNSAFE)
+    ok, _ = _mod.CHECKS["preflight-or-upsert"](tree)
+    assert not ok

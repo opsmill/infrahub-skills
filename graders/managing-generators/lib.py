@@ -410,10 +410,102 @@ def check_members_add_iterates(
             paths.append(ast.unparse(call.func))
         except Exception:
             pass
-    if len(paths) >= 2 and len(set(paths)) <= len(paths):
+    if len(paths) >= 2 and len(set(paths)) < len(paths):
         return True, f".add() called multiple times: {len(add_calls)} calls"
 
     return False, "Only a single .add() call and not in a for loop"
+
+
+# ---------------------------------------------------------------------------
+# Natural-key preflight
+# ---------------------------------------------------------------------------
+
+
+def _has_save_with_upsert_true(tree: ast.Module) -> bool:
+    """True if any ``.save(allow_upsert=True)`` call exists."""
+    for call in _iter_calls(tree):
+        func = call.func
+        if not isinstance(func, ast.Attribute) or func.attr != "save":
+            continue
+        for kw in call.keywords:
+            if kw.arg == "allow_upsert":
+                if isinstance(kw.value, ast.Constant) and kw.value.value is True:
+                    return True
+    return False
+
+
+def _has_client_get_for_same_kind_as_create(tree: ast.Module) -> bool:
+    """True if there is at least one ``client.get(kind=X)`` AND a
+    ``client.create(kind=X)`` for the same kind value.
+    """
+    def _kind_arg(call: ast.Call) -> str | None:
+        for kw in call.keywords:
+            if kw.arg == "kind" and isinstance(kw.value, ast.Constant):
+                return kw.value.value
+        return None
+
+    creates = find_client_create_calls(tree)
+    gets = find_client_get_calls(tree)
+
+    # Also accept generic ``client.get`` (not self.client.get) for non-generator scripts
+    for call in _iter_calls(tree):
+        func = call.func
+        if not isinstance(func, ast.Attribute) or func.attr != "get":
+            continue
+        if isinstance(func.value, ast.Name) and func.value.id == "client":
+            gets.append(call)
+
+    # Also accept generic ``client.create`` for non-generator scripts
+    for call in _iter_calls(tree):
+        func = call.func
+        if not isinstance(func, ast.Attribute) or func.attr != "create":
+            continue
+        if isinstance(func.value, ast.Name) and func.value.id == "client":
+            creates.append(call)
+
+    create_kinds = {_kind_arg(c) for c in creates if _kind_arg(c)}
+    get_kinds = {_kind_arg(c) for c in gets if _kind_arg(c)}
+    return bool(create_kinds & get_kinds)
+
+
+def check_preflight_or_upsert(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """Either a same-kind client.get precedes create, OR save uses upsert."""
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    if _has_save_with_upsert_true(tree):
+        return True, "save(allow_upsert=True) found"
+    if _has_client_get_for_same_kind_as_create(tree):
+        return True, "client.get preflights client.create for the same kind"
+    return False, "Neither preflight client.get nor save(allow_upsert=True) found"
+
+
+def check_no_raw_create_without_handler(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """If client.create is used but neither preflight nor upsert is present,
+    this is the bug 5 pattern.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    has_self_create = bool(find_client_create_calls(tree))
+    has_bare_client_create = any(
+        isinstance(c.func, ast.Attribute) and c.func.attr == "create"
+        and isinstance(c.func.value, ast.Name) and c.func.value.id == "client"
+        for c in _iter_calls(tree)
+    )
+
+    if not has_self_create and not has_bare_client_create:
+        return False, "No client.create call found"
+
+    if _has_save_with_upsert_true(tree):
+        return True, "save(allow_upsert=True) covers the collision case"
+    if _has_client_get_for_same_kind_as_create(tree):
+        return True, "preflight client.get covers the collision case"
+    return False, "client.create has no preflight and no allow_upsert=True"
 
 
 # ---------------------------------------------------------------------------
@@ -429,6 +521,8 @@ CHECKS: dict[str, Any] = {
     "sdk-object-reference-used": check_sdk_object_reference_used,
     "no-list-passed-to-add": check_no_list_passed_to_add,
     "members-add-iterates": check_members_add_iterates,
+    "preflight-or-upsert": check_preflight_or_upsert,
+    "no-raw-create-without-handler": check_no_raw_create_without_handler,
 }
 
 
