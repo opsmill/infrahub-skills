@@ -38,14 +38,15 @@ class MyGenerator(InfrahubGenerator):
 ### Object Creation API
 
 ```python
-# Create a new object
+# Create a new object — see [python-relationship-references.md]
+# for the three accepted forms for relationship fields.
 obj = await self.client.create(
     kind="DcimDevice",
     data={
         "name": "my-device",
         "status": "active",
-        # Use ID for relationships
-        "device_type": device_type_id,
+        # HFID dict for single-component HFID targets
+        "device_type": {"hfid": ["cEdge-1000"]},
     }
 )
 await obj.save(allow_upsert=True)
@@ -71,7 +72,10 @@ ip = await self.client.allocate_next_ip_address(
   idempotent create-or-update
 - Use `self.client` (not `self._init_client`) inside
   `generate()` -- it has tracking enabled
-- Use IDs for relationship references in `data` dict
+- Reference related objects in `data` by HFID dict
+  (`{"hfid": ["name"]}`), ID dict (`{"id": "<uuid>"}`), or SDK
+  object directly. A bare string is treated as ``id``, not HFID.
+  See [python-relationship-references.md](./python-relationship-references.md).
 - Handle empty/missing data gracefully -- GraphQL may
   return `None` for optional fields
 
