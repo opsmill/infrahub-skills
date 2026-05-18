@@ -281,6 +281,49 @@ def check_no_overpacked_hfid_list(
     return True, "No over-packed HFID lists for single-component targets"
 
 
+def check_hfid_form_for_name_lookup(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """At least one relationship in client.create uses {"hfid": [...]}."""
+    if tree is None:
+        return False, "No Python source to inspect"
+    for call in find_client_create_calls(tree):
+        for key, value in get_data_dict_items(call).items():
+            if _is_known_relationship_key(key):
+                ok, _ = is_hfid_dict(value)
+                if ok:
+                    return True, f"{key} uses HFID dict form"
+    return False, "No relationship uses {'hfid': [...]} form"
+
+
+def check_id_form_for_uuid(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """At least one relationship in client.create uses {"id": ...}."""
+    if tree is None:
+        return False, "No Python source to inspect"
+    for call in find_client_create_calls(tree):
+        for key, value in get_data_dict_items(call).items():
+            if _is_known_relationship_key(key) and is_id_dict(value):
+                return True, f"{key} uses ID dict form"
+    return False, "No relationship uses {'id': ...} form"
+
+
+def check_sdk_object_reference_used(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """At least one relationship in client.create is a variable reference
+    (presumably an SDK object from a prior client.get / client.create call).
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+    for call in find_client_create_calls(tree):
+        for key, value in get_data_dict_items(call).items():
+            if _is_known_relationship_key(key) and is_name_or_attribute(value):
+                return True, f"{key} uses SDK object reference"
+    return False, "No relationship passes an SDK object reference"
+
+
 # ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
@@ -289,6 +332,9 @@ CHECKS: dict[str, Any] = {
     "relationship-hfid-form-correct": check_relationship_hfid_form_correct,
     "no-bare-string-relationship": check_no_bare_string_relationship,
     "no-overpacked-hfid-list": check_no_overpacked_hfid_list,
+    "hfid-form-for-name-lookup": check_hfid_form_for_name_lookup,
+    "id-form-for-uuid": check_id_form_for_uuid,
+    "sdk-object-reference-used": check_sdk_object_reference_used,
 }
 
 

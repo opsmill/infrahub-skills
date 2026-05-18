@@ -714,3 +714,41 @@ tasks:
         check: >-
           Single-component HFID targets (device_type, manufacturer, platform)
           receive an HFID list of length 1.
+
+  - name: generator-relationship-three-forms
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write an Infrahub Generator that creates a DcimDevice 'cEdge-1' and
+      sets its relationships using all three forms documented in the skill:
+
+      - manufacturer: by HFID (the name 'Cisco' — DcimDevice.manufacturer is a
+        single-component HFID).
+      - device_type: by explicit ID, where the UUID is obtained from a prior
+        GraphQL query and is available in scope as a string variable.
+      - site: by SDK object reference, where you first call self.client.get
+        for the LocationSite and pass the returned object directly.
+
+      Save ONLY the final Python generator class to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_relationship_three_forms.py
+        weight: 1.0
+    expected_output: >-
+      A Python generator that exercises each of the three relationship
+      reference forms (HFID dict, ID dict, SDK object reference) on the
+      same client.create call.
+    expectations:
+      - "At least one relationship uses {'hfid': ['<name>']}"
+      - "At least one relationship uses {'id': <uuid>}"
+      - >-
+        At least one relationship passes a variable (SDK object) from
+        a prior self.client.get call
+    assertions:
+      - name: hfid-form-for-name-lookup
+        check: "At least one relationship uses {'hfid': [...]} form"
+      - name: id-form-for-uuid
+        check: "At least one relationship uses {'id': ...} form"
+      - name: sdk-object-reference-used
+        check: At least one relationship is a variable reference

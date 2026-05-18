@@ -209,3 +209,57 @@ def test_no_overpacked_hfid_fails_on_empty_hfid():
     ok, msg = _mod.CHECKS["no-overpacked-hfid-list"](tree)
     assert not ok
     assert "device_type" in msg
+
+
+SRC_THREE_FORMS = """
+async def generate(self):
+    site = await self.client.get(kind="LocationSite", name__value="PAR-1")
+    device_type_uuid = "11111111-1111-1111-1111-111111111111"
+    await self.client.create(
+        kind="DcimDevice",
+        data={
+            "name": "cEdge-1",
+            "manufacturer": {"hfid": ["Cisco"]},
+            "device_type": {"id": device_type_uuid},
+            "site": site,
+        },
+    )
+"""
+
+
+def test_hfid_form_for_name_lookup_passes_on_three_forms():
+    tree = ast.parse(SRC_THREE_FORMS)
+    ok, msg = _mod.CHECKS["hfid-form-for-name-lookup"](tree)
+    assert ok, msg
+
+
+def test_id_form_for_uuid_passes_on_three_forms():
+    tree = ast.parse(SRC_THREE_FORMS)
+    ok, msg = _mod.CHECKS["id-form-for-uuid"](tree)
+    assert ok, msg
+
+
+def test_sdk_object_reference_used_passes_on_three_forms():
+    tree = ast.parse(SRC_THREE_FORMS)
+    ok, msg = _mod.CHECKS["sdk-object-reference-used"](tree)
+    assert ok, msg
+
+
+def test_three_forms_fail_when_all_hfid():
+    src = """
+async def generate(self):
+    await self.client.create(
+        kind="DcimDevice",
+        data={
+            "name": "x",
+            "manufacturer": {"hfid": ["Cisco"]},
+            "device_type": {"hfid": ["cEdge-1000"]},
+            "site": {"hfid": ["PAR-1"]},
+        },
+    )
+"""
+    tree = ast.parse(src)
+    ok, _ = _mod.CHECKS["id-form-for-uuid"](tree)
+    assert not ok
+    ok, _ = _mod.CHECKS["sdk-object-reference-used"](tree)
+    assert not ok
