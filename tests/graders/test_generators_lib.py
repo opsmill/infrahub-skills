@@ -263,3 +263,79 @@ async def generate(self):
     assert not ok
     ok, _ = _mod.CHECKS["sdk-object-reference-used"](tree)
     assert not ok
+
+
+# Task 4 follow-up: missing negative coverage for hfid-form-for-name-lookup
+def test_hfid_form_for_name_lookup_fails_when_none_use_hfid():
+    src = """
+async def generate(self):
+    site = await self.client.get(kind="LocationSite", name__value="PAR-1")
+    await self.client.create(
+        kind="DcimDevice",
+        data={
+            "name": "x",
+            "device_type": {"id": "abc-uuid"},
+            "site": site,
+        },
+    )
+"""
+    tree = ast.parse(src)
+    ok, _ = _mod.CHECKS["hfid-form-for-name-lookup"](tree)
+    assert not ok
+
+
+# Task 5 — Multi-peer add tests
+
+SRC_GOOD_ADD_LOOP = """
+async def generate(self):
+    group = await self.client.get(kind="CoreStandardGroup", name__value="g")
+    devices = [d1, d2, d3]
+    for peer in devices:
+        group.members.add(peer)
+    await group.save()
+"""
+
+SRC_BAD_ADD_LIST = """
+async def generate(self):
+    group = await self.client.get(kind="CoreStandardGroup", name__value="g")
+    devices = [d1, d2, d3]
+    group.members.add(devices)
+    await group.save()
+"""
+
+SRC_BAD_ADD_LIST_LITERAL = """
+async def generate(self):
+    group = await self.client.get(kind="CoreStandardGroup", name__value="g")
+    group.members.add([d1, d2, d3])
+    await group.save()
+"""
+
+
+def test_no_list_passed_to_add_passes_on_iteration():
+    tree = ast.parse(SRC_GOOD_ADD_LOOP)
+    ok, msg = _mod.CHECKS["no-list-passed-to-add"](tree)
+    assert ok, msg
+
+
+def test_no_list_passed_to_add_fails_on_list_literal():
+    tree = ast.parse(SRC_BAD_ADD_LIST_LITERAL)
+    ok, msg = _mod.CHECKS["no-list-passed-to-add"](tree)
+    assert not ok
+
+
+def test_no_list_passed_to_add_fails_on_list_named_variable():
+    tree = ast.parse(SRC_BAD_ADD_LIST)
+    ok, msg = _mod.CHECKS["no-list-passed-to-add"](tree)
+    assert not ok
+
+
+def test_members_add_iterates_passes_on_loop():
+    tree = ast.parse(SRC_GOOD_ADD_LOOP)
+    ok, msg = _mod.CHECKS["members-add-iterates"](tree)
+    assert ok, msg
+
+
+def test_members_add_iterates_fails_on_no_loop():
+    tree = ast.parse(SRC_BAD_ADD_LIST_LITERAL)
+    ok, msg = _mod.CHECKS["members-add-iterates"](tree)
+    assert not ok

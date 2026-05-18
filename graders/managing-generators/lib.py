@@ -325,6 +325,98 @@ def check_sdk_object_reference_used(
 
 
 # ---------------------------------------------------------------------------
+# Multi-peer add checks
+# ---------------------------------------------------------------------------
+
+
+def _is_list_referenced(node: ast.AST, tree: ast.Module) -> bool:
+    """Best-effort: is ``node`` either a list literal or a Name that was
+    assigned a list literal earlier in the module?
+    """
+    if isinstance(node, ast.List):
+        return True
+    if isinstance(node, ast.Name):
+        target_name = node.id
+        for assign in ast.walk(tree):
+            if not isinstance(assign, ast.Assign):
+                continue
+            for tgt in assign.targets:
+                if isinstance(tgt, ast.Name) and tgt.id == target_name:
+                    if isinstance(assign.value, ast.List):
+                        return True
+                    if isinstance(assign.value, ast.ListComp):
+                        return True
+        # Also check ann-assigns: `devices: list[T] = [...]`
+        for ann in ast.walk(tree):
+            if not isinstance(ann, ast.AnnAssign):
+                continue
+            tgt = ann.target
+            if isinstance(tgt, ast.Name) and tgt.id == target_name:
+                if isinstance(ann.value, (ast.List, ast.ListComp)):
+                    return True
+    return False
+
+
+def check_no_list_passed_to_add(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """No .add(...) call may receive a list argument as its sole peer."""
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    add_calls = find_relationship_add_calls(tree)
+    if not add_calls:
+        return False, "No .add(...) calls found"
+
+    bad: list[str] = []
+    for call in add_calls:
+        if len(call.args) != 1:
+            continue
+        arg = call.args[0]
+        if _is_list_referenced(arg, tree):
+            bad.append(ast.unparse(call.func) if hasattr(ast, "unparse") else call.func.attr)
+
+    if bad:
+        return False, f".add() received a list: {', '.join(bad)}"
+    return True, "No .add() call received a list argument"
+
+
+def check_members_add_iterates(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """``.add(...)`` should appear inside a For loop OR be called multiple times
+    on the same attribute path. Both indicate per-peer iteration.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    add_calls = find_relationship_add_calls(tree)
+    if not add_calls:
+        return False, "No .add(...) calls found"
+
+    # Look for any For loop containing a .add() call
+    for for_node in ast.walk(tree):
+        if not isinstance(for_node, ast.For):
+            continue
+        for inner in ast.walk(for_node):
+            if isinstance(inner, ast.Call) and inner in add_calls:
+                return True, ".add() is called inside a for loop"
+
+    # If multiple .add() calls share the same attribute path, treat as
+    # explicit per-peer adds
+    paths = []
+    for call in add_calls:
+        try:
+            paths.append(ast.unparse(call.func))
+        except Exception:
+            pass
+    if len(paths) >= 2 and len(set(paths)) <= len(paths):
+        return True, f".add() called multiple times: {len(add_calls)} calls"
+
+    return False, "Only a single .add() call and not in a for loop"
+
+
+# ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
 
@@ -335,6 +427,8 @@ CHECKS: dict[str, Any] = {
     "hfid-form-for-name-lookup": check_hfid_form_for_name_lookup,
     "id-form-for-uuid": check_id_form_for_uuid,
     "sdk-object-reference-used": check_sdk_object_reference_used,
+    "no-list-passed-to-add": check_no_list_passed_to_add,
+    "members-add-iterates": check_members_add_iterates,
 }
 
 

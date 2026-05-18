@@ -752,3 +752,31 @@ tasks:
         check: "At least one relationship uses {'id': ...} form"
       - name: sdk-object-reference-used
         check: At least one relationship is a variable reference
+
+  - name: generator-multi-peer-iteration
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write an Infrahub Generator that creates a CoreStandardGroup named
+      'sdwan-edges' and adds five DcimDevice instances ('edge-1' through
+      'edge-5') as members of that group via group.members.add().
+
+      Save ONLY the final Python generator class to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_multi_peer_iteration.py
+        weight: 1.0
+    expected_output: >-
+      A Python generator that adds each peer to the group with one .add()
+      call per peer (typically inside a for loop), then a single .save().
+      No list is passed to .add() in a single call.
+    expectations:
+      - "Group is created or fetched via self.client.get / self.client.create"
+      - ".add() is called once per peer (inside a for loop or 5 explicit calls)"
+      - "No call passes a list of peers as a single .add() argument"
+    assertions:
+      - name: no-list-passed-to-add
+        check: No .add() call receives a list as its argument
+      - name: members-add-iterates
+        check: .add() is invoked inside a for loop or multiple times explicitly
