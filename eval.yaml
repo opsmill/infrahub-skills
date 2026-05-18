@@ -814,3 +814,30 @@ tasks:
       - name: no-raw-create-without-handler
         check: >-
           client.create has either a preflight get OR allow_upsert=True.
+
+  - name: generator-process-integration-test
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write an Infrahub Generator that creates three DcimDevice instances
+      from a TopologyDataCenter design. After the generator class, include a
+      short section (as a Python triple-quoted string named TEST_PLAN at the
+      bottom of the file, or as a # block comment) explaining how to test the
+      generator end-to-end against a live Infrahub instance before merging.
+
+      Save ONLY the final Python file to: output.py
+    graders: []
+    expected_output: >-
+      A Python generator plus end-to-end test guidance. The guidance should
+      mention infrahubctl generator run against a live instance and note
+      that input-dict unit tests don't cover SDK call shape.
+    expectations:
+      - "Generator class is present and creates DcimDevice instances"
+      - "TEST_PLAN string or block comment exists at the bottom of the file"
+      - >-
+        The guidance mentions infrahubctl generator run against a real
+        Infrahub instance
+      - >-
+        The guidance notes that unit tests on the input dict do not cover
+        SDK call shape
