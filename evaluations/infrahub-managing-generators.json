@@ -1,0 +1,112 @@
+{
+  "skill_name": "infrahub-managing-generators",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Write an Infrahub Generator that creates a DcimDevice named 'cEdge-1'\nwith these single-component HFID references on the schema:\n- device_type: 'cEdge-1000' (DcimDeviceType.human_friendly_id = [name__value])\n- manufacturer: 'Cisco' (OrganizationManufacturer.human_friendly_id = [name__value])\n- platform: 'ios-xe' (DcimPlatform.human_friendly_id = [name__value])\n\nThe generator must use the documented HFID dict form for each relationship,\nnot bare strings, and the HFID lists must be single-element (matching the\nschema's human_friendly_id length).",
+      "expected_output": "A Python generator class that calls self.client.create with each relationship field set to {\"hfid\": [\"<name>\"]} \u2014 a single-element list inside a dict with the literal key \"hfid\". No bare strings.",
+      "files": [],
+      "expectations": [
+        "Generator inherits from InfrahubGenerator and implements async generate()",
+        "Each relationship field uses the {\"hfid\": [\"<name>\"]} dict form",
+        "No relationship field is a bare string (would be treated as id)",
+        "HFID lists for single-component targets are length 1 (no over-pack)",
+        "save() is called with allow_upsert=True"
+      ],
+      "assertions": [
+        {
+          "name": "relationship-hfid-form-correct",
+          "check": "Every relationship key in client.create(data=...) is either a {\"hfid\": [...]} dict, {\"id\": \"...\"} dict, or a variable reference."
+        },
+        {
+          "name": "no-bare-string-relationship",
+          "check": "No relationship key has a bare string literal as its value."
+        },
+        {
+          "name": "no-overpacked-hfid-list",
+          "check": "Single-component HFID targets (device_type, manufacturer, platform) receive an HFID list of length 1."
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Write an Infrahub Generator that creates a DcimDevice 'cEdge-1' and\nsets its relationships using all three forms documented in the skill:\n\n- manufacturer: by HFID (the name 'Cisco' \u2014 DcimDevice.manufacturer is a\n  single-component HFID).\n- device_type: by explicit ID, where the UUID is obtained from a prior\n  GraphQL query and is available in scope as a string variable.\n- site: by SDK object reference, where you first call self.client.get\n  for the LocationSite and pass the returned object directly.",
+      "expected_output": "A Python generator that exercises each of the three relationship reference forms (HFID dict, ID dict, SDK object reference) on the same client.create call.",
+      "files": [],
+      "expectations": [
+        "At least one relationship uses {'hfid': ['<name>']}",
+        "At least one relationship uses {'id': <uuid>}",
+        "At least one relationship passes a variable (SDK object) from a prior self.client.get call"
+      ],
+      "assertions": [
+        {
+          "name": "hfid-form-for-name-lookup",
+          "check": "At least one relationship uses {'hfid': [...]} form"
+        },
+        {
+          "name": "id-form-for-uuid",
+          "check": "At least one relationship uses {'id': ...} form"
+        },
+        {
+          "name": "sdk-object-reference-used",
+          "check": "At least one relationship is a variable reference"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Write an Infrahub Generator that creates a CoreStandardGroup named\n'sdwan-edges' and adds five DcimDevice instances ('edge-1' through\n'edge-5') as members of that group via group.members.add().",
+      "expected_output": "A Python generator that adds each peer to the group with one .add() call per peer (typically inside a for loop), then a single .save(). No list is passed to .add() in a single call.",
+      "files": [],
+      "expectations": [
+        "Group is created or fetched via self.client.get / self.client.create",
+        ".add() is called once per peer (inside a for loop or 5 explicit calls)",
+        "No call passes a list of peers as a single .add() argument"
+      ],
+      "assertions": [
+        {
+          "name": "no-list-passed-to-add",
+          "check": "No .add() call receives a list as its argument"
+        },
+        {
+          "name": "members-add-iterates",
+          "check": ".add() is invoked inside a for loop or multiple times explicitly"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Write a Python script that creates an IpamPrefix '10.250.10.0/24'\nfrom user input. The prefix may already have been seeded by an earlier\nbootstrap run. Handle the collision gracefully \u2014 either pre-flight check\nfor an existing prefix (and exit with a clear message) or save with\nallow_upsert=True. Do not let a raw server-side uniqueness error escape.",
+      "expected_output": "A Python script that either uses client.get with the natural key before calling client.create, or passes allow_upsert=True to save().",
+      "files": [],
+      "expectations": [
+        "Calls client.create(kind='IpamPrefix', ...)",
+        "Either calls client.get(kind='IpamPrefix', ...) before create, or passes allow_upsert=True to save()",
+        "No bare client.create + save() without one of the two patterns"
+      ],
+      "assertions": [
+        {
+          "name": "preflight-or-upsert",
+          "check": "Either client.get(kind='IpamPrefix', ...) precedes create, OR save(allow_upsert=True) is called."
+        },
+        {
+          "name": "no-raw-create-without-handler",
+          "check": "client.create has either a preflight get OR allow_upsert=True."
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Write an Infrahub Generator that creates three DcimDevice instances\nfrom a TopologyDataCenter design. After the generator class, include a\nshort section (as a Python triple-quoted string named TEST_PLAN at the\nbottom of the file, or as a # block comment) explaining how to test the\ngenerator end-to-end against a live Infrahub instance before merging.",
+      "expected_output": "A Python generator plus end-to-end test guidance. The guidance should mention infrahubctl generator run against a live instance and note that input-dict unit tests don't cover SDK call shape.",
+      "files": [],
+      "expectations": [
+        "Generator class is present and creates DcimDevice instances",
+        "TEST_PLAN string or block comment exists at the bottom of the file",
+        "The guidance mentions infrahubctl generator run against a real Infrahub instance",
+        "The guidance notes that unit tests on the input dict do not cover SDK call shape"
+      ],
+      "assertions": []
+    }
+  ]
+}
