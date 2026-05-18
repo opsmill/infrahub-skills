@@ -669,6 +669,7 @@ tasks:
 
   # --- Generators: relationship reference encoding --- #
   - name: generator-relationship-hfid-encoding
+    trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
       follow its workflow and rules.
@@ -716,6 +717,7 @@ tasks:
           receive an HFID list of length 1.
 
   - name: generator-relationship-three-forms
+    trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
       follow its workflow and rules.
@@ -754,6 +756,7 @@ tasks:
         check: At least one relationship is a variable reference
 
   - name: generator-multi-peer-iteration
+    trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
       follow its workflow and rules.
@@ -782,6 +785,7 @@ tasks:
         check: .add() is invoked inside a for loop or multiple times explicitly
 
   - name: generator-natural-key-preflight
+    trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
       follow its workflow and rules.
@@ -816,6 +820,7 @@ tasks:
           client.create has either a preflight get OR allow_upsert=True.
 
   - name: generator-process-integration-test
+    trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
       follow its workflow and rules.
