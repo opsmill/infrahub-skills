@@ -167,10 +167,123 @@ def is_name_or_attribute(node: ast.AST) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# CHECKS registry (populated by later tasks)
+# Relationship field checks
 # ---------------------------------------------------------------------------
 
-CHECKS: dict[str, Any] = {}
+# Relationship-like attribute names commonly used in this repo's base
+# schema. The check inspects only these keys in the ``data=`` dict.
+# Attribute-style scalar fields (name, status, description, etc.) are
+# intentionally excluded so a bare ``"name": "x"`` doesn't fail.
+_RELATIONSHIP_KEYS = {
+    "device_type", "manufacturer", "platform", "site", "location",
+    "device", "interface", "connected_to", "endpoint_a", "endpoint_z",
+    "role", "tenant", "provider", "circuit", "asn", "vlan", "vrf",
+    "ip_namespace", "address", "prefix", "group",
+}
+
+
+def _is_known_relationship_key(key: str) -> bool:
+    return key in _RELATIONSHIP_KEYS
+
+
+def check_relationship_hfid_form_correct(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """For each relationship field in client.create(data=...), the value is
+    one of: HFID dict, ID dict, or a Name/Attribute reference.
+
+    Bare strings, list literals (non-HFID), or numeric literals fail.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    creates = find_client_create_calls(tree)
+    if not creates:
+        return False, "No self.client.create(...) calls found"
+
+    problems: list[str] = []
+    for call in creates:
+        data_items = get_data_dict_items(call)
+        for key, value in data_items.items():
+            if not _is_known_relationship_key(key):
+                continue
+            hfid_ok, _elts = is_hfid_dict(value)
+            if hfid_ok or is_id_dict(value) or is_name_or_attribute(value):
+                continue
+            problems.append(f"{key}: {ast.dump(value)[:60]}")
+
+    if problems:
+        return False, f"Wrong relationship reference shape: {'; '.join(problems)}"
+    return True, "All relationship references use HFID dict, ID dict, or SDK object"
+
+
+def check_no_bare_string_relationship(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """Relationship fields must not be bare string literals (bug 3 pattern)."""
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    creates = find_client_create_calls(tree)
+    if not creates:
+        return False, "No self.client.create(...) calls found"
+
+    bad: list[str] = []
+    for call in creates:
+        for key, value in get_data_dict_items(call).items():
+            if _is_known_relationship_key(key) and is_bare_string(value):
+                bad.append(f"{key}={value.value!r}")
+
+    if bad:
+        return False, f"Bare-string relationship values (treated as id): {', '.join(bad)}"
+    return True, "No bare-string relationship values found"
+
+
+def check_no_overpacked_hfid_list(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """Single-component HFID targets must not receive a multi-string HFID list.
+
+    Heuristic: for the relationships that resolve to single-component HFIDs in
+    Infrahub's base schema (DcimDeviceType, DcimPlatform, OrganizationManufacturer
+    referenced via device_type/platform/manufacturer), the HFID list must be
+    length 1.
+    """
+    SINGLE_COMPONENT_RELATIONSHIPS = {
+        "device_type", "manufacturer", "platform", "site", "location",
+        "role", "tenant", "provider",
+    }
+
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    creates = find_client_create_calls(tree)
+    if not creates:
+        return False, "No self.client.create(...) calls found"
+
+    bad: list[str] = []
+    for call in creates:
+        for key, value in get_data_dict_items(call).items():
+            if key not in SINGLE_COMPONENT_RELATIONSHIPS:
+                continue
+            hfid_ok, elts = is_hfid_dict(value)
+            if hfid_ok and elts is not None and len(elts) > 1:
+                bad.append(f"{key} got HFID list of length {len(elts)}")
+
+    if bad:
+        return False, f"Over-packed HFID list: {', '.join(bad)}"
+    return True, "No over-packed HFID lists for single-component targets"
+
+
+# ---------------------------------------------------------------------------
+# CHECKS registry
+# ---------------------------------------------------------------------------
+
+CHECKS: dict[str, Any] = {
+    "relationship-hfid-form-correct": check_relationship_hfid_form_correct,
+    "no-bare-string-relationship": check_no_bare_string_relationship,
+    "no-overpacked-hfid-list": check_no_overpacked_hfid_list,
+}
 
 
 # ---------------------------------------------------------------------------

@@ -666,3 +666,51 @@ tasks:
         check: >-
           Targeted check_definitions entry declares both targets and
           parameters
+
+  # --- Generators: relationship reference encoding --- #
+  - name: generator-relationship-hfid-encoding
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write an Infrahub Generator that creates a DcimDevice named 'cEdge-1'
+      with these single-component HFID references on the schema:
+      - device_type: 'cEdge-1000' (DcimDeviceType.human_friendly_id = [name__value])
+      - manufacturer: 'Cisco' (OrganizationManufacturer.human_friendly_id = [name__value])
+      - platform: 'ios-xe' (DcimPlatform.human_friendly_id = [name__value])
+
+      The generator must use the documented HFID dict form for each relationship,
+      not bare strings, and the HFID lists must be single-element (matching the
+      schema's human_friendly_id length).
+
+      Save ONLY the final Python generator class to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_relationship_hfid_encoding.py
+        weight: 1.0
+    expected_output: >-
+      A Python generator class that calls self.client.create with each
+      relationship field set to {"hfid": ["<name>"]} — a single-element
+      list inside a dict with the literal key "hfid". No bare strings.
+    expectations:
+      - >-
+        Generator inherits from InfrahubGenerator and implements async generate()
+      - >-
+        Each relationship field uses the {"hfid": ["<name>"]} dict form
+      - >-
+        No relationship field is a bare string (would be treated as id)
+      - >-
+        HFID lists for single-component targets are length 1 (no over-pack)
+      - "save() is called with allow_upsert=True"
+    assertions:
+      - name: relationship-hfid-form-correct
+        check: >-
+          Every relationship key in client.create(data=...) is either a
+          {"hfid": [...]} dict, {"id": "..."} dict, or a variable reference.
+      - name: no-bare-string-relationship
+        check: >-
+          No relationship key has a bare string literal as its value.
+      - name: no-overpacked-hfid-list
+        check: >-
+          Single-component HFID targets (device_type, manufacturer, platform)
+          receive an HFID list of length 1.
