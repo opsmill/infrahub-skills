@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### managing-generators
+
+- New rule `python-relationship-references` covering the three
+  accepted forms for relationship fields in
+  `self.client.create()` (HFID dict, ID dict, SDK object) plus
+  the bare-string and over-packed-list anti-patterns.
+- New rule `python-multi-peer-add` explaining that
+  `RelationshipManager.add()` takes one peer per call; iterate
+  the peer list.
+- New rule `patterns-natural-key-preflight` covering form-driven
+  mutations that collide with bootstrap-seeded keys.
+- New advisory rule `testing-integration` recommending
+  end-to-end runs against a live instance before merge.
+- Fixed misleading `device_type_id` example in `python-generate`
+  that suggested bare-string relationship values.
+- Added 5 deterministic evals + 4 graders to `eval.yaml` (first
+  evals for this skill).
+
+### Notes
+
+- `skillgrade --smoke` was not run in this branch (skillgrade
+  CLI not installed in the dev environment). Run before merging
+  to baseline pass rates against the new evals.
+
 ## [1.1.0] - 2026-03-18
 
 ### Added
