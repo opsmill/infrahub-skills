@@ -832,7 +832,27 @@ tasks:
       generator end-to-end against a live Infrahub instance before merging.
 
       Save ONLY the final Python file to: output.py
-    graders: []
+    graders:
+      - type: llm_rubric
+        provider: anthropic
+        weight: 1.0
+        rubric: |
+          The model output is a Python file at output.py. Score each
+          criterion 0.0 or 1.0; return the average.
+
+          1. A generator class is present and its generate() method
+             creates DcimDevice instances (via self.client.create or
+             similar).
+          2. The file contains either a Python triple-quoted string
+             named TEST_PLAN, or a block of # comments, that explains
+             how to test the generator end-to-end. Mentions
+             "infrahubctl generator run" (or equivalent live-instance
+             command). At least one full sentence of guidance — not
+             just a stub.
+          3. The guidance explicitly notes that unit tests on the
+             input dict do not cover SDK call shape (or equivalent
+             warning that runtime SDK shape errors slip past
+             type/unit checks).
     expected_output: >-
       A Python generator plus end-to-end test guidance. The guidance should
       mention infrahubctl generator run against a live instance and note
