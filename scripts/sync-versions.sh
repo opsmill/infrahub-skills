@@ -22,4 +22,10 @@ if [ -f ".github/.release-manifest.json" ]; then
   echo "  Updated: .github/.release-manifest.json"
 fi
 
+# Update pyproject.toml
+if [ -f "pyproject.toml" ]; then
+  sed -i.bak "s/^version = .*/version = \"$VERSION\"/" pyproject.toml && rm -f pyproject.toml.bak
+  echo "  Updated: pyproject.toml"
+fi
+
 echo "Done."

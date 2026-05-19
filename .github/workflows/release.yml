@@ -38,6 +38,15 @@ jobs:
             exit 1
           fi
 
+      - name: Validate pyproject.toml version matches tag
+        run: |
+          PYPROJECT_VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml)
+          TAG_VERSION="${{ steps.tag.outputs.version }}"
+          if [ "$PYPROJECT_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Version mismatch: pyproject.toml=$PYPROJECT_VERSION, tag=v$TAG_VERSION"
+            exit 1
+          fi
+
       - name: Validate SKILL.md versions match tag
         run: |
           TAG_VERSION="${{ steps.tag.outputs.version }}"

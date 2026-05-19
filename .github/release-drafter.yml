@@ -1,0 +1,57 @@
+---
+# Configuration for release-drafter/release-drafter.
+# Generates categorized release notes from merged PRs.
+
+name-template: "Version $RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
+
+categories:
+  - title: "Breaking Changes"
+    labels:
+      - "changes/major"
+      - "type/breaking-change"
+
+  - title: "Features"
+    labels:
+      - "type/feature"
+      - "changes/minor"
+
+  - title: "Improvements"
+    labels:
+      - "type/refactoring"
+      - "type/housekeeping"
+      - "type/tech-debt"
+
+  - title: "Bug Fixes"
+    labels:
+      - "type/bug"
+      - "changes/patch"
+
+  - title: "Documentation"
+    labels:
+      - "type/documentation"
+
+exclude-labels:
+  - "ci/skip-changelog"
+  - "type/duplicate"
+
+autolabeler:
+  - label: "type/documentation"
+    files:
+      - "docs/**"
+    branch:
+      - '/docs?\/.+/'
+
+  - label: "group/ci"
+    files:
+      - ".github/**"
+
+change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
+no-changes-template: "- No changes"

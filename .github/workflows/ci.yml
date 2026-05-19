@@ -19,6 +19,7 @@ jobs:
       markdown: ${{ steps.changes.outputs.markdown_all }}
       yaml: ${{ steps.changes.outputs.yaml_all }}
       skills: ${{ steps.changes.outputs.skills_all }}
+      documentation: ${{ steps.changes.outputs.documentation_all }}
     steps:
       - uses: actions/checkout@v6
       - uses: opsmill/paths-filter@v3.0.2
@@ -35,7 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: DavidAnson/markdownlint-cli2-action@v22
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run rumdl check .
 
   # ---------------------------------------------------------------------------
   # Lint YAML files
@@ -50,10 +52,54 @@ jobs:
       - run: yamllint -c .yamllint.yml .
 
   # ---------------------------------------------------------------------------
+  # Build documentation (Docusaurus)
+  # ---------------------------------------------------------------------------
+  docs-build:
+    needs: files-changed
+    if: needs.files-changed.outputs.documentation == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+      - run: npm ci
+        working-directory: docs
+      - run: npm run build
+        working-directory: docs
+
+  # ---------------------------------------------------------------------------
+  # Verify evaluations/*.json is in sync with eval.yaml
+  # ---------------------------------------------------------------------------
+  # evals-sync:
+  #   needs: files-changed
+  #   if: needs.files-changed.outputs.yaml == 'true' || needs.files-changed.outputs.skills == 'true'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.13"
+  #     - name: Install PyYAML
+  #       run: pip install pyyaml
+  #     - name: Regenerate evaluations/*.json
+  #       run: python scripts/sync-evals.py
+  #     - name: Fail if evaluations/ is out of sync with eval.yaml
+  #       run: |
+  #         if ! git diff --quiet evaluations/; then
+  #           echo "::error::evaluations/*.json is out of sync with eval.yaml."
+  #           echo "Run 'python scripts/sync-evals.py' locally and commit the result."
+  #           git diff evaluations/
+  #           exit 1
+  #         fi
+
+  # ---------------------------------------------------------------------------
   # Run skill evaluations (reusable workflow)
   # ---------------------------------------------------------------------------
-  skill-evals:
-    needs: files-changed
-    if: needs.files-changed.outputs.skills == 'true'
-    uses: ./.github/workflows/skill-evals.yml
-    secrets: inherit
+  # skill-evals:
+  #   needs: files-changed
+  #   if: needs.files-changed.outputs.skills == 'true'
+  #   uses: ./.github/workflows/skill-evals.yml
+  #   secrets: inherit

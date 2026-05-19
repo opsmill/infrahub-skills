@@ -29,7 +29,7 @@ Plugin (plugin.json)
 │           schema files
 │
 ├── Skills (skills/)
-│   ├── schema-creator/
+│   ├── infrahub-managing-schemas/
 │   │   ├── SKILL.md          ← Entry point
 │   │   ├── rules/            ← Modular rules
 │   │   │   ├── _sections.md  ← Category index
@@ -38,22 +38,24 @@ Plugin (plugin.json)
 │   │   ├── reference.md      ← Property/format tables
 │   │   └── validation.md     ← Validation guidance
 │   │
-│   ├── object-creator/
-│   ├── check-creator/
-│   ├── generator-creator/
-│   ├── transform-creator/
-│   ├── menu-creator/
-│   ├── analyst/
-│   ├── repo-auditor/
+│   ├── infrahub-managing-objects/
+│   ├── infrahub-managing-checks/
+│   ├── infrahub-managing-generators/
+│   ├── infrahub-managing-transforms/
+│   ├── infrahub-managing-menus/
+│   ├── infrahub-analyzing-data/
+│   ├── infrahub-auditing-repo/
 │   │
-│   └── common/               ← Cross-cutting refs
+│   └── infrahub-common/      ← Cross-cutting refs
 │       ├── graphql-queries.md
 │       ├── infrahub-yml-reference.md
 │       └── rules/            ← Shared rules
 │
-└── Evaluations (evaluations/)
-    ├── schema-creator.json   ← Test scenarios
-    └── menu-creator.json     ← Test scenarios
+├── eval.yaml                             ← skillgrade config (all skills)
+│
+└── graders/                              ← Deterministic grader scripts
+    ├── managing-schemas/                  ← managing-schemas graders
+    └── managing-menus/                   ← managing-menus graders
 ```
 
 ## Progressive Disclosure Model
@@ -63,7 +65,7 @@ manage AI context window efficiently:
 
 ```text
 Level 1: Metadata (always loaded, ~100 words)
-  ├── name: "infrahub-schema-creator"
+  ├── name: "infrahub-managing-schemas"
   └── description: "Create and validate..."
          ↓ triggers activation
 Level 2: SKILL.md body (loaded on activation)
@@ -74,7 +76,7 @@ Level 3: Supporting files (loaded as needed)
   ├── rules/*.md — individual rules
   ├── examples.md — complete patterns
   ├── reference.md — property tables
-  └── ../common/*.md — shared references
+  └── ../infrahub-common/*.md — shared references
 ```
 
 The description field in the frontmatter is the
@@ -103,23 +105,28 @@ task, keeping context focused.
 ## Evaluation System
 
 Evaluations test that skills produce correct output.
-They use the skill-creator eval format
-(`evaluations/<skill-name>.json`) with:
+Each skill that has evals carries them alongside its
+other files:
 
-- **Prompts** — Realistic user requests that exercise
-  the skill
-- **Expected output** — Description of what correct
-  output looks like
-- **Expectations** — Human-readable list of verifiable
-  outcomes
-- **Assertions** — Machine-checkable criteria with
-  descriptive names
+- **`eval.yaml`** — Single skillgrade configuration at
+  project root defining all tasks with prompts,
+  expected output descriptions, and grader script paths
+- **`graders/`** — Deterministic Python scripts
+  organized per skill that read model output and emit
+  skillgrade JSON
 
-Run evals with the `/skill-creator` skill to iterate
-on quality. The eval workflow: run prompts with and
-without the skill, grade outputs against assertions,
-compare in the eval viewer, and refine the skill
-based on feedback.
+Run evals locally with skillgrade:
+
+```bash
+skillgrade --smoke
+```
+
+CI runs `skillgrade --ci --provider=local --threshold=0.8`
+per skill in a matrix, failing if the pass rate drops
+below the threshold. The eval workflow: run prompts,
+grade outputs with graders, view results with
+`skillgrade preview`, and refine the skill based on
+failures.
 
 ## Design Decisions
 
@@ -146,7 +153,7 @@ large prompt) means:
 
 ### Shared Common Resources
 
-Cross-cutting concerns live in `skills/common/` to
+Cross-cutting concerns live in `skills/infrahub-common/` to
 avoid duplication. When multiple skills need GraphQL
 query guidance or `.infrahub.yml` format reference,
 they point to the same shared files.

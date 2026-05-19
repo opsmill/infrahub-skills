@@ -69,26 +69,26 @@ specifically designed to catch:
 
 | Gotcha | Skill Rule |
 | ------ | --------- |
-| Using `String` instead of `Text` (deprecated) | schema-creator: attribute-defaults-and-types |
-| Attribute name < 3 characters | schema-creator: naming-conventions |
-| `display_labels` (plural) instead of `display_label` (singular) | schema-creator: display-human-friendly-id |
-| Mismatched relationship identifiers | schema-creator: relationship-identifiers |
-| Missing `human_friendly_id` | schema-creator: display-human-friendly-id |
-| Short kind references (`VlanGroup` vs `IpamVlanGroup`) | schema-creator: relationship-peer-kind |
+| Using `String` instead of `Text` (deprecated) | managing-schemas: attribute-defaults-and-types |
+| Attribute name < 3 characters | managing-schemas: naming-conventions |
+| `display_labels` (plural) instead of `display_label` (singular) | managing-schemas: display-human-friendly-id |
+| Mismatched relationship identifiers | managing-schemas: relationship-identifiers |
+| Missing `human_friendly_id` | managing-schemas: display-human-friendly-id |
+| Short kind references (`VlanGroup` vs `IpamVlanGroup`) | managing-schemas: relationship-peer-kind |
 
 ## .infrahub.yml
 
 The project configuration file. Registers checks,
 Generators, Transformations, and other artifacts with
 the Infrahub server. Reference:
-`skills/common/infrahub-yml-reference.md`.
+`skills/infrahub-common/infrahub-yml-reference.md`.
 
 ## GraphQL Queries
 
 Checks, Generators, and Transformations all use
 GraphQL to fetch data from Infrahub. The query syntax has
 Infrahub-specific conventions. Reference:
-`skills/common/graphql-queries.md`.
+`skills/infrahub-common/graphql-queries.md`.
 
 ## Metadata: Source, Owner, and Protection
 

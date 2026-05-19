@@ -1,0 +1,91 @@
+---
+title: How It Works
+sidebar_position: 3
+---
+
+Infrahub Skills gives an AI assistant domain-specific knowledge about the Infrahub platform. Each skill is a structured set of Markdown files — rules, examples, and references — that the AI reads at the point it's needed. The assistant matches each user request to the relevant skill automatically, loads only the context required for that task, and applies the rules embedded in the skill.
+
+## What a skill is
+
+A skill is a directory containing a `SKILL.md` entry point, modular rule files, examples, and references. Skills are designed to load progressively so they don't exhaust the AI's context window:
+
+- **Metadata** (always loaded, ~100 words) — the name and description in `SKILL.md` frontmatter. This is the triggering mechanism: if the description matches the user's request, the AI activates the skill and reads the full `SKILL.md`.
+- **SKILL.md body** (loaded on activation) — overview, workflow steps, and pointers to supporting files. Tells the AI what to do and where to look next.
+- **Supporting files** (loaded on demand) — individual rule files organized by category, `examples.md`, `reference.md`. The AI reads only the files relevant to the current task.
+
+```text
+skills/infrahub-managing-schemas/
+├── SKILL.md              # Entry point — overview and workflow
+├── examples.md           # Concrete schema examples
+├── reference.md          # Attribute types, relationship kinds
+├── validation.md         # Schema validation rules
+└── rules/
+    ├── naming.md         # Naming convention rules
+    ├── relationships.md  # Relationship identifier rules
+    ├── generics.md       # Generic/hierarchy rules
+    └── ...
+```
+
+## How skills are triggered
+
+The AI infers whether a skill is relevant by matching the user's request against each skill's description. When a user asks "create a schema for VLAN management," the AI recognizes this matches the Schema Manager skill, activates it, and reads its `SKILL.md` to understand how to proceed.
+
+Users can also invoke skills directly by name in Claude Code:
+
+```text
+/infrahub:managing-schemas
+/infrahub:managing-objects
+/infrahub:managing-checks
+```
+
+For tools other than Claude Code, skill activation is passive — the AI finds skill files through its normal file context and applies them when the request is relevant. No explicit invocation is needed.
+
+## Auto-detection (Claude Code plugin)
+
+When installed as a Claude Code plugin, a `SessionStart` hook runs on project open. The hook checks for Infrahub project markers:
+
+- `.infrahub.yml`
+- `infrahub.toml`
+- Schema files containing `version: "1.0"` with `nodes:` or `generics:` keys
+
+If markers are found, the hook outputs context that tells the AI which skills are available and how to use them — before the user types anything.
+
+With other AI tools (npx or manual copy), discovery happens because the skill files are present in the project directory. The AI finds them through its normal file context when the user's request is relevant.
+
+## The infrahub-common library
+
+A shared set of references available to all skills. Skills reference these files rather than duplicating the content, which keeps rules consistent across the entire package.
+
+Contents:
+
+- **GraphQL query syntax** — how to structure queries for Infrahub's API
+- **`.infrahub.yml` configuration format** — how to register checks, generators, transforms, and artifact definitions
+- **YAML structure** — correct structure for schema and object definition files
+- **Shared rules** — git integration patterns, protocol/generated file handling, Python environment detection, and display label caching
+
+## Context efficiency
+
+Each skill is self-contained but references shared resources by file path rather than embedding them. When the AI activates a skill, it loads:
+
+1. The `SKILL.md` body (~500–1000 words)
+2. Only the rule files relevant to the current task
+3. Shared references from `infrahub-common` as needed
+
+This progressive loading means a simple task like "add an attribute to this node" loads far less context than a complex task like "design a new schema domain with generics and hierarchies." The AI manages this automatically.
+
+## Supported AI tools
+
+| AI Tool | Installation Method | Auto-detection | Direct Skill Invocation |
+| --------- | ------------------- | ---------------- | ------------------------ |
+| Claude Code (plugin) | `/plugin install infrahub@opsmill` | Yes (session hook) | Yes (`/infrahub:managing-schemas`, etc.) |
+| Claude Code (npx) | `npx skills add` | No | Yes |
+| GitHub Copilot | `npx skills add` | No | No — passive only |
+| Cursor | `npx skills add` | No | No — passive only |
+| Windsurf | `npx skills add` | No | No — passive only |
+| Amp | `npx skills add` | No | No — passive only |
+| Cline | `npx skills add` | No | No — passive only |
+| Codex | `npx skills add` | No | No — passive only |
+
+**Auto-detection** means the tool automatically recognizes an Infrahub project and activates skills without the user explicitly asking. This is a Claude Code plugin feature via the session start hook.
+
+**Direct skill invocation** means the user can call a skill by name (e.g., `/infrahub:managing-schemas`). This is a Claude Code feature. All other tools are passive — they read skill content as context when the request is relevant. For passive tools, describe what you want and the AI applies the right skill automatically.

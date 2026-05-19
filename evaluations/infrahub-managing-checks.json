@@ -1,0 +1,77 @@
+{
+  "skill_name": "infrahub-managing-checks",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need to register a global Infrahub check that detects rack unit collisions\nacross all racks. The check class is RackUnitCollisionCheck and lives in\nchecks/rack_unit_collision.py. It runs against a GraphQL query named rack_devices\nstored at queries/rack_devices.gql.\n\nProduce ONLY the `.infrahub.yml` snippet that registers both the GraphQL query and\nthe check definition correctly. Do not include schema, generator, or transform\nsections \u2014 just queries: and check_definitions:.",
+      "expected_output": "A `.infrahub.yml` snippet with a `queries:` section listing rack_devices, and a `check_definitions:` entry for the check. The check_definitions entry must NOT contain a `query:` field (Pydantic extra=\"forbid\" rejects it) \u2014 the query is bound from the Python class's `query = \"rack_devices\"` attribute.",
+      "files": [],
+      "expectations": [
+        "Top-level `queries:` section declares the rack_devices query with file_path queries/rack_devices.gql",
+        "`check_definitions:` has an entry for the check with name, file_path, and class_name",
+        "The check_definitions entry does NOT contain a `query:` field (this is the central rule \u2014 `query` is rejected by the Pydantic model on check_definitions, unlike generator_definitions which does require it)",
+        "Only allowed fields appear under check_definitions: name, file_path, class_name, targets, parameters"
+      ],
+      "assertions": [
+        {
+          "name": "check-definitions-present",
+          "check": "check_definitions has at least one entry"
+        },
+        {
+          "name": "no-query-field-in-check-def",
+          "check": "No check_definitions entry contains a `query:` field"
+        },
+        {
+          "name": "only-allowed-fields-in-check-def",
+          "check": "check_definitions entries use only name, file_path, class_name, targets, parameters"
+        },
+        {
+          "name": "queries-section-present",
+          "check": "Top-level queries: section is present"
+        },
+        {
+          "name": "check-def-required-fields",
+          "check": "Each check_definitions entry has name and file_path"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Register a targeted Infrahub check called LeafValidation that runs once per\nleaf device. The class is in checks/leaf.py, the GraphQL query is leaf_config stored\nat queries/leaf.gql and takes a $device variable. The targets group is leaf_devices,\nand the GraphQL $device variable should be bound to the target's name.\n\nProduce ONLY the `.infrahub.yml` snippet that registers both the query and the check\ncorrectly. Do not include schema, generator, or transform sections \u2014 just queries:\nand check_definitions:.",
+      "expected_output": "A `.infrahub.yml` snippet with `queries:` declaring leaf_config and `check_definitions:` declaring leaf_validation with targets: leaf_devices and parameters mapping the $device variable. The check_definitions entry must NOT contain a `query:` field; the query is bound on the Python class via `query = \"leaf_config\"`.",
+      "files": [],
+      "expectations": [
+        "Top-level `queries:` section declares leaf_config with file_path queries/leaf.gql",
+        "check_definitions entry has name, file_path, class_name, AND targets: leaf_devices AND parameters mapping device to name__value",
+        "The check_definitions entry does NOT contain a `query:` field (rejected by Pydantic extra=\"forbid\"; differs from generator_definitions which requires it)",
+        "parameters maps `device: name__value` so the GraphQL $device variable is bound to the target's name attribute"
+      ],
+      "assertions": [
+        {
+          "name": "check-definitions-present",
+          "check": "check_definitions has at least one entry"
+        },
+        {
+          "name": "no-query-field-in-check-def",
+          "check": "No check_definitions entry contains a `query:` field"
+        },
+        {
+          "name": "only-allowed-fields-in-check-def",
+          "check": "check_definitions entries use only name, file_path, class_name, targets, parameters"
+        },
+        {
+          "name": "queries-section-present",
+          "check": "Top-level queries: section declares leaf_config"
+        },
+        {
+          "name": "check-def-required-fields",
+          "check": "Each check_definitions entry has name and file_path"
+        },
+        {
+          "name": "targeted-has-targets-and-parameters",
+          "check": "Targeted check_definitions entry declares both targets and parameters"
+        }
+      ]
+    }
+  ]
+}

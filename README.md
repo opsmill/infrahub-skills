@@ -7,8 +7,18 @@ AI skills for developing with [Infrahub](https://github.com/opsmill/infrahub). I
 npx skills add opsmill/infrahub-skills
 ```
 
-Once installed, open any Infrahub project and start working — try *"describe what this schema does"* to explore, or *"add a status attribute to Device"* to make a change.
+The skills installer will walk through where you want to install the skill (project specific or global), and what agents you want to be able to use it.
 
+To update teh skills:
+
+```bash
+# Update skills
+npx skills update
+```
+
+Once installed, start working on an infrahub project — try *"describe what this schema does"* to explore, or *"add a status attribute to Device"* to make a change.
+
+>Note, the `npx skills` command uses the Vercel Skills CLI. See the [Vercel Skills CLI documentation](https://github.com/vercel-labs/skills) for details
 ---
 
 ## What You Can Do With It
@@ -35,9 +45,9 @@ For targeted changes, skip the ceremony. Describe what you want and the agent ha
 
 **Examples:**
 
-- *"Add a `contract_start_date` attribute to `InfraCircuit`"* — the agent uses **schema-creator**, applies naming conventions, and updates the schema file.
-- *"Create a check that validates every device has a primary IP"* — the agent uses **check-creator**, writes the Python class and GraphQL query, and registers it in `.infrahub.yml`.
-- *"Add a menu section for IP address management"* — the agent uses **menu-creator** and produces the YAML with correct icon references and hierarchy.
+- *"Add a `contract_start_date` attribute to `InfraCircuit`"* — the agent uses **managing-schemas**, applies naming conventions, and updates the schema file.
+- *"Create a check that validates every device has a primary IP"* — the agent uses **managing-checks**, writes the Python class and GraphQL query, and registers it in `.infrahub.yml`.
+- *"Add a menu section for IP address management"* — the agent uses **managing-menus** and produces the YAML with correct icon references and hierarchy.
 
 This is the fastest path for well-scoped work: adding attributes, writing a check, populating objects, creating a transform. No planning step needed. It's also how most people start — install the skills, describe what you need, and iterate from there.
 
@@ -88,16 +98,16 @@ A team already running Infrahub who needs to continue extending it — adding sc
 
 | Skill | What it does |
 | ----- | ------------ |
-| **schema-creator** | Describe your use case and get best-practice schema design — nodes, generics, attributes, relationships, hierarchies, and migrations |
-| **object-creator** | Create YAML data files for infrastructure objects with correct references and load order |
-| **check-creator** | Write Python validation checks (`InfrahubCheck`) for proposed change pipelines |
-| **generator-creator** | Build design-driven generators with idempotent create-or-update patterns |
-| **transform-creator** | Create data transforms (Python, Jinja2, or hybrid) for configs, reports, and exports |
-| **menu-creator** | Define custom navigation menus for the Infrahub web UI |
-| **analyst** | Query and correlate live Infrahub data via the MCP server (requires MCP connection) |
-| **repo-auditor** | Audit your repository against Infrahub best practices |
+| **managing-schemas** | Describe your use case and get best-practice schema design — nodes, generics, attributes, relationships, hierarchies, and migrations |
+| **managing-objects** | Create YAML data files for infrastructure objects with correct references and load order |
+| **managing-checks** | Write Python validation checks (`InfrahubCheck`) for proposed change pipelines |
+| **managing-generators** | Build design-driven generators with idempotent create-or-update patterns |
+| **managing-transforms** | Create data transforms (Python, Jinja2, or hybrid) for configs, reports, and exports |
+| **managing-menus** | Define custom navigation menus for the Infrahub web UI |
+| **analyzing-data** | Query and correlate live Infrahub data via the MCP server (requires MCP connection) |
+| **auditing-repo** | Audit your repository against Infrahub best practices |
 
-Each skill lives in `skills/<name>/` with a `SKILL.md` entry point, reference docs, examples, and modular rules. Shared references (GraphQL patterns, `.infrahub.yml` format, git integration) are in `skills/common/`.
+Each skill lives in `skills/infrahub-<name>/` with a `SKILL.md` entry point, reference docs, examples, and modular rules. Shared references (GraphQL patterns, `.infrahub.yml` format, git integration) are in `skills/infrahub-common/`. Skills use gerund-form names following the [Agent Skills best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
 
 ---
 
@@ -143,7 +153,7 @@ cp -r infrahub-skills/skills /path/to/your-infrahub-project/
 rm -rf infrahub-skills
 ```
 
-Always include `skills/common/` — it contains shared references that all skills depend on.
+Always include `skills/infrahub-common/` — it contains shared references that all skills depend on.
 
 ### Tool-Specific Setup
 
@@ -155,6 +165,7 @@ After installing skills (via `npx` or manual copy), some tools benefit from addi
 ---
 applyTo: '**/*.py,**/*.yml,**/*.yaml'
 ---
+
 For Infrahub development guidance, refer to the skill files in skills/.
 ```
 
@@ -168,6 +179,7 @@ description: Infrahub development guidance
 globs: ["**/*.py", "**/*.yml", "**/*.yaml"]
 alwaysApply: false
 ---
+
 For Infrahub development guidance, refer to the skill files in skills/.
 ```
 
@@ -188,15 +200,15 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 ├── hooks-handlers/
 │   └── session-start.sh         # Infrahub project detection
 ├── skills/
-│   ├── common/                  # Shared references and rules
-│   ├── schema-creator/          # Schema design
-│   ├── object-creator/          # Data population
-│   ├── check-creator/           # Validation checks
-│   ├── generator-creator/       # Design-driven generators
-│   ├── transform-creator/       # Data transforms
-│   ├── menu-creator/            # Navigation menus
-│   ├── analyst/                 # Live data analysis (MCP)
-│   └── repo-auditor/            # Best-practice audits
+│   ├── infrahub-common/          # Shared references and rules
+│   ├── infrahub-managing-schemas/  # Schema design
+│   ├── infrahub-managing-objects/  # Data population
+│   ├── infrahub-managing-checks/   # Validation checks
+│   ├── infrahub-managing-generators/ # Design-driven generators
+│   ├── infrahub-managing-transforms/ # Data transforms
+│   ├── infrahub-managing-menus/    # Navigation menus
+│   ├── infrahub-analyzing-data/    # Live data analysis (MCP)
+│   └── infrahub-auditing-repo/     # Best-practice audits
 ├── CLAUDE.md
 ├── README.md
 └── LICENSE                      # Apache 2.0
