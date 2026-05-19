@@ -1,0 +1,52 @@
+{
+  "skill_name": "infrahub-managing-transforms",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Write a GraphQL query for a Jinja2 transform that fetches DcimDevice\nwith the device's name, its role, and its location's name + shortname.\nlocation is a union of LocationSite | LocationBuilding | LocationHosting\nin this repo's base schema. LocationHosting has neither name nor shortname,\nso the query must handle the union explicitly so that schema-sync doesn't\nfail when a LocationHosting instance is present.",
+      "expected_output": "A GraphQL query that uses inline fragments (... on LocationSite { ... } and similar) for the location relationship, so fields that exist on some concrete types but not others are scoped to the correct type.",
+      "files": [],
+      "expectations": [
+        "Query touches DcimDevice and location",
+        "Inline fragments (... on Location...) are used inside location.node",
+        "name and shortname are not selected directly under location.node"
+      ],
+      "assertions": [
+        {
+          "name": "query-uses-inline-fragments-for-location",
+          "check": "location { node { ... } } contains at least one ... on Location<Type> inline fragment"
+        },
+        {
+          "name": "query-no-direct-field-on-union-location",
+          "check": "Neither 'name' nor 'shortname' appears as a direct selection under location.node without an enclosing inline fragment"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Write a Python async helper named regenerate_and_wait that triggers\nregeneration for an Infrahub artifact definition by POSTing to\n/api/artifact/generate/<def-id>?branch=<branch>, then waits for completion\nby polling CoreArtifact filtered by the definition until at least\n`expected_count` instances exist. Time out after 60 seconds and raise\nTimeoutError. The helper takes (client, def_id, expected_count, branch)\nas parameters.",
+      "expected_output": "A Python async function that POSTs to /api/artifact/generate/<def-id>, then polls CoreArtifact in a loop until count >= expected_count, with a hard timeout.",
+      "files": [],
+      "expectations": [
+        "Helper POSTs to /api/artifact/generate/<def-id>?branch=<branch>",
+        "Helper contains a loop (while or for) that waits for completion",
+        "Helper polls CoreArtifact via client.filters or client.get with kind='CoreArtifact'",
+        "Hard timeout exists (raises after some seconds)"
+      ],
+      "assertions": [
+        {
+          "name": "posts-artifact-generate-endpoint",
+          "check": "The code calls .post(...) with a URL containing /api/artifact/generate"
+        },
+        {
+          "name": "has-polling-loop",
+          "check": "A while/for/async for loop is present (not fire-and-forget)"
+        },
+        {
+          "name": "polls-coreartifact-after-post",
+          "check": "A call passes kind=\"CoreArtifact\" (read of artifact state after the POST)"
+        }
+      ]
+    }
+  ]
+}
