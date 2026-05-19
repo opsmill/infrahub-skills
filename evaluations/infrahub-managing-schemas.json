@@ -279,10 +279,10 @@
     {
       "id": 8,
       "prompt": "Create an Infrahub schema for a service-handoff intent model. Namespace: 'Service'.\n\nDefine a single node, HandoffIntent, with:\n\n  - intent_id: a Number, the unique identifier for the handoff intent.\n  - state: a Dropdown \u2014 one of draft, active, decommissioned.\n\nPlus two relationships on HandoffIntent:\n\n  - source_device: peer DcimDevice. Constraint: must point to a customer-edge\n    router where the provider hands traffic off. Non-edge devices are rejected at\n    submit by the generator's _validate() step.\n  - handoff_port: peer DcimInterface. The specific port on source_device where\n    the handover happens. The picker walks DcimDevice \u2192 DcimInterface via the\n    peer's human_friendly_id; only ports on the chosen source_device are valid.\n\nThese descriptions are operator-facing \u2014 they are the only docs operators see in the UI\ntooltip. Make sure the schema actually loads (`infrahubctl schema load`) without errors\nin addition to passing `infrahubctl schema check`.",
-      "expected_output": "A schema where every string field (`description`, `label`, `identifier`, `deprecation`) stays within Infrahub's server-enforced Pydantic `max_length` caps so the schema loads cleanly. Limits are resolved live from `/api/openapi.json` (see the validation-string-limits rule); this eval does not pin specific numbers. Longer operator-facing context belongs in YAML comments next to the field, not in `description:` itself.",
+      "expected_output": "A schema where every string field (`description`, `label`, `identifier`, `deprecation`) stays within Infrahub's server-enforced Pydantic `max_length` caps so the schema loads cleanly. Limits are resolved live per the validation-string-limits rule (public JSON Schema primary, `/api/openapi.json` fallback); this eval does not pin specific numbers. Longer operator-facing context belongs in YAML comments next to the field, not in `description:` itself.",
       "files": [],
       "expectations": [
-        "Every node, attribute, and relationship `description`, `label`, `identifier`, and `deprecation` length is within the live cap reported by the running instance's `/api/openapi.json` (resolved per the validation-string-limits rule). Over-cap fields fail with `Input should have at most N characters` at `infrahubctl schema load` time.",
+        "Every node, attribute, and relationship `description`, `label`, `identifier`, and `deprecation` length is within the live cap published by the Infrahub schema (resolved per the validation-string-limits rule). Over-cap fields fail with `Input should have at most N characters` at `infrahubctl schema load` time.",
         "Longer operator-facing context (picker behavior, generator _validate() rules, why non-edge devices are rejected) lives in YAML comments above the field, not inside `description:`",
         "All peer references use the full namespace+name kind (DcimDevice, DcimInterface \u2014 not Device or Interface)",
         "human_friendly_id is defined on HandoffIntent",
@@ -295,7 +295,7 @@
         },
         {
           "name": "string-limits",
-          "check": "All description/label/identifier/deprecation fields fit the live `max_length` caps fetched from `{base}/api/openapi.json` by the grader"
+          "check": "All description/label/identifier/deprecation fields fit the live `max_length` caps fetched from `https://schema.infrahub.app/infrahub/schema/latest.json` by the grader"
         },
         {
           "name": "full-kind-references",
