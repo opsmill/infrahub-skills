@@ -96,7 +96,7 @@ of which tier produced the data.
 If Tier 1 and the connectivity check in Tier 2 both
 fail, stop the length validation and tell the user:
 
-```
+```text
 Could not reach https://schema.infrahub.app/infrahub/schema/latest.json,
 and no running Infrahub instance was found via
 connectivity-server-check. String-length validation
