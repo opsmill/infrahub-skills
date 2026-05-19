@@ -24,10 +24,10 @@ Properties for entries in the `nodes:` list.
 
 | Property | Type | Default | Constraints | Description |
 | -------- | ---- | ------- | ----------- | ----------- |
-| `name` | string | *required* | PascalCase, `^[A-Z][a-zA-Z0-9]+$` | Node name |
-| `namespace` | string | *required* | First upper, `^[A-Z][a-z0-9]+$` | Namespace |
-| `description` | string | null | Short tooltip text | Short desc |
-| `label` | string | null | Display name | Display name |
+| `name` | string | *required* | PascalCase | Node name |
+| `namespace` | string | *required* | First upper | Namespace |
+| `description` | string | null | - | Short desc |
+| `label` | string | null | - | Display name |
 | `icon` | string | null | Iconify value | e.g., `mdi:server` |
 | `display_label` | string | null | - | Jinja2 template |
 | `human_friendly_id` | list | null | - | Human-readable ID paths |
@@ -114,10 +114,10 @@ plus:
 
 | Property | Type | Default | Constraints | Description |
 | -------- | ---- | ------- | ----------- | ----------- |
-| `name` | string | *required* | snake_case, `^[a-z0-9_]+$` | Attr name |
+| `name` | string | *required* | snake_case | Attr name |
 | `kind` | string | *required* | AttributeKind | Attr type |
-| `label` | string | null | Display label | Display label |
-| `description` | string | null | Help text | Help text |
+| `label` | string | null | - | Display label |
+| `description` | string | null | - | Help text |
 | `default_value` | any | null | - | Default value |
 | `unique` | boolean | `false` | - | Globally unique |
 | `optional` | boolean | **`false`** | - | **Mandatory by default** |
@@ -127,7 +127,7 @@ plus:
 | `choices` | list | null | - | Dropdown choices |
 | `allow_override` | enum | `"any"` | `"none"`/`"any"` | Profile override |
 | `state` | enum | `"present"` | - | `absent` to remove |
-| `deprecation` | string | null | Deprecation msg | Deprecation msg |
+| `deprecation` | string | null | - | Deprecation msg |
 
 ### Attribute Parameters (kind-specific)
 
@@ -189,12 +189,12 @@ plus:
 
 | Property | Type | Default | Constraints | Description |
 | -------- | ---- | ------- | ----------- | ----------- |
-| `name` | string | *required* | snake_case, `^[a-z0-9_]+$` | Rel name |
-| `peer` | string | *required* | PascalCase, `^[A-Z][a-zA-Z0-9]+$` | Target kind |
+| `name` | string | *required* | snake_case | Rel name |
+| `peer` | string | *required* | PascalCase | Target kind |
 | `kind` | enum | `"Generic"` | See table | Rel type |
-| `label` | string | null | Display label | Display label |
-| `description` | string | null | Help text | Help text |
-| `identifier` | string | null | snake_case, `^[a-z0-9_]+$` | Match both sides |
+| `label` | string | null | - | Display label |
+| `description` | string | null | - | Help text |
+| `identifier` | string | null | snake_case | Match both sides |
 | `cardinality` | enum | **`"many"`** | `"one"`/`"many"` | Count |
 | `optional` | boolean | **`true`** | - | **Optional by default** |
 | `direction` | enum | `"bidirectional"` | bi/out/in | Direction |
@@ -207,7 +207,7 @@ plus:
 | `state` | enum | `"present"` | - | `absent` to remove |
 | `common_parent` | string | null | - | Must share parent |
 | `common_relatives` | list | null | - | Must share relatives |
-| `deprecation` | string | null | Deprecation msg | Deprecation msg |
+| `deprecation` | string | null | - | Deprecation msg |
 
 ### Relationship Kinds
 
@@ -350,12 +350,8 @@ referenced without defining them:
 | Description | Free text | - |
 | Label (attr) | Free text | - |
 | Label (node) | Free text | - |
-| Peer | PascalCase | `^[A-Z][a-zA-Z0-9]+$` |
 
-**Length caps are fetched from the live Infrahub
-OpenAPI spec at validation time.** Length numbers are
-deliberately not duplicated here — see
-[validation-string-limits](./rules/validation-string-limits.md)
-for the resolution procedure
-(`INFRAHUB_ADDRESS` → `localhost:8000` fallback →
-`/api/openapi.json`).
+Length caps live in
+[validation-string-limits](./rules/validation-string-limits.md);
+they are resolved from the live Infrahub schema at
+validation time rather than duplicated here.
