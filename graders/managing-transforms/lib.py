@@ -157,6 +157,16 @@ def _string_contains(node: ast.AST, needle: str) -> bool:
     return False
 
 
+def _is_post_like_method(attr_name: str) -> bool:
+    """True if ``attr_name`` is any plausible HTTP-POST method name.
+
+    Matches ``post`` (httpx/requests/aiohttp public method),
+    ``_post`` (infrahub_sdk's private helper), and anything else
+    ending in ``post`` (``do_post``, ``async_post``, etc.).
+    """
+    return attr_name.endswith("post")
+
+
 def has_post_to_artifact_generate(
     tree: ast.Module | None, py_raw: str = ""
 ) -> bool:
@@ -164,27 +174,24 @@ def has_post_to_artifact_generate(
 
     Two detection strategies:
 
-    1. **Direct AST match** — any ``<expr>.post(...)`` call whose
-       positional arg[0] or ``url``/``path``/``endpoint`` kwarg is
-       a string literal (or f-string) containing the path. Catches
-       ``client.post("/api/artifact/generate/...")``,
-       ``httpx.post(url=f"...")``, etc.
+    1. **Direct AST match** — any call to a method whose name ends in
+       ``post`` (``post``, ``_post``, etc.) where the URL is a string
+       literal (or f-string) containing the path. Catches the public
+       HTTP-client ``.post(url)`` pattern and the SDK's private
+       ``client._post(url=..., payload=...)`` pattern alike.
 
     2. **Fallback text+call match** — if (1) doesn't fire, accept
-       the case where the source contains both *some* ``.post(``
-       call AND a string literal containing ``/api/artifact/generate``
-       (possibly stored in a variable, a constant, or built via
-       multiple f-string fragments the AST helper can't reassemble).
-       This is fuzzier but catches realistic patterns the model
-       produces, e.g. ``endpoint = f"...{def_id}..."; await client.post(endpoint)``.
+       the case where the source contains both *some* post-like call
+       AND the path as a string anywhere in the file. Covers
+       realistic LLM output like
+       ``endpoint = f"...{def_id}..."; await client._post(endpoint)``.
     """
     if tree is None:
         return False
-    # Strategy 1: direct AST match
     has_any_post = False
     for call in _iter_calls(tree):
         func = call.func
-        if not (isinstance(func, ast.Attribute) and func.attr == "post"):
+        if not (isinstance(func, ast.Attribute) and _is_post_like_method(func.attr)):
             continue
         has_any_post = True
         candidates: list[ast.AST] = list(call.args[:1])
@@ -194,8 +201,6 @@ def has_post_to_artifact_generate(
         for c in candidates:
             if _string_contains(c, _ARTIFACT_GENERATE_PATH):
                 return True
-    # Strategy 2: fallback — a .post() call somewhere AND the path
-    # appears as a string literal anywhere in the file.
     if has_any_post and py_raw and _ARTIFACT_GENERATE_PATH in py_raw:
         return True
     return False
@@ -282,10 +287,7 @@ def check_posts_artifact_generate_endpoint(
         return False, "No Python source to inspect"
     if has_post_to_artifact_generate(tree, py_raw):
         return True, "POST to /api/artifact/generate found"
-    # Include a short preview on failure so CI logs surface why we missed.
-    # Encode newlines so the JSON payload stays single-line in skillgrade.
-    preview = (py_raw[:400] or "<empty>").replace("\n", "\\n")
-    return False, f"No POST to /api/artifact/generate found. py_raw[:400]={preview}"
+    return False, "No POST to /api/artifact/generate found"
 
 
 def check_has_polling_loop(

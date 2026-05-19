@@ -25,9 +25,13 @@ surfaces a warning instead of silently shipping zero artifacts.
 
 Every function that triggers regen MUST contain all three:
 
-1. **A POST** to ``/api/artifact/generate/<def-id>?branch=<branch>``
-   via ``.post(...)`` (any HTTP client — ``client.post``,
-   ``httpx.post``, ``requests.post``, etc.).
+1. **A POST** to ``/api/artifact/generate/<def-id>?branch=<branch>``.
+   Use whichever HTTP entry point fits — public methods like
+   ``client.post(...)``, ``httpx.post(...)``, ``requests.post(...)``,
+   ``aiohttp.ClientSession().post(...)``, or the infrahub_sdk's own
+   private helper ``client._post(url=..., payload={}, params=...)``.
+   The URL must contain the literal string
+   ``/api/artifact/generate``.
 2. **A loop** (``while``, ``for``, or ``async for``) that waits
    for completion. A function that POSTs and returns is the bug.
 3. **A read** of ``CoreArtifact`` inside the loop —

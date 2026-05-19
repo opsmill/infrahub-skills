@@ -184,6 +184,28 @@ def test_has_post_to_artifact_generate_fallback_rejects_without_post():
     assert has_post_to_artifact_generate(tree, src) is False
 
 
+def test_has_post_to_artifact_generate_sdk_private_post():
+    """infrahub_sdk's private ``client._post(...)`` helper is matched."""
+    src = (
+        "async def regen(client, def_id, branch):\n"
+        "    url = f'{client.address}/api/artifact/generate/{def_id}'\n"
+        "    await client._post(url=url, payload={}, params={'branch': branch})\n"
+    )
+    tree = ast.parse(src)
+    # Via fallback (url is a Name, not literal in the post call)
+    assert has_post_to_artifact_generate(tree, src) is True
+
+
+def test_has_post_to_artifact_generate_sdk_private_post_literal_url():
+    """``client._post(url="/api/artifact/generate/...")`` direct AST match."""
+    src = (
+        "async def regen(client):\n"
+        "    await client._post(url='/api/artifact/generate/abc?branch=main')\n"
+    )
+    tree = ast.parse(src)
+    assert has_post_to_artifact_generate(tree) is True
+
+
 # -- has_loop_construct ---------------------------------------------------
 
 
