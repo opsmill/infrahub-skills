@@ -40,6 +40,16 @@ is unreachable.
 
 ### Resolution procedure (2-tier)
 
+Both tiers go through the same script —
+[`scripts/fetch_schema_limits.py`](../scripts/fetch_schema_limits.py).
+It uses only Python's stdlib (`urllib`) so it runs on
+macOS, Linux, and Windows (cmd.exe / PowerShell)
+without any shell-quoting differences or `curl`
+dependency. The output is a compact (~1 KB) JSON
+object — **read only that into your context, never
+the 66 KB raw schema file or the 100 KB raw OpenAPI
+spec.**
+
 #### Tier 1 — Public JSON Schema (preferred)
 
 The same URL referenced in every schema file's
@@ -48,31 +58,12 @@ every constraint. It is a public CDN URL, no auth, no
 running server required.
 
 ```bash
-curl -sS -H 'Accept: application/json' \
-  -H 'User-Agent: infrahub-skills/1.0' \
-  https://schema.infrahub.app/infrahub/schema/latest.json \
-| python3 -c '
-import json, sys
-defs = json.load(sys.stdin)["$defs"]
-out = {}
-for name in ("NodeSchema", "GenericSchema",
-             "AttributeSchema", "RelationshipSchema"):
-    fields = {}
-    for f, info in defs[name]["properties"].items():
-        merged = {}
-        for c in [info] + info.get("anyOf", []):
-            for k in ("minLength", "maxLength", "pattern"):
-                if k in c and k not in merged:
-                    merged[k] = c[k]
-        if merged:
-            fields[f] = merged
-    out[name] = fields
-print(json.dumps(out))
-'
+python skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py
 ```
 
-The output is ~1 KB. **Read only the filtered JSON
-into your context, never the 66 KB raw schema file.**
+Exit code `0` means the constraints landed on stdout.
+Exit `1` means the source was unreachable (a
+diagnostic is on stderr) — fall through to Tier 2.
 
 #### Tier 2 — Running Infrahub `/api/openapi.json` (fallback)
 
@@ -85,44 +76,20 @@ environment detection, and the troubleshooting flow —
 do not duplicate any of it here.
 
 Once a reachable Infrahub `BASE_URL` has been
-established by that rule, fetch the OpenAPI subset
-the same way:
+established by that rule, hand the URL to the same
+script with `--openapi`:
 
 ```bash
-curl -sS -H 'Accept: application/json' \
-  -H 'User-Agent: infrahub-skills/1.0' \
-  "$BASE_URL/api/openapi.json" \
-| python3 -c '
-import json, sys
-schemas = json.load(sys.stdin)["components"]["schemas"]
-out = {}
-for openapi_name, key in (("NodeSchema", "NodeSchema"),
-                          ("GenericSchema", "GenericSchema"),
-                          ("AttributeSchema-Input", "AttributeSchema"),
-                          ("RelationshipSchema", "RelationshipSchema")):
-    fields = {}
-    for f, info in schemas[openapi_name]["properties"].items():
-        merged = {}
-        for c in [info] + info.get("anyOf", []):
-            for k in ("minLength", "maxLength", "pattern"):
-                if k in c and k not in merged:
-                    merged[k] = c[k]
-        if merged:
-            fields[f] = merged
-    out[key] = fields
-print(json.dumps(out))
-'
+python skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py \
+  --openapi "$BASE_URL"
 ```
 
-Note the path and naming differences vs Tier 1:
-- JSON Schema: `$defs.AttributeSchema`
-- OpenAPI: `components.schemas.AttributeSchema-Input`
-
-The filter normalizes them so the downstream check
-keys against the same names (`NodeSchema`,
-`GenericSchema`, `AttributeSchema`,
-`RelationshipSchema`) regardless of which tier
-produced the data.
+The script normalises the OpenAPI naming difference
+(`AttributeSchema-Input` → `AttributeSchema`)
+internally, so the downstream check keys against the
+same names (`NodeSchema`, `GenericSchema`,
+`AttributeSchema`, `RelationshipSchema`) regardless
+of which tier produced the data.
 
 #### Tier 3 — Both unreachable
 
