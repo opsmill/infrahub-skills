@@ -251,12 +251,55 @@ def check_query_no_direct_field_on_union_location(
 
 
 # ---------------------------------------------------------------------------
+# Artifact regen polling checks
+# ---------------------------------------------------------------------------
+
+
+def check_posts_artifact_generate_endpoint(
+    tree: ast.Module | None = None, **_: Any
+) -> tuple[bool, str]:
+    """Source must contain a POST whose URL mentions /api/artifact/generate."""
+    if tree is None:
+        return False, "No Python source to inspect"
+    if has_post_to_artifact_generate(tree):
+        return True, "POST to /api/artifact/generate found"
+    return False, "No POST to /api/artifact/generate found"
+
+
+def check_has_polling_loop(
+    tree: ast.Module | None = None, **_: Any
+) -> tuple[bool, str]:
+    """Source must contain at least one ``while``/``for``/``async for`` loop."""
+    if tree is None:
+        return False, "No Python source to inspect"
+    if has_loop_construct(tree):
+        return True, "Loop construct found"
+    return False, "No loop construct found — fire-and-forget pattern"
+
+
+def check_polls_coreartifact_after_post(
+    tree: ast.Module | None = None, **_: Any
+) -> tuple[bool, str]:
+    """Source must reference ``kind="CoreArtifact"`` in a call (a read)."""
+    if tree is None:
+        return False, "No Python source to inspect"
+    if not has_post_to_artifact_generate(tree):
+        return False, "No POST to /api/artifact/generate; nothing to poll"
+    if references_core_artifact_in_call(tree):
+        return True, "CoreArtifact read found after POST"
+    return False, "No call references kind='CoreArtifact'"
+
+
+# ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
 
 CHECKS: dict[str, Any] = {
     "query-uses-inline-fragments-for-location": check_query_uses_inline_fragments_for_location,
     "query-no-direct-field-on-union-location": check_query_no_direct_field_on_union_location,
+    "posts-artifact-generate-endpoint": check_posts_artifact_generate_endpoint,
+    "has-polling-loop": check_has_polling_loop,
+    "polls-coreartifact-after-post": check_polls_coreartifact_after_post,
 }
 
 

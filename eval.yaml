@@ -883,3 +883,44 @@ tasks:
         check: >-
           Neither 'name' nor 'shortname' appears as a direct selection under
           location.node without an enclosing inline fragment
+
+  - name: transform-artifact-regen-polling
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-transforms/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write a Python async helper named regenerate_and_wait that triggers
+      regeneration for an Infrahub artifact definition by POSTing to
+      /api/artifact/generate/<def-id>?branch=<branch>, then waits for completion
+      by polling CoreArtifact filtered by the definition until at least
+      `expected_count` instances exist. Time out after 60 seconds and raise
+      TimeoutError. The helper takes (client, def_id, expected_count, branch)
+      as parameters.
+
+      Save ONLY the final Python helper to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-transforms/check_artifact_regen_polling.py
+        weight: 1.0
+    expected_output: >-
+      A Python async function that POSTs to /api/artifact/generate/<def-id>,
+      then polls CoreArtifact in a loop until count >= expected_count, with
+      a hard timeout.
+    expectations:
+      - "Helper POSTs to /api/artifact/generate/<def-id>?branch=<branch>"
+      - "Helper contains a loop (while or for) that waits for completion"
+      - "Helper polls CoreArtifact via client.filters or client.get with kind='CoreArtifact'"
+      - "Hard timeout exists (raises after some seconds)"
+    assertions:
+      - name: posts-artifact-generate-endpoint
+        check: >-
+          The code calls .post(...) with a URL containing
+          /api/artifact/generate
+      - name: has-polling-loop
+        check: >-
+          A while/for/async for loop is present (not fire-and-forget)
+      - name: polls-coreartifact-after-post
+        check: >-
+          A call passes kind="CoreArtifact" (read of artifact state
+          after the POST)

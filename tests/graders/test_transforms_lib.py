@@ -262,3 +262,84 @@ def test_query_no_direct_field_on_union_location_fails_on_bug():
     )
     assert not ok
     assert "name" in msg or "shortname" in msg
+
+
+# -- Task 4: artifact regen polling checks --------------------------------
+
+
+SRC_GOOD_POLLING = """
+import asyncio
+
+
+async def regen_and_wait(client, def_id, expected_count, branch):
+    await client.post(f"/api/artifact/generate/{def_id}?branch={branch}")
+    deadline = asyncio.get_event_loop().time() + 60
+    while asyncio.get_event_loop().time() < deadline:
+        artifacts = await client.filters(
+            kind="CoreArtifact", definition__ids=[def_id], branch=branch,
+        )
+        if len(artifacts) >= expected_count:
+            return artifacts
+        await asyncio.sleep(2)
+    raise TimeoutError("regen did not converge")
+"""
+
+SRC_BAD_FIRE_AND_FORGET = """
+async def regenerate(client, def_id, branch):
+    await client.post(f"/api/artifact/generate/{def_id}?branch={branch}")
+    return "regenerated"
+"""
+
+SRC_BAD_NO_POST = """
+async def maybe_regen(client, def_id):
+    artifacts = await client.filters(kind="CoreArtifact", definition__ids=[def_id])
+    return artifacts
+"""
+
+
+def test_posts_artifact_generate_passes_on_good():
+    tree = ast.parse(SRC_GOOD_POLLING)
+    ok, msg = _mod.CHECKS["posts-artifact-generate-endpoint"](
+        gql_text="", tree=tree, py_raw=SRC_GOOD_POLLING
+    )
+    assert ok, msg
+
+
+def test_posts_artifact_generate_fails_when_missing():
+    tree = ast.parse(SRC_BAD_NO_POST)
+    ok, msg = _mod.CHECKS["posts-artifact-generate-endpoint"](
+        gql_text="", tree=tree, py_raw=SRC_BAD_NO_POST
+    )
+    assert not ok
+
+
+def test_has_polling_loop_passes_on_good():
+    tree = ast.parse(SRC_GOOD_POLLING)
+    ok, msg = _mod.CHECKS["has-polling-loop"](
+        gql_text="", tree=tree, py_raw=SRC_GOOD_POLLING
+    )
+    assert ok, msg
+
+
+def test_has_polling_loop_fails_on_fire_and_forget():
+    tree = ast.parse(SRC_BAD_FIRE_AND_FORGET)
+    ok, msg = _mod.CHECKS["has-polling-loop"](
+        gql_text="", tree=tree, py_raw=SRC_BAD_FIRE_AND_FORGET
+    )
+    assert not ok
+
+
+def test_polls_coreartifact_passes_on_good():
+    tree = ast.parse(SRC_GOOD_POLLING)
+    ok, msg = _mod.CHECKS["polls-coreartifact-after-post"](
+        gql_text="", tree=tree, py_raw=SRC_GOOD_POLLING
+    )
+    assert ok, msg
+
+
+def test_polls_coreartifact_fails_on_fire_and_forget():
+    tree = ast.parse(SRC_BAD_FIRE_AND_FORGET)
+    ok, msg = _mod.CHECKS["polls-coreartifact-after-post"](
+        gql_text="", tree=tree, py_raw=SRC_BAD_FIRE_AND_FORGET
+    )
+    assert not ok
