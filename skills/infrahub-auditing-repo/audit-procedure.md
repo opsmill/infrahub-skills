@@ -61,12 +61,12 @@ convention).
 
 ### 2.2 Naming conventions
 
-- **Namespace**: `^[A-Z][a-z0-9]+$` (3-32 chars) —
+- **Namespace**: `^[A-Z][a-z0-9]+$` (3-64 chars) —
   check every node and generic
 - **Node/Generic name**: `^[A-Z][a-zA-Z0-9]+$`
   (2-32 chars)
-- **Attribute names**: `^[a-z0-9_]+$` (3-32 chars)
-- **Relationship names**: `^[a-z0-9_]+$` (3-32 chars)
+- **Attribute names**: `^[a-z0-9_]+$` (3-64 chars)
+- **Relationship names**: `^[a-z0-9_]+$` (3-64 chars)
 - **Kind**: must be `Namespace` + `Name` concatenation
 
 ### 2.3 Attribute checks

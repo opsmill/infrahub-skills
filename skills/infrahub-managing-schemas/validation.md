@@ -114,7 +114,7 @@ Names have strict regex patterns:
 # Node name: 2-32 chars
 - name: X                # BAD - too short
 
-# Namespace: 3-32 chars
+# Namespace: 3-64 chars
 - namespace: DC          # BAD - too short
 
 # Attribute/Relationship name: 3-64 chars

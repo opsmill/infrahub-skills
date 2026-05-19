@@ -342,7 +342,7 @@ referenced without defining them:
 | Element | Convention | Pattern | Length |
 | ------- | ---------- | ------- | ------ |
 | Node name | PascalCase | `^[A-Z][a-zA-Z0-9]+$` | 2-32 |
-| Namespace | First upper | `^[A-Z][a-z0-9]+$` | 3-32 |
+| Namespace | First upper | `^[A-Z][a-z0-9]+$` | 3-64 |
 | Attr name | snake_case | `^[a-z0-9\_]+$` | 3-64 |
 | Rel name | snake_case | `^[a-z0-9\_]+$` | 3-64 |
 | Identifier | snake_case | `^[a-z0-9\_]+$` | max 128 |
