@@ -67,6 +67,7 @@ CHANGELOG.md                             # add release-notes bullets
 ## Task 1: Set up grader package skeleton
 
 **Files:**
+
 - Create: `graders/managing-generators/__init__.py`
 - Create: `graders/managing-generators/lib.py`
 
@@ -235,6 +236,7 @@ git commit -m "feat(graders): scaffold managing-generators grader package"
 ## Task 2: Add AST helper functions
 
 **Files:**
+
 - Modify: `graders/managing-generators/lib.py`
 - Create: `tests/graders/test_generators_lib.py`
 
@@ -521,6 +523,7 @@ git commit -m "feat(graders): add AST helpers for managing-generators lib"
 ## Task 3: Bug 2/3 — HFID encoding (rule + grader + eval)
 
 **Files:**
+
 - Create: `skills/infrahub-managing-generators/rules/python-relationship-references.md`
 - Modify: `graders/managing-generators/lib.py` (add checks)
 - Modify: `tests/graders/test_generators_lib.py` (add check tests)
@@ -1036,6 +1039,7 @@ git commit -m "feat(generators): rule + grader for HFID relationship encoding"
 ## Task 4: Three-forms variant (rule already covers it, just add grader + eval)
 
 **Files:**
+
 - Modify: `graders/managing-generators/lib.py` (add 3 checks)
 - Modify: `tests/graders/test_generators_lib.py` (add tests)
 - Create: `graders/managing-generators/check_relationship_three_forms.py`
@@ -1292,12 +1296,12 @@ git commit -m "feat(generators): grader + eval for three-form relationship refer
 ## Task 5: Bug 4 — Multi-peer add (rule + grader + eval)
 
 **Files:**
+
 - Create: `skills/infrahub-managing-generators/rules/python-multi-peer-add.md`
 - Modify: `graders/managing-generators/lib.py`
 - Modify: `tests/graders/test_generators_lib.py`
 - Create: `graders/managing-generators/check_multi_peer_iteration.py`
 - Modify: `eval.yaml`
-
 - [ ] **Step 1: Write the rule file**
 
 Create `skills/infrahub-managing-generators/rules/python-multi-peer-add.md`:
@@ -1352,6 +1356,7 @@ The same constraint applies to other ``RelationshipManager``
 mutators (``.update``, ``.remove``).
 
 ### Why iterate, not collect into a list comprehension that's then
+
 passed to ``.add()``?
 
 ``RelationshipManager.add(peer)`` mutates internal state in place;
@@ -1621,12 +1626,12 @@ git commit -m "feat(generators): rule + grader for multi-peer .add() iteration"
 ## Task 6: Bug 5 — Natural-key preflight (rule + grader + eval)
 
 **Files:**
+
 - Create: `skills/infrahub-managing-generators/rules/patterns-natural-key-preflight.md`
 - Modify: `graders/managing-generators/lib.py`
 - Modify: `tests/graders/test_generators_lib.py`
 - Create: `graders/managing-generators/check_natural_key_preflight.py`
 - Modify: `eval.yaml`
-
 - [ ] **Step 1: Write the rule**
 
 Create `skills/infrahub-managing-generators/rules/patterns-natural-key-preflight.md`:
@@ -1989,6 +1994,7 @@ git commit -m "feat(generators): rule + grader for natural-key preflight"
 ## Task 7: Integration-testing rule + advisory eval task
 
 **Files:**
+
 - Create: `skills/infrahub-managing-generators/rules/testing-integration.md`
 - Modify: `eval.yaml`
 
@@ -2100,6 +2106,7 @@ git commit -m "feat(generators): advisory rule + eval task for integration testi
 ## Task 8: Fix the misleading example in python-generate.md
 
 **Files:**
+
 - Modify: `skills/infrahub-managing-generators/rules/python-generate.md`
 
 The current example uses ``device_type_id`` as a singular variable
@@ -2157,7 +2164,6 @@ ip = await self.client.allocate_next_ip_address(
     identifier=f"{device_name}-loopback",
 )
 ```
-```
 
 Find the ``### Critical Rules`` block and update the bullet that
 reads "Use IDs for relationship references in `data` dict" to:
@@ -2191,6 +2197,7 @@ git commit -m "fix(generators): replace misleading device_type_id example"
 ## Task 9: Update _sections.md
 
 **Files:**
+
 - Modify: `skills/infrahub-managing-generators/rules/_sections.md`
 
 The sections index documents the prefix categories. We extend the
@@ -2238,6 +2245,7 @@ git commit -m "docs(generators): update _sections.md to mention new rules"
 ## Task 10: Regenerate evaluations/managing-generators.json
 
 **Files:**
+
 - Generated: `evaluations/managing-generators.json`
 
 `sync-evals.py` converts the root `eval.yaml` into per-skill JSON
@@ -2302,7 +2310,6 @@ For any task with pass rate < 0.8:
   forbid the failure mode?
 - Add a concrete WRONG/RIGHT example to the rule if missing.
 - Strengthen the cross-references between rules.
-
 - [ ] **Step 3: (Conditional) Iterate**
 
 If iteration is needed, edit the relevant rule file(s) in
@@ -2324,6 +2331,7 @@ git commit -m "docs(generators): strengthen rules based on smoke results"
 ## Task 12: Update CHANGELOG.md
 
 **Files:**
+
 - Modify: `CHANGELOG.md`
 
 - [ ] **Step 1: Read current CHANGELOG**
@@ -2389,7 +2397,6 @@ Confirm:
 - `eval.yaml` has 5 new tasks
 - `evaluations/managing-generators.json` is regenerated
 - `CHANGELOG.md` is updated
-
 - [ ] **Step 2: Run the full pytest suite**
 
 ```bash

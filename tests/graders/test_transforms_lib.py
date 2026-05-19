@@ -155,6 +155,35 @@ def test_has_post_to_artifact_generate_no_match():
     assert has_post_to_artifact_generate(tree) is False
 
 
+def test_has_post_to_artifact_generate_url_in_variable():
+    """Fallback path: URL stored in a variable + a .post() call elsewhere.
+
+    The strict AST helper can't reassemble the path through a Name node,
+    but the fallback (py_raw text + any .post call) accepts it. This is
+    a realistic pattern produced by capable LLMs.
+    """
+    src = (
+        "async def regenerate(client, def_id, branch):\n"
+        "    endpoint = f'/api/artifact/generate/{def_id}?branch={branch}'\n"
+        "    await client.post(endpoint)\n"
+    )
+    tree = ast.parse(src)
+    # Without py_raw fallback, this fails (URL is a Name, not a Constant)
+    assert has_post_to_artifact_generate(tree) is False
+    # With py_raw, the fallback fires
+    assert has_post_to_artifact_generate(tree, src) is True
+
+
+def test_has_post_to_artifact_generate_fallback_rejects_without_post():
+    """The fallback requires SOME .post() call — text alone isn't enough."""
+    src = (
+        "URL_TEMPLATE = '/api/artifact/generate/{}'\n"
+        "# never actually POSTs\n"
+    )
+    tree = ast.parse(src)
+    assert has_post_to_artifact_generate(tree, src) is False
+
+
 # -- has_loop_construct ---------------------------------------------------
 
 

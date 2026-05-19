@@ -157,21 +157,36 @@ def _string_contains(node: ast.AST, needle: str) -> bool:
     return False
 
 
-def has_post_to_artifact_generate(tree: ast.Module | None) -> bool:
-    """True if any ``post(...)`` call's URL argument mentions
-    ``/api/artifact/generate``.
+def has_post_to_artifact_generate(
+    tree: ast.Module | None, py_raw: str = ""
+) -> bool:
+    """True if the source POSTs to ``/api/artifact/generate``.
 
-    Accepts any callee whose attribute name is ``post`` —
-    ``httpx.post``, ``requests.post``, ``client.post``,
-    ``self.client.post``, etc. Inspects positional arg[0] and
-    keyword args ``url`` / ``path`` for the substring.
+    Two detection strategies:
+
+    1. **Direct AST match** — any ``<expr>.post(...)`` call whose
+       positional arg[0] or ``url``/``path``/``endpoint`` kwarg is
+       a string literal (or f-string) containing the path. Catches
+       ``client.post("/api/artifact/generate/...")``,
+       ``httpx.post(url=f"...")``, etc.
+
+    2. **Fallback text+call match** — if (1) doesn't fire, accept
+       the case where the source contains both *some* ``.post(``
+       call AND a string literal containing ``/api/artifact/generate``
+       (possibly stored in a variable, a constant, or built via
+       multiple f-string fragments the AST helper can't reassemble).
+       This is fuzzier but catches realistic patterns the model
+       produces, e.g. ``endpoint = f"...{def_id}..."; await client.post(endpoint)``.
     """
     if tree is None:
         return False
+    # Strategy 1: direct AST match
+    has_any_post = False
     for call in _iter_calls(tree):
         func = call.func
         if not (isinstance(func, ast.Attribute) and func.attr == "post"):
             continue
+        has_any_post = True
         candidates: list[ast.AST] = list(call.args[:1])
         for kw in call.keywords:
             if kw.arg in ("url", "path", "endpoint"):
@@ -179,6 +194,10 @@ def has_post_to_artifact_generate(tree: ast.Module | None) -> bool:
         for c in candidates:
             if _string_contains(c, _ARTIFACT_GENERATE_PATH):
                 return True
+    # Strategy 2: fallback — a .post() call somewhere AND the path
+    # appears as a string literal anywhere in the file.
+    if has_any_post and py_raw and _ARTIFACT_GENERATE_PATH in py_raw:
+        return True
     return False
 
 
@@ -256,12 +275,12 @@ def check_query_no_direct_field_on_union_location(
 
 
 def check_posts_artifact_generate_endpoint(
-    tree: ast.Module | None = None, **_: Any
+    tree: ast.Module | None = None, py_raw: str = "", **_: Any
 ) -> tuple[bool, str]:
     """Source must contain a POST whose URL mentions /api/artifact/generate."""
     if tree is None:
         return False, "No Python source to inspect"
-    if has_post_to_artifact_generate(tree):
+    if has_post_to_artifact_generate(tree, py_raw):
         return True, "POST to /api/artifact/generate found"
     return False, "No POST to /api/artifact/generate found"
 
@@ -278,12 +297,12 @@ def check_has_polling_loop(
 
 
 def check_polls_coreartifact_after_post(
-    tree: ast.Module | None = None, **_: Any
+    tree: ast.Module | None = None, py_raw: str = "", **_: Any
 ) -> tuple[bool, str]:
     """Source must reference ``kind="CoreArtifact"`` in a call (a read)."""
     if tree is None:
         return False, "No Python source to inspect"
-    if not has_post_to_artifact_generate(tree):
+    if not has_post_to_artifact_generate(tree, py_raw):
         return False, "No POST to /api/artifact/generate; nothing to poll"
     if references_core_artifact_in_call(tree):
         return True, "CoreArtifact read found after POST"

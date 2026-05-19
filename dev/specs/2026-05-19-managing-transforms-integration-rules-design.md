@@ -236,7 +236,7 @@ PR 2 is done when:
 - `evaluations/infrahub-managing-transforms.json` regenerated
   and committed.
 - Each grader returns correct result on hand-crafted compliant
-  + violating fixtures.
+  - violating fixtures.
 - Full test suite passes (existing tests not broken).
 - `CHANGELOG.md` updated.
 - (Skip live `skillgrade --smoke` for the same reason as PR 1

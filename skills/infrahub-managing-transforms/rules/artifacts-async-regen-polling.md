@@ -21,6 +21,22 @@ CI job, generator orchestration) **must poll** ``CoreArtifact``
 until the expected count materialises, with a hard timeout that
 surfaces a warning instead of silently shipping zero artifacts.
 
+### Required shape of a programmatic regen helper
+
+Every function that triggers regen MUST contain all three:
+
+1. **A POST** to ``/api/artifact/generate/<def-id>?branch=<branch>``
+   via ``.post(...)`` (any HTTP client — ``client.post``,
+   ``httpx.post``, ``requests.post``, etc.).
+2. **A loop** (``while``, ``for``, or ``async for``) that waits
+   for completion. A function that POSTs and returns is the bug.
+3. **A read** of ``CoreArtifact`` inside the loop —
+   ``client.filters(kind="CoreArtifact", ...)`` or equivalent —
+   to check whether regen has produced the expected count yet.
+
+If any of the three is missing, you have written the bug. Refer
+to "Correct pattern" below.
+
 ### Anti-pattern
 
 ```python

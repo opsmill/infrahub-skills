@@ -65,6 +65,7 @@ CHANGELOG.md                             # extend [Unreleased] block
 ## Task 1: Scaffold grader package
 
 **Files:**
+
 - Create: `graders/managing-transforms/__init__.py`
 - Create: `graders/managing-transforms/lib.py`
 
@@ -242,6 +243,7 @@ git commit -m "feat(graders): scaffold managing-transforms grader package"
 ## Task 2: Add helper functions (TDD)
 
 **Files:**
+
 - Modify: `graders/managing-transforms/lib.py`
 - Create: `tests/graders/test_transforms_lib.py`
 
@@ -263,7 +265,6 @@ Add the helpers that the check functions in Tasks 3-4 will use:
   `ast.For` appears in the tree
 - `references_core_artifact_in_call(tree)` — True if any
   call passes `kind="CoreArtifact"` as a keyword argument
-
 - [ ] **Step 1: Write the failing tests**
 
 Create `tests/graders/test_transforms_lib.py`:
@@ -652,6 +653,7 @@ git commit -m "feat(graders): add GraphQL + AST helpers for managing-transforms 
 ## Task 3: Union-fragments (rule + checks + grader + eval)
 
 **Files:**
+
 - Create: `skills/infrahub-managing-transforms/rules/queries-union-fragments.md`
 - Modify: `graders/managing-transforms/lib.py` (add checks)
 - Modify: `tests/graders/test_transforms_lib.py` (add check tests)
@@ -1031,6 +1033,7 @@ git commit -m "feat(transforms): rule + grader for union-relationship query frag
 ## Task 4: Artifact regen polling (rule + checks + grader + eval)
 
 **Files:**
+
 - Create: `skills/infrahub-managing-transforms/rules/artifacts-async-regen-polling.md`
 - Modify: `graders/managing-transforms/lib.py`
 - Modify: `tests/graders/test_transforms_lib.py`
@@ -1464,6 +1467,7 @@ git commit -m "docs(transforms): register queries- prefix and extend artifacts-"
 ## Task 6: Regenerate evaluations JSON
 
 **Files:**
+
 - Generated: `evaluations/infrahub-managing-transforms.json`
 
 - [ ] **Step 1: Run sync-evals**
