@@ -69,12 +69,12 @@ specifically designed to catch:
 
 | Gotcha | Skill Rule |
 | ------ | --------- |
-| Using `String` instead of `Text` (deprecated) | schema-creator: attribute-defaults-and-types |
-| Attribute name < 3 characters | schema-creator: naming-conventions |
-| `display_labels` (plural) instead of `display_label` (singular) | schema-creator: display-human-friendly-id |
-| Mismatched relationship identifiers | schema-creator: relationship-identifiers |
-| Missing `human_friendly_id` | schema-creator: display-human-friendly-id |
-| Short kind references (`VlanGroup` vs `IpamVlanGroup`) | schema-creator: relationship-peer-kind |
+| Using `String` instead of `Text` (deprecated) | managing-schemas: attribute-defaults-and-types |
+| Attribute name < 3 characters | managing-schemas: naming-conventions |
+| `display_labels` (plural) instead of `display_label` (singular) | managing-schemas: display-human-friendly-id |
+| Mismatched relationship identifiers | managing-schemas: relationship-identifiers |
+| Missing `human_friendly_id` | managing-schemas: display-human-friendly-id |
+| Short kind references (`VlanGroup` vs `IpamVlanGroup`) | managing-schemas: relationship-peer-kind |
 
 ## .infrahub.yml
 

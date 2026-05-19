@@ -1,4 +1,4 @@
-"""Tests for graders/schema-creator/lib.py.
+"""Tests for graders/managing-schemas/lib.py.
 
 Covers >= 10 check functions against both good and bad schemas.
 """
@@ -12,7 +12,7 @@ import yaml
 
 # ---------------------------------------------------------------------------
 # Adjust import path so tests work when run from repo root or this directory.
-# The grader library lives in graders/schema-creator/lib.py — the
+# The grader library lives in graders/managing-schemas/lib.py — the
 # hyphenated directory name is not a valid Python package name so we use
 # importlib.util to load the module directly by file path.
 # ---------------------------------------------------------------------------
@@ -20,8 +20,8 @@ import importlib.util
 import sys
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-_LIB_PATH = _REPO_ROOT / "graders" / "schema-creator" / "lib.py"
-_spec = importlib.util.spec_from_file_location("schema_creator_graders_lib", _LIB_PATH)
+_LIB_PATH = _REPO_ROOT / "graders" / "managing-schemas" / "lib.py"
+_spec = importlib.util.spec_from_file_location("managing_schemas_graders_lib", _LIB_PATH)
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
 

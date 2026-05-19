@@ -8,11 +8,32 @@ root, with grader scripts organized under `graders/<skill>/`.
 Evals are run with [skillgrade](https://github.com/mgechev/skillgrade),
 which replaces the previous custom eval runner.
 
+A second consumer of `eval.yaml` exists: the
+`/skill-creator` evals workflow reads
+`evaluations/*.json`, which is a per-skill JSON
+projection of the same task definitions. Those JSON
+files are generated, never hand-edited.
+
 ## Installation
 
 ```bash
 npm i -g skillgrade
 ```
+
+## Syncing eval.yaml → evaluations/*.json
+
+After every edit to `eval.yaml` (adding a task,
+changing a prompt, tuning trials), regenerate the
+JSON projection:
+
+```bash
+python scripts/sync-evals.py
+```
+
+Commit the regenerated `evaluations/*.json` files
+together with the `eval.yaml` change. CI does not
+run sync-evals automatically, so missing this step
+silently desynchronizes the two formats.
 
 ## Running Evals Locally
 
@@ -166,10 +187,10 @@ things the skill's rules specifically address.
 
 | Skill | Eval File | Tasks |
 | ----- | --------- | ----- |
-| infrahub-schema-creator | `eval.yaml` (tasks: vlan-management, circuit-management, location-hierarchy) | 3 |
-| infrahub-menu-creator | `eval.yaml` (tasks: flat-menu, hierarchical-menu, generic-kind-menu) | 3 |
+| infrahub-managing-schemas | `eval.yaml` (tasks: vlan-management, circuit-management, location-hierarchy) | 3 |
+| infrahub-managing-menus | `eval.yaml` (tasks: flat-menu, hierarchical-menu, generic-kind-menu) | 3 |
 
 Other skills don't have evals yet — adding them is a
 good contribution. Focus on skills with the most
-complex rules first (object-creator, check-creator,
-generator-creator).
+complex rules first (managing-objects, managing-checks,
+managing-generators).

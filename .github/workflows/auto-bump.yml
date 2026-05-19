@@ -1,0 +1,125 @@
+---
+name: Auto bump version
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: auto-bump
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Guard: skip bot commits to prevent infinite loops
+  # ---------------------------------------------------------------------------
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - name: Check commit author and message
+        id: check
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+          AUTHOR: ${{ github.event.head_commit.author.username }}
+        run: |
+          if [[ "$MSG" == chore\(release\):* ]] || [[ "$MSG" == "chore: sync version"* ]]; then
+            echo "Skipping: bot commit message detected"
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          elif [[ "$AUTHOR" == "opsmill-bot" ]]; then
+            echo "Skipping: opsmill-bot author detected"
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Bump: calculate next version, update files, commit
+  #
+  # Tag creation is deferred to release publication. When a maintainer
+  # publishes the draft maintained by release-drafter, GitHub creates the
+  # tag against the release's targetCommitish (main HEAD at that moment),
+  # guaranteeing the tag includes every PR merged up to publish time.
+  # ---------------------------------------------------------------------------
+  bump:
+    needs: guard
+    if: needs.guard.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.next.outputs.next-version }}
+      changed: ${{ steps.compare.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Calculate next version from PR labels
+        uses: patrickjahns/version-drafter-action@v1.3.1
+        id: next
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}
+
+      - name: Compare with current version
+        id: compare
+        run: |
+          CURRENT=$(jq -r .version .claude-plugin/plugin.json)
+          NEXT="${{ steps.next.outputs.next-version }}"
+          echo "Current: $CURRENT"
+          echo "Next:    $NEXT"
+
+          if [ "$CURRENT" = "$NEXT" ]; then
+            echo "No version change needed"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version bump: $CURRENT -> $NEXT"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update plugin.json
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          jq --arg v "${{ steps.next.outputs.next-version }}" \
+            '.version = $v' .claude-plugin/plugin.json > /tmp/plugin.json \
+            && mv /tmp/plugin.json .claude-plugin/plugin.json
+
+      - name: Sync versions to all files
+        if: steps.compare.outputs.changed == 'true'
+        run: bash scripts/sync-versions.sh "${{ steps.next.outputs.next-version }}"
+
+      - name: Commit version bump
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          VERSION="${{ steps.next.outputs.next-version }}"
+          git config user.name "opsmill-bot"
+          git config user.email "opsmill-bot@users.noreply.github.com"
+          # Stage only files version-sync is allowed to touch — avoids
+          # picking up stray files dropped by third-party tools.
+          git add .claude-plugin/plugin.json \
+                  skills/*/SKILL.md \
+                  pyproject.toml \
+                  .github/.release-manifest.json
+          git commit -m "chore(release): bump to v${VERSION}"
+          git push origin main
+
+  # ---------------------------------------------------------------------------
+  # Release draft: create/update a draft GitHub release.
+  # The draft's tag (`v${VERSION}`) is materialized by GitHub only when the
+  # maintainer publishes the draft — guaranteeing the tag points at HEAD at
+  # publish time, with every subsequent PR included.
+  # ---------------------------------------------------------------------------
+  release-draft:
+    needs: bump
+    if: always() && needs.bump.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: release-drafter/release-drafter@v7
+        with:
+          tag: "v${{ needs.bump.outputs.version }}"
+          version: "${{ needs.bump.outputs.version }}"
+          publish: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}

@@ -1,0 +1,79 @@
+---
+title: Repo Auditor
+sidebar_position: 8
+---
+
+The Repo Auditor performs a comprehensive audit of an Infrahub repository against all Infrahub best practices. It checks schema files, object files, Python components (checks, generators, transforms), `.infrahub.yml` registration, and project structure — then generates a report identifying issues and explaining what to fix and why.
+
+## When to use
+
+- Before loading a new schema into a production instance
+- After onboarding to verify the repository follows Infrahub conventions
+- When inheriting or taking over an existing Infrahub implementation
+- As a periodic quality check on an active repository
+- Before opening a pull request that touches schema or automation files
+
+## What it checks
+
+### Project structure
+
+- Required files present (`.infrahub.yml`, schema files)
+- Directory conventions followed
+- File naming patterns (numeric prefixes on object files, snake_case on Python files)
+
+### Schema
+
+- Naming conventions (namespace, node name, attribute name lengths and casing)
+- Attribute types (no deprecated `String`, correct use of `Dropdown`, `Text`, `Number`, etc.)
+- Relationship identifiers (both sides match)
+- Relationship peer references (full namespace+name)
+- `human_friendly_id` present on all nodes
+- `display_label` present and syntactically correct
+- Hierarchy configuration (correct `parent`/`children` setup for hierarchical generics)
+
+### Object files
+
+- Correct `apiVersion`, `kind: Object`, `spec` structure
+- Value mapping (correct use of `value:`, dropdown names vs. labels)
+- Load order (no forward references)
+- Relationship references match existing node `human_friendly_id` values
+
+### Python components
+
+- **`InfrahubCheck`** — `validate()` signature, `log_error()` vs `log_info()` usage, error collection pattern
+- **`InfrahubGenerator`** — `allow_upsert=True`, `delete_unused_nodes=True`, async `generate()` method
+- **`InfrahubTransform`** — correct return types, `data` variable usage in Jinja2 templates
+
+### Cross-references and registration
+
+- Every Python component referenced in `.infrahub.yml` exists as a file
+- Every `.gql` query referenced in Python classes exists as a file
+- Query names match between `.gql` files and Python class attributes
+- Artifact definitions reference existing transforms
+
+### Best practices
+
+- `display_label` caching patterns for nodes with parent relationships
+- Python environment detection configuration
+- Git integration setup
+
+## What it produces
+
+A structured audit report listing:
+
+- **Issue** — what was found
+- **Severity** — error, warning, or info
+- **Location** — file and line where possible
+- **Recommended fix** — what to change and why
+
+Issues are grouped by category so the most critical problems are addressed first.
+
+## Acting on the results
+
+| Severity | Meaning | Action |
+| ---------- | --------- | -------- |
+| **Error** | Will cause load failures or runtime errors | Must fix before loading into Infrahub |
+| **Warning** | Convention violation that may cause confusing behavior | Should fix |
+| **Info** | Suggestion for improvement | Optional |
+
+The Repo Auditor can be asked to fix issues directly after reporting them — describe which issues to address and the AI applies the relevant skill to make the corrections.

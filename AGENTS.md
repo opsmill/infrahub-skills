@@ -19,6 +19,7 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 ## Development Guides
 
 @dev/guides/adding-a-skill.md
+@dev/guides/adding-a-rule.md
 @dev/guides/running-evals.md
 
 ## Domain Knowledge
@@ -36,25 +37,45 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 
 | Skill | Directory | Description |
 | ------- | ----------- | ------------- |
-| `infrahub-schema-creator` | `skills/infrahub-schema-creator/` | Schema nodes, generics, attributes, relationships |
-| `infrahub-object-creator` | `skills/infrahub-object-creator/` | YAML data files for infrastructure objects |
-| `infrahub-check-creator` | `skills/infrahub-check-creator/` | Python validation checks for proposed changes |
-| `infrahub-generator-creator` | `skills/infrahub-generator-creator/` | Design-driven automation |
-| `infrahub-transform-creator` | `skills/infrahub-transform-creator/` | Data transforms (Python/Jinja2) |
-| `infrahub-menu-creator` | `skills/infrahub-menu-creator/` | Custom navigation menus |
-| `infrahub-analyst` | `skills/infrahub-analyst/` | Live data analysis via MCP server |
-| `infrahub-repo-auditor` | `skills/infrahub-repo-auditor/` | Audit repository against best practices |
+| `infrahub-managing-schemas` | `skills/infrahub-managing-schemas/` | Schema nodes, generics, attributes, relationships |
+| `infrahub-managing-objects` | `skills/infrahub-managing-objects/` | YAML data files for infrastructure objects |
+| `infrahub-managing-checks` | `skills/infrahub-managing-checks/` | Python validation checks for proposed changes |
+| `infrahub-managing-generators` | `skills/infrahub-managing-generators/` | Design-driven automation |
+| `infrahub-managing-transforms` | `skills/infrahub-managing-transforms/` | Data transforms (Python/Jinja2) |
+| `infrahub-managing-menus` | `skills/infrahub-managing-menus/` | Custom navigation menus |
+| `infrahub-analyzing-data` | `skills/infrahub-analyzing-data/` | Live data analysis via MCP server |
+| `infrahub-auditing-repo` | `skills/infrahub-auditing-repo/` | Audit repository against best practices |
 
 ### Key Directories
 
 - `skills/` — Skill definitions with rules, examples, and references
 - `eval.yaml` — skillgrade eval config (all skills)
+- `evaluations/` — Auto-generated JSON eval files (regenerate with `python scripts/sync-evals.py` after editing `eval.yaml`)
 - `graders/` — Deterministic grader scripts per skill
 - `skills/infrahub-common/` — Shared references and cross-cutting rules
 - `hooks/` — Hook definitions for Infrahub project detection
-- `scripts/` — Utility scripts (e.g., `sync-versions.sh`)
+- `scripts/` — Utility scripts (`sync-versions.sh`, `sync-evals.py`)
 - `dev/` — Development guides, domain knowledge, and AI commands
 - `.claude-plugin/` — Plugin manifest
+
+### Rule = Test (Required)
+
+Adding a new rule under `skills/<skill>/rules/` must
+ship with its eval coverage in the same change:
+
+1. New check function in `graders/<skill>/lib.py`
+   registered in `CHECKS`.
+2. New task block in `eval.yaml` whose prompt
+   naturally exercises the rule.
+3. Task grader script under `graders/<skill>/`.
+4. `python scripts/sync-evals.py` to regenerate
+   `evaluations/*.json` (commit alongside `eval.yaml`).
+
+Full walkthrough in
+[dev/guides/adding-a-rule.md](dev/guides/adding-a-rule.md).
+A rule without a grader is a rule that can rot
+silently — the next refactor of the skill's prose
+loses the constraint with no failing test to flag it.
 
 ### Versioning
 

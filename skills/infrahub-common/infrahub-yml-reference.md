@@ -117,6 +117,15 @@ checks/transforms/generators) and a `file_path` to the
 | `targets` | No | Group name; omit for global checks |
 | `parameters` | No | Maps query variables to target attrs |
 
+> **No `query` field.** Unlike `generator_definitions`
+> and `jinja2_transforms`, `check_definitions` does
+> **not** accept a `query:` key. The associated query
+> is declared on the Python class (`query = "..."`)
+> and must reference a `name` from the top-level
+> `queries:` section. The Pydantic model uses
+> `extra="forbid"`, so adding `query:` here makes the
+> repository config fail to load.
+
 ### `python_transforms`
 
 | Field | Required | Description |

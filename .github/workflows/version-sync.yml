@@ -1,11 +1,12 @@
 ---
+# yamllint disable rule:truthy
 name: Version sync
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Auto bump version"]
+    types: [completed]
     branches: [main]
-    paths:
-      - ".claude-plugin/plugin.json"
   workflow_dispatch:
 
 permissions:
@@ -13,11 +14,17 @@ permissions:
 
 jobs:
   sync-versions:
+    # Only run after auto-bump succeeds (or when manually dispatched).
+    # Acts as a safety net for direct plugin.json edits that bypass auto-bump.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+          token: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}
 
       - name: Extract version from plugin.json
         id: version
@@ -32,7 +39,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add skills/*/SKILL.md .github/.release-manifest.json
+          git add skills/*/SKILL.md .github/.release-manifest.json pyproject.toml
           if git diff --staged --quiet; then
             echo "All versions already in sync"
             exit 0

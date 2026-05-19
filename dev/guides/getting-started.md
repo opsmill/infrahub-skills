@@ -125,9 +125,9 @@ skill for each task.
 You can invoke skills directly by name:
 
 ```text
-/infrahub:schema-creator
-/infrahub:object-creator
-/infrahub:check-creator
+/infrahub:managing-schemas
+/infrahub:managing-objects
+/infrahub:managing-checks
 ```
 
 Or just describe your task — the AI will match it to
@@ -141,25 +141,25 @@ this order:
 
 1. **Design the schema** — Define your data model
    (nodes, generics, attributes, relationships) using
-   `infrahub:schema-creator`
+   `infrahub:managing-schemas`
 2. **Populate data** — Create YAML data files for
    infrastructure objects with
-   `infrahub:object-creator`
+   `infrahub:managing-objects`
 3. **Add validation** — Write Python checks that run
    in proposed change pipelines with
-   `infrahub:check-creator`
+   `infrahub:managing-checks`
 4. **Build automation** — Create generators that
    produce objects from design definitions with
-   `infrahub:generator-creator`
+   `infrahub:managing-generators`
 5. **Create transforms** — Convert Infrahub data to
    configs, reports, or exports with
-   `infrahub:transform-creator`
+   `infrahub:managing-transforms`
 6. **Customize the UI** — Design navigation menus for
-   the web interface with `infrahub:menu-creator`
+   the web interface with `infrahub:managing-menus`
 7. **Analyze data** — Query and correlate live
-   Infrahub data with `infrahub:analyst`
+   Infrahub data with `infrahub:analyzing-data`
 8. **Audit** — Verify your repository follows best
-   practices with `infrahub:repo-auditor`
+   practices with `infrahub:auditing-repo`
 
 Not every project needs every step. Schema and data
 are the foundation; the rest depends on your use case.
@@ -168,14 +168,14 @@ are the foundation; the rest depends on your use case.
 
 | Skill | Use When |
 | ----- | -------- |
-| `infrahub:schema-creator` | Designing data models — nodes, generics, attributes, relationships, hierarchies |
-| `infrahub:object-creator` | Creating YAML data files — devices, locations, organizations, modules |
-| `infrahub:check-creator` | Writing Python validation checks for proposed change pipelines |
-| `infrahub:generator-creator` | Building design-driven automation (create objects from design definitions) |
-| `infrahub:transform-creator` | Converting Infrahub data to other formats (JSON, text, CSV, device configs) |
-| `infrahub:menu-creator` | Customizing the web UI sidebar with nested navigation menus |
-| `infrahub:analyst` | Querying and correlating live Infrahub data via the MCP server |
-| `infrahub:repo-auditor` | Auditing a repository against all rules and best practices |
+| `infrahub:managing-schemas` | Designing data models — nodes, generics, attributes, relationships, hierarchies |
+| `infrahub:managing-objects` | Creating YAML data files — devices, locations, organizations, modules |
+| `infrahub:managing-checks` | Writing Python validation checks for proposed change pipelines |
+| `infrahub:managing-generators` | Building design-driven automation (create objects from design definitions) |
+| `infrahub:managing-transforms` | Converting Infrahub data to other formats (JSON, text, CSV, device configs) |
+| `infrahub:managing-menus` | Customizing the web UI sidebar with nested navigation menus |
+| `infrahub:analyzing-data` | Querying and correlating live Infrahub data via the MCP server |
+| `infrahub:auditing-repo` | Auditing a repository against all rules and best practices |
 
 ## Using with Non-Claude Tools
 
@@ -195,7 +195,7 @@ Confirm skills are installed and discoverable:
    ```
 
    You should see one `SKILL.md` per skill (e.g.,
-   `skills/infrahub-schema-creator/SKILL.md`).
+   `skills/infrahub-managing-schemas/SKILL.md`).
 
 2. Test a skill invocation — ask your AI assistant:
 
@@ -204,7 +204,7 @@ Confirm skills are installed and discoverable:
    that has a name and status attribute.
    ```
 
-   The assistant should activate `infrahub:schema-creator`
+   The assistant should activate `infrahub:managing-schemas`
    and produce a YAML schema starting with
    `version: "1.0"` containing a `nodes:` list.
 
