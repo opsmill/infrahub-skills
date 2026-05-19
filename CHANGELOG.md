@@ -38,6 +38,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Added 2 deterministic evals + graders to `eval.yaml` (first
   evals for this skill).
 
+### infrahub-common
+
+- New rule `deployment-gql-dry-run` recommending that any PR
+  touching `queries/**/*.gql` runs `infrahubctl render
+  --dry-run` (or the equivalent check/generator run) against
+  a live Infrahub schema before merge. YAML schema validation
+  and Python type checking don't catch GraphQL query/schema
+  mismatches; only a live dry-run does. This is the failure
+  class that hides behind silent CoreRepository
+  schema-sync hangs.
+
 ### Notes
 
 - `skillgrade --smoke` was not run in this branch (skillgrade
