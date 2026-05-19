@@ -24,6 +24,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Added 5 deterministic evals + 4 graders to `eval.yaml` (first
   evals for this skill).
 
+### managing-transforms
+
+- New rule `queries-union-fragments` documenting the need for
+  GraphQL inline fragments on union-typed relationships
+  (`DcimDevice.location`, `Organization*` peers) to avoid
+  "Cannot query field 'X' on type 'Y'" failures in
+  CoreRepository schema-sync.
+- New rule `artifacts-async-regen-polling` documenting that
+  `POST /api/artifact/generate` is fire-and-forget and
+  programmatic callers must poll `CoreArtifact` to confirm
+  completion.
+- Added 2 deterministic evals + graders to `eval.yaml` (first
+  evals for this skill).
+
 ### Notes
 
 - `skillgrade --smoke` was not run in this branch (skillgrade
