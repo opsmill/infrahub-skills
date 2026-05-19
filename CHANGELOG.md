@@ -38,6 +38,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Added 2 deterministic evals + graders to `eval.yaml` (first
   evals for this skill).
 
+### Hook (session-start)
+
+- Added per-path skill activation triggers to the
+  SessionStart hook's `additionalContext`. When the user
+  touches `generators/**`, `transforms/**`, `queries/**`,
+  `checks/**`, `objects/**`, `menus/**`, or `.gql` files, the
+  hook now explicitly tells Claude to read the corresponding
+  skill (with specific rule files) before editing. The trigger
+  block opens with a rationale — integration-layer rules live
+  in the skills, not in source, so pattern-matching produces
+  bugs that pass unit tests but fail at runtime.
+
 ### infrahub-common
 
 - New rule `deployment-gql-dry-run` recommending that any PR
