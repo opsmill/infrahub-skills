@@ -19,7 +19,8 @@
 5. **Artifacts (artifacts-)** -- HIGH. Connecting
    transforms to output files via artifact_definitions,
    content types, targets (CoreArtifactTarget),
-   parameter mapping.
+   parameter mapping, and async regeneration polling
+   (the /api/artifact/generate endpoint is fire-and-forget).
 
 6. **API Reference (api-)** -- HIGH. Class attributes
    (query, timeout), instance properties (client,
@@ -31,3 +32,9 @@
 
 8. **Testing (testing-)** -- LOW. infrahubctl transform
    and render commands, REST API endpoints.
+
+9. **Queries (queries-)** -- CRITICAL. Writing the .gql
+   query that feeds the transform. Covers union-typed
+   relationships (DcimDevice.location, Organization*) that
+   require inline fragments (... on Type { fields }) to
+   avoid "Cannot query field 'X' on type 'Y'" errors.
