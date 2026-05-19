@@ -520,70 +520,89 @@ def check_generate_template_concrete_only(schema: dict, **_: Any) -> tuple[bool,
     return True, f"generate_template: true on concrete nodes only: {', '.join(flagged_nodes)}"
 
 
-_SCHEMA_URL = "https://schema.infrahub.app/infrahub/schema/latest.json"
-_SCHEMA_CACHE: dict[str, Any] | None = None
-_SCHEMA_ERROR: str | None = None
-
+_FETCH_SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "skills"
+    / "infrahub-managing-schemas"
+    / "scripts"
+    / "fetch_schema_limits.py"
+)
+_SCHEMA_LIMITS_CACHE: dict[str, dict[str, int]] | None = None
+_SCHEMA_LIMITS_ERROR: str | None = None
 _SCHEMA_NAMES = ("NodeSchema", "GenericSchema",
                  "AttributeSchema", "RelationshipSchema")
 
 
 def _load_schema_limits() -> tuple[dict[str, dict[str, int]] | None, str | None]:
-    """Fetch the public Infrahub JSON Schema and return per-kind maxLength tables.
+    """Run the shared fetch script and return per-schema maxLength tables.
 
-    Result is cached on the first call. On fetch failure the limits are
-    ``None`` and an error string is returned for the caller to surface.
+    Caches the result for the lifetime of the process. On any failure
+    (script missing, non-zero exit, malformed JSON) limits are ``None``
+    and an error string is returned for the caller to surface.
     """
-    global _SCHEMA_CACHE, _SCHEMA_ERROR
-    if _SCHEMA_CACHE is None and _SCHEMA_ERROR is None:
-        import json
-        import urllib.error
-        import urllib.request
+    global _SCHEMA_LIMITS_CACHE, _SCHEMA_LIMITS_ERROR
+    if _SCHEMA_LIMITS_CACHE is not None:
+        return _SCHEMA_LIMITS_CACHE, None
+    if _SCHEMA_LIMITS_ERROR is not None:
+        return None, _SCHEMA_LIMITS_ERROR
 
-        req = urllib.request.Request(
-            _SCHEMA_URL,
-            headers={
-                "User-Agent": "infrahub-skills-grader/1.0",
-                "Accept": "application/json",
-            },
+    import json
+    import subprocess
+    import sys
+
+    if not _FETCH_SCRIPT.is_file():
+        _SCHEMA_LIMITS_ERROR = f"fetch script not found at {_FETCH_SCRIPT}"
+        return None, _SCHEMA_LIMITS_ERROR
+
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(_FETCH_SCRIPT)],
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
-        try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                _SCHEMA_CACHE = json.loads(resp.read().decode())
-        except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
-            _SCHEMA_ERROR = f"{type(exc).__name__}: {exc}"
-            return None, _SCHEMA_ERROR
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        _SCHEMA_LIMITS_ERROR = f"{type(exc).__name__}: {exc}"
+        return None, _SCHEMA_LIMITS_ERROR
 
-    if _SCHEMA_ERROR is not None:
-        return None, _SCHEMA_ERROR
+    if proc.returncode != 0:
+        stderr = (proc.stderr or "").strip().splitlines()[-1:] or ["non-zero exit"]
+        _SCHEMA_LIMITS_ERROR = f"exit {proc.returncode}: {stderr[0]}"
+        return None, _SCHEMA_LIMITS_ERROR
 
-    spec = _SCHEMA_CACHE or {}
-    defs = spec.get("$defs", {})
-    limits: dict[str, dict[str, int]] = {name: {} for name in _SCHEMA_NAMES}
+    try:
+        full = json.loads(proc.stdout)
+    except ValueError as exc:
+        _SCHEMA_LIMITS_ERROR = f"invalid JSON from fetch script: {exc}"
+        return None, _SCHEMA_LIMITS_ERROR
+
+    # Project {SchemaName: {field: {minLength, maxLength, pattern}}}
+    # down to {SchemaName: {field: maxLength}} for the cap-only check.
+    limits: dict[str, dict[str, int]] = {}
     for name in _SCHEMA_NAMES:
-        props = defs.get(name, {}).get("properties", {})
-        for field, info in props.items():
-            for candidate in [info] + info.get("anyOf", []):
-                cap = candidate.get("maxLength")
-                if cap is not None and field not in limits[name]:
-                    limits[name][field] = cap
+        limits[name] = {
+            field: info["maxLength"]
+            for field, info in full.get(name, {}).items()
+            if "maxLength" in info
+        }
+    _SCHEMA_LIMITS_CACHE = limits
     return limits, None
 
 
 def check_string_limits(schema: dict, **_: Any) -> tuple[bool, str]:
     """All schema string fields fit Infrahub's load-time max_length caps.
 
-    Caps are resolved at run time from the public Infrahub JSON Schema
-    at ``schema.infrahub.app`` so the grader stays correct across
-    Infrahub versions without needing a running server. If the spec is
-    unreachable, the check returns ``True`` with an explicit
-    "unverified" reason so transient network failures don't fail CI —
-    the result is visibly inconclusive.
+    Delegates to ``skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py``
+    so the source-of-truth URL and extraction logic live in exactly one
+    place across the repo. If the script can't reach the live schema,
+    the check returns ``True`` with an explicit "unverified" reason so
+    transient network failures don't fail CI — the result is visibly
+    inconclusive.
     """
     limits, error = _load_schema_limits()
     if limits is None:
         return True, (
-            f"String-length caps not verified — could not fetch {_SCHEMA_URL} "
+            f"String-length caps not verified — fetch_schema_limits.py failed "
             f"({error}). Check skipped for this run."
         )
 
@@ -611,7 +630,7 @@ def check_string_limits(schema: dict, **_: Any) -> tuple[bool, str]:
 
     if issues:
         return False, "Over-limit string fields: " + "; ".join(issues)
-    return True, f"All string fields within max_length caps (per {_SCHEMA_URL})"
+    return True, "All string fields within max_length caps (per fetch_schema_limits.py)"
 
 
 def check_core_artifact_target_concrete(schema: dict, **_: Any) -> tuple[bool, str]:
