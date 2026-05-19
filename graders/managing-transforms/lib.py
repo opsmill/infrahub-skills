@@ -205,10 +205,59 @@ def references_core_artifact_in_call(tree: ast.Module | None) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# CHECKS registry (populated by later tasks)
+# Union-fragments checks
 # ---------------------------------------------------------------------------
 
-CHECKS: dict[str, Any] = {}
+# Known union-typed relationships in Infrahub base schema. The
+# grader is intentionally narrow — extend this dict when new
+# unions enter the eval corpus.
+_KNOWN_UNION_RELATIONSHIPS = {
+    "location": ("name", "shortname"),  # rel name -> divergent fields
+}
+
+
+def check_query_uses_inline_fragments_for_location(
+    gql_text: str = "", **_: Any
+) -> tuple[bool, str]:
+    """If the query touches ``location``, it must contain at least one
+    ``... on Location<...>`` inline fragment.
+    """
+    if not gql_text:
+        return False, "No GraphQL output to inspect"
+    block = block_for_relationship(gql_text, "location")
+    if block is None:
+        return False, "Query does not touch 'location' relationship"
+    fragments = find_inline_fragments(block)
+    if any(f.startswith("Location") for f in fragments):
+        return True, f"Uses inline fragments: {fragments}"
+    return False, "location { ... } contains no ... on Location<Type> fragment"
+
+
+def check_query_no_direct_field_on_union_location(
+    gql_text: str = "", **_: Any
+) -> tuple[bool, str]:
+    """The query must not select ``name``/``shortname`` directly on
+    the ``location`` union (the bug 1 pattern).
+    """
+    if not gql_text:
+        return False, "No GraphQL output to inspect"
+    bad: list[str] = []
+    for field in _KNOWN_UNION_RELATIONSHIPS["location"]:
+        if field_appears_directly_under_union(gql_text, "location", field):
+            bad.append(field)
+    if bad:
+        return False, f"Direct field(s) on union location.node: {', '.join(bad)}"
+    return True, "No direct field selections on union location.node"
+
+
+# ---------------------------------------------------------------------------
+# CHECKS registry
+# ---------------------------------------------------------------------------
+
+CHECKS: dict[str, Any] = {
+    "query-uses-inline-fragments-for-location": check_query_uses_inline_fragments_for_location,
+    "query-no-direct-field-on-union-location": check_query_no_direct_field_on_union_location,
+}
 
 
 # ---------------------------------------------------------------------------

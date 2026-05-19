@@ -846,3 +846,40 @@ tasks:
       - >-
         The guidance notes that unit tests on the input dict do not cover
         SDK call shape
+
+  # --- Transforms: union-typed relationship queries --- #
+  - name: transform-query-union-fragments
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-transforms/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write a GraphQL query for a Jinja2 transform that fetches DcimDevice
+      with the device's name, its role, and its location's name + shortname.
+      location is a union of LocationSite | LocationBuilding | LocationHosting
+      in this repo's base schema. LocationHosting has neither name nor shortname,
+      so the query must handle the union explicitly so that schema-sync doesn't
+      fail when a LocationHosting instance is present.
+
+      Save ONLY the final GraphQL query to: output.gql
+    graders:
+      - type: deterministic
+        run: python graders/managing-transforms/check_query_union_fragments.py
+        weight: 1.0
+    expected_output: >-
+      A GraphQL query that uses inline fragments (... on LocationSite { ... }
+      and similar) for the location relationship, so fields that exist on
+      some concrete types but not others are scoped to the correct type.
+    expectations:
+      - "Query touches DcimDevice and location"
+      - "Inline fragments (... on Location...) are used inside location.node"
+      - "name and shortname are not selected directly under location.node"
+    assertions:
+      - name: query-uses-inline-fragments-for-location
+        check: >-
+          location { node { ... } } contains at least one ... on Location<Type>
+          inline fragment
+      - name: query-no-direct-field-on-union-location
+        check: >-
+          Neither 'name' nor 'shortname' appears as a direct selection under
+          location.node without an enclosing inline fragment

@@ -200,3 +200,65 @@ def test_references_core_artifact_get_call():
 def test_references_core_artifact_no_match():
     tree = ast.parse("x = client.filters(kind='CoreNode')\n")
     assert references_core_artifact_in_call(tree) is False
+
+
+# -- Task 3: union-fragment checks ----------------------------------------
+
+
+SRC_BUG_QUERY = """
+query {
+  DcimDevice {
+    edges {
+      node {
+        location { node { name { value } shortname { value } } }
+      }
+    }
+  }
+}
+"""
+
+SRC_GOOD_QUERY = """
+query {
+  DcimDevice {
+    edges {
+      node {
+        location {
+          node {
+            ... on LocationSite { name { value } shortname { value } }
+            ... on LocationBuilding { name { value } }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+
+def test_query_uses_inline_fragments_for_location_passes_on_good():
+    ok, msg = _mod.CHECKS["query-uses-inline-fragments-for-location"](
+        gql_text=SRC_GOOD_QUERY, tree=None, py_raw=""
+    )
+    assert ok, msg
+
+
+def test_query_uses_inline_fragments_for_location_fails_on_bug():
+    ok, msg = _mod.CHECKS["query-uses-inline-fragments-for-location"](
+        gql_text=SRC_BUG_QUERY, tree=None, py_raw=""
+    )
+    assert not ok
+
+
+def test_query_no_direct_field_on_union_location_passes_on_good():
+    ok, msg = _mod.CHECKS["query-no-direct-field-on-union-location"](
+        gql_text=SRC_GOOD_QUERY, tree=None, py_raw=""
+    )
+    assert ok, msg
+
+
+def test_query_no_direct_field_on_union_location_fails_on_bug():
+    ok, msg = _mod.CHECKS["query-no-direct-field-on-union-location"](
+        gql_text=SRC_BUG_QUERY, tree=None, py_raw=""
+    )
+    assert not ok
+    assert "name" in msg or "shortname" in msg
