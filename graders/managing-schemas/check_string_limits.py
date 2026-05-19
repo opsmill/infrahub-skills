@@ -3,9 +3,13 @@
 
 Asserts that no `description`, `label`, `identifier`, or `deprecation`
 field on any node/generic/attribute/relationship exceeds Infrahub's
-schema-load Pydantic max_length cap. Bundled with baseline schema-shape
-checks so this task also guards against regressions in unrelated rules
-under the same prompt.
+schema-load max_length cap. Caps are fetched at run time from the
+public Infrahub JSON Schema at
+``https://schema.infrahub.app/infrahub/schema/latest.json`` so the
+grader stays correct across Infrahub versions without needing a
+running server. Bundled with baseline schema-shape checks so this
+task also guards against regressions in unrelated rules under the
+same prompt.
 """
 
 from __future__ import annotations

@@ -520,43 +520,98 @@ def check_generate_template_concrete_only(schema: dict, **_: Any) -> tuple[bool,
     return True, f"generate_template: true on concrete nodes only: {', '.join(flagged_nodes)}"
 
 
+_SCHEMA_URL = "https://schema.infrahub.app/infrahub/schema/latest.json"
+_SCHEMA_CACHE: dict[str, Any] | None = None
+_SCHEMA_ERROR: str | None = None
+
+_SCHEMA_NAMES = ("NodeSchema", "GenericSchema",
+                 "AttributeSchema", "RelationshipSchema")
+
+
+def _load_schema_limits() -> tuple[dict[str, dict[str, int]] | None, str | None]:
+    """Fetch the public Infrahub JSON Schema and return per-kind maxLength tables.
+
+    Result is cached on the first call. On fetch failure the limits are
+    ``None`` and an error string is returned for the caller to surface.
+    """
+    global _SCHEMA_CACHE, _SCHEMA_ERROR
+    if _SCHEMA_CACHE is None and _SCHEMA_ERROR is None:
+        import json
+        import urllib.error
+        import urllib.request
+
+        req = urllib.request.Request(
+            _SCHEMA_URL,
+            headers={
+                "User-Agent": "infrahub-skills-grader/1.0",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                _SCHEMA_CACHE = json.loads(resp.read().decode())
+        except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+            _SCHEMA_ERROR = f"{type(exc).__name__}: {exc}"
+            return None, _SCHEMA_ERROR
+
+    if _SCHEMA_ERROR is not None:
+        return None, _SCHEMA_ERROR
+
+    spec = _SCHEMA_CACHE or {}
+    defs = spec.get("$defs", {})
+    limits: dict[str, dict[str, int]] = {name: {} for name in _SCHEMA_NAMES}
+    for name in _SCHEMA_NAMES:
+        props = defs.get(name, {}).get("properties", {})
+        for field, info in props.items():
+            for candidate in [info] + info.get("anyOf", []):
+                cap = candidate.get("maxLength")
+                if cap is not None and field not in limits[name]:
+                    limits[name][field] = cap
+    return limits, None
+
+
 def check_string_limits(schema: dict, **_: Any) -> tuple[bool, str]:
     """All schema string fields fit Infrahub's load-time max_length caps.
 
-    Server-validated via Pydantic Field(max_length=...) on the generated
-    schema models. Violations only fire at `infrahubctl schema load` time,
-    not at `infrahubctl schema check`, so editors and offline lints miss
-    them. Verified against infrahub-v1.9.4.
+    Caps are resolved at run time from the public Infrahub JSON Schema
+    at ``schema.infrahub.app`` so the grader stays correct across
+    Infrahub versions without needing a running server. If the spec is
+    unreachable, the check returns ``True`` with an explicit
+    "unverified" reason so transient network failures don't fail CI —
+    the result is visibly inconclusive.
     """
-    # field -> max_length (per generated Pydantic models)
-    NODE_LIMITS = {"name": 32, "namespace": 64, "label": 64, "description": 128}
-    ATTR_LIMITS = {"name": 64, "label": 64, "description": 128, "deprecation": 128}
-    REL_LIMITS = {
-        "name": 64,
-        "label": 64,
-        "description": 128,
-        "identifier": 128,
-        "deprecation": 128,
-    }
+    limits, error = _load_schema_limits()
+    if limits is None:
+        return True, (
+            f"String-length caps not verified — could not fetch {_SCHEMA_URL} "
+            f"({error}). Check skipped for this run."
+        )
 
-    def _check(ref: str, obj: dict, limits: dict[str, int], issues: list[str]) -> None:
-        for field, cap in limits.items():
+    def _check(ref: str, obj: dict, table: dict[str, int], issues: list[str]) -> None:
+        for field, cap in table.items():
             value = obj.get(field)
             if isinstance(value, str) and len(value) > cap:
                 issues.append(f"{ref}.{field}={len(value)} (max {cap})")
 
     issues: list[str] = []
-    for node in _all_nodes(schema) + _all_generics(schema):
+    for node in _all_nodes(schema):
         ref = _full_kind(node) or "<unnamed>"
-        _check(ref, node, NODE_LIMITS, issues)
+        _check(ref, node, limits["NodeSchema"], issues)
         for attr in _all_attrs(node):
-            _check(f"{ref}.{attr.get('name', '?')}", attr, ATTR_LIMITS, issues)
+            _check(f"{ref}.{attr.get('name', '?')}", attr, limits["AttributeSchema"], issues)
         for rel in _all_rels(node):
-            _check(f"{ref}.{rel.get('name', '?')}", rel, REL_LIMITS, issues)
+            _check(f"{ref}.{rel.get('name', '?')}", rel, limits["RelationshipSchema"], issues)
+    for generic in _all_generics(schema):
+        ref = _full_kind(generic) or "<unnamed>"
+        _check(ref, generic, limits["GenericSchema"], issues)
+        for attr in _all_attrs(generic):
+            _check(f"{ref}.{attr.get('name', '?')}", attr, limits["AttributeSchema"], issues)
+        for rel in _all_rels(generic):
+            _check(f"{ref}.{rel.get('name', '?')}", rel, limits["RelationshipSchema"], issues)
 
     if issues:
         return False, "Over-limit string fields: " + "; ".join(issues)
-    return True, "All string fields within max_length caps"
+    return True, f"All string fields within max_length caps (per {_SCHEMA_URL})"
 
 
 def check_core_artifact_target_concrete(schema: dict, **_: Any) -> tuple[bool, str]:

@@ -110,15 +110,19 @@ Names have strict regex patterns:
 
 ### "Name too short/long"
 
+Names have min/max length caps enforced by the
+server's Pydantic models. Hard-coded numbers here go
+stale across Infrahub versions. Resolve them from the
+live OpenAPI spec instead — see
+[validation-string-limits](./rules/validation-string-limits.md)
+for the procedure (`INFRAHUB_ADDRESS` →
+`localhost:8000` fallback → `/api/openapi.json`).
+
 ```text
-# Node name: 2-32 chars
-- name: X                # BAD - too short
-
-# Namespace: 3-64 chars
-- namespace: DC          # BAD - too short
-
-# Attribute/Relationship name: 3-64 chars
-- name: id               # BAD - too short, use "obj_id" or similar
+# Symptoms (live caps come from openapi.json):
+- name: X                # BAD - shorter than the live minLength
+- namespace: DC          # BAD - shorter than the live minLength
+- name: id               # BAD - shorter than the live minLength
 ```
 
 ### "Peer not found"
@@ -261,7 +265,9 @@ Before running `infrahubctl schema check`, verify:
 - [ ] Every schema file starts with `version: "1.0"`
 - [ ] All node/generic names are PascalCase
 - [ ] All namespaces start with uppercase, rest lowercase
-- [ ] All attribute/relationship names are snake_case, 3+ chars
+- [ ] All attribute/relationship names are snake_case
+      (length caps fetched per
+      [validation-string-limits](./rules/validation-string-limits.md))
 - [ ] All relationship `peer` values use full kind (namespace + name)
 - [ ] All bidirectional relationships have matching `identifier` on both sides
 - [ ] All Component relationships have a matching Parent on the other node

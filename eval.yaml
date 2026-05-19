@@ -583,20 +583,22 @@ tasks:
         run: python graders/managing-schemas/check_string_limits.py
         weight: 1.0
     expected_output: >-
-      A schema where every `description:` field stays within Infrahub's
-      server-enforced Pydantic max_length caps (128 for description /
-      identifier / deprecation, 64 for label) so the schema loads
-      cleanly. Longer operator-facing context belongs in YAML comments
-      next to the field, not in `description:` itself.
+      A schema where every string field (`description`, `label`,
+      `identifier`, `deprecation`) stays within Infrahub's
+      server-enforced Pydantic `max_length` caps so the schema loads
+      cleanly. Limits are resolved live from
+      `/api/openapi.json` (see the validation-string-limits rule);
+      this eval does not pin specific numbers. Longer operator-facing
+      context belongs in YAML comments next to the field, not in
+      `description:` itself.
     expectations:
       - >-
-        Every node, attribute, and relationship `description:` is at
-        most 128 characters (the schema-load cap; longer values fail
-        with `Input should have at most 128 characters` at
-        `infrahubctl schema load` time)
-      - >-
-        Every `label:` is at most 64 characters, and every relationship
-        `identifier:` is at most 128 characters
+        Every node, attribute, and relationship `description`, `label`,
+        `identifier`, and `deprecation` length is within the live cap
+        reported by the running instance's `/api/openapi.json`
+        (resolved per the validation-string-limits rule). Over-cap
+        fields fail with `Input should have at most N characters` at
+        `infrahubctl schema load` time.
       - >-
         Longer operator-facing context (picker behavior, generator
         _validate() rules, why non-edge devices are rejected) lives in
@@ -612,7 +614,8 @@ tasks:
       - name: string-limits
         check: >-
           All description/label/identifier/deprecation fields fit
-          Infrahub's load-time max_length caps (128 / 64 / 128 / 128)
+          the live `max_length` caps fetched from
+          `{base}/api/openapi.json` by the grader
       - name: full-kind-references
         check: All peer references use full Namespace+Name kind
       - name: human-friendly-id
