@@ -8,7 +8,10 @@ specific to any single workflow.
 1. **Deployment (deployment-)** -- CRITICAL. Git repository
    integration, CoreRepository vs
    CoreReadOnlyRepository, local dev setup, worker race
-   conditions, file commit requirements.
+   conditions, file commit requirements, and pre-merge
+   dry-run validation of `.gql` queries against a live
+   schema (YAML-check alone misses GraphQL/schema
+   mismatches).
 
 2. **Protocols (protocols-)** -- CRITICAL. Protocol files
    are generated code (`infrahubctl protocols generate`),
