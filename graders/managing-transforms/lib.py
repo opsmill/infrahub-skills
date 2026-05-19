@@ -282,7 +282,10 @@ def check_posts_artifact_generate_endpoint(
         return False, "No Python source to inspect"
     if has_post_to_artifact_generate(tree, py_raw):
         return True, "POST to /api/artifact/generate found"
-    return False, "No POST to /api/artifact/generate found"
+    # Include a short preview on failure so CI logs surface why we missed.
+    # Encode newlines so the JSON payload stays single-line in skillgrade.
+    preview = (py_raw[:400] or "<empty>").replace("\n", "\\n")
+    return False, f"No POST to /api/artifact/generate found. py_raw[:400]={preview}"
 
 
 def check_has_polling_loop(
