@@ -178,11 +178,45 @@ field is over its cap; each violation is printed as
 Compose with `--openapi $BASE_URL` for the Tier 2
 case.
 
+### Red flags — STOP before writing a number
+
+Any of these thoughts means **do not type a cap value
+from memory**. Run `fetch_schema_limits.py` instead.
+
+- "I know `description` is 128 / `name` is 32 from
+  training."
+- "I'll cite *Infrahub's Pydantic models* as the
+  source." (vague — name the URL or run the script.)
+- "I'll assert the number now and add a caveat at
+  the end about confirming with the live spec."
+- "The teammate / user can verify against openapi
+  later."
+- "Just this one field, I'm confident."
+- "Fetching is out of scope for this review."
+
+Training data on these caps is partially wrong —
+field-level testing showed agents confidently
+producing `identifier: 32` when the live cap is
+`128`. A wrong "cap" causes the reviewer to truncate
+real data to fit a non-existent limit. Treat every
+cap value as a live lookup, never a recall.
+
+### Rationalizations and rebuttals
+
+| "But I…" | Rebuttal |
+| -------- | -------- |
+| "…can recall the caps from training" | Training is partially wrong (`identifier` cap mis-recalled as 32 vs the live 128). Recall is not a source. |
+| "…will skip the fetch and add a caveat" | A caveat doesn't make a wrong number right; it just shifts the failure mode from "wrong output" to "wrong output the reader trusts because they skim past the caveat". |
+| "…cited the Pydantic models generally" | Cite the URL of the document you actually read. If you didn't fetch one, you have no source. |
+| "…am only reviewing, the author can verify" | The verification is the review. Punting it makes the rule a no-op. |
+| "…can't reach the network for this run" | Warn and skip — over-cap fields will still be caught at `schema load`. Do not substitute training memory. |
+| "…need a hardcoded fallback for offline CI" | Use `--check`'s skip-on-unreachable behaviour. CI stays green; the result is visibly inconclusive rather than wrong. |
+
 ### Common mistakes
 
 | Mistake | Fix |
 | ------- | --- |
-| Hardcoding 128 / 64 / 32 in skill prose or AI output | Resolve at validation time from the live spec |
+| Hardcoding cap numbers (128 / 64 / 32) in skill prose, eval text, or AI output | Resolve from `fetch_schema_limits.py` at validation time |
 | Reading the raw 66 KB / 100 KB JSON into context | Always pipe through `fetch_schema_limits.py` — output is ~1 KB |
 | Treating `description:` as a design-doc paragraph | One sentence; detail goes in YAML comments or `documentation:` |
 | Falling back to baked-in numbers when both tiers fail | Warn and skip; over-cap fields will be caught at `schema load` |
