@@ -9,7 +9,7 @@ npx skills add opsmill/infrahub-skills
 
 The skills installer will walk through where you want to install the skill (project specific or global), and what agents you want to be able to use it.
 
-To update teh skills:
+To update the skills:
 
 ```bash
 # Update skills
