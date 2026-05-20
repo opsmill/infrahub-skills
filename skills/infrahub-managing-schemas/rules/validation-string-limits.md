@@ -116,15 +116,15 @@ version baked into prose.
 
 ```yaml
 relationships:
-  - name: cpe_handover_interface
+  - name: handoff_interface
     peer: DcimInterface
     kind: Attribute
     description: >-
-      Port on a CSW (customer switch) where the provider's
-      backbone hands traffic off to the customer's CPE. The
-      picker walks SbsDevice → SbsPhysicalInterface via the
-      peer's HFID; pick a CSW device (e.g. csw01.sjc2) and then
-      its handover port. Non-CSW devices are rejected at submit
+      Port on an edge switch where the provider's backbone
+      hands traffic off to a downstream device. The picker
+      walks DcimDevice → DcimInterface via the peer's HFID;
+      pick an edge device (e.g. edge01.lon1) and then its
+      handover port. Non-edge devices are rejected at submit
       by the generator's `_validate()` step.
 ```
 
@@ -133,8 +133,8 @@ Editor and `schema check` pass. `schema load` rejects:
 ```text
 $ infrahubctl schema load schemas/
 Unable to load the schema:
-    Node: SbsL3VPNIntent | Relationship: cpe_handover_interface
-    Port on a CSW (customer switch) where the provider's backbone hands traffic off to the customer's CPE. ...
+    Node: ServiceHandoffIntent | Relationship: handoff_interface
+    Port on an edge switch where the provider's backbone hands traffic off to a downstream device. ...
     | Input should have at most <N> characters (string_too_long)
 ```
 
@@ -142,14 +142,14 @@ Unable to load the schema:
 
 ```yaml
 relationships:
-  # Picker walks SbsDevice → SbsPhysicalInterface via the
-  # peer's HFID. The generator's _validate() step rejects
-  # non-CSW devices at submit, so this relationship only
-  # constrains the picker's *shape*, not its acceptance.
-  - name: cpe_handover_interface
+  # Picker walks DcimDevice → DcimInterface via the peer's
+  # HFID. The generator's _validate() step rejects non-edge
+  # devices at submit, so this relationship only constrains
+  # the picker's *shape*, not its acceptance.
+  - name: handoff_interface
     peer: DcimInterface
     kind: Attribute
-    description: CSW port where provider hands off to the customer CPE.
+    description: Edge port where the backbone hands off to a downstream device.
 ```
 
 `description` surfaces in the UI tooltip and GraphQL
