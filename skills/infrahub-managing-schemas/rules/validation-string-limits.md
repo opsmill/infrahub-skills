@@ -1,18 +1,24 @@
 ---
 title: Schema String-Length Limits
 impact: HIGH
-tags: validation, description, label, identifier, max_length, schema-load, openapi, json-schema
+tags: validation, description, label, identifier, max_length, schema-load, string_too_long, openapi, json-schema, pre-flight
 ---
 
 ## Schema String-Length Limits
 
 Impact: HIGH
 
-Several string fields on schema nodes, attributes, and
-relationships have hard `max_length` caps enforced by
-Pydantic on the server. Violations are not caught by
-YAML editors — they fire at `infrahubctl schema load`
-time as
+### When this rule applies
+
+Use this rule whenever you author or review a schema
+field that takes free text — `description`, `label`,
+`identifier`, `deprecation`, `name`, `namespace` — or
+when triaging an `Input should have at most <N>
+characters` failure from `infrahubctl schema load`.
+
+The cap is enforced by Pydantic on the server. YAML
+editors, `infrahubctl schema check`, and most CI
+linters all silently let over-cap values through:
 
 ```text
 Unable to load the schema:
@@ -20,134 +26,93 @@ Unable to load the schema:
     | Input should have at most <N> characters (string_too_long)
 ```
 
-…which means a schema that "looked fine" all the way
-through review and CI rejects on the apply step. Treat
-`description:` as a one-line tooltip, not a place to
-document picker behavior, validation rules, or change
-history.
+A schema that "looked fine" through review and CI
+will reject only on the apply step. Treat
+`description:` as a one-line tooltip — picker behavior,
+validation rules, and change history belong in
+surrounding YAML comments or in `documentation:`.
 
 ### Source of truth
 
-The caps drift between Infrahub versions, and a static
-table in this rule will go stale. **Resolve them at
-validation time from the live spec, never from prose.**
+Caps drift between Infrahub versions; a static table
+here would go stale silently. Resolve them at
+validation time from one of two equivalent live
+sources:
 
-Two equivalent sources expose the same
-`minLength` / `maxLength` / `pattern` data — use the
-public JSON Schema by default, and fall back to a
-running Infrahub instance only if the public source
-is unreachable.
+1. **Public JSON Schema** —
+   `https://schema.infrahub.app/infrahub/schema/latest.json`.
+   No auth, no running server. Same URL the
+   `# yaml-language-server: $schema=...` IDE hint at
+   the top of every schema file already points at.
+2. **Running Infrahub** — `{BASE_URL}/api/openapi.json`.
+   Identical constraint values, just a heavier path.
 
-### Resolution procedure (2-tier)
+Property tables in [reference.md](../reference.md),
+patterns in [naming-conventions.md](./naming-conventions.md),
+and the guide in [validation.md](../validation.md)
+deliberately carry only the stable regex patterns —
+no length numbers — so the constraints live in
+exactly one place: the live spec.
 
-Both tiers go through the same script —
+### Resolution procedure
+
+Both tiers go through one cross-platform script,
 [`scripts/fetch_schema_limits.py`](../scripts/fetch_schema_limits.py).
-It uses only Python's stdlib (`urllib`) so it runs on
-macOS, Linux, and Windows (cmd.exe / PowerShell)
-without any shell-quoting differences or `curl`
-dependency. The output is a compact (~1 KB) JSON
-object — **read only that into your context, never
-the 66 KB raw schema file or the 100 KB raw OpenAPI
-spec.**
-
-#### Tier 1 — Public JSON Schema (preferred)
-
-The same URL referenced in every schema file's
-`# yaml-language-server: $schema=...` IDE hint carries
-every constraint. It is a public CDN URL, no auth, no
-running server required.
+It uses only Python's stdlib so it runs identically
+on macOS, Linux, and Windows. Output is ~1 KB of
+JSON keyed by `NodeSchema`, `GenericSchema`,
+`AttributeSchema`, `RelationshipSchema` — **read only
+that into context, never the raw 66 KB schema or
+100 KB OpenAPI document.**
 
 ```bash
+# Tier 1 — public JSON Schema (default)
 python skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py
 ```
 
-Exit code `0` means the constraints landed on stdout.
-Exit `1` means the source was unreachable (a
-diagnostic is on stderr) — fall through to Tier 2.
+Exit 0 means the constraints are on stdout. Exit 1
+means the source is unreachable — diagnostic on
+stderr — fall through to Tier 2.
 
-#### Tier 2 — Running Infrahub `/api/openapi.json` (fallback)
-
-If Tier 1 fails (DNS, non-2xx, timeout), defer
-connectivity probing to
-[connectivity-server-check.md](../../infrahub-common/rules/connectivity-server-check.md).
-That rule handles `infrahubctl info`, the
-`INFRAHUB_ADDRESS` environment variable, the Python
-environment detection, and the troubleshooting flow —
-do not duplicate any of it here.
-
-Once a reachable Infrahub `BASE_URL` has been
-established by that rule, hand the URL to the same
-script with `--openapi`:
+Tier 2 defers connectivity probing to
+[connectivity-server-check.md](../../infrahub-common/rules/connectivity-server-check.md)
+(it owns `INFRAHUB_ADDRESS`, `infrahubctl info`, and
+the troubleshooting flow — do not duplicate any of it
+here). Once it has established a reachable
+`BASE_URL`:
 
 ```bash
+# Tier 2 — running Infrahub /api/openapi.json (fallback)
 python skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py \
   --openapi "$BASE_URL"
 ```
 
 The script normalises the OpenAPI naming difference
-(`AttributeSchema-Input` → `AttributeSchema`)
-internally, so the downstream check keys against the
-same names (`NodeSchema`, `GenericSchema`,
-`AttributeSchema`, `RelationshipSchema`) regardless
-of which tier produced the data.
+(`AttributeSchema-Input` → `AttributeSchema`), so the
+output structure is identical regardless of source.
 
-#### Tier 3 — Both unreachable
+If both tiers fail, **do not fall back to hardcoded
+numbers**. Warn the user that string-length
+validation cannot be performed for this run and
+continue with the rest of the review — regex
+patterns can still be checked offline against
+[naming-conventions.md](./naming-conventions.md).
 
-If Tier 1 and the connectivity check in Tier 2 both
-fail, stop the length validation and tell the user:
+### Field-to-key map
 
-```text
-Could not reach https://schema.infrahub.app/infrahub/schema/latest.json,
-and no running Infrahub instance was found via
-connectivity-server-check. String-length validation
-cannot be performed for this run.
-```
-
-Do not fall back to numbers baked into this rule.
-Continue with the rest of the schema review — patterns
-can still be checked offline against the regex in
-[naming-conventions.md](./naming-conventions.md) — but
-flag explicitly that length checks were skipped.
-
-### Validation
-
-Use the filtered dict (from whichever tier succeeded)
-to validate every node, generic, attribute, and
-relationship in the user's YAML. Keys map directly:
-
-| Schema field | Filtered-dict path |
-| ------------ | ------------------ |
+| Schema field | Lookup key in the script's output |
+| ------------ | --------------------------------- |
 | Node / Generic `name`, `namespace`, `label`, `description` | `NodeSchema.<field>` / `GenericSchema.<field>` |
 | Attribute `name`, `label`, `description`, `deprecation` | `AttributeSchema.<field>` |
 | Relationship `name`, `label`, `description`, `identifier`, `deprecation` | `RelationshipSchema.<field>` |
 
-For each over-cap field, emit an error of the form
-`{kind}.{field}: <len> chars (max <cap>, from <source-url>)` so the source of the cap is
-auditable. Always cite the actual URL — never the
-version of Infrahub baked into prose.
+Each key carries `minLength`, `maxLength`, and/or
+`pattern`. Emit over-cap errors as
+`{kind}.{field}: <len> chars (max <cap>, from <source-url>)`
+so the source is auditable — cite the URL, never a
+version baked into prose.
 
-### Why this rule does not list the numbers
-
-The reference here is the *contract* (live sources,
-fetch procedure, fallback behavior), not the
-*values*. Listing numbers in markdown puts the
-constraints in two places — they drift, and the
-silent failure mode is a wrong number in this file
-that the AI propagates into a generated schema.
-Always read the live spec.
-
-For the same reason, the property tables in
-[reference.md](../reference.md), the patterns in
-[naming-conventions.md](./naming-conventions.md),
-and the validation guide in
-[validation.md](../validation.md) all carry the
-regex patterns (which are stable) but do not list
-length numbers. They point back to this rule.
-
-### Incorrect
-
-A long, helpful-looking description that paste
-straight from a design doc:
+### Incorrect — description used as a design doc
 
 ```yaml
 relationships:
@@ -163,8 +128,7 @@ relationships:
       by the generator's `_validate()` step.
 ```
 
-At schema-load time, against any current Infrahub
-(check the live cap with the procedure above):
+Editor and `schema check` pass. `schema load` rejects:
 
 ```text
 $ infrahubctl schema load schemas/
@@ -174,11 +138,7 @@ Unable to load the schema:
     | Input should have at most <N> characters (string_too_long)
 ```
 
-### Correct
-
-Short, tooltip-sized `description:`. Put the
-operator-facing detail in a YAML comment so it lives
-in the file but doesn't fight the limit:
+### Correct — short description, detail in a comment
 
 ```yaml
 relationships:
@@ -192,180 +152,38 @@ relationships:
     description: CSW port where provider hands off to the customer CPE.
 ```
 
-`description` is what shows up in the UI tooltip and
-the GraphQL introspection — it should be one sentence
-a user can read at a glance. Anything longer belongs
-in surrounding YAML/Python comments, in
-`documentation:` (a free-text URL field, currently
-uncapped — confirm against the live spec), or in the
-project's design docs.
+`description` surfaces in the UI tooltip and GraphQL
+introspection — one sentence the operator reads at a
+glance. Operator detail goes in surrounding comments
+or in `documentation:` (a free-text URL field —
+confirm its cap against the live spec if you fill
+it).
 
-### Pre-flight check
+### Pre-flight check (CI / pre-commit)
 
-`infrahubctl schema load` is too late — by then
-you've already pushed the branch. Drop this into
-project CI or a pre-commit hook to catch the
-violation locally. The script below uses the same
-2-tier source so it stays correct across Infrahub
-upgrades and runs without a server when the public
-schema is reachable:
+`infrahubctl schema load` is too late: the branch is
+already pushed. The same script's `--check` mode
+validates files locally against the live caps:
 
-```python
-# scripts/check_schema_string_limits.py
-"""Validate schema YAML string lengths against the live
-Infrahub schema constraints. Tier 1: public JSON Schema
-at schema.infrahub.app. Tier 2: /api/openapi.json on the
-INFRAHUB_ADDRESS server (when set). Skip with a clear
-warning if neither is reachable — do not fall back to
-hardcoded numbers."""
-from __future__ import annotations
-
-import json
-import os
-import sys
-import urllib.error
-import urllib.request
-from pathlib import Path
-
-import yaml
-
-PUBLIC_SCHEMA_URL = "https://schema.infrahub.app/infrahub/schema/latest.json"
-
-# (openapi_schema_name, normalized_key)
-OPENAPI_SCHEMAS = (
-    ("NodeSchema", "NodeSchema"),
-    ("GenericSchema", "GenericSchema"),
-    ("AttributeSchema-Input", "AttributeSchema"),
-    ("RelationshipSchema", "RelationshipSchema"),
-)
-
-JSON_SCHEMA_NAMES = ("NodeSchema", "GenericSchema",
-                     "AttributeSchema", "RelationshipSchema")
-
-
-def _fetch(url: str) -> dict | None:
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": "infrahub-skills/1.0",
-            "Accept": "application/json",
-        },
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read().decode())
-    except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
-        print(f"WARNING: {url} unreachable ({exc}).", file=sys.stderr)
-        return None
-
-
-def _merge(info: dict) -> dict:
-    """Merge minLength/maxLength/pattern across anyOf branches."""
-    merged: dict[str, int | str] = {}
-    for c in [info] + info.get("anyOf", []):
-        for k in ("minLength", "maxLength", "pattern"):
-            if k in c and k not in merged:
-                merged[k] = c[k]
-    return merged
-
-
-def load_caps() -> tuple[dict[str, dict[str, dict]] | None, str | None]:
-    """Return ({SchemaName: {field: {min/max/pattern}}}, source_url) or (None, None)."""
-    spec = _fetch(PUBLIC_SCHEMA_URL)
-    if spec is not None:
-        defs = spec.get("$defs", {})
-        out = {
-            name: {f: _merge(info) for f, info in defs.get(name, {}).get("properties", {}).items() if _merge(info)}
-            for name in JSON_SCHEMA_NAMES
-        }
-        return out, PUBLIC_SCHEMA_URL
-
-    # Tier 2: fall back to a running server per
-    # connectivity-server-check.md. INFRAHUB_ADDRESS is the
-    # one variable that rule exposes for the address — do not
-    # invent a localhost fallback here.
-    base = (os.environ.get("INFRAHUB_ADDRESS") or "").rstrip("/")
-    if not base:
-        return None, None
-    url = f"{base}/api/openapi.json"
-    spec = _fetch(url)
-    if spec is None:
-        return None, None
-    schemas = spec.get("components", {}).get("schemas", {})
-    out = {}
-    for openapi_name, key in OPENAPI_SCHEMAS:
-        props = schemas.get(openapi_name, {}).get("properties", {})
-        out[key] = {f: _merge(info) for f, info in props.items() if _merge(info)}
-    return out, url
-
-
-def walk(doc: dict, file_path: str, caps: dict) -> list[str]:
-    issues: list[str] = []
-
-    def check(ref: str, obj: dict, table: dict[str, dict]) -> None:
-        for field, info in table.items():
-            cap = info.get("maxLength")
-            if cap is None:
-                continue
-            value = obj.get(field)
-            if isinstance(value, str) and len(value) > cap:
-                issues.append(f"{ref}.{field}: {len(value)} chars (max {cap})")
-
-    kind_to_schema = {"nodes": "NodeSchema", "generics": "GenericSchema"}
-    for kind, schema_key in kind_to_schema.items():
-        for node in doc.get(kind, []) or []:
-            ref = f"{file_path}:{node.get('namespace', '?')}{node.get('name', '?')}"
-            check(ref, node, caps[schema_key])
-            for attr in node.get("attributes", []) or []:
-                check(f"{ref}.{attr.get('name', '?')}", attr, caps["AttributeSchema"])
-            for rel in node.get("relationships", []) or []:
-                check(f"{ref}.{rel.get('name', '?')}", rel, caps["RelationshipSchema"])
-    return issues
-
-
-def main() -> int:
-    caps, source = load_caps()
-    if caps is None:
-        print(
-            "WARNING: Could not reach the public schema or a configured "
-            "Infrahub instance. String-length validation cannot be "
-            "performed for this run.",
-            file=sys.stderr,
-        )
-        return 0
-    print(f"# string-length caps resolved from {source}", file=sys.stderr)
-    all_issues: list[str] = []
-    for path in sys.argv[1:]:
-        doc = yaml.safe_load(Path(path).read_text()) or {}
-        all_issues.extend(walk(doc, path, caps))
-    for line in all_issues:
-        print(line)
-    return 1 if all_issues else 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+```bash
+python skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py \
+  --check schemas/*.yml
 ```
 
-Run as
-`python scripts/check_schema_string_limits.py schemas/*.yml`.
+Exit 0 if all files pass *or* if the live source is
+unreachable (warning on stderr — skip-on-unreachable
+keeps CI green during transient blips). Exit 1 if any
+field is over its cap; each violation is printed as
+`{path}:{Kind}.{field}: <len> chars (max <cap>)`.
+Compose with `--openapi $BASE_URL` for the Tier 2
+case.
 
-### Why this isn't enforced earlier
+### Common mistakes
 
-The schema-load validator is the Pydantic models
-generated under
-`backend/infrahub/core/schema/generated/`. The
-public JSON Schema at
-`https://schema.infrahub.app/infrahub/schema/latest.json`
-mirrors the same `maxLength` / `minLength` /
-`pattern` constraints — which is why this rule
-prefers it as the primary source. The
-`# yaml-language-server: $schema=...` comment in
-every schema file points editors at the same URL,
-so a properly configured IDE will warn on over-cap
-strings inline. CI that runs `infrahubctl schema
-check` against only naming patterns (and skips
-length validation) still misses the failure mode
-this rule guards against — which is why the
-pre-flight script above explicitly validates
-lengths.
+| Mistake | Fix |
+| ------- | --- |
+| Hardcoding 128 / 64 / 32 in skill prose or AI output | Resolve at validation time from the live spec |
+| Reading the raw 66 KB / 100 KB JSON into context | Always pipe through `fetch_schema_limits.py` — output is ~1 KB |
+| Treating `description:` as a design-doc paragraph | One sentence; detail goes in YAML comments or `documentation:` |
+| Falling back to baked-in numbers when both tiers fail | Warn and skip; over-cap fields will be caught at `schema load` |
+| Inventing a `localhost:8000` fallback inside this rule | Tier 2 owns connectivity via `connectivity-server-check.md` |
