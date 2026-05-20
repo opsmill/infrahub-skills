@@ -1,0 +1,20 @@
+dev/guides/adding-a-skill.md
+  s_e06e0c591afd7a::t_7bc52d6be75680 306-307
+  s_e06e0c591afd7a::t_5b44f4ff90e0b6 256-261
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "7cc42af94ddbe899351a0c8e0d1339391056a1da",
+  "prompts": {},
+  "sessions": {
+    "s_e06e0c591afd7a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9f29bcc7-b493-4738-9f07-4fb0633f35a6",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Benoit Kohler <bkohler@bearchitek.com>"
+    }
+  }
+}
