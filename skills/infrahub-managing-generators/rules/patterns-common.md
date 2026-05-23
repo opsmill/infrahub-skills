@@ -44,7 +44,9 @@ def clean_data(data):
 
 ```python
 async def generate(self, data: dict) -> None:
-    for element in design["elements"]:
+    # Sort by role for deterministic ordering across runs — see
+    # python-stable-iteration.md
+    for element in sorted(design["elements"], key=lambda e: e["role"]):
         quantity = element["quantity"]
         role = element["role"]
 

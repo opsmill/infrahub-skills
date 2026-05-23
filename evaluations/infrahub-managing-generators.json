@@ -1,0 +1,159 @@
+{
+  "skill_name": "infrahub-managing-generators",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create an Infrahub generator that builds DCIM devices from a\n`TopologyDataCenter` design object. The design has an `elements` list,\nwhere each element has a `role` (string) and a `quantity` (integer). For\neach element, create `quantity` `DcimDevice` objects whose names follow\nthe pattern `{topology_name}-{role}-{i:02d}` (e.g. `dc1-spine-01`).\n\nThe design also exposes `expected_element_count` (integer) so consumers\ncan confirm they received the full element list.\n\nWrite ONLY the Python generator class (no GraphQL query, no\n.infrahub.yml, no schema). Save it to: generators/generate_dc.py",
+      "expected_output": "A Python file with an InfrahubGenerator subclass implementing async generate(self, data). Before any object creation, it validates that len(elements) equals expected_element_count and raises on mismatch. It iterates elements via sorted(...) and uses range() for the per-quantity loop. Every .save() call passes allow_upsert=True.",
+      "files": [],
+      "expectations": [
+        "File defines a class inheriting from InfrahubGenerator",
+        "generate() validates the element count against expected_element_count before creating any object",
+        "The outer iteration over elements uses sorted(...) with a key",
+        "The inner per-quantity loop uses range()",
+        "Every .save() call passes allow_upsert=True"
+      ],
+      "assertions": [
+        {
+          "name": "allow-upsert-everywhere",
+          "check": "Every .save() call passes allow_upsert=True"
+        },
+        {
+          "name": "upstream-count-validation",
+          "check": "generate() validates element count via len() before any .create() call"
+        },
+        {
+          "name": "stable-iteration",
+          "check": "Every create-loop iterates sorted() or range(), never a raw GraphQL response list"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Create an Infrahub generator that builds DCIM interfaces for each\ndevice in a `DcimDeviceTemplate`. The template has an `interfaces` list\nand an `interface_count` integer that should match the list length. The\ngenerator must be safe to re-run after partial GraphQL responses without\nsilently deleting previously-created interfaces, so handle incomplete\nupstream data correctly.\n\nFor each interface in the template, create a `DcimInterface` named\n`{device_name}-{interface_name}`.\n\nWrite ONLY the Python generator class. Save it to:\ngenerators/generate_interfaces.py",
+      "expected_output": "A Python file whose generate() compares len(interfaces) against interface_count and raises (or otherwise aborts) on mismatch, BEFORE any await self.client.create(...) call. It iterates interfaces via sorted(...) with a stable key. Every .save() passes allow_upsert=True.",
+      "files": [],
+      "expectations": [
+        "generate() raises or aborts on count mismatch BEFORE any .create() call",
+        "The interface iteration uses sorted(...) with a stable key",
+        "Every .save() call passes allow_upsert=True",
+        "The validation does NOT use truthiness (`if interfaces:`) alone"
+      ],
+      "assertions": [
+        {
+          "name": "allow-upsert-everywhere",
+          "check": "Every .save() call passes allow_upsert=True"
+        },
+        {
+          "name": "upstream-count-validation",
+          "check": "generate() validates interface count via len() before any .create() call"
+        },
+        {
+          "name": "stable-iteration",
+          "check": "Every create-loop iterates sorted() or range()"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Create an Infrahub generator that allocates `OrgContact` objects\nfor each role defined in a `ProjectStaffing` object. Staffing has a\n`roles` list (each with `name` and `headcount`) and a `total_roles`\ninteger. For each role, create `headcount` contacts named\n`{project_name}-{role_name}-{i:02d}`.\n\nThe generator will be re-run on every branch update. Re-runs must\nproduce byte-identical output when the upstream design hasn't changed.\n\nWrite ONLY the Python generator class. Save it to:\ngenerators/generate_contacts.py",
+      "expected_output": "A Python file whose generate() iterates the roles list via sorted(...) with a stable key (role name), uses range() for the per-headcount loop, validates len(roles) against total_roles before creating, and passes allow_upsert=True on every save.",
+      "files": [],
+      "expectations": [
+        "The outer iteration over roles uses sorted(...) with a stable key",
+        "The inner per-headcount loop uses range()",
+        "generate() validates len(roles) against total_roles before any .create() call",
+        "Every .save() call passes allow_upsert=True"
+      ],
+      "assertions": [
+        {
+          "name": "stable-iteration",
+          "check": "Outer role loop wraps the iterable in sorted() with a stable key"
+        },
+        {
+          "name": "allow-upsert-everywhere",
+          "check": "Every .save() call passes allow_upsert=True"
+        },
+        {
+          "name": "upstream-count-validation",
+          "check": "generate() validates role count via len() before any .create() call"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "This is the UPSTREAM generator in a two-generator cascade.\n\nProduce TWO files:\n\n1. A schema YAML at: schema.yml\n   - Defines a `DcimDevice` node (namespace Dcim, name Device).\n   - The device MUST inherit from `GeneratorTarget` so a downstream\n     generator can use its checksum attribute.\n   - Include attributes: name (Text), role (Text).\n\n2. A Python generator at: generators/generate_devices.py\n   - Reads a `TopologyDataCenter` design with an `elements` list\n     (each element has `role` and `quantity`) and an\n     `expected_element_count` integer.\n   - Creates `quantity` `DcimDevice` objects per element, named\n     `{topology_name}-{role}-{i:02d}`.\n   - Creates ONLY `DcimDevice` (one kind, one layer).\n   - Validates element count, iterates deterministically, uses\n     allow_upsert=True.\n\nDo NOT include .infrahub.yml or any other files.",
+      "expected_output": "A schema.yml with DcimDevice inheriting from GeneratorTarget AND a generator class that creates only DcimDevice objects, with count validation, sorted iteration, and allow_upsert=True on every save.",
+      "files": [],
+      "expectations": [
+        "schema.yml defines a Device node with inherit_from including GeneratorTarget",
+        "The generator file creates ONLY DcimDevice objects (one kind)",
+        "generate() validates len(elements) against expected_element_count",
+        "The element loop uses sorted(...) with a stable key",
+        "Every .save() passes allow_upsert=True"
+      ],
+      "assertions": [
+        {
+          "name": "cascade-target-inheritance",
+          "check": "schema.yml has a node inheriting from GeneratorTarget"
+        },
+        {
+          "name": "cascade-one-layer",
+          "check": "The generator file creates exactly one literal kind"
+        },
+        {
+          "name": "upstream-count-validation",
+          "check": "generate() validates element count via len() before any .create()"
+        },
+        {
+          "name": "stable-iteration",
+          "check": "Create-loops iterate sorted() or range()"
+        },
+        {
+          "name": "allow-upsert-everywhere",
+          "check": "Every .save() call passes allow_upsert=True"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "This is the DOWNSTREAM generator in a two-generator cascade.\n\nThe GraphQL response includes:\n\n- `DcimDevice.edges` \u2014 the devices to process. Each device carries a\n  `checksum` attribute because the upstream schema makes Device\n  inherit from GeneratorTarget.\n- `expected_device_count` (integer) \u2014 the number of devices the\n  upstream design expects to be present, so this generator can guard\n  against partial GraphQL responses.\n\nThe generator must create one `DcimInterfaceManagement` per device,\nnamed `{device_name}-mgmt0`.\n\nRequirements:\n\n- Define a module-level `GENERATOR_VERSION` string constant.\n- Validate that `len(devices) == expected_device_count` before any\n  creation. Raise on mismatch.\n- Compute a checksum (hashlib) over inputs, prefixed by\n  `GENERATOR_VERSION`, for each device.\n- Use the checksum to skip work when the downstream is already in\n  sync (an `if` whose body either short-circuits with `continue` or\n  gates the create/save call works equally well).\n- When work runs, write the new checksum back to the device.\n- Create only ONE kind of object (DcimInterfaceManagement).\n- Iterate devices via sorted(...) with a stable key.\n- Every `.save()` passes `allow_upsert=True`.\n\nWrite ONLY the Python generator. Save it to:\ngenerators/generate_mgmt_interfaces.py",
+      "expected_output": "A Python file that defines GENERATOR_VERSION at module scope, imports hashlib (or similar), validates len(devices) against expected_device_count before any creation, and contains a checksum-based if statement that either short-circuits with continue or gates the create/save call directly. The generator creates only DcimInterfaceManagement and passes allow_upsert=True on every save.",
+      "files": [],
+      "expectations": [
+        "Module defines GENERATOR_VERSION as a string constant",
+        "generate() validates len(devices) against expected_device_count before any .create()",
+        "generate() contains a checksum-referencing if statement whose body either short-circuits (continue/return/break) or contains a .create()/.save() call \u2014 direction of comparison is up to the generator",
+        "The generator creates only ONE kind (DcimInterfaceManagement)",
+        "The device iteration uses sorted(...) with a stable key",
+        "Every .save() passes allow_upsert=True"
+      ],
+      "assertions": [
+        {
+          "name": "cascade-version-constant",
+          "check": "Module-level GENERATOR_VERSION constant is defined"
+        },
+        {
+          "name": "cascade-checksum-guard",
+          "check": "A checksum-referencing if statement gates work (body short-circuits or contains create/save)"
+        },
+        {
+          "name": "cascade-one-layer",
+          "check": "The generator file creates exactly one literal kind"
+        },
+        {
+          "name": "upstream-count-validation",
+          "check": "generate() validates device count via len() before any .create() call"
+        },
+        {
+          "name": "stable-iteration",
+          "check": "Create-loops iterate sorted() or range()"
+        },
+        {
+          "name": "allow-upsert-everywhere",
+          "check": "Every .save() call passes allow_upsert=True"
+        }
+      ]
+    }
+  ]
+}
