@@ -47,6 +47,9 @@
    state: absent. Strategies for non-breaking schema
    changes.
 
-9. **Validation (validation-)** — LOW. Common
-   validation errors and their fixes. Pre-validation
-   checklist before running infrahubctl schema check.
+9. **Validation (validation-)** — HIGH for
+   string-length caps (load-time `string_too_long`
+   on `description` / `label` / `identifier` /
+   `deprecation`), otherwise LOW. Pre-validation
+   checklist and common error messages with
+   cross-links to the detail rules.
