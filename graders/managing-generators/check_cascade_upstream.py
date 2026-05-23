@@ -20,6 +20,12 @@ CHECKS = [
     "allow-upsert-everywhere",
     "upstream-count-validation",
     "stable-iteration",
+    "kind-literal",
+    "no-broad-except",
+    "no-early-return",
+    "no-self-read-after-create",
+    "filters-parallel",
+    "upstream-update-group-context",
     "cascade-one-layer",
     "cascade-target-inheritance",
 ]

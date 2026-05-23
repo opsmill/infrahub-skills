@@ -9,7 +9,10 @@
    InfrahubGenerator base class, async generate() method,
    object creation via self.client.create(), save with
    allow_upsert=True, relationship references by ID,
-   stable iteration in create-loops.
+   stable iteration in create-loops, string-literal
+   ``kind=`` arguments, no broad except, no early return
+   after creates, no self-read of just-created kinds, and
+   ``parallel=True`` on ``.filters(...)`` calls.
 
 3. **Validation (validation-)** -- CRITICAL.
    Upstream count checks before creating anything. Guards
@@ -23,9 +26,12 @@
    single-generator solutions; see SKILL.md Step 2 for the
    topology choice.
 
-5. **Tracking (tracking-)** -- HIGH. Automatic cleanup of
-   stale objects via delete_unused_nodes=True, idempotent
-   behavior, why allow_upsert is essential.
+5. **Tracking (tracking-)** -- CRITICAL. Automatic cleanup
+   of stale objects via delete_unused_nodes=True,
+   idempotent behavior, why allow_upsert is essential, and
+   why nodes fetched (not created) by the generator must
+   save with ``update_group_context=False`` to avoid being
+   deleted on the next run.
 
 6. **API Reference (api-)** -- HIGH. Constructor parameters,
    instance properties (client, nodes, store, branch), key

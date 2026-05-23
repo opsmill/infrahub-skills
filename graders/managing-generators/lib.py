@@ -296,6 +296,300 @@ def check_stable_iteration(root: Path, **_: Any) -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
+# Check functions — extended universal tier (Tier A from bottleneck research)
+# ---------------------------------------------------------------------------
+
+
+def check_kind_literal(root: Path, **_: Any) -> tuple[bool, str]:
+    """Every ``kind=`` argument to ``.create(...)`` must be a string literal.
+
+    Dynamic kinds (``kind=device_type``, ``kind=my_var.value``) defeat static
+    analysis on the cascade-one-layer check and obscure intent. They almost
+    always reflect either confused control flow or a missing schema-driven
+    helper.
+    """
+    files = find_generator_files(root)
+    if not files:
+        return False, "No generator .py files found"
+
+    for f in files:
+        tree = parse_python(f)
+        if tree is None:
+            return False, f"Could not parse {f.name}"
+        for gen_fn in generate_methods(tree):
+            for call in create_calls(gen_fn):
+                for kw in call.keywords:
+                    if kw.arg != "kind":
+                        continue
+                    if not (
+                        isinstance(kw.value, ast.Constant)
+                        and isinstance(kw.value.value, str)
+                    ):
+                        return (
+                            False,
+                            f"{f.name}:{call.lineno}: kind= must be a string "
+                            f"literal, not a variable/attribute",
+                        )
+
+    return True, "All .create(kind=...) values are string literals"
+
+
+def check_no_broad_except(root: Path, **_: Any) -> tuple[bool, str]:
+    """``generate()`` must not swallow ``Exception`` (or bare except) silently.
+
+    Catching broad exceptions without re-raising lets the tracking context exit
+    "successfully" while leaving the in-memory ``related_node_ids`` list
+    inconsistent. ``delete_unused_nodes=True`` then deletes objects the
+    generator meant to keep on the next run. Re-raise or narrow the catch.
+    """
+    files = find_generator_files(root)
+    if not files:
+        return False, "No generator .py files found"
+
+    for f in files:
+        tree = parse_python(f)
+        if tree is None:
+            return False, f"Could not parse {f.name}"
+        for gen_fn in generate_methods(tree):
+            for node in ast.walk(gen_fn):
+                if not isinstance(node, ast.ExceptHandler):
+                    continue
+                is_broad = node.type is None or (
+                    isinstance(node.type, ast.Name)
+                    and node.type.id in ("Exception", "BaseException")
+                )
+                if not is_broad:
+                    continue
+                has_raise = any(
+                    isinstance(stmt, ast.Raise) for stmt in ast.walk(node)
+                )
+                if not has_raise:
+                    return (
+                        False,
+                        f"{f.name}:{node.lineno}: broad except without "
+                        f"re-raise — silent failure leaks tracking state",
+                    )
+
+    return True, "No broad except without re-raise"
+
+
+def check_no_early_return(root: Path, **_: Any) -> tuple[bool, str]:
+    """``return`` must not appear after the first ``.create()``/``.save()``.
+
+    An early return after partial creates exits the tracking context without
+    finalizing the group — the saved nodes become orphans the tracking system
+    can no longer find on subsequent runs.
+    """
+    files = find_generator_files(root)
+    if not files:
+        return False, "No generator .py files found"
+
+    for f in files:
+        tree = parse_python(f)
+        if tree is None:
+            return False, f"Could not parse {f.name}"
+        for gen_fn in generate_methods(tree):
+            first_mutating_call_lineno: int | None = None
+            for node in ast.walk(gen_fn):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                if isinstance(func, ast.Attribute) and func.attr in (
+                    "create",
+                    "save",
+                ):
+                    if (
+                        first_mutating_call_lineno is None
+                        or node.lineno < first_mutating_call_lineno
+                    ):
+                        first_mutating_call_lineno = node.lineno
+
+            if first_mutating_call_lineno is None:
+                continue
+
+            for node in ast.walk(gen_fn):
+                if (
+                    isinstance(node, ast.Return)
+                    and node.lineno > first_mutating_call_lineno
+                ):
+                    return (
+                        False,
+                        f"{f.name}:{node.lineno}: return after .create()/"
+                        f".save() at line {first_mutating_call_lineno} — "
+                        f"partial commit, tracking group not finalized",
+                    )
+
+    return True, "No return after first .create()/.save()"
+
+
+def check_no_self_read_after_create(root: Path, **_: Any) -> tuple[bool, str]:
+    """Don't ``.get(kind=X)`` after a ``.create(kind=X)`` in the same generate().
+
+    The created object is already in scope as a local variable. A fresh
+    ``.get()`` is a full HTTP round-trip and may see stale read-replica data —
+    use the local SDK object directly or pass it through ``self.store``.
+    """
+    files = find_generator_files(root)
+    if not files:
+        return False, "No generator .py files found"
+
+    for f in files:
+        tree = parse_python(f)
+        if tree is None:
+            return False, f"Could not parse {f.name}"
+        for gen_fn in generate_methods(tree):
+            created_by_lineno: dict[int, str] = {}
+            for call in create_calls(gen_fn):
+                for kw in call.keywords:
+                    if (
+                        kw.arg == "kind"
+                        and isinstance(kw.value, ast.Constant)
+                        and isinstance(kw.value.value, str)
+                    ):
+                        created_by_lineno[call.lineno] = kw.value.value
+
+            if not created_by_lineno:
+                continue
+
+            for node in ast.walk(gen_fn):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                if not (isinstance(func, ast.Attribute) and func.attr == "get"):
+                    continue
+                get_kind = None
+                for kw in node.keywords:
+                    if (
+                        kw.arg == "kind"
+                        and isinstance(kw.value, ast.Constant)
+                        and isinstance(kw.value.value, str)
+                    ):
+                        get_kind = kw.value.value
+                        break
+                if get_kind is None:
+                    continue
+                for create_lineno, kind in created_by_lineno.items():
+                    if kind == get_kind and create_lineno < node.lineno:
+                        return (
+                            False,
+                            f"{f.name}:{node.lineno}: .get(kind={kind!r}) "
+                            f"after earlier .create(kind={kind!r}) at line "
+                            f"{create_lineno} — use the local SDK object",
+                        )
+
+    return True, "No .get() after .create() of the same kind"
+
+
+def check_filters_parallel(root: Path, **_: Any) -> tuple[bool, str]:
+    """``self.client.filters(...)`` calls inside ``generate()`` must pass
+    ``parallel=True``.
+
+    The SDK's filter pagination is sequential by default
+    (``client.py:849-919``, ``pagination_size=50``); for fan-outs greater than
+    50 items this adds a round-trip per page. Generators routinely operate at
+    that scale, so always pass ``parallel=True``.
+    """
+    files = find_generator_files(root)
+    if not files:
+        return False, "No generator .py files found"
+
+    for f in files:
+        tree = parse_python(f)
+        if tree is None:
+            return False, f"Could not parse {f.name}"
+        for gen_fn in generate_methods(tree):
+            for node in ast.walk(gen_fn):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                if not (
+                    isinstance(func, ast.Attribute) and func.attr == "filters"
+                ):
+                    continue
+                has_parallel = any(
+                    kw.arg == "parallel"
+                    and isinstance(kw.value, ast.Constant)
+                    and kw.value.value is True
+                    for kw in node.keywords
+                )
+                if not has_parallel:
+                    return (
+                        False,
+                        f"{f.name}:{node.lineno}: .filters(...) without "
+                        f"parallel=True — default is sequential pagination",
+                    )
+
+    return True, "All .filters() calls pass parallel=True"
+
+
+def check_upstream_update_group_context(root: Path, **_: Any) -> tuple[bool, str]:
+    """Saves on nodes that were fetched via ``.get(...)`` must pass
+    ``update_group_context=False``.
+
+    Inside ``generate()`` the SDK client is in TRACKING mode. ``node.save()``
+    auto-enrolls the node in the generator's ``CoreGeneratorGroup``. On the
+    next run, if the generator doesn't touch that node again,
+    ``delete_unused_nodes=True`` will delete the upstream node the generator
+    only intended to modify. Opt out for any node you didn't create.
+    """
+    files = find_generator_files(root)
+    if not files:
+        return False, "No generator .py files found"
+
+    for f in files:
+        tree = parse_python(f)
+        if tree is None:
+            return False, f"Could not parse {f.name}"
+        for gen_fn in generate_methods(tree):
+            fetched_vars: set[str] = set()
+            for stmt in ast.walk(gen_fn):
+                if not isinstance(stmt, ast.Assign):
+                    continue
+                value = stmt.value
+                # Unwrap `await <expr>`
+                if isinstance(value, ast.Await):
+                    value = value.value
+                if not isinstance(value, ast.Call):
+                    continue
+                func = value.func
+                if not (isinstance(func, ast.Attribute) and func.attr == "get"):
+                    continue
+                for target in stmt.targets:
+                    if isinstance(target, ast.Name):
+                        fetched_vars.add(target.id)
+
+            if not fetched_vars:
+                continue
+
+            for node in ast.walk(gen_fn):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                if not (isinstance(func, ast.Attribute) and func.attr == "save"):
+                    continue
+                receiver = func.value
+                if not (
+                    isinstance(receiver, ast.Name) and receiver.id in fetched_vars
+                ):
+                    continue
+                has_opt_out = any(
+                    kw.arg == "update_group_context"
+                    and isinstance(kw.value, ast.Constant)
+                    and kw.value.value is False
+                    for kw in node.keywords
+                )
+                if not has_opt_out:
+                    return (
+                        False,
+                        f"{f.name}:{node.lineno}: .save() on fetched node "
+                        f"{receiver.id!r} must pass update_group_context=False "
+                        f"to avoid enrolling upstream nodes in tracking",
+                    )
+
+    return True, "All saves on fetched nodes opt out of group context"
+
+
+# ---------------------------------------------------------------------------
 # Check functions — cascade tier (conditional, applies only when building
 # modular cascading generators)
 # ---------------------------------------------------------------------------
@@ -523,6 +817,12 @@ CHECKS: dict[str, Any] = {
     "allow-upsert-everywhere": check_allow_upsert_everywhere,
     "upstream-count-validation": check_upstream_count_validation,
     "stable-iteration": check_stable_iteration,
+    "kind-literal": check_kind_literal,
+    "no-broad-except": check_no_broad_except,
+    "no-early-return": check_no_early_return,
+    "no-self-read-after-create": check_no_self_read_after_create,
+    "filters-parallel": check_filters_parallel,
+    "upstream-update-group-context": check_upstream_update_group_context,
     "cascade-one-layer": check_cascade_one_layer,
     "cascade-target-inheritance": check_cascade_target_inheritance,
     "cascade-checksum-guard": check_cascade_checksum_guard,

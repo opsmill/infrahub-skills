@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Grader for the generator-validation eval task.
+"""Grader for the generator-upstream-modification eval task.
 
-The prompt for this task emphasizes safety under partial upstream data. All
-three universal checks run, but the failure of upstream-count-validation is
-the rule this task is designed to expose.
+This task exercises the Tier A rules: a generator that fetches existing
+DcimDevice objects, modifies them, and creates downstream children. The
+critical assertion is that ``.save()`` on fetched nodes opts out of group
+context (otherwise tracking deletes upstream nodes on subsequent runs).
 """
 
 from __future__ import annotations

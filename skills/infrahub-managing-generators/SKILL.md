@@ -44,17 +44,17 @@ Existing generators:
 
 ## Rule Categories
 
-| Priority   | Category     | Prefix          | Description                       |
-| ---------- | ------------ | --------------- | --------------------------------- |
-| CRITICAL   | Architecture | `architecture-` | Components, groups                |
-| CRITICAL   | Python Class | `python-`       | Generator, generate(), stable it. |
-| CRITICAL   | Validation   | `validation-`   | Upstream count checks             |
-| CRITICAL\* | Cascade      | `cascade-`      | Multi-layer cascade pattern       |
-| HIGH       | Tracking     | `tracking-`     | Upsert, idempotent                |
-| HIGH       | API Ref      | `api-`          | Constructor, props                |
-| HIGH       | Registration | `registration-` | .infrahub.yml config              |
-| MEDIUM     | Patterns     | `patterns-`     | Cleaning, batch, store            |
-| LOW        | Testing      | `testing-`      | infrahubctl commands              |
+| Priority   | Category     | Prefix          | Description                                           |
+| ---------- | ------------ | --------------- | ----------------------------------------------------- |
+| CRITICAL   | Architecture | `architecture-` | Components, groups                                    |
+| CRITICAL   | Python Class | `python-`       | generate(), kind literals, no early-exit, stable iter |
+| CRITICAL   | Validation   | `validation-`   | Upstream count checks                                 |
+| CRITICAL\* | Cascade      | `cascade-`      | Multi-layer cascade pattern                           |
+| CRITICAL   | Tracking     | `tracking-`     | Upsert, idempotent, group-context opt-out             |
+| HIGH       | API Ref      | `api-`          | Constructor, props                                    |
+| HIGH       | Registration | `registration-` | .infrahub.yml config                                  |
+| MEDIUM     | Patterns     | `patterns-`     | Cleaning, batch, store                                |
+| LOW        | Testing      | `testing-`      | infrahubctl commands                                  |
 
 \* `cascade-` rules are CRITICAL **only when building a modular cascade**
 (see Step 2 of the workflow). For single-generator solutions, they don't
@@ -121,7 +121,17 @@ Follow these steps when creating a generator:
    [rules/python-generate.md](./rules/python-generate.md)
    for the class pattern and
    [rules/api-reference.md](./rules/api-reference.md)
-   for available methods.
+   for available methods. Code-discipline rules apply
+   throughout: string-literal `kind=`
+   ([python-kind-literal.md](./rules/python-kind-literal.md)),
+   no broad except
+   ([python-no-broad-except.md](./rules/python-no-broad-except.md)),
+   no early return after creates
+   ([python-no-early-return.md](./rules/python-no-early-return.md)),
+   no self-reads of just-created kinds
+   ([python-no-self-read-after-create.md](./rules/python-no-self-read-after-create.md)),
+   `parallel=True` on `.filters(...)`
+   ([python-filters-parallel.md](./rules/python-filters-parallel.md)).
 5. **Validate upstream data before creating** — At the top
    of `generate()`, compare received counts against expected
    counts and raise on mismatch. A partial GraphQL response
@@ -134,6 +144,12 @@ Follow these steps when creating a generator:
 7. **Make it idempotent** — Use `allow_upsert=True` so
    re-running creates or updates without duplicates.
    See [rules/tracking-idempotent.md](./rules/tracking-idempotent.md).
+   When `generate()` modifies a node it did NOT create
+   (fetched via `self.client.get(...)` or `.filters(...)`),
+   the `.save()` must also pass `update_group_context=False`
+   to keep that upstream node out of this generator's
+   tracking group. See
+   [rules/tracking-upstream-update-group-context.md](./rules/tracking-upstream-update-group-context.md).
 8. **(Cascade only)** **Guard with a checksum** — Read the
    downstream `checksum.value`, compare against a fresh
    hash of inputs (prefixed by `GENERATOR_VERSION`), and

@@ -154,6 +154,56 @@
           "check": "Every .save() call passes allow_upsert=True"
         }
       ]
+    },
+    {
+      "id": 6,
+      "prompt": "Create a generator that promotes existing devices to a new\nrole and provisions a management interface for each. The GraphQL\nresponse includes:\n\n- `TopologySpec` with a `spine_candidates` list of device IDs\n  (each entry is a string id) and an `expected_spine_count`\n  integer.\n\nFor each candidate device, the generator must:\n\n1. Fetch the existing `DcimDevice` by id.\n2. Update its `role` attribute to \"spine\".\n3. Save the device. Because the device is an upstream node that\n   this generator did NOT create, the save must not enroll it in\n   this generator's tracking group (otherwise the tracking system\n   will delete the upstream device on the next run when\n   spine_candidates changes).\n4. Create one `DcimInterfaceManagement` for the device named\n   `{device_id}-mgmt0`.\n\nValidate that `len(spine_candidates) == expected_spine_count`\nbefore any save or create.\n\nIterate candidates in sorted order. Use string literals for every\n`kind=` argument. Do not catch broad exceptions; let them\npropagate. Do not return early from `generate()` after any save\nor create has happened.\n\nWrite ONLY the Python generator. Save to:\ngenerators/generate_spine_promotion.py",
+      "expected_output": "A generator that validates len(spine_candidates) against expected_spine_count before any mutation, fetches each existing DcimDevice, updates its role, saves it with update_group_context=False, creates a DcimInterfaceManagement per device with allow_upsert=True, and iterates candidates in sorted order. All kind= values are string literals. No broad except, no early return after any save/create, no .get() of a kind that was already created in this run.",
+      "files": [],
+      "expectations": [
+        "generate() validates len() against expected_spine_count before any save/create",
+        "Each .save() on a fetched DcimDevice passes update_group_context=False",
+        "Every .save() on a created DcimInterfaceManagement passes allow_upsert=True",
+        "Candidate iteration uses sorted(...) with a stable key",
+        "Every kind= argument is a string literal (no variables)",
+        "No broad `except Exception:` without re-raise",
+        "No `return` after the first .create()/.save()",
+        "No .get(kind=\"DcimDevice\") after .create(kind=\"DcimDevice\") (no self-read)"
+      ],
+      "assertions": [
+        {
+          "name": "upstream-update-group-context",
+          "check": ".save() on .get()-fetched nodes passes update_group_context=False"
+        },
+        {
+          "name": "kind-literal",
+          "check": "Every .create(kind=...) / .get(kind=...) uses a string literal"
+        },
+        {
+          "name": "no-self-read-after-create",
+          "check": "No .get(kind=X) after an earlier .create(kind=X) in the same generate()"
+        },
+        {
+          "name": "no-broad-except",
+          "check": "No except Exception without re-raise"
+        },
+        {
+          "name": "no-early-return",
+          "check": "No return statement after the first .create()/.save() call"
+        },
+        {
+          "name": "allow-upsert-everywhere",
+          "check": "Every .save() call passes allow_upsert=True"
+        },
+        {
+          "name": "upstream-count-validation",
+          "check": "generate() validates len(spine_candidates) against expected_spine_count before any save/create"
+        },
+        {
+          "name": "stable-iteration",
+          "check": "Candidate iteration uses sorted()"
+        }
+      ]
     }
   ]
 }
