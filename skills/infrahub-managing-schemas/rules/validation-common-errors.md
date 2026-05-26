@@ -105,6 +105,17 @@ for dir in schemas/*/; do
 done
 ```
 
+### "Input should have at most N characters (string_too_long)"
+
+A schema-load-time Pydantic error on
+`description` (128), `label` (64), `identifier`
+(128), or `deprecation` (128). Not caught by
+`infrahubctl schema check` — only by
+`infrahubctl schema load`. See
+[validation-string-limits](./validation-string-limits.md) for
+the verified per-field caps and a Python preflight
+walker.
+
 ### Pre-Validation Checklist
 
 Before running `infrahubctl schema check`, verify:

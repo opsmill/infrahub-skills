@@ -56,7 +56,7 @@ use the first argument as the namespace and remaining arguments as node names.
 | MEDIUM | Extensions | `extension-` | Cross-file via extensions block, artifact targets |
 | MEDIUM | Uniqueness | `uniqueness-` | Constraint format, __value suffix |
 | MEDIUM | Migration | `migration-` | Add/remove attributes, state: absent |
-| LOW | Validation | `validation-` | Common errors, pre-check checklist |
+| HIGH | Validation | `validation-` | Load-time string-length caps (description / label / identifier), common error messages, pre-check checklist |
 
 ## Schema File Basics
 

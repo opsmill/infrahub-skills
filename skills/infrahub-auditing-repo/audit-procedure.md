@@ -61,13 +61,26 @@ convention).
 
 ### 2.2 Naming conventions
 
-- **Namespace**: `^[A-Z][a-z0-9]+$` (3-32 chars) —
-  check every node and generic
-- **Node/Generic name**: `^[A-Z][a-zA-Z0-9]+$`
-  (2-32 chars)
-- **Attribute names**: `^[a-z0-9_]+$` (3-32 chars)
-- **Relationship names**: `^[a-z0-9_]+$` (3-32 chars)
-- **Kind**: must be `Namespace` + `Name` concatenation
+Validate every node, generic, attribute, and
+relationship against:
+
+- **Namespace** pattern: `^[A-Z][a-z0-9]+$`
+- **Node/Generic name** pattern: `^[A-Z][a-zA-Z0-9]+$`
+- **Attribute name** pattern: `^[a-z0-9_]+$`
+- **Relationship name** pattern: `^[a-z0-9_]+$`
+- **Kind**: must equal `Namespace` + `Name`
+
+Length caps (min/max) for each of the above are
+version-dependent. Do not hardcode them here; resolve
+them at audit time from the running instance's
+OpenAPI spec — see
+[validation-string-limits](../infrahub-managing-schemas/rules/validation-string-limits.md)
+in the schemas skill for the procedure
+(`INFRAHUB_ADDRESS` → `http://localhost:8000`
+fallback → `/api/openapi.json`). If no instance is
+reachable, warn and skip the length portion of the
+naming audit (patterns can still be checked
+offline).
 
 ### 2.3 Attribute checks
 
