@@ -20,6 +20,27 @@ files are generated, never hand-edited.
 npm i -g skillgrade
 ```
 
+## Local Setup
+
+Grader scripts in `eval.yaml` invoke `python ...` (not
+`python3`). On macOS with Homebrew Python, `python` is
+not on `PATH` by default — every grader fails with
+"python: command not found" and reports a deterministic
+score of 0.0 even when the model output is correct.
+
+Activate the project's virtualenv before running
+`skillgrade` locally:
+
+```bash
+source .venv/bin/activate
+skillgrade --smoke
+```
+
+The `.venv` provides a `python` symlink alongside
+`python3` and bundles PyYAML (required by every
+grader). CI runs from images where `python` resolves
+natively, so this is a local-dev concern only.
+
 ## Syncing eval.yaml → evaluations/*.json
 
 After every edit to `eval.yaml` (adding a task,
@@ -187,10 +208,12 @@ things the skill's rules specifically address.
 
 | Skill | Eval File | Tasks |
 | ----- | --------- | ----- |
-| infrahub-managing-schemas | `eval.yaml` (tasks: vlan-management, circuit-management, location-hierarchy) | 3 |
-| infrahub-managing-menus | `eval.yaml` (tasks: flat-menu, hierarchical-menu, generic-kind-menu) | 3 |
+| infrahub-managing-schemas | `eval.yaml` (8 tasks: vlan-management, circuit-management, location-hierarchy, …) | 8 |
+| infrahub-managing-menus | `eval.yaml` (3 tasks: flat-menu, hierarchical-menu, generic-kind-menu) | 3 |
+| infrahub-managing-checks | `eval.yaml` (2 tasks) | 2 |
+| infrahub-managing-generators | `eval.yaml` (5 tasks across universal + cascade tiers) | 5 |
 
 Other skills don't have evals yet — adding them is a
 good contribution. Focus on skills with the most
-complex rules first (managing-objects, managing-checks,
-managing-generators).
+complex rules first (managing-objects, managing-transforms,
+auditing-repo, analyzing-data).

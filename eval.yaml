@@ -738,3 +738,349 @@ tasks:
         check: >-
           Targeted check_definitions entry declares both targets and
           parameters
+
+  # --- Generator Creator (universal tier) --- #
+  - name: generator-basic
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md
+      and follow its workflow and rules.
+
+      Task: Create an Infrahub generator that builds DCIM devices from a
+      `TopologyDataCenter` design object. The design has an `elements` list,
+      where each element has a `role` (string) and a `quantity` (integer). For
+      each element, create `quantity` `DcimDevice` objects whose names follow
+      the pattern `{topology_name}-{role}-{i:02d}` (e.g. `dc1-spine-01`).
+
+      The design also exposes `expected_element_count` (integer) so consumers
+      can confirm they received the full element list.
+
+      Write ONLY the Python generator class (no GraphQL query, no
+      .infrahub.yml, no schema). Save it to: generators/generate_dc.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_generator_basic.py
+        weight: 1.0
+    expected_output: >-
+      A Python file with an InfrahubGenerator subclass implementing async
+      generate(self, data). Before any object creation, it validates that
+      len(elements) equals expected_element_count and raises on mismatch. It
+      iterates elements via sorted(...) and uses range() for the per-quantity
+      loop. Every .save() call passes allow_upsert=True.
+    expectations:
+      - File defines a class inheriting from InfrahubGenerator
+      - >-
+        generate() validates the element count against
+        expected_element_count before creating any object
+      - The outer iteration over elements uses sorted(...) with a key
+      - The inner per-quantity loop uses range()
+      - Every .save() call passes allow_upsert=True
+    assertions:
+      - name: allow-upsert-everywhere
+        check: Every .save() call passes allow_upsert=True
+      - name: upstream-count-validation
+        check: >-
+          generate() validates element count via len() before any
+          .create() call
+      - name: stable-iteration
+        check: >-
+          Every create-loop iterates sorted() or range(), never a raw
+          GraphQL response list
+
+  - name: generator-validation
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md
+      and follow its workflow and rules.
+
+      Task: Create an Infrahub generator that builds DCIM interfaces for each
+      device in a `DcimDeviceTemplate`. The template has an `interfaces` list
+      and an `interface_count` integer that should match the list length. The
+      generator must be safe to re-run after partial GraphQL responses without
+      silently deleting previously-created interfaces, so handle incomplete
+      upstream data correctly.
+
+      For each interface in the template, create a `DcimInterface` named
+      `{device_name}-{interface_name}`.
+
+      Write ONLY the Python generator class. Save it to:
+      generators/generate_interfaces.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_generator_validation.py
+        weight: 1.0
+    expected_output: >-
+      A Python file whose generate() compares len(interfaces) against
+      interface_count and raises (or otherwise aborts) on mismatch, BEFORE
+      any await self.client.create(...) call. It iterates interfaces via
+      sorted(...) with a stable key. Every .save() passes allow_upsert=True.
+    expectations:
+      - >-
+        generate() raises or aborts on count mismatch BEFORE any .create()
+        call
+      - The interface iteration uses sorted(...) with a stable key
+      - Every .save() call passes allow_upsert=True
+      - The validation does NOT use truthiness (`if interfaces:`) alone
+    assertions:
+      - name: allow-upsert-everywhere
+        check: Every .save() call passes allow_upsert=True
+      - name: upstream-count-validation
+        check: >-
+          generate() validates interface count via len() before any
+          .create() call
+      - name: stable-iteration
+        check: Every create-loop iterates sorted() or range()
+
+  - name: generator-deterministic
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md
+      and follow its workflow and rules.
+
+      Task: Create an Infrahub generator that allocates `OrgContact` objects
+      for each role defined in a `ProjectStaffing` object. Staffing has a
+      `roles` list (each with `name` and `headcount`) and a `total_roles`
+      integer. For each role, create `headcount` contacts named
+      `{project_name}-{role_name}-{i:02d}`.
+
+      The generator will be re-run on every branch update. Re-runs must
+      produce byte-identical output when the upstream design hasn't changed.
+
+      Write ONLY the Python generator class. Save it to:
+      generators/generate_contacts.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_generator_deterministic.py
+        weight: 1.0
+    expected_output: >-
+      A Python file whose generate() iterates the roles list via sorted(...)
+      with a stable key (role name), uses range() for the per-headcount
+      loop, validates len(roles) against total_roles before creating, and
+      passes allow_upsert=True on every save.
+    expectations:
+      - The outer iteration over roles uses sorted(...) with a stable key
+      - The inner per-headcount loop uses range()
+      - >-
+        generate() validates len(roles) against total_roles before any
+        .create() call
+      - Every .save() call passes allow_upsert=True
+    assertions:
+      - name: stable-iteration
+        check: >-
+          Outer role loop wraps the iterable in sorted() with a stable key
+      - name: allow-upsert-everywhere
+        check: Every .save() call passes allow_upsert=True
+      - name: upstream-count-validation
+        check: >-
+          generate() validates role count via len() before any .create()
+          call
+
+  # --- Generator Creator (cascade tier) --- #
+  - name: cascade-upstream
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md
+      and follow its workflow and rules. You are explicitly building a
+      modular cascade — the cascade- rules apply.
+
+      Task: This is the UPSTREAM generator in a two-generator cascade.
+
+      Produce TWO files:
+
+      1. A schema YAML at: schema.yml
+         - Defines a `DcimDevice` node (namespace Dcim, name Device).
+         - The device MUST inherit from `GeneratorTarget` so a downstream
+           generator can use its checksum attribute.
+         - Include attributes: name (Text), role (Text).
+
+      2. A Python generator at: generators/generate_devices.py
+         - Reads a `TopologyDataCenter` design with an `elements` list
+           (each element has `role` and `quantity`) and an
+           `expected_element_count` integer.
+         - Creates `quantity` `DcimDevice` objects per element, named
+           `{topology_name}-{role}-{i:02d}`.
+         - Creates ONLY `DcimDevice` (one kind, one layer).
+         - Validates element count, iterates deterministically, uses
+           allow_upsert=True.
+
+      Do NOT include .infrahub.yml or any other files.
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_cascade_upstream.py
+        weight: 1.0
+    expected_output: >-
+      A schema.yml with DcimDevice inheriting from GeneratorTarget AND a
+      generator class that creates only DcimDevice objects, with count
+      validation, sorted iteration, and allow_upsert=True on every save.
+    expectations:
+      - schema.yml defines a Device node with inherit_from including GeneratorTarget
+      - The generator file creates ONLY DcimDevice objects (one kind)
+      - generate() validates len(elements) against expected_element_count
+      - The element loop uses sorted(...) with a stable key
+      - Every .save() passes allow_upsert=True
+    assertions:
+      - name: cascade-target-inheritance
+        check: schema.yml has a node inheriting from GeneratorTarget
+      - name: cascade-one-layer
+        check: The generator file creates exactly one literal kind
+      - name: upstream-count-validation
+        check: generate() validates element count via len() before any .create()
+      - name: stable-iteration
+        check: Create-loops iterate sorted() or range()
+      - name: allow-upsert-everywhere
+        check: Every .save() call passes allow_upsert=True
+
+  - name: cascade-downstream
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md
+      and follow its workflow and rules. You are explicitly building a
+      modular cascade — the cascade- rules apply.
+
+      Task: This is the DOWNSTREAM generator in a two-generator cascade.
+
+      The GraphQL response includes:
+
+      - `DcimDevice.edges` — the devices to process. Each device carries a
+        `checksum` attribute because the upstream schema makes Device
+        inherit from GeneratorTarget.
+      - `expected_device_count` (integer) — the number of devices the
+        upstream design expects to be present, so this generator can guard
+        against partial GraphQL responses.
+
+      The generator must create one `DcimInterfaceManagement` per device,
+      named `{device_name}-mgmt0`.
+
+      Requirements:
+
+      - Define a module-level `GENERATOR_VERSION` string constant.
+      - Validate that `len(devices) == expected_device_count` before any
+        creation. Raise on mismatch.
+      - Compute a checksum (hashlib) over inputs, prefixed by
+        `GENERATOR_VERSION`, for each device.
+      - Use the checksum to skip work when the downstream is already in
+        sync (an `if` whose body either short-circuits with `continue` or
+        gates the create/save call works equally well).
+      - When work runs, write the new checksum back to the device.
+      - Create only ONE kind of object (DcimInterfaceManagement).
+      - Iterate devices via sorted(...) with a stable key.
+      - Every `.save()` passes `allow_upsert=True`.
+
+      Write ONLY the Python generator. Save it to:
+      generators/generate_mgmt_interfaces.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_cascade_downstream.py
+        weight: 1.0
+    expected_output: >-
+      A Python file that defines GENERATOR_VERSION at module scope,
+      imports hashlib (or similar), validates len(devices) against
+      expected_device_count before any creation, and contains a
+      checksum-based if statement that either short-circuits with
+      continue or gates the create/save call directly. The generator
+      creates only DcimInterfaceManagement and passes allow_upsert=True
+      on every save.
+    expectations:
+      - Module defines GENERATOR_VERSION as a string constant
+      - generate() validates len(devices) against expected_device_count before any .create()
+      - >-
+        generate() contains a checksum-referencing if statement whose
+        body either short-circuits (continue/return/break) or contains
+        a .create()/.save() call — direction of comparison is up to
+        the generator
+      - The generator creates only ONE kind (DcimInterfaceManagement)
+      - The device iteration uses sorted(...) with a stable key
+      - Every .save() passes allow_upsert=True
+    assertions:
+      - name: cascade-version-constant
+        check: Module-level GENERATOR_VERSION constant is defined
+      - name: cascade-checksum-guard
+        check: >-
+          A checksum-referencing if statement gates work (body
+          short-circuits or contains create/save)
+      - name: cascade-one-layer
+        check: The generator file creates exactly one literal kind
+      - name: upstream-count-validation
+        check: >-
+          generate() validates device count via len() before any
+          .create() call
+      - name: stable-iteration
+        check: Create-loops iterate sorted() or range()
+      - name: allow-upsert-everywhere
+        check: Every .save() call passes allow_upsert=True
+
+  - name: generator-upstream-modification
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md
+      and follow its workflow and rules.
+
+      Task: Create a generator that promotes existing devices to a new
+      role and provisions a management interface for each. The GraphQL
+      response includes:
+
+      - `TopologySpec` with a `spine_candidates` list of device IDs
+        (each entry is a string id) and an `expected_spine_count`
+        integer.
+
+      For each candidate device, the generator must:
+
+      1. Fetch the existing `DcimDevice` by id.
+      2. Update its `role` attribute to "spine".
+      3. Save the device. Because the device is an upstream node that
+         this generator did NOT create, the save must not enroll it in
+         this generator's tracking group (otherwise the tracking system
+         will delete the upstream device on the next run when
+         spine_candidates changes).
+      4. Create one `DcimInterfaceManagement` for the device named
+         `{device_id}-mgmt0`.
+
+      Validate that `len(spine_candidates) == expected_spine_count`
+      before any save or create.
+
+      Iterate candidates in sorted order. Use string literals for every
+      `kind=` argument. Do not catch broad exceptions; let them
+      propagate. Do not return early from `generate()` after any save
+      or create has happened.
+
+      Write ONLY the Python generator. Save to:
+      generators/generate_spine_promotion.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_upstream_modification.py
+        weight: 1.0
+    expected_output: >-
+      A generator that validates len(spine_candidates) against
+      expected_spine_count before any mutation, fetches each existing
+      DcimDevice, updates its role, saves it with
+      update_group_context=False, creates a DcimInterfaceManagement per
+      device with allow_upsert=True, and iterates candidates in sorted
+      order. All kind= values are string literals. No broad except, no
+      early return after any save/create, no .get() of a kind that was
+      already created in this run.
+    expectations:
+      - generate() validates len() against expected_spine_count before any save/create
+      - Each .save() on a fetched DcimDevice passes update_group_context=False
+      - Every .save() on a created DcimInterfaceManagement passes allow_upsert=True
+      - Candidate iteration uses sorted(...) with a stable key
+      - Every kind= argument is a string literal (no variables)
+      - No broad `except Exception:` without re-raise
+      - No `return` after the first .create()/.save()
+      - No .get(kind="DcimDevice") after .create(kind="DcimDevice") (no self-read)
+    assertions:
+      - name: upstream-update-group-context
+        check: >-
+          .save() on .get()-fetched nodes passes
+          update_group_context=False
+      - name: kind-literal
+        check: Every .create(kind=...) / .get(kind=...) uses a string literal
+      - name: no-self-read-after-create
+        check: >-
+          No .get(kind=X) after an earlier .create(kind=X) in the
+          same generate()
+      - name: no-broad-except
+        check: No except Exception without re-raise
+      - name: no-early-return
+        check: No return statement after the first .create()/.save() call
+      - name: allow-upsert-everywhere
+        check: Every .save() call passes allow_upsert=True
+      - name: upstream-count-validation
+        check: >-
+          generate() validates len(spine_candidates) against
+          expected_spine_count before any save/create
+      - name: stable-iteration
+        check: Candidate iteration uses sorted()

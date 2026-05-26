@@ -385,6 +385,156 @@ generator_definitions:
 
 ---
 
+## 5. Modular Cascade (Two Generators)
+
+A cascade splits work across hierarchy layers. Here, an
+upstream generator creates devices from a topology design;
+a downstream generator allocates management interfaces per
+device. The downstream skips work when its inputs haven't
+changed.
+
+### Downstream schema: device inherits GeneratorTarget
+
+```yaml
+nodes:
+  - name: Device
+    namespace: Dcim
+    inherit_from:
+      - GeneratorTarget
+    attributes:
+      - name: name
+        kind: Text
+      - name: role
+        kind: Text
+    relationships:
+      - name: mgmt_interface
+        peer: DcimInterfaceManagement
+        kind: Component
+        cardinality: one
+        optional: true
+```
+
+The `checksum` attribute comes from `GeneratorTarget` — no
+need to declare it.
+
+### Upstream generator: creates devices
+
+```python
+# generators/generate_devices.py
+from infrahub_sdk.generator import InfrahubGenerator
+
+
+class DeviceGenerator(InfrahubGenerator):
+    async def generate(self, data: dict) -> None:
+        topology = data["TopologyDataCenter"]["edges"][0]["node"]
+        design = topology["design"]["node"]
+        expected = design["expected_element_count"]["value"]
+        elements = design["elements"]["edges"]
+
+        if len(elements) != expected:
+            raise ValueError(
+                f"Incomplete upstream data: expected {expected} "
+                f"elements, got {len(elements)}"
+            )
+
+        topology_name = topology["name"]["value"]
+        for element in sorted(
+            elements, key=lambda e: e["node"]["role"]["value"]
+        ):
+            quantity = element["node"]["quantity"]["value"]
+            role = element["node"]["role"]["value"]
+            for i in range(1, quantity + 1):
+                device = await self.client.create(
+                    kind="DcimDevice",
+                    data={"name": f"{topology_name}-{role}-{i:02d}"},
+                )
+                await device.save(allow_upsert=True)
+```
+
+Notice: this generator creates exactly one kind
+(`DcimDevice`) and writes nothing to `checksum` — it's the
+upstream, not the downstream.
+
+### Downstream generator: allocates mgmt interfaces with checksum guard
+
+```python
+# generators/generate_mgmt_interfaces.py
+import hashlib
+
+from infrahub_sdk.generator import InfrahubGenerator
+
+
+GENERATOR_VERSION = "1"
+
+
+class MgmtInterfaceGenerator(InfrahubGenerator):
+    async def generate(self, data: dict) -> None:
+        devices = data["DcimDevice"]["edges"]
+        expected = data.get("expected_count", {}).get("value", len(devices))
+
+        if len(devices) != expected:
+            raise ValueError(
+                f"Incomplete upstream: expected {expected} devices, "
+                f"got {len(devices)}"
+            )
+
+        for edge in sorted(devices, key=lambda e: e["node"]["id"]):
+            device = edge["node"]
+
+            # Compute a checksum over the inputs this run depends on
+            inputs = f"v{GENERATOR_VERSION}:{device['id']}:{device['name']['value']}"
+            new_checksum = hashlib.sha256(inputs.encode()).hexdigest()
+
+            if device["checksum"]["value"] == new_checksum:
+                continue  # downstream already in sync — skip
+
+            iface = await self.client.create(
+                kind="DcimInterfaceManagement",
+                data={
+                    "device": device["id"],
+                    "name": "mgmt0",
+                },
+            )
+            await iface.save(allow_upsert=True)
+
+            # Record the new checksum on the upstream device so the
+            # cascade settles on the next no-op run.
+            device_obj = await self.client.get(
+                kind="DcimDevice", id=device["id"],
+            )
+            device_obj.checksum.value = new_checksum
+            await device_obj.save(allow_upsert=True)
+```
+
+Notice:
+
+- Single `kind` (`DcimInterfaceManagement`) — one layer per
+  generator.
+- `GENERATOR_VERSION` prefixed into the hash so a logic
+  change forces re-cascade on the next run.
+- The guard (`if device["checksum"]["value"] == new_checksum:
+  continue`) is what makes this a true cascade rather than
+  just two generators that happen to run in sequence.
+
+### Registration
+
+```yaml
+# .infrahub.yml
+generator_definitions:
+  - name: generate_devices
+    file_path: generators/generate_devices.py
+    query: dc_topology
+    targets: dc_topologies
+    class_name: DeviceGenerator
+  - name: generate_mgmt_interfaces
+    file_path: generators/generate_mgmt_interfaces.py
+    query: devices_for_mgmt
+    targets: devices_needing_mgmt
+    class_name: MgmtInterfaceGenerator
+```
+
+---
+
 ## Complete File Structure
 
 ```text
