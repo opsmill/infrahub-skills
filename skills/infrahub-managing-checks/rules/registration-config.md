@@ -8,11 +8,28 @@ tags: registration, config, infrahub-yml, targets, parameters, no-query-field
 
 Impact: HIGH
 
-Checks are registered in `.infrahub.yml` under
-`check_definitions`. The query is **not** declared
-here — it is bound from the Python class's `query`
-attribute, which references a `name` listed under the
-top-level `queries:` section.
+Register checks under `check_definitions` in
+`.infrahub.yml`; the query is **not** declared here —
+it is bound from the Python class's `query` attribute,
+which must match a `name` under the top-level
+`queries:` section.
+
+### Why it matters
+
+`InfrahubCheckDefinitionConfig` is a Pydantic model
+configured with `extra="forbid"`, so adding a
+`query:` key under a check entry — the single most
+common mistake, borrowed from
+`generator_definitions` which *does* take one —
+raises `extra fields not permitted` and fails the
+whole repository config. The repo then refuses to
+load and *every* check in the file is unavailable,
+not just the broken one. The corollary failure is
+silent: if the class's `query = "..."` string does
+not match a `queries[].name`, the SDK fetches nothing,
+`validate(data)` runs against an empty payload, and
+the check passes vacuously — letting bad data merge
+unnoticed.
 
 ### Allowed Fields (and only these)
 

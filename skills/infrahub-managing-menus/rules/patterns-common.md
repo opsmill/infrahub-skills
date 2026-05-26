@@ -8,6 +8,16 @@ tags: patterns, flat-menu, commented-items, generic-links
 
 Impact: LOW (reference patterns)
 
+### Why it matters
+
+These patterns are the recurring shapes that work
+in practice. Picking one as a starting point is
+cheaper than designing a menu structure from
+scratch — and lifts the three boilerplate comments
+(`$schema`, `.infrahub.yml` registration,
+`include_in_menu: false` advice) that every menu
+file should ship with.
+
 ### Flat Menu (No Nesting)
 
 For simple projects with few node types:

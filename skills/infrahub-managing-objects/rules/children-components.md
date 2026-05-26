@@ -8,9 +8,24 @@ tags: children, components, interfaces, modules
 
 Impact: HIGH
 
-For Component relationships (interfaces, modules), nest
-children inline under the relationship name with `kind`
-specified.
+Component relationships (interfaces, modules, tenant
+membership) carry their children inline under the
+relationship name, with `kind` set on the wrapper
+when the relationship targets a generic peer.
+
+### Why it matters
+
+Component children are created together with their
+parent in a single loader pass — that's how a device
+and its interfaces land in one transaction. If the
+relationship peer is a generic (for example
+`InterfaceGeneric`), the loader can't pick a
+concrete schema without a `kind`, and the whole
+device record is rejected before any interface is
+written. When the relationship peer is already a
+concrete kind on the schema side, the loader infers
+it; that's why some component blocks legitimately
+omit `kind`.
 
 **Incorrect -- missing kind on component children:**
 
@@ -56,8 +71,8 @@ spec:
           - name: IT
 ```
 
-Note: Non-hierarchical component children don't always
-require `kind` if the schema relationship unambiguously
-identifies the child type.
+Note: when the relationship peer is a concrete kind
+on the schema side, the loader can infer the child
+type and `kind` on the wrapper is optional.
 
 Reference: [Infrahub Object Docs](https://docs.infrahub.app)

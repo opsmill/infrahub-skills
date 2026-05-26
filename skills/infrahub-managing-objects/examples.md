@@ -2,6 +2,25 @@
 
 Real-world examples extracted from production Infrahub repositories.
 
+## Contents
+
+- [1. Simple Flat List (Manufacturers)](#1-simple-flat-list-manufacturers)
+- [2. Parent-Child Inline (Tenant Groups with Tenants)](#2-parent-child-inline-tenant-groups-with-tenants)
+- [3. Groups (CoreStandardGroup)](#3-groups-corestandardgroup)
+- [4. Device Types (Referencing Manufacturers)](#4-device-types-referencing-manufacturers)
+- [5. Module Types](#5-module-types)
+- [6. Module Bay Templates](#6-module-bay-templates)
+- [7. Hierarchical Location Tree](#7-hierarchical-location-tree)
+- [8. Devices (With Type and Location References)](#8-devices-with-type-and-location-references)
+- [9. Multiple Document Types in One File](#9-multiple-document-types-in-one-file)
+- [10. Devices with Inline Interfaces](#10-devices-with-inline-interfaces)
+- [11. Devices with Interface Range Expansion](#11-devices-with-interface-range-expansion)
+- [12. Module Installations (Occupied Slots)](#12-module-installations-occupied-slots)
+- [13. Empty/Vacant Slots](#13-emptyvacant-slots)
+- [14. IP Prefixes](#14-ip-prefixes)
+- [15. Git Repository](#15-git-repository)
+- [Complete File Organization Example](#complete-file-organization-example)
+
 ---
 
 ## 1. Simple Flat List (Manufacturers)

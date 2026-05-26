@@ -6,7 +6,26 @@ tags: patterns, data-extraction, csv, common-py
 
 ## Common Transform Patterns
 
-**Impact:** MEDIUM
+Impact: MEDIUM
+
+Pull repeated GraphQL-response shaping (unwrapping
+`edges`/`node`, picking a single root, sorting
+interfaces) into `transforms/common.py` and import
+across transform files.
+
+### Why it matters
+
+The GraphQL response shape is verbose and uniform —
+every list is wrapped in `edges → node`, every
+attribute in `{value, ...}` — so each transform that
+inlines this shaping ends up with the same five lines
+of unwrapping at the top. Duplicating it makes
+schema or query changes a multi-file edit and hides
+the actual transform logic behind boilerplate. A
+shared `common.py` also gives a single place to add
+defensive `if not interfaces: return []` guards, so
+one transform handling empty data correctly means all
+transforms do.
 
 ### Data Extraction Utilities
 

@@ -8,8 +8,23 @@ tags: children, hierarchy, locations, nesting
 
 Impact: HIGH
 
-For hierarchical nodes (location trees), nest children
-inline with the `kind` field specified on each level.
+Hierarchical children (location trees and similar)
+nest inline under `children`, with a `kind` field at
+each level.
+
+### Why it matters
+
+A hierarchical generic like `LocationGeneric` covers
+many concrete kinds (`LocationSite`, `LocationRoom`,
+`LocationRack`), so the loader can't infer which
+schema applies from the parent alone. Without `kind`
+on the child wrapper, the loader doesn't know which
+node type to instantiate and the branch is rejected
+— even if every other field is valid. Inline nesting
+also drives Infrahub's auto-resolution of the
+`parent`/`children` relationship, which is what
+makes the tree appear in the UI without explicit
+parent references on each row.
 
 **Incorrect -- missing kind on children:**
 
@@ -28,7 +43,7 @@ data:
   - name: "AMERICAS"
     shortname: "amer"
     children:
-      kind: LocationSite              # Must specify child kind
+      kind: LocationSite              # Concrete child kind
       data:
         - name: "Boston HQ"
           shortname: "bos"
@@ -46,9 +61,10 @@ data:
 
 ### Rules
 
-- `children` must contain a `kind` field and a `data` array
-- `kind` specifies the schema node type of the child objects
-- Nesting depth is unlimited -- matches your schema hierarchy
-- The hierarchy auto-resolves parent references
+- `children` carries a `kind` field and a `data` array
+- `kind` names the schema node type for that level
+- Nesting depth is unlimited — it mirrors the schema
+  hierarchy
+- Parent references auto-resolve from the nesting
 
 Reference: [Infrahub Object Docs](https://docs.infrahub.app)

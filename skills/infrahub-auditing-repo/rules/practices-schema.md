@@ -1,3 +1,9 @@
+---
+title: practices-schema
+impact: MEDIUM
+tags: audit, best-practices, schema
+---
+
 # Rule: practices-schema
 
 **Severity**: MEDIUM
@@ -5,7 +11,30 @@
 
 ## What It Checks
 
-Schema best practices that improve usability and maintainability.
+Schema best practices that affect day-to-day
+usability: `human_friendly_id` coverage,
+`display_label` presence, sane `order_weight`
+spacing, generic extraction when nodes share
+shape, and migration away from deprecated
+`display_labels`.
+
+## Why it matters
+
+A node without `human_friendly_id` falls back to
+its UUID in every reference, dropdown, and audit
+log — the platform still works but the UI becomes
+hostile to operate because nobody can tell which
+device they're looking at. Flat `order_weight`
+values yield a sidebar that reorders itself
+arbitrarily on schema reloads, which users
+experience as "Infrahub keeps moving things
+around". Lingering `display_labels` (plural) is a
+ticking clock: deprecated since v1.5 and slated
+for removal, so the schema loads today with a
+warning and breaks on the next major upgrade.
+None of these findings block deployment, but each
+one degrades the experience enough to warrant
+fixing before handing the system to operators.
 
 ## Checks
 

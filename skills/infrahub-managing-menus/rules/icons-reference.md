@@ -9,7 +9,18 @@ tags: icons, mdi, material-design
 Impact: HIGH
 
 Icons use the Material Design Icons (MDI) library
-with `mdi:` prefix.
+with the `mdi:` prefix.
+
+### Why it matters
+
+Infrahub renders sidebar icons by passing the
+string straight to its MDI component — an icon name
+without `mdi:` (`server` instead of `mdi:server`)
+or a typo'd name resolves to nothing and the slot
+renders blank. A whole sidebar of blank icons is
+the most common "menu rendering looks broken"
+report; picking from a known list is faster than
+debugging a missing glyph.
 
 ### Common Infrastructure Icons
 

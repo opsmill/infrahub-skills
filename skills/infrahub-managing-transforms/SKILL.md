@@ -55,6 +55,21 @@ Existing transforms:
 | MEDIUM   | Patterns  | `patterns-`  | Utilities, CSV, shared    |
 | LOW      | Testing   | `testing-`   | Transform/render commands |
 
+## Schema Features This Skill Depends On
+
+A transform reads schema-shaped data and produces a
+file. Misalignment between the transform and the
+schema fails late — at artifact-render time, when
+someone is waiting for the output.
+
+| If the transform... | The schema (or .infrahub.yml) must... | See |
+| ------------------- | ------------------------------------- | --- |
+| Will feed an `artifact_definitions` entry | The target node must `inherit_from: CoreArtifactTarget` so the artifact pipeline can attach to it | [../infrahub-managing-schemas/rules/extension-artifact-target.md](../infrahub-managing-schemas/rules/extension-artifact-target.md) |
+| Reads attributes from a node | Define those attributes with their full `__value` access path in GraphQL — silent empty strings come from accessing the node, not the value | [../infrahub-managing-schemas/rules/attribute-defaults-and-types.md](../infrahub-managing-schemas/rules/attribute-defaults-and-types.md) |
+| Picks a template per device by platform/role | The schema must expose that platform/role as a real attribute or relationship — string-matching on `display_label` is brittle | [../infrahub-managing-schemas/rules/display-human-friendly-id.md](../infrahub-managing-schemas/rules/display-human-friendly-id.md) |
+| Is referenced from `artifact_definitions.transformation` | The transform's registered `name` must match the `transformation:` field exactly — mismatch produces "transformation not found" at render time | [rules/artifacts-definitions.md](./rules/artifacts-definitions.md) |
+| Uses Jinja2 (not Python) | Register under `jinja2_transforms` with a top-level `query:` field — `python_transforms` binds query on the class, the two keys are not interchangeable | [rules/api-reference.md](./rules/api-reference.md) |
+
 ## Transform Basics
 
 Two types of transforms:
@@ -107,6 +122,9 @@ Follow these steps when creating a transform:
 
 ## Supporting References
 
+- **[reference.md](./reference.md)** -- Class API,
+  lifecycle, return-type matrix, `.infrahub.yml`
+  registration shapes, filter env overview
 - **[examples.md](./examples.md)** -- Complete transform
   patterns (Python, Jinja2, hybrid, CSV)
 - **[../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)**

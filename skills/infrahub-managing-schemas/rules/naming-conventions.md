@@ -8,8 +8,21 @@ tags: naming, namespace, node, attribute, kind
 
 Impact: CRITICAL
 
-Infrahub enforces strict naming patterns via JSON schema
-validation. Violations cause immediate validation errors.
+Namespaces, node names, and attribute names follow
+fixed regex patterns with hard length limits.
+
+### Why it matters
+
+The Infrahub JSON schema enforces these patterns with
+`additionalProperties: false` and explicit regex
+checks; `infrahubctl schema check` fails before the
+file ever reaches the server. The length minimums
+trip up the obvious shorthand — `id` (too short),
+`DC` (too short), `MyAttribute` (mixed case) — and
+the kind reference everywhere else in the schema is
+built from `Namespace + Name`, so a non-conforming
+name silently breaks every `peer`, `inherit_from`,
+`parent`, and `children` reference that points to it.
 
 ### Namespace
 
@@ -60,7 +73,7 @@ Pattern: `^[a-z0-9_]+$` (snake_case). Min 3, max 64 chars.
 
 ```yaml
 - name: id               # Too short (min 3 chars)
-- name: MyAttribute      # Must be lowercase
+- name: MyAttribute      # Mixed case — needs snake_case
 ```
 
 **Correct:**

@@ -6,7 +6,28 @@ tags: types, python, jinja2, choosing
 
 ## Transform Types Overview
 
-**Impact:** CRITICAL
+Impact: CRITICAL
+
+Pick the transform type that matches the output shape,
+and register it under the matching key in
+`.infrahub.yml` — `python_transforms` for Python
+classes, `jinja2_transforms` for `.j2` templates.
+
+### Why it matters
+
+The two transform kinds are loaded by entirely
+separate code paths: a Python class listed under
+`jinja2_transforms` (or vice-versa) is simply ignored
+at repository sync, with no validation error to point
+the user at the typo. The first symptom is usually
+"my transform isn't in the list" or an artifact
+definition failing with "transformation not found" —
+both of which trace back to picking the wrong key.
+Choosing the right shape up front also avoids
+reworking later: a Jinja2 template that grows
+conditional logic for platform variants is the signal
+to switch to the hybrid pattern, not to keep
+expanding the template.
 
 Choose the right transform type based on your output needs.
 

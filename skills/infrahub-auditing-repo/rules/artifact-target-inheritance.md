@@ -1,3 +1,9 @@
+---
+title: artifact-target-inheritance
+impact: HIGH
+tags: audit, schema, artifacts
+---
+
 # Rule: artifact-target-inheritance
 
 **Severity**: HIGH
@@ -6,10 +12,24 @@
 ## What It Checks
 
 Every node whose instances can become an artifact or
-generator target must inherit from `CoreArtifactTarget`.
-Failing this, the artifact pipeline rejects the target
-at runtime with a confusing "target node does not
-support artifacts" error.
+generator target inherits from `CoreArtifactTarget`,
+walking the full `inherit_from` chain through any
+intermediate generics.
+
+## Why it matters
+
+Without `CoreArtifactTarget` in the inheritance
+chain, the artifact pipeline can't resolve the
+target node and either rejects the job with a
+"target node does not support artifacts" error or
+silently produces nothing — the proposed change
+pipeline goes green but no artifact lands in the
+object's `artifacts` relationship. The failure is
+runtime-only, so the schema loads fine and the
+issue surfaces only when someone opens the device
+in the UI and finds no rendered config. Catching
+this at audit time avoids a debugging detour
+through pipeline logs.
 
 ## Checks
 

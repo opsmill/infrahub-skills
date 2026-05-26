@@ -121,6 +121,11 @@ can call tools such as:
 - **`mcp__infrahub__infrahub_update`** — Update an
   object (remediation, on a branch)
 
+Full per-tool signatures (parameters, examples,
+response shapes) are in
+[rules/mcp-tools.md](./rules/mcp-tools.md) — read
+that before invoking any of these.
+
 ```graphql
 # Example: find all devices in an active
 # maintenance window

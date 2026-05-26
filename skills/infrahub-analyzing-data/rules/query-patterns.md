@@ -16,6 +16,23 @@ combine data that doesn't naturally live together.
 These patterns cover the most common compliance
 query shapes.
 
+### Why it matters
+
+The Infrahub GraphQL envelope is unforgiving: every
+relationship level wraps the data in another
+`edges` → `node` pair, and dropping a single layer
+returns an empty result rather than an error. That
+empty result then propagates into the correlation
+step as zero violations, hiding both real drift and
+the actual bug (a missing wrapper). Scoping queries
+to all objects of a kind is also a deliberate choice
+— adding filters narrows the audit population, so a
+filter typo can silently shrink the compliance scope
+to "0 of 0 compliant". The patterns below pin down
+the exact envelope shape per query type so the
+empty-edges trap surfaces as a syntax review, not a
+production audit gap.
+
 ---
 
 ### Pattern 1: Fetch All Objects of a Kind
@@ -180,9 +197,11 @@ query GenericDeviceCompliance {
 }
 ```
 
-Always include `__typename` when using inline
-fragments so you can identify the concrete type
-in your correlation logic.
+Include `__typename` when using inline fragments —
+without it, the correlation code can't tell a
+`DcimDevice` row from a `DcimVirtualMachine` row,
+and subtype-specific fields end up keyed against the
+wrong node type in the violation report.
 
 ---
 

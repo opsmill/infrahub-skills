@@ -8,8 +8,16 @@ tags: tag1, tag2
 
 Impact: MEDIUM
 
-Brief explanation of the rule and why it matters for
-Infrahub generator creation.
+One-sentence statement of the rule.
+
+### Why it matters
+
+Two to four sentences naming the concrete
+consequence of getting this wrong — the API failure,
+the silent data loss, the dispatcher behavior that
+confuses users. Skip generic "best practice"
+language; describe what actually breaks when the
+generator runs.
 
 **Incorrect:**
 

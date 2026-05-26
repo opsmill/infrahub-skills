@@ -57,6 +57,14 @@ When invoked, the auditor:
    `.infrahub.yml`)
 4. **Generates** a markdown report with findings organized by severity
 
+The phased procedure that ties these steps together
+lives in [audit-procedure.md](./audit-procedure.md) —
+read that file when running an audit. It defines the
+eight phases (project structure → schema → objects →
+Python components → cross-references → registration →
+best practices → deployment) and the per-finding
+severity levels used in the final report.
+
 ## Audit Categories
 
 | Priority | Category | What It Checks |
@@ -76,7 +84,10 @@ When invoked, the auditor:
 
 Tell Claude: **"Audit this Infrahub repo"** or **"Run the Infrahub repo auditor"**
 
-The auditor will scan the current working directory and produce a report.
+The auditor will scan the current working directory,
+walk the phases defined in
+[audit-procedure.md](./audit-procedure.md), and
+produce the report described below.
 
 ## Report Format
 
@@ -147,6 +158,12 @@ The auditor checks rules from all skills:
 - **[../infrahub-common/](../infrahub-common/)** -- Git integration,
   caching, `.infrahub.yml` reference, GraphQL
 
-## Rules
+## Rules and Procedure
 
-See [rules/](./rules/) for detailed audit rule definitions.
+- [audit-procedure.md](./audit-procedure.md) — the
+  eight-phase walkthrough that drives every audit
+  run
+- [rules/](./rules/) — detailed audit rule
+  definitions referenced from the phases
+- [examples.md](./examples.md) — sample audit
+  reports and finding patterns

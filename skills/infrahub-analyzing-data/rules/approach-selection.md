@@ -13,6 +13,20 @@ and surface findings. Picking the right one avoids
 over-engineering simple tasks and under-engineering
 recurring ones.
 
+### Why it matters
+
+Picking the wrong tier — manual MCP analysis when a
+check is needed, or a check when a one-off question
+would suffice — wastes engineering time on the
+over-engineered side and creates false-confidence
+gaps on the under-engineered side. A policy worth
+enforcing every proposed change but only audited
+manually drifts the moment attention moves on; a
+one-off curiosity reified as a Python check adds CI
+surface area for no compliance win. The decision
+table below exists so the choice is made on shape of
+the question, not on what tooling feels available.
+
 ---
 
 ### Decision Table

@@ -54,6 +54,21 @@ Existing generators:
 | MEDIUM   | Patterns     | `patterns-`     | Cleaning, batch, store |
 | LOW      | Testing      | `testing-`      | infrahubctl commands   |
 
+## Schema Features This Skill Depends On
+
+Generators create real objects, so the schema must
+permit the shape they emit. Catch these gaps before
+the first run — re-running a buggy generator can
+delete data via the tracking cleanup.
+
+| If the generator... | The schema must... | See |
+| ------------------- | ------------------ | --- |
+| Creates objects of kind X | Have node X defined with the attributes the generator sets — extra attributes silently fail validation, missing required ones abort the create | [../infrahub-managing-schemas/rules/attribute-defaults-and-types.md](../infrahub-managing-schemas/rules/attribute-defaults-and-types.md) |
+| Links the created object to a parent | Have a Component/Parent relationship pair with matching identifiers and `optional: false` on the Parent side | [../infrahub-managing-schemas/rules/relationship-component-parent.md](../infrahub-managing-schemas/rules/relationship-component-parent.md) |
+| Reads a "design" node to drive output | Define that node's `human_friendly_id` so the generator's tracking key stays stable across runs | [../infrahub-managing-schemas/rules/display-human-friendly-id.md](../infrahub-managing-schemas/rules/display-human-friendly-id.md) |
+| Is triggered by membership in a group | The target group must be a `CoreGeneratorGroup` (not `CoreStandardGroup`) — the dispatcher only recognizes the former | [rules/registration-config.md](./rules/registration-config.md) |
+| Should be idempotent on re-run | Every `save()` uses `allow_upsert=True`; the run's tracking context deletes objects from prior runs that aren't recreated | [rules/tracking-idempotent.md](./rules/tracking-idempotent.md) |
+
 ## Generator Basics
 
 Every generator has three components:
@@ -105,6 +120,10 @@ Follow these steps when creating a generator:
 
 ## Supporting References
 
+- **[reference.md](./reference.md)** -- Class API,
+  lifecycle, idempotency contract, `.infrahub.yml`
+  registration (with the `query:`-required shape that
+  differs from check_definitions)
 - **[examples.md](./examples.md)** -- Complete Generator
   patterns (POP topology, network segment, minimal)
 - **[../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)**

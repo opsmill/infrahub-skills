@@ -14,6 +14,21 @@ and comparing it against a policy to find violations.
 These patterns cover the most common correlation
 techniques.
 
+### Why it matters
+
+Cross-query correlation needs the same key on both
+sides — usually `id` or a `human_friendly_id` field
+— and when the keys don't line up exactly, the join
+silently returns "0 matches". The report then looks
+like clean compliance ("no violations") when it
+actually reflects a broken join, which is the worst
+possible failure mode: a compliance pass that hides
+real drift. The patterns below pin down the join key
+explicitly per technique (set membership, regex,
+threshold, presence, cross-node ID), so the failure
+mode shows up as a code-review concern rather than a
+production audit miss.
+
 ---
 
 ### Pattern 1: Membership Check (Allow-list)
