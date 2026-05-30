@@ -39,7 +39,13 @@ For `infrahubctl`:
 
 | Allowed | Forbidden |
 | ------- | --------- |
-| `version`, `info`, `branch list`, `branch report`, `schema check`, `schema list`, `schema show`, `schema export`, `repository list`, `task list`, `telemetry export`, `dump`, `graphql --query "query{...}"` (queries only, no mutations) | `schema load`, `branch create`, `branch merge`, `branch delete`, `branch rebase`, `task delete`, `repository add`, `graphql --query "mutation{...}"` |
+| `version`, `info`, `branch list`, `branch report <name>`, `schema check`, `schema list`, `schema show`, `schema export`, `repository list`, `task list`, `telemetry export`, `dump`, `graphql export-schema`, `graphql generate-return-types` | `schema load`, `branch create`, `branch merge`, `branch delete`, `branch rebase`, `task delete`, `repository add`, any GraphQL mutation posted to `/graphql` |
+
+`infrahubctl` does not provide an ad-hoc GraphQL
+query subcommand — `infrahubctl graphql` only
+supports `export-schema` and `generate-return-types`.
+For ad-hoc queries, post directly to `/graphql` with
+`curl` (read-only queries only — no mutations).
 
 For `docker compose` / `kubectl` / `helm`:
 
@@ -52,7 +58,11 @@ For `docker compose` / `kubectl` / `helm`:
 ```bash
 docker compose ps -a --format json > bundle/state/compose-ps.json
 docker compose logs --since 24h --no-color task-worker > bundle/logs/task-worker.log
-infrahubctl branch list --json > bundle/state/branches.json
+infrahubctl branch list > bundle/state/branches.txt
+curl -sX POST http://localhost:8000/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query { Branch { id name status is_default }}"}' \
+  > bundle/state/branches.json
 ```
 
 ### Non-compliant

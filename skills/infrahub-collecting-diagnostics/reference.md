@@ -52,9 +52,18 @@ Canonical service names are the same across
 Docker Compose and Helm. Per-topology addressing
 differs.
 
+Docker Compose container names follow the pattern
+`<project>-<service>-<index>`. With the upstream
+project name `infrahub`, the `infrahub-server`
+service ends up as `infrahub-infrahub-server-N` (the
+project prefix is repeated because the service name
+itself starts with `infrahub-`). The loops below use
+`docker ps --filter "name=..."` substring matching,
+which catches both shapes.
+
 | Canonical | Docker Compose container | Kubernetes label selector | Local dev (`invoke demo.*`) |
 | --------- | ------------------------ | ------------------------- | --------------------------- |
-| `infrahub-server` | `infrahub-server-1`, `-2`, ... | `app.kubernetes.io/component=server` | `infrahub-server-N` |
+| `infrahub-server` | `infrahub-infrahub-server-1`, `-2`, ... | `app.kubernetes.io/component=server` | `infrahub-infrahub-server-N` |
 | `task-worker` | `infrahub-task-worker-1`, `-2`, ... | `app.kubernetes.io/component=task-worker` | `infrahub-task-worker-N` |
 | `database` | `infrahub-database-1` | `app.kubernetes.io/component=database` | `infrahub-database-1` |
 | `cache` | `infrahub-cache-1` | `app.kubernetes.io/component=cache` | `infrahub-cache-1` |
@@ -115,10 +124,18 @@ if [ -d schemas ]; then
 fi
 
 # Live state (read-only)
-infrahubctl branch list --json            > bundle/baseline/state/branches.json 2>&1
+# infrahubctl branch list does not support --json; fetch via GraphQL for structured output.
+infrahubctl branch list                   > bundle/baseline/state/branches.txt 2>&1
+curl -sX POST http://localhost:8000/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query { Branch { id name description origin_branch branched_from sync_with_git has_schema_changes is_default is_isolated status }}"}' \
+                                          > bundle/baseline/state/branches.json 2>&1
 infrahubctl schema list                   > bundle/baseline/state/schema-kinds.txt 2>&1
 infrahubctl repository list               > bundle/baseline/state/repositories.txt 2>&1
 infrahubctl task list --json --limit 50   > bundle/baseline/state/recent-tasks.json 2>&1
+# Note: telemetry export requires an authenticated user with permission on
+# /api/telemetry/snapshots. The `|| true` keeps the bundle building when the
+# call fails (403 for anonymous, missing endpoint on older builds).
 infrahubctl telemetry export \
   --output bundle/baseline/state/telemetry.json   2>/dev/null || true
 
@@ -135,14 +152,14 @@ infrahubctl telemetry export \
 
 # 24h logs — one file per replica for multi-replica services
 for c in $(docker ps --filter "name=infrahub-server" --format '{{.Names}}'); do
-  docker logs --since 24h --no-color "$c" > "bundle/baseline/logs/${c}.log" 2>&1
+  docker logs --since 24h "$c"            > "bundle/baseline/logs/${c}.log" 2>&1
 done
 for c in $(docker ps --filter "name=task-worker" --format '{{.Names}}'); do
-  docker logs --since 24h --no-color "$c" > "bundle/baseline/logs/${c}.log" 2>&1
+  docker logs --since 24h "$c"            > "bundle/baseline/logs/${c}.log" 2>&1
 done
 for svc in database message-queue cache task-manager task-manager-db; do
   for c in $(docker ps --filter "name=infrahub-${svc}" --format '{{.Names}}'); do
-    docker logs --since 24h --no-color "$c" > "bundle/baseline/logs/${c}.log" 2>&1
+    docker logs --since 24h "$c"            > "bundle/baseline/logs/${c}.log" 2>&1
   done
 done
 ```
@@ -185,7 +202,12 @@ curl -sf http://localhost:8000/api/config > bundle/baseline/api-config.json 2>&1
 kill $PF_PID 2>/dev/null || true
 
 # Live state
-infrahubctl branch list --json            > bundle/baseline/state/branches.json 2>&1
+# infrahubctl branch list does not support --json; fetch via GraphQL for structured output.
+infrahubctl branch list                   > bundle/baseline/state/branches.txt 2>&1
+curl -sX POST http://localhost:8000/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query { Branch { id name description origin_branch branched_from sync_with_git has_schema_changes is_default is_isolated status }}"}' \
+                                          > bundle/baseline/state/branches.json 2>&1
 infrahubctl schema list                   > bundle/baseline/state/schema-kinds.txt 2>&1
 infrahubctl repository list               > bundle/baseline/state/repositories.txt 2>&1
 infrahubctl task list --json --limit 50   > bundle/baseline/state/recent-tasks.json 2>&1
@@ -233,7 +255,12 @@ docker compose config                     > bundle/baseline/config/compose-resol
 curl -sf http://localhost:8000/api/config > bundle/baseline/api-config.json 2>&1
 
 # Live state via the same infrahubctl that the demo brings up
-infrahubctl branch list --json            > bundle/baseline/state/branches.json 2>&1
+# infrahubctl branch list does not support --json; fetch via GraphQL for structured output.
+infrahubctl branch list                   > bundle/baseline/state/branches.txt 2>&1
+curl -sX POST http://localhost:8000/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query { Branch { id name description origin_branch branched_from sync_with_git has_schema_changes is_default is_isolated status }}"}' \
+                                          > bundle/baseline/state/branches.json 2>&1
 infrahubctl schema list                   > bundle/baseline/state/schema-kinds.txt 2>&1
 infrahubctl repository list               > bundle/baseline/state/repositories.txt 2>&1
 infrahubctl task list --json --limit 50   > bundle/baseline/state/recent-tasks.json 2>&1
@@ -250,14 +277,14 @@ infrahubctl telemetry export \
 
 # Logs — same loops as Compose
 for c in $(docker ps --filter "name=infrahub-server" --format '{{.Names}}'); do
-  docker logs --since 24h --no-color "$c" > "bundle/baseline/logs/${c}.log" 2>&1
+  docker logs --since 24h "$c"            > "bundle/baseline/logs/${c}.log" 2>&1
 done
 for c in $(docker ps --filter "name=task-worker" --format '{{.Names}}'); do
-  docker logs --since 24h --no-color "$c" > "bundle/baseline/logs/${c}.log" 2>&1
+  docker logs --since 24h "$c"            > "bundle/baseline/logs/${c}.log" 2>&1
 done
 for svc in database message-queue cache task-manager task-manager-db; do
   for c in $(docker ps --filter "name=infrahub-${svc}" --format '{{.Names}}'); do
-    docker logs --since 24h --no-color "$c" > "bundle/baseline/logs/${c}.log" 2>&1
+    docker logs --since 24h "$c"            > "bundle/baseline/logs/${c}.log" 2>&1
   done
 done
 ```
@@ -297,7 +324,7 @@ done
 
 # Full-history logs (no --since cap; startup is small anyway)
 for c in $(docker compose ps -a --format '{{.Name}}'); do
-  docker logs --no-color "$c"             > "bundle/category/installation-startup/logs/${c}.log" 2>&1
+  docker logs "$c"                        > "bundle/category/installation-startup/logs/${c}.log" 2>&1
 done
 ```
 
@@ -334,7 +361,7 @@ docker compose images                     > bundle/category/upgrade/compose-imag
 
 # 24h logs from every service — upgrade-specific runs unbounded across all of them
 for c in $(docker compose ps -a --format '{{.Name}}'); do
-  docker logs --since 24h --no-color "$c" > "bundle/category/upgrade/logs/${c}.log" 2>&1
+  docker logs --since 24h "$c"            > "bundle/category/upgrade/logs/${c}.log" 2>&1
 done
 
 # Neo4j health report — bundled tool, writes a single tgz
@@ -345,14 +372,18 @@ docker compose exec -T database \
 # Copy the report tgz out to the bundle
 docker compose cp database:/tmp/. bundle/category/upgrade/neo4j-report/ 2>/dev/null || true
 
-# Branches in stuck states
-infrahubctl branch list --json            > bundle/category/upgrade/branches/list.json
+# Branches in stuck states — infrahubctl branch list does not support --json,
+# so fetch via GraphQL for structured output.
+infrahubctl branch list                   > bundle/category/upgrade/branches/list.txt 2>&1
+curl -sX POST http://localhost:8000/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query { Branch { id name status is_default branched_from }}"}' \
+                                          > bundle/category/upgrade/branches/list.json 2>&1
 # Filter for stuck branches (informational; raw list is the source of truth)
-infrahubctl branch list --json \
-  | python3 -c 'import json,sys; \
-  data = json.load(sys.stdin); \
-  print(json.dumps([b for b in data \
-    if b.get("status") in ("NEED_UPGRADE_REBASE","MERGING")], indent=2))' \
+python3 -c 'import json,sys
+data = json.load(sys.stdin).get("data", {}).get("Branch", [])
+print(json.dumps([b for b in data if b.get("status") in ("NEED_UPGRADE_REBASE","MERGING")], indent=2))' \
+  < bundle/category/upgrade/branches/list.json \
                                           > bundle/category/upgrade/branches/stuck.json 2>&1
 ```
 
@@ -377,7 +408,12 @@ kubectl -n infrahub exec "$DB_POD" -- \
   | tee bundle/category/upgrade/neo4j-report/run.log
 kubectl -n infrahub cp "${DB_POD}:/tmp" bundle/category/upgrade/neo4j-report/ 2>/dev/null || true
 
-infrahubctl branch list --json            > bundle/category/upgrade/branches/list.json
+# infrahubctl branch list does not support --json; fetch via GraphQL for structured output.
+infrahubctl branch list                   > bundle/category/upgrade/branches/list.txt 2>&1
+curl -sX POST http://localhost:8000/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query { Branch { id name status is_default branched_from }}"}' \
+                                          > bundle/category/upgrade/branches/list.json 2>&1
 ```
 
 ### 3.3 `git-sync`
@@ -411,26 +447,20 @@ for c in $(docker ps --filter "name=task-worker" --format '{{.Names}}'); do
     echo
   done'                                   > "bundle/category/git-sync/workers/${c}/repo-status.txt" 2>&1
   # 1h focused logs from this worker
-  docker logs --since 1h --no-color "$c" \
+  docker logs --since 1h "$c" \
                                           > "bundle/category/git-sync/workers/${c}/recent.log" 2>&1
 done
 
-# Repository state from the server's point of view
+# Repository state from the server's point of view.
+# `infrahubctl graphql` only exposes `export-schema` and `generate-return-types`
+# — there is no ad-hoc query subcommand — so post to /graphql directly.
+# `commit` lives on the concrete CoreRepository / CoreReadOnlyRepository types,
+# not on the generic, so use inline fragments to pull it.
 infrahubctl repository list               > bundle/category/git-sync/repositories.txt 2>&1
-infrahubctl graphql --query 'query {
-  CoreGenericRepository {
-    edges {
-      node {
-        id
-        name { value }
-        location { value }
-        commit { value }
-        status { value }
-        operational_status { value }
-      }
-    }
-  }
-}'                                        > bundle/category/git-sync/repos-graphql.json 2>&1
+curl -sX POST http://localhost:8000/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query { CoreGenericRepository { edges { node { id display_label name { value } location { value } operational_status { value } ... on CoreRepository { commit { value } } ... on CoreReadOnlyRepository { commit { value } } } } } }"}' \
+                                          > bundle/category/git-sync/repos-graphql.json 2>&1
 ```
 
 **Kubernetes:**
@@ -458,12 +488,18 @@ for pod in $(kubectl -n infrahub get pods \
 done
 
 infrahubctl repository list               > bundle/category/git-sync/repositories.txt 2>&1
-infrahubctl graphql --query 'query {
-  CoreGenericRepository {
-    edges { node { id name { value } location { value } commit { value }
-      status { value } operational_status { value } } }
-  }
-}'                                        > bundle/category/git-sync/repos-graphql.json 2>&1
+# `infrahubctl graphql` only exposes `export-schema` and `generate-return-types`
+# — no ad-hoc query subcommand — so port-forward and post to /graphql directly.
+# `commit` lives on the concrete CoreRepository / CoreReadOnlyRepository types,
+# not on the generic, so use inline fragments to pull it.
+kubectl -n infrahub port-forward svc/infrahub-server 8000:8000 > /dev/null 2>&1 &
+PF_PID=$!
+sleep 2
+curl -sX POST http://localhost:8000/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query { CoreGenericRepository { edges { node { id display_label name { value } location { value } operational_status { value } ... on CoreRepository { commit { value } } ... on CoreReadOnlyRepository { commit { value } } } } } }"}' \
+                                          > bundle/category/git-sync/repos-graphql.json 2>&1
+kill $PF_PID 2>/dev/null || true
 ```
 
 ### 3.4 `task-worker-pipeline`
@@ -487,7 +523,7 @@ infrahubctl task list --include-related-nodes --json --limit 200 \
 
 # 2h focused worker + task-manager logs (heavier than baseline 24h sample)
 for c in $(docker ps --filter "name=task-worker" --format '{{.Names}}'); do
-  docker logs --since 2h --no-color "$c"  > "bundle/category/task-worker-pipeline/logs/${c}.log" 2>&1
+  docker logs --since 2h "$c"             > "bundle/category/task-worker-pipeline/logs/${c}.log" 2>&1
 done
 docker compose logs --since 2h --no-color task-manager \
                                           > bundle/category/task-worker-pipeline/logs/task-manager.log 2>&1
@@ -603,7 +639,7 @@ done
 
 # 1h focused worker logs — where the in-pipeline failure prints its traceback
 for c in $(docker ps --filter "name=task-worker" --format '{{.Names}}'); do
-  docker logs --since 1h --no-color "$c"  > "bundle/category/check-generator-transform/logs/${c}.log" 2>&1
+  docker logs --since 1h "$c"             > "bundle/category/check-generator-transform/logs/${c}.log" 2>&1
 done
 ```
 
@@ -615,9 +651,14 @@ HTTP 5xx; non-nullable field errors; timeouts.
 mkdir -p bundle/category/graphql-api/{logs,response} bundle/repro
 
 # User pastes the failing query into bundle/repro/failing.gql first.
-# Then run it via infrahubctl so the response is captured verbatim.
+# Then post it to /graphql directly — `infrahubctl graphql` only exposes
+# `export-schema` and `generate-return-types`, not an ad-hoc query subcommand.
 if [ -f bundle/repro/failing.gql ]; then
-  infrahubctl graphql --query "$(cat bundle/repro/failing.gql)" \
+  python3 -c 'import json,sys; print(json.dumps({"query": sys.stdin.read()}))' \
+    < bundle/repro/failing.gql \
+    | curl -sX POST http://localhost:8000/graphql \
+        -H 'Content-Type: application/json' \
+        -d @- \
                                           > bundle/repro/graphql-response.json 2>&1 || true
 fi
 
@@ -656,11 +697,16 @@ mkdir -p bundle/category/performance/{stats,neo4j,host}
 # Container resource use right now
 docker stats --no-stream                  > bundle/category/performance/stats/docker-stats.txt 2>&1
 
-# Neo4j active queries — the long ones are the smoking gun
+# Neo4j active queries — the long ones are the smoking gun.
+# CALL dbms.listQueries() was removed in Neo4j 5; use SHOW TRANSACTIONS instead.
+# The password lives inside the infrahub-server container, not on the host shell,
+# so pull it from there before exec-ing into the database container.
+DB_PASSWORD="$(docker compose exec -T infrahub-server printenv INFRAHUB_DB_PASSWORD 2>/dev/null)"
 docker compose exec -T database cypher-shell -u neo4j \
-  -p "$INFRAHUB_DB_PASSWORD" \
-  "CALL dbms.listQueries() YIELD query, elapsedTimeMillis
-   RETURN query, elapsedTimeMillis ORDER BY elapsedTimeMillis DESC LIMIT 50;" \
+  -p "$DB_PASSWORD" \
+  "SHOW TRANSACTIONS YIELD transactionId, currentQuery, elapsedTime, username
+   RETURN transactionId, currentQuery, elapsedTime, username
+   ORDER BY elapsedTime DESC LIMIT 50;" \
                                           > bundle/category/performance/neo4j/active-queries.txt 2>&1
 
 # Telemetry — has per-endpoint timings
@@ -687,10 +733,16 @@ kubectl top nodes                         > bundle/category/performance/stats/no
 
 DB_POD=$(kubectl -n infrahub get pods -l app.kubernetes.io/component=database \
   -o jsonpath='{.items[0].metadata.name}')
+# CALL dbms.listQueries() was removed in Neo4j 5; use SHOW TRANSACTIONS instead.
+# Pull the DB password from the server pod (the DB pod does not have it set).
+SERVER_POD=$(kubectl -n infrahub get pods -l app.kubernetes.io/component=server \
+  -o jsonpath='{.items[0].metadata.name}')
+DB_PASSWORD="$(kubectl -n infrahub exec "$SERVER_POD" -- printenv INFRAHUB_DB_PASSWORD 2>/dev/null)"
 kubectl -n infrahub exec "$DB_POD" -- cypher-shell -u neo4j \
-  -p "$INFRAHUB_DB_PASSWORD" \
-  "CALL dbms.listQueries() YIELD query, elapsedTimeMillis
-   RETURN query, elapsedTimeMillis ORDER BY elapsedTimeMillis DESC LIMIT 50;" \
+  -p "$DB_PASSWORD" \
+  "SHOW TRANSACTIONS YIELD transactionId, currentQuery, elapsedTime, username
+   RETURN transactionId, currentQuery, elapsedTime, username
+   ORDER BY elapsedTime DESC LIMIT 50;" \
                                           > bundle/category/performance/neo4j/active-queries.txt 2>&1
 
 infrahubctl telemetry export \
@@ -716,20 +768,14 @@ docker compose logs --since 30m --no-color infrahub-server 2>&1 \
   | grep -iE 'auth|token|oauth|oidc|permission' \
                                           > bundle/category/auth-permissions/logs/server-auth.log
 
-# Account inventory — who exists, what role, what account_type
-infrahubctl graphql --query 'query {
-  CoreAccount {
-    count
-    edges {
-      node {
-        id
-        name { value }
-        account_type { value }
-        role { node { name { value } } }
-      }
-    }
-  }
-}'                                        > bundle/category/auth-permissions/accounts/inventory.json 2>&1
+# Account inventory — who exists, what groups, what account_type.
+# `infrahubctl graphql` only exposes `export-schema` and `generate-return-types`
+# — there is no ad-hoc query subcommand — so post to /graphql directly.
+# Permissions hang off `member_of_groups`, not a (non-existent) `role` field.
+curl -sX POST http://localhost:8000/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query { CoreAccount { count edges { node { id name { value } account_type { value } status { value } member_of_groups { edges { node { name { value } } } } } } } }"}' \
+                                          > bundle/category/auth-permissions/accounts/inventory.json 2>&1
 ```
 
 For Kubernetes:
@@ -758,13 +804,29 @@ leaves partial state.
 ```bash
 mkdir -p bundle/category/branch-merge/{branches,neo4j}
 
-infrahubctl branch list --json            > bundle/category/branch-merge/branches/list.json 2>&1
-infrahubctl branch report                 > bundle/category/branch-merge/branches/report.txt 2>&1 || true
+# infrahubctl branch list does not support --json; fetch via GraphQL for structured output.
+infrahubctl branch list                   > bundle/category/branch-merge/branches/list.txt 2>&1
+curl -sX POST http://localhost:8000/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query { Branch { id name status is_default branched_from origin_branch sync_with_git has_schema_changes }}"}' \
+                                          > bundle/category/branch-merge/branches/list.json 2>&1
+
+# infrahubctl branch report requires a BRANCH_NAME — run it per non-default branch.
+for b in $(curl -sX POST http://localhost:8000/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query { Branch { name is_default }}"}' \
+  | python3 -c 'import json,sys; data=json.load(sys.stdin).get("data",{}).get("Branch",[]); print(" ".join(b["name"] for b in data if not b.get("is_default")))'); do
+  infrahubctl branch report "$b" \
+                                          > "bundle/category/branch-merge/branches/report-${b}.txt" 2>&1 || true
+done
 
 # Direct Neo4j peek — bypasses the API so you see stuck branches even when the
-# merge controller is wedged
+# merge controller is wedged. The password lives inside the infrahub-server
+# container; the host shell rarely has $INFRAHUB_DB_PASSWORD set, so pull it
+# from the server container and pass it explicitly.
+DB_PASSWORD="$(docker compose exec -T infrahub-server printenv INFRAHUB_DB_PASSWORD 2>/dev/null)"
 docker compose exec -T database cypher-shell -u neo4j \
-  -p "$INFRAHUB_DB_PASSWORD" \
+  -p "$DB_PASSWORD" \
   "MATCH (b:Branch) RETURN b.name, b.status, b.is_default ORDER BY b.name;" \
                                           > bundle/category/branch-merge/neo4j/branches-raw.txt 2>&1
 
