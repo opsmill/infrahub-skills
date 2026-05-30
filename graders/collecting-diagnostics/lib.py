@@ -109,17 +109,30 @@ def check_baseline_present(bundle: Path, **_: object) -> CheckResult:
 
 
 _SECRET_PATTERNS = (
-    # Env key=value style with secret-shaped value (avoid matching REDACTED).
+    # Env key=value style. Matches keys containing a sensitive word as a
+    # substring, including underscore-bounded shapes like INFRAHUB_DB_PASSWORD.
+    # Python's \b treats _ as a word char, so we can't rely on \b alone to find
+    # _PASSWORD within INFRAHUB_DB_PASSWORD; instead we let [\w]* swallow the
+    # surrounding env-key chars and anchor on a non-word char (or line start)
+    # before the key.
     re.compile(
-        r"(?i)\b(password|secret|token|client_secret|api_key|aws_secret_access_key|"
-        r"db_password|broker_password|cache_password)\b\s*[:=]\s*['\"]?"
-        r"(?!\*+REDACTED)[^'\"\s#]{4,}"
+        r"(?im)"
+        r"(?:^|[^\w])"  # boundary: line start or a non-word char (incl. quotes)
+        r"\w*"
+        r"(?:password|secret|token|client_secret|api_key|aws_secret_access_key|auth_token|bearer|private_key)"
+        r"\w*"
+        r"\s*[:=]\s*"
+        r"['\"]?"
+        # Skip already-redacted values and obvious non-secret literals
+        # (booleans, null, small integers, enable/disable flags).
+        r"(?!\*+REDACTED|true|false|null|none|yes|no|enabled|disabled|\d+[\s,'\"}\]]*$)"
+        r"[^'\"\s#]{4,}"
     ),
     re.compile(r"AKIA[0-9A-Z]{16}"),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
     re.compile(
-        r"\bey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\b"
-    ),  # JWT
+        r"\bey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\b"
+    ),  # JWT — minimum {alg:HS256} header is ~18 chars including 'ey', so {10,} is safe
     re.compile(r"https?://[^\s/:@]+:[^\s/@]+@"),  # URL credentials
 )
 
