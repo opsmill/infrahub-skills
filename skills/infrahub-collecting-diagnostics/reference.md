@@ -34,13 +34,17 @@ command block, it should invoke it explicitly as
 shell guess, because some compatibility helpers
 (e.g., `compgen -G`) are bash-only.
 
-Docker syntax assumes **Docker Compose v2** (the
-`docker compose` subcommand, **not** `docker-compose`
-v1). If a user is on Compose v1, every `docker
-compose ...` line below becomes `docker-compose
-...` — substitute throughout. Compose v2 has been
-the default since Docker Desktop 4.x and Docker
-Engine 20.10+.
+**Only Docker Compose v2 is supported.** The skill
+uses the `docker compose` subcommand exclusively;
+legacy `docker-compose` (v1) is not a fallback. v1
+reached end-of-life mid-2023 and is missing
+features (notably `compose ps --format json` shape
+and `compose exec -T`) that the catalog relies on.
+If `docker compose version` doesn't return v2.x,
+the workflow should ask the user to upgrade Docker
+before continuing rather than substitute v1
+commands. Compose v2 has shipped by default with
+Docker Desktop 4.x and Docker Engine 20.10+.
 
 ## 1. Service-name map
 

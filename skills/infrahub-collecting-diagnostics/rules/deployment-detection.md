@@ -31,7 +31,12 @@ Run probes in this order, stopping at the first
 success:
 
 1. `docker compose ps` — exits 0 with non-empty
-   output → **Docker Compose**.
+   output → **Docker Compose**. The skill requires
+   Compose v2 (the `docker compose` subcommand);
+   if `docker compose version` returns v1.x, stop
+   and ask the user to upgrade Docker before
+   continuing. Legacy `docker-compose` is not
+   supported as a fallback.
 2. `kubectl -n infrahub get pods` — exits 0 with
    non-empty output → **Kubernetes**.
 3. `tasks/demo.py` exists and `invoke demo.status`
