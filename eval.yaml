@@ -891,3 +891,223 @@ tasks:
           `.github/ISSUE_TEMPLATE/`
       - name: references-target-repo
         check: Plan references opsmill/infrahub as the target repo
+
+  # --- Diagnostics Collector --- #
+  - name: collecting-diagnostics-git-sync
+    instruction: |
+      Read the skill at .agents/skills/infrahub-collecting-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      The user says: "My proposed change pipeline fails — the repo isn't loading
+      schemas. I'm on docker-compose with 2 task-worker replicas, infrahub 1.9.6
+      community edition."
+
+      Treat this as a simulation: do NOT actually run any commands. Instead, when
+      the workflow tells you to run a command, treat the following blocks as the
+      mocked output. Then produce the final bundle directory tree under
+      ./output_bundle/.
+
+      docker compose ps (deployment detection succeeded; compose topology):
+        infrahub-server-1            Up 2h
+        infrahub-task-worker-1       Up 2h
+        infrahub-task-worker-2       Up 30m
+        database-1                   Up 2h
+        cache-1                      Up 2h
+        message-queue-1              Up 2h
+        task-manager-1               Up 2h
+        task-manager-db-1            Up 2h
+
+      curl /api/config: {"version": "1.9.6", "edition": "community"}
+      infrahubctl version: 1.9.6
+      uname -a: Linux example 6.5.0 x86_64
+
+      docker logs infrahub-task-worker-1 (excerpt at line 4521):
+        ...
+        2026-05-29 14:22:09 ERROR CommitNotFoundError: Commit abc123 not found with GitRepository my-repo
+        ...
+
+      docker logs infrahub-task-worker-2: clean, same commit found and processed.
+
+      infrahubctl repository list:
+        my-repo  Error  https://${GITHUB_PAT}@github.com/example/my-repo.git
+
+      The user has already answered the user-gate questions: this is a git-sync
+      issue, redaction sample: redact-all for IPs and customer strings, keep
+      hostnames.
+
+      Produce the final bundle as a directory tree at ./output_bundle/. The bundle
+      must include manifest.yml, README.md, flags.yml, redaction-report.txt,
+      baseline/ with versions.yml + api-config.json + deployment.yml + host.yml +
+      logs/ containing one file per task-worker replica, and
+      category/git-sync/ with per-worker artifacts (git-tree-task-worker-1.txt,
+      git-tree-task-worker-2.txt, repositories-graphql.json).
+
+      Apply Tier 1 redaction: any password/token/secret value or URL credential
+      must be replaced with ***REDACTED:*** style markers. The GitHub PAT in the
+      repo URL must be redacted to https://***REDACTED***@github.com/...
+
+      The manifest.yml must include problem.category: git-sync,
+      deployment.worker_replicas: 2, infrahub.version: 1.9.6,
+      infrahub.edition: community, and the full bug-report-template fields
+      under problem.
+
+      The flags.yml must include an entry with id: commit-not-found, severity:
+      warning, evidence pointing to the worker-1 log, and a short hint.
+    graders:
+      - type: deterministic
+        run: python graders/collecting-diagnostics/check_git_sync_bundle.py
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_bundle/ following the bundle layout from the skill,
+      with manifest.yml claiming category: git-sync and worker_replicas: 2,
+      two per-worker log files under baseline/logs/, a category/git-sync/
+      directory with per-worker git artifacts and repositories-graphql.json,
+      and flags.yml including a commit-not-found entry. All secrets are
+      redacted (passwords, tokens, URL credentials).
+    expectations:
+      - Bundle root has manifest.yml and README.md
+      - flags.yml is present at the bundle root and is a YAML list
+      - baseline/ has versions.yml, api-config.json, deployment.yml, host.yml
+      - baseline/logs/ has one file per task-worker replica (two files here)
+      - category/git-sync/ exists with per-worker artifacts
+      - manifest.yml problem.category equals "git-sync"
+      - flags.yml contains an entry with id "commit-not-found"
+      - No file in the bundle contains an unredacted password, token, or URL credential
+    assertions:
+      - name: bundle-has-manifest-and-readme
+        check: Bundle root contains manifest.yml and README.md
+      - name: baseline-canonical-files
+        check: baseline/ has versions.yml, api-config.json, deployment.yml, host.yml, logs/
+      - name: multi-replica-coverage
+        check: One log file per task-worker replica (two for this scenario)
+      - name: manifest-category-git-sync
+        check: manifest.yml problem.category equals git-sync
+      - name: category-dir-git-sync
+        check: category/git-sync/ directory exists and is non-empty
+      - name: commit-not-found-flag-fires
+        check: flags.yml contains an entry with id `commit-not-found`
+      - name: redaction-applied
+        check: No file contains an unredacted secret pattern (password, token, JWT, URL credential)
+
+  - name: collecting-diagnostics-redaction
+    instruction: |
+      Read the skill at .agents/skills/infrahub-collecting-diagnostics/SKILL.md and
+      apply the redaction rules in rules/redaction-tiers.md.
+
+      You are given a small bundle that has been partially collected. The
+      baseline/config/compose-resolved.yml currently looks like this (raw, before
+      redaction):
+
+        services:
+          infrahub-server:
+            environment:
+              INFRAHUB_DB_PASSWORD: hunter2-mysql-pass
+              INFRAHUB_INITIAL_ADMIN_TOKEN: 06438eb2-8d1a-490f-9d11-3bdb6b73f329
+              INFRAHUB_SECURITY_SECRET_KEY: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
+              INFRAHUB_LOG_LEVEL: INFO
+              INFRAHUB_TELEMETRY_OPTOUT: "true"
+
+      And baseline/logs/server.log contains:
+
+        2026-05-29 10:22:15 INFO  Bound to 0.0.0.0:8000
+        2026-05-29 10:22:18 DEBUG Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature_padding_here_extra
+        2026-05-29 10:22:20 INFO  Schema loaded
+
+      And baseline/config/sample-cert.txt contains a literal block:
+
+        -----BEGIN PRIVATE KEY-----
+        MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...
+        -----END PRIVATE KEY-----
+
+      Apply Tier 1 auto-redaction. Produce the redacted bundle directory at
+      ./output_bundle/ with:
+
+      1. manifest.yml at the root with minimal but valid bug-report-template
+         fields (any category is fine; this task is about redaction, not
+         classification).
+      2. README.md at the root, 3-5 lines.
+      3. baseline/config/compose-resolved.yml — with all passwords, tokens, and
+         security keys replaced by ***REDACTED:env-key***-style markers.
+         Innocuous values (INFRAHUB_LOG_LEVEL, INFRAHUB_TELEMETRY_OPTOUT) are
+         left alone.
+      4. baseline/logs/server.log — JWT replaced with ***REDACTED:jwt***.
+      5. baseline/config/sample-cert.txt — entire BEGIN/END PRIVATE KEY block
+         removed (replaced with a placeholder note).
+      6. redaction-report.txt at the bundle root listing every redaction with
+         file path and a count summary (e.g., "compose-resolved.yml: 3 env
+         values REDACTED").
+    graders:
+      - type: deterministic
+        run: python graders/collecting-diagnostics/check_redaction_compliance.py
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_bundle/ where no file contains an unredacted secret
+      (password value, token value, JWT, private-key block, URL credentials),
+      with manifest.yml and README.md at the root, and a non-empty
+      redaction-report.txt listing the replacements applied.
+    expectations:
+      - Bundle root has manifest.yml and README.md
+      - redaction-report.txt is present and lists each redaction
+      - No file contains an unredacted INFRAHUB_*_PASSWORD or _TOKEN or _SECRET_KEY value
+      - No file contains an unredacted JWT (three base64 segments)
+      - No file contains a literal BEGIN/END PRIVATE KEY block
+    assertions:
+      - name: redaction-report-present
+        check: redaction-report.txt is present and non-empty
+      - name: no-unredacted-secrets
+        check: >-
+          No file in the bundle contains an unredacted password, token, JWT,
+          private key block, or URL credential
+
+  - name: collecting-diagnostics-flag-emission
+    instruction: |
+      Read the skill at .agents/skills/infrahub-collecting-diagnostics/SKILL.md and
+      study rules/flag-checks-deterministic.md and the catalog at flag-checks.md.
+
+      You have already collected a baseline. The file
+      baseline/logs/infrahub-task-worker-1.log contains (around line 1234):
+
+        2026-05-29 02:11:09 WARN  Garbage collection pressure
+        2026-05-29 02:11:42 ERROR java.lang.OutOfMemoryError: Java heap space
+        2026-05-29 02:11:42 ERROR Worker process terminated; restarting
+
+      Produce ./output_bundle/ containing:
+
+      1. manifest.yml — any minimal but valid bug-report-template content.
+      2. README.md — short.
+      3. baseline/logs/infrahub-task-worker-1.log — the log content as above.
+      4. flags.yml — a YAML list at the root including at minimum a correct
+         entry for the oom-in-logs flag from the catalog:
+
+         - id: oom-in-logs
+           severity: warning
+           evidence:
+             file: baseline/logs/infrahub-task-worker-1.log
+             line: 1234
+             excerpt: "java.lang.OutOfMemoryError: Java heap space"
+           hint: <one short hint sentence; do NOT claim a root-cause diagnosis>
+           related_issues: []
+
+      Do not invent flags that are not justified by the collected evidence.
+      Each entry must have id, severity (info or warning), evidence (file +
+      line + excerpt), and hint.
+    graders:
+      - type: deterministic
+        run: python graders/collecting-diagnostics/check_flag_emission.py
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_bundle/ with manifest.yml and README.md at the
+      root, and flags.yml at the root containing a well-formed YAML list
+      that includes an entry with id "oom-in-logs", severity "warning",
+      evidence pointing to the worker log, and a short hint.
+    expectations:
+      - flags.yml is a YAML list at the bundle root
+      - Each flag entry has id, severity, evidence, and hint
+      - severity is either "info" or "warning"
+      - An entry with id "oom-in-logs" is present
+      - The hint is descriptive but does not claim a root-cause diagnosis
+    assertions:
+      - name: flags-yml-shape
+        check: flags.yml is a list whose entries all have id/severity/evidence/hint
+      - name: oom-in-logs-fires
+        check: flags.yml contains an entry with id `oom-in-logs`
