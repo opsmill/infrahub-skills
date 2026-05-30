@@ -1,7 +1,7 @@
 # Flag Checks — Deterministic Catalog
 
 This file is the full catalog of v1 flag checks
-that the skill runs in workflow step 5, after
+that the skill runs in workflow step 6, after
 collection and before the redaction gate. Every
 check here is deterministic: it inspects a specific
 collected file, applies a regex / `jq` / `yq`
@@ -27,17 +27,31 @@ Every entry follows the schema:
   hint: "<one short sentence; never a diagnosis>"
 ```
 
-## v1 catalog (15 checks)
+Every check below reads files **already present in
+the bundle** — none of them probe the running
+deployment. The catalog was previously larger; flag
+checks that depended on speculative probes
+(`schema-hash-drift` polled the workers, the
+RabbitMQ and Prefect checks needed `docker compose
+exec` into the broker / Postgres) were dropped when
+the skill tightened its contract to `infrahubctl`-only
+for instance state.
+
+## v1 catalog (12 checks)
 
 ### 1. `using-default-security-key`
 
 - **Severity:** warning
-- **Pattern:** sha256 of `INFRAHUB_SECURITY_SECRET_KEY`
-  (read from `bundle/baseline/config/compose-resolved.yml`
-  or `bundle/baseline/config/helm-values.yml`)
-  matches the documented compose default. Compute
+- **Pattern:** read `bundle/baseline/config/compose-resolved.yml`
+  (Docker Compose) or `bundle/baseline/config/helm-values.yml`
+  (Kubernetes) for the value of `INFRAHUB_SECURITY_SECRET_KEY`,
+  compute its sha256, and compare to the sha256 of the
+  documented compose default. Compute the reference hash
   against the upstream
   [docker-compose.yml](https://github.com/opsmill/infrahub/blob/main/docker-compose.yml).
+  This reads a file already on disk — the skill does
+  not `docker compose exec` into the server container
+  to print the env.
 - **Hint:** "JWT signing key is the documented
   default — sessions issued by one server pod may
   not validate on another."
@@ -49,9 +63,13 @@ Every entry follows the schema:
 ### 2. `using-default-init-token`
 
 - **Severity:** warning
-- **Pattern:** sha256 of
-  `INFRAHUB_INITIAL_ADMIN_TOKEN` (same source files
-  as above) matches the documented compose default.
+- **Pattern:** same source files as
+  `using-default-security-key` — read
+  `INFRAHUB_INITIAL_ADMIN_TOKEN` from the resolved
+  compose config or helm values, sha256 it, compare
+  to the sha256 of the documented compose default.
+  Again: a file read, not an env probe inside the
+  container.
 - **Hint:** "Initial admin token is the documented
   default — anyone who can reach the API can
   authenticate as admin."
@@ -85,13 +103,17 @@ Every entry follows the schema:
 ### 4. `branch-stuck-merging`
 
 - **Severity:** warning
-- **Pattern:** in `bundle/baseline/state/branches.json`,
-  any element with `status: "MERGING"` and
-  `updated_at` older than 10 minutes (measured
-  against `manifest.generated_at`).
-- **Hint:** "A branch has been in MERGING state
-  for more than 10 minutes; the merge controller
-  is likely wedged."
+- **Pattern:** in `bundle/baseline/state/branches.txt`
+  (the text output of `infrahubctl branch list`),
+  any row whose status column is `MERGING`. The text
+  output is the source of truth — `--json` is not
+  exposed on `branch list`. If the user wants
+  fresher per-branch detail, `infrahubctl branch
+  report <name>` text output is collected per
+  non-default branch in the `branch-merge` category.
+- **Hint:** "A branch is in MERGING state; the merge
+  controller may be wedged. Confirm with
+  `infrahubctl branch report <name>`."
 - **Related GitHub issues:** none specific (this
   pattern is the canonical symptom for several
   branch-merge bugs).
@@ -99,8 +121,9 @@ Every entry follows the schema:
 ### 5. `branch-needs-rebase`
 
 - **Severity:** warning
-- **Pattern:** in `bundle/baseline/state/branches.json`,
-  any element with `status: "NEED_UPGRADE_REBASE"`.
+- **Pattern:** in `bundle/baseline/state/branches.txt`,
+  any row whose status column is
+  `NEED_UPGRADE_REBASE`.
 - **Hint:** "Branch was open across an upgrade and
   needs `infrahubctl branch rebase <name>` before
   further changes can merge."
@@ -109,33 +132,19 @@ Every entry follows the schema:
 ### 6. `repo-error`
 
 - **Severity:** warning
-- **Pattern:** in
-  `bundle/category/git-sync/repos-graphql.json`,
-  any `CoreGenericRepository` whose
-  `operational_status != "operational"`.
+- **Pattern:** in `bundle/baseline/state/repositories.txt`
+  (the text output of `infrahubctl repository list`),
+  any row whose operational-status column is not
+  `operational` (e.g., `degraded`, `error`,
+  `unknown`).
 - **Hint:** "A Git repository registered with
   Infrahub reports a non-operational status; see
-  the `name` and `commit` fields for the failing
-  repo."
+  the row in repositories.txt for the failing repo."
 - **Related GitHub issues:**
   [#9036](https://github.com/opsmill/infrahub/issues/9036),
   [#9349](https://github.com/opsmill/infrahub/issues/9349)
 
-### 7. `schema-hash-drift`
-
-- **Severity:** warning
-- **Pattern:** the `/api/schema/summary` `hash`
-  field collected from each worker (when
-  multi-replica probing is possible) does not
-  match across workers. With a single-replica
-  deployment this check is skipped.
-- **Hint:** "Workers report different schema
-  hashes — one worker is on an older schema than
-  another. The schema-load propagation step
-  didn't reach every worker."
-- **Related GitHub issues:** none specific.
-
-### 8. `n-1-upgrade-violation`
+### 7. `n-1-upgrade-violation`
 
 - **Severity:** warning
 - **Pattern:** in `bundle/manifest.yml`, the
@@ -149,30 +158,7 @@ Every entry follows the schema:
   upgrade policy is N to N+1."
 - **Related GitHub issues:** none specific.
 
-### 9. `rabbit-queue-backlog`
-
-- **Severity:** warning
-- **Pattern:** parse
-  `bundle/category/task-worker-pipeline/rabbitmq/queues.txt`
-  for any queue whose `messages` column exceeds
-  100.
-- **Hint:** "RabbitMQ queue depth is over 100;
-  consumers may not be keeping up or are wedged."
-- **Related GitHub issues:** none specific.
-
-### 10. `prefect-many-failed-runs`
-
-- **Severity:** warning
-- **Pattern:** parse
-  `bundle/category/task-worker-pipeline/prefect/recent-runs.txt`
-  for more than 5 rows with `state_type = 'FAILED'`
-  whose `start_time` is within the last hour.
-- **Hint:** "More than 5 Prefect flow runs failed
-  in the last hour — likely a systemic issue
-  rather than an isolated task failure."
-- **Related GitHub issues:** none specific.
-
-### 11. `oom-in-logs`
+### 8. `oom-in-logs`
 
 - **Severity:** warning
 - **Pattern:** `grep -E 'OOMKilled|OutOfMemoryError'`
@@ -183,7 +169,7 @@ Every entry follows the schema:
   killed by the kernel or the JVM."
 - **Related GitHub issues:** none specific.
 
-### 12. `db-tx-memory-limit`
+### 9. `db-tx-memory-limit`
 
 - **Severity:** warning
 - **Pattern:**
@@ -197,12 +183,12 @@ Every entry follows the schema:
   isn't being batched."
 - **Related GitHub issues:** none specific.
 
-### 13. `commit-not-found`
+### 10. `commit-not-found`
 
 - **Severity:** warning
 - **Pattern:** `grep 'CommitNotFoundError'` in any
   `bundle/baseline/logs/*task-worker*.log` or
-  `bundle/category/git-sync/workers/*/recent.log`.
+  `bundle/category/git-sync/logs/*.log`.
 - **Hint:** "A task-worker references a Git commit
   that isn't in its local clone — multi-worker git
   race condition is the usual cause."
@@ -210,19 +196,19 @@ Every entry follows the schema:
   [#9036](https://github.com/opsmill/infrahub/issues/9036),
   [#9293](https://github.com/opsmill/infrahub/issues/9293)
 
-### 14. `git-permission-denied`
+### 11. `git-permission-denied`
 
 - **Severity:** warning
 - **Pattern:**
   `grep -E 'fatal:.*Permission denied'` in any
   `bundle/baseline/logs/*task-worker*.log` or
-  `bundle/category/git-sync/workers/*/recent.log`.
+  `bundle/category/git-sync/logs/*.log`.
 - **Hint:** "A task-worker failed a Git operation
   with Permission denied — credentials (PAT, SSH
   key) are missing, expired, or rotated."
 - **Related GitHub issues:** none specific.
 
-### 15. `host-low-resources`
+### 12. `host-low-resources`
 
 - **Severity:** warning
 - **Pattern:** parse `bundle/baseline/host.yml` for
@@ -237,13 +223,20 @@ Every entry follows the schema:
 ## Adding a check
 
 A new flag check is a contract: a row in this file
-and a function in the workflow's step-5 runner.
+and a function in the workflow's step-6 runner.
 
 The contract is intentionally narrow — the goal is
 to surface known shapes that experts learn to
 recognize, not to do open-ended pattern matching.
+A new check must read a file that already exists in
+the bundle. If you find yourself wanting to add a
+check that needs a new probe — and especially one
+that runs `docker compose exec`, `curl /api/...`, or
+a direct DB query — stop. That probe is exactly the
+kind of speculative coupling the skill removed; the
+bundle does not need it.
 
-To add one:
+To add a check:
 
 1. **Add a row to this catalog** with:
    - `id` (kebab-case, prefixed with the file or
@@ -255,7 +248,7 @@ To add one:
    - `hint` (one sentence; never a diagnosis)
    - `related_issues` (GitHub issue numbers if
      known)
-2. **Implement the pattern in workflow step 5.**
+2. **Implement the pattern in workflow step 6.**
    The implementation reads the named file from
    the bundle, applies the selector, and on a hit
    appends a `flags.yml` entry. Keep the pattern
@@ -286,5 +279,6 @@ added:
   already runs in the `schema-load` category.
 
 When in doubt: if you can write the selector in
-five lines of `grep`/`jq`/`yq`, it belongs here.
-If you can't, it doesn't.
+five lines of `grep`/`jq`/`yq` against an existing
+bundle file, it belongs here. If you can't, it
+doesn't.

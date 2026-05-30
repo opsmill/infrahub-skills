@@ -1,7 +1,7 @@
 # Reference — Command Catalog
 
 This file is the working command catalog for the
-`infrahub-collecting-diagnostics` skill. Step 4 of
+`infrahub-collecting-diagnostics` skill. Step 5 of
 the workflow (targeted collection) reads from here.
 Commands are read-only and safe to run against a
 production Infrahub deployment.
@@ -16,6 +16,61 @@ working directory and that `bundle/` has been
 created. If a command writes a path under `bundle/`,
 the parent directory must exist first — the
 workflow creates them up front.
+
+## The contract: `infrahubctl` only against the instance
+
+Anything that probes Infrahub instance state — branches,
+repositories, schemas, tasks, telemetry — uses
+`infrahubctl` and nothing else.
+
+The only stable, version-versioned contract OpsMill
+commits to is `infrahubctl`. Every other path is
+speculative:
+
+- HTTP probes (`curl http://.../api/...`,
+  `curl -sX POST http://.../graphql`) couple the skill
+  to specific GraphQL field names and REST routes that
+  shift between minor versions.
+- `docker compose exec`/`kubectl exec` into stack
+  containers (`cypher-shell`, `psql`, `rabbitmqctl`,
+  `neo4j-admin`, `printenv`) couples the skill to
+  internal implementation details (the DB engine, the
+  message broker, the Prefect schema, env-var names)
+  that are explicitly out of contract.
+
+These probes worked yesterday and break tomorrow,
+silently. Stick to `infrahubctl`. See
+[rules/infrahubctl-only-for-instance.md](rules/infrahubctl-only-for-instance.md)
+for the full rule and the live-test failures that
+informed it.
+
+Deployment-infrastructure inspection (Docker/k8s
+topology, container logs, host fingerprint, file
+reads of the user's local files) is **not** "the
+instance" — it inspects the host and orchestration
+layer the user controls, not Infrahub internals.
+That is allowed and forms the rest of this catalog.
+
+## Connection info: URL + token
+
+Every `infrahubctl` call below assumes the workflow's
+step 2 ran first and exported:
+
+```bash
+export INFRAHUB_ADDRESS="<URL the user provided>"
+export INFRAHUBCTL_TOKEN="<token the user provided>"
+```
+
+The token is added to the Tier-1 redactor mask list
+the moment the user shares it, so it never appears in
+any bundle file — see
+[rules/connection-info-and-token.md](rules/connection-info-and-token.md).
+
+If the user declined to share a token, **every
+`infrahubctl` block in this file is skipped** and
+`manifest.yml` records `collected.infrahubctl_state:
+false`. The topology/log/file-read collection still
+runs.
 
 ## OS and shell assumptions
 
@@ -37,14 +92,14 @@ shell guess, because some compatibility helpers
 **Only Docker Compose v2 is supported.** The skill
 uses the `docker compose` subcommand exclusively;
 legacy `docker-compose` (v1) is not a fallback. v1
-reached end-of-life mid-2023 and is missing
-features (notably `compose ps --format json` shape
-and `compose exec -T`) that the catalog relies on.
-If `docker compose version` doesn't return v2.x,
-the workflow should ask the user to upgrade Docker
-before continuing rather than substitute v1
-commands. Compose v2 has shipped by default with
-Docker Desktop 4.x and Docker Engine 20.10+.
+reached end-of-life mid-2023 and is missing features
+(notably `compose ps --format json` shape) that the
+catalog relies on. If `docker compose version`
+doesn't return v2.x, the workflow should ask the user
+to upgrade Docker before continuing rather than
+substitute v1 commands. Compose v2 has shipped by
+default with Docker Desktop 4.x and Docker Engine
+20.10+.
 
 ## 1. Service-name map
 
@@ -80,7 +135,7 @@ relevant `bundle/category/<name>/logs/`.
 
 ## 2. Baseline collection — per topology
 
-The baseline runs unconditionally in step 2, before
+The baseline runs unconditionally in step 3, before
 the category is known. Output paths follow the
 bundle layout (see
 [rules/bundle-layout.md](rules/bundle-layout.md)).
@@ -104,15 +159,19 @@ docker compose ps -a --format json        > bundle/baseline/deployment/compose-p
 docker compose top                        > bundle/baseline/deployment/compose-top.txt 2>&1
 docker network ls                         > bundle/baseline/deployment/docker-networks.txt 2>&1
 
-# Resolved compose config — Tier-1 redactor pass required before sharing
+# Per-container inspect (resource limits, healthcheck, exit code) — host-side, not exec.
+for c in $(docker compose ps -a --format '{{.Name}}'); do
+  docker inspect "$c"                     > "bundle/baseline/deployment/inspect-${c}.json" 2>&1
+done
+
+# Resolved compose config — Tier-1 redactor pass required before sharing.
+# This file is the source for the using-default-* flag checks (read, hash, compare).
 docker compose config                     > bundle/baseline/config/compose-resolved.yml 2>&1
 
 # User config files — copy verbatim, redactor will handle them
 cp .infrahub.yml         bundle/baseline/config/  2>/dev/null || true
 cp infrahub.toml         bundle/baseline/config/  2>/dev/null || true
-
-# Server self-report — version + edition + build SHA when present
-curl -sf http://localhost:8000/api/config > bundle/baseline/api-config.json 2>&1
+[ -f docker-compose.yml ] && cp docker-compose.yml bundle/baseline/config/ 2>/dev/null || true
 
 # Schema snapshot from the repo on disk (not from the server).
 # sha256sum is GNU coreutils (Linux); macOS uses `shasum -a 256`.
@@ -123,13 +182,8 @@ if [ -d schemas ]; then
     > bundle/baseline/schemas-repo.sha256 2>&1
 fi
 
-# Live state (read-only)
-# infrahubctl branch list does not support --json; fetch via GraphQL for structured output.
+# Live state — `infrahubctl` only. Skipped entirely if no token was provided.
 infrahubctl branch list                   > bundle/baseline/state/branches.txt 2>&1
-curl -sX POST http://localhost:8000/graphql \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"query { Branch { id name description origin_branch branched_from sync_with_git has_schema_changes is_default is_isolated status }}"}' \
-                                          > bundle/baseline/state/branches.json 2>&1
 infrahubctl schema list                   > bundle/baseline/state/schema-kinds.txt 2>&1
 infrahubctl repository list               > bundle/baseline/state/repositories.txt 2>&1
 infrahubctl task list --json --limit 50   > bundle/baseline/state/recent-tasks.json 2>&1
@@ -184,7 +238,8 @@ kubectl -n infrahub get svc,ingress,pvc   > bundle/baseline/deployment/k8s-objec
 kubectl -n infrahub get events --sort-by=.lastTimestamp \
                                           > bundle/baseline/deployment/events.txt 2>&1
 
-# Helm-resolved values — Tier-1 redactor pass required before sharing
+# Helm-resolved values — Tier-1 redactor pass required before sharing.
+# This file is the source for the using-default-* flag checks.
 helm -n infrahub list                     > bundle/baseline/deployment/helm-list.txt 2>&1
 helm -n infrahub get values --all infrahub \
                                           > bundle/baseline/config/helm-values.yml 2>&1
@@ -193,21 +248,10 @@ helm -n infrahub get values --all infrahub \
 cp .infrahub.yml         bundle/baseline/config/  2>/dev/null || true
 cp infrahub.toml         bundle/baseline/config/  2>/dev/null || true
 
-# Server self-report — port-forward if no Ingress
-kubectl -n infrahub port-forward svc/infrahub-server 8000:8000 \
-  > /dev/null 2>&1 &
-PF_PID=$!
-sleep 2
-curl -sf http://localhost:8000/api/config > bundle/baseline/api-config.json 2>&1
-kill $PF_PID 2>/dev/null || true
-
-# Live state
-# infrahubctl branch list does not support --json; fetch via GraphQL for structured output.
+# Live state — `infrahubctl` only. INFRAHUB_ADDRESS should already point at the
+# cluster's ingress / service URL; if not reachable from the host, the user
+# port-forwards themselves out-of-band.
 infrahubctl branch list                   > bundle/baseline/state/branches.txt 2>&1
-curl -sX POST http://localhost:8000/graphql \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"query { Branch { id name description origin_branch branched_from sync_with_git has_schema_changes is_default is_isolated status }}"}' \
-                                          > bundle/baseline/state/branches.json 2>&1
 infrahubctl schema list                   > bundle/baseline/state/schema-kinds.txt 2>&1
 infrahubctl repository list               > bundle/baseline/state/repositories.txt 2>&1
 infrahubctl task list --json --limit 50   > bundle/baseline/state/recent-tasks.json 2>&1
@@ -251,16 +295,8 @@ docker compose ps -a --format json        > bundle/baseline/deployment/compose-p
 # Resolved compose config — Tier-1 redactor pass required before sharing
 docker compose config                     > bundle/baseline/config/compose-resolved.yml 2>&1
 
-# Server self-report
-curl -sf http://localhost:8000/api/config > bundle/baseline/api-config.json 2>&1
-
 # Live state via the same infrahubctl that the demo brings up
-# infrahubctl branch list does not support --json; fetch via GraphQL for structured output.
 infrahubctl branch list                   > bundle/baseline/state/branches.txt 2>&1
-curl -sX POST http://localhost:8000/graphql \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"query { Branch { id name description origin_branch branched_from sync_with_git has_schema_changes is_default is_isolated status }}"}' \
-                                          > bundle/baseline/state/branches.json 2>&1
 infrahubctl schema list                   > bundle/baseline/state/schema-kinds.txt 2>&1
 infrahubctl repository list               > bundle/baseline/state/repositories.txt 2>&1
 infrahubctl task list --json --limit 50   > bundle/baseline/state/recent-tasks.json 2>&1
@@ -294,7 +330,7 @@ done
 Every block here is run **after** the baseline.
 Outputs land under `bundle/category/<name>/`.
 
-When the user picks **everything** mode (step 3),
+When the user picks **everything** mode (step 4),
 run every block below in sequence.
 
 ### 3.1 `installation-startup`
@@ -354,7 +390,7 @@ stuck in `NEED_UPGRADE_REBASE`.
 **Docker Compose:**
 
 ```bash
-mkdir -p bundle/category/upgrade/{logs,neo4j-report,branches}
+mkdir -p bundle/category/upgrade/{logs,branches}
 
 # Image SHAs reveal what version is actually running per service
 docker compose images                     > bundle/category/upgrade/compose-images.txt
@@ -364,33 +400,20 @@ for c in $(docker compose ps -a --format '{{.Name}}'); do
   docker logs --since 24h "$c"            > "bundle/category/upgrade/logs/${c}.log" 2>&1
 done
 
-# Neo4j health report — bundled tool, writes a single tgz
-docker compose exec -T database \
-  neo4j-admin server report --to-path=/tmp/ 2>&1 \
-  | tee bundle/category/upgrade/neo4j-report/run.log
+# Focused database container logs — surfaces migration / startup errors from Neo4j or Memgraph
+# (no infrahubctl wrapper — relying on logs and topology only)
+for c in $(docker ps --filter "name=infrahub-database" --format '{{.Names}}'); do
+  docker logs --since 24h "$c"            > "bundle/category/upgrade/logs/${c}.log" 2>&1
+done
 
-# Copy the report tgz out to the bundle
-docker compose cp database:/tmp/. bundle/category/upgrade/neo4j-report/ 2>/dev/null || true
-
-# Branches in stuck states — infrahubctl branch list does not support --json,
-# so fetch via GraphQL for structured output.
+# Branches in stuck states — text output from infrahubctl is the source of truth.
 infrahubctl branch list                   > bundle/category/upgrade/branches/list.txt 2>&1
-curl -sX POST http://localhost:8000/graphql \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"query { Branch { id name status is_default branched_from }}"}' \
-                                          > bundle/category/upgrade/branches/list.json 2>&1
-# Filter for stuck branches (informational; raw list is the source of truth)
-python3 -c 'import json,sys
-data = json.load(sys.stdin).get("data", {}).get("Branch", [])
-print(json.dumps([b for b in data if b.get("status") in ("NEED_UPGRADE_REBASE","MERGING")], indent=2))' \
-  < bundle/category/upgrade/branches/list.json \
-                                          > bundle/category/upgrade/branches/stuck.json 2>&1
 ```
 
 **Kubernetes:**
 
 ```bash
-mkdir -p bundle/category/upgrade/{logs,neo4j-report,branches}
+mkdir -p bundle/category/upgrade/{logs,branches}
 
 kubectl -n infrahub get pods -o yaml      > bundle/category/upgrade/pods-yaml.txt
 helm -n infrahub history infrahub         > bundle/category/upgrade/helm-history.txt 2>&1
@@ -400,20 +423,14 @@ for pod in $(kubectl -n infrahub get pods -o jsonpath='{.items[*].metadata.name}
                                           > "bundle/category/upgrade/logs/${pod}.log" 2>&1
 done
 
-# Neo4j health report from the database pod
-DB_POD=$(kubectl -n infrahub get pods -l app.kubernetes.io/component=database \
-  -o jsonpath='{.items[0].metadata.name}')
-kubectl -n infrahub exec "$DB_POD" -- \
-  neo4j-admin server report --to-path=/tmp/ 2>&1 \
-  | tee bundle/category/upgrade/neo4j-report/run.log
-kubectl -n infrahub cp "${DB_POD}:/tmp" bundle/category/upgrade/neo4j-report/ 2>/dev/null || true
+# Database pod logs explicitly — migration errors land here
+for pod in $(kubectl -n infrahub get pods -l app.kubernetes.io/component=database \
+  -o jsonpath='{.items[*].metadata.name}'); do
+  kubectl -n infrahub logs --since=24h --timestamps "$pod" \
+                                          > "bundle/category/upgrade/logs/${pod}-database.log" 2>&1
+done
 
-# infrahubctl branch list does not support --json; fetch via GraphQL for structured output.
 infrahubctl branch list                   > bundle/category/upgrade/branches/list.txt 2>&1
-curl -sX POST http://localhost:8000/graphql \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"query { Branch { id name status is_default branched_from }}"}' \
-                                          > bundle/category/upgrade/branches/list.json 2>&1
 ```
 
 ### 3.3 `git-sync`
@@ -424,82 +441,39 @@ schemas not loaded from repo.
 **Docker Compose:**
 
 ```bash
-mkdir -p bundle/category/git-sync/{workers,repos-graphql,config}
+mkdir -p bundle/category/git-sync/{config,logs}
 
 # Copy the user's .infrahub.yml so the expert can see what was expected
 cp .infrahub.yml bundle/category/git-sync/config/ 2>/dev/null || true
 
-# Per-worker /opt/infrahub/git inspection — every replica
+# 1h focused logs from every task-worker replica — multi-worker race conditions
+# (#9036, #9293) hide when only one replica is sampled. The traceback for
+# CommitNotFoundError and Permission denied (publickey) lands here.
+# (no infrahubctl wrapper for per-worker git state — relying on logs only)
 for c in $(docker ps --filter "name=task-worker" --format '{{.Names}}'); do
-  mkdir -p "bundle/category/git-sync/workers/${c}"
-  docker exec "$c" ls -la /opt/infrahub/git \
-                                          > "bundle/category/git-sync/workers/${c}/git-dir-listing.txt" 2>&1
-  docker exec "$c" sh -c 'for d in /opt/infrahub/git/*/; do
-    [ -d "$d/.git" ] || continue
-    echo "===== $d ====="
-    cd "$d" && git status --short --branch
-    echo
-    echo "--- recent commits ---"
-    git log --oneline -10
-    echo
-    echo "--- remote ---"
-    git remote -v
-    echo
-  done'                                   > "bundle/category/git-sync/workers/${c}/repo-status.txt" 2>&1
-  # 1h focused logs from this worker
   docker logs --since 1h "$c" \
-                                          > "bundle/category/git-sync/workers/${c}/recent.log" 2>&1
+                                          > "bundle/category/git-sync/logs/${c}.log" 2>&1
 done
 
-# Repository state from the server's point of view.
-# `infrahubctl graphql` only exposes `export-schema` and `generate-return-types`
-# — there is no ad-hoc query subcommand — so post to /graphql directly.
-# `commit` lives on the concrete CoreRepository / CoreReadOnlyRepository types,
-# not on the generic, so use inline fragments to pull it.
+# Repository state from the server's point of view — infrahubctl only.
 infrahubctl repository list               > bundle/category/git-sync/repositories.txt 2>&1
-curl -sX POST http://localhost:8000/graphql \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"query { CoreGenericRepository { edges { node { id display_label name { value } location { value } operational_status { value } ... on CoreRepository { commit { value } } ... on CoreReadOnlyRepository { commit { value } } } } } }"}' \
-                                          > bundle/category/git-sync/repos-graphql.json 2>&1
 ```
 
 **Kubernetes:**
 
 ```bash
-mkdir -p bundle/category/git-sync/{workers,repos-graphql,config}
+mkdir -p bundle/category/git-sync/{config,logs}
 
 cp .infrahub.yml bundle/category/git-sync/config/ 2>/dev/null || true
 
 for pod in $(kubectl -n infrahub get pods \
   -l app.kubernetes.io/component=task-worker \
   -o jsonpath='{.items[*].metadata.name}'); do
-  mkdir -p "bundle/category/git-sync/workers/${pod}"
-  kubectl -n infrahub exec "$pod" -- ls -la /opt/infrahub/git \
-                                          > "bundle/category/git-sync/workers/${pod}/git-dir-listing.txt" 2>&1
-  kubectl -n infrahub exec "$pod" -- sh -c 'for d in /opt/infrahub/git/*/; do
-    [ -d "$d/.git" ] || continue
-    echo "===== $d ====="
-    cd "$d" && git status --short --branch
-    echo "--- recent commits ---"; git log --oneline -10
-    echo "--- remote ---"; git remote -v
-  done'                                   > "bundle/category/git-sync/workers/${pod}/repo-status.txt" 2>&1
   kubectl -n infrahub logs --since=1h --timestamps "$pod" \
-                                          > "bundle/category/git-sync/workers/${pod}/recent.log" 2>&1
+                                          > "bundle/category/git-sync/logs/${pod}.log" 2>&1
 done
 
 infrahubctl repository list               > bundle/category/git-sync/repositories.txt 2>&1
-# `infrahubctl graphql` only exposes `export-schema` and `generate-return-types`
-# — no ad-hoc query subcommand — so port-forward and post to /graphql directly.
-# `commit` lives on the concrete CoreRepository / CoreReadOnlyRepository types,
-# not on the generic, so use inline fragments to pull it.
-kubectl -n infrahub port-forward svc/infrahub-server 8000:8000 > /dev/null 2>&1 &
-PF_PID=$!
-sleep 2
-curl -sX POST http://localhost:8000/graphql \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"query { CoreGenericRepository { edges { node { id display_label name { value } location { value } operational_status { value } ... on CoreRepository { commit { value } } ... on CoreReadOnlyRepository { commit { value } } } } } }"}' \
-                                          > bundle/category/git-sync/repos-graphql.json 2>&1
-kill $PF_PID 2>/dev/null || true
 ```
 
 ### 3.4 `task-worker-pipeline`
@@ -511,9 +485,10 @@ completes.
 **Docker Compose:**
 
 ```bash
-mkdir -p bundle/category/task-worker-pipeline/{logs,prefect,rabbitmq}
+mkdir -p bundle/category/task-worker-pipeline/logs
 
-# Failed / crashed / hung tasks with full logs
+# Failed / crashed / hung tasks with full logs — `--json` is supported on
+# `infrahubctl task list`. -s filters stack: list each state to include.
 infrahubctl task list --include-logs --json \
   -s FAILED -s CRASHED -s RUNNING         > bundle/category/task-worker-pipeline/failed-tasks.json 2>&1
 
@@ -521,31 +496,23 @@ infrahubctl task list --include-logs --json \
 infrahubctl task list --include-related-nodes --json --limit 200 \
                                           > bundle/category/task-worker-pipeline/recent-tasks.json 2>&1
 
-# 2h focused worker + task-manager logs (heavier than baseline 24h sample)
+# 2h focused worker + task-manager logs (heavier than baseline 24h sample).
+# Queue depths and Prefect flow-run state live inside the message-queue and
+# task-manager-db containers respectively; this skill no longer reaches inside
+# them. The worker + task-manager logs report the same symptoms one layer up.
 for c in $(docker ps --filter "name=task-worker" --format '{{.Names}}'); do
   docker logs --since 2h "$c"             > "bundle/category/task-worker-pipeline/logs/${c}.log" 2>&1
 done
 docker compose logs --since 2h --no-color task-manager \
                                           > bundle/category/task-worker-pipeline/logs/task-manager.log 2>&1
-
-# Prefect flow-run state via task-manager-db (Postgres)
-docker compose exec -T task-manager-db psql -U postgres -d prefect -c \
-  "SELECT id, name, state_type, state_name, start_time, end_time
-   FROM flow_run ORDER BY start_time DESC LIMIT 50;" \
-                                          > bundle/category/task-worker-pipeline/prefect/recent-runs.txt 2>&1
-
-# RabbitMQ queue depths — non-empty queues are the smoking gun
-docker compose exec -T message-queue \
-  rabbitmqctl list_queues name messages consumers \
-                                          > bundle/category/task-worker-pipeline/rabbitmq/queues.txt 2>&1
-docker compose exec -T message-queue \
-  rabbitmqctl list_consumers              > bundle/category/task-worker-pipeline/rabbitmq/consumers.txt 2>&1
+docker compose logs --since 2h --no-color message-queue \
+                                          > bundle/category/task-worker-pipeline/logs/message-queue.log 2>&1
 ```
 
 **Kubernetes:**
 
 ```bash
-mkdir -p bundle/category/task-worker-pipeline/{logs,prefect,rabbitmq}
+mkdir -p bundle/category/task-worker-pipeline/logs
 
 infrahubctl task list --include-logs --json \
   -s FAILED -s CRASHED -s RUNNING         > bundle/category/task-worker-pipeline/failed-tasks.json 2>&1
@@ -559,26 +526,24 @@ for pod in $(kubectl -n infrahub get pods \
                                           > "bundle/category/task-worker-pipeline/logs/${pod}.log" 2>&1
 done
 
-TM_DB=$(kubectl -n infrahub get pods -l app.kubernetes.io/component=task-manager-db \
-  -o jsonpath='{.items[0].metadata.name}')
-kubectl -n infrahub exec "$TM_DB" -- psql -U postgres -d prefect -c \
-  "SELECT id, name, state_type, state_name, start_time, end_time
-   FROM flow_run ORDER BY start_time DESC LIMIT 50;" \
-                                          > bundle/category/task-worker-pipeline/prefect/recent-runs.txt 2>&1
-
-MQ=$(kubectl -n infrahub get pods -l app.kubernetes.io/component=message-queue \
-  -o jsonpath='{.items[0].metadata.name}')
-kubectl -n infrahub exec "$MQ" -- rabbitmqctl list_queues name messages consumers \
-                                          > bundle/category/task-worker-pipeline/rabbitmq/queues.txt 2>&1
+# Task-manager + message-queue logs — same role as the compose block above
+for component in task-manager message-queue; do
+  for pod in $(kubectl -n infrahub get pods \
+    -l "app.kubernetes.io/component=${component}" \
+    -o jsonpath='{.items[*].metadata.name}'); do
+    kubectl -n infrahub logs --since=2h --timestamps "$pod" \
+                                          > "bundle/category/task-worker-pipeline/logs/${pod}.log" 2>&1
+  done
+done
 ```
 
 ### 3.5 `schema-load`
 
 `schema check` rejects file; `/api/schema/load`
-hangs; schema hash drift between workers.
+hangs; schema-load failures.
 
 ```bash
-mkdir -p bundle/category/schema-load/{check,export,summary} bundle/repro/schemas
+mkdir -p bundle/category/schema-load/{check,export} bundle/repro/schemas
 
 # Validate the user's schemas — surfaces compliance failures without touching server.
 # Use a portable existence check (compgen is bash-only).
@@ -592,10 +557,6 @@ infrahubctl schema export \
   --directory bundle/category/schema-load/export/   2>&1 \
   | tee bundle/category/schema-load/export/run.log
 infrahubctl schema list                   > bundle/category/schema-load/kinds.txt 2>&1
-
-# Summary endpoint — hash field is the schema-hash-drift signal
-curl -sf http://localhost:8000/api/schema/summary \
-                                          > bundle/category/schema-load/summary/main.json 2>&1
 
 # 30m server logs filtered to schema activity
 docker compose logs --since 30m --no-color infrahub-server 2>&1 \
@@ -648,19 +609,11 @@ done
 HTTP 5xx; non-nullable field errors; timeouts.
 
 ```bash
-mkdir -p bundle/category/graphql-api/{logs,response} bundle/repro
+mkdir -p bundle/category/graphql-api/logs bundle/repro
 
-# User pastes the failing query into bundle/repro/failing.gql first.
-# Then post it to /graphql directly — `infrahubctl graphql` only exposes
-# `export-schema` and `generate-return-types`, not an ad-hoc query subcommand.
-if [ -f bundle/repro/failing.gql ]; then
-  python3 -c 'import json,sys; print(json.dumps({"query": sys.stdin.read()}))' \
-    < bundle/repro/failing.gql \
-    | curl -sX POST http://localhost:8000/graphql \
-        -H 'Content-Type: application/json' \
-        -d @- \
-                                          > bundle/repro/graphql-response.json 2>&1 || true
-fi
+# The user pastes the failing query into bundle/repro/failing.gql for the
+# expert to reproduce — the skill itself does not run ad-hoc GraphQL queries.
+# (no infrahubctl wrapper for ad-hoc query execution — paste-only)
 
 # 15m server logs
 docker compose logs --since 15m --no-color infrahub-server \
@@ -681,6 +634,11 @@ For a follow-up run, the user can opt in to verbose query logging:
 
 The skill does not restart the server; the user must do that themselves
 before re-collecting if they want the verbose logs.
+
+If you want to attach the failing query and the server's response, paste
+the query body into bundle/repro/failing.gql and (optionally) the response
+JSON into bundle/repro/graphql-response.json. The skill itself does not
+issue ad-hoc GraphQL POSTs.
 EOF
 ```
 
@@ -692,24 +650,12 @@ large nodes.
 **Docker Compose:**
 
 ```bash
-mkdir -p bundle/category/performance/{stats,neo4j,host}
+mkdir -p bundle/category/performance/{stats,host}
 
-# Container resource use right now
+# Container resource use right now — host-side, no exec into stack containers
 docker stats --no-stream                  > bundle/category/performance/stats/docker-stats.txt 2>&1
 
-# Neo4j active queries — the long ones are the smoking gun.
-# CALL dbms.listQueries() was removed in Neo4j 5; use SHOW TRANSACTIONS instead.
-# The password lives inside the infrahub-server container, not on the host shell,
-# so pull it from there before exec-ing into the database container.
-DB_PASSWORD="$(docker compose exec -T infrahub-server printenv INFRAHUB_DB_PASSWORD 2>/dev/null)"
-docker compose exec -T database cypher-shell -u neo4j \
-  -p "$DB_PASSWORD" \
-  "SHOW TRANSACTIONS YIELD transactionId, currentQuery, elapsedTime, username
-   RETURN transactionId, currentQuery, elapsedTime, username
-   ORDER BY elapsedTime DESC LIMIT 50;" \
-                                          > bundle/category/performance/neo4j/active-queries.txt 2>&1
-
-# Telemetry — has per-endpoint timings
+# Telemetry — has per-endpoint timings (infrahubctl only)
 infrahubctl telemetry export \
   --output bundle/category/performance/telemetry.json   2>/dev/null || true
 
@@ -725,25 +671,11 @@ infrahubctl telemetry export \
 **Kubernetes:**
 
 ```bash
-mkdir -p bundle/category/performance/{stats,neo4j,host}
+mkdir -p bundle/category/performance/{stats,host}
 
 # Per-pod resource use
 kubectl -n infrahub top pods              > bundle/category/performance/stats/pod-resources.txt 2>&1
 kubectl top nodes                         > bundle/category/performance/stats/node-resources.txt 2>&1
-
-DB_POD=$(kubectl -n infrahub get pods -l app.kubernetes.io/component=database \
-  -o jsonpath='{.items[0].metadata.name}')
-# CALL dbms.listQueries() was removed in Neo4j 5; use SHOW TRANSACTIONS instead.
-# Pull the DB password from the server pod (the DB pod does not have it set).
-SERVER_POD=$(kubectl -n infrahub get pods -l app.kubernetes.io/component=server \
-  -o jsonpath='{.items[0].metadata.name}')
-DB_PASSWORD="$(kubectl -n infrahub exec "$SERVER_POD" -- printenv INFRAHUB_DB_PASSWORD 2>/dev/null)"
-kubectl -n infrahub exec "$DB_POD" -- cypher-shell -u neo4j \
-  -p "$DB_PASSWORD" \
-  "SHOW TRANSACTIONS YIELD transactionId, currentQuery, elapsedTime, username
-   RETURN transactionId, currentQuery, elapsedTime, username
-   ORDER BY elapsedTime DESC LIMIT 50;" \
-                                          > bundle/category/performance/neo4j/active-queries.txt 2>&1
 
 infrahubctl telemetry export \
   --output bundle/category/performance/telemetry.json   2>/dev/null || true
@@ -755,38 +687,34 @@ OAuth/OIDC login fails; default role can't create
 proposed change; JWT mismatch.
 
 ```bash
-mkdir -p bundle/category/auth-permissions/{env,logs,accounts}
+mkdir -p bundle/category/auth-permissions/{config,logs}
 
-# SSO-related env — masked inline before writing to disk
-docker compose exec -T infrahub-server env \
-  | grep -E '^INFRAHUB_(SECURITY|OAUTH2|OIDC)_' \
-  | sed -E 's/(SECRET|TOKEN|PASSWORD)[^=]*=.*/\1=***REDACTED***/' \
-                                          > bundle/category/auth-permissions/env/sso-vars.txt 2>&1
+# SSO-related config comes from the resolved compose / helm values file we
+# already collected in the baseline — we do not exec inside the server
+# container to print env. The redactor masks INFRAHUB_*_SECRET / *_TOKEN /
+# *_PASSWORD values before the bundle is finalized.
+{
+  echo "Auth-related keys from the resolved deployment config (already collected"
+  echo "into bundle/baseline/config/compose-resolved.yml or helm-values.yml)."
+  echo "The Tier-1 redactor masks secret values before the bundle is finalized."
+} > bundle/category/auth-permissions/config/README.txt
 
 # 30m server logs filtered to auth lines
 docker compose logs --since 30m --no-color infrahub-server 2>&1 \
   | grep -iE 'auth|token|oauth|oidc|permission' \
                                           > bundle/category/auth-permissions/logs/server-auth.log
-
-# Account inventory — who exists, what groups, what account_type.
-# `infrahubctl graphql` only exposes `export-schema` and `generate-return-types`
-# — there is no ad-hoc query subcommand — so post to /graphql directly.
-# Permissions hang off `member_of_groups`, not a (non-existent) `role` field.
-curl -sX POST http://localhost:8000/graphql \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"query { CoreAccount { count edges { node { id name { value } account_type { value } status { value } member_of_groups { edges { node { name { value } } } } } } } }"}' \
-                                          > bundle/category/auth-permissions/accounts/inventory.json 2>&1
 ```
 
 For Kubernetes:
 
 ```bash
-SERVER_POD=$(kubectl -n infrahub get pods -l app.kubernetes.io/component=server \
-  -o jsonpath='{.items[0].metadata.name}')
-kubectl -n infrahub exec "$SERVER_POD" -- env \
-  | grep -E '^INFRAHUB_(SECURITY|OAUTH2|OIDC)_' \
-  | sed -E 's/(SECRET|TOKEN|PASSWORD)[^=]*=.*/\1=***REDACTED***/' \
-                                          > bundle/category/auth-permissions/env/sso-vars.txt 2>&1
+mkdir -p bundle/category/auth-permissions/{config,logs}
+
+cat > bundle/category/auth-permissions/config/README.txt <<'EOF'
+Auth-related keys from the resolved helm values are in
+bundle/baseline/config/helm-values.yml. Secret values are masked by the
+Tier-1 redactor before the bundle is finalized.
+EOF
 
 for pod in $(kubectl -n infrahub get pods -l app.kubernetes.io/component=server \
   -o jsonpath='{.items[*].metadata.name}'); do
@@ -802,33 +730,19 @@ Branch stuck `MERGING`/`DELETING`; failed merge
 leaves partial state.
 
 ```bash
-mkdir -p bundle/category/branch-merge/{branches,neo4j}
+mkdir -p bundle/category/branch-merge/branches
 
-# infrahubctl branch list does not support --json; fetch via GraphQL for structured output.
+# Branch state — `infrahubctl` only.
 infrahubctl branch list                   > bundle/category/branch-merge/branches/list.txt 2>&1
-curl -sX POST http://localhost:8000/graphql \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"query { Branch { id name status is_default branched_from origin_branch sync_with_git has_schema_changes }}"}' \
-                                          > bundle/category/branch-merge/branches/list.json 2>&1
 
-# infrahubctl branch report requires a BRANCH_NAME — run it per non-default branch.
-for b in $(curl -sX POST http://localhost:8000/graphql \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"query { Branch { name is_default }}"}' \
-  | python3 -c 'import json,sys; data=json.load(sys.stdin).get("data",{}).get("Branch",[]); print(" ".join(b["name"] for b in data if not b.get("is_default")))'); do
+# Per-branch detailed report. `infrahubctl branch report` requires a branch
+# name; iterate the names from `branch list` (text parsing is fine — the
+# output is stable per-version).
+for b in $(awk 'NR>1 {print $1}' bundle/category/branch-merge/branches/list.txt 2>/dev/null \
+            | grep -vE '^(main|\-+|NAME|$)'); do
   infrahubctl branch report "$b" \
                                           > "bundle/category/branch-merge/branches/report-${b}.txt" 2>&1 || true
 done
-
-# Direct Neo4j peek — bypasses the API so you see stuck branches even when the
-# merge controller is wedged. The password lives inside the infrahub-server
-# container; the host shell rarely has $INFRAHUB_DB_PASSWORD set, so pull it
-# from the server container and pass it explicitly.
-DB_PASSWORD="$(docker compose exec -T infrahub-server printenv INFRAHUB_DB_PASSWORD 2>/dev/null)"
-docker compose exec -T database cypher-shell -u neo4j \
-  -p "$DB_PASSWORD" \
-  "MATCH (b:Branch) RETURN b.name, b.status, b.is_default ORDER BY b.name;" \
-                                          > bundle/category/branch-merge/neo4j/branches-raw.txt 2>&1
 
 # Prompt the user to export filtered activity CSV from the UI:
 #   Open <infrahub-url>/activities, filter to "Branch", "Merge", "Delete"
@@ -840,15 +754,24 @@ at bundle/category/branch-merge/activities.csv.
 EOF
 ```
 
-Kubernetes is identical except the `cypher-shell`
-call goes through `kubectl exec` on the database
-pod (see [3.8](#38-performance) for the pattern).
+Kubernetes is identical — every command above is
+`infrahubctl` and works regardless of topology, given
+that `INFRAHUB_ADDRESS` reaches the cluster (the user
+sets that up out-of-band — see step 2 in the
+workflow).
 
 ## 4. Environment variable catalog
 
 Diagnostic-relevant `INFRAHUB_*` variables. The
 "Masked" column shows whether the Tier-1 redactor
 strips the value before the bundle is written.
+
+This is documentation, not a probe — the skill does
+not run `env` or `printenv` inside any Infrahub
+container. The skill reads the resolved deployment
+config (`compose-resolved.yml` /
+`helm-values.yml`) for any variable it needs to
+inspect (see the `using-default-*` flag checks).
 
 | Variable | Default | What it tells you when present | Masked |
 | -------- | ------- | ------------------------------ | ------ |
@@ -871,12 +794,27 @@ strips the value before the bundle is written.
 Authoritative source:
 [docs.infrahub.app — Configuration reference](https://docs.infrahub.app/reference/configuration).
 
-## 5. `/api/config` reference
+## 5. `/api/config` — optional, user-paste only
 
 `/api/config` is the server's own health and identity
 endpoint. The upstream `docker-compose.yml` uses it
 as the healthcheck target, so any working deployment
-returns it.
+returns it. The skill **does not** call this
+endpoint itself — see the contract at the top of this
+file. If the user wants the server's own
+version self-report in the bundle, they can run the
+request themselves and paste the JSON into
+`bundle/baseline/api-config.json`:
+
+```bash
+# Run by the user, out-of-band — NOT by this skill:
+#   curl -sf "$INFRAHUB_ADDRESS/api/config" > bundle/baseline/api-config.json
+```
+
+The skill relies on `infrahubctl version` and
+`infrahubctl info --detail` for the version/edition
+fields in `manifest.yml` — both are first-party
+contract.
 
 Example response (truncated to the diagnostic-
 relevant fields):
@@ -898,18 +836,14 @@ relevant fields):
 }
 ```
 
-Key fields to extract into `manifest.yml`:
+If the user does paste this file, key fields to
+extract into `manifest.yml`:
 
 | Field | Manifest target |
 | ----- | --------------- |
-| `version.version` | `infrahub.version` |
+| `version.version` | `infrahub.version` (cross-check vs `infrahubctl version`) |
 | `version.edition` | `infrahub.edition` |
 | `version.build_sha` (if present) | `infrahub.build_sha` |
-
-When `infrahubctl version` and `version.version`
-from `/api/config` disagree, write both into the
-manifest and emit a flag entry — see
-[rules/manifest-template.md](rules/manifest-template.md).
 
 ## 6. `manifest.yml` schema (canonical)
 
@@ -921,11 +855,11 @@ bundle_version: "1.0"
 generated_at: "2026-05-30T12:00:00Z"
 skill_version: "1.2.5"               # from .claude-plugin/plugin.json
 infrahub:
-  version: "1.9.6"                   # from /api/config
+  version: "1.9.6"                   # from `infrahubctl version` (or /api/config if user pasted it)
   edition: "community"               # community | enterprise
-  using_default_security_key: false  # hash compare, not value
+  using_default_security_key: false  # hash compare against compose-resolved.yml / helm-values.yml
   using_default_init_token: false
-  # Optional — only present when client and server disagree
+  # Optional — only present when client and server self-report disagree
   client_version: "1.8.2"            # from `infrahubctl version`
   version_mismatch: false
 deployment:
@@ -955,6 +889,7 @@ collected:
   category_dirs: ["git-sync"]
   repro_included: true
   multi_replica_coverage: true
+  infrahubctl_state: true            # false when the user declined to share a token
 redaction:
   applied: true
   rules_version: "1.0"
