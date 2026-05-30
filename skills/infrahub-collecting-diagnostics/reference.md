@@ -17,6 +17,31 @@ created. If a command writes a path under `bundle/`,
 the parent directory must exist first — the
 workflow creates them up front.
 
+## OS and shell assumptions
+
+The skill assumes a Unix-like environment:
+
+- **Linux** (any modern distro)
+- **macOS** (12+; uses BSD `sed`/`grep` and lacks `nproc`/`free`/`sha256sum` — fallbacks below are wired in)
+- **Windows** users must run from **WSL2** (Ubuntu or Debian); native `cmd.exe` and PowerShell are not supported.
+
+The skill assumes **`bash` 4.x+** (default on Linux,
+default user shell on Windows-WSL2; on macOS 10.15+
+the default user shell is `zsh` but `bash` 3.2 is
+present at `/bin/bash`). When the AI runs a multi-line
+command block, it should invoke it explicitly as
+`bash -c '<block>'` rather than letting the active
+shell guess, because some compatibility helpers
+(e.g., `compgen -G`) are bash-only.
+
+Docker syntax assumes **Docker Compose v2** (the
+`docker compose` subcommand, **not** `docker-compose`
+v1). If a user is on Compose v1, every `docker
+compose ...` line below becomes `docker-compose
+...` — substitute throughout. Compose v2 has been
+the default since Docker Desktop 4.x and Docker
+Engine 20.10+.
+
 ## 1. Service-name map
 
 Canonical service names are the same across
@@ -76,10 +101,14 @@ cp infrahub.toml         bundle/baseline/config/  2>/dev/null || true
 # Server self-report — version + edition + build SHA when present
 curl -sf http://localhost:8000/api/config > bundle/baseline/api-config.json 2>&1
 
-# Schema snapshot from the repo on disk (not from the server)
+# Schema snapshot from the repo on disk (not from the server).
+# sha256sum is GNU coreutils (Linux); macOS uses `shasum -a 256`.
 [ -d schemas ] && cp -r schemas bundle/baseline/schemas-repo/
-[ -d schemas ] && (cd schemas && find . -type f -print0 | xargs -0 sha256sum) \
-  > bundle/baseline/schemas-repo.sha256 2>&1
+if [ -d schemas ]; then
+  HASHER="$(command -v sha256sum || echo 'shasum -a 256')"
+  (cd schemas && find . -type f -print0 | xargs -0 $HASHER) \
+    > bundle/baseline/schemas-repo.sha256 2>&1
+fi
 
 # Live state (read-only)
 infrahubctl branch list --json            > bundle/baseline/state/branches.json 2>&1
@@ -511,8 +540,9 @@ hangs; schema hash drift between workers.
 ```bash
 mkdir -p bundle/category/schema-load/{check,export,summary} bundle/repro/schemas
 
-# Validate the user's schemas — surfaces compliance failures without touching server
-if compgen -G "schemas/*.yml" > /dev/null; then
+# Validate the user's schemas — surfaces compliance failures without touching server.
+# Use a portable existence check (compgen is bash-only).
+if ls schemas/*.yml > /dev/null 2>&1; then
   infrahubctl schema check schemas/*.yml  > bundle/category/schema-load/check/output.txt 2>&1 || true
   cp -r schemas bundle/repro/
 fi
