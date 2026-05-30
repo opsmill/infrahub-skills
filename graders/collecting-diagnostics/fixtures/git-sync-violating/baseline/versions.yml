@@ -1,0 +1,3 @@
+infrahub_server_version: "1.9.6"
+infrahubctl_version: "1.9.6"
+edition: "community"

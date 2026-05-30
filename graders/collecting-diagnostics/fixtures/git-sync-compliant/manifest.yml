@@ -1,0 +1,43 @@
+bundle_version: "1.0"
+generated_at: "2026-05-30T12:00:00Z"
+skill_version: "1.2.5"
+infrahub:
+  version: "1.9.6"
+  edition: "community"
+  using_default_security_key: false
+  using_default_init_token: false
+deployment:
+  topology: "docker-compose"
+  worker_replicas: 2
+  image_shas:
+    infrahub-server: "sha256:aaaaaaaa"
+    task-worker: "sha256:bbbbbbbb"
+host:
+  os: "Linux 6.x"
+  cpu_cores: 8
+  memory_gb: 16
+problem:
+  component: "Git Integration"
+  current_behavior: "Proposed change pipeline fails with CommitNotFoundError"
+  expected_behavior: "Pipeline completes; schemas loaded from repo"
+  steps_to_reproduce: "Push to main; open proposed change; wait"
+  error_message: "CommitNotFoundError: Commit abc123 not found"
+  first_observed: "2026-05-29"
+  reproducible: true
+  impact: "blocker"
+  category: "git-sync"
+collected:
+  baseline: true
+  category_dirs: ["git-sync"]
+  repro_included: false
+  multi_replica_coverage: true
+redaction:
+  applied: true
+  rules_version: "1.0"
+  files_touched: 12
+  replacements: 38
+  user_review_completed: true
+  user_choices:
+    public_ips: "redact-all"
+    hostnames: "keep"
+    customer_strings: "redact-all"

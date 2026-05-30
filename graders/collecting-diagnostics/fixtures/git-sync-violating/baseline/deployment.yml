@@ -1,0 +1,7 @@
+topology: docker-compose
+project_name: infrahub
+services:
+  - name: infrahub-server
+    replicas: 1
+  - name: task-worker
+    replicas: 2

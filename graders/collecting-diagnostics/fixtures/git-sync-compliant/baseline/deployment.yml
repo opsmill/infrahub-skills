@@ -1,0 +1,15 @@
+topology: docker-compose
+project_name: infrahub
+services:
+  - name: infrahub-server
+    replicas: 1
+  - name: task-worker
+    replicas: 2
+  - name: database
+    replicas: 1
+  - name: message-queue
+    replicas: 1
+volumes:
+  - infrahub-git-data
+networks:
+  - infrahub-net

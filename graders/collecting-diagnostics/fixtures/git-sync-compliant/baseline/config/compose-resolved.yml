@@ -1,0 +1,16 @@
+services:
+  infrahub-server:
+    image: opsmill/infrahub:1.9.6
+    environment:
+      INFRAHUB_DB_PASSWORD: ***REDACTED:env-key***
+      INFRAHUB_INITIAL_ADMIN_TOKEN: ***REDACTED:init-token***
+      INFRAHUB_BROKER_PASSWORD: ***REDACTED:env-key***
+      INFRAHUB_CACHE_PASSWORD: ***REDACTED:env-key***
+      INFRAHUB_SECURITY_SECRET_KEY: ***REDACTED:env-key***
+  task-worker:
+    image: opsmill/infrahub:1.9.6
+    deploy:
+      replicas: 2
+    environment:
+      INFRAHUB_DB_PASSWORD: ***REDACTED:env-key***
+      INFRAHUB_BROKER_PASSWORD: ***REDACTED:env-key***
