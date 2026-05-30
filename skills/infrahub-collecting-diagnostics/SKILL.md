@@ -73,7 +73,7 @@ Do not trigger when:
 
 ## Workflow
 
-Follow these steps in order. Three user-gates;
+Follow these steps in order. Four user-gates;
 everything else is automatic.
 
 ### 1. Capture the problem
@@ -83,7 +83,59 @@ words if they haven't already. Don't probe yet —
 listen for product names, version numbers, error
 messages, workflow context.
 
-### 2. Establish baseline
+### 2. Capture connection info (user-gate)
+
+The skill uses `infrahubctl` exclusively for instance
+state. `infrahubctl` needs a URL and (for any
+non-anonymous deployment) an API token to talk to the
+server. Ask the user **before** any other probing:
+
+1. **Infrahub URL or IP** — e.g.,
+   `http://localhost:8000`, `https://infrahub.example.com`.
+   Required. The skill cannot guess this for any
+   non-local deployment.
+2. **API token** — required for any `infrahubctl`
+   call against a deployment that has anonymous
+   access disabled (the typical case). Present this
+   reassurance **verbatim** when asking for it:
+
+   > Your API token is **only used locally** by
+   > `infrahubctl` to query state on your behalf.
+   > It is **never written to the bundle**. The
+   > skill's redactor masks the token before any
+   > bundle file is finalized. The token is **not
+   > sent anywhere** outside your machine.
+
+3. Optional: **Branch name** if the user wants to
+   scope the diagnostic to a non-default branch.
+
+Once the user shares the values:
+
+- Export `INFRAHUB_ADDRESS=<url>` and
+  `INFRAHUBCTL_TOKEN=<token>` in the shell for the
+  rest of the workflow.
+- Add the token to the Tier-1 redactor mask list
+  immediately, so any downstream command that
+  accidentally echoes it ends up with the token
+  masked before the bundle is finalized.
+
+**If the user declines to share a token**, do not
+press them — this is a legitimate concern. Fall back:
+
+- Run topology / log / host / file-read collection
+  (which does not need a token).
+- Skip every `infrahubctl` state query (branches,
+  repos, schema, tasks, telemetry).
+- Record `collected.infrahubctl_state: false` in
+  `manifest.yml` so the expert sees the bundle is
+  partial and why.
+
+See
+[rules/connection-info-and-token.md](rules/connection-info-and-token.md)
+for the full rule (including the privacy notice
+wording).
+
+### 3. Establish baseline
 
 Detect deployment topology by trying, in order:
 
@@ -98,10 +150,11 @@ Then collect baseline artifacts (see
 exact files). The baseline log window is 24 hours
 unless the user changes it. Telemetry
 (`infrahubctl telemetry export`) is included unless
+the user declined to share a token or
 `INFRAHUB_TELEMETRY_OPTOUT=true` is set on the
 server.
 
-### 3. Classify into a category (user-gate)
+### 4. Classify into a category (user-gate)
 
 Ask the bug-report-template fields verbatim
 (see [manifest-template](rules/manifest-template.md))
@@ -119,14 +172,14 @@ The categories are:
 | 2 | `upgrade` | After `infrahub upgrade` or `helm upgrade`; branches stuck in `NEED_UPGRADE_REBASE` |
 | 3 | `git-sync` | Repo state `Error`/`Unknown`; `CommitNotFoundError`; schemas not loaded from repo |
 | 4 | `task-worker-pipeline` | Tasks stuck `RUNNING`/`MERGING`; worker CrashLoopBackOff |
-| 5 | `schema-load` | `schema check` rejects file; `/api/schema/load` hangs; schema hash drift |
+| 5 | `schema-load` | `schema check` rejects file; `/api/schema/load` hangs; schema-load failures |
 | 6 | `check-generator-transform` | Pipeline check red; `infrahubctl <kind>` raises; Jinja2 transform fails |
 | 7 | `graphql-api` | HTTP 5xx; non-nullable field errors; timeouts |
 | 8 | `performance` | Slow UI, slow diff, OOM kills, browser hangs |
 | 9 | `auth-permissions` | OAuth/OIDC login fails; default role can't create PC; JWT mismatch |
 | 10 | `branch-merge` | Branch stuck `MERGING`/`DELETING`; failed merge leaves partial state |
 
-### 4. Targeted collection
+### 5. Targeted collection
 
 Run the category-specific commands documented in
 `reference.md`. Always pull logs from every
@@ -135,7 +188,7 @@ Run the category-specific commands documented in
 recent race-condition bugs hide root cause when
 only one replica is sampled.
 
-### 5. Run flag checks
+### 6. Run flag checks
 
 Run the deterministic flag-check catalog (see
 `flag-checks.md`) against the collected files.
@@ -143,7 +196,7 @@ Write hits to `bundle/flags.yml`. Flag checks are
 hints, not diagnoses (see
 [flag-checks-deterministic](rules/flag-checks-deterministic.md)).
 
-### 6. Redact and present a review summary (user-gate)
+### 7. Redact and present a review summary (user-gate)
 
 Apply Tier 1 auto-redaction (see
 [redaction-tiers](rules/redaction-tiers.md)). Then
@@ -154,14 +207,14 @@ the user `keep` / `redact-all` / `case-by-case`.
 Apply the choices. Log every replacement to
 `bundle/redaction-report.txt`.
 
-### 7. Finalize the bundle
+### 8. Finalize the bundle
 
 Write `manifest.yml` and `README.md`. Print the
 tarball command (`tar czf infrahub-diagnostics-*.tgz
 infrahub-diagnostics-*/`). The bundle is now ready
 to hand to an expert.
 
-### 8. Hand-off (user-gate)
+### 9. Hand-off (user-gate)
 
 Print the expert-ready short summary (3-5 lines).
 If the user then says they also want to file a
@@ -175,7 +228,9 @@ Never duplicate that skill's routing logic here.
 | Prefix | Category | Description |
 | ------ | -------- | ----------- |
 | workflow | Workflow | User-gate semantics, step ordering |
+| connection | Connection | URL + API token capture with privacy guarantee |
 | collection | Collection | Read-only command policy |
+| infrahubctl-only | Instance contract | `infrahubctl`-only probes against the instance |
 | multi-replica | Coverage | Multi-worker log collection |
 | redaction | Redaction | Two-tier secret/PII masking |
 | deployment | Detection | Topology detection order |
@@ -192,13 +247,13 @@ index.
 - [reference.md](reference.md) — exact commands per
   deployment topology (Compose, Kubernetes, local
   dev), environment-variable catalog, service-name
-  map. **Read in step 4.**
+  map. **Read in step 5.**
 - [examples.md](examples.md) — three end-to-end
   walk-throughs: git-sync failure, upgrade with
   stuck branch, performance investigation.
 - [flag-checks.md](flag-checks.md) — full catalog
   of deterministic checks with patterns, severity,
-  and related issue links. **Read in step 5.**
+  and related issue links. **Read in step 6.**
 - [../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)
   — for git-sync and check/generator/transform
   categories.
@@ -208,6 +263,15 @@ index.
 - **Running anything that mutates state.** No
   `infrahubctl schema load`, no `docker compose
   down`, no `kubectl delete`. Read-only only.
+- **Hitting `/api/...` or `docker compose exec` into
+  the database / worker / message-queue containers
+  for state.** Speculative and brittle — every such
+  probe couples the skill to internal implementation
+  details (a GraphQL field name, a Cypher procedure,
+  a Postgres column, an env var inside the
+  container) that change between minor versions.
+  Use `infrahubctl` only for instance state. See
+  [rules/infrahubctl-only-for-instance.md](rules/infrahubctl-only-for-instance.md).
 - **Sampling one replica when there are many.**
   Multi-worker race conditions are common in recent
   releases; missing one replica's logs hides the
@@ -215,6 +279,12 @@ index.
 - **Skipping the redaction review gate.** The Tier
   2 review is non-negotiable. The bundle must be
   safe to share when finalized.
+- **Skipping the connection-info gate.** Even on a
+  local deployment, ask for the URL and offer the
+  token-privacy reassurance. The bundle's
+  `infrahubctl_state: false` path exists for users
+  who legitimately decline; never silently assume
+  anonymous access.
 - **Claiming root cause.** This skill produces
   hints (flag checks), not diagnoses. The expert
   does the actual debugging.
