@@ -9,6 +9,7 @@
     "infrahub-managing-menus",
     "infrahub-auditing-repo",
     "infrahub-analyzing-data",
-    "infrahub-reporting-issues"
+    "infrahub-reporting-issues",
+    "infrahub-collecting-diagnostics"
   ]
 }
