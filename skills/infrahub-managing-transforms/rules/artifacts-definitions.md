@@ -51,15 +51,15 @@ The full allowlist is fixed at eight values
 `infrahub/core/constants/__init__.py` and enforced
 on the schema attribute):
 
-| Content Type       | Use Case                          |
-| ------------------ | --------------------------------- |
-| `text/plain`       | Device configs, scripts           |
-| `text/csv`         | Cable matrices, inventory reports |
-| `text/markdown`    | Generated documentation, reports  |
-| `application/json` | Structured data, API payloads     |
-| `application/yaml` | YAML config files                 |
-| `application/xml`  | XML config / SOAP payloads        |
-| `application/hcl`  | Terraform / HCL config            |
+| Content Type       | Use Case                             |
+| ------------------ | ------------------------------------ |
+| `text/plain`       | Device configs, scripts              |
+| `text/csv`         | Cable matrices, inventory reports    |
+| `text/markdown`    | Generated documentation, reports     |
+| `application/json` | Structured data, API payloads        |
+| `application/yaml` | YAML config files                    |
+| `application/xml`  | XML config / SOAP payloads           |
+| `application/hcl`  | Terraform / HCL config               |
 | `image/svg+xml`    | Generated diagrams (topology, racks) |
 
 > **Use `application/yaml`, not `text/yaml`.** The

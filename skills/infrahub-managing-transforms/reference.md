@@ -84,7 +84,7 @@ with stale or `None` values.
 
 ## Lifecycle: collect_data → transform → return
 
-```
+```text
 SDK calls run()
   → collect_data() — runs the query named in `query`
   → self.nodes / self.store populated

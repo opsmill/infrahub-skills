@@ -86,7 +86,7 @@ class MyGenerator(InfrahubGenerator):
 
 ## Lifecycle: collect_data → generate → tracking cleanup
 
-```
+```text
 Dispatcher invokes run() for each target object
   → collect_data() fetches the design via GraphQL
   → tracking context opens (group = generator name + target id)

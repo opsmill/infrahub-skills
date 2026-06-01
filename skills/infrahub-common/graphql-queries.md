@@ -108,7 +108,7 @@ but never references `$device` in its body is
 rejected at validation time (before any field
 resolver runs) with an error of the form:
 
-```
+```text
 Variable '$device' is never used in operation 'Q'.
 ```
 

@@ -134,7 +134,7 @@ fragment matched on (see
 
 ## Lifecycle: collect_data → validate → pass/fail count
 
-```
+```text
 Dispatcher invokes run()
   → collect_data() executes the registered query
   → the outer "data" key is unwrapped
