@@ -1,3 +1,4 @@
+---
 - id: commit-not-found
   severity: warning
   evidence:

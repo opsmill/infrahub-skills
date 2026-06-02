@@ -32,7 +32,7 @@ and JSON file in the bundle. Log every replacement
 with file + line in `redaction-report.txt`.
 
 | Pattern | Replacement |
-|---|---|
+| --- | --- |
 | Env keys matching `(PASSWORD\|SECRET\|TOKEN\|CLIENT_SECRET\|API_KEY\|AWS_SECRET_ACCESS_KEY\|DSN\|AUTH)`, case-insensitive | `***REDACTED:env-key***` |
 | URL credentials `https?://user:pass@` | `https://***REDACTED***@` |
 | JWT shapes (three base64 segments dot-joined) | `***REDACTED:jwt***` |

@@ -1,3 +1,4 @@
+---
 - id: oom-in-logs
   severity: warning
   evidence:

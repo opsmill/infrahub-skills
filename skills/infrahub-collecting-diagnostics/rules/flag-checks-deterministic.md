@@ -104,5 +104,3 @@ and the emitted entry.
 - Skipping `flags.yml` when nothing fired. The
   file must exist (`[]`) so the expert knows the
   catalog ran.
-
-Reference: [Spec — Flag checks](../../../dev/specs/2026-05-30-collecting-diagnostics-design.md)

@@ -1,3 +1,4 @@
+---
 topology: docker-compose
 project_name: infrahub
 services:

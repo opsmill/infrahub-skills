@@ -54,7 +54,7 @@ For every later step, address each canonical service
 using the per-topology pattern below:
 
 | Canonical service | Docker Compose container | Kubernetes label selector |
-|---|---|---|
+| --- | --- | --- |
 | `infrahub-server` | `infrahub-server-*` | `app.kubernetes.io/component=infrahub-server` |
 | `task-worker` | `infrahub-task-worker-*` | `app.kubernetes.io/component=task-worker` |
 | `database` | `database-*` | `app.kubernetes.io/component=database` |

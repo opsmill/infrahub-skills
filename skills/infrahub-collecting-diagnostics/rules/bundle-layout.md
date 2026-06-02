@@ -136,5 +136,3 @@ infrahub-diagnostics-20260530-120000/
 - Putting `redaction-report.txt` inside `baseline/`.
   It belongs at the root next to `manifest.yml` so
   the user sees it before any drill-down.
-
-Reference: [Spec — Bundle layout](../../../dev/specs/2026-05-30-collecting-diagnostics-design.md)

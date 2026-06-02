@@ -1,3 +1,4 @@
+---
 services:
   infrahub-server:
     image: opsmill/infrahub:1.9.6

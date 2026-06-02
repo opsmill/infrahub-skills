@@ -56,5 +56,3 @@ response. Do not proceed on silence or ambiguity.
 - Auto-applying redaction choices to all groups
   because "they all look like the same kind of
   data" — they may not be.
-
-Reference: [Spec design](../../../dev/specs/2026-05-30-collecting-diagnostics-design.md)

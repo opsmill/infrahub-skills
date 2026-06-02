@@ -1,3 +1,4 @@
+---
 version: "1"
 
 defaults:
@@ -1010,7 +1011,7 @@ tasks:
       And baseline/logs/server.log contains:
 
         2026-05-29 10:22:15 INFO  Bound to 0.0.0.0:8000
-        2026-05-29 10:22:18 DEBUG Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature_padding_here_extra
+        2026-05-29 10:22:18 DEBUG Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sig_padding
         2026-05-29 10:22:20 INFO  Schema loaded
 
       And baseline/config/sample-cert.txt contains a literal block:
