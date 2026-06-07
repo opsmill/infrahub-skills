@@ -552,6 +552,71 @@ tasks:
       - name: human-friendly-id
         check: human_friendly_id defined on the concrete Device
 
+  - name: network-diagram-file-object
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Add a DcimNetworkDiagram node to my Infrahub schema. Each diagram is a Visio
+      file attached to a LocationSite. Track a title, the author, and the date it was
+      last reviewed. The Visio file itself must be stored inside Infrahub, not as a URL.
+      Use namespace 'Dcim'. The LocationSite node already exists — extend it via the
+      schema's relationships rather than redefining it.
+
+      Save ONLY the final schema YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_file_object.py
+        weight: 1.0
+    expected_output: >-
+      A schema in which DcimNetworkDiagram inherits from CoreFileObject (so
+      the Visio file lives in Infrahub object storage with auto file
+      metadata and a GraphQL upload mutation), carries domain attributes
+      (title, author, last_reviewed) but does NOT redeclare the reserved
+      file_name/file_size/file_type/checksum/storage_id attributes, and
+      links back to LocationSite via a cardinality:one relationship.
+    expectations:
+      - >-
+        DcimNetworkDiagram lists CoreFileObject in its inherit_from so the
+        node is a file-bearing entity with auto metadata and an upload
+        mutation
+      - >-
+        CoreFileObject is applied to the concrete DcimNetworkDiagram node,
+        never to a generic — generics are not instantiable and have
+        nothing to upload to
+      - >-
+        The reserved CoreFileObject attributes (file_name, file_size,
+        file_type, checksum, storage_id) are NOT redeclared on
+        DcimNetworkDiagram — they are inherited and system-managed
+      - >-
+        No Text attribute with a name like url, path, file_url,
+        file_path, filename, or location is declared on
+        DcimNetworkDiagram — storing a path/URL alongside CoreFileObject
+        is the bypass antipattern
+      - "human_friendly_id is defined on DcimNetworkDiagram"
+      - 'Schema starts with version: "1.0"'
+    assertions:
+      - name: schema-version
+        check: "Schema starts with version: '1.0'"
+      - name: core-file-object-inherited
+        check: >-
+          DcimNetworkDiagram inherits from CoreFileObject so the Visio
+          file is stored in Infrahub object storage
+      - name: file-object-on-node-not-generic
+        check: >-
+          CoreFileObject is declared only on the concrete node, never on
+          a generic
+      - name: no-reserved-file-attrs
+        check: >-
+          The reserved file_name/file_size/file_type/checksum/storage_id
+          attributes are not redeclared on DcimNetworkDiagram
+      - name: no-filename-text-bypass
+        check: >-
+          No bypass Text attribute (url/path/filename/etc.) is declared
+          alongside the CoreFileObject inheritance
+      - name: human-friendly-id
+        check: human_friendly_id defined on DcimNetworkDiagram
+
   - name: string-length-limits
     trials: 3
     instruction: |

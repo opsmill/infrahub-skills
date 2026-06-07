@@ -321,6 +321,7 @@ referenced without defining them:
 | `BuiltinIPAddress` | Base IP address (for IPAM) |
 | `BuiltinIPPrefix` | Base IP prefix (for IPAM) |
 | `CoreArtifactTarget` | Artifact generation target |
+| `CoreFileObject` | File storage capability (auto file metadata + GraphQL upload mutation) |
 
 ---
 

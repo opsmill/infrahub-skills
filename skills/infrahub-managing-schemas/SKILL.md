@@ -90,6 +90,7 @@ those features require:
 | Be the target of a generator (group member referenced by a `generator_definition`) | `inherit_from: [..., CoreArtifactTarget]` on the concrete node | [rules/extension-artifact-target.md](./rules/extension-artifact-target.md) |
 | Appear in a custom sidebar menu | `include_in_menu: false` so the auto-menu doesn't duplicate the manual entry | [../infrahub-managing-menus/rules/schema-integration.md](../infrahub-managing-menus/rules/schema-integration.md) |
 | Be cloneable as an object template | `generate_template: true` | [rules/extension-object-template.md](./rules/extension-object-template.md) |
+| Store an uploaded file (PDF, image, Visio, KMZ, contract, …) | `inherit_from: [..., CoreFileObject]` on the concrete node | [rules/extension-file-object.md](./rules/extension-file-object.md) |
 | Be displayed with a stable name across UI lists and APIs | `human_friendly_id` and `display_label` | [rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md) |
 
 This audit is the difference between a schema that
@@ -175,6 +176,14 @@ miss when building from scratch:
   duplicate the object as a starter for new
   instances. See
   [rules/extension-object-template.md](./rules/extension-object-template.md).
+- **File objects** — `inherit_from: CoreFileObject`
+  turns a node into a file-bearing entity (PDF,
+  Visio, KMZ, image, certificate, contract, etc.)
+  with auto file metadata and a GraphQL upload
+  mutation. Apply to concrete nodes that *are* a
+  stored file, not to nodes that merely reference
+  one. See
+  [rules/extension-file-object.md](./rules/extension-file-object.md).
 
 ## Supporting References
 
