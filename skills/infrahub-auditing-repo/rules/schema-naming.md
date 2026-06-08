@@ -1,3 +1,9 @@
+---
+title: schema-naming
+impact: CRITICAL
+tags: audit, schema, naming
+---
+
 # Rule: schema-naming
 
 **Severity**: CRITICAL
@@ -6,8 +12,28 @@
 ## What It Checks
 
 Validates that all schema naming conventions are
-followed: namespace, node/generic names,
-attribute/relationship names, and kind derivation.
+followed: namespace casing and length,
+node/generic names in PascalCase,
+attribute/relationship names in snake_case, and
+kind derivation as namespace+name concatenation.
+
+## Why it matters
+
+Naming convention violations are not stylistic —
+`infrahubctl schema check` rejects the entire
+schema bundle when any node breaks the regex, so
+one underscore in a node name blocks the whole
+load and every other change in the same branch
+sits unmergeable until the offender is fixed. The
+kind-derivation rule (`kind == namespace + name`)
+is the most confusing variant because the user
+"set the kind" explicitly and the platform
+silently ignores it, derived value wins, and
+relationships referencing the typed-in kind fail
+to resolve. Catching these at audit time saves
+the round trip through `infrahubctl` output that
+points at line numbers rather than at the
+underlying convention.
 
 ## Checks
 

@@ -8,15 +8,23 @@ tags: tag1, tag2
 
 Impact: MEDIUM
 
-Brief explanation of the rule and why it matters for Infrahub object creation.
+One-sentence statement of the rule.
 
-**Incorrect:**
+### Why it matters
+
+Two or three sentences naming the concrete
+consequence of getting this wrong — the loader
+rejection, the silent reference failure, the data
+that ends up in the wrong shape. Skip generic "best
+practice" language; describe what actually breaks.
+
+### Incorrect
 
 ```yaml
 # Bad example
 ```
 
-**Correct:**
+### Correct
 
 ```yaml
 # Good example

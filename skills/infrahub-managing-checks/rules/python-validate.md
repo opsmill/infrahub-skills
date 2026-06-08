@@ -8,9 +8,26 @@ tags: python, validate, log_error, log_info, InfrahubCheck
 
 Impact: CRITICAL
 
-The `validate()` method is where all check logic lives.
-Understanding logging behavior is essential --
-`log_error()` causes failure, `log_info()` is safe.
+The `validate()` method is where all check logic
+lives, and the choice between `log_error()` and
+`log_info()` is what decides whether the proposed
+change can merge.
+
+### Why it matters
+
+Infrahub counts ERROR-level log entries after
+`validate()` returns: one or more `log_error()` calls
+mark the check failed, which blocks the proposed
+change from merging until a human fixes the data.
+`log_info()` produces messages that surface in the UI
+but do not affect pass/fail. There is no
+`log_warning()` method — reaching for it raises
+`AttributeError` and the check fails with a traceback
+instead of the intended validation message. The
+`data` argument is the unpacked GraphQL response (the
+SDK already strips the outer `"data"` key), so
+indexing it as `data["data"]["..."]` returns `None`
+and silently passes everything.
 
 ### Basic Structure
 

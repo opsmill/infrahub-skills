@@ -8,6 +8,27 @@ tags: patterns, data-cleaning, batch-creation, local-store
 
 Impact: MEDIUM
 
+A few patterns recur across nearly every generator:
+unwrapping the nested GraphQL response, creating
+objects in batches from design quantities, and
+chaining created objects through subsequent calls.
+
+### Why it matters
+
+GraphQL responses are deeply wrapped
+(`edges → node → value`); without a recursive
+unwrap, generator code becomes a forest of
+`["edges"][0]["node"]["value"]` chains that break
+the moment the schema gains an extra layer. Batch
+creation loops have to call `save(allow_upsert=True)`
+inside the loop or the second run fails on the first
+existing object and aborts before it touches the
+rest. Passing freshly-created SDK objects directly
+into the `data` dict of the next `create()` call
+avoids a second round trip to look up the ID — and
+keeps both objects in the same tracking group so
+they get cleaned up together if the design changes.
+
 ### Data Cleaning Helper
 
 ```python

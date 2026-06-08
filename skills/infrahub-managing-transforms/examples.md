@@ -2,6 +2,15 @@
 
 Real-world examples extracted from production Infrahub repositories.
 
+## Contents
+
+- [1. Python Transform with Jinja2 Rendering (Spine Config)](#1-python-transform-with-jinja2-rendering-spine-config)
+- [2. CSV Cable Matrix Transform](#2-csv-cable-matrix-transform)
+- [3. Jinja2 Transform (ContainerLab Topology)](#3-jinja2-transform-containerlab-topology)
+- [4. Minimal Python Transform Template](#4-minimal-python-transform-template)
+- [5. Shared Transform Utilities](#5-shared-transform-utilities)
+- [Complete File Structure](#complete-file-structure)
+
 ---
 
 ## 1. Python Transform with Jinja2 Rendering (Spine Config)

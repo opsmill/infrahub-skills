@@ -8,15 +8,29 @@ tags: format, apiVersion, kind, spec, structure
 
 Impact: CRITICAL
 
-Every object file must follow the exact YAML structure.
-Missing or misplaced fields cause silent failures.
+Object files use a fixed `apiVersion` / `kind` /
+`spec.kind` / `spec.data` envelope. Deviations are
+rejected at load time.
+
+### Why it matters
+
+`infrahubctl object load` parses each document
+through a strict Pydantic model: a missing
+`apiVersion`, the wrong `kind`, or a `data:` list
+sitting outside `spec` causes the file to be skipped
+or to fail validation before any object is created.
+The failure mode is silent for batch loads — the
+file is reported as processed while none of its
+objects reach Infrahub — so the user only notices
+later when references to those objects can't
+resolve.
 
 ### Required Fields
 
 | Field | Value | Description |
 | ----- | ----- | ----------- |
-| `apiVersion` | `infrahub.app/v1` | Always this value |
-| `kind` | `Object` | Always `Object` for data files |
+| `apiVersion` | `infrahub.app/v1` | Fixed string |
+| `kind` | `Object` | Fixed string for data files |
 | `spec.kind` | Node kind | Schema node type (e.g., `DcimDellServer`) |
 | `spec.data` | list | List of object instances |
 

@@ -3,6 +3,18 @@
 Real-world analysis and correlation patterns using
 the Infrahub MCP server.
 
+## Contents
+
+- [1. Device Naming Convention Compliance](#1-device-naming-convention-compliance)
+- [2. VLAN Assignment Compliance](#2-vlan-assignment-compliance)
+- [3. BGP Peer Correlation](#3-bgp-peer-correlation)
+- [4. IP Address Space Compliance](#4-ip-address-space-compliance)
+- [5. Design-to-Reality Correlation](#5-design-to-reality-correlation)
+- [6. Maintenance Window Impact Analysis](#6-maintenance-window-impact-analysis)
+- [7. Service Impact Analysis for a Planned Change](#7-service-impact-analysis-for-a-planned-change)
+- [8. Multi-Check Analysis Run](#8-multi-check-analysis-run)
+- [Complete MCP Tool Invocation Reference](#complete-mcp-tool-invocation-reference)
+
 ---
 
 ## 1. Device Naming Convention Compliance

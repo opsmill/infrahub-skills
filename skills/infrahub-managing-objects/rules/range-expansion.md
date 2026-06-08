@@ -8,8 +8,23 @@ tags: range, expansion, interfaces, sequential
 
 Impact: MEDIUM
 
-For interfaces with sequential names, use range syntax
-with `expand_range: true` to avoid repetitive entries.
+Sequential interface names use bracket-range syntax
+(`Ethernet1/[1-4]`) together with `expand_range:
+true` set under `parameters` on the relationship
+block.
+
+### Why it matters
+
+`expand_range` is a loader directive that applies to
+a whole `data:` list — it tells the loader to fan
+out each ranged entry into individual items before
+upsert. Placing it on an individual data item
+silently has no effect: the loader looks for it on
+`parameters`, doesn't find it, and treats
+`Ethernet1/[1-4]` as a literal interface name with
+brackets in it. The first run creates one strangely
+named interface; the user only notices when the
+expected 4-port range never appears.
 
 **Incorrect -- expand_range on individual items:**
 
@@ -45,8 +60,11 @@ interfaces:
 
 ### Key Rules
 
-- `expand_range: true` goes under `parameters`, not on individual data items
-- All expanded interfaces share the same attribute values (role, status, etc.)
-- Range uses inclusive bounds: `[1-4]` means 1, 2, 3, and 4
+- `expand_range: true` belongs under `parameters`,
+  not on individual data items
+- Expanded interfaces share the same attribute
+  values (role, status, etc.)
+- Range bounds are inclusive — `[1-4]` covers 1, 2,
+  3, and 4
 
 Reference: [Infrahub Object Docs](https://docs.infrahub.app)

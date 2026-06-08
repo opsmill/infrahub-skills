@@ -6,18 +6,26 @@ tags: tag1, tag2
 
 ## Rule Title Here
 
-**Impact:** MEDIUM
+Impact: MEDIUM
 
-Brief explanation of the rule and why it matters
-for Infrahub Transformation creation.
+One-sentence statement of the rule.
 
-**Incorrect:**
+### Why it matters
+
+Two or three sentences naming the concrete
+consequence of getting this wrong — the registration
+that silently fails, the artifact that renders
+unreadable, the template variable that doesn't
+resolve. Skip generic "best practice" language;
+describe what actually breaks.
+
+### Incorrect
 
 ```python
 # Bad example
 ```
 
-**Correct:**
+### Correct
 
 ```python
 # Good example

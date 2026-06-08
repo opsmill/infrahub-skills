@@ -8,12 +8,24 @@ tags: extension, object-template, generate_template, clone, ux
 
 Impact: MEDIUM
 
-`generate_template: true` enables Infrahub's Object
-Template UX on a node: users can mark instances as
-templates and clone them as starters for new
-instances. It is a **node-level capability flag**,
-unrelated to artifact rendering or any inheritance
-requirement.
+`generate_template: true` is a node-level flag that
+enables Infrahub's clone-from-template UX — users
+mark instances as templates and create new ones by
+duplicating them.
+
+### Why it matters
+
+The flag is the entire feature: no companion field
+is required, and it is independent of
+`CoreArtifactTarget` despite the two often appearing
+on the same node. Coupling the two by habit muddles
+design intent — a Topology Design is cloneable but
+has no rendered output, while an auto-managed
+inventory record produces configs but should not
+be cloned. Setting `generate_template: true` on a
+generator-managed node is the most common slip: the
+user duplicates a record the system then overwrites,
+losing the human edits with no error to point at.
 
 Set it on nodes whose creation flow benefits from
 duplicating a known-good instance — common patterns,

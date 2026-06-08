@@ -99,6 +99,68 @@ When Infrahub runs this check for a device named
 `spine-01`, it executes the query with
 `$device = "spine-01"`.
 
+### Declared variables must be used
+
+Infrahub uses `graphql-core`, which enforces the
+GraphQL spec's `NoUnusedVariables` validation rule
+by default. A query that declares `$device: String!`
+but never references `$device` in its body is
+rejected at validation time (before any field
+resolver runs) with an error of the form:
+
+```text
+Variable '$device' is never used in operation 'Q'.
+```
+
+Because validation runs before execution, the
+rejection fires every time the query is rendered —
+including for global queries copy-pasted from a
+targeted base — so a stray unused `$device` is
+enough to block an otherwise correct query.
+
+When converting a targeted query into a global one
+(or vice versa), strip the variable declaration as
+well as the filter that used it. Empty parens
+(`query Q { ... }` with no variables) are valid;
+declared-but-unused variables are not.
+
+### Inline fragments populate fields, but `__typename` returns the concrete kind
+
+A query using a generic kind plus inline fragments
+selects subtype-specific fields only on matching
+nodes:
+
+```graphql
+DcimInterface {
+  edges {
+    node {
+      __typename
+      name { value }
+      ... on InfraInterfaceLayer2 {
+        l2_mode { value }
+      }
+    }
+  }
+}
+```
+
+For each result node, `__typename` resolves to the
+**concrete kind** (`InfraInterfacePhysical`,
+`InfraInterfaceVirtual`, ...) — not the generic
+(`InfraInterfaceLayer2`) named in the fragment.
+Branches that compare `__typename` against the
+generic name will never fire.
+
+Discriminate on field presence instead: subtype
+fields are only populated on nodes the fragment
+matched, so `iface.l2_mode is defined and
+iface.l2_mode.value` is a reliable signal that this
+node is an `InfraInterfaceLayer2`. Field-presence
+also survives schema renames cleanly, where a
+hardcoded kind name does not. See the worked Jinja2
+template in
+[../infrahub-managing-transforms/rules/jinja2-template.md](../infrahub-managing-transforms/rules/jinja2-template.md#discriminating-subtypes--dont-trust-__typename-alone).
+
 ## Infrahub GraphQL Conventions
 
 ### Data Access Pattern
