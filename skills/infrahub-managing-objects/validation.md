@@ -54,7 +54,7 @@ infrahubctl object load objects/ --debug
 Loads are not transactional across files: if file
 17 fails partway through, files 1-16 are already
 written. Test on a branch (`--branch test-load`)
-before loading to `main`.
+before loading to the default branch.
 
 ### What `object load` Does NOT Load
 
@@ -201,7 +201,7 @@ Before running `infrahubctl object load`, verify:
 - [ ] `member_of_groups` is on the member side, not inline `members:` on the group
 - [ ] `expand_range: true` is in `parameters:`, not on individual items
 - [ ] Bootstrap files are **not** in `objects/` (they'd re-load on every sync, overwriting state)
-- [ ] First load goes to a test branch, not `main`
+- [ ] First load goes to a dedicated branch, not the default branch
 
 ## Branch-Based Object Loads
 

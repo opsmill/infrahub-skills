@@ -48,6 +48,7 @@ use the first argument as the kind and remaining arguments as object details.
 
 | Priority | Category | Prefix | Description |
 | -------- | -------- | ------ | ----------- |
+| CRITICAL | Branch-First Loading | `workflow-` | Load onto a branch, not the default branch |
 | CRITICAL | File Format | `format-` | apiVersion, kind, spec structure |
 | CRITICAL | Value Mapping | `value-` | Attributes, dropdowns, references |
 | HIGH | Children | `children-` | Hierarchy/component nesting |
@@ -94,27 +95,42 @@ node kind.
 
 Follow these steps when creating object data files:
 
-1. **Read the schema** — Identify the target node kind,
+1. **Plan to load onto a branch, not the default branch** —
+   Decide the dedicated branch this data will load onto
+   before writing the files, and surface it when you hand
+   off the load commands. Loading into the default branch
+   (the target when no `--branch` is given — `main` by
+   convention, but it can be renamed) writes unreviewed
+   data to the source of truth, and a bad bulk load there
+   means deleting objects one by one instead of discarding
+   a branch. Read
+   [rules/workflow-branch-first.md](./rules/workflow-branch-first.md).
+   The default branch is only reasonable on a local
+   throwaway instance.
+2. **Read the schema** — Identify the target node kind,
    its attributes, relationships, and whether it has
    component children or hierarchy parents.
-2. **Plan the file structure** — Read
+3. **Plan the file structure** — Read
    [rules/format-structure.md](./rules/format-structure.md)
    for the required YAML structure and
    [rules/organization-load-order.md](./rules/organization-load-order.md)
    for file naming and load order conventions.
-3. **Map attribute values** — Set each attribute using
+4. **Map attribute values** — Set each attribute using
    the correct value format. Read
    [rules/value-attributes.md](./rules/value-attributes.md)
    for attribute mapping and
    [rules/value-relationships.md](./rules/value-relationships.md)
    for relationship references.
-4. **Handle children** — If the node has component
+5. **Handle children** — If the node has component
    children or hierarchy nesting, read
    [rules/children-components.md](./rules/children-components.md)
    and [rules/children-hierarchy.md](./rules/children-hierarchy.md).
-5. **Validate** — Check YAML syntax and ensure
-   referenced objects exist or are defined in earlier
-   load-order files.
+6. **Validate and load on the branch** — Check YAML syntax,
+   ensure referenced objects exist or are defined in
+   earlier load-order files, then validate and load against
+   your branch (`--branch`). See
+   [validation.md](./validation.md) for the commands and
+   pre-load checklist.
 
 ## Supporting References
 

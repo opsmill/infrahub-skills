@@ -92,7 +92,7 @@ Remediation
       id="<id>",
       data={"name": "<correct-name>"}
     )
-  Note: always use a branch, not main.
+  Note: always use a dedicated branch, not the default branch.
 • Consider adding an InfrahubCheck to
   enforce naming on future proposed
   changes.

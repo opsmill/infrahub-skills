@@ -48,6 +48,7 @@ use the first argument as the namespace and remaining arguments as node names.
 
 | Priority | Category | Prefix | Description |
 | -------- | -------- | ------ | ----------- |
+| CRITICAL | Branch-First Changes | `workflow-` | Load schema onto a branch, not the default branch |
 | CRITICAL | Naming | `naming-` | Namespace, node, attribute naming |
 | CRITICAL | Relationships | `relationship-` | IDs, peers, component/parent, on_delete |
 | HIGH | Attributes | `attribute-` | Defaults, dropdowns, computed Jinja2, branch-agnostic, deprecated |
@@ -131,9 +132,22 @@ Follow these steps when creating or modifying a schema:
    `order_weight` per
    [rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md)
    and [rules/display-order-weight.md](./rules/display-order-weight.md).
-6. **Validate** — Run `infrahubctl schema check` per
-   [validation.md](./validation.md). Fix any errors
-   using [rules/validation-common-errors.md](./rules/validation-common-errors.md).
+6. **Validate and roll out on a branch** — Run
+   `infrahubctl schema check` to fix errors per
+   [validation.md](./validation.md) and
+   [rules/validation-common-errors.md](./rules/validation-common-errors.md).
+   Then apply the change on a dedicated branch, not the
+   default branch (`main` by convention, but it can be
+   renamed): `infrahubctl branch create <name>` →
+   `schema check --branch <name>` →
+   `schema load --branch <name>`, and merge via a proposed
+   change once it looks right. A schema load runs
+   migrations against loaded data immediately, so on a
+   shared server the default branch gives no preview and no
+   per-step undo — the branch does. See
+   [rules/workflow-branch-first.md](./rules/workflow-branch-first.md).
+   The default branch is only reasonable on a local
+   throwaway instance.
 
 ## Production Patterns Worth Knowing
 

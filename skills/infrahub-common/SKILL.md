@@ -24,6 +24,7 @@ Infrahub skills. It is not meant to be invoked directly.
   migration appendix for engineers porting NetBox
   queries, templates, or overlay data
 - **`rules/`** — Cross-cutting rules shared across skills:
+  - Branch-first data CRUD (default to a branch, not the default branch)
   - Caching display labels in queries
   - Python environment and connectivity checks
   - Git integration and deployment patterns
