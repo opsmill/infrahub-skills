@@ -5,7 +5,7 @@ description: >-
   DO NOT TRIGGER directly — loaded automatically by other Infrahub skills when they need shared references.
 user-invocable: false
 metadata:
-  version: 1.2.5
+  version: 1.2.6
   author: OpsMill
 ---
 
@@ -20,8 +20,12 @@ Infrahub skills. It is not meant to be invoked directly.
   filters, nested queries, and pagination patterns
 - **`infrahub-yml-reference.md`** — `.infrahub.yml`
   configuration file format and field reference
+- **`netbox-vs-infrahub.md`** — Field-by-field
+  migration appendix for engineers porting NetBox
+  queries, templates, or overlay data
 - **`rules/`** — Cross-cutting rules shared across skills:
   - Caching display labels in queries
   - Python environment and connectivity checks
   - Git integration and deployment patterns
+  - Recovery from partial repository syncs
   - Generated file protocol conventions

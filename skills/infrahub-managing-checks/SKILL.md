@@ -12,7 +12,7 @@ allowed-tools:
   - Grep
 argument-hint: "[check-name] [description...]"
 metadata:
-  version: 1.2.5
+  version: 1.2.6
   author: OpsMill
 ---
 
@@ -61,6 +61,20 @@ Existing queries:
 | LOW | Testing | `testing-` | infrahubctl check commands, branch testing |
 
 <!-- markdownlint-enable MD013 -->
+
+## Schema Features This Skill Depends On
+
+A check is only useful if it can fetch and validate
+the right data. Most check failures at deploy time
+are actually schema-side gaps:
+
+| If the check... | The schema (or .infrahub.yml) must... | See |
+| --------------- | ------------------------------------- | --- |
+| Reads an attribute via GraphQL | Expose it on the schema node with the same name (`name__value`-shaped paths) | [../infrahub-managing-schemas/rules/attribute-defaults-and-types.md](../infrahub-managing-schemas/rules/attribute-defaults-and-types.md) |
+| Walks a relationship to validate related objects | Have both sides of the relationship defined with matching identifiers; otherwise the traversal returns nothing | [../infrahub-managing-schemas/rules/relationship-identifiers.md](../infrahub-managing-schemas/rules/relationship-identifiers.md) |
+| Is targeted (per-object) | Register a `CoreStandardGroup` as `targets:` in `.infrahub.yml` and map `parameters:` to bind GraphQL variables | [rules/registration-config.md](./rules/registration-config.md) |
+| Needs the GraphQL response keyed to typed nodes | Select `id` and `__typename` in the query — the SDK relies on both | [../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md) |
+| Should never block a merge but only annotate | Use `self.log_info()` instead of `log_error()`; `log_warning()` does not exist | [rules/python-validate.md](./rules/python-validate.md) |
 
 ## Check Basics
 
@@ -128,6 +142,10 @@ Follow these steps when creating a check:
 
 ## Supporting References
 
+- **[reference.md](./reference.md)** -- Class API,
+  log_error/log_info (no log_warning), lifecycle,
+  `.infrahub.yml` registration (with the no-`query:`
+  shape that differs from generator_definitions)
 - **[examples.md](./examples.md)** -- Complete check
   patterns (global, targeted, minimal)
 - **[../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)**

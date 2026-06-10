@@ -9,15 +9,24 @@ tags: attribute, computed_attribute, jinja2, read_only, derived
 Impact: HIGH
 
 A `computed_attribute` derives its value from other
-fields via a Jinja2 template. The system populates it
-on every save, so the user must not be allowed to
-write to it: pair `computed_attribute` with
-`read_only: true` always. The `optional` setting
-depends on how the value is used — keep it mandatory
-when something else relies on it being present
-(display label, `human_friendly_id`, uniqueness
-constraints), make it optional when the derivation
-is best-effort and an empty value is acceptable.
+fields via a Jinja2 template; it pairs with
+`read_only: true` so users cannot write to a field
+the system overwrites on every save.
+
+### Why it matters
+
+The Infrahub schema validator rejects a
+`computed_attribute` that is not `read_only: true` —
+the load fails before the schema is applied. Without
+that check, a user-supplied value would be silently
+overwritten on the next save and the user's change
+would simply vanish, with no error message to
+attribute it to. The `optional` setting is the
+second trap: if the template inputs are themselves
+optional, a mandatory derivation makes the parent
+record fail to save whenever any input is unset,
+which manifests as bulk-load failures that point at
+the wrong field.
 
 Common use cases seen across production schemas:
 
@@ -37,16 +46,17 @@ Common use cases seen across production schemas:
   computed_attribute:
     kind: Jinja2
     jinja2_template: "AS{{ asn__value }}"
-  read_only: true                # ALWAYS — system writes; block user input
+  read_only: true                # System writes the value; block user input
 ```
 
-That's the minimum. `read_only: true` is non-negotiable
-whenever `computed_attribute` is present.
+That's the minimum. `read_only: true` is required
+whenever `computed_attribute` is present — the schema
+validator rejects the load otherwise.
 
 ### When `optional: false` Is Right
 
 Mark it mandatory if downstream features assume the
-value is always populated:
+value is populated:
 
 - The attribute is referenced by `display_label`
 - The attribute appears in `human_friendly_id`

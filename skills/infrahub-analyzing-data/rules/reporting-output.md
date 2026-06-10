@@ -14,6 +14,23 @@ findings need context, counts, severity, and
 remediation hints. These patterns define how to
 present compliance results.
 
+### Why it matters
+
+Compliance reports are read by people who skim:
+operators triaging a change window, leads deciding
+whether to approve, auditors scanning for the
+headline number. Burying the answer (count,
+compliance percentage, pass/fail) under the raw
+violation list makes the report less actionable
+because the reader has to reconstruct the summary
+themselves, and they often won't. The standard
+structure below leads with the policy and the
+totals, then drills into per-violation detail with
+the IDs needed to remediate — without those IDs the
+operator has to re-run the analysis just to find the
+objects, doubling the work the report was supposed
+to save.
+
 ---
 
 ### Standard Report Structure
@@ -155,8 +172,12 @@ levels are explicitly requested.
 
 ### Remediation Hints
 
-Always include a remediation section. Match the
-remediation to the violation type:
+Include a remediation section in every report — a
+violation list without a fix path forces the reader
+to re-derive how to repair each item, and the
+report becomes a problem statement rather than an
+action item. Match the remediation to the violation
+type:
 
 | Violation Type | Remediation Hint |
 | -------------- | ---------------- |

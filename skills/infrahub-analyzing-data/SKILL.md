@@ -11,7 +11,7 @@ allowed-tools:
   - Bash
 argument-hint: "[question about infrastructure data]"
 metadata:
-  version: 1.2.5
+  version: 1.2.6
   author: OpsMill
 ---
 
@@ -120,6 +120,11 @@ can call tools such as:
   object (remediation, on a branch)
 - **`mcp__infrahub__infrahub_update`** — Update an
   object (remediation, on a branch)
+
+Full per-tool signatures (parameters, examples,
+response shapes) are in
+[rules/mcp-tools.md](./rules/mcp-tools.md) — read
+that before invoking any of these.
 
 ```graphql
 # Example: find all devices in an active

@@ -8,7 +8,22 @@ tags: format, apiVersion, kind, Menu, spec
 
 Impact: CRITICAL
 
-Every menu file must follow the exact YAML structure.
+Menu files need a fixed `apiVersion` / `kind` /
+`spec.data` envelope. Deviations are rejected at
+load time.
+
+### Why it matters
+
+Infrahub parses every menu file through a strict
+Pydantic model: missing `apiVersion`, the wrong
+`kind`, or items outside `spec.data` cause the
+menu to fail to load entirely — the sidebar then
+falls back to the auto-generated menu, masking the
+intent of the custom file. Including the
+`.infrahub.yml` registration comment and the
+`include_in_menu: false` advice in the output is
+what saves the user from a second confused round
+trip when their menu "doesn't show up".
 
 ### Required Fields
 
@@ -47,6 +62,19 @@ YAML comment in the output file so the user knows:
 #   menus:
 #     - menus/menu-full.yml
 ```
+
+> **Common typo: `menu:` (singular) instead of
+> `menus:` (plural).** The `.infrahub.yml`
+> validator is `additionalProperties: false`, so a
+> singular key is rejected with
+> `menu: extra_forbidden`. The plural form
+> propagated through several repo skeletons and
+> templates, so this is a high-frequency mistake
+> when copy-pasting into a new project. The key is
+> always `menus:`, matching `queries:`,
+> `check_definitions:`, `python_transforms:`,
+> `jinja2_transforms:`, and
+> `artifact_definitions:` — all plurals.
 
 ### Key Rules
 

@@ -8,16 +8,31 @@ tags: schema, include_in_menu, kind-links
 
 Impact: MEDIUM
 
-When using a custom menu, configure schema nodes
-to prevent duplicate menu entries.
+A custom menu doesn't replace the auto-generated
+sidebar; it sits next to it. Schema nodes need
+`include_in_menu: false` to opt out of the
+auto-menu, or the user sees both entries.
+
+### Why it matters
+
+Infrahub builds the sidebar by merging custom menus
+with auto-menus derived from the schema. The merge
+is additive — neither side dedupes against the
+other — so every node referenced by a custom item
+that hasn't set `include_in_menu: false` shows up
+twice: once in the custom hierarchy, once at the
+namespace root. Users typically report this as "my
+menu is weird" without realizing both entries are
+working as designed; the fix is on the schema side,
+which is why this rule lives in `managing-menus`
+but acts on `managing-schemas`.
 
 ### Set include_in_menu: false
 
-When you use a custom menu, set
-`include_in_menu: false` on all schema nodes that
-appear in the menu. Without this, Infrahub generates
-auto-menu entries alongside your custom menu,
-creating duplicates.
+Set `include_in_menu: false` on every schema node
+that appears in the custom menu. Without it, the
+auto-menu emits a duplicate entry alongside the
+custom one.
 
 Always include this advice as a YAML comment at the
 top of the menu file so the user sees it:

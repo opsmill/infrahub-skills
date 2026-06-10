@@ -8,20 +8,32 @@ tags: naming, namespace, node, attribute, kind
 
 Impact: CRITICAL
 
-Infrahub enforces strict naming patterns via JSON schema
-validation. Violations cause immediate validation errors.
+Namespaces, node names, and attribute names follow
+fixed regex patterns with hard length limits.
+
+### Why it matters
+
+The Infrahub JSON schema enforces these patterns with
+`additionalProperties: false` and explicit regex
+checks; `infrahubctl schema check` fails before the
+file ever reaches the server. The length minimums
+trip up the obvious shorthand — `id` (too short),
+`DC` (too short), `MyAttribute` (mixed case) — and
+the kind reference everywhere else in the schema is
+built from `Namespace + Name`, so a non-conforming
+name silently breaks every `peer`, `inherit_from`,
+`parent`, and `children` reference that points to it.
 
 ### Namespace
 
 Pattern: `^[A-Z][a-z0-9]+$` (first letter uppercase,
-rest lowercase letters or digits). Min 3, max 32 chars.
+rest lowercase letters or digits).
 
 **Incorrect:**
 
 ```yaml
 namespace: DCIM          # All uppercase
 namespace: dcim          # No uppercase
-namespace: DC            # Too short (min 3)
 ```
 
 **Correct:**
@@ -35,13 +47,12 @@ namespace: Ipam
 
 ### Node and Generic Names
 
-Pattern: `^[A-Z][a-zA-Z0-9]+$` (PascalCase). Min 2, max 32 chars.
+Pattern: `^[A-Z][a-zA-Z0-9]+$` (PascalCase).
 
 **Incorrect:**
 
 ```yaml
 name: my_node            # snake_case
-name: X                  # Too short
 ```
 
 **Correct:**
@@ -54,22 +65,35 @@ name: ModuleBayTemplate
 
 ### Attribute and Relationship Names
 
-Pattern: `^[a-z0-9_]+$` (snake_case). Min 3, max 64 chars.
+Pattern: `^[a-z0-9_]+$` (snake_case).
 
 **Incorrect:**
 
 ```yaml
-- name: id               # Too short (min 3 chars)
-- name: MyAttribute      # Must be lowercase
+- name: id               # Too short (min length is version-dependent — see below)
+- name: MyAttribute      # Mixed case — needs snake_case
 ```
 
 **Correct:**
 
 ```yaml
-- name: obj_id           # Use obj_id instead of id
+- name: obj_id
 - name: my_attribute
 - name: rack_u_position
 ```
+
+The regex patterns above are stable across Infrahub
+versions and enforced at both `schema check`
+(JSON-Schema lint) and `schema load` (server
+Pydantic). **Length caps are version-dependent and
+must be resolved from the running instance's
+OpenAPI spec, not hardcoded here.** See
+[validation-string-limits](./validation-string-limits.md)
+for the lookup procedure
+(`INFRAHUB_ADDRESS` → `localhost:8000` fallback →
+`/api/openapi.json`) and for the `label`,
+`description`, `identifier`, and `deprecation` caps
+that the JSON-Schema lint silently passes over.
 
 ### Kind Derivation
 

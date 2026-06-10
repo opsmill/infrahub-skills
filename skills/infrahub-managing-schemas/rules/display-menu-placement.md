@@ -8,12 +8,24 @@ tags: display, menu_placement, include_in_menu, navigation, generic
 
 Impact: MEDIUM
 
-The Infrahub UI builds its sidebar from two
-sources: the default per-kind menu (one entry per
-node/generic) and **explicit menu files** declared
-under `menus:` in `.infrahub.yml`. The two
-strategies are mutually exclusive in practice — pick
-one and apply it consistently.
+The sidebar is built from two independent sources —
+the per-kind default menu and explicit menu files in
+`.infrahub.yml`. Pick one strategy and apply it
+consistently.
+
+### Why it matters
+
+The two sources are additive, not deduplicating: a
+custom menu file plus a node left at default
+visibility produces the hand-authored entry and an
+auto-generated duplicate at the namespace root. Users
+read this as "the menu is broken" and the cause is
+invisible because both halves are working as designed.
+`menu_placement` only nests inside the per-kind
+sidebar, so it does nothing in projects that ship a
+menu file; conversely, leaving subtypes unplaced in
+a per-kind project clutters the top level with
+abstract bases users cannot instantiate.
 
 | Property | Effect |
 | -------- | ------ |
@@ -25,16 +37,16 @@ one and apply it consistently.
 When the project ships menu YAML files (registered
 under `menus:` in `.infrahub.yml`), the menu is
 authored by hand and the per-kind defaults only get
-in the way. **Set `include_in_menu: false` on every
-node and generic.** The menu file is the single
-source of truth; nothing should leak through from
-the schema.
+in the way. Set `include_in_menu: false` on every
+node and generic — the menu file is the single
+source of truth, and any node left at default
+visibility surfaces as a duplicate sidebar entry.
 
 ```yaml
 nodes:
   - name: Device
     namespace: Dcim
-    include_in_menu: false        # Always, when menu files are used
+    include_in_menu: false        # Required when menu files are used
     ...
   - name: Interface
     namespace: Dcim
@@ -67,7 +79,7 @@ see types they cannot instantiate:
 generics:
   - name: PhysicalDevice
     namespace: Dcim
-    include_in_menu: false        # Abstract — never instantiated
+    include_in_menu: false        # Abstract — has no instances
 
   - name: Endpoint
     namespace: Dcim

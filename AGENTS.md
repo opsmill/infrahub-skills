@@ -45,6 +45,7 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 | `infrahub-managing-menus` | `skills/infrahub-managing-menus/` | Custom navigation menus |
 | `infrahub-analyzing-data` | `skills/infrahub-analyzing-data/` | Live data analysis via MCP server |
 | `infrahub-auditing-repo` | `skills/infrahub-auditing-repo/` | Audit repository against best practices |
+| `infrahub-reporting-issues` | `skills/infrahub-reporting-issues/` | Route and prepare bug/feature reports for any opsmill/infrahub-* repo |
 
 ### Key Directories
 

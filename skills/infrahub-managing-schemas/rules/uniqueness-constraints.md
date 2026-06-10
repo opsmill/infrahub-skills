@@ -8,10 +8,22 @@ tags: uniqueness, constraints, validation
 
 Impact: MEDIUM
 
-Uniqueness constraints use `__value` suffix for
-attributes but bare names for relationships. Getting
-this wrong causes a "references unknown field"
-validation error.
+Uniqueness constraints reference attributes with the
+`__value` suffix and relationships by bare name.
+
+### Why it matters
+
+The two field types are stored differently inside
+Infrahub — attributes have a `__value` accessor for
+the scalar value behind the property wrapper, while
+relationships resolve to peer objects directly. The
+constraint validator does an exact field-name lookup,
+so `name` (without `__value`) and `rack__value` (with
+the suffix on a relationship) both fail schema load
+with `uniqueness constraint references unknown
+field`. The error message names the wrong field but
+not the right one, which is why the rule lives here:
+it's the format you have to know in advance.
 
 **Incorrect:**
 
@@ -42,7 +54,7 @@ nodes:
   - name: PDU
     namespace: Dcim
     uniqueness_constraints:
-      - ["rack", "name__value"]   # Name must be unique within each rack
+      - ["rack", "name__value"]   # Name is unique within each rack
     human_friendly_id:
       - name__value
       - rack__name__value

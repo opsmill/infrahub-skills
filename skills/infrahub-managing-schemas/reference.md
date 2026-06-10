@@ -24,10 +24,10 @@ Properties for entries in the `nodes:` list.
 
 | Property | Type | Default | Constraints | Description |
 | -------- | ---- | ------- | ----------- | ----------- |
-| `name` | string | *required* | 2-32, PascalCase | Node name |
-| `namespace` | string | *required* | 3-32, First upper | Namespace |
-| `description` | string | null | Max 128 chars | Short desc |
-| `label` | string | null | Max 64 chars | Display name |
+| `name` | string | *required* | PascalCase | Node name |
+| `namespace` | string | *required* | First upper | Namespace |
+| `description` | string | null | - | Short desc |
+| `label` | string | null | - | Display name |
 | `icon` | string | null | Iconify value | e.g., `mdi:server` |
 | `display_label` | string | null | - | Jinja2 template |
 | `human_friendly_id` | list | null | - | Human-readable ID paths |
@@ -114,10 +114,10 @@ plus:
 
 | Property | Type | Default | Constraints | Description |
 | -------- | ---- | ------- | ----------- | ----------- |
-| `name` | string | *required* | 3-64, snake_case | Attr name |
+| `name` | string | *required* | snake_case | Attr name |
 | `kind` | string | *required* | AttributeKind | Attr type |
-| `label` | string | null | Max 64 chars | Display label |
-| `description` | string | null | Max 128 chars | Help text |
+| `label` | string | null | - | Display label |
+| `description` | string | null | - | Help text |
 | `default_value` | any | null | - | Default value |
 | `unique` | boolean | `false` | - | Globally unique |
 | `optional` | boolean | **`false`** | - | **Mandatory by default** |
@@ -127,7 +127,7 @@ plus:
 | `choices` | list | null | - | Dropdown choices |
 | `allow_override` | enum | `"any"` | `"none"`/`"any"` | Profile override |
 | `state` | enum | `"present"` | - | `absent` to remove |
-| `deprecation` | string | null | Max 128 chars | Deprecation msg |
+| `deprecation` | string | null | - | Deprecation msg |
 
 ### Attribute Parameters (kind-specific)
 
@@ -189,12 +189,12 @@ plus:
 
 | Property | Type | Default | Constraints | Description |
 | -------- | ---- | ------- | ----------- | ----------- |
-| `name` | string | *required* | 3-64, snake_case | Rel name |
+| `name` | string | *required* | snake_case | Rel name |
 | `peer` | string | *required* | PascalCase | Target kind |
 | `kind` | enum | `"Generic"` | See table | Rel type |
-| `label` | string | null | Max 64 chars | Display label |
-| `description` | string | null | Max 128 chars | Help text |
-| `identifier` | string | null | Max 128, snake_case | Match both sides |
+| `label` | string | null | - | Display label |
+| `description` | string | null | - | Help text |
+| `identifier` | string | null | snake_case | Match both sides |
 | `cardinality` | enum | **`"many"`** | `"one"`/`"many"` | Count |
 | `optional` | boolean | **`true`** | - | **Optional by default** |
 | `direction` | enum | `"bidirectional"` | bi/out/in | Direction |
@@ -207,7 +207,7 @@ plus:
 | `state` | enum | `"present"` | - | `absent` to remove |
 | `common_parent` | string | null | - | Must share parent |
 | `common_relatives` | list | null | - | Must share relatives |
-| `deprecation` | string | null | Max 128 chars | Deprecation msg |
+| `deprecation` | string | null | - | Deprecation msg |
 
 ### Relationship Kinds
 
@@ -339,14 +339,19 @@ referenced without defining them:
 
 ## Naming Constraints Summary
 
-| Element | Convention | Pattern | Length |
-| ------- | ---------- | ------- | ------ |
-| Node name | PascalCase | `^[A-Z][a-zA-Z0-9]+$` | 2-32 |
-| Namespace | First upper | `^[A-Z][a-z0-9]+$` | 3-32 |
-| Attr name | snake_case | `^[a-z0-9\_]+$` | 3-64 |
-| Rel name | snake_case | `^[a-z0-9\_]+$` | 3-64 |
-| Identifier | snake_case | `^[a-z0-9\_]+$` | max 128 |
-| Kind (auto) | NS + Name | - | - |
-| Description | Free text | - | max 128 |
-| Label (attr) | Free text | - | max 64 |
-| Label (node) | Free text | - | max 64 |
+| Element | Convention | Pattern |
+| ------- | ---------- | ------- |
+| Node name | PascalCase | `^[A-Z][a-zA-Z0-9]+$` |
+| Namespace | First upper | `^[A-Z][a-z0-9]+$` |
+| Attr name | snake_case | `^[a-z0-9\_]+$` |
+| Rel name | snake_case | `^[a-z0-9\_]+$` |
+| Identifier | snake_case | `^[a-z0-9\_]+$` |
+| Kind (auto) | NS + Name | - |
+| Description | Free text | - |
+| Label (attr) | Free text | - |
+| Label (node) | Free text | - |
+
+Length caps live in
+[validation-string-limits](./rules/validation-string-limits.md);
+they are resolved from the live Infrahub schema at
+validation time rather than duplicated here.

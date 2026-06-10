@@ -8,11 +8,29 @@ tags: migration, state, absent, adding, removing
 
 Impact: MEDIUM
 
-Schema changes on live data require careful migration strategies.
+Schema changes on data that is already loaded follow
+a staged migration — mark removals with
+`state: absent`, add new fields as optional first,
+and split type changes into add/migrate/remove.
+
+### Why it matters
+
+Deleting an attribute from the YAML does not remove
+it from the data: the loader sees a field that
+"disappeared" rather than one explicitly retired, and
+the column lingers in the underlying graph attached
+to every existing object. Adding a mandatory
+attribute without a default fails validation for
+every pre-existing record on the next load, blocking
+the schema update entirely. The asymmetry — schema
+changes are cheap before data is loaded, expensive
+after — is what makes a planned migration sequence
+mandatory once a node has live instances.
 
 ### Removing an Attribute
 
-Use `state: absent` to remove an attribute. Don't just delete it from the YAML.
+Use `state: absent` to remove an attribute rather
+than deleting it from the YAML.
 
 ```yaml
 - name: old_field

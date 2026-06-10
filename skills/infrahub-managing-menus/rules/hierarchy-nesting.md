@@ -8,8 +8,21 @@ tags: hierarchy, nesting, children, data, group-headers
 
 Impact: HIGH
 
-Menu items can be nested to any depth using
-`children.data`.
+Nested menu items live under `children.data`, never
+directly under `children`.
+
+### Why it matters
+
+The menu schema models children as an object that
+carries pagination metadata alongside the `data`
+list — the same shape every paginated Infrahub
+GraphQL response uses. Putting a bare list under
+`children` makes the parser reject that branch; the
+sidebar renders the parent as a clickable leaf with
+no children, which looks to the user like the
+sub-items "disappeared". The wrapper is also what
+lets future versions extend children with filtering
+or pagination without reshaping existing menu files.
 
 ### Incorrect -- children without data wrapper
 
@@ -81,8 +94,8 @@ Device Management
 
 ### Key Rules
 
-- `children` must contain a `data` key wrapping
-  the array of child items
+- `children` is the wrapper; `data` inside it
+  carries the list of child items
 - Children follow the identical property structure
   (unlimited nesting depth)
 - Use YAML comments for readability in large menus

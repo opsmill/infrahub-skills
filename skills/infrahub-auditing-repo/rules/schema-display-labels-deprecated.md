@@ -1,3 +1,9 @@
+---
+title: schema-display-labels-deprecated
+impact: HIGH
+tags: audit, schema, deprecated, migration
+---
+
 # Rule: schema-display-labels-deprecated
 
 **Severity**: HIGH
@@ -5,11 +11,28 @@
 
 ## What It Checks
 
-Detects usage of the deprecated `display_labels` field
-(plural, list format) in schema files and provides
-exact migration instructions to the replacement
-`display_label` field (singular, Jinja2 template
-string). Deprecated since Infrahub v1.5.
+Detects usage of the deprecated `display_labels`
+field (plural, list format) in schema files and
+provides exact migration instructions to the
+replacement `display_label` field (singular,
+Jinja2 template string). Deprecated since Infrahub
+v1.5.
+
+## Why it matters
+
+`display_labels` is on a removal track — every
+schema that still uses it loads today with a
+deprecation warning and will fail to load
+entirely on the Infrahub release that drops the
+field. The migration is mechanical (list of
+attribute paths to a single Jinja2 template) but
+has to happen on the schema author's clock, not
+under upgrade pressure with the platform refusing
+to start. Flagging this at audit time also gives
+the engineer the exact replacement string to
+paste, which removes the most error-prone part of
+the migration — getting the `{{ }}` delimiters
+and separator characters right per field.
 
 ## Checks
 

@@ -8,8 +8,15 @@ tags: tag1, tag2
 
 Impact: MEDIUM
 
-Brief explanation of the rule and why it matters
-for Infrahub menu creation.
+One-sentence statement of the rule.
+
+### Why it matters
+
+Two or three sentences naming the concrete
+consequence of getting this wrong — the validation
+error, the silent data corruption, the UI behavior
+that surprises users. Skip generic "best practice"
+language; describe what actually breaks.
 
 ### Incorrect
 

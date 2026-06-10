@@ -1,17 +1,30 @@
 ---
-title: Always Set human_friendly_id on Nodes
+title: Set human_friendly_id on Nodes
 impact: HIGH
 tags: display, human_friendly_id, identity
 ---
 
-## Always Set human_friendly_id on Nodes
+## Set human_friendly_id on Nodes
 
 Impact: HIGH
 
-`human_friendly_id` determines how objects are identified
-in the UI and how they're referenced from object data
-files. Without it, objects can only be referenced by
-internal UUID.
+Every user-facing node carries a `human_friendly_id`
+listing the attribute paths that identify it.
+
+### Why it matters
+
+Object data files reference peers by their
+human-friendly id, not by UUID — without one,
+loading data can only target objects by their
+internal UUID, which is unknown until after the
+object exists. The UI also falls back to UUID in
+selectors and breadcrumbs, leaving users staring at
+strings like `f47ac10b-58cc-…` instead of
+`PowerEdge R960`. `default_filter` was the old name
+for this concept and is deprecated; the loader
+still parses it on older versions but it is removed
+in current Infrahub, so any new schema should use
+`human_friendly_id`.
 
 **Incorrect -- no human_friendly_id:**
 
@@ -63,7 +76,7 @@ human_friendly_id:
   - name__value
 ```
 
-Also set `display_label` for UI rendering (supports Jinja2):
+Pair with `display_label` for UI rendering (supports Jinja2):
 
 ```yaml
 display_label: "{{ manufacturer__name__value }} {{ name__value }}"

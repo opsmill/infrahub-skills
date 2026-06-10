@@ -3,6 +3,13 @@
 Real-world examples extracted from production Infrahub
 repositories.
 
+## Contents
+
+- [1. Global Check: Rack Unit Collision Detection](#1-global-check-rack-unit-collision-detection)
+- [2. Targeted Check: Leaf Device Validation](#2-targeted-check-leaf-device-validation)
+- [3. Minimal Check Template](#3-minimal-check-template)
+- [Complete File Structure](#complete-file-structure)
+
 ---
 
 ## 1. Global Check: Rack Unit Collision Detection

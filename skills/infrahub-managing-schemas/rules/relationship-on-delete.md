@@ -8,13 +8,26 @@ tags: relationship, on_delete, cascade, no-action, lifecycle
 
 Impact: MEDIUM
 
-`on_delete` controls what happens to peers when an
-object is deleted. The two values used in production
-are `cascade` (delete the peer too) and `no-action`
-(leave the peer in place). The default is implicit
-`no-action`, which means cascade behavior is opt-in
-and `kind: Component` does **not** automatically
-cascade on its own — you have to declare it.
+`on_delete` controls peer lifecycle when the source
+object is deleted. It is independent of
+`kind: Component` — cascade behavior is opt-in and
+has to be declared explicitly.
+
+### Why it matters
+
+The structural classification (`kind: Component`) and
+the runtime lifecycle (`on_delete: cascade`) are two
+separate decisions, but the naming makes them look
+linked. A `kind: Component` relationship that omits
+`on_delete` defaults to `no-action`, so deleting the
+owner leaves every child intact as an orphan with no
+back-reference — a frequent bug when refactoring
+ownership. The reverse mistake hurts more: cascading
+a relationship to a shared peer (an IP referenced by
+multiple services, a device used by many circuits)
+deletes data that other objects depend on, breaking
+those other objects silently until they fail at
+query time.
 
 ### Values
 

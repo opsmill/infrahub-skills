@@ -11,7 +11,7 @@ allowed-tools:
   - Bash
 argument-hint: "[menu-structure-description]"
 metadata:
-  version: 1.2.5
+  version: 1.2.6
   author: OpsMill
 ---
 
@@ -53,6 +53,24 @@ Schema files (to identify available node types):
 | HIGH     | Icons      | `icons-`     | MDI icon reference, choices  |
 | MEDIUM   | Schema     | `schema-`    | include_in_menu, kind links  |
 | LOW      | Patterns   | `patterns-`  | Flat menu, comments, links   |
+
+## Schema Features This Skill Depends On
+
+A custom menu doesn't replace the auto-menu — it
+augments it. Schemas need cooperating settings to
+avoid duplicates and stay UI-stable.
+
+| If the menu item... | The schema must... | See |
+| ------------------- | ------------------ | --- |
+| Links to a schema node's list view via `kind:` | Define that node (or generic) so the URL resolves — and set `include_in_menu: false` on it to suppress the duplicate auto-menu entry | [rules/schema-integration.md](./rules/schema-integration.md) |
+| Shows all subtypes under one entry via a generic kind | Have the generic defined, with all the relevant nodes `inherit_from` it | [../infrahub-managing-schemas/rules/hierarchy-setup.md](../infrahub-managing-schemas/rules/hierarchy-setup.md) |
+| Should appear at a specific position when auto-menu is in play | Set `order_weight` on the schema node (auto-menu uses it; custom menu ignores it) | [../infrahub-managing-schemas/rules/display-order-weight.md](../infrahub-managing-schemas/rules/display-order-weight.md) |
+| Groups subtypes under a parent node entry | Set `menu_placement: <FullKind>` on each subtype so the auto-menu side groups consistently with the custom menu | [../infrahub-managing-schemas/rules/display-menu-placement.md](../infrahub-managing-schemas/rules/display-menu-placement.md) |
+
+Audit `include_in_menu` on every node you reference
+from the menu file — the sidebar duplicates that
+this prevents look to users like the custom menu is
+"broken", but the fix is on the schema side.
 
 ## Menu File Basics
 
@@ -105,6 +123,9 @@ Follow these steps when creating a menu:
 
 ## Supporting References
 
+- **[examples.md](./examples.md)** -- Four worked
+  menu hierarchies (flat, grouped, generic-linked,
+  full multi-domain) ready to copy and adapt
 - **[infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
 - **[common/rules/](../infrahub-common/rules/)**

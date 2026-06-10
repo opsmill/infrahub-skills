@@ -8,10 +8,32 @@ tags: validation, errors, debugging, additionalProperties
 
 Impact: LOW (but saves debugging time)
 
-The Infrahub JSON schema uses
-`additionalProperties: false`, meaning any typo in
-property names causes a validation error. Here are the
-most common errors and fixes.
+A lookup table that maps the validator's error
+messages to the rule files that explain how to fix
+them.
+
+> **Note on `MUST`/`must` in this file and in
+> [relationship-defaults.md](./relationship-defaults.md)
+> and
+> [relationship-component-parent.md](./relationship-component-parent.md):**
+> any `must` appearing inside a quoted string or
+> backticks is a verbatim Infrahub server error
+> message — kept literal so users can grep their
+> actual error output against the docs. Do not
+> rewrite those occurrences.
+
+### Why it matters
+
+The Infrahub JSON schema is `additionalProperties:
+false` — every typo in a property name surfaces as a
+generic "unknown field" instead of a hint at the
+correct spelling. The error messages from
+`_validate_parents_one_schema` and the relationship
+validator are similarly terse: they name the
+violated rule but not the file or the fix. This
+table closes that gap, pointing each error message
+at the rule file that explains what to change and
+why the validator rejects the current shape.
 
 ### "Unknown field"
 
@@ -64,6 +86,35 @@ references. See
 
 Wrong format in constraints. See the
 [uniqueness-constraints](./uniqueness-constraints.md) rule.
+
+### "Unable to load the schema:" with empty body
+
+When `infrahubctl schema load` prints
+`Unable to load the schema:` followed by nothing,
+the CLI couldn't parse the response far enough to
+report which file failed. Bisect by directory and
+then by file with `infrahubctl schema check`,
+which gives a real error (line number, field
+name) per-file. The empty-body symptom only
+appears at `schema load`.
+
+```bash
+# Bisect by directory
+for dir in schemas/*/; do
+  echo "=== $dir ==="; infrahubctl schema check "$dir"
+done
+```
+
+### "Input should have at most N characters (string_too_long)"
+
+A schema-load-time Pydantic error on
+`description` (128), `label` (64), `identifier`
+(128), or `deprecation` (128). Not caught by
+`infrahubctl schema check` — only by
+`infrahubctl schema load`. See
+[validation-string-limits](./validation-string-limits.md) for
+the verified per-field caps and a Python preflight
+walker.
 
 ### Pre-Validation Checklist
 

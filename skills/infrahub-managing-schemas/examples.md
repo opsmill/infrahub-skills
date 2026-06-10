@@ -4,6 +4,63 @@ Real-world schema patterns extracted from production
 Infrahub deployments. Use these as templates for common
 infrastructure modeling scenarios.
 
+## Contents
+
+- [Production Patterns Worth Knowing](#production-patterns-worth-knowing)
+- [Organization Schema (Simplest Pattern)](#organization-schema-simplest-pattern)
+- [Hierarchical Location Schema](#hierarchical-location-schema)
+- [Device Management with Generics and Inheritance](#device-management-with-generics-and-inheritance)
+- [Component Pattern (Modules/Slots)](#component-pattern-modulesslots)
+- [IPAM Schema (Inheriting Built-in Types)](#ipam-schema-inheriting-built-in-types)
+- [Extensions Pattern (Cross-File Relationships)](#extensions-pattern-cross-file-relationships)
+- [Network Interface Schema (Multiple Generics Composing Behavior)](#network-interface-schema-multiple-generics-composing-behavior)
+- [Custom Menu File](#custom-menu-file)
+- [State Management (Removing Attributes)](#state-management-removing-attributes)
+
+## Production Patterns Worth Knowing
+
+These patterns recur across the OpsMill reference
+schemas (`opsmill/schema-library`,
+`opsmill/infrahub-demo-dc`,
+`opsmill/infrahub-solution-ai-dc`) and are easy to
+miss when building from scratch:
+
+- **Computed Jinja2 attributes** — `computed_attribute`
+  always pairs with `read_only: true`; choose
+  `optional` based on whether the value is
+  load-bearing (display label, hfid, uniqueness) or
+  informational. See
+  [rules/attribute-computed-jinja2.md](./rules/attribute-computed-jinja2.md).
+- **Cascade vs no-action deletes** — `on_delete:`
+  is independent of `kind: Component`; pick
+  `cascade` only for owned children whose existence
+  has no meaning without the parent. See
+  [rules/relationship-on-delete.md](./rules/relationship-on-delete.md).
+- **Menu visibility** — when the project ships menu
+  files in `.infrahub.yml`, set `include_in_menu:
+  false` on every node and generic; otherwise hide
+  abstract bases and use `menu_placement: <FullKind>`
+  to group subtypes. See
+  [rules/display-menu-placement.md](./rules/display-menu-placement.md).
+- **Branch-agnostic identity** — `branch: agnostic`
+  on attributes that must be globally unique (AS
+  numbers, service names, customer IDs). See
+  [rules/attribute-branch-agnostic.md](./rules/attribute-branch-agnostic.md).
+- **Artifact targets** — `inherit_from:
+  CoreArtifactTarget` lets a node receive rendered
+  artifacts. Apply to concrete nodes, not generics.
+  See
+  [rules/extension-artifact-target.md](./rules/extension-artifact-target.md).
+- **Object Templates** — `generate_template: true`
+  enables clone-from-template UX. Independent of
+  artifact targets; use only when users should
+  duplicate the object as a starter for new
+  instances. See
+  [rules/extension-object-template.md](./rules/extension-object-template.md).
+
+The sections below show each of these patterns in
+context, alongside the rest of the schema examples.
+
 ## Organization Schema (Simplest Pattern)
 
 A generic base with simple nodes inheriting from it.
