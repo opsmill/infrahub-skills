@@ -1,31 +1,59 @@
 ---
-# yaml-disable-next-line rule:truthy
-"group/skills":
-  - changed-files:
-      - any-glob-to-any-file:
-          - "skills/**"
-
 "group/ci":
   - changed-files:
-      - any-glob-to-any-file:
-          - ".github/**"
-          - "scripts/**"
+      - any-glob-to-any-file: [".github/**"]
 
-"group/docs":
+"type/documentation":
+  - changed-files:
+      - any-glob-to-any-file: ["docs/**"]
+
+"skill/analyzing-data":
   - changed-files:
       - any-glob-to-any-file:
-          - "dev/**"
-          - "docs/**"
-          - "*.md"
+          - "skills/infrahub-analyzing-data/**"
 
-"group/evaluations":
+"skill/auditing-repo":
   - changed-files:
       - any-glob-to-any-file:
-          - "evaluations/**"
+          - "skills/infrahub-auditing-repo/**"
 
-"group/plugin":
+"skill/common":
   - changed-files:
       - any-glob-to-any-file:
-          - ".claude-plugin/**"
-          - "hooks/**"
-          - "hooks-handlers/**"
+          - "skills/infrahub-common/**"
+
+"skill/managing-checks":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "skills/infrahub-managing-checks/**"
+          - "graders/managing-checks/**"
+
+"skill/managing-generators":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "skills/infrahub-managing-generators/**"
+          - "graders/managing-generators/**"
+
+"skill/managing-menus":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "skills/infrahub-managing-menus/**"
+          - "graders/managing-menus/**"
+
+"skill/managing-objects":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "skills/infrahub-managing-objects/**"
+          - "graders/managing-objects/**"
+
+"skill/managing-schemas":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "skills/infrahub-managing-schemas/**"
+          - "graders/managing-schemas/**"
+
+"skill/managing-transforms":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "skills/infrahub-managing-transforms/**"
+          - "graders/managing-transforms/**"

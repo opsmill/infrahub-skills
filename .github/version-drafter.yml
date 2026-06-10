@@ -1,0 +1,20 @@
+---
+# Label-to-semver mapping for patrickjahns/version-drafter-action.
+# Both type/* and changes/* labels drive version bumps.
+# changes/* labels serve as explicit overrides when the type label
+# doesn't reflect the desired bump level.
+
+version_major_labels:
+  - "changes/major"
+  - "type/breaking-change"
+
+version_minor_labels:
+  - "changes/minor"
+  - "type/feature"
+  - "type/refactoring"
+
+version_patch_labels:
+  - "changes/patch"
+  - "type/bug"
+  - "type/housekeeping"
+  - "type/documentation"

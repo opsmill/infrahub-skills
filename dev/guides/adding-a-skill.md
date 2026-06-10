@@ -12,7 +12,7 @@ format.
 ## Skill Anatomy
 
 ```text
-skills/my-skill/
+skills/infrahub-my-skill/
 ├── SKILL.md              # Entry point (required)
 ├── examples.md           # Ready-to-use patterns
 ├── reference.md          # Property/format reference
@@ -61,14 +61,13 @@ Individual rule files and references hold the details.
 ### 1. Create the Skill Directory
 
 ```bash
-mkdir -p skills/my-skill/rules
+mkdir -p skills/infrahub-my-skill/rules
 ```
 
-- Directory name drops the `infrahub-` prefix
-  (e.g., `schema-creator` not
-  `infrahub-schema-creator`)
-- Skill name in frontmatter uses the full prefix
-  (e.g., `infrahub-schema-creator`)
+- Directory name matches the skill name
+  (e.g., `infrahub-managing-schemas`)
+- Skill name in frontmatter uses the same name
+  (e.g., `infrahub-managing-schemas`)
 
 ### 2. Write SKILL.md
 
@@ -105,7 +104,7 @@ including synonyms and adjacent concepts.
 - **Rule Categories** — Links to `rules/_sections.md`
   or directly to rule files
 - **Supporting References** — When to read
-  `examples.md`, `reference.md`, `../common/`
+  `examples.md`, `reference.md`, `../infrahub-common/`
   resources
 
 **Writing tips** (from the skill-creator best
@@ -135,7 +134,7 @@ index:
 ## Rule Categories
 
 | Prefix | Category | Description |
-|--------|----------|-------------|
+| -------- | ---------- | ------------- |
 | naming | Naming | Naming conventions and constraints |
 | structure | Structure | Structural requirements and patterns |
 | display | Display | UI display configuration |
@@ -163,7 +162,7 @@ should have:
   tables. Useful when the skill deals with structured
   formats (schema properties, YAML fields, API
   parameters).
-- **`../common/`** — Reference shared resources for
+- **`../infrahub-common/`** — Reference shared resources for
   cross-cutting concerns:
   - `graphql-queries.md` — Query syntax for checks,
     generators, transforms
@@ -184,34 +183,35 @@ Add the skill name to the `skills` array in
 
 ### 6. Write Evaluations
 
-Create evaluation scenarios in
-`evaluations/my-skill.json` to test the skill produces
-correct output. This file follows the skill-creator
-eval format:
+Add evaluation tasks to the root `eval.yaml` and
+create deterministic grader scripts in
+`graders/my-skill/` to test the skill produces
+correct output.
 
-```json
-{
-  "skill_name": "infrahub-my-skill",
-  "evals": [
-    {
-      "id": 1,
-      "prompt": "A realistic user request",
-      "expected_output": "What correct output looks like",
-      "files": [],
-      "expectations": [
-        "Specific verifiable outcome 1",
-        "Specific verifiable outcome 2"
-      ],
-      "assertions": [
-        {
-          "name": "descriptive-name",
-          "check": "What to verify programmatically"
-        }
-      ]
-    }
-  ]
-}
+```yaml
+skill_name: infrahub-my-skill
+
+tasks:
+  - id: basic-scenario
+    prompt: >-
+      A realistic user request with specific names,
+      namespaces, and field types.
+    expected_output: >-
+      What correct output looks like.
+    grader: graders/my-skill/basic-scenario.sh
+
+  - id: advanced-scenario
+    prompt: >-
+      A more complex request covering relationships
+      or edge cases.
+    expected_output: >-
+      What correct output looks like.
+    grader: graders/my-skill/advanced-scenario.sh
 ```
+
+Each grader script in `graders/my-skill/` reads the model
+output on stdin and prints `{"pass": true}` or
+`{"pass": false, "reason": "..."}` to stdout.
 
 **Writing good eval prompts**: Make them realistic —
 the kind of thing an actual user would type, with
@@ -220,21 +220,45 @@ Not abstract requests like "create a schema" but
 concrete ones like "Create an Infrahub schema for a
 VLAN management system with...".
 
-**Writing good assertions**: Each assertion should be
-objectively verifiable. Use descriptive names that
-explain what's being tested at a glance (e.g.,
-`dropdown-for-status` not `check-1`).
+**Writing good assertions**: Each grader should be
+objectively deterministic. Use descriptive file names
+that explain what's being tested at a glance (e.g.,
+`dropdown-for-status.sh` not `check-1.sh`).
 
-Run evals with `/skill-creator` to iterate on skill
-quality.
+Run evals with skillgrade to iterate on quality:
+
+```bash
+skillgrade --smoke
+```
+
+After editing `eval.yaml`, regenerate the JSON
+projection used by the `/skill-creator` evals
+runner:
+
+```bash
+python scripts/sync-evals.py
+```
+
+Commit the regenerated `evaluations/*.json` files
+alongside the `eval.yaml` change.
+
+For the per-rule eval workflow (the more common
+case once a skill exists), see
+[adding-a-rule.md](./adding-a-rule.md).
 
 ### 7. Register in Documentation
 
 - Add the skill to the table in `CLAUDE.md`
 - Add the skill to `README.md`
   (skills section + project structure)
-- Update `CHANGELOG.md`
 - Update `AGENTS.md` quick reference table
+
+Release notes are generated automatically by
+[release-drafter](../../.github/release-drafter.yml)
+from PR labels — no manual changelog edit is needed.
+Apply the appropriate `type/*` and `changes/*` labels
+to your PR so it lands in the right release-notes
+category.
 
 ### 8. Verification
 
@@ -259,25 +283,28 @@ Confirm the skill works before submitting for review.
 **Run evaluations** (see [Step 6](#6-write-evaluations)):
 
 ```bash
-python scripts/run_evals.py \
-  --eval-file evaluations/my-skill.json
+skillgrade --smoke
 ```
 
-Review the generated report in `eval-results/`.
+Review results with `skillgrade preview`.
 
 **Required files checklist:**
 
-- [ ] `skills/my-skill/SKILL.md` with correct
+- [ ] `skills/infrahub-my-skill/SKILL.md` with correct
   frontmatter
-- [ ] `skills/my-skill/rules/_sections.md`
+- [ ] `skills/infrahub-my-skill/rules/_sections.md`
 - [ ] At least one rule file in `rules/`
-- [ ] `evaluations/my-skill.json` with test scenarios
+- [ ] Tasks added to root `eval.yaml`
+- [ ] `graders/my-skill/` with grader scripts
+- [ ] `python scripts/sync-evals.py` run and the
+  regenerated `evaluations/*.json` committed
 - [ ] `CLAUDE.md` updated with the new skill
 - [ ] `README.md` updated (skills section + project
   structure)
-- [ ] `CHANGELOG.md` updated
 - [ ] `AGENTS.md` quick reference table updated
   (see [Step 7](#7-register-in-documentation))
+- [ ] PR labeled with `type/*` and `changes/*` so
+  release-drafter categorizes it correctly
 
 **Validate version consistency:**
 
