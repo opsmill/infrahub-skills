@@ -1,8 +1,8 @@
 ---
 name: infrahub-managing-checks
 description: >-
-  Creates Infrahub check definitions — Python validation logic and GraphQL queries for proposed change pipelines.
-  TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes.
+  Creates Infrahub check definitions — Python validation logic, GraphQL queries, and YAML-driven tests for proposed change pipelines.
+  TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes, writing or running tests for a check.
   DO NOT TRIGGER when: designing schemas, querying live data, building transforms or generators.
 allowed-tools:
   - Read
