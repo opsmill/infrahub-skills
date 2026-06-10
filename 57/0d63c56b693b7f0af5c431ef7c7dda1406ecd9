@@ -1,0 +1,21 @@
+skills/infrahub-managing-transforms/SKILL.md
+  s_819ec41dbab4b6::t_91f3bc2857d1c7 4-5
+skills/infrahub-managing-checks/SKILL.md
+  s_819ec41dbab4b6::t_24e56ec61fdeea 4-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "570d63c56b693b7f0af5c431ef7c7dda1406ecd9",
+  "prompts": {},
+  "sessions": {
+    "s_819ec41dbab4b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eecaa17f-c091-4d4a-9eab-d4b814383470",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
