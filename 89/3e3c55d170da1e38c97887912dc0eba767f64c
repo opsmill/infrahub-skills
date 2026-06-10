@@ -1,0 +1,486 @@
+skills/infrahub-managing-objects/examples.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-795
+.github/workflows/sync-docs.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 2-3,6,8-9,11-12,15,18-19,21,23-24,27-28,30,32-41
+.github/workflows/ci.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 22,39-40,55-74,76,78-105
+skills/infrahub-managing-menus/rules/item-properties.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-82
+skills/infrahub-managing-objects/rules/value-relationships.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-128
+skills/infrahub-managing-menus/examples.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-331
+docs/src/css/custom.css
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-146
+skills/infrahub-managing-transforms/examples.md
+  s_819ec41dbab4b6::t_2fc4a985ee7543 483
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-482,484-656
+skills/infrahub-analyzing-data/rules/approach-selection.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-136
+README.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 3,6-7,10,12,15-16,19,21,24,26-32,34,36,38,40,42,44,46,48-50,52,54,56,58,60,62-65,67,69,71-80,84,86-87,89-90,92-93,97,99-109,111,115,117-120,122,124,126,128,130-132,134,136,138,140-143,145,147,149,151-155,157,159,161,163,169,175,183,187,189,202,204-216,219-220,225,229-236,239
+scripts/sync-evals.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-110
+skills/infrahub-analyzing-data/examples.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-666
+eval.yaml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-893
+skills/infrahub-auditing-repo/audit-procedure.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-385
+scripts/sync-versions.sh
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 25-30
+docs/docs/skills-reference/managing-objects.mdx
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-59
+skills/infrahub-managing-checks/rules/_template.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-34
+docs/docs/skills-reference/managing-transforms.mdx
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-64
+skills/infrahub-common/graphql-queries.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-402
+skills/infrahub-managing-menus/rules/_sections.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-27
+docs/docusaurus.config.ts
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-83
+graders/managing-schemas/check_location.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-36
+skills/infrahub-managing-schemas/rules/relationship-component-parent.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-101
+dev/knowledges/infrahub-concepts.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 72-77,84,91
+dev/guides/getting-started.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 89,128-130,144,147,150,153,156,158-162,171-178,198,207
+skills/infrahub-auditing-repo/rules/schema-naming.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-68
+skills/infrahub-managing-objects/rules/format-structure.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-97
+graders/managing-checks/check_global_registration.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-31
+skills/infrahub-managing-generators/examples.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-413
+graders/managing-schemas/check_service_cascade.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-30
+skills/infrahub-common/rules/_sections.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-28
+skills/infrahub-managing-checks/rules/api-reference.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-68
+skills/infrahub-managing-schemas/rules/migration-state-absent.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-85
+skills/infrahub-reporting-issues/rules/_sections.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-9
+skills/infrahub-managing-objects/rules/value-attributes.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-60
+skills/infrahub-managing-checks/rules/patterns-common.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-126
+docs/sidebars.ts
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-12
+skills/infrahub-managing-objects/reference.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-269
+skills/infrahub-managing-objects/rules/range-expansion.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-70
+.vale/styles/Infrahub/simple-easy.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-9
+skills/infrahub-auditing-repo/rules/python-classes.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-69
+skills/infrahub-managing-menus/SKILL.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-137
+docs/babel.config.js
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-3
+skills/infrahub-auditing-repo/rules/artifact-target-inheritance.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-84
+skills/infrahub-managing-generators/rules/architecture-components.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-93
+.gitignore
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 62-64,75
+docs/docs/skills-reference/managing-menus.mdx
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-41
+graders/managing-schemas/check_computed_jinja2.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-28
+.github/version-drafter.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-20
+graders/reporting-issues/check_bug_sanitization.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-39
+skills/infrahub-common/rules/_template.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-43
+skills/infrahub-common/infrahub-yml-reference.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-242
+docs/docs/spec-driven-development.mdx
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-232
+scripts/grade_evals.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 10
+AGENTS.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 7,22,39-48,53-56,58,62-80,84
+skills/infrahub-reporting-issues/templates/bug.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-42
+.vale.ini
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 14
+docs/docs/skills-reference/analyzing-data.mdx
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-47
+evaluations/infrahub-reporting-issues.json
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-88
+graders/managing-schemas/check_parent_relationships.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-31
+skills/infrahub-managing-checks/rules/python-validate.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-91
+skills/infrahub-managing-generators/rules/api-reference.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-67
+skills/infrahub-managing-checks/rules/architecture-types.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-108
+evaluations/infrahub-managing-checks.json
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-77
+skills/infrahub-managing-menus/rules/icons-reference.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-68
+skills/infrahub-managing-menus/rules/patterns-common.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-90
+skills/infrahub-managing-menus/rules/schema-integration.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-68
+skills/infrahub-common/rules/testing-resource-framework.md
+  s_819ec41dbab4b6::t_4d26a76e0e0c3e 35-43
+  s_819ec41dbab4b6::t_d6fc9b97918f64 99
+  s_819ec41dbab4b6::t_a6dfb2f8b8c4bb 83
+  s_819ec41dbab4b6::t_32bc5142a061ab 9
+  s_819ec41dbab4b6::t_9635fc19b9ede3 108
+.vale/styles/Infrahub/swap.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-10
+graders/managing-menus/lib.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-460
+skills/infrahub-auditing-repo/examples.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-229
+skills/infrahub-managing-schemas/rules/display-menu-placement.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-160
+skills/infrahub-managing-schemas/rules/_template.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-34
+graders/reporting-issues/check_template_fidelity.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-34
+skills/infrahub-auditing-repo/rules/xref-query-names.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-58
+skills/infrahub-managing-transforms/rules/patterns-common.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-92
+.github/file-filters.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 6-7,11-15,21-26,28-30
+skills/infrahub-analyzing-data/rules/_template.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-35
+skills/infrahub-managing-generators/rules/_sections.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-31
+skills/infrahub-managing-menus/rules/format-structure.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-88
+skills/infrahub-managing-transforms/rules/testing-commands.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-140
+skills/infrahub-common/rules/deployment-git-integration.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-130
+docs/package.json
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-46
+skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-261
+.claude-plugin/plugin.json
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 3-4,22-23
+.vale/styles/Infrahub/branded-terms-case-swap.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-14
+.vale/styles/Infrahub/sentence-case.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-90
+.github/workflows/auto-bump.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-125
+.github/workflows/version-sync.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 2,6-8,17-21,26-27,42
+docs/docs/how-it-works.mdx
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-91
+.yamllint.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 4-10,12-17,20-21
+docs/docs/skills-reference/managing-schemas.mdx
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-68
+graders/managing-schemas/check_string_limits.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-36
+skills/infrahub-analyzing-data/SKILL.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-193
+skills/infrahub-managing-schemas/rules/attribute-computed-jinja2.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-169
+skills/infrahub-managing-schemas/rules/relationship-peer-kind.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-49
+skills/infrahub-reporting-issues/templates/feature.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-32
+docs/static/img/infrahub-hori.svg
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-30
+dev/guides/adding-a-rule.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-229
+docs/docs/skills-reference/_category_.json
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-5
+skills/infrahub-managing-schemas/rules/relationship-on-delete.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-124
+skills/infrahub-managing-generators/rules/testing-commands.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-67
+skills/infrahub-common/rules/connectivity-python-environment.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-100
+.github/workflows/release.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 41-49
+skills/infrahub-analyzing-data/rules/reporting-output.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-235
+skills/infrahub-managing-schemas/rules/relationship-identifiers.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-69
+skills/infrahub-managing-transforms/rules/artifacts-definitions.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-104
+docs/static/img/infrahub-hori-dark.svg
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-34
+skills/infrahub-managing-transforms/rules/hybrid-python-jinja2.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-84
+skills/infrahub-reporting-issues/rules/environment-info-sanitization.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-129
+skills/infrahub-managing-menus/rules/hierarchy-nesting.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-105
+skills/infrahub-managing-objects/rules/_sections.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-32
+skills/infrahub-managing-transforms/rules/_sections.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-32
+skills/infrahub-managing-checks/examples.md
+  s_819ec41dbab4b6::t_24ea11411c0e6d 474
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-473,475-614
+skills/infrahub-analyzing-data/rules/mcp-tools.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-245
+graders/managing-menus/check_hierarchical.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-43
+dev/guides/running-evals.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 6-66,69-71,73-138,169-172,179,181,183-184,188-191,195-196
+skills/infrahub-managing-schemas/rules/uniqueness-constraints.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-63
+.vale/styles/Infrahub/oxford-comma.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-8
+skills/infrahub-auditing-repo/rules/practices-schema.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-64
+skills/infrahub-analyzing-data/rules/query-patterns.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-322
+skills/infrahub-auditing-repo/rules/structure-infrahub-yml.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-58
+skills/infrahub-analyzing-data/rules/_sections.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-37
+skills/infrahub-managing-generators/rules/patterns-common.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-109
+skills/infrahub-auditing-repo/rules/deployment-readiness.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-55
+.github/labels.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 2-10,12-56,58,60,62,64,66,68-76,78,80-123,125-136,138-153,155-194,196-214
+scripts/run_evals.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 11,35-36,74,451-452,455-456,662-731,768-772,826-827
+graders/managing-checks/lib.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-208
+skills/infrahub-managing-objects/rules/_template.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-33
+skills/infrahub-managing-schemas/rules/display-human-friendly-id.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-85
+skills/infrahub-managing-transforms/rules/types-overview.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-89
+.github/workflows/labeler.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1
+skills/infrahub-managing-schemas/rules/relationship-defaults.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-75
+.vale/styles/spelling-exceptions.txt
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-180
+skills/infrahub-managing-checks/rules/testing-resource-framework.md
+  s_819ec41dbab4b6::t_4d26a76e0e0c3e 18
+  s_819ec41dbab4b6::t_d44f1915362a2e 9
+  s_819ec41dbab4b6::t_64c1364d2010ce 130
+skills/infrahub-auditing-repo/SKILL.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-169
+graders/managing-schemas/check_artifact_target.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-29
+skills/infrahub-managing-objects/rules/organization-load-order.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-120
+tests/graders/test_schema_lib.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-915
+skills/infrahub-managing-transforms/rules/testing-resource-framework.md
+  s_819ec41dbab4b6::t_9fc7590e4a7895 9
+  s_819ec41dbab4b6::t_57ee2161d64db9 174
+  s_819ec41dbab4b6::t_4d26a76e0e0c3e 18-26
+.github/.release-manifest.json
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 2,4-12
+pyproject.toml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-38
+skills/infrahub-auditing-repo/rules/schema-display-labels-deprecated.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-121
+skills/infrahub-managing-schemas/rules/extension-object-template.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-145
+graders/managing-schemas/lib.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-752
+skills/infrahub-managing-schemas/rules/hierarchy-setup.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-98
+skills/infrahub-managing-objects/rules/children-components.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-78
+skills/infrahub-auditing-repo/rules/_template.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-29
+skills/infrahub-managing-schemas/examples.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-1008
+skills/infrahub-managing-checks/rules/testing-commands.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-64
+docs/docs/installation-setup.mdx
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-166
+skills/infrahub-managing-schemas/rules/extension-artifact-target.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-153
+skills/infrahub-managing-schemas/reference.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-357
+skills/infrahub-managing-schemas/rules/validation-string-limits.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-223
+skills/infrahub-analyzing-data/rules/correlation-patterns.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-249
+skills/infrahub-managing-schemas/rules/attribute-defaults-and-types.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-103
+tests/graders/test_menu_lib.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-897
+.vale/styles/Infrahub/colon-space.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-8
+skills/infrahub-common/rules/deployment-partial-sync-recovery.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-109
+skills/infrahub-common/SKILL.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-31
+skills/infrahub-managing-checks/rules/_sections.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-28
+graders/managing-menus/check_flat_menu.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-43
+graders/managing-schemas/check_vlan.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-36
+skills/infrahub-managing-checks/rules/registration-config.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-152
+skills/infrahub-managing-transforms/rules/_template.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-34
+skills/infrahub-common/rules/protocols-generated.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-118
+dev/guides/adding-a-skill.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 15,64,67-70,107,137,165,186-209,212-215,223-232,234-247,256-262,286,289,293,295,297-300,306-307
+tests/graders/test_schema_graders.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-344
+skills/infrahub-auditing-repo/rules/registration-completeness.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-57
+skills/infrahub-managing-objects/validation.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-231
+skills/infrahub-managing-schemas/rules/naming-conventions.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-110
+skills/infrahub-reporting-issues/reference.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-263
+skills/infrahub-managing-transforms/rules/python-transform.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-109
+skills/infrahub-managing-transforms/rules/api-reference.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-53
+docs/docs/skills-reference/managing-generators.mdx
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-52
+skills/infrahub-managing-transforms/rules/jinja2-template.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-164
+skills/infrahub-managing-schemas/rules/validation-common-errors.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-149
+.vale/styles/Infrahub/eg-ie.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-12
+graders/managing-checks/check_targeted_registration.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-32
+.github/release-drafter.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-57
+skills/infrahub-managing-schemas/validation.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-295
+docs/docs/readme.mdx
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-82
+skills/infrahub-managing-generators/rules/_template.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-34
+skills/infrahub-managing-generators/rules/registration-config.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-81
+skills/infrahub-managing-objects/SKILL.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-135
+skills/infrahub-auditing-repo/rules/objects-format.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-52
+hooks-handlers/session-start.sh
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 31
+skills/infrahub-managing-generators/rules/tracking-idempotent.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-74
+graders/reporting-issues/lib.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-322
+skills/infrahub-managing-objects/rules/value-generic-relationships.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-103
+.github/labeler.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 2-10,13,15-37,40-41,43,46-47,49,52-53,55,58-59
+docs/tsconfig.json
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-7
+skills/infrahub-managing-transforms/reference.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-252
+skills/infrahub-managing-schemas/rules/extension-cross-file.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-96
+dev/knowledges/architecture.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 32,41-47,49,54-58,68,79,108-129,156
+.vale/styles/Infrahub/spelling.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-8
+graders/managing-schemas/check_circuit.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-35
+.markdownlint.yaml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-13
+skills/infrahub-managing-schemas/rules/attribute-branch-agnostic.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-123
+skills/infrahub-managing-transforms/SKILL.md
+  s_819ec41dbab4b6::t_1a047c037c813a 119-125
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-46,57-118,126-143
+  s_819ec41dbab4b6::t_4d26a76e0e0c3e 47-55
+  s_819ec41dbab4b6::t_443aa0036de1d8 56
+skills/infrahub-common/rules/connectivity-server-check.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-145
+skills/infrahub-common/netbox-vs-infrahub.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-134
+skills/infrahub-managing-menus/rules/_template.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-34
+skills/infrahub-managing-objects/rules/children-hierarchy.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-70
+skills/infrahub-managing-schemas/rules/_sections.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-55
+skills/infrahub-managing-generators/reference.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-221
+skills/infrahub-managing-checks/reference.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-217
+skills/infrahub-auditing-repo/rules/schema-relationships.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-57
+skills/infrahub-managing-generators/SKILL.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-138
+skills/infrahub-managing-schemas/SKILL.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-162
+docs/docs/skills-reference/auditing-repo.mdx
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-79
+skills/infrahub-common/rules/caching-display-label.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-81
+docs/.gitignore
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-20
+tasks.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-14
+skills/infrahub-auditing-repo/rules/_sections.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-16
+skills/infrahub-managing-objects/rules/patterns-common.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-81
+skills/infrahub-reporting-issues/SKILL.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-308
+skills/infrahub-managing-generators/rules/python-generate.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-106
+docs/docs/skills-reference/managing-checks.mdx
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-52
+.github/workflows/skill-evals.yml
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 7-8,11,13,17-18,20,23,28,30,33-34,38-46,48-81,84,86-88,90,92,97-105,107-108,110,112,114-122,126,131,133-134,136,138,141,149-152,155,157-166,168-169,171,178-180,182-189,212
+evaluations/infrahub-managing-menus.json
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-125
+graders/reporting-issues/check_route_to_main.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-34
+evaluations/infrahub-managing-schemas.json
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-315
+graders/managing-menus/check_generic_kind.py
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-43
+skills/infrahub-managing-checks/SKILL.md
+  s_819ec41dbab4b6::t_1894641df56b60 61
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-60,62-139,147-167
+  s_819ec41dbab4b6::t_b896dd204acc95 140-146
+.github/build-docs.sh
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-3
+skills/infrahub-managing-schemas/rules/display-order-weight.md
+  s_819ec41dbab4b6::t_d5a4b53f6a565c 1-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "893e3c55d170da1e38c97887912dc0eba767f64c",
+  "prompts": {},
+  "sessions": {
+    "s_819ec41dbab4b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eecaa17f-c091-4d4a-9eab-d4b814383470",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
