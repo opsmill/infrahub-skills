@@ -1,0 +1,23 @@
+skills/infrahub-common/rules/workflow-information-priority.md
+  s_d865d018439349::t_32d9bacf86e83d 1-64
+skills/infrahub-common/rules/_sections.md
+  s_d865d018439349::t_e9f430a78cc131 29-34
+skills/infrahub-common/SKILL.md
+  s_d865d018439349::t_2a9eef679296f7 32-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "9b3d6a30016c21413ac6dda72871b2c40b38dc46",
+  "prompts": {},
+  "sessions": {
+    "s_d865d018439349": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5a6b2a38-b88f-40d4-9d60-3fe2028e2e86",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
