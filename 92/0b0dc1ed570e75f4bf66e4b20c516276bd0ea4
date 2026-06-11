@@ -1,0 +1,42 @@
+skills/infrahub-managing-transforms/SKILL.md
+  s_3a972c8530d0f1::t_436ae676bb594a 15
+skills/infrahub-common/SKILL.md
+  s_3a972c8530d0f1::t_87e46fb1868d21 8
+skills/infrahub-managing-checks/SKILL.md
+  s_3a972c8530d0f1::t_59d5a99ba3c347 15
+skills/infrahub-managing-generators/SKILL.md
+  s_3a972c8530d0f1::t_272cfeff0346f3 15
+skills/infrahub-managing-objects/SKILL.md
+  s_3a972c8530d0f1::t_d3e148364a7176 14
+skills/infrahub-managing-schemas/SKILL.md
+  s_3a972c8530d0f1::t_393da91e83788e 5
+  s_3a972c8530d0f1::t_4381d05129110f 14
+skills/infrahub-managing-menus/SKILL.md
+  s_3a972c8530d0f1::t_2714115233bf2d 14
+skills/infrahub-reporting-issues/SKILL.md
+  s_3a972c8530d0f1::t_820c3cce127c64 18
+skills/infrahub-analyzing-data/SKILL.md
+  s_3a972c8530d0f1::t_69ec294c25dfbf 14
+.claude-plugin/plugin.json
+  s_3a972c8530d0f1::t_d2f3cf9c4374c5 3
+skills/infrahub-auditing-repo/SKILL.md
+  s_3a972c8530d0f1::t_67a88689e16b6d 15
+.github/.release-manifest.json
+  s_3a972c8530d0f1::t_1335efc3586f77 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "920b0dc1ed570e75f4bf66e4b20c516276bd0ea4",
+  "prompts": {},
+  "sessions": {
+    "s_3a972c8530d0f1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f30fd5b4-c4a0-4345-b674-79b97a5acafa",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
