@@ -1,8 +1,8 @@
 ---
 name: infrahub-managing-transforms
 description: >-
-  Creates Infrahub transforms that convert data into JSON, text, CSV, or device configs using Python or Jinja2 templates.
-  TRIGGER when: building config generation, data export, format conversion, Jinja2 templates, artifact pipelines.
+  Creates Infrahub transforms that convert data into JSON, text, CSV, or device configs using Python or Jinja2 templates, with YAML-driven tests.
+  TRIGGER when: building config generation, data export, format conversion, Jinja2 templates, artifact pipelines, writing or running tests for a transform.
   DO NOT TRIGGER when: designing schemas, writing validation checks, creating generators, querying live data.
 allowed-tools:
   - Read
@@ -44,16 +44,16 @@ Existing transforms:
 
 ## Rule Categories
 
-| Priority | Category  | Prefix       | Description               |
-| -------- | --------- | ------------ | ------------------------- |
-| CRITICAL | Types     | `types-`     | Python vs Jinja2 choice   |
-| CRITICAL | Python    | `python-`    | InfrahubTransform class   |
-| CRITICAL | Jinja2    | `jinja2-`    | Template syntax, filters  |
-| HIGH     | Hybrid    | `hybrid-`    | Python + Jinja2 combined  |
-| HIGH     | Artifacts | `artifacts-` | Output files, targets     |
-| HIGH     | API Ref   | `api-`       | Class attrs, methods      |
-| MEDIUM   | Patterns  | `patterns-`  | Utilities, CSV, shared    |
-| LOW      | Testing   | `testing-`   | Transform/render commands |
+| Priority | Category  | Prefix       | Description                                            |
+| -------- | --------- | ------------ | ------------------------------------------------------ |
+| CRITICAL | Types     | `types-`     | Python vs Jinja2 choice                                |
+| CRITICAL | Python    | `python-`    | InfrahubTransform class                                |
+| CRITICAL | Jinja2    | `jinja2-`    | Template syntax, filters                               |
+| HIGH     | Hybrid    | `hybrid-`    | Python + Jinja2 combined                               |
+| HIGH     | Artifacts | `artifacts-` | Output files, targets                                  |
+| HIGH     | API Ref   | `api-`       | Class attrs, methods                                   |
+| MEDIUM   | Patterns  | `patterns-`  | Utilities, CSV, shared                                 |
+| HIGH     | Testing   | `testing-`   | Resources Testing Framework, transform/render commands |
 
 ## Schema Features This Skill Depends On
 
@@ -116,8 +116,13 @@ Follow these steps when creating a transform:
 5. **Register in .infrahub.yml** — Add under
    `python_transforms` or `jinja2_transforms`. See
    [rules/api-reference.md](./rules/api-reference.md).
-6. **Test** — Run `infrahubctl transform` or
-   `infrahubctl render`. See
+6. **Add tests** — Create YAML-driven test definitions
+   (smoke, unit, integration) alongside the transform so
+   it is validated automatically in the proposed change
+   pipeline. Read
+   [rules/testing-resource-framework.md](./rules/testing-resource-framework.md).
+7. **Test locally** — Run `infrahubctl transform` or
+   `infrahubctl render` to validate. See
    [rules/testing-commands.md](./rules/testing-commands.md).
 
 ## Supporting References
