@@ -8,6 +8,22 @@ tags: patterns, flat-list, parent-child, devices, git-repo
 
 Impact: LOW (reference patterns)
 
+Worked examples of the shapes the loader expects for
+the recurring cases: flat lists, devices with full
+reference fan-out, empty rack slots, and git repo
+objects.
+
+### Why it matters
+
+The other rules describe the envelope and the value
+mapping; this file shows them composed. Copying from
+a working pattern is the fastest way to avoid the
+common mistakes — list-vs-scalar HFID confusion,
+forgetting `status: empty` on vacant slots, mixing
+device and component fields at the wrong level —
+because the patterns embed the rule choices instead
+of asking the reader to recombine them from scratch.
+
 ### Flat List (No Relationships)
 
 ```yaml

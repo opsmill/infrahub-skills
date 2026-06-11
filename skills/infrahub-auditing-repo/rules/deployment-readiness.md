@@ -1,3 +1,9 @@
+---
+title: deployment-readiness
+impact: MEDIUM
+tags: audit, deployment
+---
+
 # Rule: deployment-readiness
 
 **Severity**: MEDIUM
@@ -5,7 +11,25 @@
 
 ## What It Checks
 
-Validates the repository is ready for deployment to Infrahub.
+Validates the repository is ready for deployment to
+Infrahub — git tracking, bootstrap placement, load
+ordering, and display-label safety during batch
+loads.
+
+## Why it matters
+
+Infrahub syncs from the git ref of the repository,
+not the working tree — uncommitted edits to Python
+checks, queries, or templates are invisible to the
+server after sync, so the audit consumer sees their
+"fix" not take effect and assumes the platform is
+broken. Bootstrap files mistakenly placed under
+`objects/` are even worse: every sync re-imports
+them, overwriting whatever the user typed in the
+UI between syncs. Load-order mistakes show up as
+`display_label` rendering `None` because the
+parent reference wasn't resolved yet at the moment
+the child was created.
 
 ## Checks
 

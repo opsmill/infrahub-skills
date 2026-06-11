@@ -1,8 +1,8 @@
 ---
 name: infrahub-managing-transforms
 description: >-
-  Creates Infrahub transforms that convert data into JSON, text, CSV, or device configs using Python or Jinja2 templates.
-  TRIGGER when: building config generation, data export, format conversion, Jinja2 templates, artifact pipelines.
+  Creates Infrahub transforms that convert data into JSON, text, CSV, or device configs using Python or Jinja2 templates, with YAML-driven tests.
+  TRIGGER when: building config generation, data export, format conversion, Jinja2 templates, artifact pipelines, writing or running tests for a transform.
   DO NOT TRIGGER when: designing schemas, writing validation checks, creating generators, querying live data.
 allowed-tools:
   - Read
@@ -12,7 +12,7 @@ allowed-tools:
   - Grep
 argument-hint: "[transform-name] [format]"
 metadata:
-  version: 1.2.5
+  version: 1.2.6
   author: OpsMill
 ---
 
@@ -44,16 +44,31 @@ Existing transforms:
 
 ## Rule Categories
 
-| Priority | Category  | Prefix       | Description               |
-| -------- | --------- | ------------ | ------------------------- |
-| CRITICAL | Types     | `types-`     | Python vs Jinja2 choice   |
-| CRITICAL | Python    | `python-`    | InfrahubTransform class   |
-| CRITICAL | Jinja2    | `jinja2-`    | Template syntax, filters  |
-| HIGH     | Hybrid    | `hybrid-`    | Python + Jinja2 combined  |
-| HIGH     | Artifacts | `artifacts-` | Output files, targets     |
-| HIGH     | API Ref   | `api-`       | Class attrs, methods      |
-| MEDIUM   | Patterns  | `patterns-`  | Utilities, CSV, shared    |
-| LOW      | Testing   | `testing-`   | Transform/render commands |
+| Priority | Category  | Prefix       | Description                                            |
+| -------- | --------- | ------------ | ------------------------------------------------------ |
+| CRITICAL | Types     | `types-`     | Python vs Jinja2 choice                                |
+| CRITICAL | Python    | `python-`    | InfrahubTransform class                                |
+| CRITICAL | Jinja2    | `jinja2-`    | Template syntax, filters                               |
+| HIGH     | Hybrid    | `hybrid-`    | Python + Jinja2 combined                               |
+| HIGH     | Artifacts | `artifacts-` | Output files, targets                                  |
+| HIGH     | API Ref   | `api-`       | Class attrs, methods                                   |
+| MEDIUM   | Patterns  | `patterns-`  | Utilities, CSV, shared                                 |
+| HIGH     | Testing   | `testing-`   | Resources Testing Framework, transform/render commands |
+
+## Schema Features This Skill Depends On
+
+A transform reads schema-shaped data and produces a
+file. Misalignment between the transform and the
+schema fails late — at artifact-render time, when
+someone is waiting for the output.
+
+| If the transform... | The schema (or .infrahub.yml) must... | See |
+| ------------------- | ------------------------------------- | --- |
+| Will feed an `artifact_definitions` entry | The target node must `inherit_from: CoreArtifactTarget` so the artifact pipeline can attach to it | [../infrahub-managing-schemas/rules/extension-artifact-target.md](../infrahub-managing-schemas/rules/extension-artifact-target.md) |
+| Reads attributes from a node | Define those attributes with their full `__value` access path in GraphQL — silent empty strings come from accessing the node, not the value | [../infrahub-managing-schemas/rules/attribute-defaults-and-types.md](../infrahub-managing-schemas/rules/attribute-defaults-and-types.md) |
+| Picks a template per device by platform/role | The schema must expose that platform/role as a real attribute or relationship — string-matching on `display_label` is brittle | [../infrahub-managing-schemas/rules/display-human-friendly-id.md](../infrahub-managing-schemas/rules/display-human-friendly-id.md) |
+| Is referenced from `artifact_definitions.transformation` | The transform's registered `name` must match the `transformation:` field exactly — mismatch produces "transformation not found" at render time | [rules/artifacts-definitions.md](./rules/artifacts-definitions.md) |
+| Uses Jinja2 (not Python) | Register under `jinja2_transforms` with a top-level `query:` field — `python_transforms` binds query on the class, the two keys are not interchangeable | [rules/api-reference.md](./rules/api-reference.md) |
 
 ## Transform Basics
 
@@ -101,12 +116,20 @@ Follow these steps when creating a transform:
 5. **Register in .infrahub.yml** — Add under
    `python_transforms` or `jinja2_transforms`. See
    [rules/api-reference.md](./rules/api-reference.md).
-6. **Test** — Run `infrahubctl transform` or
-   `infrahubctl render`. See
+6. **Add tests** — Create YAML-driven test definitions
+   (smoke, unit, integration) alongside the transform so
+   it is validated automatically in the proposed change
+   pipeline. Read
+   [rules/testing-resource-framework.md](./rules/testing-resource-framework.md).
+7. **Test locally** — Run `infrahubctl transform` or
+   `infrahubctl render` to validate. See
    [rules/testing-commands.md](./rules/testing-commands.md).
 
 ## Supporting References
 
+- **[reference.md](./reference.md)** -- Class API,
+  lifecycle, return-type matrix, `.infrahub.yml`
+  registration shapes, filter env overview
 - **[examples.md](./examples.md)** -- Complete transform
   patterns (Python, Jinja2, hybrid, CSV)
 - **[../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)**

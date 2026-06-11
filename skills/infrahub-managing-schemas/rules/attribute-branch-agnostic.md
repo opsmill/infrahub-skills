@@ -8,20 +8,32 @@ tags: attribute, branch, branch-agnostic, branch-aware
 
 Impact: MEDIUM
 
-Infrahub is branch-aware by default: every change to
-an object lives on a branch and merges into main with
-the proposed-change pipeline. The `branch:` setting
-opts a node or attribute out of that workflow. Two
-values exist:
+`branch: agnostic` opts a node or attribute out of
+the branch-aware workflow and applies its value
+globally across every branch.
+
+### Why it matters
+
+Branching is the core feature of Infrahub — every
+change lives on a branch until merged through a
+proposed change. Marking too much `agnostic` defeats
+that workflow: edits skip review, conflicts surface
+in production rather than at merge time, and the
+proposed-change pipeline can no longer reason about
+the data. Marking too little leaves business
+identifiers (service names, AS numbers, customer
+IDs) free to collide across branches and only blow
+up at merge time, when rolling them back is
+expensive. The setting is rare and load-bearing —
+use it deliberately, only for data that has to be
+globally consistent.
+
+Two values exist:
 
 | Value | Behavior |
 | ----- | -------- |
 | `aware` (default) | Changes are scoped to a branch and only become global on merge |
 | `agnostic` | Changes apply globally and are not subject to branching |
-
-`branch: agnostic` is rare and load-bearing — use it
-deliberately, only for data that *must* be globally
-consistent across all branches.
 
 ### When to Use `branch: agnostic`
 
@@ -33,9 +45,9 @@ Real-world examples from production schemas:
 - **Read-only reference data** — provider catalogs,
   hardware part numbers from an external system of
   record.
-- **Top-level identity fields** that are mirrored
-  from external systems and must not diverge across
-  branches.
+- **Top-level identity fields** mirrored from
+  external systems where branch divergence is
+  unacceptable.
 
 ### Node-Level vs Attribute-Level
 
@@ -81,7 +93,7 @@ keep the identity field global, let everything else
 branch normally. This is the "namespaces are global,
 content branches" model.
 
-### Why It Matters for Uniqueness
+### Uniqueness Across Branches
 
 If two branches each create an object with the same
 key on a `branch: aware` attribute, they coexist

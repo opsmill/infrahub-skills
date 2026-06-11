@@ -8,8 +8,25 @@ tags: architecture, global, targeted, components
 
 Impact: CRITICAL
 
-Every check consists of three components that must be
-wired together correctly.
+Every check consists of three components — a GraphQL
+query, a Python class, and a `.infrahub.yml`
+registration — and a choice between *global* (runs
+every change) and *targeted* (runs when group members
+change) execution.
+
+### Why it matters
+
+The three pieces are bound by name, not by file
+layout: the Python class's `query` attribute names a
+`queries[]` entry, and `check_definitions[]` points
+at the class. Get any of the three out of sync and
+Infrahub either rejects the repo config at load time
+or runs the check against an empty payload, with no
+hint to the user about which leg of the triangle is
+broken. The global-vs-targeted choice also dictates
+query shape — a targeted check needs GraphQL
+variables bound from `parameters:`, while a global
+check fetches the full set in one go.
 
 ### Three Components
 

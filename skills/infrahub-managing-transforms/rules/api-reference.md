@@ -6,7 +6,25 @@ tags: api, class-attributes, properties, methods
 
 ## InfrahubTransform API Reference
 
-**Impact:** HIGH
+Impact: HIGH
+
+The base class exposes a small surface area: one
+required `query` class attribute, a handful of
+instance properties populated by the SDK, and a
+single method to implement.
+
+### Why it matters
+
+Most transform errors trace back to misusing this
+surface: shadowing `self.client` or `self.store` in
+`__init__`, omitting the `query` attribute (which
+makes the SDK skip data collection entirely and call
+`transform(None)`), or overriding `run()` and losing
+the orchestration that calls `collect_data()` first.
+Reading the table below before writing custom `async`
+plumbing usually saves a round trip — the SDK already
+runs the query, hydrates `self.nodes`, and hands the
+parsed response to `transform()`.
 
 ### Class Attributes
 

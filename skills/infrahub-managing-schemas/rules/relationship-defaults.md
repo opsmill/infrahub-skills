@@ -8,9 +8,26 @@ tags: relationship, defaults, cardinality, optional
 
 Impact: CRITICAL
 
-Relationship defaults are different from attribute
-defaults. Getting these wrong leads to unexpected
-behavior.
+Relationship defaults diverge from attribute
+defaults: `cardinality` defaults to `many`, and
+`optional` defaults to `true`.
+
+### Why it matters
+
+The cardinality default is the trap — a relationship
+written without `cardinality:` is read as
+`many`, even when the field name is singular
+(`rack`, `device_type`, `manufacturer`). Infrahub
+then expects a list everywhere the relationship is
+written or queried, the UI renders a multi-select
+where users expected a single picker, and object
+files that pass a single value fail validation.
+Equally, `optional: true` being the default lets a
+`kind: Parent` slip through with no parent required —
+the server then rejects schema load with
+`Relationship of type parent must not be optional`,
+but only after the mismatched intent has shaped
+surrounding code.
 
 | Property | Default | Notes |
 | -------- | ------- | ----- |
@@ -49,8 +66,8 @@ are `optional: true` by default.
 **Exception — `kind: Parent` rejects `optional: true`:**
 The server validates that any relationship with
 `kind: Parent` has `optional: false`. The default is
-wrong here, so you must set it explicitly. Leaving it
-unset (or `true`) fails schema check with
+wrong here, so set it explicitly. Leaving it unset
+(or `true`) fails schema check with
 `Relationship of type parent must not be optional`.
 See
 [relationship-component-parent.md](./relationship-component-parent.md).

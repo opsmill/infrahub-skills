@@ -8,9 +8,22 @@ tags: values, attributes, dropdown, text, number, boolean
 
 Impact: CRITICAL
 
-Schema attribute types map directly to YAML values. The
-most common mistake is using a Dropdown `label` instead
-of `name`.
+Schema attribute kinds map onto specific YAML value
+shapes. Dropdown attributes take the choice `name`,
+not the display `label`.
+
+### Why it matters
+
+Dropdown choices are stored by their machine `name`
+(typically lowercase, like `active`) and rendered in
+the UI with the human `label` (`Active`). The loader
+validates submitted values against the `name` list,
+so passing the label produces a hard rejection:
+`'Active' is not a valid choice for status`. Type
+mismatches on other kinds (string into a Number
+attribute, untyped date into DateTime) fail the same
+way at upsert time, so the type table below isn't
+cosmetic — each mapping is what survives validation.
 
 ### Type Mapping
 

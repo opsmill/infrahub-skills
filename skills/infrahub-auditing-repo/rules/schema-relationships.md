@@ -1,3 +1,9 @@
+---
+title: schema-relationships
+impact: CRITICAL
+tags: audit, schema, relationships
+---
+
 # Rule: schema-relationships
 
 **Severity**: CRITICAL
@@ -5,9 +11,30 @@
 
 ## What It Checks
 
-Validates relationship definitions: peer kinds use full
-namespace, bidirectional identifiers match, and
-Component/Parent cardinality is correct.
+Validates relationship definitions: peer kinds use
+the full namespace+name reference, the
+`identifier` is identical on both sides of the
+link, and Component/Parent pairs use the
+cardinalities they require.
+
+## Why it matters
+
+Mismatched relationship identifiers are the
+single most common schema bug and the hardest to
+diagnose: each side loads as a one-way edge, so
+the platform reports no error, the UI shows the
+relationship on one node, and queries from the
+other side return empty — looking exactly like a
+data problem rather than a schema problem.
+Short-form peer references (`peer: Device`
+instead of `peer: InfraDevice`) fail at schema-
+load time with a cryptic "kind not found" because
+the resolver doesn't search across namespaces.
+Component with `cardinality: one` produces the
+strangest UX of all: deleting the parent silently
+also deletes the single child, which works until
+someone adds a second child and the schema
+rejects it without explaining why.
 
 ## Checks
 

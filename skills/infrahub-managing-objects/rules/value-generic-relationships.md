@@ -8,16 +8,27 @@ tags: values, relationships, generics, human_friendly_id, LocationGeneric
 
 Impact: CRITICAL
 
-When a relationship targets a generic type (e.g.,
-`LocationGeneric`) that does not have a
-`human_friendly_id` defined, the standard scalar or
-list HFID reference syntax will fail with:
+Relationships whose `peer` is a generic without an
+`human_friendly_id` use an inline data block with an
+explicit `kind:` naming a concrete type instead of a
+scalar/list HFID.
+
+### Why it matters
+
+The loader resolves HFID references against the
+schema named on the relationship's `peer`. Generics
+like `LocationGeneric` or `GenericInterfaceL3`
+typically don't carry their own `human_friendly_id`
+— the HFID is defined on each concrete kind that
+inherits from them. Passing a scalar to that
+relationship therefore fails fast:
 
 > Unable to lookup node by HFID, schema
 > 'LocationGeneric' does not have a HFID defined.
 
-Use the inline data block with an explicit `kind:` to
-specify the concrete type instead.
+The inline-`kind` form swaps the lookup over to the
+concrete schema (which does have an HFID) without
+requiring a schema change on the generic.
 
 ### Problem: Direct Reference to Generic
 
@@ -86,7 +97,7 @@ data:
         - name: "Building H"
 ```
 
-**Key rule**: Always specify `kind:` when the
-relationship targets a generic type. Use only the
-fields needed to match the concrete type's
-`human_friendly_id`.
+**Key rule**: when the relationship peer is a
+generic without an HFID, supply `kind:` inline and
+include only the fields that match the concrete
+type's `human_friendly_id`.
