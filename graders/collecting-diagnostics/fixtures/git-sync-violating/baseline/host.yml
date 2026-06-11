@@ -1,0 +1,4 @@
+---
+os: "Linux 6.x"
+cpu_cores: 8
+memory_gb: 16

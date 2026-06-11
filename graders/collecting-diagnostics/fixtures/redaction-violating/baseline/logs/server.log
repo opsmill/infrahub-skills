@@ -1,0 +1,4 @@
+2026-05-29T08:00:01Z INFO  server starting infrahub 1.9.6
+2026-05-29T08:00:02Z INFO  database connection established
+2026-05-29T08:30:25Z DEBUG Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature_here_padding_padding
+2026-05-29T08:30:26Z INFO  POST /graphql 200

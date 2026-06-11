@@ -1,0 +1,16 @@
+{
+  "data": {
+    "CoreGenericRepository": {
+      "edges": [
+        {
+          "node": {
+            "name": {"value": "schemas-prod"},
+            "location": {"value": "git@github.com:example/schemas-prod.git"},
+            "commit": {"value": "abc1232b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f"},
+            "default_branch": {"value": "main"}
+          }
+        }
+      ]
+    }
+  }
+}

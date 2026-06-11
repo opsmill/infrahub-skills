@@ -1,0 +1,17 @@
+---
+- id: commit-not-found
+  severity: warning
+  evidence:
+    file: baseline/logs/infrahub-task-worker-1.log
+    line: 4521
+    excerpt: "CommitNotFoundError: Commit abc123 not found in repo schemas-prod"
+  hint: "Multi-worker git race; check git directory ownership across replicas"
+  related_issues: [9036, 8930]
+- id: repo-error
+  severity: warning
+  evidence:
+    file: baseline/logs/infrahub-task-worker-1.log
+    line: 4530
+    excerpt: "RepositoryError: failed to fetch schemas-prod"
+  hint: "Repository fetch failed shortly after CommitNotFound; correlate timestamps"
+  related_issues: []

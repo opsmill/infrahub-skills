@@ -1,0 +1,17 @@
+Redaction report — 2026-05-30T12:00:00Z
+Rules version: 1.0
+Files touched: 12
+Total replacements: 38
+
+Summary by category:
+  env-key (passwords/tokens in compose/env)   : 14 REDACTED
+  bearer-tokens (Authorization headers)        : 18 REDACTED
+  jwt (signed tokens in logs)                  :  4 REDACTED
+  private-key blocks                           :  2 REDACTED
+
+Sample replacements:
+  baseline/config/compose-resolved.yml:14  INFRAHUB_DB_PASSWORD: ***REDACTED:env-key***
+  baseline/config/compose-resolved.yml:21  INFRAHUB_INITIAL_ADMIN_TOKEN: ***REDACTED:init-token***
+  baseline/logs/infrahub-server-1.log:88   Authorization: Bearer ***REDACTED:jwt***
+
+User review completed: yes (operator initials: ic)
