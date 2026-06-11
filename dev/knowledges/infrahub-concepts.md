@@ -98,7 +98,7 @@ protection.
 
 ### Source
 
-**"Where did this data come from?"**
+> "Where did this data come from?"
 
 Source is purely informational — it records the origin
 of a data point. It can be an `Account` or a
@@ -110,7 +110,7 @@ system).
 
 ### Owner
 
-**"Who is responsible for this data?"**
+> "Who is responsible for this data?"
 
 Owner designates who manages a data point. It can be
 a `Group`, an `Account`, or a `Repository`. Owner is
