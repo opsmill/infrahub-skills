@@ -1,0 +1,20 @@
+dev/knowledges/infrahub-concepts.md
+  s_c913923527c524::t_cf26cc109d535e 113
+  s_c913923527c524::t_2b6d8e91199b55 101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "d01abdf6d7f2c9b9a433d8e4a7f1c28f7a08d245",
+  "prompts": {},
+  "sessions": {
+    "s_c913923527c524": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "69d88a79-37d6-4aa6-8745-56e8b2a946c8",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
