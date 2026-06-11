@@ -2,7 +2,7 @@
 name: infrahub-managing-schemas
 description: >-
   Creates, validates, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions.
-  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations.
+  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations, modeling file objects / attachments / uploads (storing PDFs, diagrams, images, certificates, documents as Infrahub objects).
   DO NOT TRIGGER when: populating data objects, writing checks/generators/transforms, querying live data.
 allowed-tools:
   - Read
@@ -90,6 +90,7 @@ those features require:
 | Be the target of a generator (group member referenced by a `generator_definition`) | `inherit_from: [..., CoreArtifactTarget]` on the concrete node | [rules/extension-artifact-target.md](./rules/extension-artifact-target.md) |
 | Appear in a custom sidebar menu | `include_in_menu: false` so the auto-menu doesn't duplicate the manual entry | [../infrahub-managing-menus/rules/schema-integration.md](../infrahub-managing-menus/rules/schema-integration.md) |
 | Be cloneable as an object template | `generate_template: true` | [rules/extension-object-template.md](./rules/extension-object-template.md) |
+| Store an uploaded file (PDF, image, Visio, KMZ, contract, …) | `inherit_from: [..., CoreFileObject]` on the concrete node | [rules/extension-file-object.md](./rules/extension-file-object.md) |
 | Be displayed with a stable name across UI lists and APIs | `human_friendly_id` and `display_label` | [rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md) |
 
 This audit is the difference between a schema that
@@ -137,11 +138,11 @@ Follow these steps when creating or modifying a schema:
 
 ## Production Patterns Worth Knowing
 
-Six recurring patterns — computed Jinja2 attributes,
+Seven recurring patterns — computed Jinja2 attributes,
 cascade-vs-no-action deletes, menu visibility,
-branch-agnostic identity, artifact targets, and
-object templates — are documented at the top of
-[examples.md](./examples.md). Read those before
+branch-agnostic identity, artifact targets, object
+templates, and file objects — are documented at the top
+of [examples.md](./examples.md). Read those before
 finalizing a schema; each pattern is easy to miss
 when building from scratch and expensive to retrofit
 after data is loaded.
