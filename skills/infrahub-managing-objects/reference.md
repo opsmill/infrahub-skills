@@ -36,6 +36,42 @@ spec:
 | `JSON` | object/string | `config: {"key": "value"}` |
 | `Password` | string | `password: "secret"` |
 
+## Value Metadata (Source, Owner, Protection)
+
+Any attribute can carry **metadata** that records the
+value's lineage, ownership, and lock state. Write the
+attribute as a mapping with `value` plus the metadata
+keys instead of a plain scalar:
+
+```yaml
+data:
+  - name: spine-01           # plain scalar — no metadata
+    role:                    # mapping form — value + metadata
+      value: leaf
+      source: netbox-sync     # Account or Repository (lineage)
+      owner: network-team     # Group, Account, or Repository
+      is_protected: true      # only owner (+admins) can edit this attribute
+    status: active           # stays editable by anyone
+```
+
+| Metadata key | Type | Meaning |
+| --- | --- | --- |
+| `value` | the attribute value | Required when using the mapping form |
+| `source` | node reference (`Account`, `Repository`) | Lineage only — **no** access-control effect |
+| `owner` | node reference (`Group`, `Account`, `Repository`) | Responsible party; enforces edits only with `is_protected` |
+| `is_protected` | boolean | `true` locks the attribute to its owner (+admins) |
+
+`source` and `owner` reference an existing node the same
+way any relationship is referenced (by `id` or HFID);
+the referenced `Account`/`Repository`/`Group` must
+already exist when the value loads.
+
+**`source` does not restrict who can edit a value** —
+only `owner` + `is_protected: true` does. To lock synced
+data, set the owner and protect it; setting `source`
+alone leaves the value freely editable. Full discussion:
+[../infrahub-common/metadata-lineage.md](../infrahub-common/metadata-lineage.md).
+
 ## Relationship Value Formats
 
 ### cardinality: one (Simple Reference)
