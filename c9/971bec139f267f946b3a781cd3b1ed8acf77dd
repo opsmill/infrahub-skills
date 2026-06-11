@@ -1,0 +1,29 @@
+skills/infrahub-managing-objects/SKILL.md
+  s_c913923527c524::t_8912af8aded57f 110-114
+  s_c913923527c524::t_8125531ca4e855 134-137
+skills/infrahub-common/SKILL.md
+  s_c913923527c524::t_56c4317440b675 26-29
+skills/infrahub-managing-objects/examples.md
+  s_c913923527c524::t_5022aaa6075a80 770-818
+  s_c913923527c524::t_b0934df2073fa7 22
+skills/infrahub-common/metadata-lineage.md
+  s_c913923527c524::t_de35b91ee31b72 1-125
+skills/infrahub-managing-objects/reference.md
+  s_c913923527c524::t_76cbe3e5d50e96 39-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "c9971bec139f267f946b3a781cd3b1ed8acf77dd",
+  "prompts": {},
+  "sessions": {
+    "s_c913923527c524": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "69d88a79-37d6-4aa6-8745-56e8b2a946c8",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
