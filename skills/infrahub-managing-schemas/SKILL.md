@@ -2,7 +2,7 @@
 name: infrahub-managing-schemas
 description: >-
   Creates, validates, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions.
-  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations.
+  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations, modeling file objects / attachments / uploads (storing PDFs, diagrams, images, certificates, documents as Infrahub objects).
   DO NOT TRIGGER when: populating data objects, writing checks/generators/transforms, querying live data.
 allowed-tools:
   - Read
@@ -11,7 +11,7 @@ allowed-tools:
   - Bash
 argument-hint: "[namespace] [node-names...]"
 metadata:
-  version: 1.2.5
+  version: 1.2.7
   author: OpsMill
 ---
 
