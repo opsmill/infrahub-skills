@@ -8,7 +8,9 @@
 2. **Python Class (python-)** -- CRITICAL.
    InfrahubGenerator base class, async generate() method,
    object creation via self.client.create(), save with
-   allow_upsert=True, relationship references by ID.
+   allow_upsert=True, relationship references via HFID dict /
+   ID dict / SDK object (never bare string), and multi-peer
+   add iteration on RelationshipManager.
 
 3. **Tracking (tracking-)** -- HIGH. Automatic cleanup of
    stale objects via delete_unused_nodes=True, idempotent
@@ -25,7 +27,10 @@
 
 6. **Patterns (patterns-)** -- MEDIUM. Data cleaning helper,
    batch object creation, using the local store for
-   inter-object references.
+   inter-object references, and natural-key preflight for
+   form-driven mutations.
 
 7. **Testing (testing-)** -- LOW. infrahubctl generator
-   commands, listing and running Generators locally.
+   commands, listing and running Generators locally, and the
+   integration-test workflow (run end-to-end against a live
+   instance before declaring done).

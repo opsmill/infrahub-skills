@@ -19,7 +19,8 @@
 5. **Artifacts (artifacts-)** -- HIGH. Connecting
    transforms to output files via artifact_definitions,
    content types, targets (CoreArtifactTarget),
-   parameter mapping.
+   parameter mapping, and async regeneration polling
+   (the /api/artifact/generate endpoint is fire-and-forget).
 
 6. **API Reference (api-)** -- HIGH. Class attributes
    (query, timeout), instance properties (client,
@@ -30,3 +31,9 @@
    functions (get_data, get_interfaces).
 
 8. **Testing (testing-)** -- HIGH. Resources Testing Framework (YAML-driven pytest tests: smoke, unit, integration), infrahubctl transform/render commands. Always create tests alongside new transforms.
+
+9. **Queries (queries-)** -- CRITICAL. Writing the .gql
+   query that feeds the transform. Covers union-typed
+   relationships (DcimDevice.location, Organization*) that
+   require inline fragments (... on Type { fields }) to
+   avoid "Cannot query field 'X' on type 'Y'" errors.

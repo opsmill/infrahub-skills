@@ -804,6 +804,284 @@ tasks:
           Targeted check_definitions entry declares both targets and
           parameters
 
+  # --- Generators: relationship reference encoding --- #
+  - name: generator-relationship-hfid-encoding
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write an Infrahub Generator that creates a DcimDevice named 'cEdge-1'
+      with these single-component HFID references on the schema:
+      - device_type: 'cEdge-1000' (DcimDeviceType.human_friendly_id = [name__value])
+      - manufacturer: 'Cisco' (OrganizationManufacturer.human_friendly_id = [name__value])
+      - platform: 'ios-xe' (DcimPlatform.human_friendly_id = [name__value])
+
+      The generator must use the documented HFID dict form for each relationship,
+      not bare strings, and the HFID lists must be single-element (matching the
+      schema's human_friendly_id length).
+
+      Save ONLY the final Python generator class to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_relationship_hfid_encoding.py
+        weight: 1.0
+    expected_output: >-
+      A Python generator class that calls self.client.create with each
+      relationship field set to {"hfid": ["<name>"]} — a single-element
+      list inside a dict with the literal key "hfid". No bare strings.
+    expectations:
+      - >-
+        Generator inherits from InfrahubGenerator and implements async generate()
+      - >-
+        Each relationship field uses the {"hfid": ["<name>"]} dict form
+      - >-
+        No relationship field is a bare string (would be treated as id)
+      - >-
+        HFID lists for single-component targets are length 1 (no over-pack)
+      - "save() is called with allow_upsert=True"
+    assertions:
+      - name: relationship-hfid-form-correct
+        check: >-
+          Every relationship key in client.create(data=...) is either a
+          {"hfid": [...]} dict, {"id": "..."} dict, or a variable reference.
+      - name: no-bare-string-relationship
+        check: >-
+          No relationship key has a bare string literal as its value.
+      - name: no-overpacked-hfid-list
+        check: >-
+          Single-component HFID targets (device_type, manufacturer, platform)
+          receive an HFID list of length 1.
+
+  - name: generator-relationship-three-forms
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write an Infrahub Generator that creates a DcimDevice 'cEdge-1' and
+      sets its relationships using all three forms documented in the skill:
+
+      - manufacturer: by HFID (the name 'Cisco' — DcimDevice.manufacturer is a
+        single-component HFID).
+      - device_type: by explicit ID, where the UUID is obtained from a prior
+        GraphQL query and is available in scope as a string variable.
+      - site: by SDK object reference, where you first call self.client.get
+        for the LocationSite and pass the returned object directly.
+
+      Save ONLY the final Python generator class to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_relationship_three_forms.py
+        weight: 1.0
+    expected_output: >-
+      A Python generator that exercises each of the three relationship
+      reference forms (HFID dict, ID dict, SDK object reference) on the
+      same client.create call.
+    expectations:
+      - "At least one relationship uses {'hfid': ['<name>']}"
+      - "At least one relationship uses {'id': <uuid>}"
+      - >-
+        At least one relationship passes a variable (SDK object) from
+        a prior self.client.get call
+    assertions:
+      - name: hfid-form-for-name-lookup
+        check: "At least one relationship uses {'hfid': [...]} form"
+      - name: id-form-for-uuid
+        check: "At least one relationship uses {'id': ...} form"
+      - name: sdk-object-reference-used
+        check: At least one relationship is a variable reference
+
+  - name: generator-multi-peer-iteration
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write an Infrahub Generator that creates a CoreStandardGroup named
+      'sdwan-edges' and adds five DcimDevice instances ('edge-1' through
+      'edge-5') as members of that group via group.members.add().
+
+      Save ONLY the final Python generator class to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_multi_peer_iteration.py
+        weight: 1.0
+    expected_output: >-
+      A Python generator that adds each peer to the group with one .add()
+      call per peer (typically inside a for loop), then a single .save().
+      No list is passed to .add() in a single call.
+    expectations:
+      - "Group is created or fetched via self.client.get / self.client.create"
+      - ".add() is called once per peer (inside a for loop or 5 explicit calls)"
+      - "No call passes a list of peers as a single .add() argument"
+    assertions:
+      - name: no-list-passed-to-add
+        check: No .add() call receives a list as its argument
+      - name: members-add-iterates
+        check: .add() is invoked inside a for loop or multiple times explicitly
+
+  - name: generator-natural-key-preflight
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write a Python script that creates an IpamPrefix '10.250.10.0/24'
+      from user input. The prefix may already have been seeded by an earlier
+      bootstrap run. Handle the collision gracefully — either pre-flight check
+      for an existing prefix (and exit with a clear message) or save with
+      allow_upsert=True. Do not let a raw server-side uniqueness error escape.
+
+      Save ONLY the final Python script to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_natural_key_preflight.py
+        weight: 1.0
+    expected_output: >-
+      A Python script that either uses client.get with the natural key
+      before calling client.create, or passes allow_upsert=True to save().
+    expectations:
+      - "Calls client.create(kind='IpamPrefix', ...)"
+      - >-
+        Either calls client.get(kind='IpamPrefix', ...) before create,
+        or passes allow_upsert=True to save()
+      - "No bare client.create + save() without one of the two patterns"
+    assertions:
+      - name: preflight-or-upsert
+        check: >-
+          Either client.get(kind='IpamPrefix', ...) precedes create, OR
+          save(allow_upsert=True) is called.
+      - name: no-raw-create-without-handler
+        check: >-
+          client.create has either a preflight get OR allow_upsert=True.
+
+  - name: generator-process-integration-test
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write an Infrahub Generator that creates three DcimDevice instances
+      from a TopologyDataCenter design. After the generator class, include a
+      short section (as a Python triple-quoted string named TEST_PLAN at the
+      bottom of the file, or as a # block comment) explaining how to test the
+      generator end-to-end against a live Infrahub instance before merging.
+
+      Save ONLY the final Python file to: output.py
+    graders:
+      - type: llm_rubric
+        provider: anthropic
+        weight: 1.0
+        rubric: |
+          The model output is a Python file at output.py. Score each
+          criterion 0.0 or 1.0; return the average.
+
+          1. A generator class is present and its generate() method
+             creates DcimDevice instances (via self.client.create or
+             similar).
+          2. The file contains either a Python triple-quoted string
+             named TEST_PLAN, or a block of # comments, that explains
+             how to test the generator end-to-end. Mentions
+             "infrahubctl generator run" (or equivalent live-instance
+             command). At least one full sentence of guidance — not
+             just a stub.
+          3. The guidance explicitly notes that unit tests on the
+             input dict do not cover SDK call shape (or equivalent
+             warning that runtime SDK shape errors slip past
+             type/unit checks).
+    expected_output: >-
+      A Python generator plus end-to-end test guidance. The guidance should
+      mention infrahubctl generator run against a live instance and note
+      that input-dict unit tests don't cover SDK call shape.
+    expectations:
+      - "Generator class is present and creates DcimDevice instances"
+      - "TEST_PLAN string or block comment exists at the bottom of the file"
+      - >-
+        The guidance mentions infrahubctl generator run against a real
+        Infrahub instance
+      - >-
+        The guidance notes that unit tests on the input dict do not cover
+        SDK call shape
+
+  # --- Transforms: union-typed relationship queries --- #
+  - name: transform-query-union-fragments
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-transforms/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write a GraphQL query for a Jinja2 transform that fetches DcimDevice
+      with the device's name, its role, and its location's name + shortname.
+      location is a union of LocationSite | LocationBuilding | LocationHosting
+      in this repo's base schema. LocationHosting has neither name nor shortname,
+      so the query must handle the union explicitly so that schema-sync doesn't
+      fail when a LocationHosting instance is present.
+
+      Save ONLY the final GraphQL query to: output.gql
+    graders:
+      - type: deterministic
+        run: python graders/managing-transforms/check_query_union_fragments.py
+        weight: 1.0
+    expected_output: >-
+      A GraphQL query that uses inline fragments (... on LocationSite { ... }
+      and similar) for the location relationship, so fields that exist on
+      some concrete types but not others are scoped to the correct type.
+    expectations:
+      - "Query touches DcimDevice and location"
+      - "Inline fragments (... on Location...) are used inside location.node"
+      - "name and shortname are not selected directly under location.node"
+    assertions:
+      - name: query-uses-inline-fragments-for-location
+        check: >-
+          location { node { ... } } contains at least one ... on Location<Type>
+          inline fragment
+      - name: query-no-direct-field-on-union-location
+        check: >-
+          Neither 'name' nor 'shortname' appears as a direct selection under
+          location.node without an enclosing inline fragment
+
+  - name: transform-artifact-regen-polling
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-transforms/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write a Python async helper named regenerate_and_wait that triggers
+      regeneration for an Infrahub artifact definition by POSTing to
+      /api/artifact/generate/<def-id>?branch=<branch>, then waits for completion
+      by polling CoreArtifact filtered by the definition until at least
+      `expected_count` instances exist. Time out after 60 seconds and raise
+      TimeoutError. The helper takes (client, def_id, expected_count, branch)
+      as parameters.
+
+      Save ONLY the final Python helper to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-transforms/check_artifact_regen_polling.py
+        weight: 1.0
+    expected_output: >-
+      A Python async function that POSTs to /api/artifact/generate/<def-id>,
+      then polls CoreArtifact in a loop until count >= expected_count, with
+      a hard timeout.
+    expectations:
+      - "Helper POSTs to /api/artifact/generate/<def-id>?branch=<branch>"
+      - "Helper contains a loop (while or for) that waits for completion"
+      - "Helper polls CoreArtifact via client.filters or client.get with kind='CoreArtifact'"
+      - "Hard timeout exists (raises after some seconds)"
+    assertions:
+      - name: posts-artifact-generate-endpoint
+        check: >-
+          The code calls .post(...) with a URL containing
+          /api/artifact/generate
+      - name: has-polling-loop
+        check: >-
+          A while/for/async for loop is present (not fire-and-forget)
+      - name: polls-coreartifact-after-post
+        check: >-
+          A call passes kind="CoreArtifact" (read of artifact state
+          after the POST)
+
   # --- Issue Reporter --- #
   - name: bug-sanitization
     instruction: |
