@@ -1,3 +1,9 @@
+---
+title: objects-format
+impact: CRITICAL
+tags: audit, objects
+---
+
 # Rule: objects-format
 
 **Severity**: CRITICAL
@@ -5,7 +11,27 @@
 
 ## What It Checks
 
-Validates that object YAML files follow the required structure and value conventions.
+Validates that object YAML files follow the
+required `apiVersion` / `kind` / `spec` envelope
+and the value conventions for `spec.kind`,
+`spec.data`, multi-document separation, and
+`expand_range` placement.
+
+## Why it matters
+
+Object loaders parse each YAML document through a
+strict Pydantic model — a missing `apiVersion`,
+the wrong `kind`, or `spec.data` shaped as a dict
+instead of a list causes the entire file to fail
+to load, and `infrahubctl object load` exits non-
+zero before any object reaches the database. The
+fix is mechanical once the violation is named, but
+without this audit step the operator hits a wall
+of validation tracebacks and has to bisect which
+document triggered it. `expand_range` on the wrong
+level is the silent variant — the load succeeds
+but creates one literal item instead of expanding
+the range.
 
 ## Checks
 

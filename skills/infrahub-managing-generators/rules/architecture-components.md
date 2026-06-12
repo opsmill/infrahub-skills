@@ -8,8 +8,23 @@ tags: architecture, components, target-group, triggers
 
 Impact: CRITICAL
 
-Generators consist of three components that work together
-for design-driven automation.
+Generators consist of three components that work
+together for design-driven automation: a target
+group, a GraphQL query, and a Python class.
+
+### Why it matters
+
+The dispatcher links these three by name: the target
+group's members trigger the run, the named query
+fetches the design payload, and the Python class
+processes it. If the target group is a
+`CoreStandardGroup` instead of `CoreGeneratorGroup`,
+the dispatcher never sees it and the generator
+silently never fires — the proposed change appears
+to "do nothing". The query and class are decoupled
+on purpose so the same design data can feed multiple
+generators, but each piece has to be present and
+named correctly for the chain to resolve.
 
 ### Three Components
 

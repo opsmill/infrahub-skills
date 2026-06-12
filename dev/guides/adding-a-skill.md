@@ -251,8 +251,14 @@ case once a skill exists), see
 - Add the skill to the table in `CLAUDE.md`
 - Add the skill to `README.md`
   (skills section + project structure)
-- Update `CHANGELOG.md`
 - Update `AGENTS.md` quick reference table
+
+Release notes are generated automatically by
+[release-drafter](../../.github/release-drafter.yml)
+from PR labels — no manual changelog edit is needed.
+Apply the appropriate `type/*` and `changes/*` labels
+to your PR so it lands in the right release-notes
+category.
 
 ### 8. Verification
 
@@ -295,9 +301,10 @@ Review results with `skillgrade preview`.
 - [ ] `CLAUDE.md` updated with the new skill
 - [ ] `README.md` updated (skills section + project
   structure)
-- [ ] `CHANGELOG.md` updated
 - [ ] `AGENTS.md` quick reference table updated
   (see [Step 7](#7-register-in-documentation))
+- [ ] PR labeled with `type/*` and `changes/*` so
+  release-drafter categorizes it correctly
 
 **Validate version consistency:**
 

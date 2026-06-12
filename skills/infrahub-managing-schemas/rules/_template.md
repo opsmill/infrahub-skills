@@ -6,17 +6,26 @@ tags: tag1, tag2
 
 ## Rule Title Here
 
-**Impact:** *MEDIUM*
+Impact: MEDIUM
 
-Brief explanation of the rule and why it matters for Infrahub schema design.
+One-sentence statement of the rule.
 
-**Incorrect:**
+### Why it matters
+
+Two or three sentences naming the concrete
+consequence of getting this wrong — the validation
+error, the silent data corruption, the UI behavior
+that surprises users, the migration cost on
+already-loaded data. Skip generic "best practice"
+language; describe what actually breaks.
+
+### Incorrect
 
 ```yaml
 # Bad example
 ```
 
-**Correct:**
+### Correct
 
 ```yaml
 # Good example

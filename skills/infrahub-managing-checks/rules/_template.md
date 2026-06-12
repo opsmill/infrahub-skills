@@ -8,16 +8,24 @@ tags: tag1, tag2
 
 Impact: MEDIUM
 
-Brief explanation of the rule and why it matters for
-Infrahub check creation.
+One-sentence statement of the rule.
 
-**Incorrect:**
+### Why it matters
+
+Two or three sentences naming the concrete
+consequence of getting this wrong — the proposed
+change that won't merge, the silent runtime failure,
+the Pydantic validation rejection at repo load.
+Skip generic "best practice" language; describe what
+actually breaks.
+
+### Incorrect
 
 ```python
 # Bad example
 ```
 
-**Correct:**
+### Correct
 
 ```python
 # Good example

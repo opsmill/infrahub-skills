@@ -2,6 +2,26 @@
 
 Real-world examples extracted from production Infrahub repositories.
 
+## Contents
+
+- [1. Simple Flat List (Manufacturers)](#1-simple-flat-list-manufacturers)
+- [2. Parent-Child Inline (Tenant Groups with Tenants)](#2-parent-child-inline-tenant-groups-with-tenants)
+- [3. Groups (CoreStandardGroup)](#3-groups-corestandardgroup)
+- [4. Device Types (Referencing Manufacturers)](#4-device-types-referencing-manufacturers)
+- [5. Module Types](#5-module-types)
+- [6. Module Bay Templates](#6-module-bay-templates)
+- [7. Hierarchical Location Tree](#7-hierarchical-location-tree)
+- [8. Devices (With Type and Location References)](#8-devices-with-type-and-location-references)
+- [9. Multiple Document Types in One File](#9-multiple-document-types-in-one-file)
+- [10. Devices with Inline Interfaces](#10-devices-with-inline-interfaces)
+- [11. Devices with Interface Range Expansion](#11-devices-with-interface-range-expansion)
+- [12. Module Installations (Occupied Slots)](#12-module-installations-occupied-slots)
+- [13. Empty/Vacant Slots](#13-emptyvacant-slots)
+- [14. IP Prefixes](#14-ip-prefixes)
+- [15. Git Repository](#15-git-repository)
+- [16. Attribute Value Metadata (Source, Owner, Protection)](#16-attribute-value-metadata-source-owner-protection)
+- [Complete File Organization Example](#complete-file-organization-example)
+
 ---
 
 ## 1. Simple Flat List (Manufacturers)
@@ -744,6 +764,55 @@ spec:
   `objects/git-repo/`
 - The `---` document separator is optional for
   the first document in a file
+
+---
+
+## 16. Attribute Value Metadata (Source, Owner, Protection)
+
+Stamp lineage and lock specific attributes by writing
+them as a mapping (`value` + metadata) instead of a
+plain scalar. Here a device is imported from a NetBox
+sync, and its `role` is locked so only the network team
+can change it — while `description` stays freely
+editable.
+
+```yaml
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: DcimDevice
+  data:
+    - name: spine-01
+      # role: imported AND locked to the owning team
+      role:
+        value: leaf
+        source: netbox-sync       # lineage: an Account/Repository
+        owner: network-team       # a Group/Account/Repository
+        is_protected: true        # only network-team (+admins) edit this
+      # status: provenance recorded, but left editable
+      status:
+        value: active
+        source: netbox-sync
+      # description: plain scalar, no metadata
+      description: "Spine switch in pod 1"
+```
+
+**Key points:**
+
+- The metadata keys are `source`, `owner`, and
+  `is_protected`; any attribute can use them.
+- `source` is **lineage only** — recording it does
+  not stop anyone from editing the value. Locking
+  requires `owner` + `is_protected: true`.
+- `source` accepts an `Account` or `Repository`;
+  `owner` accepts a `Group`, `Account`, or
+  `Repository`. Reference the node by `id` or HFID; it
+  must already exist when the value loads.
+- Attributes left as plain scalars (`description`)
+  carry no metadata and stay editable by everyone.
+- Concept reference:
+  [../infrahub-common/metadata-lineage.md](../infrahub-common/metadata-lineage.md).
 
 ---
 

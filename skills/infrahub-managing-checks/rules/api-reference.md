@@ -8,6 +8,24 @@ tags: api, class-attributes, properties, methods, lifecycle
 
 Impact: HIGH
 
+The `InfrahubCheck` base class exposes a fixed
+surface: a `query` class attribute, a handful of
+instance properties populated by the SDK, and the
+`log_error` / `log_info` methods that drive pass/fail.
+
+### Why it matters
+
+The SDK wires `validate(data)` into a lifecycle that
+runs the GraphQL query, unpacks the `"data"` key, and
+then counts ERROR-level log entries to decide whether
+the check passes. Reaching for attributes that don't
+exist (a `log_warning` method, a `self.warnings`
+list) or skipping the documented ones (`self.client`
+for follow-up API calls, `__typename` in error
+payloads) produces `AttributeError` at runtime and
+the check fails the proposed change with a traceback
+instead of a useful validation message.
+
 ### Class Attributes
 
 | Attribute | Type | Description |

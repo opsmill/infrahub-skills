@@ -8,6 +8,27 @@ tags: patterns, error-collection, shared-utilities, scoped-validation
 
 Impact: MEDIUM
 
+Collect findings into local lists during traversal,
+then emit them through `log_error` / `log_info` at
+the end; share data-shaping helpers in a `common.py`
+module; for large global checks, bucket records by
+parent before validating.
+
+### Why it matters
+
+Interleaving `log_error` calls with the traversal
+makes failure ordering depend on dict iteration and
+makes it hard to add a "summary" log line — collecting
+first lets the check report a deterministic count and
+group related messages. Sharing helpers in
+`checks/common.py` keeps each check focused on its
+rule rather than re-implementing GraphQL response
+unwrapping, which is where subtle bugs (treating a
+node as a list, missing the `edges` wrapper) creep in.
+Bucketing by parent turns an O(n²) cross-check into
+O(n) per group — relevant when a global check sweeps
+thousands of devices on every proposed change.
+
 ### Collecting Errors Before Logging
 
 ```python

@@ -8,14 +8,23 @@ tags: extension, artifact, CoreArtifactTarget, inheritance
 
 Impact: MEDIUM
 
-`CoreArtifactTarget` is a built-in Infrahub generic
-that makes a node eligible to have artifacts
-(rendered configs, manifests, exports) attached via
-artifact definitions in `.infrahub.yml`. A concrete
-node inherits it alongside its domain generics; the
-generic exposes the `artifacts` relationship and the
-machinery that links instances to their rendered
-outputs.
+Concrete nodes that artifact definitions render
+against inherit from `CoreArtifactTarget` alongside
+their domain generics.
+
+### Why it matters
+
+Artifact pipelines bind by inheritance: an artifact
+definition in `.infrahub.yml` declares a `targets:`
+group whose members come from a kind that inherits
+`CoreArtifactTarget`. Without
+the inheritance, the pipeline fails at runtime with
+`target kind does not support artifacts` and no
+rendered output is produced. The cost of adding the
+inheritance later is a schema migration on every
+already-loaded instance, where adding it on day one
+is free — that asymmetry is why this is a
+design-time decision, not a refactor.
 
 This is independent of the Object Template feature
 (`generate_template: true`) — see
@@ -46,10 +55,10 @@ nodes:
 ```
 
 Artifact definitions in `.infrahub.yml` reference a
-`targets:` group, and the group's members must be of
-a kind that inherits `CoreArtifactTarget`. Without
-the inheritance, transforms cannot attach to
-instances of this node.
+`targets:` group whose members come from a kind that
+inherits `CoreArtifactTarget`. Without the
+inheritance, transforms cannot attach to instances
+of this node.
 
 ### Apply It to the Concrete, Not the Generic
 
@@ -128,6 +137,17 @@ mis-targeted definitions in `.infrahub.yml`.
 artifact definitions point at:** the artifact
 pipeline cannot bind. Add the inheritance to the
 concrete node, not its generic.
+
+**Trying to add `CoreArtifactTarget` via `extensions:`:**
+the `extensions:` block only takes new `attributes:`
+and `relationships:` on an existing node — adding
+`inherit_from`, `generics:`, or any other top-level
+property either raises `ValidationError`
+(server-side) or silently drops (SDK-side). The
+inheritance is never applied either way. Edit the
+node's source schema file instead, or define your
+own concrete node that inherits from the foreign
+generic plus `CoreArtifactTarget`.
 
 Reference:
 [Infrahub Schema Docs](https://docs.infrahub.app)

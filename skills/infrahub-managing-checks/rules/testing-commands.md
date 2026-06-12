@@ -8,6 +8,22 @@ tags: testing, infrahubctl, commands
 
 Impact: LOW (reference)
 
+Run checks locally with `infrahubctl check` against a
+feature branch before opening a proposed change.
+
+### Why it matters
+
+The proposed-change pipeline is the wrong place to
+discover that a check raises `AttributeError` or
+fetches an empty payload — every failed iteration
+costs a branch push and a pipeline run, and the
+traceback shows up to reviewers rather than to the
+author. Running `infrahubctl check` locally exercises
+the same SDK path the pipeline uses, so a check that
+passes locally on a representative branch will behave
+the same way in the pipeline, and one that explodes
+locally never reaches a reviewer.
+
 ### Prerequisites
 
 All commands below require a running Infrahub server.

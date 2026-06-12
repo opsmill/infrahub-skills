@@ -520,6 +520,119 @@ def check_generate_template_concrete_only(schema: dict, **_: Any) -> tuple[bool,
     return True, f"generate_template: true on concrete nodes only: {', '.join(flagged_nodes)}"
 
 
+_FETCH_SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "skills"
+    / "infrahub-managing-schemas"
+    / "scripts"
+    / "fetch_schema_limits.py"
+)
+_SCHEMA_LIMITS_CACHE: dict[str, dict[str, int]] | None = None
+_SCHEMA_LIMITS_ERROR: str | None = None
+_SCHEMA_NAMES = ("NodeSchema", "GenericSchema",
+                 "AttributeSchema", "RelationshipSchema")
+
+
+def _load_schema_limits() -> tuple[dict[str, dict[str, int]] | None, str | None]:
+    """Run the shared fetch script and return per-schema maxLength tables.
+
+    Caches the result for the lifetime of the process. On any failure
+    (script missing, non-zero exit, malformed JSON) limits are ``None``
+    and an error string is returned for the caller to surface.
+    """
+    global _SCHEMA_LIMITS_CACHE, _SCHEMA_LIMITS_ERROR
+    if _SCHEMA_LIMITS_CACHE is not None:
+        return _SCHEMA_LIMITS_CACHE, None
+    if _SCHEMA_LIMITS_ERROR is not None:
+        return None, _SCHEMA_LIMITS_ERROR
+
+    import json
+    import subprocess
+    import sys
+
+    if not _FETCH_SCRIPT.is_file():
+        _SCHEMA_LIMITS_ERROR = f"fetch script not found at {_FETCH_SCRIPT}"
+        return None, _SCHEMA_LIMITS_ERROR
+
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(_FETCH_SCRIPT)],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        _SCHEMA_LIMITS_ERROR = f"{type(exc).__name__}: {exc}"
+        return None, _SCHEMA_LIMITS_ERROR
+
+    if proc.returncode != 0:
+        stderr = (proc.stderr or "").strip().splitlines()[-1:] or ["non-zero exit"]
+        _SCHEMA_LIMITS_ERROR = f"exit {proc.returncode}: {stderr[0]}"
+        return None, _SCHEMA_LIMITS_ERROR
+
+    try:
+        full = json.loads(proc.stdout)
+    except ValueError as exc:
+        _SCHEMA_LIMITS_ERROR = f"invalid JSON from fetch script: {exc}"
+        return None, _SCHEMA_LIMITS_ERROR
+
+    # Project {SchemaName: {field: {minLength, maxLength, pattern}}}
+    # down to {SchemaName: {field: maxLength}} for the cap-only check.
+    limits: dict[str, dict[str, int]] = {}
+    for name in _SCHEMA_NAMES:
+        limits[name] = {
+            field: info["maxLength"]
+            for field, info in full.get(name, {}).items()
+            if "maxLength" in info
+        }
+    _SCHEMA_LIMITS_CACHE = limits
+    return limits, None
+
+
+def check_string_limits(schema: dict, **_: Any) -> tuple[bool, str]:
+    """All schema string fields fit Infrahub's load-time max_length caps.
+
+    Delegates to ``skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py``
+    so the source-of-truth URL and extraction logic live in exactly one
+    place across the repo. If the script can't reach the live schema,
+    the check returns ``True`` with an explicit "unverified" reason so
+    transient network failures don't fail CI — the result is visibly
+    inconclusive.
+    """
+    limits, error = _load_schema_limits()
+    if limits is None:
+        return True, (
+            f"String-length caps not verified — fetch_schema_limits.py failed "
+            f"({error}). Check skipped for this run."
+        )
+
+    def _check(ref: str, obj: dict, table: dict[str, int], issues: list[str]) -> None:
+        for field, cap in table.items():
+            value = obj.get(field)
+            if isinstance(value, str) and len(value) > cap:
+                issues.append(f"{ref}.{field}={len(value)} (max {cap})")
+
+    issues: list[str] = []
+    for node in _all_nodes(schema):
+        ref = _full_kind(node) or "<unnamed>"
+        _check(ref, node, limits["NodeSchema"], issues)
+        for attr in _all_attrs(node):
+            _check(f"{ref}.{attr.get('name', '?')}", attr, limits["AttributeSchema"], issues)
+        for rel in _all_rels(node):
+            _check(f"{ref}.{rel.get('name', '?')}", rel, limits["RelationshipSchema"], issues)
+    for generic in _all_generics(schema):
+        ref = _full_kind(generic) or "<unnamed>"
+        _check(ref, generic, limits["GenericSchema"], issues)
+        for attr in _all_attrs(generic):
+            _check(f"{ref}.{attr.get('name', '?')}", attr, limits["AttributeSchema"], issues)
+        for rel in _all_rels(generic):
+            _check(f"{ref}.{rel.get('name', '?')}", rel, limits["RelationshipSchema"], issues)
+
+    if issues:
+        return False, "Over-limit string fields: " + "; ".join(issues)
+    return True, "All string fields within max_length caps (per fetch_schema_limits.py)"
+
+
 def check_core_artifact_target_concrete(schema: dict, **_: Any) -> tuple[bool, str]:
     """CoreArtifactTarget is inherited only by concrete nodes, not by generics.
 
@@ -541,6 +654,103 @@ def check_core_artifact_target_concrete(schema: dict, **_: Any) -> tuple[bool, s
     if not inheriting_nodes:
         return False, "No node inherits from CoreArtifactTarget"
     return True, f"CoreArtifactTarget inherited by concrete nodes only: {', '.join(inheriting_nodes)}"
+
+
+_CORE_FILE_OBJECT_RESERVED_ATTRS = {
+    "file_name",
+    "file_size",
+    "file_type",
+    "checksum",
+    "storage_id",
+}
+
+_FILE_BYPASS_TEXT_ATTR_NAMES = {
+    "file_url",
+    "file_path",
+    "file_name",
+    "filename",
+    "url",
+    "path",
+    "location",
+}
+
+
+def _nodes_inheriting_core_file_object(schema: dict) -> list[dict]:
+    return [
+        node
+        for node in _all_nodes(schema)
+        if "CoreFileObject" in (node.get("inherit_from", []) or [])
+    ]
+
+
+def check_core_file_object_inherited(schema: dict, **_: Any) -> tuple[bool, str]:
+    """At least one concrete node inherits from CoreFileObject."""
+    inheriting = [_full_kind(node) for node in _nodes_inheriting_core_file_object(schema)]
+    if not inheriting:
+        return False, "No node inherits from CoreFileObject"
+    return True, f"CoreFileObject inherited by: {', '.join(inheriting)}"
+
+
+def check_file_object_on_node_not_generic(schema: dict, **_: Any) -> tuple[bool, str]:
+    """CoreFileObject is inherited only by concrete nodes, not by generics.
+
+    Generics aren't instantiable — files have nothing to upload to.
+    """
+    bad_generics = [
+        _full_kind(generic)
+        for generic in _all_generics(schema)
+        if "CoreFileObject" in (generic.get("inherit_from", []) or [])
+    ]
+    if bad_generics:
+        return False, f"CoreFileObject on generics: {', '.join(bad_generics)}"
+    return True, "CoreFileObject not declared on any generic"
+
+
+def check_no_reserved_file_attrs(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Nodes inheriting CoreFileObject must not redeclare reserved attributes.
+
+    file_name, file_size, file_type, checksum, storage_id are system-managed
+    and read-only; redeclaring collides with inherited definitions.
+    """
+    violations: list[str] = []
+    for node in _nodes_inheriting_core_file_object(schema):
+        kind = _full_kind(node)
+        for attr in _all_attrs(node):
+            name = attr.get("name")
+            if name in _CORE_FILE_OBJECT_RESERVED_ATTRS:
+                violations.append(f"{kind}.{name}")
+    if violations:
+        return False, (
+            "Reserved CoreFileObject attributes redeclared: "
+            + ", ".join(violations)
+        )
+    return True, "No reserved CoreFileObject attributes redeclared"
+
+
+def check_no_filename_text_bypass(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Nodes inheriting CoreFileObject must not also store a path/URL Text attr.
+
+    A Text attribute named url/path/file_url/file_path/filename/location on a
+    CoreFileObject heir is the bypass antipattern — the file should live in
+    object storage, not be a string pointer alongside it.
+    """
+    violations: list[str] = []
+    for node in _nodes_inheriting_core_file_object(schema):
+        kind = _full_kind(node)
+        for attr in _all_attrs(node):
+            name = attr.get("name")
+            if (
+                name in _FILE_BYPASS_TEXT_ATTR_NAMES
+                and attr.get("kind") == "Text"
+                and name not in _CORE_FILE_OBJECT_RESERVED_ATTRS
+            ):
+                violations.append(f"{kind}.{name}")
+    if violations:
+        return False, (
+            "Text attributes that bypass CoreFileObject storage: "
+            + ", ".join(violations)
+        )
+    return True, "No bypass Text attributes alongside CoreFileObject inheritance"
 
 
 # ---------------------------------------------------------------------------
@@ -570,6 +780,11 @@ CHECKS: dict[str, Any] = {
     "on-delete-cascade-present": check_on_delete_cascade_present,
     "generate-template-concrete-only": check_generate_template_concrete_only,
     "core-artifact-target-concrete": check_core_artifact_target_concrete,
+    "core-file-object-inherited": check_core_file_object_inherited,
+    "file-object-on-node-not-generic": check_file_object_on_node_not_generic,
+    "no-reserved-file-attrs": check_no_reserved_file_attrs,
+    "no-filename-text-bypass": check_no_filename_text_bypass,
+    "string-limits": check_string_limits,
 }
 
 

@@ -1,8 +1,8 @@
 ---
 name: infrahub-managing-checks
 description: >-
-  Creates Infrahub check definitions — Python validation logic and GraphQL queries for proposed change pipelines.
-  TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes.
+  Creates Infrahub check definitions — Python validation logic, GraphQL queries, and YAML-driven tests for proposed change pipelines.
+  TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes, writing or running tests for a check.
   DO NOT TRIGGER when: designing schemas, querying live data, building transforms or generators.
 allowed-tools:
   - Read
@@ -12,7 +12,7 @@ allowed-tools:
   - Grep
 argument-hint: "[check-name] [description...]"
 metadata:
-  version: 1.2.5
+  version: 1.2.6
   author: OpsMill
 ---
 
@@ -58,9 +58,23 @@ Existing queries:
 | HIGH | API Reference | `api-` | Class attributes, instance properties, methods, lifecycle |
 | HIGH | Registration | `registration-` | .infrahub.yml config, query name matching, parameters |
 | MEDIUM | Patterns | `patterns-` | Error collection, shared utilities, scoped validation |
-| LOW | Testing | `testing-` | infrahubctl check commands, branch testing |
+| HIGH | Testing | `testing-` | Resources Testing Framework (YAML-driven tests), infrahubctl check commands |
 
 <!-- markdownlint-enable MD013 -->
+
+## Schema Features This Skill Depends On
+
+A check is only useful if it can fetch and validate
+the right data. Most check failures at deploy time
+are actually schema-side gaps:
+
+| If the check... | The schema (or .infrahub.yml) must... | See |
+| --------------- | ------------------------------------- | --- |
+| Reads an attribute via GraphQL | Expose it on the schema node with the same name (`name__value`-shaped paths) | [../infrahub-managing-schemas/rules/attribute-defaults-and-types.md](../infrahub-managing-schemas/rules/attribute-defaults-and-types.md) |
+| Walks a relationship to validate related objects | Have both sides of the relationship defined with matching identifiers; otherwise the traversal returns nothing | [../infrahub-managing-schemas/rules/relationship-identifiers.md](../infrahub-managing-schemas/rules/relationship-identifiers.md) |
+| Is targeted (per-object) | Register a `CoreStandardGroup` as `targets:` in `.infrahub.yml` and map `parameters:` to bind GraphQL variables | [rules/registration-config.md](./rules/registration-config.md) |
+| Needs the GraphQL response keyed to typed nodes | Select `id` and `__typename` in the query — the SDK relies on both | [../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md) |
+| Should never block a merge but only annotate | Use `self.log_info()` instead of `log_error()`; `log_warning()` does not exist | [rules/python-validate.md](./rules/python-validate.md) |
 
 ## Check Basics
 
@@ -123,11 +137,21 @@ Follow these steps when creating a check:
    `check_definitions`. The query name must match the
    Python class `query` attribute. See
    [rules/registration-config.md](./rules/registration-config.md).
-5. **Test** — Run `infrahubctl check` to validate. See
+5. **Add tests** — Create YAML-driven test definitions
+   (smoke, unit, integration) alongside the check so it
+   is validated automatically in the proposed change
+   pipeline. Read
+   [rules/testing-resource-framework.md](./rules/testing-resource-framework.md).
+6. **Test locally** — Run `infrahubctl check` to validate
+   against a feature branch. See
    [rules/testing-commands.md](./rules/testing-commands.md).
 
 ## Supporting References
 
+- **[reference.md](./reference.md)** -- Class API,
+  log_error/log_info (no log_warning), lifecycle,
+  `.infrahub.yml` registration (with the no-`query:`
+  shape that differs from generator_definitions)
 - **[examples.md](./examples.md)** -- Complete check
   patterns (global, targeted, minimal)
 - **[../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)**

@@ -8,8 +8,27 @@ tags: tracking, idempotent, delete_unused_nodes, allow_upsert
 
 Impact: HIGH
 
-The `run()` method wraps your `generate()` call in a
-tracking context with `delete_unused_nodes=True`.
+`run()` wraps `generate()` in a tracking context
+with `delete_unused_nodes=True`, so the generator's
+output is treated as the desired state for its
+target.
+
+### Why it matters
+
+Generators are stateful: a re-run cleans up objects
+from the previous run that weren't recreated this
+time, which is what lets the generator "drive" the
+target instead of just accumulating data. That only
+works if every `save()` uses `allow_upsert=True` —
+without upsert the second run errors on the first
+existing object and aborts, leaving the tracking
+group half-updated. The flip side is that a buggy
+generator (one that skips objects it shouldn't, or
+narrows its target too far) can delete real data on
+the next run; the tracking group is the blast
+radius, so keeping `generate()` deterministic and
+defensive about empty input matters more here than
+in checks or transforms.
 
 ### How Tracking Works
 

@@ -275,6 +275,81 @@
           "check": "human_friendly_id defined on the concrete Device"
         }
       ]
+    },
+    {
+      "id": 8,
+      "prompt": "Add a DcimNetworkDiagram node to my Infrahub schema. Each diagram is a Visio\nfile attached to a LocationSite. Track a title, the author, and the date it was\nlast reviewed. The Visio file itself must be stored inside Infrahub, not as a URL.\nUse namespace 'Dcim'. The LocationSite node already exists \u2014 extend it via the\nschema's relationships rather than redefining it.",
+      "expected_output": "A schema in which DcimNetworkDiagram inherits from CoreFileObject (so the Visio file lives in Infrahub object storage with auto file metadata and a GraphQL upload mutation), carries domain attributes (title, author, last_reviewed) but does NOT redeclare the reserved file_name/file_size/file_type/checksum/storage_id attributes, and links back to LocationSite via a cardinality:one relationship.",
+      "files": [],
+      "expectations": [
+        "DcimNetworkDiagram lists CoreFileObject in its inherit_from so the node is a file-bearing entity with auto metadata and an upload mutation",
+        "CoreFileObject is applied to the concrete DcimNetworkDiagram node, never to a generic \u2014 generics are not instantiable and have nothing to upload to",
+        "The reserved CoreFileObject attributes (file_name, file_size, file_type, checksum, storage_id) are NOT redeclared on DcimNetworkDiagram \u2014 they are inherited and system-managed",
+        "No Text attribute with a name like url, path, file_url, file_path, filename, or location is declared on DcimNetworkDiagram \u2014 storing a path/URL alongside CoreFileObject is the bypass antipattern",
+        "human_friendly_id is defined on DcimNetworkDiagram",
+        "Schema starts with version: \"1.0\""
+      ],
+      "assertions": [
+        {
+          "name": "schema-version",
+          "check": "Schema starts with version: '1.0'"
+        },
+        {
+          "name": "core-file-object-inherited",
+          "check": "DcimNetworkDiagram inherits from CoreFileObject so the Visio file is stored in Infrahub object storage"
+        },
+        {
+          "name": "file-object-on-node-not-generic",
+          "check": "CoreFileObject is declared only on the concrete node, never on a generic"
+        },
+        {
+          "name": "no-reserved-file-attrs",
+          "check": "The reserved file_name/file_size/file_type/checksum/storage_id attributes are not redeclared on DcimNetworkDiagram"
+        },
+        {
+          "name": "no-filename-text-bypass",
+          "check": "No bypass Text attribute (url/path/filename/etc.) is declared alongside the CoreFileObject inheritance"
+        },
+        {
+          "name": "human-friendly-id",
+          "check": "human_friendly_id defined on DcimNetworkDiagram"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Create an Infrahub schema for a service-handoff intent model. Namespace: 'Service'.\n\nDefine a single node, HandoffIntent, with:\n\n  - intent_id: a Number, the unique identifier for the handoff intent.\n  - state: a Dropdown \u2014 one of draft, active, decommissioned.\n\nPlus two relationships on HandoffIntent:\n\n  - source_device: peer DcimDevice. Constraint: must point to a customer-edge\n    router where the provider hands traffic off. Non-edge devices are rejected at\n    submit by the generator's _validate() step.\n  - handoff_port: peer DcimInterface. The specific port on source_device where\n    the handover happens. The picker walks DcimDevice \u2192 DcimInterface via the\n    peer's human_friendly_id; only ports on the chosen source_device are valid.\n\nThese descriptions are operator-facing \u2014 they are the only docs operators see in the UI\ntooltip. Make sure the schema actually loads (`infrahubctl schema load`) without errors\nin addition to passing `infrahubctl schema check`.",
+      "expected_output": "A schema where every string field (`description`, `label`, `identifier`, `deprecation`) stays within Infrahub's server-enforced Pydantic `max_length` caps so the schema loads cleanly. Limits are resolved live per the validation-string-limits rule (public JSON Schema primary, `/api/openapi.json` fallback); this eval does not pin specific numbers. Longer operator-facing context belongs in YAML comments next to the field, not in `description:` itself.",
+      "files": [],
+      "expectations": [
+        "Every node, attribute, and relationship `description`, `label`, `identifier`, and `deprecation` length is within the live cap published by the Infrahub schema (resolved per the validation-string-limits rule). Over-cap fields fail with `Input should have at most N characters` at `infrahubctl schema load` time.",
+        "Longer operator-facing context (picker behavior, generator _validate() rules, why non-edge devices are rejected) lives in YAML comments above the field, not inside `description:`",
+        "All peer references use the full namespace+name kind (DcimDevice, DcimInterface \u2014 not Device or Interface)",
+        "human_friendly_id is defined on HandoffIntent",
+        "Schema starts with version: \"1.0\""
+      ],
+      "assertions": [
+        {
+          "name": "schema-version",
+          "check": "Schema starts with version: '1.0'"
+        },
+        {
+          "name": "string-limits",
+          "check": "All description/label/identifier/deprecation fields fit the live `max_length` caps fetched from `https://schema.infrahub.app/infrahub/schema/latest.json` by the grader"
+        },
+        {
+          "name": "full-kind-references",
+          "check": "All peer references use full Namespace+Name kind"
+        },
+        {
+          "name": "human-friendly-id",
+          "check": "human_friendly_id defined on HandoffIntent"
+        },
+        {
+          "name": "no-deprecated-string",
+          "check": "Attribute kinds use 'Text' not deprecated 'String'"
+        }
+      ]
     }
   ]
 }

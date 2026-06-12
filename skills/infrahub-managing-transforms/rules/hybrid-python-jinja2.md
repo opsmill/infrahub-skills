@@ -6,7 +6,27 @@ tags: hybrid, python, jinja2, FileSystemLoader, platform-specific
 
 ## Hybrid Python + Jinja2 Pattern
 
-**Impact:** HIGH
+Impact: HIGH
+
+Use Python to prepare the data and pick the template,
+then call Jinja2 to render it — registered as a single
+`python_transform` in `.infrahub.yml`.
+
+### Why it matters
+
+Logic-in-templates is the most common antipattern in
+config generation: large `{% if %}` chains that branch
+on platform or role become unreadable and untestable,
+and Jinja2 silently swallows attribute lookups against
+missing keys, so a typo produces an empty config
+rather than an error. The hybrid pattern moves that
+logic into Python where exceptions surface and unit
+tests work, while keeping the per-line output shape in
+the template where indentation and whitespace are
+easy to manage. Because the entry point is a Python
+class, it registers under `python_transforms` —
+listing it under `jinja2_transforms` skips the Python
+file entirely and the template never runs.
 
 For complex scenarios, use Python to prepare data and
 Jinja2 to render it. This is the most common pattern

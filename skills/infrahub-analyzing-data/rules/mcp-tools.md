@@ -14,6 +14,24 @@ instance directly. Compliance workflows depend on
 calling these tools correctly to fetch, evaluate,
 and optionally update data.
 
+### Why it matters
+
+MCP tools run against a live instance, so a
+malformed GraphQL query comes back as "query
+failed" with a partial reason — the difference
+between an answer and a stack trace is the exact
+shape of the kind name, the `edges`/`node` envelope,
+and the attribute filter syntax. Schema introspection
+via `mcp__infrahub__infrahub_list_schema` is the
+cheap first step; reaching for `infrahub_query`
+without it leads to round trips that fail on a typo
+the introspection call would have surfaced. The same
+care applies to writes — `infrahub_create` and
+`infrahub_update` issued against `main` skip the
+proposed-change review loop entirely, which is the
+single guard against accidental data drift from a
+remediation script.
+
 ---
 
 ### Available Tools
@@ -110,8 +128,10 @@ Arguments:
     — Branch (default: main)
 ```
 
-Always create on a **branch** (not main) so
-changes can be reviewed in a proposed change.
+Create on a **branch** (not main) so changes go
+through a proposed change for review — writes to
+`main` skip the review pipeline and land
+unreviewed.
 
 ---
 
@@ -196,8 +216,11 @@ convention:
 }
 ```
 
-Always navigate: `response.<Kind>.edges[].node`
-to get individual objects.
+Navigate: `response.<Kind>.edges[].node` to get
+individual objects. Treating the response as a flat
+list of nodes — skipping the `edges` indirection —
+returns nothing and looks like missing data, when
+the data is actually one envelope away.
 
 ---
 
@@ -213,8 +236,10 @@ mcp__infrahub__infrahub_query({
 })
 ```
 
-For remediation creates/updates, **always use a
-named branch** — never write directly to `main`.
+For remediation creates/updates, target a **named
+branch**. Writes to `main` bypass the proposed
+change review loop entirely, so a buggy remediation
+script lands unreviewed on the source of truth.
 
 Reference:
 [Infrahub MCP Server Docs](https://docs.infrahub.app/integrations/mcp)

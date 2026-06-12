@@ -3,6 +3,14 @@
 Real-world examples extracted from production Infrahub
 repositories.
 
+## Contents
+
+- [1. POP Topology Generator](#1-pop-topology-generator)
+- [2. Network Segment Generator](#2-network-segment-generator)
+- [3. Minimal Generator Template](#3-minimal-generator-template)
+- [4. Generator with convert_query_response](#4-generator-with-convert_query_response)
+- [Complete File Structure](#complete-file-structure)
+
 ---
 
 ## 1. POP Topology Generator

@@ -8,6 +8,27 @@ tags: api, constructor, properties, methods
 
 Impact: HIGH
 
+The `InfrahubGenerator` base class exposes the
+constructor parameters, instance properties, and
+methods listed below — using them as documented is
+what keeps a generator runnable both locally
+(`infrahubctl generator`) and inside the proposed
+change pipeline.
+
+### Why it matters
+
+`self.client` is the tracking-enabled client; using
+the wrong attribute (e.g., `self._init_client`)
+creates objects outside the tracking group, so they
+never get cleaned up on re-runs and accumulate as
+orphans. `convert_query_response=True` is what
+populates `self.nodes` with SDK objects — without
+it, code that iterates `self.nodes` silently sees an
+empty list and the generator produces nothing.
+Overriding anything other than `generate()` (for
+example, replacing `run()`) bypasses the tracking
+context entirely and disables idempotent cleanup.
+
 ### Constructor Parameters
 
 | Parameter | Type | Default | Description |

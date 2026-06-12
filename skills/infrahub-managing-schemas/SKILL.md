@@ -2,7 +2,7 @@
 name: infrahub-managing-schemas
 description: >-
   Creates, validates, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions.
-  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations.
+  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations, modeling file objects / attachments / uploads (storing PDFs, diagrams, images, certificates, documents as Infrahub objects).
   DO NOT TRIGGER when: populating data objects, writing checks/generators/transforms, querying live data.
 allowed-tools:
   - Read
@@ -11,7 +11,7 @@ allowed-tools:
   - Bash
 argument-hint: "[namespace] [node-names...]"
 metadata:
-  version: 1.2.5
+  version: 1.2.6
   author: OpsMill
 ---
 
@@ -56,7 +56,7 @@ use the first argument as the namespace and remaining arguments as node names.
 | MEDIUM | Extensions | `extension-` | Cross-file via extensions block, artifact targets |
 | MEDIUM | Uniqueness | `uniqueness-` | Constraint format, __value suffix |
 | MEDIUM | Migration | `migration-` | Add/remove attributes, state: absent |
-| LOW | Validation | `validation-` | Common errors, pre-check checklist |
+| HIGH | Validation | `validation-` | Load-time string-length caps (description / label / identifier), common error messages, pre-check checklist |
 
 ## Schema File Basics
 
@@ -90,6 +90,7 @@ those features require:
 | Be the target of a generator (group member referenced by a `generator_definition`) | `inherit_from: [..., CoreArtifactTarget]` on the concrete node | [rules/extension-artifact-target.md](./rules/extension-artifact-target.md) |
 | Appear in a custom sidebar menu | `include_in_menu: false` so the auto-menu doesn't duplicate the manual entry | [../infrahub-managing-menus/rules/schema-integration.md](../infrahub-managing-menus/rules/schema-integration.md) |
 | Be cloneable as an object template | `generate_template: true` | [rules/extension-object-template.md](./rules/extension-object-template.md) |
+| Store an uploaded file (PDF, image, Visio, KMZ, contract, …) | `inherit_from: [..., CoreFileObject]` on the concrete node | [rules/extension-file-object.md](./rules/extension-file-object.md) |
 | Be displayed with a stable name across UI lists and APIs | `human_friendly_id` and `display_label` | [rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md) |
 
 This audit is the difference between a schema that
@@ -137,44 +138,14 @@ Follow these steps when creating or modifying a schema:
 
 ## Production Patterns Worth Knowing
 
-These patterns recur across the OpsMill reference
-schemas (`opsmill/schema-library`,
-`opsmill/infrahub-demo-dc`,
-`opsmill/infrahub-solution-ai-dc`) and are easy to
-miss when building from scratch:
-
-- **Computed Jinja2 attributes** — `computed_attribute`
-  always pairs with `read_only: true`; choose
-  `optional` based on whether the value is
-  load-bearing (display label, hfid, uniqueness) or
-  informational. See
-  [rules/attribute-computed-jinja2.md](./rules/attribute-computed-jinja2.md).
-- **Cascade vs no-action deletes** — `on_delete:`
-  is independent of `kind: Component`; pick
-  `cascade` only for owned children whose existence
-  has no meaning without the parent. See
-  [rules/relationship-on-delete.md](./rules/relationship-on-delete.md).
-- **Menu visibility** — when the project ships menu
-  files in `.infrahub.yml`, set `include_in_menu:
-  false` on every node and generic; otherwise hide
-  abstract bases and use `menu_placement: <FullKind>`
-  to group subtypes. See
-  [rules/display-menu-placement.md](./rules/display-menu-placement.md).
-- **Branch-agnostic identity** — `branch: agnostic`
-  on attributes that must be globally unique (AS
-  numbers, service names, customer IDs). See
-  [rules/attribute-branch-agnostic.md](./rules/attribute-branch-agnostic.md).
-- **Artifact targets** — `inherit_from:
-  CoreArtifactTarget` lets a node receive rendered
-  artifacts. Apply to concrete nodes, not generics.
-  See
-  [rules/extension-artifact-target.md](./rules/extension-artifact-target.md).
-- **Object Templates** — `generate_template: true`
-  enables clone-from-template UX. Independent of
-  artifact targets; use only when users should
-  duplicate the object as a starter for new
-  instances. See
-  [rules/extension-object-template.md](./rules/extension-object-template.md).
+Seven recurring patterns — computed Jinja2 attributes,
+cascade-vs-no-action deletes, menu visibility,
+branch-agnostic identity, artifact targets, object
+templates, and file objects — are documented at the top
+of [examples.md](./examples.md). Read those before
+finalizing a schema; each pattern is easy to miss
+when building from scratch and expensive to retrofit
+after data is loaded.
 
 ## Supporting References
 

@@ -8,16 +8,24 @@ tags: tag1, tag2
 
 Impact: MEDIUM
 
-Brief explanation of the rule and why it matters
-for Infrahub compliance analysis.
+One-sentence statement of the rule.
 
-**Incorrect:**
+### Why it matters
+
+Two to four sentences naming the concrete
+consequence of getting this wrong — the runtime
+query failure, the silent wrong answer, the wasted
+round trip, the hard-to-spot join bug. Skip generic
+"best practice" language; describe what actually
+breaks at the keyboard.
+
+### Incorrect
 
 ```graphql
 # Bad example (or describe wrong approach)
 ```
 
-**Correct:**
+### Correct
 
 ```graphql
 # Good example

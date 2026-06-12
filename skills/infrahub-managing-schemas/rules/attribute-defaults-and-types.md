@@ -8,12 +8,32 @@ tags: attribute, optional, dropdown, choices, deprecated
 
 Impact: HIGH
 
+Attributes default to mandatory, dropdown choices are
+objects rather than strings, and several legacy field
+names still parse but are removed in current Infrahub.
+
+### Why it matters
+
+The optionality default is the opposite of
+relationships, so adding a new attribute without
+`optional: true` makes every existing object fail
+validation on the next load — a five-second oversight
+that turns into a data-migration day. Dropdown choices
+as bare strings parse only on very old schema
+versions; current Infrahub rejects them with a
+schema-validation error. The deprecated fields
+(`display_labels`, `default_filter`, `String`,
+top-level `regex` / `min_length` / `max_length`) are
+the highest-cost mistakes because they look correct,
+load successfully on older versions, and silently
+break when the project upgrades.
+
 ### Attributes Are Mandatory by Default
 
 Unlike relationships (which default to optional),
-attributes default to `optional: false`. If you add a
-new attribute without `optional: true`, all existing
-objects will need a value.
+attributes default to `optional: false`. Adding a
+new attribute without `optional: true` makes every
+existing object fail validation.
 
 **Incorrect -- adding a new required attribute without a default:**
 
@@ -47,7 +67,7 @@ Each choice needs at minimum a `name` field. `label`,
 - name: status
   kind: Dropdown
   choices:
-    - active                  # Must be an object with name field, not a bare string
+    - active                  # Bare string — needs an object with a name field
     - planned
 ```
 
