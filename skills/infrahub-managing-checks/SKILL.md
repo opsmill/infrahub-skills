@@ -1,8 +1,8 @@
 ---
 name: infrahub-managing-checks
 description: >-
-  Creates Infrahub check definitions — Python validation logic and GraphQL queries for proposed change pipelines.
-  TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes.
+  Creates Infrahub check definitions — Python validation logic, GraphQL queries, and YAML-driven tests for proposed change pipelines.
+  TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes, writing or running tests for a check.
   DO NOT TRIGGER when: designing schemas, querying live data, building transforms or generators.
 allowed-tools:
   - Read
@@ -58,7 +58,7 @@ Existing queries:
 | HIGH | API Reference | `api-` | Class attributes, instance properties, methods, lifecycle |
 | HIGH | Registration | `registration-` | .infrahub.yml config, query name matching, parameters |
 | MEDIUM | Patterns | `patterns-` | Error collection, shared utilities, scoped validation |
-| LOW | Testing | `testing-` | infrahubctl check commands, branch testing |
+| HIGH | Testing | `testing-` | Resources Testing Framework (YAML-driven tests), infrahubctl check commands |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -137,7 +137,13 @@ Follow these steps when creating a check:
    `check_definitions`. The query name must match the
    Python class `query` attribute. See
    [rules/registration-config.md](./rules/registration-config.md).
-5. **Test** — Run `infrahubctl check` to validate. See
+5. **Add tests** — Create YAML-driven test definitions
+   (smoke, unit, integration) alongside the check so it
+   is validated automatically in the proposed change
+   pipeline. Read
+   [rules/testing-resource-framework.md](./rules/testing-resource-framework.md).
+6. **Test locally** — Run `infrahubctl check` to validate
+   against a feature branch. See
    [rules/testing-commands.md](./rules/testing-commands.md).
 
 ## Supporting References

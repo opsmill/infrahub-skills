@@ -5,7 +5,7 @@ These rules apply across multiple Infrahub skills
 capture shared gotchas and best practices that are not
 specific to any single workflow.
 
-1. **Workflow (workflow-)** -- CRITICAL. Branch-first data
+1. **Workflow — branch-first (workflow-)** -- CRITICAL. Branch-first data
    CRUD: default to a dedicated branch (not the default
    branch, `main` by convention) for any
    create/update/delete — object loads, MCP writes,
@@ -34,3 +34,13 @@ specific to any single workflow.
 5. **Caching (caching-)** -- MEDIUM. Display label caching
    with parent relationships, batch loading timing issues,
    no-op mutation workarounds.
+
+6. **Testing (testing-)** -- HIGH. Resources Testing
+   Framework, YAML-driven pytest tests, smoke/unit/integration
+   test kinds, always-create-tests recommendation.
+
+7. **Workflow — information priority (workflow-)** -- MEDIUM. How to navigate the
+   loaded skill content: information-source priority —
+   consult the active skill's rules and references, then the
+   shared `infrahub-common/` references, before reaching for
+   external docs or a web search.

@@ -120,7 +120,11 @@ Follow these steps when creating object data files:
    [rules/value-attributes.md](./rules/value-attributes.md)
    for attribute mapping and
    [rules/value-relationships.md](./rules/value-relationships.md)
-   for relationship references.
+   for relationship references. To stamp lineage or lock
+   a value, write it as a `value` + metadata mapping —
+   see [../infrahub-common/metadata-lineage.md](../infrahub-common/metadata-lineage.md)
+   (remember `source` is lineage only; locking needs
+   `owner` + `is_protected`).
 5. **Handle children** — If the node has component
    children or hierarchy nesting, read
    [rules/children-components.md](./rules/children-components.md)
@@ -143,6 +147,10 @@ Follow these steps when creating object data files:
   patterns from production repos
 - **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
+- **[../infrahub-common/metadata-lineage.md](../infrahub-common/metadata-lineage.md)**
+  -- Value metadata (`source`, `owner`, `is_protected`):
+  setting lineage/ownership and why `source` does not
+  control edit access
 - **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
   (git integration, caching) across all skills
 - **[../infrahub-managing-schemas/SKILL.md](../infrahub-managing-schemas/SKILL.md)**

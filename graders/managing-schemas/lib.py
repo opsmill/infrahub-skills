@@ -657,6 +657,103 @@ def check_core_artifact_target_concrete(schema: dict, **_: Any) -> tuple[bool, s
     return True, f"CoreArtifactTarget inherited by concrete nodes only: {', '.join(inheriting_nodes)}"
 
 
+_CORE_FILE_OBJECT_RESERVED_ATTRS = {
+    "file_name",
+    "file_size",
+    "file_type",
+    "checksum",
+    "storage_id",
+}
+
+_FILE_BYPASS_TEXT_ATTR_NAMES = {
+    "file_url",
+    "file_path",
+    "file_name",
+    "filename",
+    "url",
+    "path",
+    "location",
+}
+
+
+def _nodes_inheriting_core_file_object(schema: dict) -> list[dict]:
+    return [
+        node
+        for node in _all_nodes(schema)
+        if "CoreFileObject" in (node.get("inherit_from", []) or [])
+    ]
+
+
+def check_core_file_object_inherited(schema: dict, **_: Any) -> tuple[bool, str]:
+    """At least one concrete node inherits from CoreFileObject."""
+    inheriting = [_full_kind(node) for node in _nodes_inheriting_core_file_object(schema)]
+    if not inheriting:
+        return False, "No node inherits from CoreFileObject"
+    return True, f"CoreFileObject inherited by: {', '.join(inheriting)}"
+
+
+def check_file_object_on_node_not_generic(schema: dict, **_: Any) -> tuple[bool, str]:
+    """CoreFileObject is inherited only by concrete nodes, not by generics.
+
+    Generics aren't instantiable — files have nothing to upload to.
+    """
+    bad_generics = [
+        _full_kind(generic)
+        for generic in _all_generics(schema)
+        if "CoreFileObject" in (generic.get("inherit_from", []) or [])
+    ]
+    if bad_generics:
+        return False, f"CoreFileObject on generics: {', '.join(bad_generics)}"
+    return True, "CoreFileObject not declared on any generic"
+
+
+def check_no_reserved_file_attrs(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Nodes inheriting CoreFileObject must not redeclare reserved attributes.
+
+    file_name, file_size, file_type, checksum, storage_id are system-managed
+    and read-only; redeclaring collides with inherited definitions.
+    """
+    violations: list[str] = []
+    for node in _nodes_inheriting_core_file_object(schema):
+        kind = _full_kind(node)
+        for attr in _all_attrs(node):
+            name = attr.get("name")
+            if name in _CORE_FILE_OBJECT_RESERVED_ATTRS:
+                violations.append(f"{kind}.{name}")
+    if violations:
+        return False, (
+            "Reserved CoreFileObject attributes redeclared: "
+            + ", ".join(violations)
+        )
+    return True, "No reserved CoreFileObject attributes redeclared"
+
+
+def check_no_filename_text_bypass(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Nodes inheriting CoreFileObject must not also store a path/URL Text attr.
+
+    A Text attribute named url/path/file_url/file_path/filename/location on a
+    CoreFileObject heir is the bypass antipattern — the file should live in
+    object storage, not be a string pointer alongside it.
+    """
+    violations: list[str] = []
+    for node in _nodes_inheriting_core_file_object(schema):
+        kind = _full_kind(node)
+        for attr in _all_attrs(node):
+            name = attr.get("name")
+            if (
+                name in _FILE_BYPASS_TEXT_ATTR_NAMES
+                and attr.get("kind") == "Text"
+                and name not in _CORE_FILE_OBJECT_RESERVED_ATTRS
+            ):
+                violations.append(f"{kind}.{name}")
+    if violations:
+        return False, (
+            "Text attributes that bypass CoreFileObject storage: "
+            + ", ".join(violations)
+        )
+    return True, "No bypass Text attributes alongside CoreFileObject inheritance"
+
+
 # ---------------------------------------------------------------------------
 # Branch-first workflow checks (text-based)
 #
@@ -741,6 +838,10 @@ CHECKS: dict[str, Any] = {
     "on-delete-cascade-present": check_on_delete_cascade_present,
     "generate-template-concrete-only": check_generate_template_concrete_only,
     "core-artifact-target-concrete": check_core_artifact_target_concrete,
+    "core-file-object-inherited": check_core_file_object_inherited,
+    "file-object-on-node-not-generic": check_file_object_on_node_not_generic,
+    "no-reserved-file-attrs": check_no_reserved_file_attrs,
+    "no-filename-text-bypass": check_no_filename_text_bypass,
     "string-limits": check_string_limits,
     "recommends-branch": check_recommends_branch,
     "explains-default-branch-risk-or-review": check_explains_default_branch_risk_or_review,

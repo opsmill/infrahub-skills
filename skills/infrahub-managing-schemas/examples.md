@@ -57,6 +57,14 @@ miss when building from scratch:
   duplicate the object as a starter for new
   instances. See
   [rules/extension-object-template.md](./rules/extension-object-template.md).
+- **File objects** — `inherit_from: CoreFileObject`
+  turns a node into a file-bearing entity (PDF,
+  Visio, KMZ, image, certificate, contract, etc.)
+  with auto file metadata and a GraphQL upload
+  mutation. Apply to concrete nodes that *are* a
+  stored file, not to nodes that merely reference
+  one. See
+  [rules/extension-file-object.md](./rules/extension-file-object.md).
 
 The sections below show each of these patterns in
 context, alongside the rest of the schema examples.

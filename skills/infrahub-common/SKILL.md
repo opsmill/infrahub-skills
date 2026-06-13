@@ -23,6 +23,10 @@ Infrahub skills. It is not meant to be invoked directly.
 - **`netbox-vs-infrahub.md`** — Field-by-field
   migration appendix for engineers porting NetBox
   queries, templates, or overlay data
+- **`metadata-lineage.md`** — Value metadata (`source`,
+  `owner`, `is_protected`): what each field means, how
+  to set it in object files, and why `source` does not
+  control edit access
 - **`rules/`** — Cross-cutting rules shared across skills:
   - Branch-first data CRUD (default to a branch, not the default branch)
   - Caching display labels in queries
@@ -30,3 +34,5 @@ Infrahub skills. It is not meant to be invoked directly.
   - Git integration and deployment patterns
   - Recovery from partial repository syncs
   - Generated file protocol conventions
+  - Information-source priority (skill content before
+    external docs)
