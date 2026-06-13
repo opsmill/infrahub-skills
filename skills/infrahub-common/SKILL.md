@@ -28,6 +28,7 @@ Infrahub skills. It is not meant to be invoked directly.
   to set it in object files, and why `source` does not
   control edit access
 - **`rules/`** — Cross-cutting rules shared across skills:
+  - Branch-first data CRUD (default to a branch, not the default branch)
   - Caching display labels in queries
   - Python environment and connectivity checks
   - Git integration and deployment patterns

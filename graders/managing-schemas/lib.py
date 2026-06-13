@@ -18,6 +18,7 @@ Usage (in a per-task grader script)::
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -754,6 +755,63 @@ def check_no_filename_text_bypass(schema: dict, **_: Any) -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
+# Branch-first workflow checks (text-based)
+#
+# The branch-first task produces a rollout *plan* (Markdown / commands), not a
+# schema YAML, so these inspect ``raw_text`` rather than the parsed ``schema``.
+# Patterns are intentionally duplicated from graders/managing-objects/lib.py —
+# the skills' graders are independently owned, so we copy rather than hoist.
+# ---------------------------------------------------------------------------
+
+
+# The change should be scoped to a dedicated branch. Any of these is a strong
+# signal the plan keeps the write off the default branch: an explicit
+# `--branch` flag, an `infrahubctl branch create` step, or prose that puts the
+# work on a branch.
+_BRANCH_PATTERNS = [
+    re.compile(r"--branch\b", re.IGNORECASE),
+    re.compile(r"\bbranch\s+create\b", re.IGNORECASE),
+    re.compile(r"\bcreate\s+(?:a\s+)?(?:new\s+)?branch\b", re.IGNORECASE),
+    re.compile(r"\b(?:on|onto|to|use|using|in|via|a)\s+(?:a\s+)?(?:new\s+|named\s+|feature\s+|separate\s+)?branch\b", re.IGNORECASE),
+    re.compile(r"\bbranch[-_]?(?:name|first)\b", re.IGNORECASE),
+]
+
+
+def check_recommends_branch(schema: dict, *, raw_text: str = "", **_: Any) -> tuple[bool, str]:
+    """Fail if the plan does not scope the schema change to a branch."""
+    for pat in _BRANCH_PATTERNS:
+        if pat.search(raw_text):
+            return True, f"Recommends a branch (matched {pat.pattern!r})"
+    return False, "Does not recommend applying the schema change on a branch"
+
+
+# The plan should make clear the dedicated branch is the safe alternative to
+# the default branch: cautioning against loading straight to the default
+# branch (named generically, or by its conventional name `main`), routing
+# through the proposed-change / merge review path, or noting the branch is
+# discardable.
+_DEFAULT_BRANCH_RISK_PATTERNS = [
+    re.compile(r"\b(?:not|instead of|rather than|avoid|without|never|off)\b[^.\n]{0,40}\bdefault\s+branch\b", re.IGNORECASE),
+    re.compile(r"\b(?:directly|straight)\s+(?:in)?to\s+(?:the\s+)?default\s+branch\b", re.IGNORECASE),
+    re.compile(r"\b(?:not|instead of|rather than|avoid|without|never|off)\b[^.\n]{0,40}\bmain\b", re.IGNORECASE),
+    re.compile(r"\b(?:directly|straight)\s+(?:in)?to\s+(?:the\s+)?`?main`?\b", re.IGNORECASE),
+    re.compile(r"\bproposed[-\s]?change\b", re.IGNORECASE),
+    re.compile(r"\bmerge\b", re.IGNORECASE),
+    re.compile(r"\bdiscard\b", re.IGNORECASE),
+    re.compile(r"\bthrow\s+(?:it\s+)?away\b", re.IGNORECASE),
+    re.compile(r"\b(?:delete|drop)\s+the\s+branch\b", re.IGNORECASE),
+]
+
+
+def check_explains_default_branch_risk_or_review(schema: dict, *, raw_text: str = "", **_: Any) -> tuple[bool, str]:
+    """Fail if the plan neither warns about the default branch nor routes through review."""
+    for pat in _DEFAULT_BRANCH_RISK_PATTERNS:
+        if pat.search(raw_text):
+            return True, f"Explains default-branch risk / review path (matched {pat.pattern!r})"
+    return False, "Does not caution against the default branch or mention the review/merge/discard path"
+
+
+# ---------------------------------------------------------------------------
 # Check registry
 # ---------------------------------------------------------------------------
 
@@ -785,6 +843,8 @@ CHECKS: dict[str, Any] = {
     "no-reserved-file-attrs": check_no_reserved_file_attrs,
     "no-filename-text-bypass": check_no_filename_text_bypass,
     "string-limits": check_string_limits,
+    "recommends-branch": check_recommends_branch,
+    "explains-default-branch-risk-or-review": check_explains_default_branch_risk_or_review,
 }
 
 
