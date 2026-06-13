@@ -1,0 +1,19 @@
+evaluations/infrahub-managing-schemas.json
+  s_f963fa14321c0d::t_5ecdf11bac89ca 355
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "821727d29f8d13d3b938cbbbea30fd810f4bb184",
+  "prompts": {},
+  "sessions": {
+    "s_f963fa14321c0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "097bc595-a7e6-4fd5-b0ae-b44c04b5fdec",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
