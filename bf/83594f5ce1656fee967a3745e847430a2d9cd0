@@ -1,0 +1,65 @@
+skills/infrahub-managing-schemas/examples.md
+  s_f963fa14321c0d::t_912e1ac220122b 60-67
+dev/knowledges/infrahub-concepts.md
+  s_f963fa14321c0d::t_912e1ac220122b 93-148
+evaluations/infrahub-managing-schemas.json
+  s_f963fa14321c0d::t_912e1ac220122b 281-320
+skills/infrahub-common/SKILL.md
+  s_f963fa14321c0d::t_912e1ac220122b 26-29
+graders/managing-schemas/lib.py
+  s_f963fa14321c0d::t_912e1ac220122b 659-755,783-786
+graders/managing-schemas/check_file_object.py
+  s_f963fa14321c0d::t_912e1ac220122b 1-31
+skills/infrahub-common/rules/testing-resource-framework.md
+  s_f963fa14321c0d::t_912e1ac220122b 1-120
+skills/infrahub-managing-transforms/rules/_sections.md
+  s_f963fa14321c0d::t_912e1ac220122b 32
+skills/infrahub-managing-checks/rules/testing-resource-framework.md
+  s_f963fa14321c0d::t_912e1ac220122b 1-184
+skills/infrahub-managing-objects/examples.md
+  s_f963fa14321c0d::t_912e1ac220122b 22,770-815
+skills/infrahub-managing-objects/reference.md
+  s_f963fa14321c0d::t_912e1ac220122b 39-74
+skills/infrahub-common/metadata-lineage.md
+  s_f963fa14321c0d::t_912e1ac220122b 1-125
+skills/infrahub-managing-objects/SKILL.md
+  s_f963fa14321c0d::t_912e1ac220122b 110-114,134-137
+skills/infrahub-managing-checks/examples.md
+  s_f963fa14321c0d::t_912e1ac220122b 472-584,603-613
+skills/infrahub-managing-checks/rules/_sections.md
+  s_f963fa14321c0d::t_912e1ac220122b 28
+skills/infrahub-managing-checks/SKILL.md
+  s_f963fa14321c0d::t_912e1ac220122b 4-5,61,140-146
+skills/infrahub-managing-schemas/reference.md
+  s_f963fa14321c0d::t_912e1ac220122b 324
+skills/infrahub-managing-schemas/rules/extension-file-object.md
+  s_f963fa14321c0d::t_912e1ac220122b 1-212
+skills/infrahub-managing-schemas/SKILL.md
+  s_f963fa14321c0d::t_912e1ac220122b 5,93,141,143-145
+skills/infrahub-managing-transforms/examples.md
+  s_f963fa14321c0d::t_912e1ac220122b 481-614,642-655
+skills/infrahub-managing-transforms/rules/testing-resource-framework.md
+  s_f963fa14321c0d::t_912e1ac220122b 1-231
+skills/infrahub-managing-transforms/SKILL.md
+  s_f963fa14321c0d::t_912e1ac220122b 4-5,47-56,119-125
+skills/infrahub-auditing-repo/rules/schema-file-object-misuse.md
+  s_f963fa14321c0d::t_912e1ac220122b 1-136
+eval.yaml
+  s_f963fa14321c0d::t_912e1ac220122b 555-619
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "bf83594f5ce1656fee967a3745e847430a2d9cd0",
+  "prompts": {},
+  "sessions": {
+    "s_f963fa14321c0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "097bc595-a7e6-4fd5-b0ae-b44c04b5fdec",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
