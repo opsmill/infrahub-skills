@@ -23,6 +23,16 @@ specific to any single workflow.
    offline vs online command awareness, environment
    variable requirements.
 
-4. **Caching (caching-)** -- MEDIUM. Display label caching with parent relationships, batch loading timing issues, no-op mutation workarounds.
+4. **Caching (caching-)** -- MEDIUM. Display label caching
+   with parent relationships, batch loading timing issues,
+   no-op mutation workarounds.
 
-5. **Testing (testing-)** -- HIGH. Resources Testing Framework, YAML-driven pytest tests, smoke/unit/integration test kinds, always-create-tests recommendation.
+5. **Testing (testing-)** -- HIGH. Resources Testing
+   Framework, YAML-driven pytest tests, smoke/unit/integration
+   test kinds, always-create-tests recommendation.
+
+6. **Workflow (workflow-)** -- MEDIUM. How to navigate the
+   loaded skill content: information-source priority —
+   consult the active skill's rules and references, then the
+   shared `infrahub-common/` references, before reaching for
+   external docs or a web search.
