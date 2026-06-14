@@ -139,11 +139,20 @@ Before running `infrahubctl schema check`, verify:
 - [ ] The `$schema` comment is present for IDE validation
 
 ```bash
-# Validate
-infrahubctl schema check schemas/
+# Validate (preview the diff)
+infrahubctl schema check schemas/ --branch schema-updates
 
-# Load
-infrahubctl schema load schemas/ --branch main
+# Load onto a branch, not the default branch — the load runs
+# migrations against loaded data, so keep it off the shared
+# default branch
+infrahubctl branch create schema-updates
+infrahubctl schema load schemas/ --branch schema-updates
 ```
+
+Load onto a dedicated branch rather than the default branch
+(`main` by convention) on any shared server: the change is
+then previewable and discardable, and merges through
+proposed-change review. See
+[workflow-branch-first](./workflow-branch-first.md).
 
 Reference: [validation.md](../validation.md) for full validation and migration guide.

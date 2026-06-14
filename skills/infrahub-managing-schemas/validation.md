@@ -234,19 +234,34 @@ Some type changes require `validate_constraint` checks. The safest approach:
 
 ## Branch-Based Schema Changes
 
-Infrahub supports schema changes on branches:
+On any shared server, apply schema changes on a dedicated
+branch, not directly to the default branch (the branch
+`schema load` targets when no `--branch` is given — `main`
+by convention, but it can be renamed per deployment). A
+schema load runs migrations against the data already loaded
+the moment it lands — on the default branch that happens
+globally with no preview and no per-step undo, whereas a
+branch is previewable, isolated, and discardable. Default
+to a branch; the default branch is only reasonable on a
+local throwaway instance. See
+[Do Data CRUD on a Branch](../infrahub-common/rules/workflow-branch-for-crud.md).
+
+Branches are managed from the CLI with `infrahubctl branch`:
 
 ```bash
-# Create a branch for schema work
-# (via Infrahub UI or API)
+# List existing branches
+infrahubctl branch list
 
-# Check schema against the branch
+# Create a branch for the schema change
+infrahubctl branch create schema-updates
+
+# Preview the diff, then load onto that branch
 infrahubctl schema check schemas/ --branch schema-updates
+infrahubctl schema load  schemas/ --branch schema-updates
 
-# Load schema to the branch
-infrahubctl schema load schemas/ --branch schema-updates
-
-# Test and validate on branch, then merge via Infrahub UI
+# Test and validate on the branch, then merge via a
+# proposed change in the Infrahub UI — or discard it:
+infrahubctl branch delete schema-updates
 ```
 
 ### Branch Support Types
@@ -278,6 +293,7 @@ Before running `infrahubctl schema check`, verify:
 - [ ] `uniqueness_constraints` use `__value` suffix for attributes
 - [ ] No deprecated fields used (`display_labels`, `default_filter`, `String` kind)
 - [ ] The `$schema` comment is present for IDE validation
+- [ ] On a shared server, the `schema load` targets a dedicated branch (`--branch <name>`), not the default branch
 
 ## IDE Integration
 

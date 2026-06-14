@@ -27,8 +27,8 @@ cheap first step; reaching for `infrahub_query`
 without it leads to round trips that fail on a typo
 the introspection call would have surfaced. The same
 care applies to writes — `infrahub_create` and
-`infrahub_update` issued against `main` skip the
-proposed-change review loop entirely, which is the
+`infrahub_update` issued against the default branch skip
+the proposed-change review loop entirely, which is the
 single guard against accidental data drift from a
 remediation script.
 
@@ -46,7 +46,7 @@ Arguments:
   query  (string, required)
     — GraphQL query string
   branch (string, optional)
-    — Branch name (default: main)
+    — Branch name (default: the default branch)
   variables (object, optional)
     — GraphQL variables for
       parameterized queries
@@ -125,13 +125,13 @@ Arguments:
   data   (object, required)
     — Attribute values
   branch (string, optional)
-    — Branch (default: main)
+    — Branch (default: the default branch)
 ```
 
-Create on a **branch** (not main) so changes go
-through a proposed change for review — writes to
-`main` skip the review pipeline and land
-unreviewed.
+Create on a dedicated **branch** (not the default
+branch) so changes go through a proposed change for
+review — writes to the default branch skip the review
+pipeline and land unreviewed.
 
 ---
 
@@ -150,7 +150,7 @@ Arguments:
   data   (object, required)
     — Fields to update
   branch (string, optional)
-    — Branch (default: main)
+    — Branch (default: the default branch)
 ```
 
 ---
@@ -226,8 +226,9 @@ the data is actually one envelope away.
 
 ### Branch Considerations
 
-By default all MCP queries run against the `main`
-branch. To audit a proposed change branch:
+By default all MCP queries run against the default
+branch (`main` by convention). To audit a proposed
+change branch:
 
 ```text
 mcp__infrahub__infrahub_query({
@@ -236,10 +237,16 @@ mcp__infrahub__infrahub_query({
 })
 ```
 
-For remediation creates/updates, target a **named
-branch**. Writes to `main` bypass the proposed
-change review loop entirely, so a buggy remediation
-script lands unreviewed on the source of truth.
+For remediation creates/updates, target a **dedicated
+branch**. Writes to the default branch bypass the
+proposed change review loop entirely, so a buggy
+remediation script lands unreviewed on the source of
+truth — and a wrong bulk remediation on the default
+branch is a per-object cleanup instead of a branch
+discard. Default to a branch for any MCP
+`infrahub_create` / `infrahub_update` /
+`infrahub_delete`; see the shared rule
+[../../infrahub-common/rules/workflow-branch-for-crud.md](../../infrahub-common/rules/workflow-branch-for-crud.md).
 
 Reference:
-[Infrahub MCP Server Docs](https://docs.infrahub.app/integrations/mcp)
+[Infrahub MCP Server Docs](https://docs.infrahub.app/mcp)

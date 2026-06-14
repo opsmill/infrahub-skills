@@ -14,19 +14,6 @@ metadata:
 This skill contains shared resources referenced by all other
 Infrahub skills. It is not meant to be invoked directly.
 
-## Information Priority
-
-When answering questions about any Infrahub topic covered
-by the loaded skills (schemas, objects, checks, generators,
-transforms, menus, data analysis, or repository audits):
-
-1. **First**: Consult the active skill's rules and reference docs
-2. **Second**: Check the infrahub-concepts knowledge base
-3. **Last resort only**: Fetch external documentation
-
-Do not skip to external docs or web searches when the
-answer is available in the skill's rules or reference files.
-
 ## Contents
 
 - **`graphql-queries.md`** — Infrahub GraphQL query syntax,
@@ -41,8 +28,11 @@ answer is available in the skill's rules or reference files.
   to set it in object files, and why `source` does not
   control edit access
 - **`rules/`** — Cross-cutting rules shared across skills:
+  - Branch-first data CRUD (default to a branch, not the default branch)
   - Caching display labels in queries
   - Python environment and connectivity checks
   - Git integration and deployment patterns
   - Recovery from partial repository syncs
   - Generated file protocol conventions
+  - Information-source priority (skill content before
+    external docs)
