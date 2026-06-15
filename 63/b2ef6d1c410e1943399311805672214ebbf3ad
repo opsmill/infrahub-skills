@@ -1,0 +1,31 @@
+skills/infrahub-common/rules/deployment-gql-dry-run.md
+  s_220f04f3131c1a::t_500e63f47516ea 38-40
+  s_220f04f3131c1a::t_a1ac8f407fa016 78
+skills/infrahub-managing-generators/rules/python-relationship-references.md
+  s_220f04f3131c1a::t_529a26be7d659f 19-26,39-40
+  s_220f04f3131c1a::t_5741cd2e496c7d 54
+  s_220f04f3131c1a::t_ba1ae9af1ea4e8 11-13
+  s_220f04f3131c1a::t_290cb382f962d3 67
+  s_220f04f3131c1a::t_c40d25b46100a8 128
+  s_220f04f3131c1a::t_1f385ecca3d7ca 124
+skills/infrahub-managing-transforms/rules/artifacts-async-regen-polling.md
+  s_220f04f3131c1a::t_9aec1334647b8b 49-51
+  s_220f04f3131c1a::t_a6688a48d79911 66-68
+  s_220f04f3131c1a::t_63d0b13400ddc0 82-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "63b2ef6d1c410e1943399311805672214ebbf3ad",
+  "prompts": {},
+  "sessions": {
+    "s_220f04f3131c1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "25c21c37-14d7-4bed-908c-46412b90a8fd",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
