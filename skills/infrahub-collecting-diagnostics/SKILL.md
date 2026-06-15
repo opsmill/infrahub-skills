@@ -1,16 +1,14 @@
 ---
 name: infrahub-collecting-diagnostics
 description: >-
-  Collects everything an Infrahub expert needs to debug a problem remotely and
-  packages it as a sanitized local bundle. Detects deployment topology
-  (Docker Compose / Kubernetes / local dev), runs read-only diagnostics, runs
-  deterministic flag checks for common root causes, auto-redacts secrets, and
-  stops at a user-review gate.
+  Collect a redacted local diagnostic bundle (logs, config, version, state)
+  for an OpsMill expert hand-off.
   TRIGGER when: Infrahub is broken/failing/erroring, the user asks for help
   debugging, wants to collect logs/diagnostics, prepares a hand-off for OpsMill
-  support, or reports a crash/timeout/connection issue.
+  support, or reports a crash/timeout/connection issue (upgrade failure, stuck
+  branch, container CrashLoopBackOff, 500s, OOM).
   DO NOT TRIGGER when: filing a public GitHub issue (use infrahub-reporting-issues),
-  or running normal operational queries (use infrahub-analyzing-data).
+  or running operational queries (use infrahub-analyzing-data).
 allowed-tools:
   - Read
   - Bash
@@ -275,10 +273,19 @@ index.
 - **Sampling one replica when there are many.**
   Multi-worker race conditions are common in recent
   releases; missing one replica's logs hides the
-  bug.
+  bug. Even if one replica's log already shows the
+  error, the *other* replica is where the
+  race-condition counter-evidence lives — collect
+  every replica, not the first one that looks
+  guilty.
 - **Skipping the redaction review gate.** The Tier
   2 review is non-negotiable. The bundle must be
-  safe to share when finalized.
+  safe to share when finalized. Even if Tier 1
+  auto-redaction looked clean and the user wants to
+  move fast, Tier 1 only masks *known* secret
+  shapes — it cannot judge what is sensitive to
+  this particular user (internal hostnames, customer
+  names, project codenames). Only the user can.
 - **Skipping the connection-info gate.** Even on a
   local deployment, ask for the URL and offer the
   token-privacy reassurance. The bundle's
@@ -287,7 +294,11 @@ index.
   anonymous access.
 - **Claiming root cause.** This skill produces
   hints (flag checks), not diagnoses. The expert
-  does the actual debugging.
+  does the actual debugging. Even when a flag check
+  fires and the cause looks obvious, a fired flag is
+  a deterministic pattern match on one signal — not
+  a verified root cause. State the flag; let the
+  expert conclude.
 - **Filing a GitHub issue from this skill.** That's
   `infrahub-reporting-issues`. Cross-link, don't
   duplicate.

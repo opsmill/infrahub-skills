@@ -138,7 +138,14 @@ _SECRET_PATTERNS = (
 
 
 def check_no_unredacted_secrets(bundle: Path, **_: object) -> CheckResult:
-    """No file in the bundle contains common secret shapes (allow REDACTED markers)."""
+    """No file in the bundle contains common secret shapes (allow REDACTED markers).
+
+    A match is treated as redacted only when a ``REDACTED`` marker appears on the
+    *same line* as the match. An earlier version used a ±30-character window,
+    which could mask a genuine leak that happened to sit within 30 chars of an
+    unrelated redaction marker (e.g., two adjacent fields in a YAML stanza).
+    Same-line matching keeps the marker bound to the value it redacts.
+    """
     offenders: list[str] = []
     for path in _iter_text_files(bundle):
         try:
@@ -149,8 +156,12 @@ def check_no_unredacted_secrets(bundle: Path, **_: object) -> CheckResult:
             m = pattern.search(text)
             if not m:
                 continue
-            window = text[max(0, m.start() - 30): m.end() + 30]
-            if "REDACTED" in window or "redacted" in window:
+            line_start = text.rfind("\n", 0, m.start()) + 1
+            line_end = text.find("\n", m.end())
+            if line_end == -1:
+                line_end = len(text)
+            line = text[line_start:line_end]
+            if "REDACTED" in line or "redacted" in line:
                 continue
             offenders.append(
                 f"{path.relative_to(bundle)}: matched /{pattern.pattern[:60]}.../"

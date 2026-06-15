@@ -8,9 +8,9 @@ tags: cross-link, reporting-issues, hand-off
 
 Impact: MEDIUM
 
-At the end of the workflow (step 8), if the user
-also wants to file a public GitHub issue, point them
-to `infrahub-reporting-issues`. This skill never
+At the end of the workflow (step 9, hand-off), if the
+user also wants to file a public GitHub issue, point
+them to `infrahub-reporting-issues`. This skill never
 files issues itself.
 
 ### Why it matters
@@ -29,8 +29,9 @@ sensitivity bars.
 
 ### What to do
 
-At step 8, after the bundle is finalized, ask the
-user whether they also want to file a public issue.
+At step 9 (hand-off), after the bundle is finalized,
+ask the user whether they also want to file a public
+issue.
 If yes, hand off to `infrahub-reporting-issues` by
 name. Keep the local bundle either way — it stays
 the artifact the user gives to OpsMill support

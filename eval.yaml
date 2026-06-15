@@ -894,6 +894,12 @@ tasks:
         check: Plan references opsmill/infrahub as the target repo
 
   # --- Diagnostics Collector --- #
+  # Scope: these tasks grade the *bundle artifact* — layout, manifest fields,
+  # redaction discipline, and flag emission — not collection mechanics. The
+  # prompts say "do NOT actually run any commands" because exercising real
+  # collection needs a live Infrahub instance; that path was validated live in
+  # commits 20f0ad0 / 28d48c2. The mocked command output below stands in for a
+  # real run so the graders can assert bundle shape deterministically.
   - name: collecting-diagnostics-git-sync
     instruction: |
       Read the skill at .agents/skills/infrahub-collecting-diagnostics/SKILL.md and
