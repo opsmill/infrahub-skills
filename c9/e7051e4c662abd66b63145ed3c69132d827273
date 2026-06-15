@@ -1,0 +1,45 @@
+eval.yaml
+  s_85ac9df2792675::t_a0873d111e5e69 1146-1194
+  s_85ac9df2792675::t_3bcf8552b85814 1203-1208
+graders/managing-transforms/check_gql_dry_run.py
+  s_85ac9df2792675::t_cd58cea9c9d407 1-27
+tests/graders/test_transforms_lib.py
+  s_85ac9df2792675::t_97e817b7de7639 397-454
+skills/infrahub-managing-transforms/rules/queries-union-fragments.md
+  s_220f04f3131c1a::t_a507a7845d8f51 28-34
+  s_220f04f3131c1a::t_47c61d850b6456 45
+  s_85ac9df2792675::t_f3b7f282dd02a7 98-108
+  s_220f04f3131c1a::t_39120893c4c4c1 77-78
+evaluations/infrahub-managing-transforms.json
+  s_85ac9df2792675::t_effb9d383a481a 50-70
+graders/managing-transforms/lib.py
+  s_85ac9df2792675::t_960e85e2be90d5 8,16-18
+  s_85ac9df2792675::t_4af54d00c27fe3 52-59
+  s_85ac9df2792675::t_e31a07007d5c28 420,428
+  s_85ac9df2792675::t_7a1f402b2ddc6c 329-379,390-391
+  s_85ac9df2792675::t_5d43f8c1df01e2 412-413
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "c9e7051e4c662abd66b63145ed3c69132d827273",
+  "prompts": {},
+  "sessions": {
+    "s_220f04f3131c1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "25c21c37-14d7-4bed-908c-46412b90a8fd",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    },
+    "s_85ac9df2792675": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f426c52-ec59-4501-bb0f-857b143f349e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
