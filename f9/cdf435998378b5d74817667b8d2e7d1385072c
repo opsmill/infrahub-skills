@@ -1,0 +1,26 @@
+dev/knowledges/architecture.md
+  s_85ac9df2792675::t_19e71351f1524e 57-63
+dev/guides/running-evals.md
+  s_85ac9df2792675::t_e8b46645ddb109 188-202
+  s_85ac9df2792675::t_5d064cab51de79 203-206
+skills/infrahub-analyzing-data/rules/mcp-tools.md
+  s_85ac9df2792675::t_ab9d9c1abb8630 131-133
+skills/infrahub-managing-generators/rules/python-multi-peer-add.md
+  s_85ac9df2792675::t_b94c5b5cd5b36e 49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "f9cdf435998378b5d74817667b8d2e7d1385072c",
+  "prompts": {},
+  "sessions": {
+    "s_85ac9df2792675": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f426c52-ec59-4501-bb0f-857b143f349e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
