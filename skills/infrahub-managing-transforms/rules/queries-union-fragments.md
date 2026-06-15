@@ -25,8 +25,13 @@ errors out.
 | ``DcimDevice.location`` | ``LocationGeneric`` | ``LocationSite``, ``LocationBuilding``, ``LocationHosting`` |
 | ``OrganizationGeneric`` peers | ``OrganizationGeneric`` | ``OrganizationManufacturer``, ``OrganizationProvider``, ``OrganizationTenant`` |
 
-(Specifics vary by repo schema; always check ``peer:`` in
-the schema before writing the query.)
+The exact fields that diverge depend on your deployment's schema
+— in some base-schema versions ``name``/``shortname`` live on the
+generic itself and are queryable directly. The durable point is
+the *pattern*, not these specific fields: when a union's
+inheritors diverge, wrap the diverging fields in inline
+fragments. Always check ``peer:`` and each inheritor's attributes
+before writing the query.
 
 ### Anti-pattern
 
@@ -37,7 +42,7 @@ query {
       node {
         location {
           node {
-            name { value }       # fails for LocationHosting
+            name { value }       # fails on any inheritor lacking this field
             shortname { value }
           }
         }
@@ -69,8 +74,8 @@ query {
           node {
             ... on LocationSite { name { value } shortname { value } }
             ... on LocationBuilding { name { value } }
-            # LocationHosting has neither — explicitly skip,
-            # or include only fields it actually defines.
+            # A subtype that defines neither — skip it, or
+            # include only the fields it actually defines.
           }
         }
       }
@@ -89,6 +94,17 @@ query {
    set. If they diverge, you need fragments.
 4. When in doubt, use fragments. They never hurt; their
    absence does.
+
+### Verify before merge
+
+This failure is invisible to ``infrahubctl schema check`` and
+YAML validation — it only surfaces when ``CoreRepository``
+executes the query during schema-sync. So before opening a PR
+that changes a ``.gql`` file, dry-run the query against a live
+schema (``infrahubctl render <transform> --branch <branch>``,
+or run the check/generator that owns the query). See the shared
+rule
+[../../infrahub-common/rules/deployment-gql-dry-run.md](../../infrahub-common/rules/deployment-gql-dry-run.md).
 
 Reference:
 [Infrahub schema docs](https://docs.infrahub.app)

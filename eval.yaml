@@ -1143,6 +1143,55 @@ tasks:
           A call passes kind="CoreArtifact" (read of artifact state
           after the POST)
 
+  # --- Transforms: pre-merge GraphQL dry-run --- #
+  # Backs the shared rule
+  # skills/infrahub-common/rules/deployment-gql-dry-run.md. Hosted under
+  # managing-transforms because `infrahubctl render` is the transform's
+  # dry-run; the queries-union-fragments rule points here.
+  - name: transform-query-dry-run-before-merge
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-transforms/SKILL.md and
+      follow its workflow and rules.
+
+      Task: I just edited the GraphQL query (queries/device_config.gql) that feeds
+      my Jinja2 device-config transform — I changed a field selection on the
+      device's `location` relationship. `infrahubctl schema check` passes and the
+      YAML is valid, so I'm about to open the PR. Is there anything else I should
+      run first so I don't hit the silent CoreRepository schema-sync hang? Give me
+      the concrete commands.
+
+      Save your full plan (the commands plus a brief rationale) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/managing-transforms/check_gql_dry_run.py
+        weight: 1.0
+    expected_output: >-
+      A plan that dry-runs the changed query against a live schema before
+      merge — e.g. `infrahubctl render <transform> --branch <branch>` (or
+      running the check/generator that owns the query) — because static
+      `schema check` and YAML validation do not catch GraphQL/schema
+      mismatches; those only surface when CoreRepository executes the query
+      during schema-sync. The plan should frame this as a pre-merge step.
+    expectations:
+      - >-
+        Recommends executing the query live as a dry-run via a concrete
+        command (`infrahubctl render`, or `infrahubctl check run` /
+        `infrahubctl generator run`), not just `schema check`
+      - >-
+        Frames the dry-run as a pre-merge gate (before opening / merging
+        the PR)
+      - >-
+        Explains that YAML / schema check does not catch GraphQL field or
+        union-fragment mismatches — only live execution does
+    assertions:
+      - name: dry-run-executes-query
+        check: >-
+          Plan dry-runs the query live (infrahubctl render / check run /
+          generator run), not only static schema check
+      - name: dry-run-before-merge
+        check: Plan frames the dry-run as a pre-merge / pre-PR step
+
   # --- Object Creator --- #
   # NOTE: regression guard, not a discrimination test. Baselines (no skill)
   # already apply branch discipline for object loads even under pressure, and
@@ -1151,6 +1200,12 @@ tasks:
   # behavior rather than proving the skill teaches it. The discriminating
   # case is `schema-branch-first` (baseline caves to `schema load` on the
   # default branch; skill holds the line).
+  #
+  # COVERAGE: this task plus `schema-branch-first` are the eval coverage for
+  # the shared common rule
+  # skills/infrahub-common/rules/workflow-branch-for-crud.md (object load and
+  # schema load are its two concrete applications). There is no separate
+  # common-rule task; the per-skill branch-first rules link back to it.
   - name: branch-first-load
     trials: 3
     instruction: |

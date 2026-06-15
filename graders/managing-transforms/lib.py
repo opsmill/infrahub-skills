@@ -5,7 +5,7 @@ helpers for ``.py`` files, individual check functions, a
 ``CHECKS`` registry, and the top-level ``run_checks`` entry
 point that returns skillgrade JSON.
 
-Two output kinds are supported:
+Three output kinds are supported:
 
 - ``output.gql`` — raw GraphQL query text. The union-fragments
   checks use simple regex/text matching rather than a full
@@ -13,6 +13,9 @@ Two output kinds are supported:
   matches the failure shape we care about.
 - ``output.py`` — Python source for the artifact-regen polling
   eval. Checks use AST parsing.
+- ``output.md`` — a workflow plan (Markdown). The pre-merge
+  dry-run checks scan it for the dry-run command and pre-merge
+  framing.
 
 Usage (in a per-task grader script)::
 
@@ -42,6 +45,14 @@ def load_output_gql(path: Path) -> str:
     """Load a GraphQL query file. Returns empty string on missing file."""
     try:
         return Path(path).read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError):
+        return ""
+
+
+def load_output_md(path: Path) -> str:
+    """Load a Markdown/plan file. Returns empty string on missing file."""
+    try:
+        return Path(path).read_text(encoding="utf-8", errors="replace")
     except (FileNotFoundError, OSError):
         return ""
 
@@ -315,6 +326,58 @@ def check_polls_coreartifact_after_post(
 
 
 # ---------------------------------------------------------------------------
+# Pre-merge GraphQL dry-run checks (deployment-gql-dry-run common rule)
+# ---------------------------------------------------------------------------
+
+# The plan must dry-run the changed query by *executing* it against a live
+# schema — `infrahubctl render` for a transform, or running the check /
+# generator that owns the query — not rely on static `schema check` alone.
+_DRY_RUN_CMD_PATTERNS = [
+    re.compile(r"infrahubctl\s+render\b", re.IGNORECASE),
+    re.compile(r"infrahubctl\s+(?:check|generator)\s+run\b", re.IGNORECASE),
+]
+
+# The dry-run must be framed as a pre-merge gate (before opening / merging
+# the PR), which is the whole point of the rule.
+_PRE_MERGE_PATTERNS = [
+    re.compile(r"\bpre[-\s]?merge\b", re.IGNORECASE),
+    re.compile(r"\bbefore\s+(?:you\s+)?merg\w+\b", re.IGNORECASE),
+    re.compile(r"\bbefore\s+opening\b", re.IGNORECASE),
+    re.compile(r"\bbefore\s+the\s+(?:pr|pull request)\b", re.IGNORECASE),
+    re.compile(r"\bprior\s+to\s+merg\w+\b", re.IGNORECASE),
+    re.compile(
+        r"\bbefore\s+(?:you\s+)?(?:open|rais\w+|submit\w*)\b[^.\n]{0,40}"
+        r"\b(?:pr|pull request|proposed change|merge)\b",
+        re.IGNORECASE,
+    ),
+]
+
+
+def check_dry_run_executes_query(md_text: str = "", **_: Any) -> tuple[bool, str]:
+    """Plan must dry-run the query live (render / check run / generator run),
+    not rely on static ``schema check`` alone."""
+    if not md_text:
+        return False, "No plan text to inspect"
+    for pat in _DRY_RUN_CMD_PATTERNS:
+        if pat.search(md_text):
+            return True, f"Dry-runs the query live (matched {pat.pattern!r})"
+    return False, (
+        "No live dry-run command (infrahubctl render / check run / "
+        "generator run) — static schema check alone misses GQL mismatches"
+    )
+
+
+def check_dry_run_before_merge(md_text: str = "", **_: Any) -> tuple[bool, str]:
+    """Plan must frame the dry-run as a pre-merge / pre-PR step."""
+    if not md_text:
+        return False, "No plan text to inspect"
+    for pat in _PRE_MERGE_PATTERNS:
+        if pat.search(md_text):
+            return True, f"Frames dry-run as pre-merge (matched {pat.pattern!r})"
+    return False, "Does not frame the dry-run as a pre-merge / pre-PR gate"
+
+
+# ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
 
@@ -324,6 +387,8 @@ CHECKS: dict[str, Any] = {
     "posts-artifact-generate-endpoint": check_posts_artifact_generate_endpoint,
     "has-polling-loop": check_has_polling_loop,
     "polls-coreartifact-after-post": check_polls_coreartifact_after_post,
+    "dry-run-executes-query": check_dry_run_executes_query,
+    "dry-run-before-merge": check_dry_run_before_merge,
 }
 
 
@@ -344,14 +409,15 @@ def run_checks(
         List of assertion names from ``CHECKS``.
     output_paths:
         Mapping of output kind to path. Recognised keys: ``"gql"``,
-        ``"py"``. Each check function declares which input it
-        needs via ``**kwargs``.
+        ``"py"``, ``"md"``. Each check function declares which input
+        it needs via ``**kwargs``.
 
     Returns skillgrade JSON ``{"score", "details", "checks"}``.
     Raises ``KeyError`` if any check name is unknown.
     """
     gql_text = load_output_gql(output_paths.get("gql", Path("output.gql")))
     tree, py_raw = load_output_py(output_paths.get("py", Path("output.py")))
+    md_text = load_output_md(output_paths.get("md", Path("output.md")))
 
     entries: list[dict] = []
     passed_count = 0
@@ -359,7 +425,7 @@ def run_checks(
     for name in check_names:
         fn = CHECKS[name]
         try:
-            ok, msg = fn(gql_text=gql_text, tree=tree, py_raw=py_raw)
+            ok, msg = fn(gql_text=gql_text, tree=tree, py_raw=py_raw, md_text=md_text)
         except Exception as exc:  # defensive — never let one check crash all
             ok, msg = False, f"Error running check: {exc}"
 

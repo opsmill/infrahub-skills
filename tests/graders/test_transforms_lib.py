@@ -394,3 +394,61 @@ def test_polls_coreartifact_fails_on_fire_and_forget():
         gql_text="", tree=tree, py_raw=SRC_BAD_FIRE_AND_FORGET
     )
     assert not ok
+
+
+# -- Task 5: pre-merge GraphQL dry-run checks -----------------------------
+
+
+PLAN_GOOD_DRY_RUN = """
+Before opening the PR, dry-run the changed query against a live schema:
+
+```bash
+infrahubctl render device_config --branch ci-check
+```
+
+`infrahubctl schema check` and YAML validation pass but don't execute the
+query, so a field / union-fragment mismatch only surfaces when CoreRepository
+runs it during schema-sync. Render it before merge to catch that.
+"""
+
+PLAN_NO_DRY_RUN = """
+Run `infrahubctl schema check schemas/` and make sure the YAML is valid,
+then open the PR. CI will validate the rest.
+"""
+
+PLAN_RENDER_NO_TIMING = """
+You can run `infrahubctl render device_config --branch dev` to see the
+output whenever you want to inspect it.
+"""
+
+
+def test_dry_run_executes_query_passes_on_render():
+    ok, msg = _mod.CHECKS["dry-run-executes-query"](md_text=PLAN_GOOD_DRY_RUN)
+    assert ok, msg
+
+
+def test_dry_run_executes_query_fails_without_live_command():
+    ok, _ = _mod.CHECKS["dry-run-executes-query"](md_text=PLAN_NO_DRY_RUN)
+    assert not ok
+
+
+def test_dry_run_executes_query_accepts_check_run():
+    ok, _ = _mod.CHECKS["dry-run-executes-query"](
+        md_text="Run `infrahubctl check run rack_collision` before merging."
+    )
+    assert ok
+
+
+def test_dry_run_before_merge_passes_on_good():
+    ok, msg = _mod.CHECKS["dry-run-before-merge"](md_text=PLAN_GOOD_DRY_RUN)
+    assert ok, msg
+
+
+def test_dry_run_before_merge_fails_without_timing():
+    ok, _ = _mod.CHECKS["dry-run-before-merge"](md_text=PLAN_RENDER_NO_TIMING)
+    assert not ok
+
+
+def test_dry_run_checks_empty_input_fails():
+    assert _mod.CHECKS["dry-run-executes-query"](md_text="")[0] is False
+    assert _mod.CHECKS["dry-run-before-merge"](md_text="")[0] is False
