@@ -185,12 +185,22 @@ things the skill's rules specifically address.
 
 ## Existing Evals
 
-| Skill | Eval File | Tasks |
-| ----- | --------- | ----- |
-| infrahub-managing-schemas | `eval.yaml` (tasks: vlan-management, circuit-management, location-hierarchy) | 3 |
-| infrahub-managing-menus | `eval.yaml` (tasks: flat-menu, hierarchical-menu, generic-kind-menu) | 3 |
+All tasks live in the single root `eval.yaml`; graders
+live under `graders/<skill>/`. Counts below reflect the
+tasks currently defined (group by the `skills/<skill>/SKILL.md`
+each task reads).
 
-Other skills don't have evals yet — adding them is a
-good contribution. Focus on skills with the most
-complex rules first (managing-objects, managing-checks,
-managing-generators).
+| Skill | Tasks |
+| ----- | ----- |
+| infrahub-managing-schemas | 10 |
+| infrahub-managing-menus | 3 |
+| infrahub-managing-checks | 2 |
+| infrahub-managing-generators | 5 |
+| infrahub-managing-transforms | 3 |
+| infrahub-managing-objects | 1 |
+| infrahub-reporting-issues | 3 |
+
+`infrahub-analyzing-data` and `infrahub-auditing-repo`
+have no eval tasks yet — adding them is a good
+contribution. `infrahub-analyzing-data` in particular
+has rules but no grader directory.

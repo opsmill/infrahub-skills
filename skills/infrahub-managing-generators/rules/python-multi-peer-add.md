@@ -46,7 +46,7 @@ await group.save()
 The same constraint applies to other ``RelationshipManager``
 mutators (``.update``, ``.remove``).
 
-### Why iterate, not collect into a list comprehension that's then passed to ``.add()``?
+### Why iterate, not a list comprehension?
 
 ``RelationshipManager.add(peer)`` mutates internal state in place;
 the return value is not the new list. So
