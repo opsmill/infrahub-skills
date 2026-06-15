@@ -128,10 +128,9 @@ Arguments:
     — Branch (default: the default branch)
 ```
 
-Create on a dedicated **branch** (not the default
-branch) so changes go through a proposed change for
-review — writes to the default branch skip the review
-pipeline and land unreviewed.
+Create on a dedicated **branch**, not the default
+branch — see [Branch Considerations](#branch-considerations)
+below for why and how.
 
 ---
 

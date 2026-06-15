@@ -16,9 +16,11 @@ specific to any single workflow.
 2. **Deployment (deployment-)** -- CRITICAL. Git repository
    integration, CoreRepository vs
    CoreReadOnlyRepository, local dev setup, worker race
-   conditions, file commit requirements, and recovery
-   from partial repository syncs (sticky-state cleanup
-   when an import fails mid-pass).
+   conditions, file commit requirements, recovery from
+   partial repository syncs (sticky-state cleanup when an
+   import fails mid-pass), and pre-merge dry-run validation
+   of `.gql` queries against a live schema (YAML-check
+   alone misses GraphQL/schema mismatches).
 
 3. **Protocols (protocols-)** -- CRITICAL. Protocol files
    are generated code (`infrahubctl protocols generate`),

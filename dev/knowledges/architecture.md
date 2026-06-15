@@ -54,8 +54,13 @@ Plugin (plugin.json)
 ├── eval.yaml                             ← skillgrade config (all skills)
 │
 └── graders/                              ← Deterministic grader scripts
-    ├── managing-schemas/                  ← managing-schemas graders
-    └── managing-menus/                   ← managing-menus graders
+    ├── managing-schemas/                  ← one directory per skill
+    ├── managing-menus/
+    ├── managing-checks/
+    ├── managing-objects/
+    ├── managing-generators/
+    ├── managing-transforms/
+    └── reporting-issues/
 ```
 
 ## Progressive Disclosure Model
