@@ -1,0 +1,32 @@
+skills/infrahub-collecting-diagnostics/SKILL.md
+  s_007ee24c83bb08::t_8e55679cf9e85a 297-301
+  s_007ee24c83bb08::t_6c44b9e78d36d0 276-280,283-288
+  s_007ee24c83bb08::t_437e8e983b0a52 4-5,8-9,11
+graders/collecting-diagnostics/lib.py
+  s_007ee24c83bb08::t_9b0247ecc702c6 141-148,159-164
+eval.yaml
+  s_007ee24c83bb08::t_653c99f27f91a6 897-902
+skills/infrahub-collecting-diagnostics/rules/workflow-user-gates.md
+  s_007ee24c83bb08::t_d9979fee070699 43
+  s_007ee24c83bb08::t_1099120ac66737 59
+  s_007ee24c83bb08::t_de2a2a1cc4ff2f 11,16-22,26,30
+skills/infrahub-collecting-diagnostics/rules/cross-link-reporting-issues.md
+  s_007ee24c83bb08::t_fdf73560a55885 11-13
+  s_007ee24c83bb08::t_500afb6eecc72e 32-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "c4633cfade3c0fa59ea1973df7fd94c1d49eb212",
+  "prompts": {},
+  "sessions": {
+    "s_007ee24c83bb08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "772893f6-0cc6-4ade-ad19-316cf3fd9ae3",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
