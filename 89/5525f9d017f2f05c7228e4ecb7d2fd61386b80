@@ -1,0 +1,19 @@
+docs/package.json
+  s_369af5700a0b98::t_676a19701c7cbe 31-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "895525f9d017f2f05c7228e4ecb7d2fd61386b80",
+  "prompts": {},
+  "sessions": {
+    "s_369af5700a0b98": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ae659080-23c5-4da1-a066-1b5c2ba6910a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
