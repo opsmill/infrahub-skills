@@ -1,0 +1,17 @@
+repository: schemas-prod
+worker_replica: 1
+git_dir: /opt/infrahub/git/schemas-prod/.git
+git_status:
+  HEAD: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  branch: main
+  tracking: origin/main
+  ahead: 0
+  behind: 0
+git_log_head_5:
+  - aaaaaaaa Update Device schema
+  - 11111111 Refactor location hierarchy
+  - 22222222 Initial commit
+git_log_grep_abc123: (none — commit not present on replica 1)
+owner_uid: 1000
+owner_gid: 1000
+permissions: 0755

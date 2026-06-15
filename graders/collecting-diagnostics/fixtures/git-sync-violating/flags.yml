@@ -1,0 +1,9 @@
+---
+- id: oom-in-logs
+  severity: warning
+  evidence:
+    file: baseline/logs/infrahub-task-worker-1.log
+    line: 12
+    excerpt: "OutOfMemoryError seen in worker log"
+  hint: "Worker exhausted heap; check container memory limits"
+  related_issues: []

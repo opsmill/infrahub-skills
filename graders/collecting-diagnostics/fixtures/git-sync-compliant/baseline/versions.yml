@@ -1,0 +1,8 @@
+---
+infrahub_server_version: "1.9.6"
+infrahubctl_version: "1.9.6"
+edition: "community"
+python_runtime: "3.12.4"
+images:
+  infrahub-server: "sha256:aaaaaaaa"
+  task-worker: "sha256:bbbbbbbb"
