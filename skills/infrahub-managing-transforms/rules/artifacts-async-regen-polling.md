@@ -46,7 +46,9 @@ to "Correct pattern" below.
 ```python
 async def regenerate(client, def_id, branch):
     # WRONG — fire-and-forget; "success" doesn't mean anything finished
-    await client.post(f"/api/artifact/generate/{def_id}?branch={branch}")
+    await client._post(
+        url=f"/api/artifact/generate/{def_id}", payload={}, params={"branch": branch}
+    )
     return "regenerated"
 ```
 
@@ -61,7 +63,9 @@ TIMEOUT_SECONDS = 60
 
 async def regenerate_and_wait(client, def_id, expected_count, branch):
     """Trigger regen, poll until artifact count matches, or warn on timeout."""
-    await client.post(f"/api/artifact/generate/{def_id}?branch={branch}")
+    await client._post(
+        url=f"/api/artifact/generate/{def_id}", payload={}, params={"branch": branch}
+    )
 
     deadline = asyncio.get_event_loop().time() + TIMEOUT_SECONDS
     reposted = False
@@ -75,7 +79,11 @@ async def regenerate_and_wait(client, def_id, expected_count, branch):
             return artifacts
         if not reposted:
             # Re-POST once: covers the read-replica visibility gap
-            await client.post(f"/api/artifact/generate/{def_id}?branch={branch}")
+            await client._post(
+                url=f"/api/artifact/generate/{def_id}",
+                payload={},
+                params={"branch": branch},
+            )
             reposted = True
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
 

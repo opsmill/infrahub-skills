@@ -8,16 +8,22 @@ tags: python, client, create, hfid, relationship, id
 
 Impact: CRITICAL
 
-The SDK accepts four explicit forms for relationship fields in
-the ``data=`` dict of ``client.create()``. Mixing them up — or
+The SDK accepts three forms for a relationship field in the
+``data=`` dict of ``client.create()`` — an HFID lookup, an
+explicit ID, or an SDK object. Mixing them up — or
 passing a bare string — is the most common source of "Unable to
 find the node" errors at runtime.
 
 ### The three accepted forms
 
-**Form A — HFID lookup (single-component).** Use when the target
-schema's ``human_friendly_id`` is one field. The list contains
-exactly one string.
+**Form 1 — HFID lookup.** Pass ``{"hfid": [...]}``. The list has
+one entry per component of the *target* node's
+``human_friendly_id``, in its declared order — so the right
+length depends on the relationship's peer, not on the
+relationship field itself. HFID lookups come in two shapes:
+
+Single-component (the target's ``human_friendly_id`` is one
+field — the list holds exactly one string):
 
 ```python
 await self.client.create(
@@ -30,9 +36,8 @@ await self.client.create(
 )
 ```
 
-**Form B — HFID lookup (composite).** Use when
-``human_friendly_id`` has multiple components. The list order
-**must** match the schema's declared order.
+Composite (``human_friendly_id`` has multiple components — list
+order **must** match the schema's declared order):
 
 ```python
 # Schema: DcimInterface.human_friendly_id = [device__name__value, name__value]
@@ -46,7 +51,7 @@ await self.client.create(
 )
 ```
 
-**Form C — Explicit ID.** Use when you already hold the UUID
+**Form 2 — Explicit ID.** Use when you already hold the UUID
 (returned by a prior query).
 
 ```python
@@ -59,7 +64,7 @@ await self.client.create(
 )
 ```
 
-**Form D — SDK object reference (passed directly).** Pass an
+**Form 3 — SDK object reference (passed directly).** Pass an
 object previously returned by ``self.client.get`` or
 ``self.client.create``.
 
@@ -116,10 +121,10 @@ await self.client.create(
 3. If you already hold a UUID, use ``{"id": ...}``. Otherwise
    prefer ``{"hfid": [...]}``.
 4. If you have an SDK object in scope (from ``client.get`` or
-   ``client.create``), pass it directly — Form D.
+   ``client.create``), pass it directly — Form 3.
 
 The same forms apply to **every** relationship in the generator,
 not only the examples above. If a relationship field doesn't fit
-forms A-D, it is shape-wrong — fix it.
+one of these three forms, it is shape-wrong — fix it.
 
 Reference: [Infrahub Generator Docs](https://docs.infrahub.app)

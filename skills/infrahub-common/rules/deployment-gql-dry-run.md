@@ -35,8 +35,9 @@ Before opening a PR that touches any `.gql` file under
 Infrahub schema.
 
 ```bash
-# Per-query dry-run via infrahubctl
-infrahubctl render <transform_name> --dry-run
+# Per-query dry-run: rendering executes the transform's query
+# against the branch and surfaces any GraphQL/schema mismatch
+infrahubctl render <transform_name> --branch <branch>
 
 # For a check or generator, the equivalent is to run the
 # check/generator itself locally — it will fetch via the .gql
@@ -74,7 +75,7 @@ a fragment, or a relationship traversal does.
 
 ### CI integration
 
-Where practical, wire `infrahubctl render --dry-run` into CI
+Where practical, wire `infrahubctl render --branch <ci-branch>` into CI
 as a pre-merge gate on `queries/**/*.gql` changes. The check
 takes <1s per query against a warmed Infrahub and prevents
 the silent-sync-failure class of bug from reaching main.
