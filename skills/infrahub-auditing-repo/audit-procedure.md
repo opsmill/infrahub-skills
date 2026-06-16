@@ -114,7 +114,7 @@ offline).
   with the matching `identifier`. Missing
   inverses force consumers into filter-in-Python
   workarounds — see
-  [rules/schema-missing-inverses.md](rules/schema-missing-inverses.md).
+  [rules/schema-design-missing-inverses.md](rules/schema-design-missing-inverses.md).
   Severity: **HIGH**.
 
 ### 2.5 Hierarchy checks
@@ -278,7 +278,7 @@ generator's `query` class attribute → the matching
   section could traverse to the others if the
   schema declared the inverse. If yes, the
   schema-side fix is the right answer; see
-  [rules/schema-missing-inverses.md](rules/schema-missing-inverses.md).
+  [rules/schema-design-missing-inverses.md](rules/schema-design-missing-inverses.md).
 
 See [rules/xref-cascade-shape.md](rules/xref-cascade-shape.md)
 for the full rule. When this finding fires, also

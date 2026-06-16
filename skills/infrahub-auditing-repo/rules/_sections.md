@@ -6,9 +6,10 @@ contains the checks to perform and the expected outcomes.
 | Priority | Category | Prefix | Description |
 | -------- | -------- | ------ | ----------- |
 | CRITICAL | Structure | `structure-` | .infrahub.yml, file paths |
-| CRITICAL | Schema | `schema-` | Naming, relationships, deprecated fields, missing inverses |
+| CRITICAL | Schema | `schema-` | Naming, relationships, deprecated fields |
 | CRITICAL | Objects | `objects-` | YAML format, values, refs |
 | CRITICAL | Python | `python-` | Class inheritance, methods |
+| HIGH | Schema Design | `schema-design-` | Schema design quality, missing inverses |
 | HIGH | Cross-Refs | `xref-` | Query name consistency, generator query↔Python shape |
 | HIGH | Registration | `registration-` | All components declared |
 | MEDIUM | Practices | `practices-` | human_friendly_id, display |

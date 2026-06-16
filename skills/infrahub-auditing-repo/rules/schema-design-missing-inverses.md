@@ -1,13 +1,13 @@
 ---
-title: schema-missing-inverses
+title: schema-design-missing-inverses
 impact: HIGH
 tags: audit, schema, relationships, inverses
 ---
 
-# Rule: schema-missing-inverses
+# Rule: schema-design-missing-inverses
 
 **Severity**: HIGH
-**Category**: Schema
+**Category**: Schema Design
 
 ## What It Checks
 

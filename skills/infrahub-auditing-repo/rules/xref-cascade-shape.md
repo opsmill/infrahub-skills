@@ -88,7 +88,7 @@ Python need to change together.
    from another section? If yes, the schema is
    missing an inverse and the query is paying for
    it." Cross-reference
-   [schema-missing-inverses](./schema-missing-inverses.md)
+   [schema-design-missing-inverses](./schema-design-missing-inverses.md)
    when the answer is yes.
 
 ## Related
@@ -101,7 +101,7 @@ Python need to change together.
   rule (cascade shape) frequently hits that one
   too — flag both findings when both apply.
 - Schema-side companion:
-  [schema-missing-inverses](./schema-missing-inverses.md).
+  [schema-design-missing-inverses](./schema-design-missing-inverses.md).
   Cascade-shape findings on the Python/query side
   often point at the same missing inverse the
   schema-side rule catches structurally.
