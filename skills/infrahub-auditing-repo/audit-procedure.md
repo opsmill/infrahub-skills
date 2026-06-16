@@ -250,7 +250,7 @@ convention).
 - Must call `save(allow_upsert=True)` on created objects
 - Should handle empty/missing data gracefully
 
-### 4.2.5 Generator query-shape review (HIGH)
+### 4.2.5 Generator query-shape review (MEDIUM)
 
 For each generator, cross-reference the Python file
 with the `.gql` it loads (resolved via the

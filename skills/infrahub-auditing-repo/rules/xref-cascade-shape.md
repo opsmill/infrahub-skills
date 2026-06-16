@@ -1,12 +1,12 @@
 ---
 title: xref-cascade-shape
-impact: HIGH
+impact: MEDIUM
 tags: audit, cross-references, generators, query-shape
 ---
 
 # Rule: xref-cascade-shape
 
-**Severity**: HIGH
+**Severity**: MEDIUM
 **Category**: Cross-References
 
 ## What It Checks
