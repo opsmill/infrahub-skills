@@ -1,33 +1,47 @@
 """Shared grader library for infrahub-managing-generators evaluations.
 
-Provides Python AST parsing helpers, individual assertion check
-functions, a CHECKS registry, and the top-level ``run_checks``
-function that returns skillgrade JSON format.
+This library backs two grader families that share one ``run_checks`` entry
+point, dispatched by the output file's suffix:
 
-Graders for this skill parse Python source (the generator class
-the model produced as ``output.py``) rather than YAML. Some
-expressions cannot be resolved from AST alone — variable
-references, function-call results — and the check functions
-treat those as "indeterminate" (passing) rather than failing.
-The checks fail only on shapes that are demonstrably wrong:
-bare string literals where a dict reference is required,
-over-packed list literals, list literals passed to ``.add()``.
+* **AST / relationship checks** (relationship references, multi-peer add,
+  natural-key preflight) parse a Python source file the model produced as
+  ``output.py``. Some expressions cannot be resolved from AST alone —
+  variable references, function-call results — and the check functions treat
+  those as "indeterminate" (passing) rather than failing. The checks fail
+  only on shapes that are demonstrably wrong: bare string literals where a
+  dict reference is required, over-packed list literals, list literals passed
+  to ``.add()``. These checks take ``(tree, raw_text=...)``.
+
+* **from_graphql hydration checks** parse a Markdown file (``output.md``)
+  that carries the refactored generator and the updated cascade query as
+  fenced ``python`` / ``graphql`` blocks. They verify the loop body does zero
+  re-fetches (``InfrahubNode.from_graphql`` instead of ``self.client.get``)
+  and that the query was extended with ``__typename``. These checks take a
+  single ``output`` dict.
 
 Usage (in a per-task grader script)::
 
     from pathlib import Path
     from lib import run_checks
 
+    # AST family — output.py
     result = run_checks(
         ["relationship-hfid-form-correct", "no-bare-string-relationship"],
         Path("output.py"),
     )
-    print(result)
+
+    # from_graphql family — output.md
+    result = run_checks(
+        ["imports-infrahub-node", "uses-from-graphql"],
+        Path("output.md"),
+    )
+    print(result)  # {"score": 0.67, "details": "...", "checks": [...]}
 """
 
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -54,8 +68,39 @@ def load_output_py(path: Path) -> tuple[ast.Module | None, str]:
     return tree, raw
 
 
+_PY_FENCE = re.compile(
+    r"^```(?:python|py)\s*\n(.*?)^```",
+    re.MULTILINE | re.DOTALL,
+)
+_GQL_FENCE = re.compile(
+    r"^```(?:graphql|gql)\s*\n(.*?)^```",
+    re.MULTILINE | re.DOTALL,
+)
+
+
+def load_output(path: Path) -> dict[str, str]:
+    """Load the model's output.md and return its fenced blocks.
+
+    Returns a dict with keys ``python``, ``graphql``, ``raw``. Missing
+    blocks resolve to empty strings; ``raw`` is always the full file
+    content (or "" if unreadable).
+    """
+    try:
+        raw = Path(path).read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError):
+        return {"python": "", "graphql": "", "raw": ""}
+
+    py = _PY_FENCE.search(raw)
+    gql = _GQL_FENCE.search(raw)
+    return {
+        "python": py.group(1) if py else "",
+        "graphql": gql.group(1) if gql else "",
+        "raw": raw,
+    }
+
+
 # ---------------------------------------------------------------------------
-# AST helpers
+# AST helpers (relationship / multi-peer / preflight family)
 # ---------------------------------------------------------------------------
 
 
@@ -164,6 +209,87 @@ def is_bare_string(node: ast.AST) -> bool:
 def is_name_or_attribute(node: ast.AST) -> bool:
     """True if ``node`` is a Name or Attribute reference (likely an SDK obj)."""
     return isinstance(node, (ast.Name, ast.Attribute))
+
+
+# ---------------------------------------------------------------------------
+# AST helpers (from_graphql hydration family)
+# ---------------------------------------------------------------------------
+
+
+def _parse_python(source: str) -> ast.Module | None:
+    if not source.strip():
+        return None
+    try:
+        return ast.parse(source)
+    except SyntaxError:
+        return None
+
+
+def _imports_infrahub_node(tree: ast.Module) -> bool:
+    """True if `InfrahubNode` is imported (any infrahub_sdk path)."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if node.module and node.module.startswith("infrahub_sdk"):
+                if any(alias.name == "InfrahubNode" for alias in node.names):
+                    return True
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name and "InfrahubNode" in alias.name:
+                    return True
+    return False
+
+
+def _from_graphql_calls(tree: ast.Module) -> list[ast.Call]:
+    """Return every `InfrahubNode.from_graphql(...)` call in the tree."""
+    out: list[ast.Call] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not isinstance(func, ast.Attribute):
+            continue
+        if func.attr != "from_graphql":
+            continue
+        # Match `InfrahubNode.from_graphql` (Name) or `<x>.InfrahubNode.from_graphql`
+        if isinstance(func.value, ast.Name) and func.value.id == "InfrahubNode":
+            out.append(node)
+        elif isinstance(func.value, ast.Attribute) and func.value.attr == "InfrahubNode":
+            out.append(node)
+    return out
+
+
+def _client_get_calls(tree: ast.Module) -> list[ast.Call]:
+    """Return every `self.client.get(...)` call in the tree."""
+    out: list[ast.Call] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not (isinstance(func, ast.Attribute) and func.attr == "get"):
+            continue
+        val = func.value
+        if not (isinstance(val, ast.Attribute) and val.attr == "client"):
+            continue
+        inner = val.value
+        if isinstance(inner, ast.Name) and inner.id == "self":
+            out.append(node)
+    return out
+
+
+def _node_within(child: ast.AST, parent: ast.AST) -> bool:
+    """True if ``child`` is a descendant of ``parent`` in the AST."""
+    for node in ast.walk(parent):
+        if node is child:
+            return True
+    return False
+
+
+def _for_loops(tree: ast.Module) -> list[ast.AST]:
+    """Return every for / async-for loop in the tree."""
+    return [
+        n for n in ast.walk(tree)
+        if isinstance(n, (ast.For, ast.AsyncFor))
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -509,10 +635,116 @@ def check_no_raw_create_without_handler(
 
 
 # ---------------------------------------------------------------------------
+# from_graphql hydration checks
+#
+# Each check has the signature:
+#     check_*(output: dict[str, str], **kwargs) -> tuple[bool, str]
+# where output is the dict returned by ``load_output``.
+# ---------------------------------------------------------------------------
+
+
+def check_imports_infrahub_node(output: dict, **_: Any) -> tuple[bool, str]:
+    """Refactored Python imports InfrahubNode from infrahub_sdk."""
+    tree = _parse_python(output["python"])
+    if tree is None:
+        return False, "No parseable Python block found"
+    if _imports_infrahub_node(tree):
+        return True, "InfrahubNode imported from infrahub_sdk"
+    return False, "InfrahubNode is not imported from infrahub_sdk"
+
+
+def check_uses_from_graphql(output: dict, **_: Any) -> tuple[bool, str]:
+    """At least one InfrahubNode.from_graphql(...) call exists inside a for-loop."""
+    tree = _parse_python(output["python"])
+    if tree is None:
+        return False, "No parseable Python block found"
+    calls = _from_graphql_calls(tree)
+    if not calls:
+        return False, "No InfrahubNode.from_graphql(...) call found"
+    loops = _for_loops(tree)
+    in_loop = [c for c in calls if any(_node_within(c, loop) for loop in loops)]
+    if not in_loop:
+        return False, (
+            f"InfrahubNode.from_graphql called {len(calls)}x but never "
+            "inside a for-loop (expected inside the peer iteration)"
+        )
+    # Verify at least one call uses the expected kwargs.
+    for call in in_loop:
+        kwargs = {kw.arg for kw in call.keywords if kw.arg}
+        if {"client", "data"}.issubset(kwargs):
+            return True, (
+                f"InfrahubNode.from_graphql called inside a for-loop "
+                f"with client= and data= kwargs ({len(in_loop)} total)"
+            )
+    return False, (
+        f"InfrahubNode.from_graphql called inside a for-loop but missing "
+        "client= or data= kwargs"
+    )
+
+
+def check_no_client_get_in_loop(output: dict, **_: Any) -> tuple[bool, str]:
+    """self.client.get(...) does not appear inside any for-loop body."""
+    tree = _parse_python(output["python"])
+    if tree is None:
+        return False, "No parseable Python block found"
+    get_calls = _client_get_calls(tree)
+    loops = _for_loops(tree)
+    leaked = [
+        c for c in get_calls
+        if any(_node_within(c, loop) for loop in loops)
+    ]
+    if leaked:
+        return False, (
+            f"self.client.get(...) still called inside a for-loop "
+            f"({len(leaked)} occurrence(s)) — refactor incomplete"
+        )
+    return True, "No self.client.get(...) calls inside any for-loop"
+
+
+def check_query_has_typename(output: dict, **_: Any) -> tuple[bool, str]:
+    """The GraphQL query includes __typename inside the bgp_neighbors selection."""
+    gql = output["graphql"]
+    if not gql.strip():
+        return False, "No GraphQL block found"
+    # Locate bgp_neighbors { ... } block (allow nesting).
+    match = re.search(r"bgp_neighbors\s*{", gql)
+    if not match:
+        return False, "bgp_neighbors selection not found in query"
+    start = match.end()
+    depth = 1
+    end = start
+    while end < len(gql) and depth > 0:
+        if gql[end] == "{":
+            depth += 1
+        elif gql[end] == "}":
+            depth -= 1
+        end += 1
+    block = gql[start:end]
+    if "__typename" in block:
+        return True, "__typename present inside bgp_neighbors selection"
+    return False, "__typename missing from bgp_neighbors selection"
+
+
+def check_python_block_present(output: dict, **_: Any) -> tuple[bool, str]:
+    """A ```python fenced block exists in output.md."""
+    if output["python"].strip():
+        return True, "Python code block present"
+    return False, "No ```python fenced block found in output.md"
+
+
+def check_graphql_block_present(output: dict, **_: Any) -> tuple[bool, str]:
+    """A ```graphql fenced block exists in output.md."""
+    if output["graphql"].strip():
+        return True, "GraphQL code block present"
+    return False, "No ```graphql fenced block found in output.md"
+
+
+# ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
 
 CHECKS: dict[str, Any] = {
+    # AST / relationship family (output.py)
     "relationship-hfid-form-correct": check_relationship_hfid_form_correct,
     "no-bare-string-relationship": check_no_bare_string_relationship,
     "no-overpacked-hfid-list": check_no_overpacked_hfid_list,
@@ -523,6 +755,13 @@ CHECKS: dict[str, Any] = {
     "members-add-iterates": check_members_add_iterates,
     "preflight-or-upsert": check_preflight_or_upsert,
     "no-raw-create-without-handler": check_no_raw_create_without_handler,
+    # from_graphql hydration family (output.md)
+    "imports-infrahub-node": check_imports_infrahub_node,
+    "uses-from-graphql": check_uses_from_graphql,
+    "no-client-get-in-loop": check_no_client_get_in_loop,
+    "query-has-typename": check_query_has_typename,
+    "python-block-present": check_python_block_present,
+    "graphql-block-present": check_graphql_block_present,
 }
 
 
@@ -531,19 +770,26 @@ CHECKS: dict[str, Any] = {
 # ---------------------------------------------------------------------------
 
 
-def run_checks(
-    check_names: list[str],
-    output_path: Path,
-) -> dict:
-    """Run named checks against a Python source file.
+def run_checks(check_names: list[str], output_path: Path) -> dict:
+    """Run named checks against a generator-task output file.
+
+    Dispatch is by the output file's suffix: ``.md`` routes to the
+    Markdown/dict family (from_graphql hydration checks, which receive the
+    ``load_output`` dict), anything else to the Python/AST family (which
+    receive ``(tree, raw_text=...)`` from ``load_output_py``). A grader
+    script requests only checks from its own family and passes the matching
+    path, so the two never mix within one call.
 
     Returns skillgrade JSON: ``{"score": float, "details": str,
     "checks": [...]}``.
 
-    Raises ``KeyError`` if any name in ``check_names`` is not in
-    ``CHECKS``.
+    Raises ``KeyError`` if any name in ``check_names`` is not in ``CHECKS``.
     """
-    tree, raw = load_output_py(output_path)
+    markdown_mode = Path(output_path).suffix.lower() == ".md"
+    if markdown_mode:
+        output = load_output(output_path)
+    else:
+        tree, raw = load_output_py(output_path)
 
     entries: list[dict] = []
     passed_count = 0
@@ -551,7 +797,10 @@ def run_checks(
     for name in check_names:
         fn = CHECKS[name]  # raises KeyError for unknown names
         try:
-            ok, msg = fn(tree, raw_text=raw)
+            if markdown_mode:
+                ok, msg = fn(output)
+            else:
+                ok, msg = fn(tree, raw_text=raw)
         except Exception as exc:  # defensive — never let one check crash all
             ok, msg = False, f"Error running check: {exc}"
 

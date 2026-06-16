@@ -28,7 +28,9 @@
 6. **Patterns (patterns-)** -- MEDIUM. Data cleaning helper,
    batch object creation, using the local store for
    inter-object references, and natural-key preflight for
-   form-driven mutations.
+   form-driven mutations. **HIGH** for hydration —
+   `InfrahubNode.from_graphql` for peer iteration to collapse
+   `O(N + 1)` round trips.
 
 7. **Testing (testing-)** -- LOW. infrahubctl generator
    commands, listing and running Generators locally, and the

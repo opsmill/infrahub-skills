@@ -1643,3 +1643,110 @@ tasks:
         check: flags.yml is a list whose entries all have id/severity/evidence/hint
       - name: oom-in-logs-fires
         check: flags.yml contains an entry with id `oom-in-logs`
+
+  # --- Generator Creator --- #
+  - name: from-graphql-hydration-refactor
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and follow its workflow and rules.
+
+      Task: Refactor an existing generator that performs an N+1 fetch
+      pattern into one that uses response-driven hydration. The
+      generator flips the `drained` attribute on every BGP neighbor of
+      a target interface when a maintenance event fires. Today it
+      iterates the cascade query's `bgp_neighbors.edges` and re-fetches
+      each peer via `self.client.get(...)`. That's `1 + N` round trips
+      per run; for a maintenance event touching 30 neighbors it's 31
+      mutations worth of latency.
+
+      Current GraphQL query (queries/drain.gql), shown indented:
+
+          query drain($name: String!) {
+            NetworkMaintenanceEvent(name__value: $name) {
+              edges {
+                node {
+                  target_interface {
+                    node {
+                      bgp_neighbors {
+                        edges {
+                          node {
+                            id
+                            hfid
+                            drained { value }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+      Current generator (generators/drain.py), shown indented:
+
+          from infrahub_sdk.generator import InfrahubGenerator
+
+
+          class DrainBgpNeighborsGenerator(InfrahubGenerator):
+              async def generate(self, data: dict) -> None:
+                  event = data["NetworkMaintenanceEvent"]["edges"][0]["node"]
+                  target = event["target_interface"]["node"]
+                  for edge in target["bgp_neighbors"]["edges"]:
+                      peer = await self.client.get(
+                          kind="NetworkBgpNeighbor",
+                          hfid=edge["node"]["hfid"],
+                      )
+                      peer.drained.value = True
+                      await peer.save(allow_upsert=True)
+
+      Refactor the generator so the loop body does zero re-fetches via
+      response-driven hydration, and update the query so the refactor
+      works.
+
+      Save ONLY the refactored generator and the updated query to a
+      single Markdown file, as two triple-backtick code-fenced blocks
+      — one tagged `python` and one tagged `graphql` — to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_from_graphql_refactor.py
+        weight: 1.0
+    expected_output: >-
+      A refactored generator that uses InfrahubNode.from_graphql to
+      hydrate each iterated peer (no self.client.get inside the loop
+      body), plus an updated GraphQL query with __typename added under
+      the iterated peer's node selection.
+    expectations:
+      - InfrahubNode is imported from infrahub_sdk.node
+      - >-
+        The for-loop body calls InfrahubNode.from_graphql with
+        client=, branch=, and data= kwargs
+      - >-
+        self.client.get(...) is NOT called inside any for-loop in the
+        refactored generator
+      - >-
+        The updated GraphQL query includes __typename inside the
+        bgp_neighbors edge's node selection
+      - >-
+        Output is a single Markdown file with one ```python block and
+        one ```graphql block
+    assertions:
+      - name: python-block-present
+        check: Output contains a ```python fenced code block
+      - name: graphql-block-present
+        check: Output contains a ```graphql fenced code block
+      - name: imports-infrahub-node
+        check: >-
+          Refactored Python imports InfrahubNode from infrahub_sdk
+      - name: uses-from-graphql
+        check: >-
+          InfrahubNode.from_graphql(...) is called inside the peer
+          iteration for-loop with client= and data= kwargs
+      - name: no-client-get-in-loop
+        check: >-
+          self.client.get(...) is not called inside any for-loop in
+          the refactored generator
+      - name: query-has-typename
+        check: >-
+          __typename appears inside the bgp_neighbors selection in
+          the updated GraphQL query

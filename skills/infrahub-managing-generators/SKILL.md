@@ -112,10 +112,18 @@ Follow these steps when creating a generator:
 4. **Make it idempotent** — Use `allow_upsert=True` so
    re-running creates or updates without duplicates.
    See [rules/tracking-idempotent.md](./rules/tracking-idempotent.md).
-5. **Register in .infrahub.yml** — Add under
+5. **Check for `from_graphql` adoption opportunity** — if
+   `generate()` iterates response edges and calls
+   `self.client.get()` to re-fetch typed peers, consider
+   refactoring to `InfrahubNode.from_graphql()` to collapse
+   `O(N + 1)` round trips to `O(1)`. Read
+   [rules/patterns-hydration.md](./rules/patterns-hydration.md)
+   for the decision tree, detection heuristic, and refactor
+   recipe.
+6. **Register in .infrahub.yml** — Add under
    `generator_definitions` with the target group. See
    [rules/registration-config.md](./rules/registration-config.md).
-6. **Test** — Run `infrahubctl generator` to validate.
+7. **Test** — Run `infrahubctl generator` to validate.
    See [rules/testing-commands.md](./rules/testing-commands.md).
 
 ## Supporting References

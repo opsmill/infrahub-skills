@@ -107,6 +107,45 @@
         "The guidance notes that unit tests on the input dict do not cover SDK call shape"
       ],
       "assertions": []
+    },
+    {
+      "id": 6,
+      "prompt": "Refactor an existing generator that performs an N+1 fetch\npattern into one that uses response-driven hydration. The\ngenerator flips the `drained` attribute on every BGP neighbor of\na target interface when a maintenance event fires. Today it\niterates the cascade query's `bgp_neighbors.edges` and re-fetches\neach peer via `self.client.get(...)`. That's `1 + N` round trips\nper run; for a maintenance event touching 30 neighbors it's 31\nmutations worth of latency.\n\nCurrent GraphQL query (queries/drain.gql), shown indented:\n\n    query drain($name: String!) {\n      NetworkMaintenanceEvent(name__value: $name) {\n        edges {\n          node {\n            target_interface {\n              node {\n                bgp_neighbors {\n                  edges {\n                    node {\n                      id\n                      hfid\n                      drained { value }\n                    }\n                  }\n                }\n              }\n            }\n          }\n        }\n      }\n    }\n\nCurrent generator (generators/drain.py), shown indented:\n\n    from infrahub_sdk.generator import InfrahubGenerator\n\n\n    class DrainBgpNeighborsGenerator(InfrahubGenerator):\n        async def generate(self, data: dict) -> None:\n            event = data[\"NetworkMaintenanceEvent\"][\"edges\"][0][\"node\"]\n            target = event[\"target_interface\"][\"node\"]\n            for edge in target[\"bgp_neighbors\"][\"edges\"]:\n                peer = await self.client.get(\n                    kind=\"NetworkBgpNeighbor\",\n                    hfid=edge[\"node\"][\"hfid\"],\n                )\n                peer.drained.value = True\n                await peer.save(allow_upsert=True)\n\nRefactor the generator so the loop body does zero re-fetches via\nresponse-driven hydration, and update the query so the refactor\nworks.",
+      "expected_output": "A refactored generator that uses InfrahubNode.from_graphql to hydrate each iterated peer (no self.client.get inside the loop body), plus an updated GraphQL query with __typename added under the iterated peer's node selection.",
+      "files": [],
+      "expectations": [
+        "InfrahubNode is imported from infrahub_sdk.node",
+        "The for-loop body calls InfrahubNode.from_graphql with client=, branch=, and data= kwargs",
+        "self.client.get(...) is NOT called inside any for-loop in the refactored generator",
+        "The updated GraphQL query includes __typename inside the bgp_neighbors edge's node selection",
+        "Output is a single Markdown file with one ```python block and one ```graphql block"
+      ],
+      "assertions": [
+        {
+          "name": "python-block-present",
+          "check": "Output contains a ```python fenced code block"
+        },
+        {
+          "name": "graphql-block-present",
+          "check": "Output contains a ```graphql fenced code block"
+        },
+        {
+          "name": "imports-infrahub-node",
+          "check": "Refactored Python imports InfrahubNode from infrahub_sdk"
+        },
+        {
+          "name": "uses-from-graphql",
+          "check": "InfrahubNode.from_graphql(...) is called inside the peer iteration for-loop with client= and data= kwargs"
+        },
+        {
+          "name": "no-client-get-in-loop",
+          "check": "self.client.get(...) is not called inside any for-loop in the refactored generator"
+        },
+        {
+          "name": "query-has-typename",
+          "check": "__typename appears inside the bgp_neighbors selection in the updated GraphQL query"
+        }
+      ]
     }
   ]
 }

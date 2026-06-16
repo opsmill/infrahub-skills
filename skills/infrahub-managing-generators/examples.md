@@ -9,6 +9,7 @@ repositories.
 - [2. Network Segment Generator](#2-network-segment-generator)
 - [3. Minimal Generator Template](#3-minimal-generator-template)
 - [4. Generator with convert_query_response](#4-generator-with-convert_query_response)
+- [5. Refactor: `client.get()` → `from_graphql` for peer iteration](#5-refactor-clientget--from_graphql-for-peer-iteration)
 - [Complete File Structure](#complete-file-structure)
 
 ---
@@ -390,6 +391,95 @@ generator_definitions:
     parameters:
       name: name__value
 ```
+
+---
+
+## 5. Refactor: `client.get()` → `from_graphql` for peer iteration
+
+A real-shape example showing round-trip elimination when the
+generator iterates a relationship from the cascade query and
+flips an attribute on each peer.
+
+See [rules/patterns-hydration.md](./rules/patterns-hydration.md)
+for the decision tree and detection heuristic.
+
+### Original (one round trip per peer)
+
+```python
+from infrahub_sdk.generator import InfrahubGenerator
+
+
+class DrainBgpNeighborsGenerator(InfrahubGenerator):
+    async def generate(self, data: dict) -> None:
+        event = data["NetworkMaintenanceEvent"]["edges"][0]["node"]
+        target = event["target_interface"]["node"]
+        for edge in target["bgp_neighbors"]["edges"]:
+            peer_hfid = edge["node"]["hfid"]
+            peer = await self.client.get(
+                kind="NetworkBgpNeighbor",
+                hfid=peer_hfid,
+            )
+            peer.drained.value = True
+            await peer.save(allow_upsert=True)
+```
+
+For `N` peers: `1` cascade query + `N` re-fetches =
+`N + 1` round trips.
+
+### Refactored (one round trip total)
+
+Query change — add `__typename` to the iterated peer's node
+selection:
+
+```diff
+ bgp_neighbors {
+   edges { node {
+     id
+     hfid
++    __typename
+     drained { value }
+   }}
+ }
+```
+
+Generator change:
+
+```python
+from infrahub_sdk.generator import InfrahubGenerator
+from infrahub_sdk.node import InfrahubNode
+
+
+class DrainBgpNeighborsGenerator(InfrahubGenerator):
+    async def generate(self, data: dict) -> None:
+        event = data["NetworkMaintenanceEvent"]["edges"][0]["node"]
+        target = event["target_interface"]["node"]
+        for edge in target["bgp_neighbors"]["edges"]:
+            peer = await InfrahubNode.from_graphql(
+                client=self.client,
+                branch=self.branch,
+                data=edge,
+            )
+            peer.drained.value = True
+            await peer.save(allow_upsert=True)
+```
+
+For `N` peers: `1` cascade query + `0` re-fetches =
+`1` round trip.
+
+### Verification
+
+After the refactor, confirm:
+
+1. The branch state matches pre-refactor — every peer's
+   mutated attribute landed correctly (spot-check via
+   `infrahubctl` or a follow-up GraphQL query).
+2. A re-fire of the generator on an unchanged design produces
+   no updates — `save(allow_upsert=True)` with identical
+   values elides the mutation, so idempotency is preserved.
+3. Unfetched optional one-cardinality relationships on the
+   peers are still set — confirm by querying the same peers
+   for those relationships post-refactor (partial-hydration
+   handling preserves them on save).
 
 ---
 
