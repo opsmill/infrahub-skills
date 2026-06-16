@@ -108,6 +108,14 @@ offline).
 - Parent relationships:
   `kind: Parent` + `cardinality: one`
 - Component/Parent pairs must share the same `identifier`
+- For every `kind: Attribute` + `cardinality: one`
+  relationship, verify the peer kind (or one of
+  its generics) declares an inverse relationship
+  with the matching `identifier`. Missing
+  inverses force consumers into filter-in-Python
+  workarounds — see
+  [rules/schema-missing-inverses.md](rules/schema-missing-inverses.md).
+  Severity: **HIGH**.
 
 ### 2.5 Hierarchy checks
 
@@ -241,6 +249,43 @@ convention).
   creation
 - Must call `save(allow_upsert=True)` on created objects
 - Should handle empty/missing data gracefully
+
+### 4.2.5 Generator query-shape review (HIGH)
+
+For each generator, cross-reference the Python file
+with the `.gql` it loads (resolved via the
+generator's `query` class attribute → the matching
+`queries` entry in `.infrahub.yml` → its
+`file_path`). Two checks:
+
+- **Trigger group must not appear in the data
+  query**: scan the generator's `.gql` for
+  `CoreGeneratorGroup`. It belongs only in
+  `.infrahub.yml` `targets:`. Finding inside the
+  data query indicates the generator is fetching
+  the membership that already dispatched it.
+- **Focal-exclude loops**: in the generator's
+  Python, look for an outer loop over
+  `data[<Kind>]["edges"]` whose first conditional
+  compares an attribute on the loop variable to
+  the same attribute on `focal` (or
+  `self.focal`) and immediately `continue`s.
+  That signature means the query fetched a whole
+  collection just to drop one row in Python.
+- **Top-level kind sections**: count the
+  top-level fields under the `query` root. Three
+  or more is a review prompt — ask whether one
+  section could traverse to the others if the
+  schema declared the inverse. If yes, the
+  schema-side fix is the right answer; see
+  [rules/schema-missing-inverses.md](rules/schema-missing-inverses.md).
+
+See [rules/xref-cascade-shape.md](rules/xref-cascade-shape.md)
+for the full rule. When this finding fires, also
+re-check the `from_graphql` adoption opportunity
+described in
+[../infrahub-managing-generators/rules/patterns-hydration.md](../infrahub-managing-generators/rules/patterns-hydration.md)
+— the two patterns frequently co-occur.
 
 ### 4.3 Transform classes
 
