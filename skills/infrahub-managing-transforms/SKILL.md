@@ -12,7 +12,7 @@ allowed-tools:
   - Grep
 argument-hint: "[transform-name] [format]"
 metadata:
-  version: 1.2.6
+  version: 1.2.7
   author: OpsMill
 ---
 
