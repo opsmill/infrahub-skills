@@ -1,13 +1,13 @@
 ---
-title: xref-cascade-shape
+title: xref-design-cascade-shape
 impact: MEDIUM
 tags: audit, cross-references, generators, query-shape
 ---
 
-# Rule: xref-cascade-shape
+# Rule: xref-design-cascade-shape
 
 **Severity**: MEDIUM
-**Category**: Cross-References
+**Category**: Cross-References Design
 
 ## What It Checks
 

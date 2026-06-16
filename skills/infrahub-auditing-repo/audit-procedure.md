@@ -280,7 +280,7 @@ generator's `query` class attribute → the matching
   schema-side fix is the right answer; see
   [rules/schema-design-missing-inverses.md](rules/schema-design-missing-inverses.md).
 
-See [rules/xref-cascade-shape.md](rules/xref-cascade-shape.md)
+See [rules/xref-design-cascade-shape.md](rules/xref-design-cascade-shape.md)
 for the full rule. When this finding fires, also
 re-check the `from_graphql` adoption opportunity
 described in

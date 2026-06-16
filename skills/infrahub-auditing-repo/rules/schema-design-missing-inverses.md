@@ -39,7 +39,7 @@ filtering logic into Python.
 
 The downstream tell for a missing inverse is
 exactly the cascade-shape pattern caught by
-[xref-cascade-shape](./xref-cascade-shape.md):
+[xref-design-cascade-shape](./xref-design-cascade-shape.md):
 a generator anchored on the peer ends up with a
 top-level section for the source kind purely so
 it can match by attribute equality in a Python
@@ -116,7 +116,7 @@ generators, checks, and transforms over time.
 ## Related
 
 - Downstream Python/query symptom:
-  [xref-cascade-shape](./xref-cascade-shape.md).
+  [xref-design-cascade-shape](./xref-design-cascade-shape.md).
   Cascade-shape findings on a generator are
   often a flag that this rule will fire on its
   schema too.

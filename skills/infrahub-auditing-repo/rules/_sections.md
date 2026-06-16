@@ -10,8 +10,9 @@ contains the checks to perform and the expected outcomes.
 | CRITICAL | Objects | `objects-` | YAML format, values, refs |
 | CRITICAL | Python | `python-` | Class inheritance, methods |
 | HIGH | Schema Design | `schema-design-` | Schema design quality, missing inverses |
-| HIGH | Cross-Refs | `xref-` | Query name consistency, generator query↔Python shape |
+| HIGH | Cross-Refs | `xref-` | Query name consistency |
 | HIGH | Registration | `registration-` | All components declared |
+| MEDIUM | Cross-Refs Design | `xref-design-` | Cross-file coordination quality, generator query↔Python shape |
 | MEDIUM | Practices | `practices-` | human_friendly_id, display |
 | MEDIUM | Deployment | `deployment-` | Git status, bootstrap |
 | LOW | Patterns | `patterns-` | Code org, file naming |
