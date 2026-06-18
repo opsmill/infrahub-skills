@@ -1,0 +1,59 @@
+---
+title: Release 1.2.6
+sidebar_position: 2
+---
+
+<table>
+  <tbody>
+    <tr>
+      <th>Release Number</th>
+      <td>1.2.6</td>
+    </tr>
+    <tr>
+      <th>Release Date</th>
+      <td>June 15th, 2026</td>
+    </tr>
+    <tr>
+      <th>Tag</th>
+      <td>[v1.2.6](https://github.com/opsmill/infrahub-skills/releases/tag/v1.2.6)</td>
+    </tr>
+  </tbody>
+</table>
+
+The largest release since launch — a new diagnostics skill, file-attachment schema support, a branch-first safety default for every data change, and a wave of empirically verified fixes across the skill set.
+
+## Highlights
+
+### Collect a redacted diagnostic bundle for expert hand-off
+
+- **The problem.** When an Infrahub deployment misbehaves and you need OpsMill's help, assembling the right logs, config, and state — across Docker Compose or Kubernetes, across multiple replicas — is manual and error-prone, and it's easy to leak secrets into whatever you share.
+- **What this enables.** The `infrahub-collecting-diagnostics` skill walks through collecting a redacted local bundle: it detects the deployment type, covers multi-replica setups, probes the running instance through `infrahubctl` only (read-only), and applies tiered redaction before producing a manifest-described bundle ready to hand off.
+- **When you need it.** Escalating an issue to OpsMill experts, or capturing a point-in-time snapshot of a misbehaving deployment. See the [collecting-diagnostics skill](https://github.com/opsmill/infrahub-skills/tree/main/skills/infrahub-collecting-diagnostics).
+
+### Model file attachments with `CoreFileObject`
+
+- **The problem.** Storing PDFs, network diagrams, KMZ overlays, certificates, or contracts against Infrahub nodes had no guidance — so the assistant defaulted to the antipattern of a `kind: Text` url/path string instead of using Infrahub's object storage.
+- **What this enables.** Schema-side rules for `CoreFileObject`, the built-in generic that turns a node into a file-bearing entity with automatic file metadata and a GraphQL upload mutation, plus an audit rule that flags reserved-attribute collisions and the text-string bypass.
+- **When you need it.** Modeling any document or binary attachment — rack photos, compliance docs, runbooks, circuit contracts — as first-class Infrahub data. See [managing-schemas](../skills-reference/managing-schemas.mdx).
+
+### Branch-first by default for all data changes
+
+- **The problem.** Writing data straight to the default branch (`main` by convention, configurable per deployment) has no per-changeset undo and skips the proposed-change review pipeline — schema validation, checks, human review. A real import of roughly 38,000 objects landed on the default branch and then had to be unwound by hand, one object at a time.
+- **What this enables.** A shared cross-cutting rule steering every CRUD path — object loads, MCP `infrahub_create`/`infrahub_update`/`infrahub_delete`, generator runs, and the SDK — toward a dedicated branch, with a rationalization table and red-flags list so the assistant holds the line under pressure. A branch is a single discard; the default branch is not.
+- **When you need it.** Any bulk import or data change you might want to review or roll back — which is to say, most of them.
+
+## Other changes
+
+#### Added
+
+- Resources testing-framework documentation for the check and transform skills.
+
+#### Changed
+
+- "Information Priority" guidance relocated to a shared rule so every skill inherits it.
+
+#### Fixed
+
+- Integration-layer gaps surfaced by a live build: union-typed GraphQL queries missing inline fragments, relationship references passed as bare strings or mis-packed lists, natural-key collisions on create, and artifact regeneration treated as synchronous (managing-generators, managing-transforms).
+- Owner vs source metadata semantics corrected across skills — source is lineage only; `owner` plus `is_protected` is what controls write access.
+- A cross-skill empirical accuracy pass: content-type allowlists, `extensions:` scope, `__typename` resolution, the Jinja2 filter sandbox, and more — each claim verified against Infrahub source or a running server.

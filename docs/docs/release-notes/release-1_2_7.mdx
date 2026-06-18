@@ -1,0 +1,25 @@
+---
+title: Release 1.2.7
+sidebar_position: 1
+---
+
+<table>
+  <tbody>
+    <tr>
+      <th>Release Number</th>
+      <td>1.2.7</td>
+    </tr>
+    <tr>
+      <th>Release Date</th>
+      <td>June 16th, 2026</td>
+    </tr>
+    <tr>
+      <th>Tag</th>
+      <td>[v1.2.7](https://github.com/opsmill/infrahub-skills/releases/tag/v1.2.7)</td>
+    </tr>
+  </tbody>
+</table>
+
+### Added
+
+- A `from_graphql` hydration rule for [managing-generators](../skills-reference/managing-generators.mdx). When a generator's `generate()` loops over query-response edges and re-fetches each peer with `client.get`, it can hydrate `InfrahubNode` objects directly from the GraphQL response instead — collapsing `O(N+1)` round trips to `O(1)`. The rule covers the decision tree, the query-coverage contract (`__typename`, `id`, and every mutated attribute), and a worked before/after refactor.

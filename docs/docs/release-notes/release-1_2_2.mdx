@@ -1,0 +1,33 @@
+---
+title: Release 1.2.2
+sidebar_position: 6
+---
+
+<table>
+  <tbody>
+    <tr>
+      <th>Release Number</th>
+      <td>1.2.2</td>
+    </tr>
+    <tr>
+      <th>Release Date</th>
+      <td>May 11th, 2026</td>
+    </tr>
+    <tr>
+      <th>Tag</th>
+      <td>[v1.2.2](https://github.com/opsmill/infrahub-skills/releases/tag/v1.2.2)</td>
+    </tr>
+  </tbody>
+</table>
+
+### Added
+
+- Six new schema rules distilled from production OpsMill repositories: computed (Jinja2) attributes, branch-aware vs branch-agnostic attributes, relationship `on_delete` (`cascade` vs `no-action`), menu-placement strategy, artifact-target extensions (`CoreArtifactTarget`), and object templates (`generate_template`).
+
+### Changed
+
+- `kind: Parent` relationship constraints tightened to match the server-side validator: a Parent relationship must be `optional: false` and `cardinality: one`, and a node may have at most one of them.
+
+### Fixed
+
+- Clarified that `check_definitions` does **not** accept a `query:` field — unlike `generator_definitions`. The query binds from the Python class's `query` attribute, so the conflation was producing repository configs that fail validation.

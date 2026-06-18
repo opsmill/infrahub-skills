@@ -1,0 +1,25 @@
+---
+title: Release 1.2.4
+sidebar_position: 4
+---
+
+<table>
+  <tbody>
+    <tr>
+      <th>Release Number</th>
+      <td>1.2.4</td>
+    </tr>
+    <tr>
+      <th>Release Date</th>
+      <td>May 11th, 2026</td>
+    </tr>
+    <tr>
+      <th>Tag</th>
+      <td>[v1.2.4](https://github.com/opsmill/infrahub-skills/releases/tag/v1.2.4)</td>
+    </tr>
+  </tbody>
+</table>
+
+### Fixed
+
+- [analyzing-data](../skills-reference/analyzing-data.mdx) now requires the user's question to be passed as `args`. The skill runs in a forked context with no view of the parent conversation; without `args` it was falling back to the example question baked into the skill and answering that instead of what the user asked. It now fails loudly with a re-invoke instruction rather than silently answering the wrong question.

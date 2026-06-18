@@ -1,0 +1,25 @@
+---
+title: Release 1.2.3
+sidebar_position: 5
+---
+
+<table>
+  <tbody>
+    <tr>
+      <th>Release Number</th>
+      <td>1.2.3</td>
+    </tr>
+    <tr>
+      <th>Release Date</th>
+      <td>May 11th, 2026</td>
+    </tr>
+    <tr>
+      <th>Tag</th>
+      <td>[v1.2.3](https://github.com/opsmill/infrahub-skills/releases/tag/v1.2.3)</td>
+    </tr>
+  </tbody>
+</table>
+
+### Fixed
+
+- Removed the non-standard `paths:` frontmatter from the six `managing-*` skills. Claude Code's skills loader was treating `paths:` as an unsupported field and silently hiding those skills from the invocable list — `/infrahub-managing-schemas` returned "Unknown skill" after a fresh install. All skills now appear and invoke correctly.

@@ -1,0 +1,43 @@
+---
+title: Release 1.2.5
+sidebar_position: 3
+---
+
+<table>
+  <tbody>
+    <tr>
+      <th>Release Number</th>
+      <td>1.2.5</td>
+    </tr>
+    <tr>
+      <th>Release Date</th>
+      <td>May 26th, 2026</td>
+    </tr>
+    <tr>
+      <th>Tag</th>
+      <td>[v1.2.5](https://github.com/opsmill/infrahub-skills/releases/tag/v1.2.5)</td>
+    </tr>
+  </tbody>
+</table>
+
+## Highlights
+
+### Report bugs and features across the Infrahub ecosystem
+
+- **The problem.** Filing a good Infrahub issue means knowing which of the ecosystem's repositories owns it (main, SDK, Ansible, VS Code, Nornir, Helm, MCP, schema-library, backup, sync, skills), matching each repo's issue template, and not leaking sensitive data from your environment into a public tracker.
+- **What this enables.** The `infrahub-reporting-issues` skill routes a report to the right repository — defaulting to `opsmill/infrahub` when ambiguous, since the main repo re-routes downstream more easily than the reverse — fills the correct template, and runs a deterministic sanitization pass that strips IPs, internal hostnames, tokens, and filesystem paths. It never auto-submits: it stops at a review gate and lets you choose `gh`, MCP, or manual submission.
+- **When you need it.** Any time you hit a bug or have a feature request and want it filed cleanly in the right place without hand-redacting your terminal output. See the [reporting-issues skill](https://github.com/opsmill/infrahub-skills/tree/main/skills/infrahub-reporting-issues).
+
+## Other changes
+
+#### Added
+
+- Documentation of Infrahub schema string-length limits in the schema skill.
+
+#### Changed
+
+- Dropped the stale `CHANGELOG.md`; release-drafter now owns release notes.
+
+#### Fixed
+
+- Typo in the skills update instructions.
