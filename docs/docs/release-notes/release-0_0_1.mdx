@@ -1,6 +1,7 @@
 ---
 title: Release 0.0.1
 sidebar_position: 9
+description: The first release of Infrahub Skills — eight skills that build, query, and audit Infrahub resources from natural language.
 ---
 
 <table>
@@ -8,6 +9,10 @@ sidebar_position: 9
     <tr>
       <th>Release Number</th>
       <td>0.0.1</td>
+    </tr>
+    <tr>
+      <th>Release Type</th>
+      <td>Feature</td>
     </tr>
     <tr>
       <th>Release Date</th>
@@ -20,44 +25,63 @@ sidebar_position: 9
   </tbody>
 </table>
 
-The first release of Infrahub Skills — an open-source skills package that gives an AI coding assistant built-in, best-practice knowledge of Infrahub's data model, conventions, and workflows. It began as a single schema helper and grew, over the work in this release, into eight skills spanning the full development lifecycle. Describe what you want in plain language and the skills produce valid Infrahub resources, instead of the assistant inferring the platform from scratch on every request.
+## Release summary
 
-## Highlights
+Describe a schema, object, check, generator, transform, or menu in plain language and get valid Infrahub resources without first mastering the platform's data model. Infrahub Skills is an open-source skills package for AI coding assistants, and this first release ships eight skills across the build, query, and audit lifecycle.
 
-### Eight skills covering the full Infrahub lifecycle
+### Build Infrahub resources from natural language
 
-- **The problem.** An AI assistant pointed at Infrahub has to guess the platform's conventions on every request — relationship rules, attribute types, naming constraints, registration formats. The guesses surface as schemas that fail `infrahubctl schema check`, checks that never register, or transforms that emit the wrong content type, and you only find out after a round-trip through validation.
-- **What this enables.** One skill per task — [schemas](../skills-reference/managing-schemas.mdx), [objects](../skills-reference/managing-objects.mdx), [checks](../skills-reference/managing-checks.mdx), [generators](../skills-reference/managing-generators.mdx), [transforms](../skills-reference/managing-transforms.mdx), and [menus](../skills-reference/managing-menus.mdx) — each embedding the rules, examples, and references the assistant needs, plus [analyzing-data](../skills-reference/analyzing-data.mdx) for live queries and [auditing-repo](../skills-reference/auditing-repo.mdx) for compliance review. The auditor cross-checks details that span files, such as whether query names line up between your Python and `.infrahub.yml`.
-- **When you need it.** Any time you build Infrahub artifacts with an AI assistant and want output that loads cleanly the first time rather than after several validation round-trips.
+Eight skills cover the Infrahub development lifecycle, one per task, each with the rules, examples, and references for that task.
 
-### Catches the non-obvious mistakes that break a load
+* Generate schemas, objects, checks, generators, transforms, and menus, one skill per task — [managing-schemas](../skills-reference/managing-schemas.mdx), [managing-objects](../skills-reference/managing-objects.mdx), and the rest.
+* Query live data with [analyzing-data](../skills-reference/analyzing-data.mdx), and audit a repository against Infrahub conventions with [auditing-repo](../skills-reference/auditing-repo.mdx), which checks details that span files, such as whether query names match between Python and `.infrahub.yml`.
+* Apply conventions verified against the server: a relationship to a generic needs an explicit `kind:` and `data:` wrapper, `regex` / `min_length` / `max_length` move into a `parameters` block, and generated SDK protocol files are never edited manually.
 
-- **The problem.** The failures that cost the most time aren't syntax slips — they're the conventions you can't guess. A relationship to a *generic* needs an explicit `kind:` and `data:` wrapper in the object file; a bare `location: chicago-1` silently fails to resolve. Attribute names and labels allow 64 characters, not 32. `regex` / `min_length` / `max_length` are deprecated as top-level attribute properties in favor of a `parameters` block. Generated SDK protocol files must never be hand-edited.
-- **What this enables.** Each skill encodes these as rules with side-by-side compliant and non-compliant examples — verified against Infrahub itself, not folklore — so the assistant emits the correct shape on the first attempt.
-- **When you need it.** Populating data across generic relationships, defining constrained attributes, or regenerating protocols after a schema change.
+### Let the right skill activate automatically inside an Infrahub repository
 
-### Progressive disclosure keeps the assistant focused
+Open an Infrahub project and the matching skill activates for the task at hand. Installed as a Claude Code plugin, a session-start hook detects the project automatically; with other tools, the skills are present in the project directory.
 
-- **The problem.** Loading an entire domain manual into the model's context for every request burns the context window and dilutes attention — more to sift through, less room to reason.
-- **What this enables.** A three-level loading model: lightweight metadata decides whether a skill applies, the `SKILL.md` body supplies the workflow (with a per-skill step-by-step `## Workflow` that points at the exact rule to read at each step), and individual rule and reference files load only on demand.
-- **When you need it.** Larger schema or generator tasks where the assistant would otherwise exhaust its context juggling unrelated guidance.
+* A `SessionStart` hook detects an Infrahub project from `.infrahub.yml`, `infrahub.toml`, or a schema file, then points the assistant at the matching skill.
+* Each skill description carries explicit `TRIGGER when:` and `DO NOT TRIGGER when:` patterns, so the matching skill activates for a request.
+* [analyzing-data](../skills-reference/analyzing-data.mdx) and [auditing-repo](../skills-reference/auditing-repo.mdx) run in a forked context, so their large reports run separately from the main conversation.
 
-### Reliable activation with explicit triggers
+### Work on large schema and generator tasks without exhausting context
 
-- **The problem.** Users had to remember to invoke the right skill for each task, and vague descriptions let the wrong skill fire — or none at all.
-- **What this enables.** A `SessionStart` hook detects Infrahub projects (`.infrahub.yml`, `infrahub.toml`, schema files) with zero configuration, and every skill description is written with explicit `TRIGGER when:` / `DO NOT TRIGGER when:` patterns so the right skill activates for the right request. The two highest-output skills — `analyzing-data` and `auditing-repo` — run in a forked context so their large reports don't crowd the main conversation.
-- **When you need it.** Working inside any existing Infrahub repository — the skills activate themselves and stay out of each other's way.
+Only the guidance the current step needs is loaded, leaving room in the context for the work itself.
 
-### Deterministic evaluation harness
+* Skill metadata decides whether a skill applies; the `SKILL.md` body supplies the workflow; rule and reference files load only when a step needs them.
+* Each skill includes a step-by-step `## Workflow` that names the exact rule to read at each step.
 
-- **The problem.** Prose-based guidance rots silently: a refactor can drop a rule with nothing to flag the regression.
-- **What this enables.** A skillgrade eval suite with deterministic Python graders and their own unit tests, so each skill's behavior is pinned by checks that fail when the guidance drifts — including guards against "vacuous pass" bugs where an empty output would otherwise have scored green.
-- **When you need it.** Contributing to, or relying on, the skills — the rules are backed by checks, not just intent.
+## Minor changes
 
-## Other changes
+**Testing**
 
-#### Added
+* A skillgrade evaluation suite with deterministic Python graders checks each skill's behavior, including guards against tests that would pass on empty output.
 
-- Apache 2.0 license and setup guidance for Claude Code, GitHub Copilot, and Cursor.
-- A shared rule guarding generated SDK protocol files, plus `infrahubctl info` connectivity and version checks (with `uv run` / Poetry environment detection) so the assistant validates its work against a live server.
-- CI automation: version auto-bump from PR labels, release-drafter release notes, and a Docusaurus docs build gate.
+**Developer experience**
+
+* A shared rule protects generated SDK protocol files from manual edits.
+* `infrahubctl info` connectivity and version checks (with uv and Poetry environment detection) validate output against a running server.
+* CI automation: version auto-bump from PR labels, release-drafter notes, and a documentation build check.
+
+## Full changelog
+
+### Added
+
+* Eight skills: managing-schemas, managing-objects, managing-checks, managing-generators, managing-transforms, managing-menus, auditing-repo, and analyzing-data ([#2](https://github.com/opsmill/infrahub-skills/pull/2), [#6](https://github.com/opsmill/infrahub-skills/pull/6), [#7](https://github.com/opsmill/infrahub-skills/pull/7)).
+* Project detection via a `SessionStart` hook ([#1](https://github.com/opsmill/infrahub-skills/pull/1)), and the skillgrade evaluation harness ([#13](https://github.com/opsmill/infrahub-skills/pull/13)).
+* Apache 2.0 license, with setup guidance for Claude Code, GitHub Copilot, and Cursor ([#3](https://github.com/opsmill/infrahub-skills/pull/3)).
+* CI automation: auto-bump, release-drafter, and documentation build ([#40](https://github.com/opsmill/infrahub-skills/pull/40)).
+
+See the [full list of merged pull requests](https://github.com/opsmill/infrahub-skills/releases/tag/v0.0.1).
+
+## Skills included
+
+* infrahub-managing-schemas
+* infrahub-managing-objects
+* infrahub-managing-checks
+* infrahub-managing-generators
+* infrahub-managing-transforms
+* infrahub-managing-menus
+* infrahub-auditing-repo
+* infrahub-analyzing-data

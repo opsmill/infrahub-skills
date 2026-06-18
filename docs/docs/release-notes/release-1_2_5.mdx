@@ -1,6 +1,7 @@
 ---
 title: Release 1.2.5
 sidebar_position: 3
+description: Report Infrahub bugs and feature requests with the reporting-issues skill, sanitized and routed automatically.
 ---
 
 <table>
@@ -8,6 +9,10 @@ sidebar_position: 3
     <tr>
       <th>Release Number</th>
       <td>1.2.5</td>
+    </tr>
+    <tr>
+      <th>Release Type</th>
+      <td>Feature</td>
     </tr>
     <tr>
       <th>Release Date</th>
@@ -20,24 +25,46 @@ sidebar_position: 3
   </tbody>
 </table>
 
-## Highlights
+## Release summary
 
-### Report bugs and features across the Infrahub ecosystem
+Report Infrahub bugs and feature requests without first working out which repository owns them or manually redacting your terminal output.
 
-- **The problem.** Filing a good Infrahub issue means knowing which of the ecosystem's repositories owns it (main, SDK, Ansible, VS Code, Nornir, Helm, MCP, schema-library, backup, sync, skills), matching each repo's issue template, and not leaking sensitive data from your environment into a public tracker.
-- **What this enables.** The `infrahub-reporting-issues` skill routes a report to the right repository — defaulting to `opsmill/infrahub` when ambiguous, since the main repo re-routes downstream more easily than the reverse — fills the correct template, and runs a deterministic sanitization pass that strips IPs, internal hostnames, tokens, and filesystem paths. It never auto-submits: it stops at a review gate and lets you choose `gh`, MCP, or manual submission.
-- **When you need it.** Any time you hit a bug or have a feature request and want it filed cleanly in the right place without hand-redacting your terminal output. See the [reporting-issues skill](https://github.com/opsmill/infrahub-skills/tree/main/skills/infrahub-reporting-issues).
+### Report bugs and feature requests across the Infrahub ecosystem
 
-## Other changes
+Report an issue from your AI assistant with the reporting-issues skill, and it is routed to the right repository, filled into that repository's template, and cleared of sensitive data before submission.
 
-#### Added
+* Route a report to the correct repository in the Infrahub ecosystem, defaulting to `opsmill/infrahub` when the target is unclear.
+* Run a deterministic sanitization pass that replaces IPs, internal hostnames, URLs, and filesystem paths, and stops to ask you when it detects a token or database connection string.
+* Stop at a review step instead of submitting automatically — choose `gh`, the MCP server, or manual submission.
 
-- Documentation of Infrahub schema string-length limits in the schema skill.
+## Minor changes
 
-#### Changed
+**Documentation**
 
-- Dropped the stale `CHANGELOG.md`; release-drafter now owns release notes.
+* Infrahub schema string-length limits documented in the schema skill ([#48](https://github.com/opsmill/infrahub-skills/pull/48)).
 
-#### Fixed
+## Full changelog
 
-- Typo in the skills update instructions.
+### Added
+
+* `infrahub-reporting-issues` skill ([#47](https://github.com/opsmill/infrahub-skills/pull/47)).
+
+### Changed
+
+* Dropped the stale `CHANGELOG.md`; release-drafter now owns release notes ([#50](https://github.com/opsmill/infrahub-skills/pull/50)).
+
+### Fixed
+
+* Typo in the skills update instructions ([#51](https://github.com/opsmill/infrahub-skills/pull/51)).
+
+## Skills included
+
+* infrahub-managing-schemas
+* infrahub-managing-objects
+* infrahub-managing-checks
+* infrahub-managing-generators
+* infrahub-managing-transforms
+* infrahub-managing-menus
+* infrahub-auditing-repo
+* infrahub-analyzing-data
+* infrahub-reporting-issues

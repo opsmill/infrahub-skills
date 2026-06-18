@@ -1,6 +1,7 @@
 ---
 title: Release 1.2.7
 sidebar_position: 1
+description: Build generators that reuse query results instead of requesting each related object separately.
 ---
 
 <table>
@@ -8,6 +9,10 @@ sidebar_position: 1
     <tr>
       <th>Release Number</th>
       <td>1.2.7</td>
+    </tr>
+    <tr>
+      <th>Release Type</th>
+      <td>Improvement</td>
     </tr>
     <tr>
       <th>Release Date</th>
@@ -20,6 +25,33 @@ sidebar_position: 1
   </tbody>
 </table>
 
+## Release summary
+
+When you build a generator that works through the results of a query, you can read each related object from the response it already returned instead of sending a separate request for each one. For generators that handle many objects, that means far fewer requests.
+
+### Build generators that reuse query results instead of requesting each object
+
+Build a generator with the managing-generators skill so that, when its query already returns the related objects it needs, the generated code builds them from that response instead of fetching each one again.
+
+* Create related objects from the data already in the query response with `from_graphql`, instead of calling `client.get` once per object.
+* Follow the query-coverage requirement so the response carries everything those objects need: `__typename`, `id`, and every attribute the generator changes.
+* Use the before/after example in [managing-generators](../skills-reference/managing-generators.mdx) to refactor an existing generator.
+
+## Full changelog
+
 ### Added
 
-- A `from_graphql` hydration rule for [managing-generators](../skills-reference/managing-generators.mdx). When a generator's `generate()` loops over query-response edges and re-fetches each peer with `client.get`, it can hydrate `InfrahubNode` objects directly from the GraphQL response instead — collapsing `O(N+1)` round trips to `O(1)`. The rule covers the decision tree, the query-coverage contract (`__typename`, `id`, and every mutated attribute), and a worked before/after refactor.
+* `from_graphql` rule for managing-generators: build related objects from the query response instead of requesting them again ([#58](https://github.com/opsmill/infrahub-skills/pull/58)).
+
+## Skills included
+
+* infrahub-managing-schemas
+* infrahub-managing-objects
+* infrahub-managing-checks
+* infrahub-managing-generators
+* infrahub-managing-transforms
+* infrahub-managing-menus
+* infrahub-auditing-repo
+* infrahub-analyzing-data
+* infrahub-reporting-issues
+* infrahub-collecting-diagnostics

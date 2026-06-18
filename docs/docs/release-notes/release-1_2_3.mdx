@@ -1,6 +1,7 @@
 ---
 title: Release 1.2.3
 sidebar_position: 5
+description: Every managing-* skill appears again after a fresh install; a frontmatter field had hidden six of them.
 ---
 
 <table>
@@ -8,6 +9,10 @@ sidebar_position: 5
     <tr>
       <th>Release Number</th>
       <td>1.2.3</td>
+    </tr>
+    <tr>
+      <th>Release Type</th>
+      <td>Improvement</td>
     </tr>
     <tr>
       <th>Release Date</th>
@@ -20,6 +25,27 @@ sidebar_position: 5
   </tbody>
 </table>
 
+## Release summary
+
+Every `managing-*` skill now appears after a fresh install. A non-standard frontmatter field had hidden six of them from Claude Code's invocable list.
+
+## Bug fixes
+
+* Removed the non-standard `paths:` frontmatter from the six `managing-*` skills. Claude Code's loader treated `paths:` as unsupported and silently hid those skills — `/infrahub-managing-schemas` returned "Unknown skill" after a fresh install. All six now appear and invoke.
+
+## Full changelog
+
 ### Fixed
 
-- Removed the non-standard `paths:` frontmatter from the six `managing-*` skills. Claude Code's skills loader was treating `paths:` as an unsupported field and silently hiding those skills from the invocable list — `/infrahub-managing-schemas` returned "Unknown skill" after a fresh install. All skills now appear and invoke correctly.
+* Removed unsupported `paths:` frontmatter that hid the `managing-*` skills ([#44](https://github.com/opsmill/infrahub-skills/pull/44)).
+
+## Skills included
+
+* infrahub-managing-schemas
+* infrahub-managing-objects
+* infrahub-managing-checks
+* infrahub-managing-generators
+* infrahub-managing-transforms
+* infrahub-managing-menus
+* infrahub-auditing-repo
+* infrahub-analyzing-data
