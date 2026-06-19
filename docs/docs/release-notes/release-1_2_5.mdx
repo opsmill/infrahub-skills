@@ -1,0 +1,70 @@
+---
+title: Release 1.2.5
+sidebar_position: 3
+description: Report Infrahub bugs and feature requests with the reporting-issues skill, sanitized and routed automatically.
+---
+
+<table>
+  <tbody>
+    <tr>
+      <th>Release Number</th>
+      <td>1.2.5</td>
+    </tr>
+    <tr>
+      <th>Release Type</th>
+      <td>Feature</td>
+    </tr>
+    <tr>
+      <th>Release Date</th>
+      <td>May 26th, 2026</td>
+    </tr>
+    <tr>
+      <th>Tag</th>
+      <td>[v1.2.5](https://github.com/opsmill/infrahub-skills/releases/tag/v1.2.5)</td>
+    </tr>
+  </tbody>
+</table>
+
+## Release summary
+
+You can now report Infrahub bugs and feature requests without first working out which repository owns them or manually redacting your terminal output.
+
+### Report bugs and feature requests across the Infrahub ecosystem
+
+Report an issue from your AI assistant with the reporting-issues skill, and it is routed to the right repository, filled into that repository's template, and cleared of sensitive data before submission.
+
+* Route a report to the correct repository in the Infrahub ecosystem, defaulting to `opsmill/infrahub` when the target is unclear.
+* Run a deterministic sanitization pass that replaces IPs, internal hostnames, URLs, and filesystem paths, and stops to ask you when it detects a token or database connection string.
+* Stop at a review step instead of submitting automatically — choose `gh`, the MCP server, or manual submission.
+
+## Minor changes
+
+**Documentation**
+
+* Infrahub schema string-length limits documented in the schema skill ([#48](https://github.com/opsmill/infrahub-skills/pull/48)).
+
+## Full changelog
+
+### Added
+
+* `infrahub-reporting-issues` skill ([#47](https://github.com/opsmill/infrahub-skills/pull/47)).
+
+### Changed
+
+* Dropped the stale `CHANGELOG.md`; release-drafter now owns release notes ([#50](https://github.com/opsmill/infrahub-skills/pull/50)).
+
+### Fixed
+
+* Typo in the skills update instructions ([#51](https://github.com/opsmill/infrahub-skills/pull/51)).
+
+## Skills included
+
+* infrahub-managing-schemas
+* infrahub-managing-objects
+* infrahub-managing-checks
+* infrahub-managing-generators
+* infrahub-managing-transforms
+* infrahub-managing-menus
+* infrahub-auditing-repo
+* infrahub-analyzing-data
+* infrahub-reporting-issues

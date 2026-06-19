@@ -1,0 +1,87 @@
+---
+title: Release 0.0.1
+sidebar_position: 9
+description: The first release of Infrahub Skills — eight skills that build, query, and audit Infrahub resources from natural language.
+---
+
+<table>
+  <tbody>
+    <tr>
+      <th>Release Number</th>
+      <td>0.0.1</td>
+    </tr>
+    <tr>
+      <th>Release Type</th>
+      <td>Feature</td>
+    </tr>
+    <tr>
+      <th>Release Date</th>
+      <td>April 9th, 2026</td>
+    </tr>
+    <tr>
+      <th>Tag</th>
+      <td>[v0.0.1](https://github.com/opsmill/infrahub-skills/releases/tag/v0.0.1)</td>
+    </tr>
+  </tbody>
+</table>
+
+## Release summary
+
+Describe a schema, object, check, generator, transform, or menu in plain language and get valid Infrahub resources without first mastering the platform's data model. Infrahub Skills is an open-source skills package for AI coding assistants, and this first release ships eight skills across the build, query, and audit lifecycle.
+
+### Build Infrahub resources from natural language
+
+Eight skills cover the Infrahub development lifecycle, one per task, each with the rules, examples, and references for that task.
+
+* Generate schemas, objects, checks, generators, transforms, and menus, one skill per task — [managing-schemas](../skills-reference/managing-schemas.mdx), [managing-objects](../skills-reference/managing-objects.mdx), and the rest.
+* Query live data with [analyzing-data](../skills-reference/analyzing-data.mdx), and audit a repository against Infrahub conventions with [auditing-repo](../skills-reference/auditing-repo.mdx), which checks details that span files, such as whether query names match between Python and `.infrahub.yml`.
+* Apply conventions verified against the server: a relationship to a generic needs an explicit `kind:` and `data:` wrapper, `regex` / `min_length` / `max_length` move into a `parameters` block, and generated SDK protocol files are never edited manually.
+
+### Let the right skill activate automatically inside an Infrahub repository
+
+Open an Infrahub project and the matching skill activates for the task at hand. Installed as a Claude Code plugin, a session-start hook detects the project automatically; with other tools, the skills are present in the project directory.
+
+* A `SessionStart` hook detects an Infrahub project from `.infrahub.yml`, `infrahub.toml`, or a schema file, then points the assistant at the matching skill.
+* Each skill description carries explicit `TRIGGER when:` and `DO NOT TRIGGER when:` patterns, so the matching skill activates for a request.
+* [analyzing-data](../skills-reference/analyzing-data.mdx) and [auditing-repo](../skills-reference/auditing-repo.mdx) run in a forked context, so their large reports run separately from the main conversation.
+
+### Work on large schema and generator tasks without exhausting context
+
+Only the guidance the current step needs is loaded, leaving room in the context for the work itself.
+
+* Skill metadata decides whether a skill applies; the `SKILL.md` body supplies the workflow; rule and reference files load only when a step needs them.
+* Each skill includes a step-by-step `## Workflow` that names the exact rule to read at each step.
+
+## Minor changes
+
+**Testing**
+
+* A skillgrade evaluation suite with deterministic Python graders checks each skill's behavior, including guards against tests that would pass on empty output.
+
+**Developer experience**
+
+* A shared rule protects generated SDK protocol files from manual edits.
+* `infrahubctl info` connectivity and version checks (with uv and Poetry environment detection) validate output against a running server.
+* CI automation: version auto-bump from PR labels, release-drafter notes, and a documentation build check.
+
+## Full changelog
+
+### Added
+
+* Eight skills: managing-schemas, managing-objects, managing-checks, managing-generators, managing-transforms, managing-menus, auditing-repo, and analyzing-data ([#2](https://github.com/opsmill/infrahub-skills/pull/2), [#6](https://github.com/opsmill/infrahub-skills/pull/6), [#7](https://github.com/opsmill/infrahub-skills/pull/7)).
+* Project detection via a `SessionStart` hook ([#1](https://github.com/opsmill/infrahub-skills/pull/1)), and the skillgrade evaluation harness ([#13](https://github.com/opsmill/infrahub-skills/pull/13)).
+* Apache 2.0 license, with setup guidance for Claude Code, GitHub Copilot, and Cursor ([#3](https://github.com/opsmill/infrahub-skills/pull/3)).
+* CI automation: auto-bump, release-drafter, and documentation build ([#40](https://github.com/opsmill/infrahub-skills/pull/40)).
+
+See the [full list of merged pull requests](https://github.com/opsmill/infrahub-skills/releases/tag/v0.0.1).
+
+## Skills included
+
+* infrahub-managing-schemas
+* infrahub-managing-objects
+* infrahub-managing-checks
+* infrahub-managing-generators
+* infrahub-managing-transforms
+* infrahub-managing-menus
+* infrahub-auditing-repo
+* infrahub-analyzing-data

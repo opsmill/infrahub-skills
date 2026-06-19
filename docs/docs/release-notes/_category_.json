@@ -1,0 +1,11 @@
+{
+  "label": "Release Notes",
+  "position": 6,
+  "collapsed": true,
+  "link": {
+    "type": "generated-index",
+    "title": "Release Notes",
+    "slug": "/release-notes",
+    "description": "What changed in each release of Infrahub Skills, and what is different about your workflow after upgrading. Newest first."
+  }
+}

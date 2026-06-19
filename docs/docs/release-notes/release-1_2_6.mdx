@@ -1,0 +1,98 @@
+---
+title: Release 1.2.6
+sidebar_position: 2
+description: A diagnostics skill, CoreFileObject schema support, and a branch-first default for every data change.
+---
+
+<table>
+  <tbody>
+    <tr>
+      <th>Release Number</th>
+      <td>1.2.6</td>
+    </tr>
+    <tr>
+      <th>Release Type</th>
+      <td>Feature</td>
+    </tr>
+    <tr>
+      <th>Release Date</th>
+      <td>June 15th, 2026</td>
+    </tr>
+    <tr>
+      <th>Tag</th>
+      <td>[v1.2.6](https://github.com/opsmill/infrahub-skills/releases/tag/v1.2.6)</td>
+    </tr>
+  </tbody>
+</table>
+
+## Release summary
+
+After upgrading, data changes target a dedicated branch by default, you can model file attachments with `CoreFileObject`, and you can collect a redacted diagnostic bundle to share when you escalate an issue to OpsMill.
+
+### Keep data changes on a branch you can review or roll back
+
+Data changes now target a dedicated branch by default instead of the default branch, so you can review them through a proposed change or discard the branch instead of reverting each object manually.
+
+* Direct every write path — `infrahubctl object load`, the MCP `infrahub_create` / `infrahub_update` / `infrahub_delete` tools, `infrahubctl generator run`, and the Python SDK — to a dedicated branch instead of the default branch (`main` by convention, configurable per deployment).
+* A shared rule in `infrahub-common` covers when a direct write to the default branch is and is not appropriate, so the assistant defaults to a branch even when a request asks to write directly.
+
+### Model file attachments with `CoreFileObject`
+
+Store documents and binary files — diagrams, certificates, contracts, rack photos — on Infrahub nodes with the managing-schemas skill, using the built-in `CoreFileObject` generic instead of a text attribute that holds a URL or path.
+
+* Make a node a file-bearing entity by inheriting `CoreFileObject`; Infrahub adds a `file:` argument to the node's create, update, and upsert mutations so a file can be uploaded against it.
+* An audit rule flags reserved-attribute collisions (`file_name`, `file_size`, `file_type`, `checksum`, `storage_id`) and the antipattern of storing a file as a URL or path in a `kind: Text` attribute.
+
+### Collect a redacted diagnostic bundle to share with OpsMill
+
+Assemble a redacted, manifest-described diagnostic bundle from a local deployment with the infrahub-collecting-diagnostics skill when you escalate an issue to OpsMill.
+
+* Collect from Docker Compose or Kubernetes deployments, including multi-replica setups where one replica's missing logs can hide a bug, and read instance state through `infrahubctl` only.
+* Apply tiered redaction before producing the bundle, and describe its contents in a `manifest.yml`.
+
+## Bug fixes
+
+* Fixed integration-layer gaps found in a live build: union-typed GraphQL queries missing inline fragments, relationship references passed as bare strings or mis-packed lists, natural-key collisions on create, and artifact regeneration treated as synchronous (managing-generators, managing-transforms).
+* Corrected owner and source metadata semantics: source records lineage only, while `owner` together with `is_protected` controls write access.
+* Verified content-type allowlists, `extensions:` scope, `__typename` resolution, and the Jinja2 filter sandbox against Infrahub source or a running server.
+
+## Minor changes
+
+**Documentation**
+
+* Resources testing-framework documentation added to the check and transform skills.
+
+**Developer experience**
+
+* "Information Priority" guidance moved to a shared rule inherited by every skill.
+
+## Full changelog
+
+### Added
+
+* `infrahub-collecting-diagnostics` skill ([#54](https://github.com/opsmill/infrahub-skills/pull/54)).
+* `CoreFileObject` schema and audit rules ([#55](https://github.com/opsmill/infrahub-skills/pull/55)).
+
+### Changed
+
+* Branch-default across object loads, MCP CRUD, generators, and the SDK ([#56](https://github.com/opsmill/infrahub-skills/pull/56)).
+* "Information Priority" moved to a shared rule ([#57](https://github.com/opsmill/infrahub-skills/pull/57)).
+
+### Fixed
+
+* Integration-layer fixes from a live build ([#49](https://github.com/opsmill/infrahub-skills/pull/49), [#53](https://github.com/opsmill/infrahub-skills/pull/53)).
+* Owner and source metadata semantics corrected ([#27](https://github.com/opsmill/infrahub-skills/pull/27)).
+* Testing-framework documentation added to the check and transform skills ([#18](https://github.com/opsmill/infrahub-skills/pull/18)).
+
+## Skills included
+
+* infrahub-managing-schemas
+* infrahub-managing-objects
+* infrahub-managing-checks
+* infrahub-managing-generators
+* infrahub-managing-transforms
+* infrahub-managing-menus
+* infrahub-auditing-repo
+* infrahub-analyzing-data
+* infrahub-reporting-issues
+* infrahub-collecting-diagnostics

@@ -1,6 +1,8 @@
 agent
 Alibaba
+allowlists
 Ansible
+antipattern
 APIs
 append_git_suffix
 artifact_definitions
@@ -65,6 +67,7 @@ fanout
 file_path
 Fortinet
 FQDNs
+frontmatter
 generator_definition
 generator_definitions
 github
@@ -75,6 +78,7 @@ greymatter
 hfid
 hfids
 hostname
+hostnames
 http
 https
 httpx
@@ -84,6 +88,7 @@ include_in_menu
 Infrahub
 Infrahub's
 infrahubctl
+invocable
 IP
 IPAddress
 IPs
@@ -137,8 +142,10 @@ repos
 REST
 Reusability
 reusability
+sanitization
 schema_mapping
 sdk
+skillgrade
 snake_case
 ssl
 startup-config

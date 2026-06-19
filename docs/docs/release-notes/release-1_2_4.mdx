@@ -1,0 +1,51 @@
+---
+title: Release 1.2.4
+sidebar_position: 4
+description: analyzing-data now answers the question you asked instead of a built-in example when none is passed.
+---
+
+<table>
+  <tbody>
+    <tr>
+      <th>Release Number</th>
+      <td>1.2.4</td>
+    </tr>
+    <tr>
+      <th>Release Type</th>
+      <td>Improvement</td>
+    </tr>
+    <tr>
+      <th>Release Date</th>
+      <td>May 11th, 2026</td>
+    </tr>
+    <tr>
+      <th>Tag</th>
+      <td>[v1.2.4](https://github.com/opsmill/infrahub-skills/releases/tag/v1.2.4)</td>
+    </tr>
+  </tbody>
+</table>
+
+## Release summary
+
+Ask analyzing-data a question and get an answer to that question. When the question was omitted, it had answered a built-in example instead.
+
+## Bug fixes
+
+* [analyzing-data](../skills-reference/analyzing-data.mdx) now requires the question as `args`. It runs in a forked context with no view of the parent conversation; without `args` it had used the example question built into the skill. It now stops with a re-invoke instruction instead of answering a different question.
+
+## Full changelog
+
+### Fixed
+
+* Require the question as `args` for analyzing-data ([#45](https://github.com/opsmill/infrahub-skills/pull/45)).
+
+## Skills included
+
+* infrahub-managing-schemas
+* infrahub-managing-objects
+* infrahub-managing-checks
+* infrahub-managing-generators
+* infrahub-managing-transforms
+* infrahub-managing-menus
+* infrahub-auditing-repo
+* infrahub-analyzing-data

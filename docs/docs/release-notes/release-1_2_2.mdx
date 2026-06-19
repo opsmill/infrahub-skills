@@ -1,0 +1,70 @@
+---
+title: Release 1.2.2
+sidebar_position: 6
+description: New managing-schemas rules for production patterns, plus relationship and check-registration fixes.
+---
+
+<table>
+  <tbody>
+    <tr>
+      <th>Release Number</th>
+      <td>1.2.2</td>
+    </tr>
+    <tr>
+      <th>Release Type</th>
+      <td>Improvement</td>
+    </tr>
+    <tr>
+      <th>Release Date</th>
+      <td>May 11th, 2026</td>
+    </tr>
+    <tr>
+      <th>Tag</th>
+      <td>[v1.2.2](https://github.com/opsmill/infrahub-skills/releases/tag/v1.2.2)</td>
+    </tr>
+  </tbody>
+</table>
+
+## Release summary
+
+Model schema patterns common in production OpsMill repositories so they pass Infrahub's validators on the first load. You can now express constructs that often fail validation — computed attributes, branch behavior, delete handling, menu placement, artifact targets, and object templates — and define relationships and register checks the way the server-side validator expects.
+
+### Model schema patterns common in production repositories
+
+When you model a schema with one of these constructs, you no longer have to infer the shape Infrahub expects — you get it from the managing-schemas skill, with compliant and non-compliant examples.
+
+* Define an attribute whose value is computed from other fields with a Jinja2 expression (`computed_attribute`, paired with `read_only: true`), instead of storing it directly.
+* Mark an attribute `branch: agnostic` so its value applies across every branch, or leave it branch-aware (the default) so changes stay scoped to a branch until merge.
+* Set a relationship's `on_delete` to `cascade` or `no-action` to control whether deleting a node also deletes its related nodes.
+* Control where a node appears in the sidebar with `menu_placement`, instead of relying on the default position.
+* Extend `CoreArtifactTarget` so a node can be rendered against by artifact definitions, and set `generate_template: true` to create nodes from a reusable template.
+* Define a `kind: Parent` relationship as `optional: false` and `cardinality: one`, with at most one per node, so it matches the server-side validator.
+
+## Bug fixes
+
+* `check_definitions` does not accept a `query:` field, unlike `generator_definitions`. The query binds from the Python class's `query` attribute, which must match a `name` under the top-level `queries:` section; the configuration model forbids extra keys, so a stray `query:` makes the repository configuration fail validation.
+
+## Full changelog
+
+### Added
+
+* Six schema rules from production repositories: computed attributes, branch behavior, relationship `on_delete`, menu placement, `CoreArtifactTarget`, and object templates ([#41](https://github.com/opsmill/infrahub-skills/pull/41)).
+
+### Changed
+
+* `kind: Parent` constraints tightened to match the server-side validator ([#41](https://github.com/opsmill/infrahub-skills/pull/41)).
+
+### Fixed
+
+* Clarified that `check_definitions` has no `query:` field ([#41](https://github.com/opsmill/infrahub-skills/pull/41)).
+
+## Skills included
+
+* infrahub-managing-schemas
+* infrahub-managing-objects
+* infrahub-managing-checks
+* infrahub-managing-generators
+* infrahub-managing-transforms
+* infrahub-managing-menus
+* infrahub-auditing-repo
+* infrahub-analyzing-data
