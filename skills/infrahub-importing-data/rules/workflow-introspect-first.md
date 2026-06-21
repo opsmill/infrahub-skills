@@ -38,6 +38,18 @@ trade-off:
 | `/api/schema` REST | live, branch-aware | The server is reachable but `infrahubctl` is not configured locally | Plain HTTP; useful in CI / containers |
 | Local `schemas/*.yml` | may lag deployed state | No server reachable at all | Last resort; step 11 server validate catches divergence |
 
+### Before introspecting
+
+MCP, `infrahubctl schema export`, and `/api/schema`
+all need the server reachable. Confirm with
+`infrahubctl info` before trying the live sources —
+see
+[../../infrahub-common/rules/connectivity-server-check.md](../../infrahub-common/rules/connectivity-server-check.md).
+When invoking `infrahubctl`, use the project's
+Python environment prefix (`uv run …`,
+`poetry run …`, or direct PATH); see
+[../../infrahub-common/rules/connectivity-python-environment.md](../../infrahub-common/rules/connectivity-python-environment.md).
+
 ### How to introspect
 
 Try in order; stop at the first source that returns

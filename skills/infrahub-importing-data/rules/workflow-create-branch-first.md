@@ -21,6 +21,17 @@ Create the branch AFTER the self-check so a
 shape-error emission doesn't leave an orphan branch
 on the server.
 
+### Before running these commands
+
+- Confirm the server is reachable
+  (`infrahubctl info`). See
+  [../../infrahub-common/rules/connectivity-server-check.md](../../infrahub-common/rules/connectivity-server-check.md).
+- Use the project's Python environment when
+  invoking `infrahubctl` (`uv run …`, `poetry run …`,
+  or direct PATH — detect once and use for all
+  commands below). See
+  [../../infrahub-common/rules/connectivity-python-environment.md](../../infrahub-common/rules/connectivity-python-environment.md).
+
 ### The commands
 
 ```bash
@@ -41,8 +52,9 @@ Never load to the default branch. Object load is
 not transactional across files — a partial failure
 leaves the branch in a mixed state. On a dedicated
 branch cleanup is one `branch delete`; on the
-default branch it's per-object cleanup. See
-[../../infrahub-managing-objects/rules/workflow-branch-first.md](../../infrahub-managing-objects/rules/workflow-branch-first.md).
+default branch it's per-object cleanup. The shared
+branch-first rule is
+[../../infrahub-common/rules/workflow-branch-for-crud.md](../../infrahub-common/rules/workflow-branch-for-crud.md).
 
 ### Common mistakes
 

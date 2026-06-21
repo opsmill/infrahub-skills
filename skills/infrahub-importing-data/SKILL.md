@@ -310,3 +310,11 @@ load-bearing — earlier steps gate later ones.
 - **[../infrahub-common/rules/workflow-branch-for-crud.md](../infrahub-common/rules/workflow-branch-for-crud.md)**
   — shared branch-first rule that both schema and
   object writes inherit from
+- **[../infrahub-common/rules/connectivity-server-check.md](../infrahub-common/rules/connectivity-server-check.md)**
+  — verify the server is reachable with `infrahubctl
+  info` before any server-dependent command in the
+  workflow
+- **[../infrahub-common/rules/connectivity-python-environment.md](../infrahub-common/rules/connectivity-python-environment.md)**
+  — detect the project's Python env prefix
+  (`uv run` / `poetry run`) for all `infrahubctl`
+  invocations
