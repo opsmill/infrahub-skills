@@ -81,6 +81,7 @@ spec:
 ```
 
 When to pick this:
+
 - Children are referenced by no other kind.
 - Their lifecycle is bound to the parent (delete
   parent ⇒ delete children).
@@ -103,6 +104,7 @@ output_dir/
 ```
 
 When to pick this:
+
 - The child kind shows up as a reference target
   elsewhere in the load (or in existing data).
 - The schema declares Attribute-kind relationships

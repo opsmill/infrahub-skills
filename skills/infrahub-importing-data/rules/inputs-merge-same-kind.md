@@ -70,6 +70,7 @@ of that contract.
      b) Use the EU value (description = "Network vendor (EU)")
      c) Inspect both — they differ on more than name; this may be two distinct objects
    ```
+
 4. **Emit one numbered file** named after the kind,
    not after any single input.
 
