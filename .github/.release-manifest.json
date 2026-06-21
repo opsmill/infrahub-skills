@@ -10,6 +10,7 @@
     "infrahub-auditing-repo",
     "infrahub-analyzing-data",
     "infrahub-reporting-issues",
-    "infrahub-collecting-diagnostics"
+    "infrahub-collecting-diagnostics",
+    "infrahub-importing-data"
   ]
 }

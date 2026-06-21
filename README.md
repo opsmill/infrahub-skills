@@ -48,6 +48,7 @@ For targeted changes, skip the ceremony. Describe what you want and the agent ha
 - *"Add a `contract_start_date` attribute to `InfraCircuit`"* — the agent uses **managing-schemas**, applies naming conventions, and updates the schema file.
 - *"Create a check that validates every device has a primary IP"* — the agent uses **managing-checks**, writes the Python class and GraphQL query, and registers it in `.infrahub.yml`.
 - *"Add a menu section for IP address management"* — the agent uses **managing-menus** and produces the YAML with correct icon references and hierarchy.
+- *"Import this `inventory.csv` into Infrahub"* — the agent uses **importing-data**, introspects the live schema, batches every ambiguity into one interview, and loads the result on a fresh branch.
 
 This is the fastest path for well-scoped work: adding attributes, writing a check, populating objects, creating a transform. No planning step needed. It's also how most people start — install the skills, describe what you need, and iterate from there.
 
@@ -108,6 +109,7 @@ A team already running Infrahub who needs to continue extending it — adding sc
 | **auditing-repo** | Audit your repository against Infrahub best practices |
 | **reporting-issues** | Route a bug or feature request to the right Infrahub-ecosystem repo (SDK, Ansible, VS Code, MCP, etc.) and prepare a sanitized draft for review |
 | **collecting-diagnostics** | When Infrahub is misbehaving, collect logs, config, branch state, and version info into a redacted local bundle ready to hand to OpsMill support |
+| **importing-data** | Convert CSV/TSV inputs into Infrahub object YAML, validate, and load onto a fresh branch |
 
 Each skill lives in `skills/infrahub-<name>/` with a `SKILL.md` entry point, reference docs, examples, and modular rules. Shared references (GraphQL patterns, `.infrahub.yml` format, git integration) are in `skills/infrahub-common/`. Skills use gerund-form names following the [Agent Skills best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
 
@@ -212,7 +214,8 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 │   ├── infrahub-analyzing-data/    # Live data analysis (MCP)
 │   ├── infrahub-auditing-repo/     # Best-practice audits
 │   ├── infrahub-reporting-issues/  # Ecosystem issue reporting
-│   └── infrahub-collecting-diagnostics/ # Diagnostic-bundle collection for support hand-off
+│   ├── infrahub-collecting-diagnostics/ # Diagnostic-bundle collection for support hand-off
+│   └── infrahub-importing-data/    # CSV/TSV → Infrahub objects
 ├── CLAUDE.md
 ├── README.md
 └── LICENSE                      # Apache 2.0

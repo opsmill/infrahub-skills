@@ -1,0 +1,260 @@
+{
+  "skill_name": "infrahub-importing-data",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have a single CSV file `manufacturers.csv` with the following columns\nand rows:\n\n    name,description,country\n    Dell,Server and storage vendor,US\n    Juniper,Network equipment,US\n    Arista,Network equipment,US\n\nThe schema defines `OrganizationManufacturer` with Text attributes `name`,\n`description`, and `country`, and `human_friendly_id: [name__value]`. The\nschema is fixed \u2014 do not propose changes to it.\n\nConvert the CSV to Infrahub object YAML and save the emitted file(s) under\n`./output_dir/` (create the directory). Do not load anything against a\nserver.",
+      "expected_output": "A directory ./output_dir/ containing at least one YAML file where every document carries the four envelope fields (apiVersion: infrahub.app/v1, kind: Object, spec.kind: OrganizationManufacturer, spec.data as a list of rows).",
+      "files": [],
+      "expectations": [
+        "Every emitted YAML document has apiVersion infrahub.app/v1",
+        "Every emitted YAML document has kind Object",
+        "Every emitted YAML document has spec.kind set to OrganizationManufacturer",
+        "Every emitted YAML document has spec.data as a list of mapping rows"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I have three CSVs that reference each other:\n\n    # manufacturers.csv\n    name,country\n    Cisco,US\n    Arista,US\n\n    # device_types.csv\n    name,manufacturer\n    c9300-48,Cisco\n    7050x-32,Arista\n\n    # devices.csv\n    name,device_type,site\n    spine-01,7050x-32,par-1\n    leaf-01,c9300-48,par-1\n\nThe schema declares OrganizationManufacturer, DcimDeviceType, DcimDevice,\nand LocationSite \u2014 each with `human_friendly_id: [name__value]`. The\nschema is fixed.\n\nEmit Infrahub object YAML under `./output_dir/`. Make sure files load in\nthe right order against `infrahubctl object load`.",
+      "expected_output": "A directory ./output_dir/ where every emitted YAML file uses an NN_ numeric prefix in its filename, and where each kind is produced by exactly one file so the load order is unambiguous.",
+      "files": [],
+      "expectations": [
+        "Every emitted YAML filename starts with an NN_ numeric prefix",
+        "Manufacturers / device types / sites load before devices",
+        "Each kind is emitted by exactly one file",
+        "Envelope (apiVersion, kind: Object, spec.kind, spec.data) is correct"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "load-order-numbering",
+          "check": "Every emitted file uses an NN_ numeric prefix and each kind is produced by exactly one file"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I have `devices.csv` with display-label values for a dropdown attribute:\n\n    name,role,status\n    spine-01,spine,Active\n    spine-02,spine,Maintenance\n    leaf-01,leaf,Active\n    leaf-02,leaf,Retired\n\nThe schema's `DcimDevice.status` is a Dropdown with choices declared as:\n\n    status:\n      kind: Dropdown\n      choices:\n        - name: active\n          label: Active\n        - name: maintenance\n          label: Maintenance\n        - name: retired\n          label: Retired\n\nDcimDevice has `human_friendly_id: [name__value]`. The schema is fixed.\n\nEmit Infrahub object YAML to `./output_dir/`.",
+      "expected_output": "A directory ./output_dir/ where every emitted DcimDevice row sets `status` to a choice name (e.g., `active`), never to a label like `Active` \u2014 the load would otherwise be rejected with `'Active' is not a valid choice for status`.",
+      "files": [],
+      "expectations": [
+        "Every status value uses a Dropdown choice `name` (active / maintenance / retired)",
+        "No status value uses a Dropdown label (Active / Maintenance / Retired)",
+        "Envelope is correct on every emitted doc"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "dropdown-names",
+          "check": "DcimDevice.status uses the choice name (active / maintenance / retired), never the display label"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "I have two CSV files referencing each other:\n\n    # rooms.csv\n    site_shortname,name,floor\n    par,server-room-1,3\n    par,server-room-2,3\n\n    # racks.csv\n    name,room,site_shortname,units\n    rack-01,server-room-1,par,42\n    rack-02,server-room-2,par,42\n\nThe schema declares:\n\n    - DcimRoom with human_friendly_id: [site__shortname__value, name__value]\n      (a two-element HFID)\n    - DcimRack with human_friendly_id: [name__value] and a relationship\n      `room` peering DcimRoom\n\nThe schema is fixed. Emit Infrahub object YAML to `./output_dir/` and make\nsure the relationship references match each target's HFID arity.",
+      "expected_output": "A directory ./output_dir/ where the DcimRack rows reference each room via a two-element list HFID (matching DcimRoom's HFID length), and any reference to a single-element-HFID kind (if present) is a scalar string.",
+      "files": [],
+      "expectations": [
+        "DcimRack `room` reference is a two-element list HFID (matching DcimRoom)",
+        "No relationship reference is over-packed for a single-element HFID target",
+        "Envelope is correct on every emitted doc"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "hfid-reference-shape",
+          "check": "Single-element HFID targets receive scalar references; multi-element HFID targets receive a list of the correct length"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "I have `devices_with_interfaces.csv` where the device columns repeat\nper interface:\n\n    device_name,device_role,interface_name,interface_role,interface_status\n    spine-01,spine,Ethernet1,uplink,active\n    spine-01,spine,Ethernet2,uplink,active\n    leaf-01,leaf,Ethernet1,uplink,active\n    leaf-01,leaf,Ethernet2,server,active\n\nThe schema declares DcimDevice with a Component relationship `interfaces`\nwhose peer is the generic `InterfacePhysical`. The matching Parent\nrelationship is on the child. DcimDevice has `human_friendly_id:\n[name__value]`. The schema is fixed.\n\nEmit Infrahub object YAML to `./output_dir/`. Group interfaces under their\nowning device.",
+      "expected_output": "A directory ./output_dir/ where the interfaces relationship is emitted as a mapping with both `kind: InterfacePhysical` and `data: [...]`, NOT as a bare list of dicts (the loader can't pick a concrete child schema without the kind wrapper when the peer is a generic).",
+      "files": [],
+      "expectations": [
+        "The `interfaces` relationship is emitted as a {kind, data} mapping",
+        "The wrapper includes `kind: InterfacePhysical` so the generic peer resolves",
+        "The wrapper's `data` is a list of interface row dicts",
+        "Envelope is correct on every emitted doc"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "component-children-shape",
+          "check": "Component children use {kind, data: [...]} wrapper mapping, not bare list of dicts"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "I have `interfaces.csv` for a single device, with 48 contiguous\ninterface names all sharing the same role and status:\n\n    device_name,interface_name,interface_role,interface_status\n    leaf-01,eth0,server,active\n    leaf-01,eth1,server,active\n    leaf-01,eth2,server,active\n    ... (continues identically) ...\n    leaf-01,eth47,server,active\n\nThe schema declares DcimDevice with a Component relationship `interfaces`\npeering `InterfacePhysical`. DcimDevice has `human_friendly_id:\n[name__value]`. The schema is fixed.\n\nEmit Infrahub object YAML to `./output_dir/`. Use the loader's\nrange-expansion feature where appropriate \u2014 emitting 48 separate rows is\nnot the right shape.",
+      "expected_output": "A directory ./output_dir/ where the 48 interface rows are collapsed into a single row with a bracket-range name (e.g., `eth[0-47]`) inside the interfaces children block, and where the enclosing block sets `parameters.expand_range: true` so the loader expands the range instead of creating one literal-named interface.",
+      "files": [],
+      "expectations": [
+        "The 48 interface rows are collapsed to a bracket-range name (e.g., eth[0-47])",
+        "The interfaces block sets parameters.expand_range true",
+        "Envelope is correct on every emitted doc"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "range-expansion",
+          "check": "Any bracket-range child name is accompanied by parameters.expand_range: true on the enclosing relationship block"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "I have `devices.csv` with an extra `gpu_count` column the schema\ndoes not declare:\n\n    name,role,status,gpu_count\n    spine-01,spine,active,0\n    gpu-rig-01,gpu,active,8\n    gpu-rig-02,gpu,active,8\n\nThe DcimDevice schema declares `name`, `role`, and `status` only \u2014 no\n`gpu_count` attribute. The schema is fixed and I have not approved any\nschema change.\n\nEmit whatever correct Infrahub object YAML you can to `./output_dir/`. Do\nNOT propose or write any schema changes; the skill fails closed on\nunmapped columns.",
+      "expected_output": "A directory ./output_dir/ that contains no schema documents (no file with top-level `version: \"1.0\"` plus `nodes:` / `generics:`), and nothing under a `schemas/` sub-path of the output dir. The skill should either emit partial object YAML (omitting the unmapped column) with a note about the unmapped `gpu_count`, or stop emission entirely and explain \u2014 but it must never write a schema mutation.",
+      "files": [],
+      "expectations": [
+        "No file in ./output_dir/ is a schema document (version 1.0 + nodes / generics)",
+        "No file lives under a schemas/ sub-path of ./output_dir/",
+        "Envelope is correct on any object YAML that is emitted"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "no-schema-mutation",
+          "check": "Output dir contains no schema document and no schemas/ sub-path"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "I have `devices.csv` with a mix of attribute types whose values arrive as CSV strings:\n\n    name,is_managed,gpu_count,commissioned_at,metadata\n    spine-01,Yes,8,2024-01-15,\"{\"\"vlan\"\": 100, \"\"tagged\"\": true}\"\n    spine-02,No,0,2024-02-01,\"{\"\"vlan\"\": 200, \"\"tagged\"\": false}\"\n\nThe DcimDevice schema declares `name` (Text, `human_friendly_id: [name__value]`),\n`is_managed` (Boolean), `gpu_count` (Number), `commissioned_at` (DateTime), and\n`metadata` (JSON). The schema is fixed.\n\nEmit Infrahub object YAML to `./output_dir/`.",
+      "expected_output": "A directory ./output_dir/ where Boolean cells emit YAML `true`/`false`, Number cells emit integers, DateTime cells emit ISO-8601 strings, and JSON cells emit parsed mappings \u2014 never the raw CSV string forms.",
+      "files": [],
+      "expectations": [
+        "Boolean cells (Yes/No) emit as YAML booleans true/false",
+        "Number cells emit as YAML integers (not numeric strings)",
+        "DateTime cells emit as ISO-8601 strings",
+        "JSON cells emit as parsed YAML mappings, not encoded strings",
+        "Envelope is correct on every emitted doc"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "value-coercion",
+          "check": "Boolean / Number / DateTime / JSON attributes use native YAML types, not CSV string pass-through"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "I have `manufacturers.csv` with optional attributes left blank in some rows:\n\n    name,description,country\n    Dell,Server vendor,US\n    Juniper,,US\n    Arista,,\n\nThe OrganizationManufacturer schema declares `name` (Text,\n`optional: false`, `human_friendly_id: [name__value]`), `description`\n(Text, `optional: true`), and `country` (Text, `optional: true`). The\nschema is fixed.\n\nEmit Infrahub object YAML to `./output_dir/`.",
+      "expected_output": "A directory ./output_dir/ where blank optional attributes are omitted entirely from the row's mapping \u2014 never emitted as `\"\"` and never as YAML `null`.",
+      "files": [],
+      "expectations": [
+        "Blank cells on optional attributes are omitted from the row mapping",
+        "No emitted attribute carries the empty string value \"\"",
+        "No emitted attribute carries YAML null on a fixture-tracked column",
+        "Envelope is correct on every emitted doc"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "empty-and-null",
+          "check": "Blank optional cells are absent from the row; no empty-string and no null scalars on known attributes"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "I have `manufacturers.csv` that was exported from a European\nspreadsheet \u2014 it is semicolon-delimited and has a UTF-8 BOM at the\nstart. The raw content is:\n\n    \ufeffname;description;country\n    Dell;Server and storage vendor;US\n    Juniper;Network equipment;US\n    Arista;Network equipment;US\n\nThe OrganizationManufacturer schema declares `name`, `description`,\n`country` as Text attributes with `human_friendly_id: [name__value]`.\nThe schema is fixed.\n\nDetect the dialect (BOM + semicolon delimiter) and emit Infrahub\nobject YAML to `./output_dir/`.",
+      "expected_output": "A directory ./output_dir/ where every emitted string value is dialect-clean \u2014 no leftover BOM byte in the first column header, no semicolon-soup from misread delimiters (each `description` is its own attribute value, not the whole row concatenated).",
+      "files": [],
+      "expectations": [
+        "The first row's name is \"Dell\" with no leading BOM byte",
+        "Each row's description is its own value, not \"Dell;Server and storage vendor;US\"",
+        "Envelope is correct on every emitted doc"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "csv-dialect",
+          "check": "Emitted string values contain no BOM byte and no semicolon-soup from misread delimiters"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "I have two CSVs that should produce internally consistent data:\n\n    # manufacturers.csv\n    name,country\n    Cisco,US\n    Arista,US\n\n    # devices.csv\n    name,manufacturer\n    spine-01,Arista\n    leaf-01,Cisco\n\nThe OrganizationManufacturer schema has `human_friendly_id:\n[name__value]`; DcimDevice has `human_friendly_id: [name__value]`\nand a `manufacturer` relationship peering OrganizationManufacturer.\nThe schema is fixed.\n\nEmit Infrahub object YAML to `./output_dir/`. Make sure every device\nreferences a manufacturer that exists in the upstream manufacturers\nfile \u2014 no orphan references.",
+      "expected_output": "A directory ./output_dir/ where every relationship reference in devices.yml resolves to a `name` of a row in manufacturers.yml.",
+      "files": [],
+      "expectations": [
+        "Every device.manufacturer value is the name of a row in the manufacturers file",
+        "No orphan references in the emission",
+        "Envelope is correct on every emitted doc"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "pre-flight-closure",
+          "check": "Every scalar relationship reference resolves to an emitted row of the target kind"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "I have `manufacturers.csv` with two rows:\n\n    name,country\n    Dell,US\n    Juniper,US\n\nThe OrganizationManufacturer schema declares `name` (Text,\n`human_friendly_id: [name__value]`) and `country` (Text). The schema\nis fixed.\n\nEmit Infrahub object YAML to `./output_dir/`. Each emitted file\nmust carry a leading provenance comment naming the source CSV, its\nsha256, the target branch name, and the emission timestamp.",
+      "expected_output": "A directory ./output_dir/ where every emitted YAML file begins with a comment block containing \"Generated by infrahub-importing-data\" and a \"Sources:\" entry naming manufacturers.csv with a sha256.",
+      "files": [],
+      "expectations": [
+        "Every emitted file starts with a # Generated by infrahub-importing-data line",
+        "Every emitted file's header includes a # Sources: section",
+        "The comment block appears before the leading `---` document separator",
+        "Envelope is correct on every emitted doc"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "provenance-comment",
+          "check": "Every emitted file carries the \"Generated by infrahub-importing-data\" + \"Sources:\" provenance comment block at the top"
+        }
+      ]
+    }
+  ]
+}

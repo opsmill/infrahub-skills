@@ -4,7 +4,7 @@ requires-python = ">=3.10"
 
 [[package]]
 name = "infrahub-skills"
-version = "1.2.1"
+version = "1.2.7"
 source = { virtual = "." }
 
 [package.dev-dependencies]
