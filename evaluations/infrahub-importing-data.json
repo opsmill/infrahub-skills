@@ -425,6 +425,50 @@
         "The response references the fail-closed posture for unsupported file types"
       ],
       "assertions": []
+    },
+    {
+      "id": 23,
+      "prompt": "I have `devices.csv` with a `license_tier` column the schema does\nnot declare anywhere:\n\n    name,role,status,license_tier\n    spine-01,spine,active,gold\n    leaf-01,leaf,active,silver\n    leaf-02,leaf,active,gold\n\nThe DcimDevice schema declares `name`, `role`, and `status` only \u2014 there\nis no `license_tier` attribute, relationship, or dropdown, and I have not\napproved any schema change. This is non-interactive: you cannot ask me to\nskip the column.\n\nFollow the fail-closed rule. If any column has no schema home, stop and\nwrite nothing to `./output_dir/` \u2014 do not emit a partial file that drops\nthe column. Report the unmapped column instead.",
+      "expected_output": "No object YAML in ./output_dir/ \u2014 the skill stops because `license_tier` has no schema home and emits a structured report naming the unmapped column and the kind it checked, pointing the user at infrahub-managing-schemas. No partial file that silently drops the column.",
+      "files": [],
+      "expectations": [
+        "No Object-envelope file in ./output_dir/ carries any spec.data rows",
+        "A report names the unmapped license_tier column and the kind checked",
+        "The user is routed to infrahub-managing-schemas for the schema decision",
+        "No partial emission that drops the unmapped column"
+      ],
+      "assertions": [
+        {
+          "name": "fail-closed",
+          "check": "No Object document in the output dir emits spec.data rows for an input that has an unmapped column"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "prompt": "I have a directory `./imports/` holding three CSV files, one kind\neach:\n\n    # imports/manufacturers.csv\n    name,country\n    Arista,US\n    Cisco,US\n\n    # imports/sites.csv\n    name,country\n    par-1,FR\n    nyc-1,US\n\n    # imports/devices.csv\n    name,role,site,manufacturer\n    spine-01,spine,par-1,Arista\n    edge-01,edge,nyc-1,Cisco\n\nSchema (fixed): OrganizationManufacturer (`human_friendly_id:\n[name__value]`), LocationSite (`human_friendly_id: [name__value]`), and\nDcimDevice (`human_friendly_id: [name__value]`, relationships `site` \u2192\nLocationSite and `manufacturer` \u2192 OrganizationManufacturer).\n\nTreat the directory as the input: scan it, normalize to a flat file list,\nand emit Infrahub object YAML for every file to `./output_dir/`, numbered\nfor load order.",
+      "expected_output": "A directory ./output_dir/ with NN-prefixed files covering all three input kinds \u2014 OrganizationManufacturer, LocationSite, and DcimDevice \u2014 with manufacturers and sites loading before devices, and scalar HFID references from devices to each.",
+      "files": [],
+      "expectations": [
+        "All three input kinds appear in the emission (no file dropped)",
+        "Manufacturers and sites are numbered before devices",
+        "Files use NN_ load-order prefixes",
+        "Envelope is correct on every emitted doc"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "load-order-numbering",
+          "check": "Emitted files use NN_ numeric prefixes for load order"
+        },
+        {
+          "name": "folder-coverage",
+          "check": "Every kind implied by the input directory appears in the emission; no file dropped during folder expansion"
+        }
+      ]
     }
   ]
 }

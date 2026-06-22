@@ -921,6 +921,90 @@ def check_provenance_comment(
     return True, f"All {len(parsed_files)} files carry the provenance comment"
 
 
+def check_fail_closed(
+    parsed_files: dict[Path, list[dict]],
+    *,
+    output_dir: Path | None = None,
+    **_: Any,
+) -> tuple[bool, str]:
+    """Fail-closed on an unmapped column: no object data is emitted.
+
+    When an input column has no schema home, the skill must stop and write
+    nothing — never a partial emission that silently drops the column. The
+    grader asserts the invariant that survives in the output directory: no
+    Object-envelope document carries any ``spec.data`` rows. A plain-text
+    report explaining the unmapped column is fine (it isn't a YAML Object),
+    and an empty / absent output dir also passes.
+    """
+    offending: list[str] = []
+    for file_path, docs in parsed_files.items():
+        for idx, doc in enumerate(docs):
+            if doc.get("kind") != "Object":
+                continue
+            spec = doc.get("spec")
+            data = spec.get("data") if isinstance(spec, dict) else None
+            if isinstance(data, list) and len(data) > 0:
+                offending.append(
+                    f"{file_path.name}[doc {idx}]: emitted {len(data)} object row(s)"
+                )
+
+    if offending:
+        return (
+            False,
+            "Did not fail closed — object data was written for an input with an "
+            "unmapped column: " + "; ".join(offending[:5]),
+        )
+    return True, "Failed closed — no object rows emitted for the unmapped column"
+
+
+# Kinds the folder-coverage eval's input directory implies. Every one must
+# appear in the emission — a missing kind means a CSV was silently dropped
+# during folder expansion. Keep in sync with the eval prompt.
+FIXTURE_FOLDER_EXPECTED_KINDS: set[str] = {
+    "OrganizationManufacturer",
+    "LocationSite",
+    "DcimDevice",
+}
+
+
+def check_folder_coverage(
+    parsed_files: dict[Path, list[dict]], **_: Any
+) -> tuple[bool, str]:
+    """Every input file in a folder / list contributes to the emission.
+
+    Folder and multi-path inputs normalize to a flat file list, so each
+    distinct kind the input implies must show up in the output. A missing
+    kind means a file was dropped during expansion rather than profiled.
+    Emitted files must also be NN-prefixed so load order is explicit.
+    """
+    if not parsed_files:
+        return False, "No YAML files in output directory"
+
+    emitted_kinds: set[str] = set()
+    for _file_path, kind, _row in _walk_data_rows(parsed_files):
+        if isinstance(kind, str):
+            emitted_kinds.add(kind)
+
+    missing = sorted(FIXTURE_FOLDER_EXPECTED_KINDS - emitted_kinds)
+    if missing:
+        return (
+            False,
+            f"Input file(s) dropped during expansion — no rows for: {', '.join(missing)}",
+        )
+
+    unnumbered = [fp.name for fp in parsed_files if not _NN_PREFIX_RE.match(fp.name)]
+    if unnumbered:
+        return (
+            False,
+            f"Emitted files lack an NN_ load-order prefix: {', '.join(unnumbered[:5])}",
+        )
+
+    return (
+        True,
+        f"All {len(FIXTURE_FOLDER_EXPECTED_KINDS)} input kinds emitted; files NN-prefixed",
+    )
+
+
 # ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
@@ -942,6 +1026,8 @@ CHECKS: dict[str, Any] = {
     "column-to-attribute": check_column_to_attribute,
     "merge-same-kind": check_merge_same_kind,
     "lineage-stamping": check_lineage_stamping,
+    "fail-closed": check_fail_closed,
+    "folder-coverage": check_folder_coverage,
 }
 
 

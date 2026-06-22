@@ -2637,3 +2637,101 @@ tasks:
       - Mixed input lists are normalized to a flat file set
       - Case-insensitive extension matching is mentioned
       - The response references the fail-closed posture for unsupported file types
+
+  - name: csv-import-fail-closed
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have `devices.csv` with a `license_tier` column the schema does
+      not declare anywhere:
+
+          name,role,status,license_tier
+          spine-01,spine,active,gold
+          leaf-01,leaf,active,silver
+          leaf-02,leaf,active,gold
+
+      The DcimDevice schema declares `name`, `role`, and `status` only — there
+      is no `license_tier` attribute, relationship, or dropdown, and I have not
+      approved any schema change. This is non-interactive: you cannot ask me to
+      skip the column.
+
+      Follow the fail-closed rule. If any column has no schema home, stop and
+      write nothing to `./output_dir/` — do not emit a partial file that drops
+      the column. Report the unmapped column instead.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_fail_closed.py output_dir
+        weight: 1.0
+    expected_output: >-
+      No object YAML in ./output_dir/ — the skill stops because `license_tier`
+      has no schema home and emits a structured report naming the unmapped
+      column and the kind it checked, pointing the user at
+      infrahub-managing-schemas. No partial file that silently drops the column.
+    expectations:
+      - No Object-envelope file in ./output_dir/ carries any spec.data rows
+      - A report names the unmapped license_tier column and the kind checked
+      - The user is routed to infrahub-managing-schemas for the schema decision
+      - No partial emission that drops the unmapped column
+    assertions:
+      - name: fail-closed
+        check: >-
+          No Object document in the output dir emits spec.data rows for an
+          input that has an unmapped column
+
+  - name: csv-import-folder-coverage
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have a directory `./imports/` holding three CSV files, one kind
+      each:
+
+          # imports/manufacturers.csv
+          name,country
+          Arista,US
+          Cisco,US
+
+          # imports/sites.csv
+          name,country
+          par-1,FR
+          nyc-1,US
+
+          # imports/devices.csv
+          name,role,site,manufacturer
+          spine-01,spine,par-1,Arista
+          edge-01,edge,nyc-1,Cisco
+
+      Schema (fixed): OrganizationManufacturer (`human_friendly_id:
+      [name__value]`), LocationSite (`human_friendly_id: [name__value]`), and
+      DcimDevice (`human_friendly_id: [name__value]`, relationships `site` →
+      LocationSite and `manufacturer` → OrganizationManufacturer).
+
+      Treat the directory as the input: scan it, normalize to a flat file list,
+      and emit Infrahub object YAML for every file to `./output_dir/`, numbered
+      for load order.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_folder_coverage.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ with NN-prefixed files covering all three input
+      kinds — OrganizationManufacturer, LocationSite, and DcimDevice — with
+      manufacturers and sites loading before devices, and scalar HFID references
+      from devices to each.
+    expectations:
+      - All three input kinds appear in the emission (no file dropped)
+      - Manufacturers and sites are numbered before devices
+      - Files use NN_ load-order prefixes
+      - Envelope is correct on every emitted doc
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: load-order-numbering
+        check: Emitted files use NN_ numeric prefixes for load order
+      - name: folder-coverage
+        check: >-
+          Every kind implied by the input directory appears in the emission;
+          no file dropped during folder expansion
