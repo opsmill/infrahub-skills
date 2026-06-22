@@ -1,0 +1,23 @@
+skills/infrahub-importing-data/examples.md
+  s_43508b74cbc76a::t_6099d6cdeeec19 17-18
+  s_43508b74cbc76a::t_f0f82cc6929c52 406-520
+  s_43508b74cbc76a::t_1a921ff63c3baf 3-7
+skills/infrahub-importing-data/rules/outputs-provenance-comment.md
+  s_43508b74cbc76a::t_a34315f14ce4f2 58-92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "5bc20a2e70113a2ff5e60200194e3061e4b78481",
+  "prompts": {},
+  "sessions": {
+    "s_43508b74cbc76a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5758f896-0d6a-4eee-a728-6b364a5ea726",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
