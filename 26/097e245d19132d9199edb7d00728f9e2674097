@@ -1,0 +1,28 @@
+evaluations/infrahub-importing-data.json
+  s_43508b74cbc76a::t_54a2b4cbfec01b 428-471
+graders/importing-data/check_fail_closed.py
+  s_43508b74cbc76a::t_40ff736396d8cb 1-36
+graders/importing-data/lib.py
+  s_43508b74cbc76a::t_fc92c14c009a4a 924-1007
+  s_43508b74cbc76a::t_2aff6441348d1b 1029-1030
+graders/importing-data/check_folder_coverage.py
+  s_43508b74cbc76a::t_2ad10b621ff0b2 1-32
+eval.yaml
+  s_43508b74cbc76a::t_d1dcc45afeb50f 2640-2737
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "26097e245d19132d9199edb7d00728f9e2674097",
+  "prompts": {},
+  "sessions": {
+    "s_43508b74cbc76a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5758f896-0d6a-4eee-a728-6b364a5ea726",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
