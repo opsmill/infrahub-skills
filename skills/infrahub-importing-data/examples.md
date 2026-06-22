@@ -1,9 +1,10 @@
 # CSV Import — Worked Examples
 
-Six realistic CSV inputs and the object YAML the
-skill emits for each. Each example shows the input
-CSV, the emitted YAML, and a short "why this
-shape" note.
+Eight realistic CSV inputs and what the skill
+produces for each — emitted object YAML, or, when a
+column has no schema home, the fail-closed report.
+Each example shows the input, the output, and a short
+"why this shape" note.
 
 ## Contents
 
@@ -13,6 +14,8 @@ shape" note.
 - [4. Dropdown Label Normalization](#4-dropdown-label-normalization)
 - [5. Range Collapse (Interface Sequences)](#5-range-collapse-interface-sequences)
 - [6. Lineage Stamping at Import](#6-lineage-stamping-at-import)
+- [7. Fail-Closed on an Unmapped Column](#7-fail-closed-on-an-unmapped-column)
+- [8. Multiple Inputs, Same Kind (Merge + Dedup)](#8-multiple-inputs-same-kind-merge--dedup)
 
 ---
 
@@ -400,3 +403,118 @@ as well — see
 [../infrahub-common/metadata-lineage.md](../infrahub-common/metadata-lineage.md).
 Always confirm whether the user wants lineage only
 or lineage + lock before emitting.
+
+---
+
+## 7. Fail-Closed on an Unmapped Column
+
+**Input:** `devices.csv` — a `license_tier` column the
+schema does not declare:
+
+```csv
+name,role,status,license_tier
+spine-01,spine,active,gold
+leaf-01,leaf,active,silver
+leaf-02,leaf,active,gold
+```
+
+**Schema:** `DcimDevice` declares `name`, `role`, and
+`status` only — no `license_tier` attribute,
+relationship, or dropdown.
+
+**Emission:** none. The skill stops at the fail-closed
+gate and writes nothing to `output_dir/`. Instead it
+emits a report:
+
+```text
+Cannot import: 1 column has no schema home.
+
+Unmapped columns:
+  - devices.csv: license_tier   (checked DcimDevice, no matching attribute or dropdown)
+
+Schemas checked: DcimDevice.
+
+To unblock this import, add the missing attribute to
+the DcimDevice schema, then re-run this skill against
+the same CSV. See:
+  - skills/infrahub-managing-schemas/SKILL.md
+
+No files have been written.
+```
+
+**Why this shape:** Emitting `name`, `role`, and
+`status` while silently dropping `license_tier` would
+"succeed" the import and bake a data-quality gap into
+the source of truth — the exact partial-write the
+fail-closed rule forbids. A visible stop with the
+column named is faster to recover from than data
+that's quietly incomplete. The only ways
+`license_tier` proceeds are the user marking it
+skipped in the interview, or extending the schema via
+`infrahub-managing-schemas`. See
+[rules/workflow-fail-closed-on-unmapped-columns.md](./rules/workflow-fail-closed-on-unmapped-columns.md).
+
+---
+
+## 8. Multiple Inputs, Same Kind (Merge + Dedup)
+
+**Input:** two regional exports that both map to
+`OrganizationManufacturer`, with `Cisco` in both:
+
+```csv
+# manufacturers-na.csv
+name,country
+Cisco,US
+Arista,US
+
+# manufacturers-eu.csv
+name,country
+Cisco,US
+Nokia,FI
+```
+
+**Schema:** `OrganizationManufacturer` with
+`human_friendly_id: [name__value]`.
+
+**Interview (the overlap is surfaced before any file
+is written):**
+
+```text
+Duplicate row in OrganizationManufacturer:
+  name = "Cisco" appears in both
+    manufacturers-na.csv (row 2)
+    manufacturers-eu.csv (row 2)
+  Both agree on country = US, so they merge cleanly.
+  (If they disagreed on a value, you'd pick a winner here.)
+```
+
+**Emission:** one merged, deduped file —
+`output_dir/01_manufacturers.yml`:
+
+```yaml
+---
+apiVersion: infrahub.app/v1
+kind: Object
+spec:
+  kind: OrganizationManufacturer
+  data:
+    - name: Cisco
+      country: US
+    - name: Arista
+      country: US
+    - name: Nokia
+      country: FI
+```
+
+**Why this shape:** Each kind is produced by exactly
+one numbered file. Emitting `01_manufacturers-na.yml`
+and `01_manufacturers-eu.yml` would collide on the
+prefix slot and double-insert `Cisco` (an HFID
+collision aborts the batch). Rows are concatenated in
+user-supplied input order (NA first), then deduped by
+HFID (`name__value`) — the first `Cisco` wins. Had the
+two `Cisco` rows disagreed on `country`, the merge
+would surface the conflict in the interview rather
+than silently pick a side. The merged file's
+provenance comment lists both source CSVs. See
+[rules/inputs-merge-same-kind.md](./rules/inputs-merge-same-kind.md).
