@@ -699,6 +699,197 @@ def check_pre_flight_closure(
     return True, f"All {inspected} references resolve to emitted rows"
 
 
+# ---------------------------------------------------------------------------
+# Fixture for column-to-attribute mapping
+# ---------------------------------------------------------------------------
+
+
+# Allowed attribute names per kind. Anything outside this set on an emitted
+# row indicates the mapping ladder invented an attribute (schema mutation by
+# stealth) or skipped the snake_case round-trip step.
+FIXTURE_ALLOWED_ATTRIBUTES: dict[str, set[str]] = {
+    "DcimDevice": {
+        "name",
+        "memory_gb",
+        "cpu_count",
+        "rack_unit_position",
+        "role",
+        "status",
+        "platform",
+        "site",
+        "manufacturer",
+        "device_type",
+    },
+    "OrganizationManufacturer": {"name", "description", "country"},
+    "LocationSite": {"name", "shortname"},
+}
+
+
+# Attribute names that should NEVER appear (silent unit-rename artifacts).
+FIXTURE_FORBIDDEN_ATTRIBUTES: set[str] = {"memory_tb", "memory_kb", "memory_mb"}
+
+
+_RAW_HEADER_CHARS = set(" ()/")
+
+
+def check_column_to_attribute(
+    parsed_files: dict[Path, list[dict]], **_: Any
+) -> tuple[bool, str]:
+    """Emitted attribute names come from the schema, not the raw CSV header.
+
+    Verifies (a) every attribute on every emitted row is in the fixture's
+    allowed set for its kind, (b) no forbidden unit-rename attribute name
+    appears, (c) no raw-header artifacts (spaces, parens, slashes) survive
+    on attribute names.
+    """
+    issues: list[str] = []
+    inspected = 0
+    for file_path, kind, row in _walk_data_rows(parsed_files):
+        if not isinstance(kind, str):
+            continue
+        allowed = FIXTURE_ALLOWED_ATTRIBUTES.get(kind)
+        for attr_name in row.keys():
+            inspected += 1
+            if any(c in _RAW_HEADER_CHARS for c in attr_name):
+                issues.append(
+                    f"{file_path.name}: {kind}.{attr_name!r} retains raw "
+                    f"header characters (snake_case round-trip skipped)"
+                )
+                continue
+            if attr_name in FIXTURE_FORBIDDEN_ATTRIBUTES:
+                issues.append(
+                    f"{file_path.name}: {kind}.{attr_name!r} is a "
+                    f"unit-rename of a schema attribute (silently bound)"
+                )
+                continue
+            if allowed is not None and attr_name not in allowed:
+                issues.append(
+                    f"{file_path.name}: {kind}.{attr_name!r} is not in the "
+                    f"schema's attribute list for {kind}"
+                )
+
+    if issues:
+        return False, "; ".join(issues[:6])
+    if inspected == 0:
+        return False, "No emitted rows to inspect for attribute names"
+    return True, f"All {inspected} attribute names map cleanly to the schema"
+
+
+# ---------------------------------------------------------------------------
+# Fixture for merge-same-kind
+# ---------------------------------------------------------------------------
+
+
+# Expected unique-row count per merged kind when two inputs are joined.
+# The check counts rows in the single emitted file for the kind and verifies
+# it matches.
+FIXTURE_MERGE_EXPECTED_ROWS: dict[str, int] = {
+    "OrganizationManufacturer": 6,
+}
+
+
+def check_merge_same_kind(
+    parsed_files: dict[Path, list[dict]], **_: Any
+) -> tuple[bool, str]:
+    """Two same-kind input CSVs collapse into one file with all rows.
+
+    For each kind in ``FIXTURE_MERGE_EXPECTED_ROWS``: exactly one emitted
+    file produces that kind, and its ``spec.data`` covers the expected
+    merged row count (after dedup).
+    """
+    # Group rows by kind across all files.
+    rows_per_kind: dict[str, list] = {}
+    files_per_kind: dict[str, set[Path]] = {}
+    for file_path, kind, row in _walk_data_rows(parsed_files):
+        if not isinstance(kind, str):
+            continue
+        rows_per_kind.setdefault(kind, []).append(row)
+        files_per_kind.setdefault(kind, set()).add(file_path)
+
+    issues: list[str] = []
+    for kind, expected_count in FIXTURE_MERGE_EXPECTED_ROWS.items():
+        files = files_per_kind.get(kind) or set()
+        rows = rows_per_kind.get(kind) or []
+        if len(files) == 0:
+            issues.append(f"{kind}: no emitted file produces this kind")
+            continue
+        if len(files) > 1:
+            names = sorted(f.name for f in files)
+            issues.append(
+                f"{kind}: emitted across {len(files)} files "
+                f"({', '.join(names)}); same-kind inputs should merge"
+            )
+            continue
+        if len(rows) < expected_count:
+            issues.append(
+                f"{kind}: emitted {len(rows)} rows, expected at least "
+                f"{expected_count} (both inputs merged + deduped)"
+            )
+
+    if issues:
+        return False, "; ".join(issues[:5])
+    return True, "Same-kind inputs merged into one file per kind"
+
+
+# ---------------------------------------------------------------------------
+# Fixture for lineage stamping
+# ---------------------------------------------------------------------------
+
+
+# Expected source tag the user opted in to in the eval prompt.
+FIXTURE_LINEAGE_TAG = "csv-import-20260622"
+
+
+def check_lineage_stamping(
+    parsed_files: dict[Path, list[dict]], **_: Any
+) -> tuple[bool, str]:
+    """Opt-in lineage stamps every value with the expected source tag.
+
+    For every emitted row, every attribute must be a mapping with both
+    ``value:`` and ``source:`` keys, and ``source:`` must match the
+    fixture's expected import tag.
+    """
+    issues: list[str] = []
+    inspected = 0
+    stamped = 0
+    for file_path, kind, row in _walk_data_rows(parsed_files):
+        for attr_name, raw in row.items():
+            # Skip relationship children blocks ({kind, data: [...]})
+            if isinstance(raw, dict) and "data" in raw and "kind" in raw:
+                continue
+            # Skip pure scalar references that aren't attributes (heuristic:
+            # the value is a list of HFID parts)
+            if isinstance(raw, list):
+                continue
+            inspected += 1
+            if not isinstance(raw, dict):
+                issues.append(
+                    f"{file_path.name}: {kind}.{attr_name} is a plain scalar "
+                    f"(opt-in lineage requires value+metadata form)"
+                )
+                continue
+            if "value" not in raw:
+                issues.append(
+                    f"{file_path.name}: {kind}.{attr_name} mapping is missing "
+                    f"`value:` key"
+                )
+                continue
+            source = raw.get("source")
+            if source != FIXTURE_LINEAGE_TAG:
+                issues.append(
+                    f"{file_path.name}: {kind}.{attr_name} source={source!r} "
+                    f"(expected {FIXTURE_LINEAGE_TAG!r})"
+                )
+                continue
+            stamped += 1
+
+    if issues:
+        return False, "; ".join(issues[:6])
+    if inspected == 0:
+        return False, "No attribute values to inspect for lineage stamping"
+    return True, f"All {stamped} attribute values stamped with the expected source"
+
+
 _PROVENANCE_RE = re.compile(
     r"(?m)^#\s*Generated by\s+infrahub-importing-data\b"
 )
@@ -748,6 +939,9 @@ CHECKS: dict[str, Any] = {
     "csv-dialect": check_csv_dialect,
     "pre-flight-closure": check_pre_flight_closure,
     "provenance-comment": check_provenance_comment,
+    "column-to-attribute": check_column_to_attribute,
+    "merge-same-kind": check_merge_same_kind,
+    "lineage-stamping": check_lineage_stamping,
 }
 
 

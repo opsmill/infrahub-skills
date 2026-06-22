@@ -17,9 +17,14 @@ local self-check passes and **before**
 `infrahubctl object validate` or `object load`.
 Both commands fail if the branch doesn't exist.
 
+### Why it matters
+
 Create the branch AFTER the self-check so a
 shape-error emission doesn't leave an orphan branch
-on the server.
+on the server. The default branch is never the
+target — a partial load is one `branch delete` on a
+dedicated branch versus per-object cleanup on the
+default branch.
 
 ### Before running these commands
 
