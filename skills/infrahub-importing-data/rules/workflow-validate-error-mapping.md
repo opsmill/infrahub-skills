@@ -110,4 +110,20 @@ self-check
   user has to grep their CSV manually. Always
   emit per-cell coordinates.
 
+### Rationalizations — and why they don't hold
+
+| Rationalization | Reality |
+| --------------- | ------- |
+| "Editing the emitted YAML directly is faster." | The next re-run regenerates from the unchanged CSV and the error returns. Fix the source cell. |
+| "I'll just say 'fix these in the CSV.'" | Without the input file + line + column the user greps blind. Always emit per-cell coordinates. |
+| "Validate passed after my YAML edit, so it's fixed." | Fixed only until the next regeneration — the input still produces the bad value. |
+
+### Red flags — stop and trace to the source
+
+- About to open the emitted YAML in an editor to patch a value.
+- Reporting a validate failure without naming the source CSV cell.
+- Re-running `object load` right after a manual YAML edit.
+
+Any of these means: stop, map the error back to the input cell, and ask the user to fix the CSV.
+
 Reference: [Infrahub Object Docs](https://docs.infrahub.app)

@@ -17,6 +17,15 @@ local self-check passes and **before**
 `infrahubctl object validate` or `object load`.
 Both commands fail if the branch doesn't exist.
 
+"Branch-first" is a *principle* — every write targets
+a branch, never the default — not a *step order*. The
+branch is created late on purpose (step 11 of the
+workflow), just before validate/load, so a failed
+emission never leaves an orphan branch behind. The
+shared principle lives in
+[../../infrahub-common/rules/workflow-branch-for-crud.md](../../infrahub-common/rules/workflow-branch-for-crud.md);
+this rule fixes *when* the branch is created.
+
 ### Why it matters
 
 Create the branch AFTER the self-check so a

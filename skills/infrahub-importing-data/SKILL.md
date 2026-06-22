@@ -256,7 +256,7 @@ load-bearing — earlier steps gate later ones.
     `csv-import-YYYYMMDD-HHMM`, user-overridable in
     the interview). Doing this last keeps
     throwaway branches out of the branch list. Read
-    [rules/workflow-create-branch-first.md](./rules/workflow-create-branch-first.md).
+    [rules/workflow-branch-before-load.md](./rules/workflow-branch-before-load.md).
 
 12. **Server validate** on the branch:
     `infrahubctl object validate ./output_dir/

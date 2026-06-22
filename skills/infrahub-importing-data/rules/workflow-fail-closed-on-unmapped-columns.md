@@ -75,4 +75,22 @@ The skill surfaces every unmapped column there
 first; the user picks "skip" deliberately. Only
 then does the column not block emission.
 
+### Rationalizations — and why they don't hold
+
+| Rationalization | Reality |
+| --------------- | ------- |
+| "I'll emit the columns that map and flag the rest for later." | Partial writes leave the branch in a mixed state. Either the mapping is complete or no file is written. |
+| "`gpu_count` is obviously a counter — I'll just add the attribute." | That's a schema edit by stealth. Schema decisions route through `infrahub-managing-schemas`, never through the importer. |
+| "The column is mostly empty, so dropping it is harmless." | Fill rate is irrelevant. Empties are decided by `optional` / `default_value` (see [mapping-empty-and-null.md](./mapping-empty-and-null.md)); an unmapped column is unmapped no matter how sparse. |
+| "Server validate will catch it." | Validate only runs on a branch and only reports schema-resolution errors. A silently dropped column resolves cleanly and ships incomplete. |
+
+### Red flags — stop and emit the report
+
+- About to write some files but not others.
+- About to invent an attribute name or dropdown choice to force a mapping.
+- About to add a `# skipped: no match` comment instead of reporting the column.
+- About to tell the user "I imported most of it."
+
+Any of these means: stop, emit the unmapped-columns report above, and write nothing.
+
 Reference: [Infrahub Docs](https://docs.infrahub.app)

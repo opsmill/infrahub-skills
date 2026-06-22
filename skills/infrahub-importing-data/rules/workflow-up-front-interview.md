@@ -83,4 +83,20 @@ branch name, the lineage setting. The user gets
 one chance to revise. Only then does any file get
 written.
 
+### Rationalizations — and why they don't hold
+
+| Rationalization | Reality |
+| --------------- | ------- |
+| "The heuristics are clear enough to skip the interview." | The split-vs-inline and lineage calls depend on the user's domain knowledge; no heuristic can decide them. |
+| "I'll ask as questions come up." | Streaming questions scatter decisions, give the user no single review surface, and break the deterministic re-run. |
+| "There's only one ambiguity — I'll just ask it inline." | One question still belongs in the batched round so the locked plan is complete before any file is written. |
+
+### Red flags — stop and batch the questions
+
+- About to write a file before the user has confirmed the plan.
+- About to send the user a second question in a separate message.
+- About to resolve an ambiguity by guessing rather than asking.
+
+Any of these means: stop, collect every open decision, and ask them in one round.
+
 Reference: [Infrahub Docs](https://docs.infrahub.app)

@@ -52,7 +52,7 @@ For each emitted file:
 3. On failure, fix in place and re-walk from step
    1 (the fix may introduce its own violations).
 4. Only when every file walks cleanly, proceed to
-   [workflow-create-branch-first.md](./workflow-create-branch-first.md).
+   [workflow-branch-before-load.md](./workflow-branch-before-load.md).
 
 ### Common mistakes
 
@@ -70,5 +70,21 @@ For each emitted file:
   isn't — it's the local correctness gate. A
   failed self-check means the emission gets fixed,
   not noted and shipped.
+
+### Rationalizations — and why they don't hold
+
+| Rationalization | Reality |
+| --------------- | ------- |
+| "Validate will catch shape errors." | Validate needs a branch first and only sees schema-resolution errors. Dropdown-label-vs-name and wrong HFID arity pass validate and corrupt data after load. |
+| "I emitted it carefully; re-walking is redundant." | The self-check is the only local correctness gate. Careful emission still drifts on component wrappers and `expand_range` placement. |
+| "I'll self-check after creating the branch." | Then a shape-error emission leaves an orphan branch. The self-check is local-only, before any branch exists. |
+
+### Red flags — stop and re-walk
+
+- About to run `branch create` without having walked every file against the managing-objects rules.
+- "The emission looks right" without re-reading the source rules.
+- Treating a self-check failure as a note to ship rather than a fix to make.
+
+Any of these means: stop, re-read the managing-objects rules, and walk every file before the branch step.
 
 Reference: [Infrahub Object Docs](https://docs.infrahub.app)
