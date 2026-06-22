@@ -1,0 +1,79 @@
+---
+title: Data Importer
+sidebar_position: 9
+---
+
+The Data Importer turns CSV or TSV inputs into Infrahub object YAML and loads it onto a fresh branch. It introspects the live schema, maps columns to attributes by heuristic plus an up-front interview, splits denormalized inputs across the right kinds with the correct load order, and fails closed when a column has no schema home — without ever proposing a schema edit.
+
+## When to use
+
+- Importing infrastructure data from a CSV or TSV export (NetBox, vendor inventories, spreadsheets)
+- Loading a denormalized one-big-sheet export and splitting it across the right Infrahub kinds
+- Bulk-loading initial data into a new Infrahub instance from a folder of CSVs
+- Re-importing edits to existing rows by HFID (upsert)
+- Importing data with lineage tagging via `source` / `owner` / `is_protected`
+
+## What it produces
+
+- Numbered object YAML files (`01_manufacturers.yml`, `02_sites.yml`, `10_devices.yml`, …) that conform to the Object Manager envelope (`apiVersion: infrahub.app/v1`, `kind: Object`, `spec.kind`, `spec.data`)
+- A fresh import branch created via `infrahubctl branch create` before any validate or load
+- A confirmed mapping plan from the up-front interview, locked before the first file is written
+- Local self-check against Object Manager rules, followed by server-side `infrahubctl object validate`, followed by `object load` — all scoped to the import branch
+- Optional `source` / `owner` / `is_protected` metadata stamping when the user opts in
+
+## Example prompts
+
+- "Import `devices.csv` into Infrahub on a fresh branch"
+- "Convert this denormalized CSV with manufacturer, location, and device columns into separate object files in the right load order"
+- "Load these three CSVs (manufacturers, sites, devices) and resolve the references between them"
+- "Import an interface CSV with `eth0..eth47` ranges and collapse them with `expand_range: true`"
+- "Import `assets.csv` and stamp every value with `source: csv-import-20260622`"
+
+## Key rules enforced
+
+- **Schema is read-only** — the skill never proposes attribute additions, dropdown choice additions, or any schema edit; an unmappable column triggers a fail-closed report and routes to the Schema Manager
+- **Up-front interview** — every ambiguity (unmapped dropdown cells, denormalization splits, branch name, lineage opt-in) is batched into one question round before any file is written
+- **Branch-first** — runs `infrahubctl branch create <name>` before `object validate` or `object load`; the import never lands on the default branch
+- **Local self-check before server validate** — the emission is walked against the Object Manager rules locally first, so shape errors don't cost a branch that has to be discarded
+- **Dropdown label to choice name** — UI-facing labels in the CSV (e.g., `Active`) are translated to the schema's choice name (e.g., `active`) using a label-to-name lookup
+- **Reference shape from HFID** — relationship references emit as a scalar or a positional list based on the target node's `human_friendly_id` length, read directly from the schema
+- **Range collapse for interfaces** — contiguous sequences like `eth0..eth47` collapse to `eth[0-47]` with `parameters.expand_range: true` when all sibling columns match across the range
+- **Numbered load order** — files use `NN_` prefixes so referents load before referrers, and dependent kinds are emitted to higher-numbered files
+
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --------- | --------------------------- |
+| Dropping unmapped columns silently | Fails closed with a structured report of unmappable columns and the kinds checked |
+| Emitting dropdown labels instead of choice names | Builds a label→name table from the schema and emits the name |
+| Wrong reference shape (scalar vs list) | Reads the target's `human_friendly_id` length and emits the matching shape |
+| Repeated parent rows treated as duplicates | Detects the denormalization and asks whether to nest as component children or split into separate kinds |
+| Emitting interface rows as 48 literal entries | Detects contiguous sequences with identical sibling columns and emits a single range row plus `expand_range: true` |
+| Loading to the default branch | Creates a dedicated import branch and validates + loads there |
+| Trying to resume a partial load | Discards the branch and re-runs with a fresh branch name (`object load` is not transactional across files) |
+
+## Validating and loading
+
+The skill produces these commands as part of the workflow. Run them in order on the import branch:
+
+```bash
+# Create the dedicated import branch (after the local self-check passes)
+infrahubctl branch create csv-import-20260622-1430
+
+# Validate the emission against the branch
+infrahubctl object validate ./output_dir/ --branch csv-import-20260622-1430
+
+# Load on success
+infrahubctl object load ./output_dir/ --branch csv-import-20260622-1430
+
+# If anything fails partway, discard the branch and re-run with a fresh name
+infrahubctl branch delete csv-import-20260622-1430
+```
+
+:::warning
+The skill never edits the schema. If a CSV column has no attribute or relationship to map to, the skill stops with a list of the unmappable columns and the kinds it checked. Resolve the gap with the [Schema Manager](./managing-schemas), then re-run.
+:::
+
+:::tip
+For Excel inputs, export each sheet to CSV first — the skill covers CSV and TSV only. For LDJSON dumps from `infrahubctl export dump`, use `infrahubctl import load` instead; that's a different format and a different tool.
+:::
