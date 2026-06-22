@@ -1,0 +1,30 @@
+skills/infrahub-importing-data/rules/workflow-fail-closed-on-unmapped-columns.md
+  s_43508b74cbc76a::t_e678a4539a1d56 78-95
+skills/infrahub-importing-data/rules/workflow-up-front-interview.md
+  s_43508b74cbc76a::t_ffe8329fb00ddf 86-101
+skills/infrahub-importing-data/rules/workflow-validate-error-mapping.md
+  s_43508b74cbc76a::t_8a38aa4f6613bd 113-128
+skills/infrahub-importing-data/rules/workflow-branch-before-load.md
+  s_43508b74cbc76a::t_05cba709aad8df 20-28
+skills/infrahub-importing-data/SKILL.md
+  s_43508b74cbc76a::t_0f64da68caf1b9 259
+skills/infrahub-importing-data/rules/workflow-self-check-against-managing-objects.md
+  s_43508b74cbc76a::t_3c37a537884912 55
+  s_43508b74cbc76a::t_f4b71b1297d6b7 74-89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "fecb507fc484d389ef3f232f4de0831fd30b5765",
+  "prompts": {},
+  "sessions": {
+    "s_43508b74cbc76a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5758f896-0d6a-4eee-a728-6b364a5ea726",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
