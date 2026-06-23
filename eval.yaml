@@ -1750,3 +1750,1043 @@ tasks:
         check: >-
           __typename appears inside the bgp_neighbors selection in
           the updated GraphQL query
+
+  # --- CSV Import --- #
+  - name: csv-import-single-kind-envelope
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have a single CSV file `manufacturers.csv` with the following columns
+      and rows:
+
+          name,description,country
+          Dell,Server and storage vendor,US
+          Juniper,Network equipment,US
+          Arista,Network equipment,US
+
+      The schema defines `OrganizationManufacturer` with Text attributes `name`,
+      `description`, and `country`, and `human_friendly_id: [name__value]`. The
+      schema is fixed — do not propose changes to it.
+
+      Convert the CSV to Infrahub object YAML and save the emitted file(s) under
+      `./output_dir/` (create the directory). Do not load anything against a
+      server.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_envelope.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ containing at least one YAML file where every
+      document carries the four envelope fields (apiVersion: infrahub.app/v1,
+      kind: Object, spec.kind: OrganizationManufacturer, spec.data as a list of
+      rows).
+    expectations:
+      - Every emitted YAML document has apiVersion infrahub.app/v1
+      - Every emitted YAML document has kind Object
+      - Every emitted YAML document has spec.kind set to OrganizationManufacturer
+      - Every emitted YAML document has spec.data as a list of mapping rows
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+
+  - name: csv-import-load-order-numbering
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have three CSVs that reference each other:
+
+          # manufacturers.csv
+          name,country
+          Cisco,US
+          Arista,US
+
+          # device_types.csv
+          name,manufacturer
+          c9300-48,Cisco
+          7050x-32,Arista
+
+          # devices.csv
+          name,device_type,site
+          spine-01,7050x-32,par-1
+          leaf-01,c9300-48,par-1
+
+      The schema declares OrganizationManufacturer, DcimDeviceType, DcimDevice,
+      and LocationSite — each with `human_friendly_id: [name__value]`. The
+      schema is fixed.
+
+      Emit Infrahub object YAML under `./output_dir/`. Make sure files load in
+      the right order against `infrahubctl object load`.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_load_order_numbering.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ where every emitted YAML file uses an NN_
+      numeric prefix in its filename, and where each kind is produced by
+      exactly one file so the load order is unambiguous.
+    expectations:
+      - Every emitted YAML filename starts with an NN_ numeric prefix
+      - Manufacturers / device types / sites load before devices
+      - Each kind is emitted by exactly one file
+      - "Envelope (apiVersion, kind: Object, spec.kind, spec.data) is correct"
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: load-order-numbering
+        check: >-
+          Every emitted file uses an NN_ numeric prefix and each kind is
+          produced by exactly one file
+
+  - name: csv-import-dropdown-name-not-label
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have `devices.csv` with display-label values for a dropdown attribute:
+
+          name,role,status
+          spine-01,spine,Active
+          spine-02,spine,Maintenance
+          leaf-01,leaf,Active
+          leaf-02,leaf,Retired
+
+      The schema's `DcimDevice.status` is a Dropdown with choices declared as:
+
+          status:
+            kind: Dropdown
+            choices:
+              - name: active
+                label: Active
+              - name: maintenance
+                label: Maintenance
+              - name: retired
+                label: Retired
+
+      DcimDevice has `human_friendly_id: [name__value]`. The schema is fixed.
+
+      Emit Infrahub object YAML to `./output_dir/`.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_dropdown_names.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ where every emitted DcimDevice row sets
+      `status` to a choice name (e.g., `active`), never to a label like
+      `Active` — the load would otherwise be rejected with `'Active' is not a
+      valid choice for status`.
+    expectations:
+      - Every status value uses a Dropdown choice `name` (active / maintenance / retired)
+      - No status value uses a Dropdown label (Active / Maintenance / Retired)
+      - Envelope is correct on every emitted doc
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: dropdown-names
+        check: >-
+          DcimDevice.status uses the choice name (active / maintenance /
+          retired), never the display label
+
+  - name: csv-import-hfid-reference-shape
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have two CSV files referencing each other:
+
+          # rooms.csv
+          site_shortname,name,floor
+          par,server-room-1,3
+          par,server-room-2,3
+
+          # racks.csv
+          name,room,site_shortname,units
+          rack-01,server-room-1,par,42
+          rack-02,server-room-2,par,42
+
+      The schema declares:
+
+          - DcimRoom with human_friendly_id: [site__shortname__value, name__value]
+            (a two-element HFID)
+          - DcimRack with human_friendly_id: [name__value] and a relationship
+            `room` peering DcimRoom
+
+      The schema is fixed. Emit Infrahub object YAML to `./output_dir/` and make
+      sure the relationship references match each target's HFID arity.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_hfid_reference_shape.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ where the DcimRack rows reference each room via
+      a two-element list HFID (matching DcimRoom's HFID length), and any
+      reference to a single-element-HFID kind (if present) is a scalar string.
+    expectations:
+      - DcimRack `room` reference is a two-element list HFID (matching DcimRoom)
+      - No relationship reference is over-packed for a single-element HFID target
+      - Envelope is correct on every emitted doc
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: hfid-reference-shape
+        check: >-
+          Single-element HFID targets receive scalar references; multi-element
+          HFID targets receive a list of the correct length
+
+  - name: csv-import-component-children-shape
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have `devices_with_interfaces.csv` where the device columns repeat
+      per interface:
+
+          device_name,device_role,interface_name,interface_role,interface_status
+          spine-01,spine,Ethernet1,uplink,active
+          spine-01,spine,Ethernet2,uplink,active
+          leaf-01,leaf,Ethernet1,uplink,active
+          leaf-01,leaf,Ethernet2,server,active
+
+      The schema declares DcimDevice with a Component relationship `interfaces`
+      whose peer is the generic `InterfacePhysical`. The matching Parent
+      relationship is on the child. DcimDevice has `human_friendly_id:
+      [name__value]`. The schema is fixed.
+
+      Emit Infrahub object YAML to `./output_dir/`. Group interfaces under their
+      owning device.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_component_children_shape.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ where the interfaces relationship is emitted as
+      a mapping with both `kind: InterfacePhysical` and `data: [...]`, NOT as a
+      bare list of dicts (the loader can't pick a concrete child schema without
+      the kind wrapper when the peer is a generic).
+    expectations:
+      - The `interfaces` relationship is emitted as a {kind, data} mapping
+      - "The wrapper includes `kind: InterfacePhysical` so the generic peer resolves"
+      - The wrapper's `data` is a list of interface row dicts
+      - Envelope is correct on every emitted doc
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: component-children-shape
+        check: >-
+          Component children use {kind, data: [...]} wrapper mapping, not bare
+          list of dicts
+
+  - name: csv-import-range-expansion
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have `interfaces.csv` for a single device, with 48 contiguous
+      interface names all sharing the same role and status:
+
+          device_name,interface_name,interface_role,interface_status
+          leaf-01,eth0,server,active
+          leaf-01,eth1,server,active
+          leaf-01,eth2,server,active
+          ... (continues identically) ...
+          leaf-01,eth47,server,active
+
+      The schema declares DcimDevice with a Component relationship `interfaces`
+      peering `InterfacePhysical`. DcimDevice has `human_friendly_id:
+      [name__value]`. The schema is fixed.
+
+      Emit Infrahub object YAML to `./output_dir/`. Use the loader's
+      range-expansion feature where appropriate — emitting 48 separate rows is
+      not the right shape.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_range_expansion.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ where the 48 interface rows are collapsed into a
+      single row with a bracket-range name (e.g., `eth[0-47]`) inside the
+      interfaces children block, and where the enclosing block sets
+      `parameters.expand_range: true` so the loader expands the range instead of
+      creating one literal-named interface.
+    expectations:
+      - The 48 interface rows are collapsed to a bracket-range name (e.g., eth[0-47])
+      - The interfaces block sets parameters.expand_range true
+      - Envelope is correct on every emitted doc
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: range-expansion
+        check: >-
+          Any bracket-range child name is accompanied by
+          parameters.expand_range: true on the enclosing relationship block
+
+  - name: csv-import-no-schema-mutation
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have `devices.csv` with an extra `gpu_count` column the schema
+      does not declare:
+
+          name,role,status,gpu_count
+          spine-01,spine,active,0
+          gpu-rig-01,gpu,active,8
+          gpu-rig-02,gpu,active,8
+
+      The DcimDevice schema declares `name`, `role`, and `status` only — no
+      `gpu_count` attribute. The schema is fixed and I have not approved any
+      schema change.
+
+      Emit whatever correct Infrahub object YAML you can to `./output_dir/`. Do
+      NOT propose or write any schema changes; the skill fails closed on
+      unmapped columns.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_no_schema_mutation.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ that contains no schema documents (no file with
+      top-level `version: "1.0"` plus `nodes:` / `generics:`), and nothing under
+      a `schemas/` sub-path of the output dir. The skill should either emit
+      partial object YAML (omitting the unmapped column) with a note about the
+      unmapped `gpu_count`, or stop emission entirely and explain — but it must
+      never write a schema mutation.
+    expectations:
+      - No file in ./output_dir/ is a schema document (version 1.0 + nodes / generics)
+      - No file lives under a schemas/ sub-path of ./output_dir/
+      - Envelope is correct on any object YAML that is emitted
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: no-schema-mutation
+        check: >-
+          Output dir contains no schema document and no schemas/ sub-path
+
+  - name: csv-import-value-coercion
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have `devices.csv` with a mix of attribute types whose values arrive as CSV strings:
+
+          name,is_managed,gpu_count,commissioned_at,metadata
+          spine-01,Yes,8,2024-01-15,"{""vlan"": 100, ""tagged"": true}"
+          spine-02,No,0,2024-02-01,"{""vlan"": 200, ""tagged"": false}"
+
+      The DcimDevice schema declares `name` (Text, `human_friendly_id: [name__value]`),
+      `is_managed` (Boolean), `gpu_count` (Number), `commissioned_at` (DateTime), and
+      `metadata` (JSON). The schema is fixed.
+
+      Emit Infrahub object YAML to `./output_dir/`.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_value_coercion.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ where Boolean cells emit YAML `true`/`false`,
+      Number cells emit integers, DateTime cells emit ISO-8601 strings, and
+      JSON cells emit parsed mappings — never the raw CSV string forms.
+    expectations:
+      - "Boolean cells (Yes/No) emit as YAML booleans true/false"
+      - "Number cells emit as YAML integers (not numeric strings)"
+      - "DateTime cells emit as ISO-8601 strings"
+      - "JSON cells emit as parsed YAML mappings, not encoded strings"
+      - Envelope is correct on every emitted doc
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: value-coercion
+        check: >-
+          Boolean / Number / DateTime / JSON attributes use native YAML
+          types, not CSV string pass-through
+
+  - name: csv-import-empty-and-null
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have `manufacturers.csv` with optional attributes left blank in some rows:
+
+          name,description,country
+          Dell,Server vendor,US
+          Juniper,,US
+          Arista,,
+
+      The OrganizationManufacturer schema declares `name` (Text,
+      `optional: false`, `human_friendly_id: [name__value]`), `description`
+      (Text, `optional: true`), and `country` (Text, `optional: true`). The
+      schema is fixed.
+
+      Emit Infrahub object YAML to `./output_dir/`.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_empty_and_null.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ where blank optional attributes are omitted
+      entirely from the row's mapping — never emitted as `""` and never as
+      YAML `null`.
+    expectations:
+      - Blank cells on optional attributes are omitted from the row mapping
+      - "No emitted attribute carries the empty string value \"\""
+      - No emitted attribute carries YAML null on a fixture-tracked column
+      - Envelope is correct on every emitted doc
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: empty-and-null
+        check: >-
+          Blank optional cells are absent from the row; no empty-string and
+          no null scalars on known attributes
+
+  - name: csv-import-csv-dialect
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have `manufacturers.csv` that was exported from a European
+      spreadsheet — it is semicolon-delimited and has a UTF-8 BOM at the
+      start. The raw content is:
+
+          ﻿name;description;country
+          Dell;Server and storage vendor;US
+          Juniper;Network equipment;US
+          Arista;Network equipment;US
+
+      The OrganizationManufacturer schema declares `name`, `description`,
+      `country` as Text attributes with `human_friendly_id: [name__value]`.
+      The schema is fixed.
+
+      Detect the dialect (BOM + semicolon delimiter) and emit Infrahub
+      object YAML to `./output_dir/`.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_csv_dialect.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ where every emitted string value is
+      dialect-clean — no leftover BOM byte in the first column header, no
+      semicolon-soup from misread delimiters (each `description` is its own
+      attribute value, not the whole row concatenated).
+    expectations:
+      - The first row's name is "Dell" with no leading BOM byte
+      - Each row's description is its own value, not "Dell;Server and storage vendor;US"
+      - Envelope is correct on every emitted doc
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: csv-dialect
+        check: >-
+          Emitted string values contain no BOM byte and no semicolon-soup
+          from misread delimiters
+
+  - name: csv-import-pre-flight-closure
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have two CSVs that should produce internally consistent data:
+
+          # manufacturers.csv
+          name,country
+          Cisco,US
+          Arista,US
+
+          # devices.csv
+          name,manufacturer
+          spine-01,Arista
+          leaf-01,Cisco
+
+      The OrganizationManufacturer schema has `human_friendly_id:
+      [name__value]`; DcimDevice has `human_friendly_id: [name__value]`
+      and a `manufacturer` relationship peering OrganizationManufacturer.
+      The schema is fixed.
+
+      Emit Infrahub object YAML to `./output_dir/`. Make sure every device
+      references a manufacturer that exists in the upstream manufacturers
+      file — no orphan references.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_pre_flight_closure.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ where every relationship reference in
+      devices.yml resolves to a `name` of a row in manufacturers.yml.
+    expectations:
+      - Every device.manufacturer value is the name of a row in the manufacturers file
+      - No orphan references in the emission
+      - Envelope is correct on every emitted doc
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: pre-flight-closure
+        check: >-
+          Every scalar relationship reference resolves to an emitted row of
+          the target kind
+
+  - name: csv-import-provenance-comment
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have `manufacturers.csv` with two rows:
+
+          name,country
+          Dell,US
+          Juniper,US
+
+      The OrganizationManufacturer schema declares `name` (Text,
+      `human_friendly_id: [name__value]`) and `country` (Text). The schema
+      is fixed.
+
+      Emit Infrahub object YAML to `./output_dir/`. Each emitted file
+      must carry a leading provenance comment naming the source CSV, its
+      sha256, the target branch name, and the emission timestamp.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_provenance_comment.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ where every emitted YAML file begins with
+      a comment block containing "Generated by infrahub-importing-data"
+      and a "Sources:" entry naming manufacturers.csv with a sha256.
+    expectations:
+      - "Every emitted file starts with a # Generated by infrahub-importing-data line"
+      - "Every emitted file's header includes a # Sources: section"
+      - The comment block appears before the leading `---` document separator
+      - Envelope is correct on every emitted doc
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: provenance-comment
+        check: >-
+          Every emitted file carries the "Generated by infrahub-importing-data"
+          + "Sources:" provenance comment block at the top
+
+  - name: csv-import-column-to-attribute
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have `devices.csv` with these CSV headers:
+
+          Name,Memory (GB),CPU Count,Role,Status
+
+      The schema declares `DcimDevice` with attributes:
+        - name (Text)
+        - memory_gb (Number)
+        - cpu_count (Number)
+        - role (Text)
+        - status (Dropdown with choices active/maintenance/retired)
+
+      DcimDevice has `human_friendly_id: [name__value]`. There is NO
+      `memory_tb`, `memory_kb`, or `memory` attribute on the schema.
+      The schema is fixed — do not propose changes.
+
+      Sample row: `spine-01,128,32,spine,active`
+
+      Convert the CSV to Infrahub object YAML and save under `./output_dir/`.
+      Do not load anything against a server.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_column_to_attribute.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ where every emitted attribute name is one of
+      the DcimDevice schema attributes (name, memory_gb, cpu_count, role,
+      status). Raw headers like "Memory (GB)" must have been round-tripped
+      to snake_case (memory_gb), not retained verbatim, and no fabricated
+      attribute names like "memory_tb" or "memory" appear.
+    expectations:
+      - "Memory (GB) header maps to the schema attribute memory_gb"
+      - No emitted attribute name contains spaces, parentheses, or slashes
+      - No emitted attribute is outside the schema's DcimDevice attribute list
+      - "No unit-rename artifacts (memory_tb, memory_kb) appear"
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind Object, spec.kind, and
+          spec.data list
+      - name: column-to-attribute
+        check: >-
+          Every emitted attribute name is in the schema's allowed list for
+          its kind, with no raw-header artifacts and no unit-rename
+          attributes
+
+  - name: csv-import-merge-same-kind
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have two CSV files that both map to the same target kind.
+
+          # manufacturers-na.csv
+          name,description,country
+          Cisco,Network vendor,US
+          Juniper,Network vendor,US
+          Arista,Network vendor,US
+
+          # manufacturers-eu.csv
+          name,description,country
+          Nokia,Network vendor,FI
+          Ericsson,Network vendor,SE
+          Huawei,Network vendor,CN
+
+      The schema declares `OrganizationManufacturer` with Text attributes
+      `name`, `description`, `country`, and `human_friendly_id: [name__value]`.
+      The schema is fixed.
+
+      Both inputs produce rows of the same target kind. Merge them into one
+      numbered output file under `./output_dir/`. Do not load anything.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_merge_same_kind.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ with exactly one YAML file producing
+      OrganizationManufacturer (e.g., 01_manufacturers.yml), and its
+      spec.data list contains rows from BOTH input CSVs (Cisco, Juniper,
+      Arista, Nokia, Ericsson, Huawei) — six rows total, deduped by HFID.
+    expectations:
+      - Exactly one emitted file produces OrganizationManufacturer
+      - The file name reflects the kind (e.g., 01_manufacturers.yml), not the inputs
+      - The spec.data list contains at least 6 rows, covering both inputs
+      - Envelope is correct on every emitted doc
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind Object, spec.kind, and
+          spec.data list
+      - name: load-order-numbering
+        check: >-
+          Each kind is produced by exactly one numbered file
+      - name: merge-same-kind
+        check: >-
+          OrganizationManufacturer is emitted by one file with rows from
+          both input CSVs (>= 6 rows after dedup)
+
+  - name: csv-import-lineage-stamping
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: Import this CSV with lineage stamping turned on. Every value
+      should be stamped with `source: csv-import-20260622` using the
+      value+metadata mapping form.
+
+          # manufacturers.csv
+          name,description,country
+          Dell,Server and storage vendor,US
+          Juniper,Network equipment,US
+
+      The schema declares `OrganizationManufacturer` with Text attributes
+      `name`, `description`, `country`, and `human_friendly_id: [name__value]`.
+      The schema is fixed.
+
+      Lineage stamping is opted in: every attribute should be emitted as a
+      value+metadata mapping with `source: csv-import-20260622`. Assume the
+      Account named `csv-import-20260622` already exists; do not emit a
+      bootstrap file. Save the output to `./output_dir/`.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_lineage_stamping.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ where every attribute on every emitted row
+      is a mapping with `value:` and `source: csv-import-20260622` — never
+      a plain scalar — using the value+metadata form documented in the
+      managing-objects skill.
+    expectations:
+      - Every attribute on every row is a mapping with value and source keys
+      - The source value is csv-import-20260622 on every stamped attribute
+      - No attribute is a plain scalar string
+      - Envelope is correct on every emitted doc
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind Object, spec.kind, and
+          spec.data list
+      - name: lineage-stamping
+        check: >-
+          Every attribute on every emitted row uses the value+metadata
+          mapping form with source set to csv-import-20260622
+
+  # --- Expectations-only tasks for process / conversation rules --- #
+
+  - name: csv-import-up-front-interview
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have `devices.csv` with these columns and rows:
+
+          name,role,status,tier_label
+          spine-01,spine,Active,gold
+          spine-02,spine,Maintenance,gold
+          leaf-01,leaf,Active,silver
+
+      The schema declares `DcimDevice` with attributes `name` (Text),
+      `role` (Text), `status` (Dropdown: active/maintenance/retired). The
+      schema has NO `tier_label` attribute on DcimDevice. DcimDevice has
+      `human_friendly_id: [name__value]`. The schema is fixed.
+
+      Before emitting any file, surface every decision you need from me in
+      ONE batch — unmapped columns, dropdown-label translation, target
+      file naming, branch name, and lineage opt-in. Do not start writing
+      until I confirm. Echo back the full plan before any file is created.
+      Save planned output under `./output_dir/`.
+    expected_output: >-
+      A single batched set of multi-choice questions covering every
+      ambiguity (tier_label has no schema home; Status is a dropdown
+      label; branch name; lineage opt-in) plus a confirm-and-lock summary
+      of the proposed plan. No file is written until the user confirms.
+    expectations:
+      - Every ambiguity is surfaced in one batched round, not one-by-one
+      - The unmapped tier_label column is called out explicitly
+      - Status values (Active/Maintenance) are flagged as dropdown labels
+      - A branch name is proposed (e.g., csv-import-YYYYMMDD-HHMM)
+      - Lineage opt-in is offered with an explanation of source vs. owner+is_protected
+      - The plan is echoed back before any file is written
+
+  - name: csv-import-profile-sample
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: Before mapping `inventory.csv` (which I will provide
+      content-wise inline below), profile it: report distinct-value counts,
+      sample values, length ranges, numeric-only fractions, date-pattern
+      matches, and any sequence patterns. Use the profile to drive the
+      mapping plan.
+
+          name,role,status,manufacturer_name,port_count,commissioned_at
+          spine-01,spine,Active,Arista,32,2024-03-15
+          spine-02,spine,Active,Arista,32,2024-03-15
+          leaf-01,leaf,Maintenance,Cisco,48,2023-09-01
+          leaf-02,leaf,Active,Cisco,48,2024-01-10
+
+      Schema is fixed. Emit only the per-file profile summary — do not
+      write any object YAML in this task.
+    expected_output: >-
+      A per-column profile of inventory.csv naming distinct-value counts
+      (4 names, 2 roles, 2 statuses, 2 manufacturers, 2 port counts, 3
+      dates), sample values, length ranges, the 100% numeric port_count
+      column, and the YYYY-MM-DD commissioned_at column as DateTime.
+    expectations:
+      - The profile names per-column distinct-value counts
+      - role and status are flagged as low-cardinality (dropdown candidates)
+      - port_count is flagged as 100% numeric
+      - commissioned_at is flagged as a YYYY-MM-DD DateTime pattern
+      - manufacturer_name is flagged as a reference candidate (low cardinality)
+
+  - name: csv-import-validate-error-mapping
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: After running `infrahubctl object validate ./output_dir/ --branch csv-import-20260622-1430`,
+      the server returned:
+
+          output_dir/04_devices.yml row 7 attribute 'status':
+            'Active' is not a valid choice for status
+
+      The skill produced the YAML from `inventory.csv` row 12. The skill
+      knows the per-row mapping back to the source. Translate the
+      validate error into a clear instruction that tells me which CSV
+      cell to fix, and explicitly tells me NOT to edit the emitted YAML
+      directly.
+    expected_output: >-
+      A traceback that names inventory.csv row 12 column "Status", explains
+      that "Active" is the display label (the schema choice name is
+      `active`), and lists fix options including re-running with the
+      dropdown-label-to-name rule applied. The response must instruct the
+      user not to edit the emitted YAML by hand.
+    expectations:
+      - The error is traced back to inventory.csv row 12 column "Status"
+      - The "Active" vs "active" label/name distinction is explained
+      - Fix options include editing the CSV and re-running the skill
+      - The user is told NOT to edit the emitted YAML directly
+
+  - name: csv-import-self-check-against-managing-objects
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: After emitting Infrahub object YAML to ./output_dir/ (do this
+      step first for the simple manufacturers CSV below), describe the
+      local self-check you would run BEFORE creating any branch. Name the
+      specific managing-objects rules you check the emission against and
+      what each one catches.
+
+          # manufacturers.csv
+          name,description,country
+          Dell,Server and storage vendor,US
+
+      Schema defines `OrganizationManufacturer` with Text attributes
+      `name`, `description`, `country`, and `human_friendly_id: [name__value]`.
+    expected_output: >-
+      The emitted YAML for OrganizationManufacturer under ./output_dir/,
+      plus a description of the local self-check that walks each emitted
+      file against managing-objects rules (format-structure,
+      value-attributes, value-relationships, children-components,
+      range-expansion, organization-load-order). No infrahubctl command
+      is run in this task — the self-check is local-only.
+    expectations:
+      - At least one YAML file is emitted to ./output_dir/
+      - The self-check is described as running BEFORE infrahubctl branch create
+      - The self-check is local-only (no server, no branch)
+      - Specific managing-objects rule files are named
+      - Each named rule is matched to the shape it verifies
+
+  - name: csv-import-create-branch-first
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: Walk me through the validate-and-load sequence after the
+      local self-check passes for a hypothetical ./output_dir/. Include
+      the exact infrahubctl commands in the order they should be run,
+      using a default branch name like `csv-import-YYYYMMDD-HHMM`. Do
+      NOT actually execute them — just produce the command sequence
+      with one-line explanations.
+    expected_output: >-
+      The command sequence in order: (1) infrahubctl info to verify
+      connectivity, (2) infrahubctl branch create <name>, (3) infrahubctl
+      object validate ./output_dir/ --branch <name>, (4) infrahubctl
+      object load ./output_dir/ --branch <name>. Plus a note about
+      `infrahubctl branch delete <name>` on partial failure. The default
+      branch is never the target.
+    expectations:
+      - The sequence creates a branch BEFORE validate or load
+      - infrahubctl info is mentioned as a connectivity check
+      - The branch is created via infrahubctl branch create
+      - validate and load both pass --branch <name>
+      - The default branch is explicitly excluded as a target
+      - branch delete is named as the cleanup on partial failure
+
+  - name: csv-import-introspect-first
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: Before mapping `devices.csv` to the schema, describe how you
+      would discover the schema. List the priority chain (MCP →
+      infrahubctl schema export → /api/schema REST → local schemas/*.yml)
+      and explain when to fall back to the next source. The schema is
+      read-only throughout — do not propose any schema edit. Do not
+      emit any YAML in this task — describe the introspection only.
+    expected_output: >-
+      A description of the four-source priority chain (MCP first,
+      infrahubctl schema export, /api/schema REST, local schemas/*.yml
+      last), with the trade-off of each source (freshness vs.
+      availability) and an explicit "schema is read-only — escalate to
+      managing-schemas if a column has no home."
+    expectations:
+      - The priority chain lists MCP first
+      - infrahubctl schema export is listed as the next fallback after MCP
+      - /api/schema REST is named as the third option
+      - Local schemas/*.yml is named as the last resort with a freshness caveat
+      - The response explicitly says no schema edit will be proposed
+      - Escalation to managing-schemas is named for the unmappable-column case
+
+  - name: csv-import-file-folder-list-input
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I will hand you any of three input shapes — a single CSV
+      file, a directory of CSVs, or an explicit list of paths. Describe
+      how the skill normalizes each shape into a flat file list before
+      profiling, and what happens to non-CSV/TSV files in a directory.
+      Do not emit any YAML in this task — describe the input
+      normalization only.
+    expected_output: >-
+      A description of the input normalization step: single file passes
+      through, directory is recursively scanned for *.csv and *.tsv
+      (case-insensitive), list of paths is expanded the same way.
+      Non-CSV/TSV files in a directory are ignored or surface a
+      fail-closed report depending on the rule.
+    expectations:
+      - Single file is accepted directly
+      - Directory is recursively scanned for .csv and .tsv files
+      - Mixed input lists are normalized to a flat file set
+      - Case-insensitive extension matching is mentioned
+      - The response references the fail-closed posture for unsupported file types
+
+  - name: csv-import-fail-closed
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have `devices.csv` with a `license_tier` column the schema does
+      not declare anywhere:
+
+          name,role,status,license_tier
+          spine-01,spine,active,gold
+          leaf-01,leaf,active,silver
+          leaf-02,leaf,active,gold
+
+      The DcimDevice schema declares `name`, `role`, and `status` only — there
+      is no `license_tier` attribute, relationship, or dropdown, and I have not
+      approved any schema change. This is non-interactive: you cannot ask me to
+      skip the column.
+
+      Follow the fail-closed rule. If any column has no schema home, stop and
+      write nothing to `./output_dir/` — do not emit a partial file that drops
+      the column. Report the unmapped column instead.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_fail_closed.py output_dir
+        weight: 1.0
+    expected_output: >-
+      No object YAML in ./output_dir/ — the skill stops because `license_tier`
+      has no schema home and emits a structured report naming the unmapped
+      column and the kind it checked, pointing the user at
+      infrahub-managing-schemas. No partial file that silently drops the column.
+    expectations:
+      - No Object-envelope file in ./output_dir/ carries any spec.data rows
+      - A report names the unmapped license_tier column and the kind checked
+      - The user is routed to infrahub-managing-schemas for the schema decision
+      - No partial emission that drops the unmapped column
+    assertions:
+      - name: fail-closed
+        check: >-
+          No Object document in the output dir emits spec.data rows for an
+          input that has an unmapped column
+
+  - name: csv-import-folder-coverage
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have a directory `./imports/` holding three CSV files, one kind
+      each:
+
+          # imports/manufacturers.csv
+          name,country
+          Arista,US
+          Cisco,US
+
+          # imports/sites.csv
+          name,country
+          par-1,FR
+          nyc-1,US
+
+          # imports/devices.csv
+          name,role,site,manufacturer
+          spine-01,spine,par-1,Arista
+          edge-01,edge,nyc-1,Cisco
+
+      Schema (fixed): OrganizationManufacturer (`human_friendly_id:
+      [name__value]`), LocationSite (`human_friendly_id: [name__value]`), and
+      DcimDevice (`human_friendly_id: [name__value]`, relationships `site` →
+      LocationSite and `manufacturer` → OrganizationManufacturer).
+
+      Treat the directory as the input: scan it, normalize to a flat file list,
+      and emit Infrahub object YAML for every file to `./output_dir/`, numbered
+      for load order.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_folder_coverage.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ with NN-prefixed files covering all three input
+      kinds — OrganizationManufacturer, LocationSite, and DcimDevice — with
+      manufacturers and sites loading before devices, and scalar HFID references
+      from devices to each.
+    expectations:
+      - All three input kinds appear in the emission (no file dropped)
+      - Manufacturers and sites are numbered before devices
+      - Files use NN_ load-order prefixes
+      - Envelope is correct on every emitted doc
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: load-order-numbering
+        check: Emitted files use NN_ numeric prefixes for load order
+      - name: folder-coverage
+        check: >-
+          Every kind implied by the input directory appears in the emission;
+          no file dropped during folder expansion
+
+  - name: csv-import-decomposition
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have ONE denormalized CSV that conflates three kinds — the site
+      and manufacturer columns repeat on every device row:
+
+          # inventory.csv
+          device_name,device_role,site_name,site_country,manufacturer_name,manufacturer_country
+          spine-01,spine,par-1,FR,Arista,US
+          spine-02,spine,par-1,FR,Arista,US
+          leaf-01,leaf,par-1,FR,Arista,US
+          edge-01,edge,nyc-1,US,Cisco,US
+
+      Schema (fixed): OrganizationManufacturer (`human_friendly_id:
+      [name__value]`, attributes `name`, `country`), LocationSite
+      (`human_friendly_id: [name__value]`, attributes `name`, `country`), and
+      DcimDevice (`human_friendly_id: [name__value]`, attribute `role`,
+      relationships `site` → LocationSite and `manufacturer` →
+      OrganizationManufacturer).
+
+      Split this single sheet across the three kinds and emit Infrahub object
+      YAML to `./output_dir/`, numbered for load order. Do not load anything.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_decomposition.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ with one NN-prefixed file per kind:
+      manufacturers (Arista, Cisco — deduped) and sites (par-1, nyc-1 —
+      deduped) loading before devices, and the four device rows carrying
+      scalar HFID references `manufacturer` and `site`.
+    expectations:
+      - The single sheet is split into three kinds, one file each
+      - Repeated manufacturer/site values are deduped (Arista and par-1 appear once)
+      - Manufacturers and sites are numbered before devices
+      - Devices carry scalar HFID references to manufacturer and site
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: load-order-numbering
+        check: Each kind is produced by exactly one numbered file
+      - name: hfid-reference-shape
+        check: >-
+          Device manufacturer and site references are scalar HFIDs (target
+          HFID length 1)
+      - name: decomposition
+        check: >-
+          The denormalized sheet is split into manufacturer, site, and device
+          kinds; referents are deduped and load before the devices that
+          reference them
