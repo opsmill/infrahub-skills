@@ -1006,6 +1006,122 @@ def check_folder_coverage(
 
 
 # ---------------------------------------------------------------------------
+# Fixture for denormalized-sheet decomposition
+# ---------------------------------------------------------------------------
+
+
+# A single denormalized sheet conflating these kinds must split into one
+# NN-prefixed file per kind. Keep in sync with the eval prompt.
+FIXTURE_DECOMP_EXPECTED_KINDS: set[str] = {
+    "OrganizationManufacturer",
+    "LocationSite",
+    "DcimDevice",
+}
+
+# Reference relationships the referring kind carries into upstream kinds. The
+# producer file of the target kind must load no later than the file holding a
+# row that references it.
+FIXTURE_DECOMP_REFERENCES: dict[str, str] = {
+    "manufacturer": "OrganizationManufacturer",
+    "site": "LocationSite",
+}
+
+
+def check_decomposition(
+    parsed_files: dict[Path, list[dict]], **_: Any
+) -> tuple[bool, str]:
+    """A denormalized sheet splits into one file per kind, referents first.
+
+    Asserts (a) every kind the sheet conflates appears, each produced by
+    exactly one NN-prefixed file (the sheet was split, not dumped into a
+    single kind); (b) the repeated parent values were deduped (no duplicate
+    HFID ``name`` within a referent kind); (c) referent kinds load before
+    the referring kind (lower-or-equal NN prefix), so ``object load`` sees
+    each reference target before the row that points at it.
+    """
+    if not parsed_files:
+        return False, "No YAML files in output directory"
+
+    # Map each kind to the NN prefix of the file(s) producing it.
+    kind_to_num: dict[str, int] = {}
+    kind_to_files: dict[str, set[Path]] = {}
+    unnumbered: set[str] = set()
+    for file_path, docs in parsed_files.items():
+        m = _NN_PREFIX_RE.match(file_path.name)
+        num = int(m.group(1)) if m else None
+        for doc in docs:
+            spec = doc.get("spec") or {}
+            kind = spec.get("kind")
+            if not isinstance(kind, str):
+                continue
+            kind_to_files.setdefault(kind, set()).add(file_path)
+            if num is None:
+                unnumbered.add(file_path.name)
+            elif kind not in kind_to_num or num < kind_to_num[kind]:
+                kind_to_num[kind] = num
+
+    # (a) The sheet was split across every conflated kind, one file each.
+    missing = sorted(FIXTURE_DECOMP_EXPECTED_KINDS - set(kind_to_files))
+    if missing:
+        return False, (
+            f"Denormalized sheet not fully split — no rows for: {', '.join(missing)}"
+        )
+    if unnumbered:
+        return False, (
+            f"Emitted files lack an NN_ load-order prefix: {', '.join(sorted(unnumbered)[:5])}"
+        )
+    multi = [
+        f"{k} in {len(fs)} files ({', '.join(sorted(f.name for f in fs))})"
+        for k, fs in kind_to_files.items()
+        if k in FIXTURE_DECOMP_EXPECTED_KINDS and len(fs) > 1
+    ]
+    if multi:
+        return False, "Kind split across multiple files: " + "; ".join(multi[:4])
+
+    # (b) Repeated parent values were deduped within each referent kind.
+    dup_issues: list[str] = []
+    for target_kind in sorted(set(FIXTURE_DECOMP_REFERENCES.values())):
+        names: list[str] = []
+        for _fp, kind, row in _walk_data_rows(parsed_files):
+            if kind != target_kind:
+                continue
+            nm = _attr_value(row.get("name"))
+            if isinstance(nm, str):
+                names.append(nm)
+        dups = sorted({n for n in names if names.count(n) > 1})
+        if dups:
+            dup_issues.append(f"{target_kind}: duplicate rows for {', '.join(dups)}")
+    if dup_issues:
+        return False, "Repeated parent rows not deduped: " + "; ".join(dup_issues[:4])
+
+    # (c) Referent kinds load before the referring kind.
+    order_issues: list[str] = []
+    for rel_key, target_kind in FIXTURE_DECOMP_REFERENCES.items():
+        target_num = kind_to_num.get(target_kind)
+        if target_num is None:
+            continue
+        for file_path, _kind, row in _walk_data_rows(parsed_files):
+            if rel_key not in row:
+                continue
+            m = _NN_PREFIX_RE.match(file_path.name)
+            if m is None:
+                continue
+            if target_num > int(m.group(1)):
+                order_issues.append(
+                    f"{target_kind} (file {target_num:02d}) loads after a row "
+                    f"referencing it via {rel_key!r} in {file_path.name}"
+                )
+                break
+    if order_issues:
+        return False, "Load order inverted: " + "; ".join(order_issues[:4])
+
+    return True, (
+        f"Denormalized sheet split into {len(kind_to_files)} kinds; referents "
+        f"deduped and loaded before referrers"
+    )
+
+
+# ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
 
@@ -1028,6 +1144,7 @@ CHECKS: dict[str, Any] = {
     "lineage-stamping": check_lineage_stamping,
     "fail-closed": check_fail_closed,
     "folder-coverage": check_folder_coverage,
+    "decomposition": check_decomposition,
 }
 
 

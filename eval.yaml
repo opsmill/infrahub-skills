@@ -2735,3 +2735,58 @@ tasks:
         check: >-
           Every kind implied by the input directory appears in the emission;
           no file dropped during folder expansion
+
+  - name: csv-import-decomposition
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have ONE denormalized CSV that conflates three kinds — the site
+      and manufacturer columns repeat on every device row:
+
+          # inventory.csv
+          device_name,device_role,site_name,site_country,manufacturer_name,manufacturer_country
+          spine-01,spine,par-1,FR,Arista,US
+          spine-02,spine,par-1,FR,Arista,US
+          leaf-01,leaf,par-1,FR,Arista,US
+          edge-01,edge,nyc-1,US,Cisco,US
+
+      Schema (fixed): OrganizationManufacturer (`human_friendly_id:
+      [name__value]`, attributes `name`, `country`), LocationSite
+      (`human_friendly_id: [name__value]`, attributes `name`, `country`), and
+      DcimDevice (`human_friendly_id: [name__value]`, attribute `role`,
+      relationships `site` → LocationSite and `manufacturer` →
+      OrganizationManufacturer).
+
+      Split this single sheet across the three kinds and emit Infrahub object
+      YAML to `./output_dir/`, numbered for load order. Do not load anything.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_decomposition.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A directory ./output_dir/ with one NN-prefixed file per kind:
+      manufacturers (Arista, Cisco — deduped) and sites (par-1, nyc-1 —
+      deduped) loading before devices, and the four device rows carrying
+      scalar HFID references `manufacturer` and `site`.
+    expectations:
+      - The single sheet is split into three kinds, one file each
+      - Repeated manufacturer/site values are deduped (Arista and par-1 appear once)
+      - Manufacturers and sites are numbered before devices
+      - Devices carry scalar HFID references to manufacturer and site
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
+          spec.data list
+      - name: load-order-numbering
+        check: Each kind is produced by exactly one numbered file
+      - name: hfid-reference-shape
+        check: >-
+          Device manufacturer and site references are scalar HFIDs (target
+          HFID length 1)
+      - name: decomposition
+        check: >-
+          The denormalized sheet is split into manufacturer, site, and device
+          kinds; referents are deduped and load before the devices that
+          reference them

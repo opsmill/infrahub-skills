@@ -469,6 +469,36 @@
           "check": "Every kind implied by the input directory appears in the emission; no file dropped during folder expansion"
         }
       ]
+    },
+    {
+      "id": 25,
+      "prompt": "I have ONE denormalized CSV that conflates three kinds \u2014 the site\nand manufacturer columns repeat on every device row:\n\n    # inventory.csv\n    device_name,device_role,site_name,site_country,manufacturer_name,manufacturer_country\n    spine-01,spine,par-1,FR,Arista,US\n    spine-02,spine,par-1,FR,Arista,US\n    leaf-01,leaf,par-1,FR,Arista,US\n    edge-01,edge,nyc-1,US,Cisco,US\n\nSchema (fixed): OrganizationManufacturer (`human_friendly_id:\n[name__value]`, attributes `name`, `country`), LocationSite\n(`human_friendly_id: [name__value]`, attributes `name`, `country`), and\nDcimDevice (`human_friendly_id: [name__value]`, attribute `role`,\nrelationships `site` \u2192 LocationSite and `manufacturer` \u2192\nOrganizationManufacturer).\n\nSplit this single sheet across the three kinds and emit Infrahub object\nYAML to `./output_dir/`, numbered for load order. Do not load anything.",
+      "expected_output": "A directory ./output_dir/ with one NN-prefixed file per kind: manufacturers (Arista, Cisco \u2014 deduped) and sites (par-1, nyc-1 \u2014 deduped) loading before devices, and the four device rows carrying scalar HFID references `manufacturer` and `site`.",
+      "files": [],
+      "expectations": [
+        "The single sheet is split into three kinds, one file each",
+        "Repeated manufacturer/site values are deduped (Arista and par-1 appear once)",
+        "Manufacturers and sites are numbered before devices",
+        "Devices carry scalar HFID references to manufacturer and site"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "load-order-numbering",
+          "check": "Each kind is produced by exactly one numbered file"
+        },
+        {
+          "name": "hfid-reference-shape",
+          "check": "Device manufacturer and site references are scalar HFIDs (target HFID length 1)"
+        },
+        {
+          "name": "decomposition",
+          "check": "The denormalized sheet is split into manufacturer, site, and device kinds; referents are deduped and load before the devices that reference them"
+        }
+      ]
     }
   ]
 }
