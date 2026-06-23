@@ -285,10 +285,11 @@ load-bearing — earlier steps gate later ones.
 
 ## Supporting References
 
-- **[examples.md](./examples.md)** — 6 worked CSV
+- **[examples.md](./examples.md)** — 8 worked CSV
   patterns: flat list, denormalized split,
   parent-with-children, dropdown label normalization,
-  range collapse, lineage stamping
+  range collapse, lineage stamping, fail-closed
+  report, merge + dedup
 - **[reference.md](./reference.md)** — heuristic
   order, file envelope reminder, HFID decision
   matrix, file naming convention
