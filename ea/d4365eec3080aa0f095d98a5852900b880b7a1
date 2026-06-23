@@ -1,0 +1,22 @@
+skills/infrahub-importing-data/SKILL.md
+  s_23cce8916795b1::t_3519381b1feb0c 288,291-292
+skills/infrahub-importing-data/rules/outputs-provenance-comment.md
+  s_23cce8916795b1::t_a16e4c34046138 107
+  s_23cce8916795b1::t_aa0954cb78374b 44,68,136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "ead4365eec3080aa0f095d98a5852900b880b7a1",
+  "prompts": {},
+  "sessions": {
+    "s_23cce8916795b1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c83da3e8-0c24-4a34-a1f5-4a899cd26d9e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
