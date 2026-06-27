@@ -362,6 +362,89 @@ convention).
 
 ---
 
+## Phase 9: YAGNI / Cost-to-Fix (MEDIUM)
+
+Walk every rule with the `yagni-` prefix against the
+artifacts in scope. These rules ask "is there a cheaper
+layer that already does this?" before accepting Python
+or denormalized data. Findings are advisory — they do
+not block deployment, but each one represents work the
+schema, GraphQL, or built-in IPAM/VLAN layers could be
+doing instead.
+
+**Severity cap**: every YAGNI rule emits at **MEDIUM**
+at most. None of these findings indicate broken or
+incorrect behaviour — the code works, the schema
+loads, the pipeline passes. CRITICAL and HIGH are
+reserved for the earlier phases (broken refs, silent
+failures, deprecated fields). If a finding feels HIGH,
+it likely belongs to a different rule category, not to
+YAGNI.
+
+The ladder steps come from each rule's `ladder_step`
+frontmatter field. Lower step numbers are cheaper
+fixes; sort findings by `ladder_step` ascending within
+this phase only (other phases keep their existing
+order).
+
+### 9.1 Schema rules
+
+- `yagni-denormalized-vs-indirect-relationship` (step 4, MEDIUM)
+- `yagni-duplicate-shape-not-extracted-to-generic` (step 2, MEDIUM)
+- `yagni-custom-domain-primitives-instead-of-builtin` (step 2, MEDIUM)
+  — IPAM (`BuiltinIPAddress`, `BuiltinIPPrefix`,
+  `BuiltinIPNamespace`, `IpamIPAddress`,
+  `IpamIPPrefix`), VLANs (`IpamVLAN`), and similar
+  built-in domain primitives must be inherited from,
+  not redefined.
+- `yagni-missing-inverse-forces-python-filter` (step 3, MEDIUM) —
+  `kind: Attribute` + `cardinality: one` rels must declare a
+  matching inverse on the peer; otherwise consumers filter in
+  Python.
+
+### 9.2 Check rules
+
+- `yagni-python-validator-vs-schema-constraint` (step 3, MEDIUM)
+- `yagni-redundant-check-that-graphql-can-answer` (step 6, MEDIUM)
+
+### 9.3 Transform rules
+
+- `yagni-python-transform-that-could-be-jinja2` (step 5, MEDIUM)
+
+### 9.4 Generator rules
+
+- `yagni-generator-hardcoding-data` (step 2, MEDIUM)
+  — explicit carve-out for `bootstrap/`, `seed/`,
+  `demo/` directories.
+- `yagni-duplicate-shape-not-extracted-to-generic`
+  (step 2, MEDIUM) — also applies when a generator's
+  output shape duplicates an existing generic.
+- `yagni-generator-query-shape-too-broad` (step 4, MEDIUM) —
+  `CoreGeneratorGroup` in the data query, focal-exclude
+  loops, or `>2` top-level kind sections. Frequently
+  co-occurs with `yagni-missing-inverse-forces-python-filter`;
+  re-check both together.
+
+### 9.5 Output
+
+When emitting YAGNI findings in `AUDIT_REPORT.md`,
+sort by `ladder_step` ascending (cheapest fix on top),
+then by file path. Each finding line carries the rule
+name, the ladder step, the file:line, and the
+suggested replacement pulled from the rule's "Checks"
+section.
+
+For tooling integration (evals, downstream automation)
+the audit can additionally emit findings as JSON to
+`output.json` when explicitly prompted to. The JSON
+form carries the same `rule`, `severity`,
+`ladder_step`, `file`, and `replacement` fields as the
+markdown report — the two are different
+serialisations of the same finding set, ordered the
+same way.
+
+---
+
 ## Report Generation
 
 After all phases, produce a markdown report with:

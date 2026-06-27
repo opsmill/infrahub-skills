@@ -44,7 +44,7 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 | `infrahub-managing-transforms` | `skills/infrahub-managing-transforms/` | Data transforms (Python/Jinja2) |
 | `infrahub-managing-menus` | `skills/infrahub-managing-menus/` | Custom navigation menus |
 | `infrahub-analyzing-data` | `skills/infrahub-analyzing-data/` | Live data analysis via MCP server |
-| `infrahub-auditing-repo` | `skills/infrahub-auditing-repo/` | Audit repository against best practices |
+| `infrahub-auditing-repo` | `skills/infrahub-auditing-repo/` | Audit repository against best practices (incl. YAGNI / cost-to-fix rules) |
 | `infrahub-reporting-issues` | `skills/infrahub-reporting-issues/` | Route and prepare bug/feature reports for any opsmill/infrahub-* repo |
 | `infrahub-collecting-diagnostics` | `skills/infrahub-collecting-diagnostics/` | Collect a redacted local diagnostic bundle (logs, config, state) for OpsMill expert hand-off |
 | `infrahub-importing-data` | `skills/infrahub-importing-data/` | Convert CSV/TSV inputs into Infrahub object YAML and load onto a fresh branch |

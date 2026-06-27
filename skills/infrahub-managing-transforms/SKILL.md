@@ -70,6 +70,28 @@ someone is waiting for the output.
 | Is referenced from `artifact_definitions.transformation` | The transform's registered `name` must match the `transformation:` field exactly — mismatch produces "transformation not found" at render time | [rules/artifacts-definitions.md](./rules/artifacts-definitions.md) |
 | Uses Jinja2 (not Python) | Register under `jinja2_transforms` with a top-level `query:` field — `python_transforms` binds query on the class, the two keys are not interchangeable | [rules/api-reference.md](./rules/api-reference.md) |
 
+## Before writing Python
+
+If the transform body is string formatting — f-strings,
+concatenation, conditional sections — Jinja2 expresses
+the same output in fewer lines, renders directly in
+the proposed-change UI, and lives under
+`jinja2_transforms` in `.infrahub.yml` instead of
+`python_transforms`. Walk this ladder before reaching
+for `InfrahubTransform`:
+
+| Signal | Cheaper layer | See rule |
+| ------ | ------------- | -------- |
+| Transform body is `return f"..."` or `"\n".join([...])` built from query results | Jinja2 template file | [yagni-python-transform-that-could-be-jinja2](../infrahub-auditing-repo/rules/yagni-python-transform-that-could-be-jinja2.md) |
+| Transform copies query data verbatim without computation | The GraphQL query alone — no transform needed | Ladder step 1 (drop the requirement); judgment call, no rule |
+| Conditionals are `if x: out += ...; else: out += ...` and nothing else | Jinja2 `{% if %}` blocks | [yagni-python-transform-that-could-be-jinja2](../infrahub-auditing-repo/rules/yagni-python-transform-that-could-be-jinja2.md) |
+
+Use Python when the transform parses, computes, or
+reshapes — IP/subnet math, hashing, ordered
+aggregation, structural JSON re-shaping. See
+[rules/python-transform.md](./rules/python-transform.md)
+for the legitimate cases.
+
 ## Transform Basics
 
 Two types of transforms:
