@@ -144,6 +144,29 @@ def check_yagni_findings_sorted_by_ladder(findings: list[dict]) -> tuple[bool, s
     return True, f"yagni findings sorted by ladder_step: {steps}"
 
 
+def check_yagni_no_finding_above_medium(findings: list[dict]) -> tuple[bool, str]:
+    """Class-level severity cap: every yagni-* finding must be MEDIUM or LOW.
+
+    YAGNI rules are advisory — the code works, the schema loads, the
+    pipeline passes. The audit's severity legend reserves CRITICAL and
+    HIGH for broken refs, silent failures, and deprecated fields. This
+    check enforces the cap across the whole finding set so a new yagni
+    rule added without updating its per-rule grader can't silently
+    introduce a HIGH-severity finding.
+    """
+    ALLOWED = {"MEDIUM", "LOW"}
+    offenders = [
+        f for f in findings
+        if isinstance(f, dict)
+        and str(f.get("rule", "")).startswith("yagni-")
+        and str(f.get("severity", "")).upper() not in ALLOWED
+    ]
+    if offenders:
+        details = [f"{f.get('rule')}={f.get('severity')}" for f in offenders]
+        return False, f"yagni severity cap violated (MEDIUM max): {details}"
+    return True, "all yagni findings at MEDIUM or below"
+
+
 def check_yagni_finding_carves_out_bootstrap(
     findings: list[dict], bootstrap_path_substring: str = "bootstrap"
 ) -> tuple[bool, str]:
@@ -173,6 +196,7 @@ _BASE_CHECKS: dict[str, Any] = {
     "yagni-finding-ladder-step": check_yagni_finding_ladder_step,
     "yagni-findings-sorted": check_yagni_findings_sorted_by_ladder,
     "yagni-bootstrap-carveout": check_yagni_finding_carves_out_bootstrap,
+    "yagni-no-above-medium": check_yagni_no_finding_above_medium,
 }
 
 
@@ -203,6 +227,8 @@ def _dispatch(name: str, findings: list[dict]) -> tuple[bool, str]:
     if fn_name == "yagni-bootstrap-carveout":
         return fn(findings)
     if fn_name == "yagni-findings-sorted":
+        return fn(findings)
+    if fn_name == "yagni-no-above-medium":
         return fn(findings)
     return False, f"unhandled check: {fn_name}"
 

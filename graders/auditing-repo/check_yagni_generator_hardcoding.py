@@ -21,6 +21,7 @@ CHECKS = [
     f"yagni-finding-severity:{RULE}:MEDIUM",
     f"yagni-finding-ladder-step:{RULE}:2",
     "yagni-bootstrap-carveout",
+    "yagni-no-above-medium",
 ]
 
 if __name__ == "__main__":

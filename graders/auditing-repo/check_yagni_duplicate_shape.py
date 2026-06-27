@@ -16,6 +16,7 @@ CHECKS = [
     f"yagni-finding-present:{RULE}",
     f"yagni-finding-severity:{RULE}:MEDIUM",
     f"yagni-finding-ladder-step:{RULE}:2",
+    "yagni-no-above-medium",
 ]
 
 if __name__ == "__main__":

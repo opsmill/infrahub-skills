@@ -35,6 +35,7 @@ for rule, step, sev in ALL_RULES:
     CHECKS.append(f"yagni-finding-severity:{rule}:{sev}")
     CHECKS.append(f"yagni-finding-ladder-step:{rule}:{step}")
 CHECKS.append("yagni-findings-sorted")
+CHECKS.append("yagni-no-above-medium")
 
 if __name__ == "__main__":
     print(json.dumps(run_checks(CHECKS, Path("output.json"))))
