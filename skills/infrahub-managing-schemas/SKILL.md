@@ -104,6 +104,28 @@ When the task spans multiple skills (schemas + transforms,
 schemas + menus, etc.), load both skills' rules together
 rather than treating the boundaries as exclusive.
 
+## Design for the cheaper layer
+
+A schema choice can remove the need for Python or
+denormalized data downstream. The schema is the cheapest
+place to get this right — fixing it later means a
+migration on already-loaded data. Before adding a field or
+node, check whether a built-in or structural feature
+already covers it:
+
+| Signal | Cheaper layer | See rule |
+| ------ | ------------- | -------- |
+| Copying a value onto a node that's reachable by traversing a relationship (`region_code` when `device.location.region.code` exists) | An indirect relationship traversal; let consumers follow the link | [yagni-denormalized-vs-indirect-relationship](../infrahub-auditing-repo/rules/yagni-denormalized-vs-indirect-relationship.md) |
+| Several sibling nodes repeating the same attributes and relationships | Extract a generic and `inherit_from` it | [yagni-duplicate-shape-not-extracted-to-generic](../infrahub-auditing-repo/rules/yagni-duplicate-shape-not-extracted-to-generic.md) |
+| Defining custom IP address / prefix / VLAN nodes | `inherit_from` the built-in primitive (`BuiltinIPAddress`, `BuiltinIPPrefix`, `IpamVLAN`) | [yagni-custom-domain-primitives-instead-of-builtin](../infrahub-auditing-repo/rules/yagni-custom-domain-primitives-instead-of-builtin.md) |
+| An `Attribute` + `cardinality: one` relationship with no inverse on the peer | Declare the matching inverse so consumers filter in the query, not in Python | [yagni-missing-inverse-forces-python-filter](../infrahub-auditing-repo/rules/yagni-missing-inverse-forces-python-filter.md) |
+
+These are the schema-side counterparts to the "Before
+writing Python" guidance in the checks, transforms, and
+generators skills. The repo auditor flags them as advisory
+cost-to-fix findings; catching them at design time avoids
+both the finding and the later migration.
+
 ## Workflow
 
 Follow these steps when creating or modifying a schema:
