@@ -3175,6 +3175,78 @@ tasks:
       cascade-shape signatures (CoreGeneratorGroup in query, focal-
       exclude loop) should be cited in the replacement.
 
+  - name: yagni-imperative-allocation
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit these two generators:
+
+      File generators/provision_circuit.py (production path):
+      ```python
+      import ipaddress
+      import random
+      from infrahub_sdk.generator import InfrahubGenerator
+
+      class ProvisionCircuit(InfrahubGenerator):
+          query = "circuit_request"
+
+          async def generate(self, data):
+              req = data["CircuitRequest"]["edges"][0]["node"]
+
+              # VLANs already come from a pool — this part is fine.
+              vlan = await self.client.allocate_next_ip_prefix(
+                  resource_pool="circuit_vlan_pool"
+              )
+
+              # Subnet: hand-split a /30 out of the parent block.
+              parent = ipaddress.ip_network(req["block"]["value"])
+              child = next(parent.subnets(new_prefix=30))
+              await (await self.client.create(
+                  kind="IpamIPPrefix", data={"prefix": str(child)}
+              )).save(allow_upsert=True)
+
+              # Port: roll a switch and scan peers for the first free one.
+              switch_index = random.randint(1, 2)
+              switch = req["switches"]["edges"][switch_index]["node"]
+              port = next(
+                  (p for p in switch["interfaces"]["edges"]
+                   if p["node"]["status"]["value"] == "free"),
+                  None,
+              )
+      ```
+
+      File generators/router_id.py (legitimate derivation):
+      ```python
+      import ipaddress
+      from infrahub_sdk.generator import InfrahubGenerator
+
+      class RouterId(InfrahubGenerator):
+          async def generate(self, data):
+              # router-id must EQUAL the loopback address — a deterministic
+              # derivation, not a "next free" allocation. Do not flag.
+              loopback = data["Device"]["edges"][0]["node"]["loopback"]["value"]
+              router_id = str(ipaddress.ip_interface(loopback).ip)
+              # ... set router_id on the device, no IPAM object created ...
+      ```
+
+      Important: the audit must NOT flag generators/router_id.py — it
+      derives a value deterministically and persists no allocation (see
+      "What NOT to flag" in the rule).
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_imperative_allocation.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-imperative-allocation-vs-resource-pool
+      finding for generators/provision_circuit.py (severity MEDIUM,
+      ladder_step 2), citing the subnet math and/or the random port
+      scan and pointing at Infrahub resource pools
+      (CoreIPPrefixPool / CoreNumberPool / allocate_next_ip_*). No
+      finding should be emitted for generators/router_id.py.
+
   - name: yagni-findings-sorted
     instruction: |
       Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and

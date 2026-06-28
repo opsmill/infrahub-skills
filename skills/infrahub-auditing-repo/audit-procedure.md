@@ -424,6 +424,14 @@ order).
   loops, or `>2` top-level kind sections. Frequently
   co-occurs with `yagni-missing-inverse-forces-python-filter`;
   re-check both together.
+- `yagni-imperative-allocation-vs-resource-pool` (step 2, MEDIUM) —
+  subnet/IP/VLAN/port allocated with `ipaddress` math,
+  `random`, or a hand-rolled free-scan loop instead of a
+  built-in resource pool (`allocate_next_ip_prefix` /
+  `allocate_next_ip_address`, `CoreIPPrefixPool` /
+  `CoreNumberPool`). Strongest signal: the same generator
+  already allocates another resource from a pool. Do not
+  flag deterministic derivations that persist no allocation.
 
 ### 9.5 Output
 

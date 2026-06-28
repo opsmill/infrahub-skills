@@ -84,6 +84,7 @@ generator. Walk this ladder before reaching for
 | Generator hardcodes object lists, role catalogs, or status sets | YAML data files under `objects/` (loaded by the object loader) | [yagni-generator-hardcoding-data](../infrahub-auditing-repo/rules/yagni-generator-hardcoding-data.md) |
 | Generator recreates a built-in IPAM/VLAN primitive (custom IP address, prefix, VLAN nodes) | `inherit_from: [BuiltinIPAddress / BuiltinIPPrefix / IpamVLAN]` in the schema, then the generator computes references rather than reimplementing the primitive | [yagni-custom-domain-primitives-instead-of-builtin](../infrahub-auditing-repo/rules/yagni-custom-domain-primitives-instead-of-builtin.md) |
 | Generator's output shape duplicates objects already in `opsmill/schema-library` | `inherit_from` a library generic; the generator computes the *instance* but not the *shape* | [yagni-duplicate-shape-not-extracted-to-generic](../infrahub-auditing-repo/rules/yagni-duplicate-shape-not-extracted-to-generic.md) |
+| Generator allocates a subnet/IP/VLAN/port with `ipaddress` math, `random`, or a hand-written "find the first free one" loop | A built-in resource pool — `allocate_next_ip_prefix` / `allocate_next_ip_address`, `CoreIPPrefixPool` / `CoreNumberPool` — which tracks utilization and stays idempotent across re-runs | [yagni-imperative-allocation-vs-resource-pool](../infrahub-auditing-repo/rules/yagni-imperative-allocation-vs-resource-pool.md) |
 
 Bootstrap, seed, and demo generators (under
 `bootstrap/`, `seed/`, `demo/`) are exempt — they
