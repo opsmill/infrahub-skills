@@ -1,13 +1,13 @@
 ---
 title: yagni-redundant-check-that-graphql-can-answer
-impact: MEDIUM
+impact: LOW
 ladder_step: 6
 tags: audit, yagni, check, graphql
 ---
 
 # Rule: yagni-redundant-check-that-graphql-can-answer
 
-**Severity**: MEDIUM
+**Severity**: LOW
 **Category**: YAGNI / Cost-to-Fix
 **Ladder step**: 6 — Can a GraphQL query + thin assertion replace the check?
 

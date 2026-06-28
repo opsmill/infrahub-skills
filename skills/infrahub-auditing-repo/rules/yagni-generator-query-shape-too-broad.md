@@ -1,13 +1,13 @@
 ---
 title: yagni-generator-query-shape-too-broad
-impact: MEDIUM
+impact: LOW
 ladder_step: 4
 tags: audit, yagni, generator, query-shape, cross-references
 ---
 
 # Rule: yagni-generator-query-shape-too-broad
 
-**Severity**: MEDIUM
+**Severity**: LOW
 **Category**: YAGNI / Cost-to-Fix
 **Ladder step**: 4 — Can an indirect relationship traversal answer it?
 

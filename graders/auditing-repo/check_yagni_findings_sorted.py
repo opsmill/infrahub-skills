@@ -17,16 +17,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import run_checks  # noqa: E402
 
 ALL_RULES = [
-    # (rule, ladder_step, severity) — all yagni rules cap at MEDIUM by policy
+    # (rule, ladder_step, severity) — severity tracks the ladder, capped at
+    # MEDIUM: cheap, unambiguous fixes (steps 2-3) emit MEDIUM; costlier
+    # rewrites where the Python is more defensible (steps 4-6) emit LOW.
     ("yagni-duplicate-shape-not-extracted-to-generic", 2, "MEDIUM"),
     ("yagni-generator-hardcoding-data", 2, "MEDIUM"),
     ("yagni-custom-domain-primitives-instead-of-builtin", 2, "MEDIUM"),
     ("yagni-python-validator-vs-schema-constraint", 3, "MEDIUM"),
     ("yagni-missing-inverse-forces-python-filter", 3, "MEDIUM"),
-    ("yagni-denormalized-vs-indirect-relationship", 4, "MEDIUM"),
-    ("yagni-generator-query-shape-too-broad", 4, "MEDIUM"),
-    ("yagni-python-transform-that-could-be-jinja2", 5, "MEDIUM"),
-    ("yagni-redundant-check-that-graphql-can-answer", 6, "MEDIUM"),
+    ("yagni-denormalized-vs-indirect-relationship", 4, "LOW"),
+    ("yagni-generator-query-shape-too-broad", 4, "LOW"),
+    ("yagni-python-transform-that-could-be-jinja2", 5, "LOW"),
+    ("yagni-redundant-check-that-graphql-can-answer", 6, "LOW"),
 ]
 
 CHECKS: list[str] = []

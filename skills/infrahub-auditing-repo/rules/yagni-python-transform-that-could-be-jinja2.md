@@ -1,13 +1,13 @@
 ---
 title: yagni-python-transform-that-could-be-jinja2
-impact: MEDIUM
+impact: LOW
 ladder_step: 5
 tags: audit, yagni, transform, jinja2
 ---
 
 # Rule: yagni-python-transform-that-could-be-jinja2
 
-**Severity**: MEDIUM
+**Severity**: LOW
 **Category**: YAGNI / Cost-to-Fix
 **Ladder step**: 5 — Can a Jinja2 transform produce it?
 

@@ -2870,7 +2870,7 @@ tasks:
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-redundant-check-that-graphql-can-answer
-      finding with severity MEDIUM and ladder_step 6.
+      finding with severity LOW and ladder_step 6.
 
   - name: yagni-python-vs-jinja2
     instruction: |
@@ -2905,7 +2905,7 @@ tasks:
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-python-transform-that-could-be-jinja2
-      finding with severity MEDIUM and ladder_step 5.
+      finding with severity LOW and ladder_step 5.
 
   - name: yagni-generator-hardcoding
     instruction: |
@@ -3007,7 +3007,7 @@ tasks:
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-denormalized-vs-indirect-relationship
-      finding with severity MEDIUM and ladder_step 4. Replacement
+      finding with severity LOW and ladder_step 4. Replacement
       points to traversing device.location.region.code.
 
   - name: yagni-duplicate-shape
@@ -3171,7 +3171,7 @@ tasks:
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-generator-query-shape-too-broad finding
-      with severity MEDIUM and ladder_step 4. Either or both of the
+      with severity LOW and ladder_step 4. Either or both of the
       cascade-shape signatures (CoreGeneratorGroup in query, focal-
       exclude loop) should be cited in the replacement.
 

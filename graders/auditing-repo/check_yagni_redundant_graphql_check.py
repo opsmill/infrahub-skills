@@ -14,7 +14,7 @@ from lib import run_checks  # noqa: E402
 RULE = "yagni-redundant-check-that-graphql-can-answer"
 CHECKS = [
     f"yagni-finding-present:{RULE}",
-    f"yagni-finding-severity:{RULE}:MEDIUM",
+    f"yagni-finding-severity:{RULE}:LOW",
     f"yagni-finding-ladder-step:{RULE}:6",
     "yagni-no-above-medium",
 ]

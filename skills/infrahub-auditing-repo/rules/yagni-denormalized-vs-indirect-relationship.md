@@ -1,13 +1,13 @@
 ---
 title: yagni-denormalized-vs-indirect-relationship
-impact: MEDIUM
+impact: LOW
 ladder_step: 4
 tags: audit, yagni, schema, relationships
 ---
 
 # Rule: yagni-denormalized-vs-indirect-relationship
 
-**Severity**: MEDIUM
+**Severity**: LOW
 **Category**: YAGNI / Cost-to-Fix
 **Ladder step**: 4 — Can an indirect relationship traversal answer it?
 

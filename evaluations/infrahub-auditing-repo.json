@@ -12,7 +12,7 @@
     {
       "id": 2,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json (same shape as\nyagni-python-validator).\n\nAudit this check (checks/check_no_unmanaged_devices.py):\n\n```python\nfrom infrahub_sdk.checks import InfrahubCheck\n\nclass NoUnmanagedDevicesCheck(InfrahubCheck):\n    query = \"unmanaged_devices\"\n\n    async def validate(self, data):\n        edges = data[\"DcimDevice\"][\"edges\"]\n        for d in edges:\n            self.log_error(message=f\"unmanaged device {d['node']['name']['value']}\")\n```\n\nWhere queries/unmanaged_devices.gql already filters to unmanaged\ndevices only (`DcimDevice(managed__value: false)`), so the Python\nis just looping and logging \u2014 no real validation logic.\n\nSave ONLY the JSON findings to: output.json",
-      "expected_output": "JSON listing one yagni-redundant-check-that-graphql-can-answer finding with severity MEDIUM and ladder_step 6.",
+      "expected_output": "JSON listing one yagni-redundant-check-that-graphql-can-answer finding with severity LOW and ladder_step 6.",
       "files": [],
       "expectations": [],
       "assertions": []
@@ -20,7 +20,7 @@
     {
       "id": 3,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this transform (transforms/interface_config.py):\n\n```python\nfrom infrahub_sdk.transforms import InfrahubTransform\n\nclass InterfaceConfig(InfrahubTransform):\n    query = \"interfaces\"\n\n    async def transform(self, data):\n        lines = []\n        for iface in data[\"DcimInterface\"][\"edges\"]:\n            n = iface[\"node\"]\n            lines.append(f\"interface {n['name']['value']}\")\n            lines.append(f\"  description {n['description']['value']}\")\n            if n[\"enabled\"][\"value\"]:\n                lines.append(\"  no shutdown\")\n            else:\n                lines.append(\"  shutdown\")\n        return \"\\n\".join(lines)\n```\n\nSave ONLY the JSON findings to: output.json",
-      "expected_output": "JSON listing one yagni-python-transform-that-could-be-jinja2 finding with severity MEDIUM and ladder_step 5.",
+      "expected_output": "JSON listing one yagni-python-transform-that-could-be-jinja2 finding with severity LOW and ladder_step 5.",
       "files": [],
       "expectations": [],
       "assertions": []
@@ -36,7 +36,7 @@
     {
       "id": 5,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this schema (schemas/dcim.yml):\n\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: Device\n    namespace: Dcim\n    attributes:\n      - name: name\n        kind: Text\n      - name: region_code\n        kind: Text\n    relationships:\n      - name: location\n        peer: LocationSite\n        kind: Attribute\n        cardinality: one\n        identifier: device__location\n  - name: Site\n    namespace: Location\n    attributes:\n      - name: name\n        kind: Text\n      - name: region_code\n        kind: Text\n    relationships:\n      - name: region\n        peer: LocationRegion\n        kind: Parent\n        cardinality: one\n        identifier: site__region\n```\n\n`region_code` is denormalized onto `DcimDevice` when\n`device.location.region.code` is the canonical path.\n\nSave ONLY the JSON findings to: output.json",
-      "expected_output": "JSON listing one yagni-denormalized-vs-indirect-relationship finding with severity MEDIUM and ladder_step 4. Replacement points to traversing device.location.region.code.",
+      "expected_output": "JSON listing one yagni-denormalized-vs-indirect-relationship finding with severity LOW and ladder_step 4. Replacement points to traversing device.location.region.code.",
       "files": [],
       "expectations": [],
       "assertions": []
@@ -68,7 +68,7 @@
     {
       "id": 9,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this generator. The `.gql` references the trigger group\n`CoreGeneratorGroup` and the Python contains a focal-exclude loop\n\u2014 both signatures of cascade-shape.\n\nFile generators/pop_designs.py:\n```python\nfrom infrahub_sdk.generator import InfrahubGenerator\n\nclass PopDesignsGenerator(InfrahubGenerator):\n    query = \"pop_designs_query\"\n\n    async def generate(self, data):\n        for design in data[\"TopologyPopDesign\"][\"edges\"]:\n            if design[\"node\"][\"name\"][\"value\"] == self.focal.name.value:\n                continue\n            # ...\n```\n\nFile queries/pop_designs_query.gql:\n```graphql\nquery {\n  CoreGeneratorGroup(name__value: \"pop_designs\") { edges { node { id } } }\n  TopologyPopDesign { edges { node { name { value } } } }\n}\n```\n\nSave ONLY the JSON findings to: output.json",
-      "expected_output": "JSON listing one yagni-generator-query-shape-too-broad finding with severity MEDIUM and ladder_step 4. Either or both of the cascade-shape signatures (CoreGeneratorGroup in query, focal- exclude loop) should be cited in the replacement.",
+      "expected_output": "JSON listing one yagni-generator-query-shape-too-broad finding with severity LOW and ladder_step 4. Either or both of the cascade-shape signatures (CoreGeneratorGroup in query, focal- exclude loop) should be cited in the replacement.",
       "files": [],
       "expectations": [],
       "assertions": []

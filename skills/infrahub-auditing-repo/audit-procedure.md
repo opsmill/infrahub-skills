@@ -362,7 +362,7 @@ convention).
 
 ---
 
-## Phase 9: YAGNI / Cost-to-Fix (MEDIUM)
+## Phase 9: YAGNI / Cost-to-Fix (MEDIUM–LOW)
 
 Walk every rule with the `yagni-` prefix against the
 artifacts in scope. These rules ask "is there a cheaper
@@ -381,15 +381,30 @@ failures, deprecated fields). If a finding feels HIGH,
 it likely belongs to a different rule category, not to
 YAGNI.
 
+**Severity tracks the ladder.** Within the MEDIUM cap,
+severity follows cost-to-fix so the cheapest, most
+clear-cut wins surface loudest:
+
+- **Steps 2–3 → MEDIUM.** A one-line or structural fix:
+  inherit a built-in primitive, move data to YAML, add
+  a schema constraint or a missing inverse. Low cost,
+  unambiguous benefit.
+- **Steps 4–6 → LOW.** A larger rewrite where the
+  Python is more defensible: re-model a relationship
+  traversal, narrow a query, port a transform to
+  Jinja2, restructure a check. Still advisory, just
+  lower priority.
+
 The ladder steps come from each rule's `ladder_step`
-frontmatter field. Lower step numbers are cheaper
-fixes; sort findings by `ladder_step` ascending within
-this phase only (other phases keep their existing
-order).
+frontmatter field, and each rule's `impact` frontmatter
+carries the MEDIUM/LOW severity above. Lower step
+numbers are cheaper fixes; sort findings by
+`ladder_step` ascending within this phase only (other
+phases keep their existing order).
 
 ### 9.1 Schema rules
 
-- `yagni-denormalized-vs-indirect-relationship` (step 4, MEDIUM)
+- `yagni-denormalized-vs-indirect-relationship` (step 4, LOW)
 - `yagni-duplicate-shape-not-extracted-to-generic` (step 2, MEDIUM)
 - `yagni-custom-domain-primitives-instead-of-builtin` (step 2, MEDIUM)
   — IPAM (`BuiltinIPAddress`, `BuiltinIPPrefix`,
@@ -405,11 +420,11 @@ order).
 ### 9.2 Check rules
 
 - `yagni-python-validator-vs-schema-constraint` (step 3, MEDIUM)
-- `yagni-redundant-check-that-graphql-can-answer` (step 6, MEDIUM)
+- `yagni-redundant-check-that-graphql-can-answer` (step 6, LOW)
 
 ### 9.3 Transform rules
 
-- `yagni-python-transform-that-could-be-jinja2` (step 5, MEDIUM)
+- `yagni-python-transform-that-could-be-jinja2` (step 5, LOW)
 
 ### 9.4 Generator rules
 
@@ -419,7 +434,7 @@ order).
 - `yagni-duplicate-shape-not-extracted-to-generic`
   (step 2, MEDIUM) — also applies when a generator's
   output shape duplicates an existing generic.
-- `yagni-generator-query-shape-too-broad` (step 4, MEDIUM) —
+- `yagni-generator-query-shape-too-broad` (step 4, LOW) —
   `CoreGeneratorGroup` in the data query, focal-exclude
   loops, or `>2` top-level kind sections. Frequently
   co-occurs with `yagni-missing-inverse-forces-python-filter`;

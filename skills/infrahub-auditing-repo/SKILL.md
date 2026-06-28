@@ -78,7 +78,7 @@ report.
 | HIGH | Relationships | Bidirectional IDs, cardinality |
 | HIGH | Registration | All files registered, no orphans |
 | MEDIUM | Best Practices | human_friendly_id, display_label |
-| MEDIUM | YAGNI / Cost-to-Fix | Python doing what schema, GraphQL, Jinja2, or built-in IPAM/VLAN can do; denormalized data; un-extracted duplicate shapes |
+| MEDIUM–LOW | YAGNI / Cost-to-Fix | Python doing what schema, GraphQL, Jinja2, or built-in IPAM/VLAN can do; denormalized data; un-extracted duplicate shapes. Severity tracks the cost-to-fix ladder: steps 2–3 MEDIUM, steps 4–6 LOW |
 | MEDIUM | Deployment | Git status, bootstrap placement |
 | LOW | Patterns & Style | Code organization, naming |
 
