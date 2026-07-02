@@ -199,7 +199,7 @@ each task reads).
 | infrahub-managing-transforms | 3 |
 | infrahub-managing-objects | 1 |
 | infrahub-reporting-issues | 3 |
-| infrahub-auditing-repo | 11 |
+| infrahub-auditing-repo | 12 |
 
 `infrahub-analyzing-data` has no eval tasks yet —
 adding them is a good contribution. It has rules but
