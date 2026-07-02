@@ -407,11 +407,12 @@ phases keep their existing order).
 
 - `yagni-reuse-existing-marketplace-schema` (step 1, MEDIUM)
   — a whole domain (DCIM, location, organization, circuits,
-  cabling) hand-rolled from scratch when the Marketplace /
-  `opsmill/schema-library` already ships it. Fix:
-  `infrahubctl marketplace get <ns>/<name>` then
-  `inherit_from`. Airgap-safe: static catalog,
-  `--marketplace-url` mirror fallback.
+  cabling) hand-rolled from scratch when the Infrahub
+  Marketplace already publishes it. Search the whole
+  marketplace first; reuse only from the marketplace, not
+  from GitHub. Fix: `infrahubctl marketplace get <ns>/<name>`
+  then `inherit_from`. Airgap-safe: static domain list,
+  `--marketplace-url` internal-mirror fallback.
 - `yagni-denormalized-vs-indirect-relationship` (step 4, LOW)
 - `yagni-duplicate-shape-not-extracted-to-generic` (step 2, MEDIUM)
 - `yagni-custom-domain-primitives-instead-of-builtin` (step 2, MEDIUM)
