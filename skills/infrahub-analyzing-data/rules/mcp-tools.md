@@ -18,10 +18,7 @@ The reworked server (v1.1.7) splits its surface into
 **read** tools (typed queries plus raw GraphQL) and
 **write** tools (typed upsert/delete, raw mutations,
 and proposed-change submission). Writes are
-**branch-isolated** by design: they land on an
-auto-created session branch, never the default
-branch, and reach the default branch only through a
-Proposed Change that a human reviews and merges.
+**branch-isolated** — see [Branch Model](#branch-model).
 
 ### Why it matters
 
@@ -127,6 +124,27 @@ several filters), use `get_nodes` with an explicit
 
 ---
 
+#### Fetching a single object by ID or HFID
+
+There is no dedicated single-object tool (the old
+`infrahub_get` is gone). Filter `get_nodes` by the
+object's `ids` / `hfid`, or query by ID with
+`query_graphql`:
+
+```text
+mcp__infrahub__get_nodes({
+  "kind": "DcimDevice",
+  "filters": { "ids": ["17f3a..."] },
+  "include_attributes": true
+})
+```
+
+Infrahub exposes `ids` and `hfid` as node filters on
+every kind; confirm the exact keys for a kind via
+`infrahub://schema/{kind}` (or `get_schema(kind="...")`).
+
+---
+
 #### `mcp__infrahub__get_schema`
 
 Discover available schema kinds — call this first
@@ -164,18 +182,9 @@ Arguments:
     — branch to read (default: the default branch)
 ```
 
-**Correct usage:**
-
-```text
-mcp__infrahub__query_graphql({
-  "query": "query { DcimDevice {
-    edges { node { id name { value } } }
-  } }"
-})
-```
-
 This tool takes no `variables` argument — inline
-concrete values into the query string.
+concrete values into the query string. See
+[examples.md](../examples.md) for full query bodies.
 
 ---
 
@@ -197,12 +206,11 @@ Arguments: none
 
 ### Write Tools
 
-Writes never touch the default branch. The first
-write of a session auto-creates a branch named
-`mcp/session-YYYYMMDD-<hex>`, and every subsequent
-write in the session lands there. Use
-`get_session_info` to see the active branch, and
-`propose_changes` to open it for human review.
+Writes never touch the default branch — they land on
+an auto-created session branch (see [Branch
+Model](#branch-model)). Check the active branch with
+`get_session_info`; open it for review with
+`propose_changes`.
 
 #### `mcp__infrahub__node_upsert`
 
@@ -285,22 +293,19 @@ default branch.
 #### `mcp__infrahub__reset_session_branch`
 
 Reset or switch the active session branch. With no
-`branch`, clears the cached session branch so the
-next write auto-creates a fresh one (use after your
-work has merged and you want a new change set). With
-a `branch`, points the session at that named branch
-(created if the name matches the configured branch
-pattern; the default branch and merged/read-only
-branches are rejected).
+`branch`, clears the cached branch so the next write
+starts a fresh session (use after your work has
+merged). With a `branch`, points the session at that
+named branch — the default branch and merged/read-only
+branches are rejected.
 
 ```text
 Arguments:
   branch (string, optional)
 ```
 
-A merged or deleted session branch is recovered
-automatically on the next write — this tool is the
-explicit override on top of that.
+A merged or deleted session branch is also recovered
+automatically on the next write.
 
 ---
 

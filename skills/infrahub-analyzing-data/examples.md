@@ -396,8 +396,8 @@ query TopologyDesigns {
 ### Step 2 — Query realized devices
 
 ```graphql
-query RealizedDevices($topology: String!) {
-  DcimDevice(topology__name__value: $topology) {
+query RealizedDevices {
+  DcimDevice(topology__name__value: "topology-par01-core") {
     edges {
       node {
         id
@@ -477,9 +477,9 @@ query ActiveMaintenanceWindows {
 ### Step 2 — Query services hosted on those devices
 
 ```graphql
-query DeviceServices($device: String!) {
+query DeviceServices {
   ServiceInstance(
-    device__name__value: $device
+    device__name__value: "par01-spine-01"
   ) {
     edges {
       node {
@@ -500,7 +500,10 @@ query DeviceServices($device: String!) {
 }
 ```
 
-Run this query for each device found in Step 1.
+Run this query once per device found in Step 1,
+inlining each device name into the filter —
+`query_graphql` takes no variables, so substitute the
+value into the query string each time.
 
 ### Step 3 — Report
 
@@ -550,8 +553,8 @@ everything that depends on it.
 ### Step 1 — Query the prefix and its consumers
 
 ```graphql
-query PrefixImpact($prefix: String!) {
-  IpamPrefix(prefix__value: $prefix) {
+query PrefixImpact {
+  IpamPrefix(prefix__value: "10.0.1.0/24") {
     edges {
       node {
         id
@@ -663,6 +666,7 @@ See detailed findings above for remediation steps.
 | Scenario | MCP Tool | Key Arguments |
 | -------- | -------- | ------------- |
 | List objects of a kind (typed) | `mcp__infrahub__get_nodes` | `kind`, `filters`, `include_attributes` |
+| Fetch one object by ID / HFID | `mcp__infrahub__get_nodes` | `kind`, `filters: {ids}` or `{hfid}` |
 | Substring search across attributes | `mcp__infrahub__search_nodes` | `kind`, `query` |
 | Raw read-only query | `mcp__infrahub__query_graphql` | `query` (GraphQL string) |
 | Discover schema kinds/filters | `mcp__infrahub__get_schema` | `kind` (optional) |
