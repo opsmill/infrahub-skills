@@ -55,10 +55,15 @@ schema after objects exist forces a migration.
 
 ## The fix
 
-1. Search the whole marketplace for the domain you are about to model
-   and note its `namespace/name` identifier. Browse
-   <https://marketplace.infrahub.app/>, or query the marketplace API to
-   cover the *entire* catalog programmatically:
+Prefer `infrahubctl` wherever it exposes the capability; reach for the
+raw marketplace API only for what the CLI does not provide (catalog
+discovery/search).
+
+1. Find the domain's `namespace/name` identifier. `infrahubctl
+   marketplace` only fetches (`get`), not searches, so discover the
+   identifier by browsing <https://marketplace.infrahub.app/>. To
+   enumerate or search the *whole* catalog programmatically, fall back
+   to the marketplace API:
    - `GET /api/v1/schemas` — every published schema (each item carries
      the `namespace` and `name` you pass to `marketplace get`).
    - `GET /api/v1/collections` — schema collections (bundles of related
@@ -67,7 +72,7 @@ schema after objects exist forces a migration.
 
    e.g. `curl https://marketplace.infrahub.app/api/v1/schemas` lists
    candidates such as `infrahub/vlan-translation`.
-2. Pull it: `infrahubctl marketplace get <namespace>/<name>`
+2. Pull it with the CLI: `infrahubctl marketplace get <namespace>/<name>`
    (auto-detects schema vs. collection; `-o <dir>` sets the output
    directory, `-s` prints to stdout, `-v <version>` pins a version).
 3. `inherit_from` the pulled generics and add only the genuinely new,

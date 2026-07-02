@@ -115,6 +115,7 @@ already covers it:
 
 | Signal | Cheaper layer | See rule |
 | ------ | ------------- | -------- |
+| Building a whole domain (DCIM, location, org, circuits, cabling) from scratch | Reuse a marketplace-published schema: `infrahubctl marketplace get <ns>/<name>` then `inherit_from` | [yagni-reuse-existing-marketplace-schema](../infrahub-auditing-repo/rules/yagni-reuse-existing-marketplace-schema.md) |
 | Copying a value onto a node that's reachable by traversing a relationship (`region_code` when `device.location.region.code` exists) | An indirect relationship traversal; let consumers follow the link | [yagni-denormalized-vs-indirect-relationship](../infrahub-auditing-repo/rules/yagni-denormalized-vs-indirect-relationship.md) |
 | Several sibling nodes repeating the same attributes and relationships | Extract a generic and `inherit_from` it | [yagni-duplicate-shape-not-extracted-to-generic](../infrahub-auditing-repo/rules/yagni-duplicate-shape-not-extracted-to-generic.md) |
 | Defining custom IP address / prefix / VLAN nodes | `inherit_from` the built-in primitive (`BuiltinIPAddress`, `BuiltinIPPrefix`, `IpamVLAN`) | [yagni-custom-domain-primitives-instead-of-builtin](../infrahub-auditing-repo/rules/yagni-custom-domain-primitives-instead-of-builtin.md) |
@@ -133,29 +134,47 @@ Follow these steps when creating or modifying a schema:
 1. **Gather requirements** — Identify the node types,
    their attributes, and how they relate to each other.
    Ask about hierarchies, dropdowns, and display needs.
-2. **Read relevant rules** — Read
+2. **Check the marketplace first** — Before building a
+   domain from scratch, see whether the Infrahub
+   Marketplace already publishes it, and reuse it rather
+   than re-deriving the model. Fetch with the CLI —
+   `infrahubctl marketplace get <namespace>/<name>` — and
+   `inherit_from` the result, adding only site-specific
+   attributes. To find the identifier, browse
+   <https://marketplace.infrahub.app/>; the CLI only
+   fetches, so for full-catalog discovery/search fall back
+   to the marketplace API (`/api/v1/schemas`,
+   `/api/v1/collections`, `/api/v1/search`). Reuse only
+   from the marketplace, not from GitHub. In airgapped
+   environments this is a fallback chain, not a blocker:
+   `infrahubctl marketplace get --marketplace-url <mirror>`
+   against an internal mirror, and if none is reachable
+   proceed with a custom schema (still preferring built-in
+   primitives). See
+   [../infrahub-auditing-repo/rules/yagni-reuse-existing-marketplace-schema.md](../infrahub-auditing-repo/rules/yagni-reuse-existing-marketplace-schema.md).
+3. **Read relevant rules** — Read
    [rules/naming-conventions.md](./rules/naming-conventions.md)
    for naming constraints,
    [rules/attribute-defaults-and-types.md](./rules/attribute-defaults-and-types.md)
    for attribute kinds and defaults, and
    [rules/relationship-identifiers.md](./rules/relationship-identifiers.md)
    for bidirectional relationship setup.
-3. **Build the schema YAML** — Start with the `$schema`
+4. **Build the schema YAML** — Start with the `$schema`
    comment and `version: "1.0"`. Define generics first
    (if any), then nodes. Apply naming, display, and
-   relationship rules from step 2.
-4. **Audit downstream consumers** — Walk the table in
+   relationship rules from step 3.
+5. **Audit downstream consumers** — Walk the table in
    "Designing for Downstream Consumers" above. If any
    node will become an artifact or generator target, add
    `CoreArtifactTarget` to its `inherit_from` now, per
    [rules/extension-artifact-target.md](./rules/extension-artifact-target.md).
    Adding it later forces a schema migration on loaded data.
-5. **Configure display properties** — Set
+6. **Configure display properties** — Set
    `human_friendly_id`, `display_label`, and
    `order_weight` per
    [rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md)
    and [rules/display-order-weight.md](./rules/display-order-weight.md).
-6. **Validate and roll out on a branch** — Run
+7. **Validate and roll out on a branch** — Run
    `infrahubctl schema check` to fix errors per
    [validation.md](./validation.md) and
    [rules/validation-common-errors.md](./rules/validation-common-errors.md).
