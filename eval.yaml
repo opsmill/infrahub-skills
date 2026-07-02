@@ -3266,8 +3266,16 @@ tasks:
             - {name: name, kind: Text}
             - {name: serial, kind: Text, optional: true}
           relationships:
-            - {name: interfaces, peer: DcimInterface, cardinality: many, kind: Component, identifier: device__interfaces}
-            - {name: rack, peer: DcimRack, cardinality: one, kind: Attribute, identifier: device__rack}
+            - name: interfaces
+              peer: DcimInterface
+              cardinality: many
+              kind: Component
+              identifier: device__interfaces
+            - name: rack
+              peer: DcimRack
+              cardinality: one
+              kind: Attribute
+              identifier: device__rack
         - name: Interface
           namespace: Dcim
           attributes:
