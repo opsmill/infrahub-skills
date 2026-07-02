@@ -9,15 +9,23 @@ tags: branch, default-branch, crud, object-load, proposed-change, rollback, mcp
 Impact: CRITICAL
 
 When creating, updating, or deleting data in Infrahub —
-whether via `infrahubctl object load`, the MCP
-`infrahub_create` / `infrahub_update` / `infrahub_delete`
-tools, `infrahubctl generator run`, or the Python SDK —
-default to working on a dedicated branch. Reach for the
-**default branch** (the branch operations target when no
-branch is given — `main` by convention, but it can be
-renamed per deployment, so confirm with
-`infrahubctl branch list` rather than assuming `main`) only
-on a local, throwaway instance you are willing to discard.
+whether via `infrahubctl object load`, the MCP write tools
+(`node_upsert` / `node_delete` / `mutate_graphql`),
+`infrahubctl generator run`, or the Python SDK — default to
+working on a dedicated branch. Reach for the **default
+branch** (the branch operations target when no branch is
+given — `main` by convention, but it can be renamed per
+deployment, so confirm with `infrahubctl branch list`
+rather than assuming `main`) only on a local, throwaway
+instance you are willing to discard.
+
+The reworked Infrahub MCP server does this for you: its
+writes land on an auto-created `mcp/session-YYYYMMDD-<hex>`
+branch and reach the default branch only through
+`propose_changes` + human review — you never pick the
+branch. The other paths (`infrahubctl`, the Python SDK) do
+**not** isolate writes for you; there you must create and
+target the branch yourself.
 
 ### Why it matters
 

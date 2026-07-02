@@ -45,8 +45,9 @@ query DeviceNamingCompliance {
 }
 ```
 
-Use `mcp__infrahub__infrahub_query` with the
-above query.
+Use `mcp__infrahub__query_graphql` with the above
+query, or `mcp__infrahub__get_nodes` with
+`kind: "DcimDevice"` for a typed read.
 
 ### Step 2 — Correlate against policy
 
@@ -81,7 +82,8 @@ Non-compliant devices:
     — missing sequence number
 
 Remediation: Rename via Infrahub UI or use
-mcp__infrahub__infrahub_update
+mcp__infrahub__node_upsert (lands on a session
+branch; submit with propose_changes)
 ```
 
 ---
@@ -631,7 +633,8 @@ Run a full analysis for site PAR01. Check:
 
 Claude will:
 
-1. Run `mcp__infrahub__infrahub_query` once per
+1. Run `mcp__infrahub__get_nodes` (or
+   `mcp__infrahub__query_graphql`) once per
    area (or combine into fewer queries)
 2. Evaluate each check independently
 3. Produce a consolidated summary
@@ -659,8 +662,17 @@ See detailed findings above for remediation steps.
 
 | Scenario | MCP Tool | Key Arguments |
 | -------- | -------- | ------------- |
-| Query objects | `mcp__infrahub__infrahub_query` | `query` (GraphQL string) |
-| List schema kinds | `mcp__infrahub__infrahub_list_schema` | none |
-| Get one object | `mcp__infrahub__infrahub_get` | `kind`, `id` or filters |
-| Update for remediation | `mcp__infrahub__infrahub_update` | `kind`, `id`, `data` |
-| Create missing object | `mcp__infrahub__infrahub_create` | `kind`, `data` |
+| List objects of a kind (typed) | `mcp__infrahub__get_nodes` | `kind`, `filters`, `include_attributes` |
+| Substring search across attributes | `mcp__infrahub__search_nodes` | `kind`, `query` |
+| Raw read-only query | `mcp__infrahub__query_graphql` | `query` (GraphQL string) |
+| Discover schema kinds/filters | `mcp__infrahub__get_schema` | `kind` (optional) |
+| Check the active session branch | `mcp__infrahub__get_session_info` | none |
+| Create or update for remediation | `mcp__infrahub__node_upsert` | `kind`, `data`, `id` or `hfid` |
+| Delete an object | `mcp__infrahub__node_delete` | `kind`, `id` or `hfid` |
+| Complex write (relationships/bulk) | `mcp__infrahub__mutate_graphql` | `query` (GraphQL mutation) |
+| Submit writes for human review | `mcp__infrahub__propose_changes` | `title`, `description` |
+
+Writes land on an auto-created `mcp/session-*`
+branch and reach the default branch only after
+`propose_changes` opens a Proposed Change that a
+human merges.

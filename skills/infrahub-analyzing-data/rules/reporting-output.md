@@ -87,12 +87,14 @@ Remediation
 ───────────
 • Rename affected devices via
   Infrahub UI or:
-    mcp__infrahub__infrahub_update(
+    mcp__infrahub__node_upsert(
       kind="DcimDevice",
       id="<id>",
       data={"name": "<correct-name>"}
     )
-  Note: always use a dedicated branch, not the default branch.
+  Note: writes land on an auto-created
+  session branch; call propose_changes to
+  open them for review, not the default branch.
 • Consider adding an InfrahubCheck to
   enforce naming on future proposed
   changes.
@@ -181,9 +183,9 @@ type:
 
 | Violation Type | Remediation Hint |
 | -------------- | ---------------- |
-| Missing required attribute | Set value via UI or `mcp__infrahub__infrahub_update` |
-| Wrong attribute value | Correct value via UI or `mcp__infrahub__infrahub_update` |
-| Missing related object | Create via `mcp__infrahub__infrahub_create` on a branch |
+| Missing required attribute | Set value via UI or `mcp__infrahub__node_upsert` |
+| Wrong attribute value | Correct value via UI or `mcp__infrahub__node_upsert` |
+| Missing related object | Create via `mcp__infrahub__node_upsert`, then `propose_changes` |
 | Naming convention | Rename via UI or update |
 | Structural gap (design vs reality) | Run the generator to reconcile, or create manually |
 | Recurring pattern | Suggest creating an `InfrahubCheck` to enforce on future changes |
