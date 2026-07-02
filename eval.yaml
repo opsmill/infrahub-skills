@@ -2799,7 +2799,7 @@ tasks:
       evaluation, emit findings as JSON to output.json (not the usual
       AUDIT_REPORT.md). Shape:
 
-      {"findings": [{"rule": "...", "severity": "HIGH|MEDIUM",
+      {"findings": [{"rule": "...", "severity": "MEDIUM|LOW",
                      "ladder_step": <int>, "file": "...",
                      "line": "...", "replacement": "..."}]}
 
@@ -3309,7 +3309,7 @@ tasks:
       ladder_step ascending (cheapest fix on top), then by file path.
 
       Audit this minimal repo, which deliberately exhibits one of each
-      yagni-* violation. Emit ALL ten yagni findings and order them
+      yagni-* violation. Emit ALL eleven yagni findings and order them
       correctly.
 
       For each artifact, the violation shape and expected rule:
@@ -3327,22 +3327,25 @@ tasks:
       3. schemas/ipam.yml — custom NetIPAddress/NetVlan without
          inheriting Builtin/Ipam primitives →
          yagni-custom-domain-primitives-instead-of-builtin (step 2).
-      4. checks/check_vpn_unique.py — uniqueness check that could be
+      4. generators/provision_circuit.py — hand-splits a /30 subnet and
+         random-scans ports instead of using a resource pool →
+         yagni-imperative-allocation-vs-resource-pool (step 2).
+      5. checks/check_vpn_unique.py — uniqueness check that could be
          uniqueness_constraints →
          yagni-python-validator-vs-schema-constraint (step 3).
-      5. schemas/dcim-interfaces.yml — `Interface.device` rel without
+      6. schemas/dcim-interfaces.yml — `Interface.device` rel without
          a matching inverse on `Device` →
          yagni-missing-inverse-forces-python-filter (step 3).
-      6. schemas/dcim.yml — `Device.region_code` denormalized when
+      7. schemas/dcim.yml — `Device.region_code` denormalized when
          `device.location.region.code` exists →
          yagni-denormalized-vs-indirect-relationship (step 4).
-      7. generators/pop_designs.py + queries/pop_designs.gql —
+      8. generators/pop_designs.py + queries/pop_designs.gql —
          CoreGeneratorGroup in data query + focal-exclude loop →
          yagni-generator-query-shape-too-broad (step 4).
-      8. transforms/interface_config.py — pure string formatting that
+      9. transforms/interface_config.py — pure string formatting that
          Jinja2 would express →
          yagni-python-transform-that-could-be-jinja2 (step 5).
-      9. checks/check_no_unmanaged_devices.py — GraphQL already
+      10. checks/check_no_unmanaged_devices.py — GraphQL already
          filters; Python is `for x in edges: log_error` →
          yagni-redundant-check-that-graphql-can-answer (step 6).
 
@@ -3352,6 +3355,6 @@ tasks:
         run: python graders/auditing-repo/check_yagni_findings_sorted.py
         weight: 1.0
     expected_output: >-
-      JSON with ten findings, one per yagni-* rule above, ordered
-      ascending by ladder_step (1, 2, 2, 2, 3, 3, 4, 4, 5, 6) and then
-      by file path within each step.
+      JSON with eleven findings, one per yagni-* rule above, ordered
+      ascending by ladder_step (1, 2, 2, 2, 2, 3, 3, 4, 4, 5, 6) and
+      then by file path within each step.
