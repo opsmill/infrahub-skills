@@ -14,7 +14,7 @@ in the cwd. Each finding is a dict with the keys this library inspects:
 
     {
         "rule": "yagni-python-validator-vs-schema-constraint",
-        "severity": "HIGH",
+        "severity": "MEDIUM",
         "ladder_step": 3,
         "file": "checks/check_vpn_unique.py",
         "line": "12"

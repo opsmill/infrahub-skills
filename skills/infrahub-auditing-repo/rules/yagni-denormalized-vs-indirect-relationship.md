@@ -27,7 +27,7 @@ has to update both — which nothing in the schema enforces, so it
 breaks the first time someone writes via a different code path. The
 graph layer exists specifically so this isn't necessary; traversing
 two relationships is cheap and authoritative. The data still loads
-and the platform still functions, so this is an advisory MEDIUM
+and the platform still functions, so this is an advisory
 finding — but unchecked it accumulates into a real maintenance
 liability.
 
