@@ -7,6 +7,7 @@ The Schema Manager produces valid Infrahub schema YAML from natural language des
 
 ## When to use
 
+- Reusing an existing schema from the Infrahub Marketplace instead of modelling a domain from scratch
 - Creating a new schema node from a description
 - Adding attributes or relationships to an existing node
 - Designing a generic (abstract base type) with inheriting nodes
@@ -48,6 +49,16 @@ The Schema Manager produces valid Infrahub schema YAML from natural language des
 | Mismatched relationship identifiers | Sets the same identifier on both sides |
 | Short kind references in peers | Uses full namespace+name (e.g., `IpamVlanGroup` not `VlanGroup`) |
 | Missing `human_friendly_id` | Includes it on every node |
+
+## Reusing published schemas
+
+Before modelling a domain (DCIM, location, organization, circuits, cabling) from scratch, the skill checks the [Infrahub Marketplace](https://marketplace.infrahub.app/) for a published schema and reuses it rather than re-deriving the model. Fetch with the CLI and `inherit_from` the result, adding only site-specific attributes:
+
+```bash
+infrahubctl marketplace get <namespace>/<name>
+```
+
+Discovery goes CLI-first: the `infrahubctl marketplace` command fetches a schema, and for catalog search the marketplace API (`/api/v1/schemas`, `/api/v1/collections`, `/api/v1/search`) enumerates what is published. Reuse only from the marketplace, not from GitHub. In airgapped environments this is a fallback chain, not a blocker — point `--marketplace-url` at an internal mirror, and if none is reachable the skill proceeds with a custom schema (still preferring built-in primitives).
 
 ## Validating and loading
 

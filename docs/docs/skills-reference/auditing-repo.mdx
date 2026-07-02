@@ -59,13 +59,14 @@ The Repo Auditor performs a comprehensive audit of an Infrahub repository agains
 
 ### YAGNI / cost-to-fix
 
-Beyond correctness, the auditor flags places where Python (or denormalized data) is doing work a cheaper, built-in Infrahub layer already handles — for example:
+Beyond correctness, the auditor flags places where a from-scratch schema, Python, or denormalized data is doing work a cheaper option — an off-the-shelf marketplace schema or a built-in Infrahub layer — already handles — for example:
 
+- A whole domain (DCIM, location, organization, circuits, cabling) hand-rolled from scratch when the [Infrahub Marketplace](https://marketplace.infrahub.app/) already publishes it — reuse it with `infrahubctl marketplace get <namespace>/<name>` and `inherit_from` instead of redefining the model
 - A check that re-implements a uniqueness, presence, or allowed-values rule the schema can enforce as a constraint
 - A Python transform that only formats strings, where a Jinja2 template would do
 - A generator that hardcodes data belonging in `objects/`, reinvents a built-in IPAM/VLAN primitive, or hand-rolls subnet/IP/VLAN/port allocation instead of using a resource pool
 
-These findings are advisory — the code works as-is, but the cheaper layer is less to maintain and visible to the rest of the platform. Each one names the specific layer to move to, and they are ranked by how cheap the fix is (a one-line schema change ranks above a full rewrite).
+These findings are advisory — the code works as-is, but the cheaper option is less to maintain and stays aligned with the platform. Each one names the specific layer to move to, and they are ranked by how cheap the fix is: reusing a published marketplace schema is the cheapest win of all and ranks first, above a one-line schema change, which ranks above a full rewrite.
 
 ## What it produces
 
