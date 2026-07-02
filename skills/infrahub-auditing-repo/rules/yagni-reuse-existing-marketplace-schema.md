@@ -59,9 +59,12 @@ schema after objects exist forces a migration.
 
 ## The fix
 
-Prefer `infrahubctl` wherever it exposes the capability; reach for the
-raw marketplace API only for what the CLI does not provide (catalog
-discovery/search).
+Full marketplace usage — CLI flags, catalog API, collections, and
+airgap fallback — is documented once in
+[../../infrahub-common/marketplace-reference.md](../../infrahub-common/marketplace-reference.md).
+In short: prefer `infrahubctl` wherever it exposes the capability;
+reach for the raw marketplace API only for what the CLI does not
+provide (catalog discovery/search).
 
 1. Find the domain's `namespace/name` identifier. `infrahubctl
    marketplace` only fetches (`get`), not searches, so discover the

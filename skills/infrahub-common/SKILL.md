@@ -20,6 +20,10 @@ Infrahub skills. It is not meant to be invoked directly.
   filters, nested queries, and pagination patterns
 - **`infrahub-yml-reference.md`** — `.infrahub.yml`
   configuration file format and field reference
+- **`marketplace-reference.md`** — Infrahub Marketplace:
+  reusing published schemas and collections via
+  `infrahubctl marketplace get`, the catalog API, and
+  airgap fallback. Reuse before modelling from scratch.
 - **`netbox-vs-infrahub.md`** — Field-by-field
   migration appendix for engineers porting NetBox
   queries, templates, or overlay data

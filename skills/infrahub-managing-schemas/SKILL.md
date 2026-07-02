@@ -1,8 +1,8 @@
 ---
 name: infrahub-managing-schemas
 description: >-
-  Creates, validates, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions.
-  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations, modeling file objects / attachments / uploads (storing PDFs, diagrams, images, certificates, documents as Infrahub objects).
+  Creates, validates, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions. Also checks the Infrahub Marketplace for an existing published schema to reuse before modelling a domain from scratch.
+  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations, looking for an existing/off-the-shelf schema or checking the marketplace for a domain (DCIM, location, routing, etc.), modeling file objects / attachments / uploads (storing PDFs, diagrams, images, certificates, documents as Infrahub objects).
   DO NOT TRIGGER when: populating data objects, writing checks/generators/transforms, querying live data.
 allowed-tools:
   - Read
@@ -134,23 +134,21 @@ Follow these steps when creating or modifying a schema:
 1. **Gather requirements** — Identify the node types,
    their attributes, and how they relate to each other.
    Ask about hierarchies, dropdowns, and display needs.
-2. **Check the marketplace first** — Before building a
-   domain from scratch, see whether the Infrahub
-   Marketplace already publishes it, and reuse it rather
-   than re-deriving the model. Fetch with the CLI —
+2. **Check the marketplace first** — Before building *any*
+   domain from scratch, search the whole Infrahub
+   Marketplace for a published schema that covers it, and
+   reuse it rather than re-deriving the model — if one
+   exists, no modelling is needed. Fetch with the CLI —
    `infrahubctl marketplace get <namespace>/<name>` — and
    `inherit_from` the result, adding only site-specific
-   attributes. To find the identifier, browse
-   <https://marketplace.infrahub.app/>; the CLI only
-   fetches, so for full-catalog discovery/search fall back
-   to the marketplace API (`/api/v1/schemas`,
-   `/api/v1/collections`, `/api/v1/search`). Reuse only
-   from the marketplace, not from GitHub. In airgapped
-   environments this is a fallback chain, not a blocker:
-   `infrahubctl marketplace get --marketplace-url <mirror>`
-   against an internal mirror, and if none is reachable
-   proceed with a custom schema (still preferring built-in
-   primitives). See
+   attributes. For several related domains at once, pull a
+   collection (`-c`, e.g. `infrahub/routing-bgp`,
+   `infrahub/base-schemas`) instead of one schema at a
+   time. Full command reference, catalog API, and airgap
+   fallback (`--marketplace-url` internal mirror) are in
+   [../infrahub-common/marketplace-reference.md](../infrahub-common/marketplace-reference.md).
+   The auditor flags a hand-rolled domain the marketplace
+   already ships — see
    [../infrahub-auditing-repo/rules/yagni-reuse-existing-marketplace-schema.md](../infrahub-auditing-repo/rules/yagni-reuse-existing-marketplace-schema.md).
 3. **Read relevant rules** — Read
    [rules/naming-conventions.md](./rules/naming-conventions.md)
@@ -212,6 +210,9 @@ after data is loaded.
   commands, migration strategies, pre-validation checklist
 - **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
+- **[../infrahub-common/marketplace-reference.md](../infrahub-common/marketplace-reference.md)**
+  -- reusing published marketplace schemas and collections
+  (`infrahubctl marketplace get`, catalog API, airgap)
 - **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
   (git integration, caching) across all skills
 - **[rules/](./rules/)** -- Individual rules by category
