@@ -59,50 +59,19 @@ schema after objects exist forces a migration.
 
 ## The fix
 
-Full marketplace usage — CLI flags, catalog API, collections, and
-airgap fallback — is documented once in
-[../../infrahub-common/marketplace-reference.md](../../infrahub-common/marketplace-reference.md).
-In short: prefer `infrahubctl` wherever it exposes the capability;
-reach for the raw marketplace API only for what the CLI does not
-provide (catalog discovery/search).
+1. Search the whole marketplace for the domain and note its
+   `namespace/name`.
+2. Pull it: `infrahubctl marketplace get <namespace>/<name>`.
+3. `inherit_from` the pulled generics, adding only genuinely new,
+   site-specific attributes.
 
-1. Find the domain's `namespace/name` identifier. `infrahubctl
-   marketplace` only fetches (`get`), not searches, so discover the
-   identifier by browsing <https://marketplace.infrahub.app/>. To
-   enumerate or search the *whole* catalog programmatically, fall back
-   to the marketplace API:
-   - `GET /api/v1/schemas` — every published schema (each item carries
-     the `namespace` and `name` you pass to `marketplace get`).
-   - `GET /api/v1/collections` — schema collections (bundles of related
-     schemas).
-   - `/api/v1/search` — search across the catalog by keyword.
-
-   e.g. `curl https://marketplace.infrahub.app/api/v1/schemas` lists
-   candidates such as `infrahub/vlan-translation`.
-2. Pull it with the CLI: `infrahubctl marketplace get <namespace>/<name>`
-   (auto-detects schema vs. collection; `-o <dir>` sets the output
-   directory, `-s` prints to stdout, `-v <version>` pins a version).
-3. `inherit_from` the pulled generics and add only the genuinely new,
-   site-specific attributes on top.
-
-Reuse only from the marketplace. Copying schema YAML out of a GitHub
-repository is not marketplace reuse — it loses the versioning and
-update path `infrahubctl marketplace get` provides.
-
-## Airgap / offline environments
-
-An unreachable marketplace is a **fallback path, not a failure**. In
-order:
-
-1. Point at an internal marketplace mirror:
-   `infrahubctl marketplace get <ns>/<name> --marketplace-url <url>`.
-   Airgapped sites mirror the marketplace internally; use that mirror,
-   not a GitHub checkout. The same `/api/v1/schemas`,
-   `/api/v1/collections`, and `/api/v1/search` endpoints are served
-   under the mirror's base URL, so full-catalog search works offline.
-2. If no mirror is reachable, proceed with the custom schema — still
-   preferring built-in primitives. Never block schema creation on
-   marketplace reachability.
+CLI flags, the catalog-discovery API, collections, and the airgap
+fallback (`--marketplace-url` internal mirror) are documented once in
+[../../infrahub-common/marketplace-reference.md](../../infrahub-common/marketplace-reference.md)
+— consult it rather than re-deriving usage here. Two constants worth
+repeating: reuse only from the marketplace (never a GitHub checkout),
+and an unreachable marketplace is a fallback path (mirror, then custom
+schema), never a reason to block schema work.
 
 Detection relies only on local schema files matched against the static
 domain list above — no network call — so audits produce identical

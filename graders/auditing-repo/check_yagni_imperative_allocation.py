@@ -21,6 +21,11 @@ CHECKS = [
     f"yagni-finding-present:{RULE}",
     f"yagni-finding-severity:{RULE}:MEDIUM",
     f"yagni-finding-ladder-step:{RULE}:2",
+    # File attribution: the finding must point at the production generator
+    # (provision_circuit.py), and the deterministic-derivation generator
+    # (router_id.py) must NOT be flagged — see the rule's "What NOT to flag".
+    f"yagni-finding-file:{RULE}:provision_circuit",
+    "yagni-finding-file-excludes:router_id",
     "yagni-no-above-medium",
 ]
 

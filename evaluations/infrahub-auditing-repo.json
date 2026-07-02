@@ -6,96 +6,372 @@
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9 of the audit procedure (YAGNI / Cost-to-Fix). For this\nevaluation, emit findings as JSON to output.json (not the usual\nAUDIT_REPORT.md). Shape:\n\n{\"findings\": [{\"rule\": \"...\", \"severity\": \"MEDIUM|LOW\",\n               \"ladder_step\": <int>, \"file\": \"...\",\n               \"line\": \"...\", \"replacement\": \"...\"}]}\n\nAudit this artifact (checks/check_vpn_unique.py):\n\n```python\nfrom infrahub_sdk.checks import InfrahubCheck\n\nclass VpnUniqueCheck(InfrahubCheck):\n    query = \"vpn_query\"\n\n    async def validate(self, data):\n        seen = set()\n        for vpn in data[\"L3vpnVpn\"][\"edges\"]:\n            vid = vpn[\"node\"][\"vpn_id\"][\"value\"]\n            if vid in seen:\n                self.log_error(message=f\"duplicate vpn_id {vid}\")\n            seen.add(vid)\n```\n\nThe schema for L3vpnVpn (schemas/l3vpn.yml):\n```yaml\n- name: Vpn\n  namespace: L3vpn\n  attributes:\n    - name: vpn_id\n      kind: Number\n```\n\nSave ONLY the JSON findings to: output.json",
       "expected_output": "JSON listing one yagni-python-validator-vs-schema-constraint finding with severity MEDIUM and ladder_step 3. Replacement should suggest uniqueness_constraints on the schema attribute.",
       "files": [],
-      "expectations": [],
-      "assertions": []
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-python-validator-vs-schema-constraint finding",
+        "That finding has severity MEDIUM and ladder_step 3",
+        "No yagni finding exceeds MEDIUM severity"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-python-validator-vs-schema-constraint finding is emitted"
+        },
+        {
+          "name": "correct-severity",
+          "check": "The yagni-python-validator-vs-schema-constraint finding has severity MEDIUM"
+        },
+        {
+          "name": "correct-ladder-step",
+          "check": "The yagni-python-validator-vs-schema-constraint finding has ladder_step 3"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        }
+      ]
     },
     {
       "id": 2,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json (same shape as\nyagni-python-validator).\n\nAudit this check (checks/check_no_unmanaged_devices.py):\n\n```python\nfrom infrahub_sdk.checks import InfrahubCheck\n\nclass NoUnmanagedDevicesCheck(InfrahubCheck):\n    query = \"unmanaged_devices\"\n\n    async def validate(self, data):\n        edges = data[\"DcimDevice\"][\"edges\"]\n        for d in edges:\n            self.log_error(message=f\"unmanaged device {d['node']['name']['value']}\")\n```\n\nWhere queries/unmanaged_devices.gql already filters to unmanaged\ndevices only (`DcimDevice(managed__value: false)`), so the Python\nis just looping and logging \u2014 no real validation logic.\n\nSave ONLY the JSON findings to: output.json",
       "expected_output": "JSON listing one yagni-redundant-check-that-graphql-can-answer finding with severity LOW and ladder_step 6.",
       "files": [],
-      "expectations": [],
-      "assertions": []
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-redundant-check-that-graphql-can-answer finding",
+        "That finding has severity LOW and ladder_step 6",
+        "No yagni finding exceeds MEDIUM severity"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-redundant-check-that-graphql-can-answer finding is emitted"
+        },
+        {
+          "name": "correct-severity",
+          "check": "The yagni-redundant-check-that-graphql-can-answer finding has severity LOW"
+        },
+        {
+          "name": "correct-ladder-step",
+          "check": "The yagni-redundant-check-that-graphql-can-answer finding has ladder_step 6"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        }
+      ]
     },
     {
       "id": 3,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this transform (transforms/interface_config.py):\n\n```python\nfrom infrahub_sdk.transforms import InfrahubTransform\n\nclass InterfaceConfig(InfrahubTransform):\n    query = \"interfaces\"\n\n    async def transform(self, data):\n        lines = []\n        for iface in data[\"DcimInterface\"][\"edges\"]:\n            n = iface[\"node\"]\n            lines.append(f\"interface {n['name']['value']}\")\n            lines.append(f\"  description {n['description']['value']}\")\n            if n[\"enabled\"][\"value\"]:\n                lines.append(\"  no shutdown\")\n            else:\n                lines.append(\"  shutdown\")\n        return \"\\n\".join(lines)\n```\n\nSave ONLY the JSON findings to: output.json",
       "expected_output": "JSON listing one yagni-python-transform-that-could-be-jinja2 finding with severity LOW and ladder_step 5.",
       "files": [],
-      "expectations": [],
-      "assertions": []
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-python-transform-that-could-be-jinja2 finding",
+        "That finding has severity LOW and ladder_step 5",
+        "No yagni finding exceeds MEDIUM severity"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-python-transform-that-could-be-jinja2 finding is emitted"
+        },
+        {
+          "name": "correct-severity",
+          "check": "The yagni-python-transform-that-could-be-jinja2 finding has severity LOW"
+        },
+        {
+          "name": "correct-ladder-step",
+          "check": "The yagni-python-transform-that-could-be-jinja2 finding has ladder_step 5"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        }
+      ]
     },
     {
       "id": 4,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit these two generators:\n\nFile generators/device_roles.py (production path):\n```python\nfrom infrahub_sdk.generator import InfrahubGenerator\n\nROLES = [\n    {\"name\": \"spine\", \"description\": \"spine switch\"},\n    {\"name\": \"leaf\", \"description\": \"leaf switch\"},\n    {\"name\": \"edge\", \"description\": \"edge router\"},\n]\n\nclass DeviceRolesGenerator(InfrahubGenerator):\n    async def generate(self, data):\n        for r in ROLES:\n            obj = await self.client.create(kind=\"DcimRole\", data=r)\n            await obj.save(allow_upsert=True)\n```\n\nFile bootstrap/seed_statuses.py (initial seed):\n```python\nfrom infrahub_sdk.generator import InfrahubGenerator\n\nSTATUSES = [\n    {\"name\": \"active\"}, {\"name\": \"draft\"}, {\"name\": \"retired\"},\n]\n\nclass SeedStatuses(InfrahubGenerator):\n    async def generate(self, data):\n        for s in STATUSES:\n            obj = await self.client.create(kind=\"DcimStatus\", data=s)\n            await obj.save(allow_upsert=True)\n```\n\nImportant: the audit must NOT flag the bootstrap/ file (see \"What\nNOT to flag\" in the rule).\n\nSave ONLY the JSON findings to: output.json",
       "expected_output": "JSON listing one yagni-generator-hardcoding-data finding for generators/device_roles.py (severity MEDIUM, ladder_step 2). No finding should be emitted for bootstrap/seed_statuses.py.",
       "files": [],
-      "expectations": [],
-      "assertions": []
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-generator-hardcoding-data finding",
+        "That finding has severity MEDIUM and ladder_step 2",
+        "No yagni finding exceeds MEDIUM severity",
+        "No finding fires on a bootstrap/seed/demo generator path"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-generator-hardcoding-data finding is emitted"
+        },
+        {
+          "name": "correct-severity",
+          "check": "The yagni-generator-hardcoding-data finding has severity MEDIUM"
+        },
+        {
+          "name": "correct-ladder-step",
+          "check": "The yagni-generator-hardcoding-data finding has ladder_step 2"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        },
+        {
+          "name": "carveout",
+          "check": "No yagni-generator-hardcoding-data finding is emitted for a bootstrap/seed/demo path"
+        }
+      ]
     },
     {
       "id": 5,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this schema (schemas/dcim.yml):\n\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: Device\n    namespace: Dcim\n    attributes:\n      - name: name\n        kind: Text\n      - name: region_code\n        kind: Text\n    relationships:\n      - name: location\n        peer: LocationSite\n        kind: Attribute\n        cardinality: one\n        identifier: device__location\n  - name: Site\n    namespace: Location\n    attributes:\n      - name: name\n        kind: Text\n      - name: region_code\n        kind: Text\n    relationships:\n      - name: region\n        peer: LocationRegion\n        kind: Parent\n        cardinality: one\n        identifier: site__region\n```\n\n`region_code` is denormalized onto `DcimDevice` when\n`device.location.region.code` is the canonical path.\n\nSave ONLY the JSON findings to: output.json",
       "expected_output": "JSON listing one yagni-denormalized-vs-indirect-relationship finding with severity LOW and ladder_step 4. Replacement points to traversing device.location.region.code.",
       "files": [],
-      "expectations": [],
-      "assertions": []
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-denormalized-vs-indirect-relationship finding",
+        "That finding has severity LOW and ladder_step 4",
+        "No yagni finding exceeds MEDIUM severity"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-denormalized-vs-indirect-relationship finding is emitted"
+        },
+        {
+          "name": "correct-severity",
+          "check": "The yagni-denormalized-vs-indirect-relationship finding has severity LOW"
+        },
+        {
+          "name": "correct-ladder-step",
+          "check": "The yagni-denormalized-vs-indirect-relationship finding has ladder_step 4"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        }
+      ]
     },
     {
       "id": 6,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this schema (schemas/devices.yml) \u2014 five device nodes each\nrepeating the same six attributes:\n\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: DeviceSpine\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: serial, kind: Text}\n      - {name: model, kind: Text}\n      - {name: vendor, kind: Text}\n      - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}\n      - {name: notes, kind: Text, optional: true}\n  - name: DeviceLeaf\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: serial, kind: Text}\n      - {name: model, kind: Text}\n      - {name: vendor, kind: Text}\n      - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}\n      - {name: notes, kind: Text, optional: true}\n  - name: DeviceEdge\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: serial, kind: Text}\n      - {name: model, kind: Text}\n      - {name: vendor, kind: Text}\n      - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}\n      - {name: notes, kind: Text, optional: true}\n```\n\nSave ONLY the JSON findings to: output.json",
       "expected_output": "JSON listing one yagni-duplicate-shape-not-extracted-to-generic finding with severity MEDIUM and ladder_step 2. Replacement points to a shared DeviceCommon generic.",
       "files": [],
-      "expectations": [],
-      "assertions": []
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-duplicate-shape-not-extracted-to-generic finding",
+        "That finding has severity MEDIUM and ladder_step 2",
+        "No yagni finding exceeds MEDIUM severity"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-duplicate-shape-not-extracted-to-generic finding is emitted"
+        },
+        {
+          "name": "correct-severity",
+          "check": "The yagni-duplicate-shape-not-extracted-to-generic finding has severity MEDIUM"
+        },
+        {
+          "name": "correct-ladder-step",
+          "check": "The yagni-duplicate-shape-not-extracted-to-generic finding has ladder_step 2"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        }
+      ]
     },
     {
       "id": 7,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this schema (schemas/ipam.yml) \u2014 defines custom IP-address\nand VLAN nodes without inheriting from the Infrahub built-in\nprimitives:\n\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: IPAddress\n    namespace: Net\n    attributes:\n      - {name: address, kind: Text}\n      - {name: description, kind: Text, optional: true}\n  - name: Vlan\n    namespace: Net\n    attributes:\n      - {name: vlan_id, kind: Number}\n      - {name: name, kind: Text}\n```\n\nSave ONLY the JSON findings to: output.json",
       "expected_output": "JSON listing one yagni-custom-domain-primitives-instead-of-builtin finding with severity MEDIUM and ladder_step 2. Replacement should reference BuiltinIPAddress / IpamIPAddress and IpamVLAN.",
       "files": [],
-      "expectations": [],
-      "assertions": []
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-custom-domain-primitives-instead-of-builtin finding",
+        "That finding has severity MEDIUM and ladder_step 2",
+        "No yagni finding exceeds MEDIUM severity"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-custom-domain-primitives-instead-of-builtin finding is emitted"
+        },
+        {
+          "name": "correct-severity",
+          "check": "The yagni-custom-domain-primitives-instead-of-builtin finding has severity MEDIUM"
+        },
+        {
+          "name": "correct-ladder-step",
+          "check": "The yagni-custom-domain-primitives-instead-of-builtin finding has ladder_step 2"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        }
+      ]
     },
     {
       "id": 8,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this schema (schemas/dcim.yml). The forward\n`Interface.device` rel is `kind: Attribute, cardinality: one` but\n`Device` declares no inverse \u2014 consumers with an interface in hand\nhave no way to traverse back to its device without filtering.\n\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: Device\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n    # no `interfaces` relationship declared\n  - name: Interface\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n    relationships:\n      - name: device\n        peer: DcimDevice\n        kind: Attribute\n        cardinality: one\n        identifier: device__interfaces\n```\n\nSave ONLY the JSON findings to: output.json",
       "expected_output": "JSON listing one yagni-missing-inverse-forces-python-filter finding with severity MEDIUM and ladder_step 3.",
       "files": [],
-      "expectations": [],
-      "assertions": []
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-missing-inverse-forces-python-filter finding",
+        "That finding has severity MEDIUM and ladder_step 3",
+        "No yagni finding exceeds MEDIUM severity"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-missing-inverse-forces-python-filter finding is emitted"
+        },
+        {
+          "name": "correct-severity",
+          "check": "The yagni-missing-inverse-forces-python-filter finding has severity MEDIUM"
+        },
+        {
+          "name": "correct-ladder-step",
+          "check": "The yagni-missing-inverse-forces-python-filter finding has ladder_step 3"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        }
+      ]
     },
     {
       "id": 9,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this generator. The `.gql` references the trigger group\n`CoreGeneratorGroup` and the Python contains a focal-exclude loop\n\u2014 both signatures of cascade-shape.\n\nFile generators/pop_designs.py:\n```python\nfrom infrahub_sdk.generator import InfrahubGenerator\n\nclass PopDesignsGenerator(InfrahubGenerator):\n    query = \"pop_designs_query\"\n\n    async def generate(self, data):\n        for design in data[\"TopologyPopDesign\"][\"edges\"]:\n            if design[\"node\"][\"name\"][\"value\"] == self.focal.name.value:\n                continue\n            # ...\n```\n\nFile queries/pop_designs_query.gql:\n```graphql\nquery {\n  CoreGeneratorGroup(name__value: \"pop_designs\") { edges { node { id } } }\n  TopologyPopDesign { edges { node { name { value } } } }\n}\n```\n\nSave ONLY the JSON findings to: output.json",
       "expected_output": "JSON listing one yagni-generator-query-shape-too-broad finding with severity LOW and ladder_step 4. Either or both of the cascade-shape signatures (CoreGeneratorGroup in query, focal- exclude loop) should be cited in the replacement.",
       "files": [],
-      "expectations": [],
-      "assertions": []
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-generator-query-shape-too-broad finding",
+        "That finding has severity LOW and ladder_step 4",
+        "No yagni finding exceeds MEDIUM severity"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-generator-query-shape-too-broad finding is emitted"
+        },
+        {
+          "name": "correct-severity",
+          "check": "The yagni-generator-query-shape-too-broad finding has severity LOW"
+        },
+        {
+          "name": "correct-ladder-step",
+          "check": "The yagni-generator-query-shape-too-broad finding has ladder_step 4"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        }
+      ]
     },
     {
       "id": 10,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit these two generators:\n\nFile generators/provision_circuit.py (production path):\n```python\nimport ipaddress\nimport random\nfrom infrahub_sdk.generator import InfrahubGenerator\n\nclass ProvisionCircuit(InfrahubGenerator):\n    query = \"circuit_request\"\n\n    async def generate(self, data):\n        req = data[\"CircuitRequest\"][\"edges\"][0][\"node\"]\n\n        # VLANs already come from a pool \u2014 this part is fine.\n        vlan = await self.client.allocate_next_ip_prefix(\n            resource_pool=\"circuit_vlan_pool\"\n        )\n\n        # Subnet: hand-split a /30 out of the parent block.\n        parent = ipaddress.ip_network(req[\"block\"][\"value\"])\n        child = next(parent.subnets(new_prefix=30))\n        await (await self.client.create(\n            kind=\"IpamIPPrefix\", data={\"prefix\": str(child)}\n        )).save(allow_upsert=True)\n\n        # Port: roll a switch and scan peers for the first free one.\n        switch_index = random.randint(1, 2)\n        switch = req[\"switches\"][\"edges\"][switch_index][\"node\"]\n        port = next(\n            (p for p in switch[\"interfaces\"][\"edges\"]\n             if p[\"node\"][\"status\"][\"value\"] == \"free\"),\n            None,\n        )\n```\n\nFile generators/router_id.py (legitimate derivation):\n```python\nimport ipaddress\nfrom infrahub_sdk.generator import InfrahubGenerator\n\nclass RouterId(InfrahubGenerator):\n    async def generate(self, data):\n        # router-id must EQUAL the loopback address \u2014 a deterministic\n        # derivation, not a \"next free\" allocation. Do not flag.\n        loopback = data[\"Device\"][\"edges\"][0][\"node\"][\"loopback\"][\"value\"]\n        router_id = str(ipaddress.ip_interface(loopback).ip)\n        # ... set router_id on the device, no IPAM object created ...\n```\n\nImportant: the audit must NOT flag generators/router_id.py \u2014 it\nderives a value deterministically and persists no allocation (see\n\"What NOT to flag\" in the rule).\n\nSave ONLY the JSON findings to: output.json",
       "expected_output": "JSON listing one yagni-imperative-allocation-vs-resource-pool finding for generators/provision_circuit.py (severity MEDIUM, ladder_step 2), citing the subnet math and/or the random port scan and pointing at Infrahub resource pools (CoreIPPrefixPool / CoreNumberPool / allocate_next_ip_*). No finding should be emitted for generators/router_id.py.",
       "files": [],
-      "expectations": [],
-      "assertions": []
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-imperative-allocation-vs-resource-pool finding",
+        "That finding has severity MEDIUM and ladder_step 2",
+        "No yagni finding exceeds MEDIUM severity",
+        "The flagged finding points at the production generator (provision_circuit.py)",
+        "The deterministic-derivation generator (router_id.py) is not flagged"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-imperative-allocation-vs-resource-pool finding is emitted"
+        },
+        {
+          "name": "correct-severity",
+          "check": "The yagni-imperative-allocation-vs-resource-pool finding has severity MEDIUM"
+        },
+        {
+          "name": "correct-ladder-step",
+          "check": "The yagni-imperative-allocation-vs-resource-pool finding has ladder_step 2"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        },
+        {
+          "name": "correct-file",
+          "check": "The finding is attributed to generators/provision_circuit.py"
+        },
+        {
+          "name": "exempt-file",
+          "check": "No finding is attributed to generators/router_id.py"
+        }
+      ]
     },
     {
       "id": 11,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this schema (schemas/dcim.yml). It hand-rolls a full DCIM\ndomain (Device, Interface, Rack) from scratch, with no\n`infrahubctl marketplace get` provenance for the DCIM schema\npublished on the Infrahub Marketplace.\n\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: Device\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: serial, kind: Text, optional: true}\n    relationships:\n      - name: interfaces\n        peer: DcimInterface\n        cardinality: many\n        kind: Component\n        identifier: device__interfaces\n      - name: rack\n        peer: DcimRack\n        cardinality: one\n        kind: Attribute\n        identifier: device__rack\n  - name: Interface\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: speed, kind: Number, optional: true}\n  - name: Rack\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: height, kind: Number, optional: true}\n```\n\nSave ONLY the JSON findings to: output.json",
       "expected_output": "JSON listing one yagni-reuse-existing-marketplace-schema finding with severity MEDIUM and ladder_step 1. The replacement should recommend `infrahubctl marketplace get` of the DCIM schema and inheriting from its generics rather than hand-rolling. Airgap note: an unreachable marketplace is a fallback (--marketplace-url pointing at an internal marketplace mirror), not a reason to skip reuse.",
       "files": [],
-      "expectations": [],
-      "assertions": []
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-reuse-existing-marketplace-schema finding",
+        "That finding has severity MEDIUM and ladder_step 1",
+        "No yagni finding exceeds MEDIUM severity",
+        "The replacement recommends infrahubctl marketplace get and inheriting, not hand-rolling"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-reuse-existing-marketplace-schema finding is emitted"
+        },
+        {
+          "name": "correct-severity",
+          "check": "The yagni-reuse-existing-marketplace-schema finding has severity MEDIUM"
+        },
+        {
+          "name": "correct-ladder-step",
+          "check": "The yagni-reuse-existing-marketplace-schema finding has ladder_step 1"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        }
+      ]
     },
     {
       "id": 12,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json sorted by\nladder_step ascending (cheapest fix on top), then by file path.\n\nAudit this minimal repo, which deliberately exhibits one of each\nyagni-* violation. Emit ALL eleven yagni findings and order them\ncorrectly.\n\nFor each artifact, the violation shape and expected rule:\n\n0. schemas/circuits.yml \u2014 hand-rolls a full circuits domain\n   (Circuit, CircuitEndpoint, Provider) from scratch with no\n   `infrahubctl marketplace get` provenance for the circuits\n   schema published on the Infrahub Marketplace \u2192\n   yagni-reuse-existing-marketplace-schema (step 1).\n1. schemas/devices.yml \u2014 five sibling DcimDevice* nodes sharing\n   attributes \u2192 yagni-duplicate-shape-not-extracted-to-generic\n   (step 2).\n2. generators/device_roles.py \u2014 module-level ROLES list of dicts\n   \u2192 yagni-generator-hardcoding-data (step 2).\n3. schemas/ipam.yml \u2014 custom NetIPAddress/NetVlan without\n   inheriting Builtin/Ipam primitives \u2192\n   yagni-custom-domain-primitives-instead-of-builtin (step 2).\n4. generators/provision_circuit.py \u2014 hand-splits a /30 subnet and\n   random-scans ports instead of using a resource pool \u2192\n   yagni-imperative-allocation-vs-resource-pool (step 2).\n5. checks/check_vpn_unique.py \u2014 uniqueness check that could be\n   uniqueness_constraints \u2192\n   yagni-python-validator-vs-schema-constraint (step 3).\n6. schemas/dcim-interfaces.yml \u2014 `Interface.device` rel without\n   a matching inverse on `Device` \u2192\n   yagni-missing-inverse-forces-python-filter (step 3).\n7. schemas/dcim.yml \u2014 `Device.region_code` denormalized when\n   `device.location.region.code` exists \u2192\n   yagni-denormalized-vs-indirect-relationship (step 4).\n8. generators/pop_designs.py + queries/pop_designs.gql \u2014\n   CoreGeneratorGroup in data query + focal-exclude loop \u2192\n   yagni-generator-query-shape-too-broad (step 4).\n9. transforms/interface_config.py \u2014 pure string formatting that\n   Jinja2 would express \u2192\n   yagni-python-transform-that-could-be-jinja2 (step 5).\n10. checks/check_no_unmanaged_devices.py \u2014 GraphQL already\n   filters; Python is `for x in edges: log_error` \u2192\n   yagni-redundant-check-that-graphql-can-answer (step 6).\n\nSave ONLY the JSON findings to: output.json",
       "expected_output": "JSON with eleven findings, one per yagni-* rule above, ordered ascending by ladder_step (1, 2, 2, 2, 2, 3, 3, 4, 4, 5, 6) and then by file path within each step.",
       "files": [],
-      "expectations": [],
-      "assertions": []
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "All eleven yagni-* rules are represented, one finding each",
+        "Findings are ordered by ladder_step ascending, then by file path",
+        "No yagni finding exceeds MEDIUM severity"
+      ],
+      "assertions": [
+        {
+          "name": "all-eleven-present",
+          "check": "One finding is emitted for each of the eleven yagni-* rules"
+        },
+        {
+          "name": "sorted-by-ladder-then-file",
+          "check": "Findings are ordered by (ladder_step, file path) ascending"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        }
+      ]
     }
   ]
 }

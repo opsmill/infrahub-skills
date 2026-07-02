@@ -2832,12 +2832,26 @@ tasks:
       Save ONLY the JSON findings to: output.json
     graders:
       - type: deterministic
-        run: python graders/auditing-repo/check_yagni_python_validator.py
+        run: python graders/auditing-repo/check_yagni_rule.py yagni-python-validator-vs-schema-constraint MEDIUM 3
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-python-validator-vs-schema-constraint
       finding with severity MEDIUM and ladder_step 3. Replacement should
       suggest uniqueness_constraints on the schema attribute.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-python-validator-vs-schema-constraint finding
+      - That finding has severity MEDIUM and ladder_step 3
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-python-validator-vs-schema-constraint finding is emitted
+      - name: correct-severity
+        check: The yagni-python-validator-vs-schema-constraint finding has severity MEDIUM
+      - name: correct-ladder-step
+        check: The yagni-python-validator-vs-schema-constraint finding has ladder_step 3
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
 
   - name: yagni-redundant-graphql-check
     instruction: |
@@ -2866,11 +2880,25 @@ tasks:
       Save ONLY the JSON findings to: output.json
     graders:
       - type: deterministic
-        run: python graders/auditing-repo/check_yagni_redundant_graphql_check.py
+        run: python graders/auditing-repo/check_yagni_rule.py yagni-redundant-check-that-graphql-can-answer LOW 6
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-redundant-check-that-graphql-can-answer
       finding with severity LOW and ladder_step 6.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-redundant-check-that-graphql-can-answer finding
+      - That finding has severity LOW and ladder_step 6
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-redundant-check-that-graphql-can-answer finding is emitted
+      - name: correct-severity
+        check: The yagni-redundant-check-that-graphql-can-answer finding has severity LOW
+      - name: correct-ladder-step
+        check: The yagni-redundant-check-that-graphql-can-answer finding has ladder_step 6
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
 
   - name: yagni-python-vs-jinja2
     instruction: |
@@ -2901,11 +2929,25 @@ tasks:
       Save ONLY the JSON findings to: output.json
     graders:
       - type: deterministic
-        run: python graders/auditing-repo/check_yagni_python_vs_jinja2.py
+        run: python graders/auditing-repo/check_yagni_rule.py yagni-python-transform-that-could-be-jinja2 LOW 5
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-python-transform-that-could-be-jinja2
       finding with severity LOW and ladder_step 5.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-python-transform-that-could-be-jinja2 finding
+      - That finding has severity LOW and ladder_step 5
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-python-transform-that-could-be-jinja2 finding is emitted
+      - name: correct-severity
+        check: The yagni-python-transform-that-could-be-jinja2 finding has severity LOW
+      - name: correct-ladder-step
+        check: The yagni-python-transform-that-could-be-jinja2 finding has ladder_step 5
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
 
   - name: yagni-generator-hardcoding
     instruction: |
@@ -2958,6 +3000,24 @@ tasks:
       JSON listing one yagni-generator-hardcoding-data finding for
       generators/device_roles.py (severity MEDIUM, ladder_step 2). No
       finding should be emitted for bootstrap/seed_statuses.py.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-generator-hardcoding-data finding
+      - That finding has severity MEDIUM and ladder_step 2
+      - No yagni finding exceeds MEDIUM severity
+      - No finding fires on a bootstrap/seed/demo generator path
+    assertions:
+      - name: finding-present
+        check: A yagni-generator-hardcoding-data finding is emitted
+      - name: correct-severity
+        check: The yagni-generator-hardcoding-data finding has severity MEDIUM
+      - name: correct-ladder-step
+        check: The yagni-generator-hardcoding-data finding has ladder_step 2
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
+      - name: carveout
+        check: >-
+          No yagni-generator-hardcoding-data finding is emitted for a bootstrap/seed/demo path
 
   - name: yagni-denormalized-rel
     instruction: |
@@ -3003,12 +3063,26 @@ tasks:
       Save ONLY the JSON findings to: output.json
     graders:
       - type: deterministic
-        run: python graders/auditing-repo/check_yagni_denormalized_rel.py
+        run: python graders/auditing-repo/check_yagni_rule.py yagni-denormalized-vs-indirect-relationship LOW 4
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-denormalized-vs-indirect-relationship
       finding with severity LOW and ladder_step 4. Replacement
       points to traversing device.location.region.code.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-denormalized-vs-indirect-relationship finding
+      - That finding has severity LOW and ladder_step 4
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-denormalized-vs-indirect-relationship finding is emitted
+      - name: correct-severity
+        check: The yagni-denormalized-vs-indirect-relationship finding has severity LOW
+      - name: correct-ladder-step
+        check: The yagni-denormalized-vs-indirect-relationship finding has ladder_step 4
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
 
   - name: yagni-duplicate-shape
     instruction: |
@@ -3053,12 +3127,26 @@ tasks:
       Save ONLY the JSON findings to: output.json
     graders:
       - type: deterministic
-        run: python graders/auditing-repo/check_yagni_duplicate_shape.py
+        run: python graders/auditing-repo/check_yagni_rule.py yagni-duplicate-shape-not-extracted-to-generic MEDIUM 2
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-duplicate-shape-not-extracted-to-generic
       finding with severity MEDIUM and ladder_step 2. Replacement
       points to a shared DeviceCommon generic.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-duplicate-shape-not-extracted-to-generic finding
+      - That finding has severity MEDIUM and ladder_step 2
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-duplicate-shape-not-extracted-to-generic finding is emitted
+      - name: correct-severity
+        check: The yagni-duplicate-shape-not-extracted-to-generic finding has severity MEDIUM
+      - name: correct-ladder-step
+        check: The yagni-duplicate-shape-not-extracted-to-generic finding has ladder_step 2
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
 
   - name: yagni-custom-ipam-vlan
     instruction: |
@@ -3087,12 +3175,26 @@ tasks:
       Save ONLY the JSON findings to: output.json
     graders:
       - type: deterministic
-        run: python graders/auditing-repo/check_yagni_custom_ipam_vlan.py
+        run: python graders/auditing-repo/check_yagni_rule.py yagni-custom-domain-primitives-instead-of-builtin MEDIUM 2
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-custom-domain-primitives-instead-of-builtin
       finding with severity MEDIUM and ladder_step 2. Replacement should
       reference BuiltinIPAddress / IpamIPAddress and IpamVLAN.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-custom-domain-primitives-instead-of-builtin finding
+      - That finding has severity MEDIUM and ladder_step 2
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-custom-domain-primitives-instead-of-builtin finding is emitted
+      - name: correct-severity
+        check: The yagni-custom-domain-primitives-instead-of-builtin finding has severity MEDIUM
+      - name: correct-ladder-step
+        check: The yagni-custom-domain-primitives-instead-of-builtin finding has ladder_step 2
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
 
   - name: yagni-missing-inverse
     instruction: |
@@ -3127,11 +3229,25 @@ tasks:
       Save ONLY the JSON findings to: output.json
     graders:
       - type: deterministic
-        run: python graders/auditing-repo/check_yagni_missing_inverse.py
+        run: python graders/auditing-repo/check_yagni_rule.py yagni-missing-inverse-forces-python-filter MEDIUM 3
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-missing-inverse-forces-python-filter
       finding with severity MEDIUM and ladder_step 3.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-missing-inverse-forces-python-filter finding
+      - That finding has severity MEDIUM and ladder_step 3
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-missing-inverse-forces-python-filter finding is emitted
+      - name: correct-severity
+        check: The yagni-missing-inverse-forces-python-filter finding has severity MEDIUM
+      - name: correct-ladder-step
+        check: The yagni-missing-inverse-forces-python-filter finding has ladder_step 3
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
 
   - name: yagni-query-shape
     instruction: |
@@ -3167,13 +3283,27 @@ tasks:
       Save ONLY the JSON findings to: output.json
     graders:
       - type: deterministic
-        run: python graders/auditing-repo/check_yagni_query_shape.py
+        run: python graders/auditing-repo/check_yagni_rule.py yagni-generator-query-shape-too-broad LOW 4
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-generator-query-shape-too-broad finding
       with severity LOW and ladder_step 4. Either or both of the
       cascade-shape signatures (CoreGeneratorGroup in query, focal-
       exclude loop) should be cited in the replacement.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-generator-query-shape-too-broad finding
+      - That finding has severity LOW and ladder_step 4
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-generator-query-shape-too-broad finding is emitted
+      - name: correct-severity
+        check: The yagni-generator-query-shape-too-broad finding has severity LOW
+      - name: correct-ladder-step
+        check: The yagni-generator-query-shape-too-broad finding has ladder_step 4
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
 
   - name: yagni-imperative-allocation
     instruction: |
@@ -3246,6 +3376,28 @@ tasks:
       scan and pointing at Infrahub resource pools
       (CoreIPPrefixPool / CoreNumberPool / allocate_next_ip_*). No
       finding should be emitted for generators/router_id.py.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-imperative-allocation-vs-resource-pool finding
+      - That finding has severity MEDIUM and ladder_step 2
+      - No yagni finding exceeds MEDIUM severity
+      - The flagged finding points at the production generator (provision_circuit.py)
+      - The deterministic-derivation generator (router_id.py) is not flagged
+    assertions:
+      - name: finding-present
+        check: A yagni-imperative-allocation-vs-resource-pool finding is emitted
+      - name: correct-severity
+        check: The yagni-imperative-allocation-vs-resource-pool finding has severity MEDIUM
+      - name: correct-ladder-step
+        check: The yagni-imperative-allocation-vs-resource-pool finding has ladder_step 2
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
+      - name: correct-file
+        check: >-
+          The finding is attributed to generators/provision_circuit.py
+      - name: exempt-file
+        check: >-
+          No finding is attributed to generators/router_id.py
 
   - name: yagni-reuse-marketplace
     instruction: |
@@ -3291,7 +3443,7 @@ tasks:
       Save ONLY the JSON findings to: output.json
     graders:
       - type: deterministic
-        run: python graders/auditing-repo/check_yagni_reuse_marketplace.py
+        run: python graders/auditing-repo/check_yagni_rule.py yagni-reuse-existing-marketplace-schema MEDIUM 1
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-reuse-existing-marketplace-schema finding
@@ -3301,6 +3453,21 @@ tasks:
       note: an unreachable marketplace is a fallback (--marketplace-url
       pointing at an internal marketplace mirror), not a reason to skip
       reuse.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-reuse-existing-marketplace-schema finding
+      - That finding has severity MEDIUM and ladder_step 1
+      - No yagni finding exceeds MEDIUM severity
+      - The replacement recommends infrahubctl marketplace get and inheriting, not hand-rolling
+    assertions:
+      - name: finding-present
+        check: A yagni-reuse-existing-marketplace-schema finding is emitted
+      - name: correct-severity
+        check: The yagni-reuse-existing-marketplace-schema finding has severity MEDIUM
+      - name: correct-ladder-step
+        check: The yagni-reuse-existing-marketplace-schema finding has ladder_step 1
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
 
   - name: yagni-findings-sorted
     instruction: |
@@ -3358,3 +3525,17 @@ tasks:
       JSON with eleven findings, one per yagni-* rule above, ordered
       ascending by ladder_step (1, 2, 2, 2, 2, 3, 3, 4, 4, 5, 6) and
       then by file path within each step.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - All eleven yagni-* rules are represented, one finding each
+      - Findings are ordered by ladder_step ascending, then by file path
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: all-eleven-present
+        check: >-
+          One finding is emitted for each of the eleven yagni-* rules
+      - name: sorted-by-ladder-then-file
+        check: >-
+          Findings are ordered by (ladder_step, file path) ascending
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity

@@ -131,17 +131,23 @@ def check_yagni_finding_ladder_step(
 
 
 def check_yagni_findings_sorted_by_ladder(findings: list[dict]) -> tuple[bool, str]:
-    """Assert all yagni-* findings come out in ascending ladder_step order."""
+    """Assert yagni-* findings are ordered by ladder_step, then by file path.
+
+    The findings-sorted eval prompt requires ascending ladder_step
+    (cheapest fix on top) and, within a step, ascending file path. Both
+    keys are enforced here so a same-step pair emitted in the wrong file
+    order is caught rather than scoring a passing 1.0.
+    """
     yagni = [
         f for f in findings
         if isinstance(f, dict) and str(f.get("rule", "")).startswith("yagni-")
     ]
     if not yagni:
         return False, "no yagni-* findings emitted"
-    steps = [f.get("ladder_step", -1) for f in yagni]
-    if steps != sorted(steps):
-        return False, f"yagni findings out of ladder order: {steps}"
-    return True, f"yagni findings sorted by ladder_step: {steps}"
+    pairs = [(f.get("ladder_step", -1), str(f.get("file", ""))) for f in yagni]
+    if pairs != sorted(pairs):
+        return False, f"yagni findings out of (ladder_step, file) order: {pairs}"
+    return True, f"yagni findings sorted by (ladder_step, file): {pairs}"
 
 
 def check_yagni_no_finding_above_medium(findings: list[dict]) -> tuple[bool, str]:
@@ -155,31 +161,92 @@ def check_yagni_no_finding_above_medium(findings: list[dict]) -> tuple[bool, str
     introduce a HIGH-severity finding.
     """
     ALLOWED = {"MEDIUM", "LOW"}
-    offenders = [
+    yagni = [
         f for f in findings
-        if isinstance(f, dict)
-        and str(f.get("rule", "")).startswith("yagni-")
+        if isinstance(f, dict) and str(f.get("rule", "")).startswith("yagni-")
+    ]
+    missing = [f for f in yagni if not str(f.get("severity", "")).strip()]
+    above = [
+        f for f in yagni
+        if str(f.get("severity", "")).strip()
         and str(f.get("severity", "")).upper() not in ALLOWED
     ]
-    if offenders:
-        details = [f"{f.get('rule')}={f.get('severity')}" for f in offenders]
-        return False, f"yagni severity cap violated (MEDIUM max): {details}"
+    if missing or above:
+        msgs = []
+        if above:
+            msgs.append(
+                "severity cap violated (MEDIUM max): "
+                + str([f"{f.get('rule')}={f.get('severity')}" for f in above])
+            )
+        if missing:
+            msgs.append(
+                "missing severity field: "
+                + str([f.get("rule") for f in missing])
+            )
+        return False, "; ".join(msgs)
     return True, "all yagni findings at MEDIUM or below"
 
 
+# The generator-hardcoding rule (and Phase 9.4) carve out bootstrap,
+# seed, AND demo paths — a substring match on any of these covers the
+# `bootstrap/`, `seed/`, `demo/` directories and the `*_bootstrap.py` /
+# `*_demo_data.py` file-name conventions the rule documents.
+_BOOTSTRAP_CARVEOUT_SUBSTRINGS = ("bootstrap", "seed", "demo")
+
+
 def check_yagni_finding_carves_out_bootstrap(
-    findings: list[dict], bootstrap_path_substring: str = "bootstrap"
+    findings: list[dict],
+    carveout_substrings: tuple[str, ...] = _BOOTSTRAP_CARVEOUT_SUBSTRINGS,
 ) -> tuple[bool, str]:
-    """Assert no yagni-generator-hardcoding-data finding fires on a bootstrap path."""
+    """Assert no yagni-generator-hardcoding-data finding fires on a carved-out path.
+
+    Covers bootstrap/seed/demo, matching the rule's documented carve-out
+    rather than only the literal ``bootstrap`` substring.
+    """
     offenders = [
         f for f in findings
         if isinstance(f, dict)
         and f.get("rule") == "yagni-generator-hardcoding-data"
-        and bootstrap_path_substring in str(f.get("file", ""))
+        and any(s in str(f.get("file", "")) for s in carveout_substrings)
     ]
     if offenders:
-        return False, f"bootstrap carve-out violated on: {[f.get('file') for f in offenders]}"
-    return True, "bootstrap carve-out respected"
+        return False, f"bootstrap/seed/demo carve-out violated on: {[f.get('file') for f in offenders]}"
+    return True, "bootstrap/seed/demo carve-out respected"
+
+
+def check_yagni_finding_file(
+    findings: list[dict], rule: str, substring: str
+) -> tuple[bool, str]:
+    """Assert the named rule's finding is attributed to the expected file.
+
+    Multi-artifact tasks have a production file that must be flagged and an
+    exempt file that must not; presence/severity checks alone pass even when
+    the finding points at the wrong file. This pins the attribution.
+    """
+    f = _find(findings, rule)
+    if f is None:
+        return False, f"{rule} missing — cannot check file"
+    fpath = str(f.get("file", ""))
+    if substring in fpath:
+        return True, f"{rule} file={fpath}"
+    return False, f"{rule} file={fpath!r} does not contain {substring!r}"
+
+
+def check_yagni_no_finding_on_file(
+    findings: list[dict], substring: str
+) -> tuple[bool, str]:
+    """Assert no finding is attributed to a file matching ``substring``.
+
+    Generalises the bootstrap carve-out to any exempt file (e.g. the
+    deterministic-derivation generator that must not be flagged).
+    """
+    offenders = [
+        f for f in findings
+        if isinstance(f, dict) and substring in str(f.get("file", ""))
+    ]
+    if offenders:
+        return False, f"finding(s) on excluded file {substring!r}: {[f.get('rule') for f in offenders]}"
+    return True, f"no finding on files matching {substring!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -187,50 +254,49 @@ def check_yagni_finding_carves_out_bootstrap(
 # ---------------------------------------------------------------------------
 #
 # Keys use a colon-separated form to encode the rule (and any expected
-# value) the check is being parameterised with. The dispatcher in
-# ``run_checks`` splits on the first one or two colons.
+# value) the check is being parameterised with, e.g.
+# ``yagni-finding-severity:<rule>:<sev>``. Each registry entry carries its
+# function and the parameter types (``"str"`` / ``"int"``) to parse from the
+# colon parts, so ``_dispatch`` is fully data-driven — adding a check means
+# adding one registry line, not a new branch in a hand-written if-chain.
 
-_BASE_CHECKS: dict[str, Any] = {
-    "yagni-finding-present": check_yagni_finding_present,
-    "yagni-finding-severity": check_yagni_finding_severity,
-    "yagni-finding-ladder-step": check_yagni_finding_ladder_step,
-    "yagni-findings-sorted": check_yagni_findings_sorted_by_ladder,
-    "yagni-bootstrap-carveout": check_yagni_finding_carves_out_bootstrap,
-    "yagni-no-above-medium": check_yagni_no_finding_above_medium,
+_CHECKS: dict[str, tuple[Any, list[str]]] = {
+    "yagni-finding-present": (check_yagni_finding_present, ["str"]),
+    "yagni-finding-severity": (check_yagni_finding_severity, ["str", "str"]),
+    "yagni-finding-ladder-step": (check_yagni_finding_ladder_step, ["str", "int"]),
+    "yagni-finding-file": (check_yagni_finding_file, ["str", "str"]),
+    "yagni-finding-file-excludes": (check_yagni_no_finding_on_file, ["str"]),
+    "yagni-findings-sorted": (check_yagni_findings_sorted_by_ladder, []),
+    "yagni-bootstrap-carveout": (check_yagni_finding_carves_out_bootstrap, []),
+    "yagni-no-above-medium": (check_yagni_no_finding_above_medium, []),
 }
 
 
 def _dispatch(name: str, findings: list[dict]) -> tuple[bool, str]:
-    """Dispatch a colon-separated check name to the right function."""
-    parts = name.split(":", 2)
-    fn_name = parts[0]
-    fn = _BASE_CHECKS.get(fn_name)
-    if fn is None:
-        return False, f"unknown check: {fn_name}"
+    """Dispatch a colon-encoded check name to its function.
 
-    if fn_name == "yagni-finding-present":
-        if len(parts) < 2:
-            return False, f"{fn_name} needs :<rule>"
-        return fn(findings, parts[1])
-    if fn_name == "yagni-finding-severity":
-        if len(parts) < 3:
-            return False, f"{fn_name} needs :<rule>:<severity>"
-        return fn(findings, parts[1], parts[2])
-    if fn_name == "yagni-finding-ladder-step":
-        if len(parts) < 3:
-            return False, f"{fn_name} needs :<rule>:<step>"
-        try:
-            step = int(parts[2])
-        except ValueError:
-            return False, f"{fn_name} step must be int, got {parts[2]!r}"
-        return fn(findings, parts[1], step)
-    if fn_name == "yagni-bootstrap-carveout":
-        return fn(findings)
-    if fn_name == "yagni-findings-sorted":
-        return fn(findings)
-    if fn_name == "yagni-no-above-medium":
-        return fn(findings)
-    return False, f"unhandled check: {fn_name}"
+    The name is ``<check>[:<arg>...]``; args are parsed positionally per the
+    registry's param spec and passed to the function after ``findings``.
+    """
+    parts = name.split(":", len(name))  # split fully; values carry no colons
+    fn_name = parts[0]
+    raw_args = parts[1:]
+    entry = _CHECKS.get(fn_name)
+    if entry is None:
+        return False, f"unknown check: {fn_name}"
+    fn, specs = entry
+    if len(raw_args) != len(specs):
+        return False, f"{fn_name} expects {len(specs)} arg(s), got {len(raw_args)}: {raw_args}"
+    parsed: list[Any] = []
+    for spec, value in zip(specs, raw_args):
+        if spec == "int":
+            try:
+                parsed.append(int(value))
+            except ValueError:
+                return False, f"{fn_name} arg must be int, got {value!r}"
+        else:
+            parsed.append(value)
+    return fn(findings, *parsed)
 
 
 # ---------------------------------------------------------------------------
