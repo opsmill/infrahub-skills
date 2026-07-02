@@ -104,8 +104,9 @@ order:
    preferring built-in primitives. Never block schema creation on
    marketplace reachability.
 
-This rule and its grader inspect only local files against the static
-domain list above, so audits produce identical results offline.
+Detection relies only on local schema files matched against the static
+domain list above — no network call — so audits produce identical
+results offline.
 
 ## Checks
 
@@ -115,9 +116,6 @@ domain list above, so audits produce identical results offline.
    referencing a marketplace-published generic anywhere in the file.
 2. A custom domain node duplicating a published schema's node
    (name + a handful of the same attributes) without inheritance.
-3. Schema YAML copied from a GitHub repository instead of pulled via
-   `infrahubctl marketplace get` — the marketplace is the only
-   supported reuse path.
 
 ## What NOT to flag
 
