@@ -3247,6 +3247,52 @@ tasks:
       (CoreIPPrefixPool / CoreNumberPool / allocate_next_ip_*). No
       finding should be emitted for generators/router_id.py.
 
+  - name: yagni-reuse-marketplace
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this schema (schemas/dcim.yml). It hand-rolls a full DCIM
+      domain (Device, Interface, Rack) from scratch, with no
+      inheritance from the Infrahub Marketplace / opsmill/schema-library
+      DCIM schema and no `infrahubctl marketplace get` provenance.
+
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Device
+          namespace: Dcim
+          attributes:
+            - {name: name, kind: Text}
+            - {name: serial, kind: Text, optional: true}
+          relationships:
+            - {name: interfaces, peer: DcimInterface, cardinality: many, kind: Component, identifier: device__interfaces}
+            - {name: rack, peer: DcimRack, cardinality: one, kind: Attribute, identifier: device__rack}
+        - name: Interface
+          namespace: Dcim
+          attributes:
+            - {name: name, kind: Text}
+            - {name: speed, kind: Number, optional: true}
+        - name: Rack
+          namespace: Dcim
+          attributes:
+            - {name: name, kind: Text}
+            - {name: height, kind: Number, optional: true}
+      ```
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_reuse_marketplace.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-reuse-existing-marketplace-schema finding
+      with severity MEDIUM and ladder_step 1. The replacement should
+      recommend `infrahubctl marketplace get` of the DCIM schema and
+      inheriting from its generics rather than hand-rolling. Airgap
+      note: an unreachable marketplace is a fallback (--marketplace-url
+      mirror or vendored schema-library), not a reason to skip reuse.
+
   - name: yagni-findings-sorted
     instruction: |
       Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
