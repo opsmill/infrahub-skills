@@ -61,7 +61,7 @@ The Repo Auditor performs a comprehensive audit of an Infrahub repository agains
 
 Beyond correctness, the auditor flags places where a from-scratch schema, Python, or denormalized data is doing work a cheaper option — an off-the-shelf marketplace schema or a built-in Infrahub layer — already handles — for example:
 
-- A whole domain (DCIM, location, organization, circuits, cabling) hand-rolled from scratch when the [Infrahub Marketplace](https://marketplace.infrahub.app/) already publishes it — reuse it with `infrahubctl marketplace get <namespace>/<name>` and `inherit_from` instead of redefining the model
+- Any domain hand-rolled from scratch when the [Infrahub Marketplace](https://marketplace.infrahub.app/) already publishes it — the auditor checks the whole catalog (DCIM, location, organization, circuits, cabling, routing, compute, security, and many more), so reuse it with `infrahubctl marketplace get <namespace>/<name>` and `inherit_from` instead of redefining the model
 - A check that re-implements a uniqueness, presence, or allowed-values rule the schema can enforce as a constraint
 - A Python transform that only formats strings, where a Jinja2 template would do
 - A generator that hardcodes data belonging in `objects/`, reinvents a built-in IPAM/VLAN primitive, or hand-rolls subnet/IP/VLAN/port allocation instead of using a resource pool

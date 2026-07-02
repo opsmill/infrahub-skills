@@ -21,11 +21,15 @@ generic.
 
 Before building *any* schema, the whole marketplace should be searched
 for a published schema covering that domain — not just the handful
-below. The marketplace is the single source of truth for reusable
-schemas; do **not** pull schemas from GitHub repositories.
+below. The marketplace publishes far more than these examples (routing,
+compute, security, VLAN translation, cross-connects, and many more), so
+whenever a match exists **no modelling is needed** — reuse it. The
+marketplace is the single source of truth for reusable schemas; do
+**not** pull schemas from GitHub repositories.
 
-Common marketplace-published domains (illustrative, not exhaustive —
-search the whole marketplace for whatever you are about to build):
+Common marketplace-published domains (illustrative only — a small slice
+of the catalog; always search the whole marketplace for whatever you
+are about to build):
 
 | Domain | Signature nodes/attributes |
 | ------ | -------------------------- |

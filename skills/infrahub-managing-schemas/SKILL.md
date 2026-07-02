@@ -115,7 +115,7 @@ already covers it:
 
 | Signal | Cheaper layer | See rule |
 | ------ | ------------- | -------- |
-| Building a whole domain (DCIM, location, org, circuits, cabling) from scratch | Reuse a marketplace-published schema: `infrahubctl marketplace get <ns>/<name>` then `inherit_from` | [yagni-reuse-existing-marketplace-schema](../infrahub-auditing-repo/rules/yagni-reuse-existing-marketplace-schema.md) |
+| Building any domain from scratch (the marketplace publishes far more than DCIM / location / org — routing, security, compute, and many more) | Search the whole marketplace and reuse a published schema: `infrahubctl marketplace get <ns>/<name>` then `inherit_from` | [yagni-reuse-existing-marketplace-schema](../infrahub-auditing-repo/rules/yagni-reuse-existing-marketplace-schema.md) |
 | Copying a value onto a node that's reachable by traversing a relationship (`region_code` when `device.location.region.code` exists) | An indirect relationship traversal; let consumers follow the link | [yagni-denormalized-vs-indirect-relationship](../infrahub-auditing-repo/rules/yagni-denormalized-vs-indirect-relationship.md) |
 | Several sibling nodes repeating the same attributes and relationships | Extract a generic and `inherit_from` it | [yagni-duplicate-shape-not-extracted-to-generic](../infrahub-auditing-repo/rules/yagni-duplicate-shape-not-extracted-to-generic.md) |
 | Defining custom IP address / prefix / VLAN nodes | `inherit_from` the built-in primitive (`BuiltinIPAddress`, `BuiltinIPPrefix`, `IpamVLAN`) | [yagni-custom-domain-primitives-instead-of-builtin](../infrahub-auditing-repo/rules/yagni-custom-domain-primitives-instead-of-builtin.md) |
