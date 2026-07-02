@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Grader: assert all 9 yagni-* findings emit sorted by ladder_step ascending.
+"""Grader: assert all 10 yagni-* findings emit sorted by ladder_step ascending.
 
 Companion to the per-rule graders. The fixture for this task contains
-violations of all 9 yagni-* rules; the auditor must emit them in
+violations of all 10 yagni-* rules; the auditor must emit them in
 ascending ladder_step order (cheapest fix on top).
 """
 
@@ -18,8 +18,9 @@ from lib import run_checks  # noqa: E402
 
 ALL_RULES = [
     # (rule, ladder_step, severity) — severity tracks the ladder, capped at
-    # MEDIUM: cheap, unambiguous fixes (steps 2-3) emit MEDIUM; costlier
+    # MEDIUM: cheap, unambiguous fixes (steps 1-3) emit MEDIUM; costlier
     # rewrites where the Python is more defensible (steps 4-6) emit LOW.
+    ("yagni-reuse-existing-marketplace-schema", 1, "MEDIUM"),
     ("yagni-duplicate-shape-not-extracted-to-generic", 2, "MEDIUM"),
     ("yagni-generator-hardcoding-data", 2, "MEDIUM"),
     ("yagni-custom-domain-primitives-instead-of-builtin", 2, "MEDIUM"),

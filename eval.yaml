@@ -3254,8 +3254,8 @@ tasks:
 
       Audit this schema (schemas/dcim.yml). It hand-rolls a full DCIM
       domain (Device, Interface, Rack) from scratch, with no
-      inheritance from the Infrahub Marketplace / opsmill/schema-library
-      DCIM schema and no `infrahubctl marketplace get` provenance.
+      `infrahubctl marketplace get` provenance for the DCIM schema
+      published on the Infrahub Marketplace.
 
       ```yaml
       version: "1.0"
@@ -3291,7 +3291,8 @@ tasks:
       recommend `infrahubctl marketplace get` of the DCIM schema and
       inheriting from its generics rather than hand-rolling. Airgap
       note: an unreachable marketplace is a fallback (--marketplace-url
-      mirror or vendored schema-library), not a reason to skip reuse.
+      pointing at an internal marketplace mirror), not a reason to skip
+      reuse.
 
   - name: yagni-findings-sorted
     instruction: |
@@ -3300,11 +3301,16 @@ tasks:
       ladder_step ascending (cheapest fix on top), then by file path.
 
       Audit this minimal repo, which deliberately exhibits one of each
-      yagni-* violation. Emit ALL nine yagni findings and order them
+      yagni-* violation. Emit ALL ten yagni findings and order them
       correctly.
 
       For each artifact, the violation shape and expected rule:
 
+      0. schemas/circuits.yml — hand-rolls a full circuits domain
+         (Circuit, CircuitEndpoint, Provider) from scratch with no
+         `infrahubctl marketplace get` provenance for the circuits
+         schema published on the Infrahub Marketplace →
+         yagni-reuse-existing-marketplace-schema (step 1).
       1. schemas/devices.yml — five sibling DcimDevice* nodes sharing
          attributes → yagni-duplicate-shape-not-extracted-to-generic
          (step 2).
@@ -3338,6 +3344,6 @@ tasks:
         run: python graders/auditing-repo/check_yagni_findings_sorted.py
         weight: 1.0
     expected_output: >-
-      JSON with nine findings, one per yagni-* rule above, ordered
-      ascending by ladder_step (2, 2, 2, 3, 3, 4, 4, 5, 6) and then by
-      file path within each step.
+      JSON with ten findings, one per yagni-* rule above, ordered
+      ascending by ladder_step (1, 2, 2, 2, 3, 3, 4, 4, 5, 6) and then
+      by file path within each step.
