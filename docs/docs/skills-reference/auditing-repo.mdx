@@ -57,6 +57,16 @@ The Repo Auditor performs a comprehensive audit of an Infrahub repository agains
 - Python environment detection configuration
 - Git integration setup
 
+### YAGNI / cost-to-fix
+
+Beyond correctness, the auditor flags places where Python (or denormalized data) is doing work a cheaper, built-in Infrahub layer already handles — for example:
+
+- A check that re-implements a uniqueness, presence, or allowed-values rule the schema can enforce as a constraint
+- A Python transform that only formats strings, where a Jinja2 template would do
+- A generator that hardcodes data belonging in `objects/`, reinvents a built-in IPAM/VLAN primitive, or hand-rolls subnet/IP/VLAN/port allocation instead of using a resource pool
+
+These findings are advisory — the code works as-is, but the cheaper layer is less to maintain and visible to the rest of the platform. Each one names the specific layer to move to, and they are ranked by how cheap the fix is (a one-line schema change ranks above a full rewrite).
+
 ## What it produces
 
 A structured audit report listing:
@@ -75,5 +85,7 @@ Issues are grouped by category so the most critical problems are addressed first
 | **Error** | Will cause load failures or runtime errors | Must fix before loading into Infrahub |
 | **Warning** | Convention violation that may cause confusing behavior | Should fix |
 | **Info** | Suggestion for improvement | Optional |
+
+Cost-to-fix (YAGNI) findings are always advisory — they never block a load. They are listed cheapest-fix-first so you can pick off the easy wins, and each carries the specific replacement to apply.
 
 The Repo Auditor can be asked to fix issues directly after reporting them — describe which issues to address and the AI applies the relevant skill to make the corrections.

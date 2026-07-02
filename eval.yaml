@@ -2790,3 +2790,508 @@ tasks:
           The denormalized sheet is split into manufacturer, site, and device
           kinds; referents are deduped and load before the devices that
           reference them
+
+  # --- Auditing Repo (YAGNI) --- #
+  - name: yagni-python-validator
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9 of the audit procedure (YAGNI / Cost-to-Fix). For this
+      evaluation, emit findings as JSON to output.json (not the usual
+      AUDIT_REPORT.md). Shape:
+
+      {"findings": [{"rule": "...", "severity": "HIGH|MEDIUM",
+                     "ladder_step": <int>, "file": "...",
+                     "line": "...", "replacement": "..."}]}
+
+      Audit this artifact (checks/check_vpn_unique.py):
+
+      ```python
+      from infrahub_sdk.checks import InfrahubCheck
+
+      class VpnUniqueCheck(InfrahubCheck):
+          query = "vpn_query"
+
+          async def validate(self, data):
+              seen = set()
+              for vpn in data["L3vpnVpn"]["edges"]:
+                  vid = vpn["node"]["vpn_id"]["value"]
+                  if vid in seen:
+                      self.log_error(message=f"duplicate vpn_id {vid}")
+                  seen.add(vid)
+      ```
+
+      The schema for L3vpnVpn (schemas/l3vpn.yml):
+      ```yaml
+      - name: Vpn
+        namespace: L3vpn
+        attributes:
+          - name: vpn_id
+            kind: Number
+      ```
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_python_validator.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-python-validator-vs-schema-constraint
+      finding with severity MEDIUM and ladder_step 3. Replacement should
+      suggest uniqueness_constraints on the schema attribute.
+
+  - name: yagni-redundant-graphql-check
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json (same shape as
+      yagni-python-validator).
+
+      Audit this check (checks/check_no_unmanaged_devices.py):
+
+      ```python
+      from infrahub_sdk.checks import InfrahubCheck
+
+      class NoUnmanagedDevicesCheck(InfrahubCheck):
+          query = "unmanaged_devices"
+
+          async def validate(self, data):
+              edges = data["DcimDevice"]["edges"]
+              for d in edges:
+                  self.log_error(message=f"unmanaged device {d['node']['name']['value']}")
+      ```
+
+      Where queries/unmanaged_devices.gql already filters to unmanaged
+      devices only (`DcimDevice(managed__value: false)`), so the Python
+      is just looping and logging — no real validation logic.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_redundant_graphql_check.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-redundant-check-that-graphql-can-answer
+      finding with severity LOW and ladder_step 6.
+
+  - name: yagni-python-vs-jinja2
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this transform (transforms/interface_config.py):
+
+      ```python
+      from infrahub_sdk.transforms import InfrahubTransform
+
+      class InterfaceConfig(InfrahubTransform):
+          query = "interfaces"
+
+          async def transform(self, data):
+              lines = []
+              for iface in data["DcimInterface"]["edges"]:
+                  n = iface["node"]
+                  lines.append(f"interface {n['name']['value']}")
+                  lines.append(f"  description {n['description']['value']}")
+                  if n["enabled"]["value"]:
+                      lines.append("  no shutdown")
+                  else:
+                      lines.append("  shutdown")
+              return "\n".join(lines)
+      ```
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_python_vs_jinja2.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-python-transform-that-could-be-jinja2
+      finding with severity LOW and ladder_step 5.
+
+  - name: yagni-generator-hardcoding
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit these two generators:
+
+      File generators/device_roles.py (production path):
+      ```python
+      from infrahub_sdk.generator import InfrahubGenerator
+
+      ROLES = [
+          {"name": "spine", "description": "spine switch"},
+          {"name": "leaf", "description": "leaf switch"},
+          {"name": "edge", "description": "edge router"},
+      ]
+
+      class DeviceRolesGenerator(InfrahubGenerator):
+          async def generate(self, data):
+              for r in ROLES:
+                  obj = await self.client.create(kind="DcimRole", data=r)
+                  await obj.save(allow_upsert=True)
+      ```
+
+      File bootstrap/seed_statuses.py (initial seed):
+      ```python
+      from infrahub_sdk.generator import InfrahubGenerator
+
+      STATUSES = [
+          {"name": "active"}, {"name": "draft"}, {"name": "retired"},
+      ]
+
+      class SeedStatuses(InfrahubGenerator):
+          async def generate(self, data):
+              for s in STATUSES:
+                  obj = await self.client.create(kind="DcimStatus", data=s)
+                  await obj.save(allow_upsert=True)
+      ```
+
+      Important: the audit must NOT flag the bootstrap/ file (see "What
+      NOT to flag" in the rule).
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_generator_hardcoding.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-generator-hardcoding-data finding for
+      generators/device_roles.py (severity MEDIUM, ladder_step 2). No
+      finding should be emitted for bootstrap/seed_statuses.py.
+
+  - name: yagni-denormalized-rel
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this schema (schemas/dcim.yml):
+
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Device
+          namespace: Dcim
+          attributes:
+            - name: name
+              kind: Text
+            - name: region_code
+              kind: Text
+          relationships:
+            - name: location
+              peer: LocationSite
+              kind: Attribute
+              cardinality: one
+              identifier: device__location
+        - name: Site
+          namespace: Location
+          attributes:
+            - name: name
+              kind: Text
+            - name: region_code
+              kind: Text
+          relationships:
+            - name: region
+              peer: LocationRegion
+              kind: Parent
+              cardinality: one
+              identifier: site__region
+      ```
+
+      `region_code` is denormalized onto `DcimDevice` when
+      `device.location.region.code` is the canonical path.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_denormalized_rel.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-denormalized-vs-indirect-relationship
+      finding with severity LOW and ladder_step 4. Replacement
+      points to traversing device.location.region.code.
+
+  - name: yagni-duplicate-shape
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this schema (schemas/devices.yml) — five device nodes each
+      repeating the same six attributes:
+
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: DeviceSpine
+          namespace: Dcim
+          attributes:
+            - {name: name, kind: Text}
+            - {name: serial, kind: Text}
+            - {name: model, kind: Text}
+            - {name: vendor, kind: Text}
+            - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}
+            - {name: notes, kind: Text, optional: true}
+        - name: DeviceLeaf
+          namespace: Dcim
+          attributes:
+            - {name: name, kind: Text}
+            - {name: serial, kind: Text}
+            - {name: model, kind: Text}
+            - {name: vendor, kind: Text}
+            - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}
+            - {name: notes, kind: Text, optional: true}
+        - name: DeviceEdge
+          namespace: Dcim
+          attributes:
+            - {name: name, kind: Text}
+            - {name: serial, kind: Text}
+            - {name: model, kind: Text}
+            - {name: vendor, kind: Text}
+            - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}
+            - {name: notes, kind: Text, optional: true}
+      ```
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_duplicate_shape.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-duplicate-shape-not-extracted-to-generic
+      finding with severity MEDIUM and ladder_step 2. Replacement
+      points to a shared DeviceCommon generic.
+
+  - name: yagni-custom-ipam-vlan
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this schema (schemas/ipam.yml) — defines custom IP-address
+      and VLAN nodes without inheriting from the Infrahub built-in
+      primitives:
+
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: IPAddress
+          namespace: Net
+          attributes:
+            - {name: address, kind: Text}
+            - {name: description, kind: Text, optional: true}
+        - name: Vlan
+          namespace: Net
+          attributes:
+            - {name: vlan_id, kind: Number}
+            - {name: name, kind: Text}
+      ```
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_custom_ipam_vlan.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-custom-domain-primitives-instead-of-builtin
+      finding with severity MEDIUM and ladder_step 2. Replacement should
+      reference BuiltinIPAddress / IpamIPAddress and IpamVLAN.
+
+  - name: yagni-missing-inverse
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this schema (schemas/dcim.yml). The forward
+      `Interface.device` rel is `kind: Attribute, cardinality: one` but
+      `Device` declares no inverse — consumers with an interface in hand
+      have no way to traverse back to its device without filtering.
+
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Device
+          namespace: Dcim
+          attributes:
+            - {name: name, kind: Text}
+          # no `interfaces` relationship declared
+        - name: Interface
+          namespace: Dcim
+          attributes:
+            - {name: name, kind: Text}
+          relationships:
+            - name: device
+              peer: DcimDevice
+              kind: Attribute
+              cardinality: one
+              identifier: device__interfaces
+      ```
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_missing_inverse.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-missing-inverse-forces-python-filter
+      finding with severity MEDIUM and ladder_step 3.
+
+  - name: yagni-query-shape
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this generator. The `.gql` references the trigger group
+      `CoreGeneratorGroup` and the Python contains a focal-exclude loop
+      — both signatures of cascade-shape.
+
+      File generators/pop_designs.py:
+      ```python
+      from infrahub_sdk.generator import InfrahubGenerator
+
+      class PopDesignsGenerator(InfrahubGenerator):
+          query = "pop_designs_query"
+
+          async def generate(self, data):
+              for design in data["TopologyPopDesign"]["edges"]:
+                  if design["node"]["name"]["value"] == self.focal.name.value:
+                      continue
+                  # ...
+      ```
+
+      File queries/pop_designs_query.gql:
+      ```graphql
+      query {
+        CoreGeneratorGroup(name__value: "pop_designs") { edges { node { id } } }
+        TopologyPopDesign { edges { node { name { value } } } }
+      }
+      ```
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_query_shape.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-generator-query-shape-too-broad finding
+      with severity LOW and ladder_step 4. Either or both of the
+      cascade-shape signatures (CoreGeneratorGroup in query, focal-
+      exclude loop) should be cited in the replacement.
+
+  - name: yagni-imperative-allocation
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit these two generators:
+
+      File generators/provision_circuit.py (production path):
+      ```python
+      import ipaddress
+      import random
+      from infrahub_sdk.generator import InfrahubGenerator
+
+      class ProvisionCircuit(InfrahubGenerator):
+          query = "circuit_request"
+
+          async def generate(self, data):
+              req = data["CircuitRequest"]["edges"][0]["node"]
+
+              # VLANs already come from a pool — this part is fine.
+              vlan = await self.client.allocate_next_ip_prefix(
+                  resource_pool="circuit_vlan_pool"
+              )
+
+              # Subnet: hand-split a /30 out of the parent block.
+              parent = ipaddress.ip_network(req["block"]["value"])
+              child = next(parent.subnets(new_prefix=30))
+              await (await self.client.create(
+                  kind="IpamIPPrefix", data={"prefix": str(child)}
+              )).save(allow_upsert=True)
+
+              # Port: roll a switch and scan peers for the first free one.
+              switch_index = random.randint(1, 2)
+              switch = req["switches"]["edges"][switch_index]["node"]
+              port = next(
+                  (p for p in switch["interfaces"]["edges"]
+                   if p["node"]["status"]["value"] == "free"),
+                  None,
+              )
+      ```
+
+      File generators/router_id.py (legitimate derivation):
+      ```python
+      import ipaddress
+      from infrahub_sdk.generator import InfrahubGenerator
+
+      class RouterId(InfrahubGenerator):
+          async def generate(self, data):
+              # router-id must EQUAL the loopback address — a deterministic
+              # derivation, not a "next free" allocation. Do not flag.
+              loopback = data["Device"]["edges"][0]["node"]["loopback"]["value"]
+              router_id = str(ipaddress.ip_interface(loopback).ip)
+              # ... set router_id on the device, no IPAM object created ...
+      ```
+
+      Important: the audit must NOT flag generators/router_id.py — it
+      derives a value deterministically and persists no allocation (see
+      "What NOT to flag" in the rule).
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_imperative_allocation.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-imperative-allocation-vs-resource-pool
+      finding for generators/provision_circuit.py (severity MEDIUM,
+      ladder_step 2), citing the subnet math and/or the random port
+      scan and pointing at Infrahub resource pools
+      (CoreIPPrefixPool / CoreNumberPool / allocate_next_ip_*). No
+      finding should be emitted for generators/router_id.py.
+
+  - name: yagni-findings-sorted
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json sorted by
+      ladder_step ascending (cheapest fix on top), then by file path.
+
+      Audit this minimal repo, which deliberately exhibits one of each
+      yagni-* violation. Emit ALL nine yagni findings and order them
+      correctly.
+
+      For each artifact, the violation shape and expected rule:
+
+      1. schemas/devices.yml — five sibling DcimDevice* nodes sharing
+         attributes → yagni-duplicate-shape-not-extracted-to-generic
+         (step 2).
+      2. generators/device_roles.py — module-level ROLES list of dicts
+         → yagni-generator-hardcoding-data (step 2).
+      3. schemas/ipam.yml — custom NetIPAddress/NetVlan without
+         inheriting Builtin/Ipam primitives →
+         yagni-custom-domain-primitives-instead-of-builtin (step 2).
+      4. checks/check_vpn_unique.py — uniqueness check that could be
+         uniqueness_constraints →
+         yagni-python-validator-vs-schema-constraint (step 3).
+      5. schemas/dcim-interfaces.yml — `Interface.device` rel without
+         a matching inverse on `Device` →
+         yagni-missing-inverse-forces-python-filter (step 3).
+      6. schemas/dcim.yml — `Device.region_code` denormalized when
+         `device.location.region.code` exists →
+         yagni-denormalized-vs-indirect-relationship (step 4).
+      7. generators/pop_designs.py + queries/pop_designs.gql —
+         CoreGeneratorGroup in data query + focal-exclude loop →
+         yagni-generator-query-shape-too-broad (step 4).
+      8. transforms/interface_config.py — pure string formatting that
+         Jinja2 would express →
+         yagni-python-transform-that-could-be-jinja2 (step 5).
+      9. checks/check_no_unmanaged_devices.py — GraphQL already
+         filters; Python is `for x in edges: log_error` →
+         yagni-redundant-check-that-graphql-can-answer (step 6).
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_findings_sorted.py
+        weight: 1.0
+    expected_output: >-
+      JSON with nine findings, one per yagni-* rule above, ordered
+      ascending by ladder_step (2, 2, 2, 3, 3, 4, 4, 5, 6) and then by
+      file path within each step.

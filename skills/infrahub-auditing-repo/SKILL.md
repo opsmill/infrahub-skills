@@ -60,10 +60,11 @@ When invoked, the auditor:
 The phased procedure that ties these steps together
 lives in [audit-procedure.md](./audit-procedure.md) —
 read that file when running an audit. It defines the
-eight phases (project structure → schema → objects →
+nine phases (project structure → schema → objects →
 Python components → cross-references → registration →
-best practices → deployment) and the per-finding
-severity levels used in the final report.
+best practices → deployment → YAGNI / cost-to-fix)
+and the per-finding severity levels used in the final
+report.
 
 ## Audit Categories
 
@@ -77,6 +78,7 @@ severity levels used in the final report.
 | HIGH | Relationships | Bidirectional IDs, cardinality |
 | HIGH | Registration | All files registered, no orphans |
 | MEDIUM | Best Practices | human_friendly_id, display_label |
+| MEDIUM–LOW | YAGNI / Cost-to-Fix | Python doing what schema, GraphQL, Jinja2, or built-in IPAM/VLAN can do; denormalized data; un-extracted duplicate shapes. Severity tracks the cost-to-fix ladder: steps 2–3 MEDIUM, steps 4–6 LOW |
 | MEDIUM | Deployment | Git status, bootstrap placement |
 | LOW | Patterns & Style | Code organization, naming |
 
@@ -136,6 +138,17 @@ The report is written to `AUDIT_REPORT.md` in the project root with this structu
 ## Deployment Readiness
 
 ...
+
+## YAGNI / Cost-to-Fix Findings
+
+Findings sorted by `ladder_step` ascending (cheapest
+fix first), then by file path. Each entry names the
+rule, the ladder step, the file:line, and the
+suggested replacement (schema feature, GraphQL query,
+Jinja2 template, `Builtin*`/`Ipam*` inheritance, or
+inverse relationship declaration).
+
+...
 ```
 
 ## Audit Rules Reference
@@ -161,7 +174,7 @@ The auditor checks rules from all skills:
 ## Rules and Procedure
 
 - [audit-procedure.md](./audit-procedure.md) — the
-  eight-phase walkthrough that drives every audit
+  nine-phase walkthrough that drives every audit
   run
 - [rules/](./rules/) — detailed audit rule
   definitions referenced from the phases

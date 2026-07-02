@@ -76,6 +76,27 @@ are actually schema-side gaps:
 | Needs the GraphQL response keyed to typed nodes | Select `id` and `__typename` in the query — the SDK relies on both | [../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md) |
 | Should never block a merge but only annotate | Use `self.log_info()` instead of `log_error()`; `log_warning()` does not exist | [rules/python-validate.md](./rules/python-validate.md) |
 
+## Before writing Python
+
+If a cheaper layer can express the constraint, use it.
+A schema constraint runs at load time on every write
+path; a Python check runs only inside the proposed-
+change pipeline, so bad data created via other paths
+slips through. Walk this short ladder before reaching
+for `InfrahubCheck`:
+
+| Signal | Cheaper layer | See rule |
+| ------ | ------------- | -------- |
+| Validating uniqueness, presence, allowed values, or regex on a single attribute | Schema constraint (`uniqueness_constraints`, `optional: false`, `kind: Dropdown` choices, `regex`) | [yagni-python-validator-vs-schema-constraint](../infrahub-auditing-repo/rules/yagni-python-validator-vs-schema-constraint.md) |
+| Check whose body is a GraphQL query plus a single `if len(...) > 0: raise` | One `.gql` file plus 5 lines of Python | [yagni-redundant-check-that-graphql-can-answer](../infrahub-auditing-repo/rules/yagni-redundant-check-that-graphql-can-answer.md) |
+| Enforcing that a relationship is single-peered or non-optional | Schema `cardinality: one`, `kind: Parent` / `Component`, `optional: false` | [yagni-python-validator-vs-schema-constraint](../infrahub-auditing-repo/rules/yagni-python-validator-vs-schema-constraint.md) |
+
+Only when none of these apply should you write a
+Python check. The cross-node business rules,
+out-of-band reconciliations, and stateful assertions
+in [rules/python-validate.md](./rules/python-validate.md)
+are the legitimate use cases.
+
 ## Check Basics
 
 Every check has three components:

@@ -199,8 +199,8 @@ each task reads).
 | infrahub-managing-transforms | 3 |
 | infrahub-managing-objects | 1 |
 | infrahub-reporting-issues | 3 |
+| infrahub-auditing-repo | 11 |
 
-`infrahub-analyzing-data` and `infrahub-auditing-repo`
-have no eval tasks yet — adding them is a good
-contribution. `infrahub-analyzing-data` in particular
-has rules but no grader directory.
+`infrahub-analyzing-data` has no eval tasks yet —
+adding them is a good contribution. It has rules but
+no grader directory.
