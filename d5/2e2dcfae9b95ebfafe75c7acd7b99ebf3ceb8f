@@ -1,0 +1,29 @@
+skills/infrahub-analyzing-data/examples.md
+  s_ad12adac0b7d6c::t_b3d39d4919d279 669
+  s_ad12adac0b7d6c::t_c2f1e8a9da14ed 556-557
+  s_ad12adac0b7d6c::t_3092263e64e31f 503-506
+  s_ad12adac0b7d6c::t_8e344f52d9e9c5 480,482
+  s_ad12adac0b7d6c::t_3c29a1f52f431e 399-400
+skills/infrahub-analyzing-data/rules/mcp-tools.md
+  s_ad12adac0b7d6c::t_e13d6cc73805c5 186-187
+  s_ad12adac0b7d6c::t_07f778b4ffaf98 21
+  s_ad12adac0b7d6c::t_732f5d9faf30ee 209-213
+  s_ad12adac0b7d6c::t_cb9938fba9bbe6 296-300,307-308
+  s_ad12adac0b7d6c::t_747dbfcfcd0011 127-147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "d52e2dcfae9b95ebfafe75c7acd7b99ebf3ceb8f",
+  "prompts": {},
+  "sessions": {
+    "s_ad12adac0b7d6c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "30665e44-b027-4bf7-ba87-8fc8c29abbb2",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
