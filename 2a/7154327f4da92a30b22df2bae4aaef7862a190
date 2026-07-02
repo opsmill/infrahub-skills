@@ -1,0 +1,34 @@
+skills/infrahub-analyzing-data/rules/reporting-output.md
+  s_ad12adac0b7d6c::t_d9e3d69ae66aa4 90,95-97
+  s_ad12adac0b7d6c::t_b292869b99b85f 186-188
+skills/infrahub-common/rules/workflow-branch-for-crud.md
+  s_ad12adac0b7d6c::t_b2cf613bc44101 12-28
+skills/infrahub-analyzing-data/SKILL.md
+  s_ad12adac0b7d6c::t_253622411c562b 110-138,141
+  s_ad12adac0b7d6c::t_88468093a8b444 184-185
+skills/infrahub-analyzing-data/examples.md
+  s_ad12adac0b7d6c::t_f61940a53c9d07 48-50
+  s_ad12adac0b7d6c::t_a7e578bf13db7a 665-678
+  s_ad12adac0b7d6c::t_87c54af43e106a 636-637
+  s_ad12adac0b7d6c::t_d2d818c8e64cc8 85-86
+skills/infrahub-analyzing-data/rules/mcp-tools.md
+  s_ad12adac0b7d6c::t_106342fccf303e 4,13-24,33-55,59,61,63-157,164,170,177-190,193,198-205,207-211,214-221,224-228,232,234-235,239-241,246,248-253,257-276,279-281,285,287-294,301-321,326,329-332,337,340-344,352,354-371,378-379,406-410,413,415-419,422-423,428-447,452-453
+skills/infrahub-analyzing-data/rules/query-patterns.md
+  s_ad12adac0b7d6c::t_49a3eb64e9f161 316-317
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "2a7154327f4da92a30b22df2bae4aaef7862a190",
+  "prompts": {},
+  "sessions": {
+    "s_ad12adac0b7d6c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "30665e44-b027-4bf7-ba87-8fc8c29abbb2",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
