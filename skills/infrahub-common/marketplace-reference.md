@@ -46,28 +46,40 @@ Flags:
 After fetching, `inherit_from` the pulled generics and add only your
 genuinely new, site-specific attributes on top.
 
-## Discovery / search (API fallback)
+## Discovery / search (infrahubctl)
 
-`infrahubctl marketplace` only fetches (`get`) — it has no list/search
-subcommand. Browse <https://marketplace.infrahub.app/> for identifiers,
-or query the marketplace API to cover the *entire* catalog
-programmatically:
+`infrahubctl marketplace` browses the catalog directly — you do not need
+to know an identifier up front. Each command pages through the *entire*
+catalog by default (no manual pagination) and takes `--json` for
+scripting:
 
-- `GET /api/v1/schemas` — every published schema (each item carries the
-  `namespace` and `name` you pass to `marketplace get`).
-- `GET /api/v1/collections` — every published collection.
-- `/api/v1/search` — search the catalog by keyword.
+```bash
+infrahubctl marketplace list                    # every published schema
+infrahubctl marketplace list --collections      # every published collection
+infrahubctl marketplace search <term>           # match name / display name / description
+infrahubctl marketplace show <namespace>/<name> # versions, members, dependencies
+```
 
-e.g. `curl https://marketplace.infrahub.app/api/v1/schemas`.
+Flags shared by `list` / `search`:
+
+- `-l, --limit` — cap the results (otherwise every page is returned)
+- `--collections` — target collections instead of schemas
+- `--json` — raw JSON on stdout; status notes go to stderr, so it pipes
+  cleanly
+
+Pick an identifier from the results, then fetch it with
+`infrahubctl marketplace get <namespace>/<name>` (see above). The
+web catalog at <https://marketplace.infrahub.app/> is a browsable
+alternative when you'd rather click than type.
 
 ## Airgap / offline environments
 
 An unreachable marketplace is a fallback path, not a failure:
 
-1. Point `--marketplace-url` at an internal marketplace mirror. The
-   same `/api/v1/schemas`, `/api/v1/collections`, and `/api/v1/search`
-   endpoints are served under the mirror's base URL, so full-catalog
-   search works offline.
+1. Point `--marketplace-url` (or the `INFRAHUB_MARKETPLACE_URL` env var)
+   at an internal marketplace mirror. Every `marketplace` subcommand
+   (`list` / `search` / `show` / `get`) honors it, so full-catalog
+   browsing and fetching work offline.
 2. If no mirror is reachable, proceed with a custom schema — still
    preferring built-in primitives. Never block schema work on
    marketplace reachability.

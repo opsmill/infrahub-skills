@@ -58,7 +58,7 @@ Before modelling **any** domain from scratch, the skill searches the **entire** 
 infrahubctl marketplace get <namespace>/<name>
 ```
 
-Discovery goes CLI-first: the `infrahubctl marketplace` command fetches a schema, and for catalog search the marketplace API (`/api/v1/schemas`, `/api/v1/collections`, `/api/v1/search`) enumerates everything that is published. Reuse only from the marketplace, not from GitHub. In airgapped environments this is a fallback chain, not a blocker — point `--marketplace-url` at an internal mirror, and if none is reachable the skill proceeds with a custom schema (still preferring built-in primitives).
+Discovery is CLI-first: `infrahubctl marketplace list`, `search <term>`, and `show <namespace>/<name>` browse the whole published catalog (paging through every result by default), and `infrahubctl marketplace get` fetches the match. Reuse only from the marketplace, not from GitHub. In airgapped environments this is a fallback chain, not a blocker — point `--marketplace-url` (or `INFRAHUB_MARKETPLACE_URL`) at an internal mirror, and if none is reachable the skill proceeds with a custom schema (still preferring built-in primitives).
 
 ## Validating and loading
 
