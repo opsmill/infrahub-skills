@@ -107,22 +107,38 @@ The typical workflow:
 
 ## MCP Server Basics
 
-When the Infrahub MCP server is connected, Claude
-can call tools such as:
+When the Infrahub MCP server (v1.1.7) is connected,
+Claude can call these tools.
 
-- **`mcp__infrahub__infrahub_query`** — Execute a
-  GraphQL query (primary tool)
-- **`mcp__infrahub__infrahub_list_schema`** — List
-  available node kinds
-- **`mcp__infrahub__infrahub_get`** — Retrieve a
-  specific object by ID or filters
-- **`mcp__infrahub__infrahub_create`** — Create an
-  object (remediation, on a branch)
-- **`mcp__infrahub__infrahub_update`** — Update an
-  object (remediation, on a branch)
+**Read:**
+
+- **`mcp__infrahub__get_nodes`** — List nodes of a
+  kind with filtering/pagination (preferred typed
+  read)
+- **`mcp__infrahub__search_nodes`** — Find nodes of
+  a kind by partial substring
+- **`mcp__infrahub__get_schema`** — Discover schema
+  kinds and their filters
+- **`mcp__infrahub__query_graphql`** — Execute a
+  read-only GraphQL query
+- **`mcp__infrahub__get_session_info`** — Report the
+  active session branch and instance address
+
+**Write** (branch-isolated — land on an auto-created
+`mcp/session-*` branch, never the default branch):
+
+- **`mcp__infrahub__node_upsert`** — Create or update
+  an object
+- **`mcp__infrahub__node_delete`** — Delete an object
+- **`mcp__infrahub__mutate_graphql`** — Run a GraphQL
+  mutation for complex writes
+- **`mcp__infrahub__propose_changes`** — Open a
+  Proposed Change for human review
+- **`mcp__infrahub__reset_session_branch`** — Reset or
+  switch the active session branch
 
 Full per-tool signatures (parameters, examples,
-response shapes) are in
+response shapes) and the branch model are in
 [rules/mcp-tools.md](./rules/mcp-tools.md) — read
 that before invoking any of these.
 
@@ -165,7 +181,8 @@ query MaintenanceDevices {
      (or equivalent in your schema)
 
 3. Query current state
-   → mcp__infrahub__infrahub_query — one query
+   → mcp__infrahub__get_nodes per kind (typed), or
+     mcp__infrahub__query_graphql — one query
      per node type, or combined
 
 4. Correlate the data
