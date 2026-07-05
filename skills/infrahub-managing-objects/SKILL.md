@@ -147,6 +147,9 @@ Follow these steps when creating object data files:
   patterns from production repos
 - **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
+- **[../infrahub-common/marketplace-reference.md](../infrahub-common/marketplace-reference.md)**
+  -- if the schema these objects populate came from the
+  marketplace, reuse it rather than modelling a new one
 - **[../infrahub-common/metadata-lineage.md](../infrahub-common/metadata-lineage.md)**
   -- Value metadata (`source`, `owner`, `is_protected`):
   setting lineage/ownership and why `source` does not
