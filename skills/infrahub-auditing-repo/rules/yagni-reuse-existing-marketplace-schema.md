@@ -59,14 +59,16 @@ schema after objects exist forces a migration.
 
 ## The fix
 
-1. Search the whole marketplace for the domain and note its
+1. Search the whole marketplace for the domain:
+   `infrahubctl marketplace search <term>` (or `list`), and note its
    `namespace/name`.
 2. Pull it: `infrahubctl marketplace get <namespace>/<name>`.
 3. `inherit_from` the pulled generics, adding only genuinely new,
    site-specific attributes.
 
-CLI flags, the catalog-discovery API, collections, and the airgap
-fallback (`--marketplace-url` internal mirror) are documented once in
+CLI flags, discovery (`list` / `search` / `show`), collections, and
+the airgap fallback (`--marketplace-url` internal mirror) are
+documented once in
 [../../infrahub-common/marketplace-reference.md](../../infrahub-common/marketplace-reference.md)
 — consult it rather than re-deriving usage here. Two constants worth
 repeating: reuse only from the marketplace (never a GitHub checkout),

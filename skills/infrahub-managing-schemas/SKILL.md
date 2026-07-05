@@ -144,8 +144,9 @@ Follow these steps when creating or modifying a schema:
    attributes. For several related domains at once, pull a
    collection (`-c`, e.g. `infrahub/routing-bgp`,
    `infrahub/base-schemas`) instead of one schema at a
-   time. Full command reference, catalog API, and airgap
-   fallback (`--marketplace-url` internal mirror) are in
+   time. Full command reference, discovery with
+   `infrahubctl marketplace list` / `search` / `show`, and
+   airgap fallback (`--marketplace-url` internal mirror) are in
    [../infrahub-common/marketplace-reference.md](../infrahub-common/marketplace-reference.md).
    The auditor flags a hand-rolled domain the marketplace
    already ships — see
@@ -212,7 +213,7 @@ after data is loaded.
   -- .infrahub.yml project configuration
 - **[../infrahub-common/marketplace-reference.md](../infrahub-common/marketplace-reference.md)**
   -- reusing published marketplace schemas and collections
-  (`infrahubctl marketplace get`, catalog API, airgap)
+  (`infrahubctl marketplace get` / `list` / `search` / `show`, airgap)
 - **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
   (git integration, caching) across all skills
 - **[rules/](./rules/)** -- Individual rules by category
