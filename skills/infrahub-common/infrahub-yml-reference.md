@@ -152,65 +152,23 @@ checks/transforms/generators) and a `file_path` to the
 | `description` | No | Documentation text |
 | `watch` | No | Extra dependencies (see below) |
 
-### The `watch` Key (transforms only)
+### The `watch` key
 
-`watch` is an optional key accepted **only** on
-`python_transforms` and `jinja2_transforms`. It declares
-extra file dependencies that Infrahub's automatic
-detection cannot see — a Jinja2 template pulled in through
-a runtime variable (`{% include some_var %}`), or a Python
-helper imported at runtime from another top-level package.
-
-Infrahub regenerates an artifact only when a changed file
-is inside its Transformation's dependency closure.
-Auto-detection follows a Jinja2 template's static includes
-and a Python transform's own package directory. When it
-cannot resolve a reference, the closure is marked
-incomplete and Infrahub conservatively regenerates that
-transform's artifacts on **any** file change in the
-repository. Declaring the real dependencies with
-`watch.files` adds them to the closure *and* marks it
-complete, restoring targeted regeneration.
-
-`watch` is a strict object with a single key today,
-`files` — a list of file or directory paths relative to
-the repository root:
-
-- A directory entry matches **recursively**: every tracked
-  file beneath it joins the dependency set.
-- Entries may be written with or without a trailing slash.
-- Git-ignored files, `.pyc` files, `__pycache__/`
-  directories, and symlinks are never included.
-- A list at the `watch` key (`watch: [a, b]`), a bare
-  string, or any unknown key is rejected on import.
-
-```yaml
-jinja2_transforms:
-  - name: device_config
-    query: device_config_query
-    template_path: templates/device_config.j2
-    watch:
-      files:
-        - templates/partials/
-
-python_transforms:
-  - name: device_name_attribute
-    class_name: DeviceNameAttribute
-    file_path: transforms/device_name_attribute.py
-    watch:
-      files:
-        - shared/helpers.py
-        - utils/
-```
+Optional on `python_transforms` and `jinja2_transforms`.
+Lists extra dependencies auto-detection can't see, such as
+a Jinja2 template pulled in via a runtime variable or a
+Python helper imported from another top-level package.
+Without it, those transforms have an incomplete dependency
+closure and Infrahub regenerates their artifacts on every
+repository change instead of only the affected ones.
+`watch.files` takes paths relative to the repo root; a
+directory entry matches recursively.
 
 > **Transforms only.** `artifact_definitions` and
-> `generator_definitions` do **not** accept `watch` — their
-> Pydantic models use `extra="forbid"`, so adding `watch:`
-> there makes the repository config fail to load. An
-> artifact regenerates as a consequence of its transform's
-> closure, so the declaration always lands on the transform.
-> Generator-side `watch` support is on the roadmap but not
-> yet released.
+> `generator_definitions` reject `watch` (`extra="forbid"`)
+> and fail to load with it. An artifact inherits its
+> transform's closure, so the declaration lands on the
+> transform. Generator-side `watch` is not yet released.
 
 ### `artifact_definitions`
 
