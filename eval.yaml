@@ -3295,3 +3295,66 @@ tasks:
       JSON with nine findings, one per yagni-* rule above, ordered
       ascending by ladder_step (2, 2, 2, 3, 3, 4, 4, 5, 6) and then by
       file path within each step.
+
+  - name: practices-transform-watch
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 7. Emit JSON findings to output.json.
+
+      Audit this .infrahub.yml plus files:
+
+      .infrahub.yml:
+      ```yaml
+      jinja2_transforms:
+        - name: firewall_policy
+          query: firewall_policy_query
+          template_path: templates/firewall/policy.j2
+      python_transforms:
+        - name: bgp_report
+          class_name: BgpReport
+          file_path: transforms/bgp_report.py
+      artifact_definitions:
+        - name: firewall_policy_artifact
+          content_type: text/plain
+          targets: firewalls
+          transformation: firewall_policy
+          parameters: {device: name__value}
+      ```
+
+      templates/firewall/policy.j2 (dynamic include auto-detection cannot follow):
+      ```jinja
+      {% set ruleset = data.device.ruleset.value %}
+      {% include "rulesets/" ~ ruleset ~ ".j2" %}
+      policy-name {{ data.device.name.value }}
+      ```
+
+      transforms/bgp_report.py (imports a sibling top-level package):
+      ```python
+      from infrahub_sdk.transforms import InfrahubTransform
+      from netcalc.asn import format_asn   # netcalc/ is a top-level sibling
+
+      class BgpReport(InfrahubTransform):
+          query = "bgp_report_query"
+          async def transform(self, data):
+              return format_asn(data)
+      ```
+
+      Note: `watch` is only valid on python_transforms / jinja2_transforms.
+      Do NOT suggest adding `watch` to the artifact_definitions entry.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_practices_transform_watch.py
+        weight: 1.0
+    expected_output: >-
+      JSON with two practices-transform-watch-dependencies findings
+      (severity MEDIUM): one for the jinja2 firewall_policy transform
+      (suggest watch.files covering templates/firewall/rulesets/, the
+      directory the dynamic include resolves into), one for the python
+      bgp_report transform (suggest watch.files including netcalc/). No
+      finding suggests watch on the artifact_definitions entry.
+    expectations:
+      - Flags the jinja2 transform with a dynamic include and no watch
+      - Flags the python transform importing from a sibling package
+      - Never suggests watch on artifact_definitions or generator_definitions

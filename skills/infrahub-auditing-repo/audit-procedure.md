@@ -334,6 +334,22 @@ convention).
 - Shared utility functions in common.py when patterns
   repeat
 
+### 7.4 Transform dependency declarations (`watch`)
+
+- `python_transforms` / `jinja2_transforms` missing a
+  `watch.files` declaration for a dependency
+  auto-detection can't see (the closure stays incomplete,
+  so Infrahub regenerates their artifacts on any
+  repository change)
+- Jinja2 templates pulled in via a dynamic
+  `{% include a_variable %}` (a variable, not a literal
+  path)
+- Python transforms importing a helper from a sibling
+  top-level package
+- `watch` is never valid on `artifact_definitions` or
+  `generator_definitions` (their models reject the key,
+  and generator-side support is not yet released)
+
 ---
 
 ## Phase 8: Deployment Readiness (MEDIUM)

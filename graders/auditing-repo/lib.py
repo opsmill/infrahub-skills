@@ -182,6 +182,35 @@ def check_yagni_finding_carves_out_bootstrap(
     return True, "bootstrap carve-out respected"
 
 
+def check_watch_not_on_artifact_or_generator(
+    findings: list[dict],
+    rule: str = "practices-transform-watch-dependencies",
+) -> tuple[bool, str]:
+    """Assert no watch finding targets an artifact/generator definition.
+
+    ``watch`` is valid only on ``python_transforms`` and ``jinja2_transforms``;
+    ``artifact_definitions`` and ``generator_definitions`` forbid the key
+    (and generator-side support is unreleased). A finding that names either
+    section as the place to add ``watch`` would produce advice that breaks the
+    repository import. This scans the whole stringified finding — ``file``,
+    ``section``, ``replacement``, ``fix``, ``description`` — for the forbidden
+    section names and fails if any watch finding mentions one.
+    """
+    forbidden = ("artifact_definitions", "generator_definitions")
+    offenders = []
+    for f in findings:
+        if not isinstance(f, dict) or f.get("rule") != rule:
+            continue
+        blob = json.dumps(f).lower()
+        if any(token in blob for token in forbidden):
+            offenders.append(f.get("file", "<no-file>"))
+    if offenders:
+        return False, (
+            f"{rule} suggested watch on an artifact/generator definition: {offenders}"
+        )
+    return True, "watch findings scoped to transforms only"
+
+
 # ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
@@ -197,6 +226,7 @@ _BASE_CHECKS: dict[str, Any] = {
     "yagni-findings-sorted": check_yagni_findings_sorted_by_ladder,
     "yagni-bootstrap-carveout": check_yagni_finding_carves_out_bootstrap,
     "yagni-no-above-medium": check_yagni_no_finding_above_medium,
+    "watch-not-on-artifact-generator": check_watch_not_on_artifact_or_generator,
 }
 
 
@@ -229,6 +259,10 @@ def _dispatch(name: str, findings: list[dict]) -> tuple[bool, str]:
     if fn_name == "yagni-findings-sorted":
         return fn(findings)
     if fn_name == "yagni-no-above-medium":
+        return fn(findings)
+    if fn_name == "watch-not-on-artifact-generator":
+        if len(parts) >= 2:
+            return fn(findings, parts[1])
         return fn(findings)
     return False, f"unhandled check: {fn_name}"
 

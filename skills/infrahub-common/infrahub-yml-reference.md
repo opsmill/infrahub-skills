@@ -41,6 +41,9 @@ python_transforms:
     file_path: "transforms/my_transform.py"
     class_name: MyTransform     # Optional: class name
     convert_query_response: true
+    watch:                      # Optional: extra dependencies
+      files:
+        - "shared/helpers.py"
 
 # Jinja2 transforms (template-based text rendering)
 jinja2_transforms:
@@ -48,6 +51,9 @@ jinja2_transforms:
     query: "my_query"           # GraphQL query name
     template_path: "templates/config.j2"
     description: "Optional description"
+    watch:                      # Optional: extra dependencies
+      files:
+        - "templates/partials/"
 
 # artifact definitions (connects Transformations to outputs)
 artifact_definitions:
@@ -134,6 +140,7 @@ checks/transforms/generators) and a `file_path` to the
 | `file_path` | Yes | Path to Python file |
 | `class_name` | No | Python class name |
 | `convert_query_response` | No | Convert to SDK objects |
+| `watch` | No | Extra dependencies (see below) |
 
 ### `jinja2_transforms`
 
@@ -143,6 +150,25 @@ checks/transforms/generators) and a `file_path` to the
 | `query` | Yes | GraphQL query name |
 | `template_path` | Yes | Path to Jinja2 template |
 | `description` | No | Documentation text |
+| `watch` | No | Extra dependencies (see below) |
+
+### The `watch` key
+
+Optional on `python_transforms` and `jinja2_transforms`.
+Lists extra dependencies auto-detection can't see, such as
+a Jinja2 template pulled in via a runtime variable or a
+Python helper imported from another top-level package.
+Without it, those transforms have an incomplete dependency
+closure and Infrahub regenerates their artifacts on every
+repository change instead of only the affected ones.
+`watch.files` takes paths relative to the repo root; a
+directory entry matches recursively.
+
+> **Transforms only.** `artifact_definitions` and
+> `generator_definitions` reject `watch` (`extra="forbid"`)
+> and fail to load with it. An artifact inherits its
+> transform's closure, so the declaration lands on the
+> transform. Generator-side `watch` is not yet released.
 
 ### `artifact_definitions`
 

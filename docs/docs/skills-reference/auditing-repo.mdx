@@ -56,6 +56,7 @@ The Repo Auditor performs a comprehensive audit of an Infrahub repository agains
 - `display_label` caching patterns for nodes with parent relationships
 - Python environment detection configuration
 - Git integration setup
+- Transform dependency declarations — `python_transforms` / `jinja2_transforms` whose real dependencies auto-detection cannot see (a dynamic Jinja2 `{% include %}`, or a Python transform importing from a sibling top-level package) and that lack a `watch.files` declaration, causing Infrahub to regenerate their artifacts on any repository change. Scoped to transforms only — `watch` is never suggested on `artifact_definitions` or `generator_definitions`.
 
 ### YAGNI / cost-to-fix
 
