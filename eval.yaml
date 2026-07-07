@@ -3295,3 +3295,65 @@ tasks:
       JSON with nine findings, one per yagni-* rule above, ordered
       ascending by ladder_step (2, 2, 2, 3, 3, 4, 4, 5, 6) and then by
       file path within each step.
+
+  - name: practices-transform-watch
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 7. Emit JSON findings to output.json.
+
+      Audit this .infrahub.yml plus files:
+
+      .infrahub.yml:
+      ```yaml
+      jinja2_transforms:
+        - name: device_config
+          query: device_config_query
+          template_path: templates/device_config.j2
+      python_transforms:
+        - name: iface_names
+          class_name: IfaceNames
+          file_path: transforms/iface_names.py
+      artifact_definitions:
+        - name: device_config_artifact
+          content_type: text/plain
+          targets: devices
+          transformation: device_config
+          parameters: {device: name__value}
+      ```
+
+      templates/device_config.j2 (dynamic include auto-detection cannot follow):
+      ```jinja
+      {% include partial_name %}
+      hostname {{ data.device.name.value }}
+      ```
+
+      transforms/iface_names.py (imports a sibling top-level package):
+      ```python
+      from infrahub_sdk.transforms import InfrahubTransform
+      from shared.formatting import render   # shared/ is a top-level sibling
+
+      class IfaceNames(InfrahubTransform):
+          query = "iface_names_query"
+          async def transform(self, data):
+              return render(data)
+      ```
+
+      Note: `watch` is only valid on python_transforms / jinja2_transforms.
+      Do NOT suggest adding `watch` to the artifact_definitions entry.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_practices_transform_watch.py
+        weight: 1.0
+    expected_output: >-
+      JSON with two practices-transform-watch-dependencies findings
+      (severity MEDIUM): one for the jinja2 device_config transform
+      (suggest watch.files including templates/partials/ or the real
+      partial), one for the python iface_names transform (suggest
+      watch.files including shared/). No finding suggests watch on the
+      artifact_definitions entry.
+    expectations:
+      - Flags the jinja2 transform with a dynamic include and no watch
+      - Flags the python transform importing from a sibling package
+      - Never suggests watch on artifact_definitions or generator_definitions
