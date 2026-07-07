@@ -3306,36 +3306,37 @@ tasks:
       .infrahub.yml:
       ```yaml
       jinja2_transforms:
-        - name: device_config
-          query: device_config_query
-          template_path: templates/device_config.j2
+        - name: firewall_policy
+          query: firewall_policy_query
+          template_path: templates/firewall/policy.j2
       python_transforms:
-        - name: iface_names
-          class_name: IfaceNames
-          file_path: transforms/iface_names.py
+        - name: bgp_report
+          class_name: BgpReport
+          file_path: transforms/bgp_report.py
       artifact_definitions:
-        - name: device_config_artifact
+        - name: firewall_policy_artifact
           content_type: text/plain
-          targets: devices
-          transformation: device_config
+          targets: firewalls
+          transformation: firewall_policy
           parameters: {device: name__value}
       ```
 
-      templates/device_config.j2 (dynamic include auto-detection cannot follow):
+      templates/firewall/policy.j2 (dynamic include auto-detection cannot follow):
       ```jinja
-      {% include partial_name %}
-      hostname {{ data.device.name.value }}
+      {% set ruleset = data.device.ruleset.value %}
+      {% include "rulesets/" ~ ruleset ~ ".j2" %}
+      policy-name {{ data.device.name.value }}
       ```
 
-      transforms/iface_names.py (imports a sibling top-level package):
+      transforms/bgp_report.py (imports a sibling top-level package):
       ```python
       from infrahub_sdk.transforms import InfrahubTransform
-      from shared.formatting import render   # shared/ is a top-level sibling
+      from netcalc.asn import format_asn   # netcalc/ is a top-level sibling
 
-      class IfaceNames(InfrahubTransform):
-          query = "iface_names_query"
+      class BgpReport(InfrahubTransform):
+          query = "bgp_report_query"
           async def transform(self, data):
-              return render(data)
+              return format_asn(data)
       ```
 
       Note: `watch` is only valid on python_transforms / jinja2_transforms.
@@ -3348,11 +3349,11 @@ tasks:
         weight: 1.0
     expected_output: >-
       JSON with two practices-transform-watch-dependencies findings
-      (severity MEDIUM): one for the jinja2 device_config transform
-      (suggest watch.files including templates/partials/ or the real
-      partial), one for the python iface_names transform (suggest
-      watch.files including shared/). No finding suggests watch on the
-      artifact_definitions entry.
+      (severity MEDIUM): one for the jinja2 firewall_policy transform
+      (suggest watch.files covering templates/firewall/rulesets/, the
+      directory the dynamic include resolves into), one for the python
+      bgp_report transform (suggest watch.files including netcalc/). No
+      finding suggests watch on the artifact_definitions entry.
     expectations:
       - Flags the jinja2 transform with a dynamic include and no watch
       - Flags the python transform importing from a sibling package

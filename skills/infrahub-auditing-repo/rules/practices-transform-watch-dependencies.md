@@ -80,6 +80,17 @@ For each `jinja2_transforms` and `python_transforms` entry in
   `generator_definitions` — they have no closure/`watch` concept, so a
   change touching their code is handled differently.
 
+## Common Issues
+
+- A Jinja2 template with `{% include partial_name %}` (variable) and no
+  `watch` — every repo commit rebuilds its artifacts.
+- A Python transform `from shared.formatting import render` where
+  `shared/` is a top-level sibling of `transforms/`, with no `watch`
+  entry, so edits to `shared/formatting.py` never targeted-regenerate
+  (they only regenerate via the any-change fallback).
+- `watch:` mistakenly added to an `artifact_definitions` entry — the
+  repository import fails with an "extra fields not permitted" error.
+
 ## How to Fix
 
 Add a `watch.files` list to the transform entry, naming the directory
@@ -110,17 +121,6 @@ python_transforms:
         - shared/helpers.py
         - utils/
 ```
-
-## Common Issues
-
-- A Jinja2 template with `{% include partial_name %}` (variable) and no
-  `watch` — every repo commit rebuilds its artifacts.
-- A Python transform `from shared.formatting import render` where
-  `shared/` is a top-level sibling of `transforms/`, with no `watch`
-  entry, so edits to `shared/formatting.py` never targeted-regenerate
-  (they only regenerate via the any-change fallback).
-- `watch:` mistakenly added to an `artifact_definitions` entry — the
-  repository import fails with an "extra fields not permitted" error.
 
 ## Related
 
