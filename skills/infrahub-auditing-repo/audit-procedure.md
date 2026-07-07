@@ -336,21 +336,19 @@ convention).
 
 ### 7.4 Transform dependency declarations (`watch`)
 
-For each `python_transforms` / `jinja2_transforms` entry
-whose real dependencies auto-detection cannot see — a
-Jinja2 template with a dynamic `{% include a_variable %}`,
-or a Python transform importing a helper from a sibling
-top-level package — check for a `watch.files` declaration.
-Missing declarations leave the transform's dependency
-closure incomplete, so Infrahub regenerates its artifacts
-on any file change in the repository. Emit a MEDIUM finding
-naming the transform entry and the suggested `watch.files`
-value. `watch` is valid ONLY on `python_transforms` and
-`jinja2_transforms`; never suggest it on
-`artifact_definitions` or `generator_definitions` (their
-config models reject the key, and generator-side support is
-not yet released). See
-[rules/practices-transform-watch-dependencies.md](rules/practices-transform-watch-dependencies.md).
+- `python_transforms` / `jinja2_transforms` missing a
+  `watch.files` declaration for a dependency
+  auto-detection can't see (the closure stays incomplete,
+  so Infrahub regenerates their artifacts on any
+  repository change)
+- Jinja2 templates pulled in via a dynamic
+  `{% include a_variable %}` (a variable, not a literal
+  path)
+- Python transforms importing a helper from a sibling
+  top-level package
+- `watch` is never valid on `artifact_definitions` or
+  `generator_definitions` (their models reject the key,
+  and generator-side support is not yet released)
 
 ---
 
