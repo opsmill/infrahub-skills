@@ -3406,6 +3406,40 @@ tasks:
       MEDIUM, ladder_step 2) for generators/leaf_ports.py, recommending an
       Object Template + clone instead of the imperative generator.
 
+  - name: yagni-unused-generate-flag
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this repo excerpt:
+
+      schemas/dcim.yml:
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Device
+          namespace: Dcim
+          generate_profile: true
+          generate_template: true
+          attributes:
+            - name: name
+              kind: Text
+      ```
+
+      The repo contains NO Profile instances, no profiles: assignments, no
+      template instances, and no object_template references anywhere in
+      objects/ — both flags are enabled but unused.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_unused_generate_flag.py
+        weight: 1.0
+    expected_output: >-
+      JSON with a yagni-unused-generate-flag finding (severity MEDIUM,
+      ladder_step 3) for the Device node whose generate_profile /
+      generate_template flags have no consumer in the repo.
+
   - name: yagni-findings-sorted
     instruction: |
       Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and

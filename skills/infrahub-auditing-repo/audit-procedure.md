@@ -420,6 +420,10 @@ phases keep their existing order).
   carrying a single, fixed value with no competing Profile
   offering a different value is doing the job of an attribute
   `default_value`.
+- `yagni-unused-generate-flag` (step 3, MEDIUM) —
+  `generate_profile: true` / `generate_template: true` with no
+  Profile/template instance or `object_template` reference
+  anywhere in the repo.
 
 ### 9.2 Check rules
 
