@@ -3440,6 +3440,59 @@ tasks:
       ladder_step 3) for the Device node whose generate_profile /
       generate_template flags have no consumer in the repo.
 
+  - name: yagni-template-profile-confusion
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this setup:
+
+      schemas/dcim.yml:
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Device
+          namespace: Dcim
+          generate_template: true
+          attributes:
+            - name: name
+              kind: Text
+            - name: timezone
+              kind: Text
+              optional: true
+            - name: syslog_server
+              kind: Text
+              optional: true
+      ```
+
+      objects/templates.yml — a set of object templates whose ONLY purpose is
+      to carry the same shared timezone and syslog_server values onto every
+      cloned device (no distinct child components), so operators clone a
+      template just to get shared defaults:
+      ```yaml
+      apiVersion: infrahub.app/v1
+      kind: Object
+      spec:
+        kind: TemplateDcimDevice
+        data:
+          - template_name: standard-defaults
+            timezone: UTC
+            syslog_server: 10.0.0.53
+      ```
+
+      The template is being used to distribute shared VALUES that should be a
+      Profile (they must stay in sync across devices), not to clone structure.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_template_profile_confusion.py
+        weight: 1.0
+    expected_output: >-
+      JSON with one yagni-template-profile-confusion finding (severity MEDIUM,
+      ladder_step 3) noting the Object Template is pushing shared values that
+      belong in a Profile.
+
   - name: yagni-findings-sorted
     instruction: |
       Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and

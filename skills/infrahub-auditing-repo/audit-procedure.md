@@ -424,6 +424,10 @@ phases keep their existing order).
   `generate_profile: true` / `generate_template: true` with no
   Profile/template instance or `object_template` reference
   anywhere in the repo.
+- `yagni-template-profile-confusion` (step 3, MEDIUM) — an
+  Object Template pushing shared constant values with no
+  structural children (a Profile's job), or a Profile
+  approximating cloned structure (a Template's job).
 
 ### 9.2 Check rules
 
