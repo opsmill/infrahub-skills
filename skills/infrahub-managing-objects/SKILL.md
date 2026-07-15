@@ -120,7 +120,11 @@ Follow these steps when creating object data files:
    [rules/value-attributes.md](./rules/value-attributes.md)
    for attribute mapping and
    [rules/value-relationships.md](./rules/value-relationships.md)
-   for relationship references. To stamp lineage or lock
+   for relationship references. If the object should inherit
+   shared defaults from a Profile or be created from an Object
+   Template, read
+   [rules/value-profiles-templates.md](./rules/value-profiles-templates.md).
+   To stamp lineage or lock
    a value, write it as a `value` + metadata mapping —
    see [../infrahub-common/metadata-lineage.md](../infrahub-common/metadata-lineage.md)
    (remember `source` is lineage only; locking needs
