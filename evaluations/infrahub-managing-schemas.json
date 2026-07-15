@@ -255,7 +255,9 @@
         "Neither CoreArtifactTarget inheritance nor generate_template appears on the GenericDevice generic (generics cannot be artifact targets and are not instantiable as templates)",
         "The Device inherits from the GenericDevice generic using its full kind (DcimGenericDevice)",
         "human_friendly_id is defined on the concrete Device node",
-        "Schema starts with version: \"1.0\""
+        "Schema starts with version: \"1.0\"",
+        "generate_template is understood as cloning the node AND its component children, not a bare UI flag",
+        "The response keeps generate_template (structure) distinct from Profiles (shared values)"
       ],
       "assertions": [
         {

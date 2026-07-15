@@ -539,6 +539,12 @@ tasks:
         full kind (DcimGenericDevice)
       - "human_friendly_id is defined on the concrete Device node"
       - 'Schema starts with version: "1.0"'
+      - >-
+        generate_template is understood as cloning the node AND its
+        component children, not a bare UI flag
+      - >-
+        The response keeps generate_template (structure) distinct from
+        Profiles (shared values)
     assertions:
       - name: schema-version
         check: "Schema starts with version: '1.0'"
