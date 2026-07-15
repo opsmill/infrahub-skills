@@ -141,7 +141,7 @@ def check_object_overrides_profile_value(text: str, **_: Any) -> tuple[bool, str
     for e in _data_entries(text):
         profs = e.get("profiles")
         if isinstance(profs, list) and profs:
-            reserved = {"profiles", "object_template"}
+            reserved = {"profiles", "object_template", "name"}
             explicit = [k for k in e.keys() if k not in reserved]
             if explicit:
                 return True, f"object with profiles overrides: {sorted(explicit)}"
