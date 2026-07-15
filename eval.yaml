@@ -618,6 +618,40 @@ tasks:
       - name: human-friendly-id
         check: human_friendly_id defined on DcimNetworkDiagram
 
+  - name: schema-generate-profile
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Model a network-device inventory where many devices share the
+      same operational defaults (MTU, status, timezone) that operators want
+      to manage in one place and change centrally. Define a generic
+      GenericDevice (hostname, role) and a concrete Device node that inherits
+      from it. Enable the mechanism that lets operators define reusable
+      default-value sets and assign them to devices. Use namespace 'Dcim'.
+
+      Save ONLY the final schema YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_object_profile.py
+        weight: 1.0
+    expected_output: >-
+      A schema whose concrete Device node sets generate_profile: true (never
+      on the GenericDevice generic), inherits from DcimGenericDevice by full
+      kind, and defines human_friendly_id. The shared attributes (mtu,
+      status, timezone) are optional so Profile-supplied values apply.
+    expectations:
+      - The concrete Device node sets generate_profile: true
+      - generate_profile does NOT appear on the GenericDevice generic
+      - Attributes meant to receive Profile defaults are optional
+      - human_friendly_id is defined on the concrete Device
+      - 'Schema starts with version: "1.0"'
+    assertions:
+      - name: generate-profile-concrete-only
+        check: generate_profile true on the concrete Device, not the generic
+      - name: human-friendly-id
+        check: human_friendly_id defined on the concrete Device
+
   - name: string-length-limits
     trials: 3
     instruction: |

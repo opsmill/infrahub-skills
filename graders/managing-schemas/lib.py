@@ -521,6 +521,26 @@ def check_generate_template_concrete_only(schema: dict, **_: Any) -> tuple[bool,
     return True, f"generate_template: true on concrete nodes only: {', '.join(flagged_nodes)}"
 
 
+def check_generate_profile_concrete_only(schema: dict, **_: Any) -> tuple[bool, str]:
+    """generate_profile: true must appear on concrete nodes, never generics.
+
+    Profiles generate a companion Profile<Kind> for an instantiable node;
+    generics are not instantiable, so the flag is meaningless on them.
+    """
+    bad_generics = [
+        _full_kind(g) for g in _all_generics(schema) if g.get("generate_profile") is True
+    ]
+    if bad_generics:
+        return False, f"generate_profile: true on generics: {', '.join(bad_generics)}"
+
+    flagged = [
+        _full_kind(n) for n in _all_nodes(schema) if n.get("generate_profile") is True
+    ]
+    if not flagged:
+        return False, "No node sets generate_profile: true"
+    return True, f"generate_profile: true on concrete nodes only: {', '.join(flagged)}"
+
+
 _FETCH_SCRIPT = (
     Path(__file__).resolve().parents[2]
     / "skills"
@@ -837,6 +857,7 @@ CHECKS: dict[str, Any] = {
     "computed-jinja2-kind": check_computed_jinja2_kind,
     "on-delete-cascade-present": check_on_delete_cascade_present,
     "generate-template-concrete-only": check_generate_template_concrete_only,
+    "generate-profile-concrete-only": check_generate_profile_concrete_only,
     "core-artifact-target-concrete": check_core_artifact_target_concrete,
     "core-file-object-inherited": check_core_file_object_inherited,
     "file-object-on-node-not-generic": check_file_object_on_node_not_generic,
