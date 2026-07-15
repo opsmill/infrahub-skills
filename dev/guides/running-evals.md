@@ -192,14 +192,14 @@ each task reads).
 
 | Skill | Tasks |
 | ----- | ----- |
-| infrahub-managing-schemas | 10 |
+| infrahub-managing-schemas | 11 |
 | infrahub-managing-menus | 3 |
 | infrahub-managing-checks | 2 |
 | infrahub-managing-generators | 5 |
 | infrahub-managing-transforms | 3 |
-| infrahub-managing-objects | 1 |
+| infrahub-managing-objects | 2 |
 | infrahub-reporting-issues | 3 |
-| infrahub-auditing-repo | 11 |
+| infrahub-auditing-repo | 15 |
 
 `infrahub-analyzing-data` has no eval tasks yet —
 adding them is a good contribution. It has rules but

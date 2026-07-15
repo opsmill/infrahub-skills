@@ -3500,7 +3500,7 @@ tasks:
       ladder_step ascending (cheapest fix on top), then by file path.
 
       Audit this minimal repo, which deliberately exhibits one of each
-      yagni-* violation. Emit ALL nine yagni findings and order them
+      yagni-* violation. Emit ALL thirteen yagni findings and order them
       correctly.
 
       For each artifact, the violation shape and expected rule:
@@ -3531,6 +3531,21 @@ tasks:
       9. checks/check_no_unmanaged_devices.py — GraphQL already
          filters; Python is `for x in edges: log_error` →
          yagni-redundant-check-that-graphql-can-answer (step 6).
+      10. objects/device_profiles.yml — the only Profile for DcimDevice,
+          carrying a single never-varying value (timezone: UTC) that a
+          default_value would cover → yagni-profile-over-default (step 2).
+      11. generators/leaf_ports.py — generate() always builds the same
+          fixed 48-port leaf with constant speed and no dependence on
+          input data → yagni-generator-that-should-be-template (step 2).
+      12. schemas/access.yml — AccessPolicy sets generate_profile and
+          generate_template, but no ProfileAccessPolicy/TemplateAccessPolicy
+          instances, `profiles:` assignments, or object_template references
+          exist for it anywhere in the repo →
+          yagni-unused-generate-flag (step 3).
+      13. objects/device_templates.yml — an Object Template whose only
+          purpose is to push shared timezone/syslog_server VALUES onto
+          every cloned device (no distinct child components) →
+          yagni-template-profile-confusion (step 3).
 
       Save ONLY the JSON findings to: output.json
     graders:
@@ -3538,6 +3553,6 @@ tasks:
         run: python graders/auditing-repo/check_yagni_findings_sorted.py
         weight: 1.0
     expected_output: >-
-      JSON with nine findings, one per yagni-* rule above, ordered
-      ascending by ladder_step (2, 2, 2, 3, 3, 4, 4, 5, 6) and then by
-      file path within each step.
+      JSON with thirteen findings, one per yagni-* rule above, ordered
+      ascending by ladder_step (2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 6) and
+      then by file path within each step.
