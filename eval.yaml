@@ -3322,6 +3322,53 @@ tasks:
       (CoreIPPrefixPool / CoreNumberPool / allocate_next_ip_*). No
       finding should be emitted for generators/router_id.py.
 
+  - name: yagni-profile-over-default
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this schema and profile data:
+
+      schemas/dcim.yml:
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Device
+          namespace: Dcim
+          generate_profile: true
+          attributes:
+            - name: name
+              kind: Text
+            - name: timezone
+              kind: Text
+              optional: true
+      ```
+
+      objects/profiles.yml (the only Profile for DcimDevice, and its
+      timezone value is the same constant every device would use):
+      ```yaml
+      apiVersion: infrahub.app/v1
+      kind: Object
+      spec:
+        kind: ProfileDcimDevice
+        data:
+          - profile_name: global-timezone
+            timezone: UTC
+      ```
+
+      There is exactly one Profile and its value never varies across
+      objects — a plain default_value would cover it.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_profile_over_default.py
+        weight: 1.0
+    expected_output: >-
+      JSON with one yagni-profile-over-default finding (severity MEDIUM,
+      ladder_step 2) pointing at the single-value Profile, recommending an
+      attribute default_value instead.
+
   - name: yagni-findings-sorted
     instruction: |
       Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and

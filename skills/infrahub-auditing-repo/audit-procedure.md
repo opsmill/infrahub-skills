@@ -416,6 +416,10 @@ phases keep their existing order).
   `kind: Attribute` + `cardinality: one` rels must declare a
   matching inverse on the peer; otherwise consumers filter in
   Python.
+- `yagni-profile-over-default` (step 2, MEDIUM) — a Profile
+  carrying a single, fixed value with no competing Profile
+  offering a different value is doing the job of an attribute
+  `default_value`.
 
 ### 9.2 Check rules
 
