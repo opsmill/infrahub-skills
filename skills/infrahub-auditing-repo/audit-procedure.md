@@ -435,6 +435,10 @@ phases keep their existing order).
 - `yagni-generator-hardcoding-data` (step 2, MEDIUM)
   — explicit carve-out for `bootstrap/`, `seed/`,
   `demo/` directories.
+- `yagni-generator-that-should-be-template` (step 2,
+  MEDIUM) — a generator that only stamps out a fixed,
+  near-identical structure with no computation is doing
+  the job of an Object Template.
 - `yagni-duplicate-shape-not-extracted-to-generic`
   (step 2, MEDIUM) — also applies when a generator's
   output shape duplicates an existing generic.

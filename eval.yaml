@@ -3369,6 +3369,43 @@ tasks:
       ladder_step 2) pointing at the single-value Profile, recommending an
       attribute default_value instead.
 
+  - name: yagni-generator-should-be-template
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this generator:
+
+      File generators/leaf_ports.py (production path):
+      ```python
+      from infrahub_sdk.generator import InfrahubGenerator
+
+      class LeafPortsGenerator(InfrahubGenerator):
+          async def generate(self, data):
+              device = await self.client.create(kind="DcimDevice", data={"name": "leaf-new"})
+              await device.save(allow_upsert=True)
+              for i in range(1, 49):
+                  port = await self.client.create(
+                      kind="DcimInterface",
+                      data={"name": f"Ethernet1/{i}", "device": device, "speed": 10000},
+                  )
+                  await port.save(allow_upsert=True)
+      ```
+
+      The generator always builds the same fixed 48-port leaf with constant
+      speed and no dependence on input data — a curated Object Template that
+      users clone would replace it.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_generator_should_be_template.py
+        weight: 1.0
+    expected_output: >-
+      JSON with one yagni-generator-that-should-be-template finding (severity
+      MEDIUM, ladder_step 2) for generators/leaf_ports.py, recommending an
+      Object Template + clone instead of the imperative generator.
+
   - name: yagni-findings-sorted
     instruction: |
       Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
