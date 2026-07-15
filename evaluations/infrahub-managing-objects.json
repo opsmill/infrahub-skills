@@ -25,14 +25,15 @@
     },
     {
       "id": 2,
-      "prompt": "Write an object data file (kind DcimDevice) that creates three\nleaf switches. leaf-01 and leaf-02 both take their default MTU, status,\nand timezone from a shared Profile named \"datacenter-defaults\" (assigned\nby its human_friendly_id). leaf-02 must run a non-default MTU of 1500\nwhile still inheriting the other defaults. leaf-03 is created from an\nexisting object template named \"template-leaf-switch\" and only sets its\nown name.",
+      "prompt": "Write an object data file (kind DcimDevice) that creates three\nleaf switches. leaf-01 and leaf-02 both take their default MTU, status,\nand timezone from a shared Profile named \"datacenter-defaults\" (assigned\nby its human_friendly_id). leaf-02 must run a non-default MTU of 1500\nwhile still inheriting the other defaults. leaf-03 is created from an\nexisting object template named \"template-leaf-switch\" and only sets its\nown name. The file must ALSO author the template-leaf-switch template\nobject itself, under kind TemplateDcimDevice, with\ntemplate_name: template-leaf-switch, loaded before leaf-03 which clones\nit.",
       "expected_output": "An object file whose data entries assign profiles: [datacenter-defaults] to leaf-01 and leaf-02, set an explicit mtu on leaf-02 (override), and set object_template: template-leaf-switch on leaf-03.",
       "files": [],
       "expectations": [
         "leaf-01 and leaf-02 carry a profiles list referencing datacenter-defaults",
         "leaf-02 sets an explicit mtu value to override the Profile",
         "leaf-03 sets object_template referencing template-leaf-switch",
-        "Profile/template references use human_friendly_id, not inline blocks"
+        "Profile/template references use human_friendly_id, not inline blocks",
+        "A TemplateDcimDevice object authoring template-leaf-switch (template_name) is present and precedes leaf-03"
       ],
       "assertions": [
         {
@@ -46,6 +47,10 @@
         {
           "name": "object-overrides-profile-value",
           "check": "a profile-assigned object sets an explicit override"
+        },
+        {
+          "name": "object-authors-template",
+          "check": "a template object is authored under a Template<Kind> with template_name"
         }
       ]
     }

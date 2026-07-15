@@ -1316,7 +1316,10 @@ tasks:
       by its human_friendly_id). leaf-02 must run a non-default MTU of 1500
       while still inheriting the other defaults. leaf-03 is created from an
       existing object template named "template-leaf-switch" and only sets its
-      own name.
+      own name. The file must ALSO author the template-leaf-switch template
+      object itself, under kind TemplateDcimDevice, with
+      template_name: template-leaf-switch, loaded before leaf-03 which clones
+      it.
 
       Save ONLY the final object YAML to: output.yml
     graders:
@@ -1332,6 +1335,8 @@ tasks:
       - leaf-02 sets an explicit mtu value to override the Profile
       - leaf-03 sets object_template referencing template-leaf-switch
       - Profile/template references use human_friendly_id, not inline blocks
+      - A TemplateDcimDevice object authoring template-leaf-switch (template_name)
+        is present and precedes leaf-03
     assertions:
       - name: object-assigns-profiles
         check: at least one object assigns a profiles list
@@ -1339,6 +1344,8 @@ tasks:
         check: at least one object sets object_template
       - name: object-overrides-profile-value
         check: a profile-assigned object sets an explicit override
+      - name: object-authors-template
+        check: a template object is authored under a Template<Kind> with template_name
 
   # --- Issue Reporter --- #
   - name: bug-sanitization

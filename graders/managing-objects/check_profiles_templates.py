@@ -2,8 +2,8 @@
 """Grader for the object-profiles-and-templates eval task.
 
 Verifies the object YAML assigns a profiles list, creates an object from an
-object_template, and sets at least one explicit override on a
-profile-assigned object.
+object_template, sets at least one explicit override on a profile-assigned
+object, and authors a template object under a Template<Kind> kind.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ CHECKS = [
     "object-assigns-profiles",
     "object-uses-object-template",
     "object-overrides-profile-value",
+    "object-authors-template",
 ]
 
 if __name__ == "__main__":

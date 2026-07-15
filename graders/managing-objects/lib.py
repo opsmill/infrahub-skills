@@ -148,6 +148,26 @@ def check_object_overrides_profile_value(text: str, **_: Any) -> tuple[bool, str
     return False, "No profile-assigned object sets an explicit override value"
 
 
+def check_object_authors_template(text: str, **_: Any) -> tuple[bool, str]:
+    """At least one document authors a template object: kind Template<Kind> + template_name."""
+    if not text.strip():
+        return False, "empty output"
+    try:
+        docs = list(yaml.safe_load_all(text))
+    except yaml.YAMLError:
+        return False, "unparseable YAML"
+    for doc in docs:
+        if not isinstance(doc, dict):
+            continue
+        spec = doc.get("spec") or {}
+        kind = str(spec.get("kind", ""))
+        data = spec.get("data") or []
+        if kind.startswith("Template") and isinstance(data, list):
+            if any(isinstance(e, dict) and e.get("template_name") for e in data):
+                return True, f"template object authored under {kind}"
+    return False, "No template object authored (kind: Template<Kind> with template_name)"
+
+
 # ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
@@ -159,6 +179,7 @@ CHECKS = {
     "object-assigns-profiles": check_object_assigns_profiles,
     "object-uses-object-template": check_object_uses_object_template,
     "object-overrides-profile-value": check_object_overrides_profile_value,
+    "object-authors-template": check_object_authors_template,
 }
 
 
