@@ -1,7 +1,0 @@
-2026-05-29T08:15:12Z INFO  worker started replica=2
-2026-05-29T08:15:12Z INFO  connected to message-queue
-2026-05-29T08:30:23Z INFO  pulling repository schemas-prod
-2026-05-29T08:30:24Z INFO  fetching commit abc123 from repo schemas-prod
-2026-05-29T08:30:24Z INFO  commit abc123 already present locally
-2026-05-29T08:30:25Z INFO  schema load complete
-2026-05-29T08:30:25Z INFO  publishing schema version 42
