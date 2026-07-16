@@ -1,138 +1,85 @@
 ---
-title: Bundle directory layout
+title: Bundle directory layout (reference)
 impact: HIGH
 tags: bundle, layout, structure
 ---
 
-## Bundle directory layout
+## Bundle directory layout (reference)
 
 Impact: HIGH
 
-The diagnostic bundle has a fixed on-disk shape so
-an expert opening it for the first time can navigate
-it without instructions. Required files always sit at
-the root; optional sections appear only when they
-apply.
+`infrahub-collect create` produces the bundle's
+on-disk layout itself — this rule documents that
+layout so the skill knows where to point the user
+during review, not so the skill builds it by hand.
 
 ### Why it matters
 
-Experts triage many bundles in a week. A
-predictable layout means they read `README.md` and
-`manifest.yml` first, then drill into the directory
-they need. Empty directories or missing required
-files break the contract and force the expert to
-re-derive what is actually present, which costs
-their time and risks them missing something the
-collector did capture.
+Knowing the fixed layout lets the skill tell the user
+exactly where to look during the review-before-sharing
+step, and lets an expert opening the bundle navigate
+it without guesswork. Since the layout comes from the
+tool, the skill must never construct or rearrange it
+manually — that would drift from what the tool
+actually emits across versions.
 
 ### What to do
 
-Produce this tree (paths verbatim from the spec):
+Point the user at this shape under `bundle/`:
 
 ```text
-infrahub-diagnostics-YYYYMMDD-HHMMSS/
-├── README.md                # what's here, how to reproduce, redaction notes
-├── manifest.yml             # see manifest-template rule
-├── flags.yml                # deterministic flag checks that fired
-├── redaction-report.txt     # what was stripped and where
-├── baseline/
-│   ├── versions.yml
-│   ├── api-config.json
-│   ├── deployment.yml
-│   ├── host.yml
-│   ├── config/
-│   ├── schemas/             # + schemas.sha256
-│   ├── state/
-│   └── logs/                # one file per replica
-├── category/
-│   └── <category-name>/
-├── repro/                   # user-provided minimal repro
-│   ├── steps.md
-│   ├── failing.gql          # graphql-api only
-│   ├── schemas/             # schema-load only
-│   └── runs/                # output of infrahubctl repro commands
-└── user-input/
-    ├── questions-answered.md   # mirrors upstream bug-report template
-    ├── screenshots/
-    └── browser-har.har         # UI bugs only
+bundle/
+├── bundle_information.json   # manifest: what was collected, what failed
+├── logs/
+│   └── <service>/            # one file per replica
+│       └── *.previous.log    # present after container restarts
+├── database/
+├── message-queue/
+├── cache/
+├── task-worker/
+├── task-manager/
+├── server/
+└── metrics/
 ```
 
-Rules for what is and is not present:
-
-- `README.md`, `manifest.yml`, and `flags.yml` are
-  **always** at the root.
-- `baseline/` is **always** populated (versions,
-  api-config, deployment, host, config, schemas,
-  state, logs).
-- `category/<name>/` is present **only for
-  categories that applied**. If only `git-sync`
-  applied, only `category/git-sync/` exists; do
-  not create `category/installation-startup/` or
-  any other empty placeholder.
-- `repro/` is present **only when the user
-  provided a reproducer**. Skip it entirely
-  otherwise — do not leave an empty `repro/steps.md`.
-- `user-input/` **always** contains at least
-  `questions-answered.md`. Sub-files
-  (`screenshots/`, `browser-har.har`) appear only
-  when relevant (e.g., UI bugs).
+`bundle_information.json` is the manifest an expert
+reads first — it records what was collected and any
+failures on degraded deployments. `logs/<service>/`
+holds one file per replica, plus `*.previous.log`
+files where a container restarted.
 
 ### Compliant
 
-A git-sync-only bundle, with screenshots provided
-by the user:
+Pointing the user at the real paths during review:
 
 ```text
-infrahub-diagnostics-20260530-120000/
-├── README.md
-├── manifest.yml
-├── flags.yml
-├── redaction-report.txt
-├── baseline/
-│   ├── versions.yml
-│   ├── api-config.json
-│   ├── deployment.yml
-│   ├── host.yml
-│   ├── config/
-│   ├── schemas/
-│   ├── state/
-│   └── logs/
-├── category/
-│   └── git-sync/
-└── user-input/
-    ├── questions-answered.md
-    └── screenshots/
+> Take a look at bundle/logs/ and bundle/server/
+> before sharing — check bundle_information.json
+> first if you want to see what was and wasn't
+> collected.
 ```
 
 ### Non-compliant
 
-A bundle where only `git-sync` applied but the
-collector created empty placeholders for the other
-nine categories:
-
 ```text
-infrahub-diagnostics-20260530-120000/
-├── README.md
-├── manifest.yml
-├── ...
-└── category/
-    ├── installation-startup/   # empty — must not exist
-    ├── git-sync/
-    ├── upgrade/                # empty — must not exist
-    ├── task-worker-pipeline/   # empty — must not exist
-    └── ...
+> I'll create bundle/logs/task-worker.log and
+> bundle/manifest.yml manually from `docker compose
+> logs` output.
 ```
+
+Hand-building a bundle layout instead of running
+`infrahub-collect create` and reading its actual
+output.
 
 ### Common mistakes
 
-- Creating one directory per category up front "in
-  case we need it later". The contract is that
-  presence equals applicability — empty dirs lie
-  about what was collected.
-- Omitting `flags.yml` when no checks fired. The
-  file must exist; an empty YAML list (`[]`) is
-  the correct signal that the catalog ran and
-  emitted no hits.
-- Putting `redaction-report.txt` inside `baseline/`.
-  It belongs at the root next to `manifest.yml` so
-  the user sees it before any drill-down.
+- Assuming a hand-rolled layout (e.g. a
+  `manifest.yml` at the root) instead of the tool's
+  actual `bundle_information.json` and per-service
+  directories.
+- Treating a missing service directory as a bug
+  instead of checking `bundle_information.json` for
+  a recorded collection failure on a degraded
+  deployment.
+
+Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
