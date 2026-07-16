@@ -45,9 +45,11 @@ are `infrahub-reporting-issues`'s contract.
 ### Compliant
 
 ```text
-> Bundle ready at infrahub-diagnostics-20260530-120000/.
-> Hand it to OpsMill support via Discord, Slack,
-> or email — it's already redacted.
+> Bundle collected under ./infrahub_bundles/.
+> Review it first — the tool masks only key names
+> (password/secret/token/key), so scan the logs and
+> config for anything else sensitive. Then hand it to
+> OpsMill support via Discord, Slack, or email.
 >
 > If you'd like to also file a public issue, use
 > `infrahub-reporting-issues` next — it'll keep
