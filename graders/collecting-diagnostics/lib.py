@@ -37,8 +37,10 @@ def check_mentions_flag(text: str, *, flag: str = "", **_: object) -> CheckResul
     """A specific create flag appears in the plan."""
     if not flag:
         return False, "check_mentions_flag requires flag kwarg"
-    # Match the flag as a whole token (e.g. --benchmark, not --benchmarking).
-    if re.search(rf"(?<!\S){re.escape(flag)}(?!\w)", text):
+    # Match the flag as a whole CLI token: allow backtick/bracket/quote/space
+    # boundaries (Markdown-rendered flags), but reject longer flags that merely
+    # start with it (e.g. --benchmark-only when flag is --benchmark).
+    if re.search(rf"(?<!\w){re.escape(flag)}(?![\w-])", text):
         return True, f"plan includes `{flag}`"
     return False, f"expected flag `{flag}` not found"
 
