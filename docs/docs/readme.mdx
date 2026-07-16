@@ -11,7 +11,7 @@ The skills cover the full Infrahub development lifecycle. Each skill embeds the 
 
 ### Design and build your data model
 
-Describe your data model in plain language and the skills produce a valid Infrahub schema — node types, attribute kinds, relationships, generics, display properties — without requiring manual study of the schema format. Naming conventions, relationship identifiers, and attribute type rules are applied at the point of generation.
+Describe your data model in plain language and the skills produce a valid Infrahub schema — node types, attribute kinds, relationships, generics, display properties, profiles (shared default values), and object templates (cloneable structures) — without requiring manual study of the schema format. Naming conventions, relationship identifiers, and attribute type rules are applied at the point of generation.
 
 ### Build generators, transforms, and checks
 
@@ -19,7 +19,7 @@ Create Python generators that auto-create infrastructure objects from design def
 
 ### Populate and manage data
 
-Produce YAML data files for infrastructure objects — devices, locations, organizations, interfaces — with correct file structure, value mappings, and load order. Generate batches of objects from descriptions or seed data for new instances.
+Produce YAML data files for infrastructure objects — devices, locations, organizations, interfaces — with correct file structure, value mappings, and load order, including assigning profiles for shared defaults and creating objects from templates. Generate batches of objects from descriptions or seed data for new instances.
 
 ### Query and analyze a live instance
 
@@ -61,7 +61,7 @@ For full lifecycle workflows. The AI generates files, loads them with `infrahubc
 | [Repo Auditor](./skills-reference/auditing-repo.mdx) | Audits a repository against Infrahub best practices |
 | [Data Importer](./skills-reference/importing-data.mdx) | Converts CSV/TSV inputs into Infrahub object YAML and loads onto a fresh branch |
 
-A shared reference library (`infrahub-common`) provides GraphQL query syntax, `.infrahub.yml` configuration format, and YAML structure conventions to all skills.
+A shared reference library (`infrahub-common`) provides GraphQL query syntax, `.infrahub.yml` configuration format, YAML structure conventions, and the Profiles vs Object Templates distinction to all skills.
 
 ## Compatibility
 

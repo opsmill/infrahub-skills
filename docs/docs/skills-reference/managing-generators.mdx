@@ -42,6 +42,7 @@ Three components:
 | Missing `delete_unused_nodes=True` | Always includes it — prevents orphaned objects |
 | Sync `generate()` method | Uses `async def generate(self, data):` |
 | Missing target group configuration | Generates the `CoreGeneratorGroup` definition |
+| Generator that only stamps a fixed structure with constant values | Steers toward an Object Template (`generate_template`) to clone instead — the structure lives in data, not Python |
 
 ## Running generators
 
