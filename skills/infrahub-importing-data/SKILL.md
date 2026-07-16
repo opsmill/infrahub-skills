@@ -12,7 +12,7 @@ allowed-tools:
   - Bash
 argument-hint: "[csv-file-or-folder] [more-paths...]"
 metadata:
-  version: 1.3.0
+  version: 1.2.7
   author: OpsMill
 ---
 
