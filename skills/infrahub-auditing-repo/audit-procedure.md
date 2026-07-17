@@ -416,6 +416,18 @@ phases keep their existing order).
   `kind: Attribute` + `cardinality: one` rels must declare a
   matching inverse on the peer; otherwise consumers filter in
   Python.
+- `yagni-profile-over-default` (step 2, MEDIUM) — a Profile
+  carrying a single, fixed value with no competing Profile
+  offering a different value is doing the job of an attribute
+  `default_value`.
+- `yagni-unused-generate-flag` (step 3, MEDIUM) —
+  `generate_profile: true` / `generate_template: true` with no
+  Profile/template instance or `object_template` reference
+  anywhere in the repo.
+- `yagni-template-profile-confusion` (step 3, MEDIUM) — an
+  Object Template pushing shared constant values with no
+  structural children (a Profile's job), or a Profile
+  approximating cloned structure (a Template's job).
 
 ### 9.2 Check rules
 
@@ -431,6 +443,10 @@ phases keep their existing order).
 - `yagni-generator-hardcoding-data` (step 2, MEDIUM)
   — explicit carve-out for `bootstrap/`, `seed/`,
   `demo/` directories.
+- `yagni-generator-that-should-be-template` (step 2,
+  MEDIUM) — a generator that only stamps out a fixed,
+  near-identical structure with no computation is doing
+  the job of an Object Template.
 - `yagni-duplicate-shape-not-extracted-to-generic`
   (step 2, MEDIUM) — also applies when a generator's
   output shape duplicates an existing generic.

@@ -35,6 +35,7 @@ The Object Manager produces YAML data files for Infrahub infrastructure objects 
 - **Children and hierarchy** — child objects (e.g., interfaces on a device) use the correct nesting structure with `kind:` specified
 - **Load order** — objects referencing other objects (e.g., interfaces referencing a device) must be in the right file or the right order within a multi-document file
 - **Numeric file prefixes** — files are named with numeric prefixes (e.g., `01_organizations.yml`, `02_locations.yml`) to enforce load order
+- **Profiles and templates** — assigns shared defaults via a `profiles:` list (explicit values override), creates objects from a template via `object_template`, and authors template objects under the generated `Template<Kind>` kind — with the referenced profile or template loaded first
 
 ## Common mistakes it catches
 

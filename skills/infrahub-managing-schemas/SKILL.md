@@ -90,7 +90,8 @@ those features require:
 | Be the target of an artifact (group member referenced by an `artifact_definition`) | `inherit_from: [..., CoreArtifactTarget]` on the concrete node | [rules/extension-artifact-target.md](./rules/extension-artifact-target.md) |
 | Be the target of a generator (group member referenced by a `generator_definition`) | `inherit_from: [..., CoreArtifactTarget]` on the concrete node | [rules/extension-artifact-target.md](./rules/extension-artifact-target.md) |
 | Appear in a custom sidebar menu | `include_in_menu: false` so the auto-menu doesn't duplicate the manual entry | [../infrahub-managing-menus/rules/schema-integration.md](../infrahub-managing-menus/rules/schema-integration.md) |
-| Be cloneable as an object template | `generate_template: true` | [rules/extension-object-template.md](./rules/extension-object-template.md) |
+| Be cloneable as an object template (node + its component children) | `generate_template: true` | [rules/extension-object-template.md](./rules/extension-object-template.md) |
+| Provide shared default values across many instances | `generate_profile: true` (+ Profile instances) | [rules/extension-object-profile.md](./rules/extension-object-profile.md) |
 | Store an uploaded file (PDF, image, Visio, KMZ, contract, …) | `inherit_from: [..., CoreFileObject]` on the concrete node | [rules/extension-file-object.md](./rules/extension-file-object.md) |
 | Be displayed with a stable name across UI lists and APIs | `human_friendly_id` and `display_label` | [rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md) |
 
@@ -119,6 +120,9 @@ already covers it:
 | Several sibling nodes repeating the same attributes and relationships | Extract a generic and `inherit_from` it | [yagni-duplicate-shape-not-extracted-to-generic](../infrahub-auditing-repo/rules/yagni-duplicate-shape-not-extracted-to-generic.md) |
 | Defining custom IP address / prefix / VLAN nodes | `inherit_from` the built-in primitive (`BuiltinIPAddress`, `BuiltinIPPrefix`, `IpamVLAN`) | [yagni-custom-domain-primitives-instead-of-builtin](../infrahub-auditing-repo/rules/yagni-custom-domain-primitives-instead-of-builtin.md) |
 | An `Attribute` + `cardinality: one` relationship with no inverse on the peer | Declare the matching inverse so consumers filter in the query, not in Python | [yagni-missing-inverse-forces-python-filter](../infrahub-auditing-repo/rules/yagni-missing-inverse-forces-python-filter.md) |
+| A Profile carrying a single value that never varies across objects | An attribute `default_value` — a Profile only earns its cost when values vary or are re-tuned centrally | [yagni-profile-over-default](../infrahub-auditing-repo/rules/yagni-profile-over-default.md) |
+| Reaching for an Object Template to share live values, or a Profile to clone a node's child components | Match the tool to intent: a Profile shares live values, an Object Template clones structure | [yagni-template-profile-confusion](../infrahub-auditing-repo/rules/yagni-template-profile-confusion.md) |
+| Enabling `generate_profile` / `generate_template` before any Profile or template will use it | Enable the flag when the defaults/cloning workflow actually exists | [yagni-unused-generate-flag](../infrahub-auditing-repo/rules/yagni-unused-generate-flag.md) |
 
 These are the schema-side counterparts to the "Before
 writing Python" guidance in the checks, transforms, and

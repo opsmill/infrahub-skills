@@ -37,6 +37,8 @@ The Schema Manager produces valid Infrahub schema YAML from natural language des
 - **display_label** — Jinja2 template set for every node for dropdown and reference rendering
 - **order_weight** — integer set on attributes to control display order in the UI
 - **Hierarchy setup** — for hierarchical generics: `hierarchical: true`, `parent` and `children` relationships configured correctly
+- **Profiles (`generate_profile`)** — enabled when the same attribute or relationship values recur across many objects and should stay in sync; a single value that never varies stays an attribute `default_value` instead
+- **Object Templates (`generate_template`)** — enabled to clone a node together with its component children as a reusable starting structure; kept distinct from Profiles (which share live values, not structure)
 
 ## Common mistakes it catches
 

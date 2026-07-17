@@ -539,6 +539,12 @@ tasks:
         full kind (DcimGenericDevice)
       - "human_friendly_id is defined on the concrete Device node"
       - 'Schema starts with version: "1.0"'
+      - >-
+        generate_template is understood as cloning the node AND its
+        component children, not a bare UI flag
+      - >-
+        The response keeps generate_template (structure) distinct from
+        Profiles (shared values)
     assertions:
       - name: schema-version
         check: "Schema starts with version: '1.0'"
@@ -617,6 +623,40 @@ tasks:
           alongside the CoreFileObject inheritance
       - name: human-friendly-id
         check: human_friendly_id defined on DcimNetworkDiagram
+
+  - name: schema-generate-profile
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Model a network-device inventory where many devices share the
+      same operational defaults (MTU, status, timezone) that operators want
+      to manage in one place and change centrally. Define a generic
+      GenericDevice (hostname, role) and a concrete Device node that inherits
+      from it. Enable the mechanism that lets operators define reusable
+      default-value sets and assign them to devices. Use namespace 'Dcim'.
+
+      Save ONLY the final schema YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_object_profile.py
+        weight: 1.0
+    expected_output: >-
+      A schema whose concrete Device node sets generate_profile: true (never
+      on the GenericDevice generic), inherits from DcimGenericDevice by full
+      kind, and defines human_friendly_id. The shared attributes (mtu,
+      status, timezone) are optional so Profile-supplied values apply.
+    expectations:
+      - The concrete Device node sets generate_profile: true
+      - generate_profile does NOT appear on the GenericDevice generic
+      - Attributes meant to receive Profile defaults are optional
+      - human_friendly_id is defined on the concrete Device
+      - 'Schema starts with version: "1.0"'
+    assertions:
+      - name: generate-profile-concrete-only
+        check: generate_profile true on the concrete Device, not the generic
+      - name: human-friendly-id
+        check: human_friendly_id defined on the concrete Device
 
   - name: string-length-limits
     trials: 3
@@ -1264,6 +1304,48 @@ tasks:
           Plan cautions against loading to the default branch or routes
           the change through the proposed-change / merge / discard
           review path
+
+  - name: object-profiles-and-templates
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-objects/SKILL.md and follow its workflow and rules.
+
+      Task: Write an object data file (kind DcimDevice) that creates three
+      leaf switches. leaf-01 and leaf-02 both take their default MTU, status,
+      and timezone from a shared Profile named "datacenter-defaults" (assigned
+      by its human_friendly_id). leaf-02 must run a non-default MTU of 1500
+      while still inheriting the other defaults. leaf-03 is created from an
+      existing object template named "template-leaf-switch" and only sets its
+      own name. The file must ALSO author the template-leaf-switch template
+      object itself, under kind TemplateDcimDevice, with
+      template_name: template-leaf-switch, loaded before leaf-03 which clones
+      it.
+
+      Save ONLY the final object YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-objects/check_profiles_templates.py
+        weight: 1.0
+    expected_output: >-
+      An object file whose data entries assign profiles: [datacenter-defaults]
+      to leaf-01 and leaf-02, set an explicit mtu on leaf-02 (override), and
+      set object_template: template-leaf-switch on leaf-03.
+    expectations:
+      - leaf-01 and leaf-02 carry a profiles list referencing datacenter-defaults
+      - leaf-02 sets an explicit mtu value to override the Profile
+      - leaf-03 sets object_template referencing template-leaf-switch
+      - Profile/template references use human_friendly_id, not inline blocks
+      - A TemplateDcimDevice object authoring template-leaf-switch (template_name)
+        is present and precedes leaf-03
+    assertions:
+      - name: object-assigns-profiles
+        check: at least one object assigns a profiles list
+      - name: object-uses-object-template
+        check: at least one object sets object_template
+      - name: object-overrides-profile-value
+        check: a profile-assigned object sets an explicit override
+      - name: object-authors-template
+        check: a template object is authored under a Template<Kind> with template_name
 
   # --- Issue Reporter --- #
   - name: bug-sanitization
@@ -3247,6 +3329,177 @@ tasks:
       (CoreIPPrefixPool / CoreNumberPool / allocate_next_ip_*). No
       finding should be emitted for generators/router_id.py.
 
+  - name: yagni-profile-over-default
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this schema and profile data:
+
+      schemas/dcim.yml:
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Device
+          namespace: Dcim
+          generate_profile: true
+          attributes:
+            - name: name
+              kind: Text
+            - name: timezone
+              kind: Text
+              optional: true
+      ```
+
+      objects/profiles.yml (the only Profile for DcimDevice, and its
+      timezone value is the same constant every device would use):
+      ```yaml
+      apiVersion: infrahub.app/v1
+      kind: Object
+      spec:
+        kind: ProfileDcimDevice
+        data:
+          - profile_name: global-timezone
+            timezone: UTC
+      ```
+
+      There is exactly one Profile and its value never varies across
+      objects — a plain default_value would cover it.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_profile_over_default.py
+        weight: 1.0
+    expected_output: >-
+      JSON with one yagni-profile-over-default finding (severity MEDIUM,
+      ladder_step 2) pointing at the single-value Profile, recommending an
+      attribute default_value instead.
+
+  - name: yagni-generator-should-be-template
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this generator:
+
+      File generators/leaf_ports.py (production path):
+      ```python
+      from infrahub_sdk.generator import InfrahubGenerator
+
+      class LeafPortsGenerator(InfrahubGenerator):
+          async def generate(self, data):
+              device = await self.client.create(kind="DcimDevice", data={"name": "leaf-new"})
+              await device.save(allow_upsert=True)
+              for i in range(1, 49):
+                  port = await self.client.create(
+                      kind="DcimInterface",
+                      data={"name": f"Ethernet1/{i}", "device": device, "speed": 10000},
+                  )
+                  await port.save(allow_upsert=True)
+      ```
+
+      The generator always builds the same fixed 48-port leaf with constant
+      speed and no dependence on input data — a curated Object Template that
+      users clone would replace it.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_generator_should_be_template.py
+        weight: 1.0
+    expected_output: >-
+      JSON with one yagni-generator-that-should-be-template finding (severity
+      MEDIUM, ladder_step 2) for generators/leaf_ports.py, recommending an
+      Object Template + clone instead of the imperative generator.
+
+  - name: yagni-unused-generate-flag
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this repo excerpt:
+
+      schemas/dcim.yml:
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Device
+          namespace: Dcim
+          generate_profile: true
+          generate_template: true
+          attributes:
+            - name: name
+              kind: Text
+      ```
+
+      The repo contains NO Profile instances, no profiles: assignments, no
+      template instances, and no object_template references anywhere in
+      objects/ — both flags are enabled but unused.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_unused_generate_flag.py
+        weight: 1.0
+    expected_output: >-
+      JSON with a yagni-unused-generate-flag finding (severity MEDIUM,
+      ladder_step 3) for the Device node whose generate_profile /
+      generate_template flags have no consumer in the repo.
+
+  - name: yagni-template-profile-confusion
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this setup:
+
+      schemas/dcim.yml:
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Device
+          namespace: Dcim
+          generate_template: true
+          attributes:
+            - name: name
+              kind: Text
+            - name: timezone
+              kind: Text
+              optional: true
+            - name: syslog_server
+              kind: Text
+              optional: true
+      ```
+
+      objects/templates.yml — a set of object templates whose ONLY purpose is
+      to carry the same shared timezone and syslog_server values onto every
+      cloned device (no distinct child components), so operators clone a
+      template just to get shared defaults:
+      ```yaml
+      apiVersion: infrahub.app/v1
+      kind: Object
+      spec:
+        kind: TemplateDcimDevice
+        data:
+          - template_name: standard-defaults
+            timezone: UTC
+            syslog_server: 10.0.0.53
+      ```
+
+      The template is being used to distribute shared VALUES that should be a
+      Profile (they must stay in sync across devices), not to clone structure.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_template_profile_confusion.py
+        weight: 1.0
+    expected_output: >-
+      JSON with one yagni-template-profile-confusion finding (severity MEDIUM,
+      ladder_step 3) noting the Object Template is pushing shared values that
+      belong in a Profile.
+
   - name: yagni-findings-sorted
     instruction: |
       Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
@@ -3254,7 +3507,7 @@ tasks:
       ladder_step ascending (cheapest fix on top), then by file path.
 
       Audit this minimal repo, which deliberately exhibits one of each
-      yagni-* violation. Emit ALL nine yagni findings and order them
+      yagni-* violation. Emit ALL thirteen yagni findings and order them
       correctly.
 
       For each artifact, the violation shape and expected rule:
@@ -3285,6 +3538,21 @@ tasks:
       9. checks/check_no_unmanaged_devices.py — GraphQL already
          filters; Python is `for x in edges: log_error` →
          yagni-redundant-check-that-graphql-can-answer (step 6).
+      10. objects/device_profiles.yml — the only Profile for DcimDevice,
+          carrying a single never-varying value (timezone: UTC) that a
+          default_value would cover → yagni-profile-over-default (step 2).
+      11. generators/leaf_ports.py — generate() always builds the same
+          fixed 48-port leaf with constant speed and no dependence on
+          input data → yagni-generator-that-should-be-template (step 2).
+      12. schemas/access.yml — AccessPolicy sets generate_profile and
+          generate_template, but no ProfileAccessPolicy/TemplateAccessPolicy
+          instances, `profiles:` assignments, or object_template references
+          exist for it anywhere in the repo →
+          yagni-unused-generate-flag (step 3).
+      13. objects/device_templates.yml — an Object Template whose only
+          purpose is to push shared timezone/syslog_server VALUES onto
+          every cloned device (no distinct child components) →
+          yagni-template-profile-confusion (step 3).
 
       Save ONLY the JSON findings to: output.json
     graders:
@@ -3292,6 +3560,6 @@ tasks:
         run: python graders/auditing-repo/check_yagni_findings_sorted.py
         weight: 1.0
     expected_output: >-
-      JSON with nine findings, one per yagni-* rule above, ordered
-      ascending by ladder_step (2, 2, 2, 3, 3, 4, 4, 5, 6) and then by
-      file path within each step.
+      JSON with thirteen findings, one per yagni-* rule above, ordered
+      ascending by ladder_step (2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 6) and
+      then by file path within each step.

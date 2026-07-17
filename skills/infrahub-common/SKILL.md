@@ -27,6 +27,8 @@ Infrahub skills. It is not meant to be invoked directly.
   `owner`, `is_protected`): what each field means, how
   to set it in object files, and why `source` does not
   control edit access
+- **`profiles-and-templates.md`** — The Profiles vs
+  Object Templates distinction and mechanics
 - **`rules/`** — Cross-cutting rules shared across skills:
   - Branch-first data CRUD (default to a branch, not the default branch)
   - Caching display labels in queries

@@ -18,7 +18,10 @@
    (scalar vs list), group membership. Generic
    relationship references using inline data blocks with
    explicit `kind:` when the target is a generic type
-   without `human_friendly_id`.
+   without `human_friendly_id`. Profile assignment
+   (`profiles:` list) and Object Template instantiation
+   (`object_template`) are relationship references too — see
+   value-profiles-templates.
 
 4. **Children (children-)** -- HIGH. Nesting hierarchical
    children (location trees) and component children

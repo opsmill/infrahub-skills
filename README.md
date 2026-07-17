@@ -23,7 +23,7 @@ Once installed, start working on an infrahub project — try *"describe what thi
 
 ## What You Can Do With It
 
-- **Build a working schema from a description** — describe your data model in plain terms and the Schema Creator produces valid Infrahub schema YAML with appropriate node types, attribute kinds, and relationships, without requiring manual study of the schema format first.
+- **Build a working schema from a description** — describe your data model in plain terms and the Schema Creator produces valid Infrahub schema YAML with appropriate node types, attribute kinds, relationships, profiles, and object templates, without requiring manual study of the schema format first.
 - **Generate automation logic from a plain description** — describe what you want to automate (for example, "create a BGP session for each spine-leaf pair in my fabric design") and the Generator Creator produces a working `InfrahubGenerator` implementation for that specific case.
 - **Get working configuration templates for your data model** — describe the output format you need and the Transform Creator produces a transform and Jinja2 template that reads from your specific schema, rather than a generic placeholder example.
 - **Write Infrahub CI pipeline checks without SDK expertise** — describe what a proposed change should or should not allow and the Check Creator produces a working `InfrahubCheck` implementation with the correct GraphQL queries and `.infrahub.yml` registration.
