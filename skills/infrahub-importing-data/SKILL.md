@@ -319,3 +319,6 @@ load-bearing — earlier steps gate later ones.
   — detect the project's Python env prefix
   (`uv run` / `poetry run`) for all `infrahubctl`
   invocations
+- **[../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)**
+  -- Skill content first; how to consult `docs.infrahub.app`
+  on a genuine gap (e.g. deleting nodes)

@@ -285,6 +285,9 @@ index.
 - [rules/environment-info-sanitization.md](rules/environment-info-sanitization.md)
   — what to redact before submitting. Security-critical;
   read this for every bug report.
+- **[../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)**
+  -- Skill content first; how to consult `docs.infrahub.app`
+  on a genuine gap (e.g. deleting nodes)
 
 ## Anti-patterns
 

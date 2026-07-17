@@ -206,5 +206,8 @@ query MaintenanceDevices {
   — Automated pipeline checks (for enforcement)
 - **[../infrahub-managing-transforms/SKILL.md](../infrahub-managing-transforms/SKILL.md)**
   — Transforms for scheduled report artifacts
+- **[../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)**
+  -- Skill content first; how to consult `docs.infrahub.app`
+  on a genuine gap (e.g. deleting nodes)
 - **[rules/](./rules/)** — Individual rules organized
   by category prefix

@@ -170,6 +170,9 @@ The auditor checks rules from all skills:
   item properties, hierarchy, icons
 - **[../infrahub-common/](../infrahub-common/)** -- Git integration,
   caching, `.infrahub.yml` reference, GraphQL
+- **[../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)**
+  -- Skill content first; how to consult `docs.infrahub.app`
+  on a genuine gap (e.g. deleting nodes)
 
 ## Rules and Procedure
 
