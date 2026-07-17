@@ -108,7 +108,7 @@ A team already running Infrahub who needs to continue extending it — adding sc
 | **analyzing-data** | Query and correlate live Infrahub data via the MCP server (requires MCP connection) |
 | **auditing-repo** | Audit your repository against Infrahub best practices |
 | **reporting-issues** | Route a bug or feature request to the right Infrahub-ecosystem repo (SDK, Ansible, VS Code, MCP, etc.) and prepare a sanitized draft for review |
-| **collecting-diagnostics** | When Infrahub is misbehaving, collect logs, config, branch state, and version info into a redacted local bundle ready to hand to OpsMill support |
+| **collecting-diagnostics** | When Infrahub is misbehaving, use the infrahub-collect tool to gather logs, config, and state into a bundle, review it, and hand it to OpsMill support |
 | **importing-data** | Convert CSV/TSV inputs into Infrahub object YAML, validate, and load onto a fresh branch |
 
 Each skill lives in `skills/infrahub-<name>/` with a `SKILL.md` entry point, reference docs, examples, and modular rules. Shared references (GraphQL patterns, `.infrahub.yml` format, git integration) are in `skills/infrahub-common/`. Skills use gerund-form names following the [Agent Skills best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).

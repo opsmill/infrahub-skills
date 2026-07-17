@@ -1,6 +1,0 @@
-# Sample certificate
------BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDfakekeydataonly
-abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ
------END PRIVATE KEY-----
-subject: CN=infrahub.example.com

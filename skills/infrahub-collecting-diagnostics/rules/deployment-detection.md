@@ -1,115 +1,82 @@
 ---
-title: Detect deployment topology before any collection
+title: Defer environment detection to the tool
 impact: HIGH
-tags: deployment, topology, detection
+tags: deployment, detection, environment
 ---
 
-## Detect deployment topology before any collection
+## Defer environment detection to the tool
 
 Impact: HIGH
 
-Every later command shape (how to list services, how
-to fetch logs, how to read config) depends on the
-deployment topology. Detect it first by running cheap
-read-only probes in a fixed order, and only fall back
-to asking the user when every probe has failed.
+`infrahub-collect` detects the deployment topology
+itself. Don't hand-roll `docker compose ps` /
+`kubectl get pods` probing — run the tool's own
+detection commands and let them decide.
 
 ### Why it matters
 
-The same Infrahub instance is addressed very
-differently from Compose, Kubernetes, and local-dev.
-A `docker compose logs` command silently produces an
-empty result when Infrahub is actually running in
-Kubernetes on a remote cluster — the collector then
-ships an empty `logs/` directory and the expert has
-nothing to work with. Detect the topology
-deterministically before any command shape is chosen.
+Hand-rolled topology detection duplicates logic that
+already lives in the tool and drifts out of sync with
+it — a new deployment mode the tool learns to detect
+would still be invisible to a hand-rolled probe. It
+also risks guessing wrong on ambiguous hosts (multiple
+Compose projects, non-default K8s namespaces) in ways
+the tool's own flags are built to disambiguate.
 
 ### What to do
 
-Run probes in this order, stopping at the first
-success:
+Run detection first:
 
-1. `docker compose ps` — exits 0 with non-empty
-   output → **Docker Compose**. The skill requires
-   Compose v2 (the `docker compose` subcommand);
-   if `docker compose version` returns v1.x, stop
-   and ask the user to upgrade Docker before
-   continuing. Legacy `docker-compose` is not
-   supported as a fallback.
-2. `kubectl -n infrahub get pods` — exits 0 with
-   non-empty output → **Kubernetes**.
-3. `tasks/demo.py` exists and `invoke demo.status`
-   exits 0 → **local dev**.
-4. **Manual fallback** — none of the above
-   succeeded; ask the user which topology is in
-   use.
+```bash
+infrahub-collect environment detect
+```
 
-Record the detected value in `manifest.yml` under
-`deployment.topology` (one of `docker-compose`,
-`kubernetes`, `local-dev`, `manual`).
+If the result is ambiguous — multiple Compose
+projects on the host, or a non-default Kubernetes
+namespace — list the candidates and disambiguate
+explicitly:
 
-Service names are stable across Compose and Helm.
-For every later step, address each canonical service
-using the per-topology pattern below:
+```bash
+infrahub-collect environment list
+```
 
-| Canonical service | Docker Compose container | Kubernetes label selector |
-| --- | --- | --- |
-| `infrahub-server` | `infrahub-server-*` | `app.kubernetes.io/component=infrahub-server` |
-| `task-worker` | `infrahub-task-worker-*` | `app.kubernetes.io/component=task-worker` |
-| `database` | `database-*` | `app.kubernetes.io/component=database` |
-| `cache` | `cache-*` | `app.kubernetes.io/component=cache` |
-| `message-queue` | `message-queue-*` | `app.kubernetes.io/component=message-queue` |
-| `task-manager` | `task-manager-*` | `app.kubernetes.io/component=task-manager` |
-| `task-manager-db` | `task-manager-db-*` | `app.kubernetes.io/component=task-manager-db` |
+- `--project=<name>` — the Compose project name must
+  contain `infrahub`.
+- `--k8s-namespace=<ns>` — the namespace whose pods
+  carry the label `app.kubernetes.io/name=infrahub`.
+
+No Infrahub API token is required for any of this —
+the tool reuses the user's existing Docker or
+`kubectl` access. On Kubernetes it only needs
+read access to `pods/log` and `pods/exec`.
 
 ### Compliant
 
 ```bash
-# Try probes in order
-if docker compose ps -q | grep -q .; then
-  TOPOLOGY=docker-compose
-elif kubectl -n infrahub get pods --no-headers 2>/dev/null | grep -q .; then
-  TOPOLOGY=kubernetes
-elif [ -f tasks/demo.py ] && invoke demo.status >/dev/null 2>&1; then
-  TOPOLOGY=local-dev
-else
-  TOPOLOGY=manual    # ask the user
-fi
-```
-
-```bash
-# Then address task-worker per topology
-# Compose:
-docker ps --filter name=task-worker --format '{{.Names}}'
-# Kubernetes:
-kubectl -n infrahub get pods -l app.kubernetes.io/component=task-worker -o name
+infrahub-collect environment detect
+# ambiguous — multiple Compose projects found
+infrahub-collect environment list
+infrahub-collect create --project=infrahub-prod
 ```
 
 ### Non-compliant
 
 ```bash
-# Assumes Compose because docker is installed locally,
-# even though Infrahub is running in a remote K8s cluster.
-docker compose logs task-worker > bundle/baseline/logs/task-worker.log
-# Result: empty file, no error surfaced, expert has nothing
+docker compose ps
+kubectl -n infrahub get pods
+# hand-rolled detection instead of using the tool
 ```
 
 ### Common mistakes
 
-- Assuming Docker Compose because the dev machine
-  has `docker` installed. The user may be running
-  Infrahub in K8s on a remote cluster reached via
-  `kubectl`. Run the probes; do not infer from
-  the local toolchain.
-- Skipping the probe step and asking the user
-  immediately. The probe is cheaper than a
-  question and removes a chance for the user to
-  guess wrong.
-- Hardcoding service names like `infrahub_server`
-  (underscore) or `infra-server` (truncated). The
-  canonical names in the service-name map are the
-  contract; anything else breaks the per-category
-  collection commands later.
+- Falling back to manual `docker compose ps` /
+  `kubectl get pods` probing instead of
+  `infrahub-collect environment detect`/`list`.
+- Assuming the default namespace or Compose project
+  without running `environment list` when detection
+  reports ambiguity.
+- Asking the user for an Infrahub API token — the
+  tool never needs one; it only needs the
+  Docker/kubectl access already on the host.
 
-Reference: [opsmill/infrahub docker-compose.yml](https://github.com/opsmill/infrahub/blob/main/docker-compose.yml)
+Reference: [Install infrahub-collect](https://docs.infrahub.app/backup/guides/install-collect)

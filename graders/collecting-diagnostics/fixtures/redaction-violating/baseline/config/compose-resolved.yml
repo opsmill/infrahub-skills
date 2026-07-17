@@ -1,7 +1,0 @@
----
-services:
-  infrahub-server:
-    image: opsmill/infrahub:1.9.6
-    environment:
-      db_password: hunter2
-      api_key: super-secret-admin-token-12345
