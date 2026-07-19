@@ -41,11 +41,12 @@ Unlike `schema check` and `schema load`, this command is
   Infrahub-reserved namespace (`Core`, `Builtin`,
   `Internal`, `Profile`, `Template`, …) are left
   untouched.
-- Re-adds the `# yaml-language-server` `$schema` header.
-  **Comments other than that header are not preserved** —
-  the command prints a warning listing how many will be
-  dropped, so move any important notes into `description`
-  fields before formatting.
+- **Preserves comments** (the `# yaml-language-server`
+  header, standalone notes, and inline comments), quoting
+  style, and inline (flow) sequences such as
+  `[manufacturer, name__value]`. The resulting diff is
+  therefore purely key reordering. If the `$schema` header
+  is missing it is added.
 
 ### Usage
 

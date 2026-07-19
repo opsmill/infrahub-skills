@@ -28,9 +28,9 @@ infrahubctl schema format schemas/ --check
 
 It reorders keys within nodes, attributes, relationships,
 and choices into a canonical order (leaving list-item
-order and reserved-namespace nodes untouched) and re-adds
-the `# yaml-language-server` header. Comments other than
-that header are not preserved.
+order and reserved-namespace nodes untouched). Comments,
+quoting, and inline (flow) sequences are preserved, so the
+diff is purely key reordering.
 
 ### Check Schema (Dry Run)
 
