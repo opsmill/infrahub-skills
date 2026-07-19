@@ -8,6 +8,30 @@
 
 ## Validation Commands
 
+### Format Schema (Offline)
+
+Normalise the key ordering of schema files before
+checking or loading them. Unlike the commands below, this
+runs **offline** — no server required. See
+[rules/workflow-format-command.md](./rules/workflow-format-command.md).
+
+```bash
+# Format a directory in place
+infrahubctl schema format schemas/
+
+# Preview changes without writing
+infrahubctl schema format schemas/base/dcim.yml --diff
+
+# CI gate: exit 1 if any file is not formatted
+infrahubctl schema format schemas/ --check
+```
+
+It reorders keys within nodes, attributes, relationships,
+and choices into a canonical order (leaving list-item
+order and reserved-namespace nodes untouched) and re-adds
+the `# yaml-language-server` header. Comments other than
+that header are not preserved.
+
 ### Check Schema (Dry Run)
 
 Validate schema files without loading them:

@@ -1,12 +1,14 @@
 # Infrahub Schema Creator - Rule Sections
 
-1. **Branch-First Changes (workflow-)** — CRITICAL. Apply
+1. **Workflow (workflow-)** — CRITICAL. Apply
    schema changes on a dedicated branch (`--branch`), not
    the default branch (`main` by convention), on any shared
    server. Schema loads run migrations against loaded data
    immediately and globally; a branch makes the change
    previewable, isolated, and discardable, and routes it
-   through proposed-change review.
+   through proposed-change review. Also covers offline file
+   hygiene — running `infrahubctl schema format` to
+   normalise key ordering before check/load.
 
 2. **Naming Conventions (naming-)** — CRITICAL.
    Namespace, node, generic, and attribute naming
