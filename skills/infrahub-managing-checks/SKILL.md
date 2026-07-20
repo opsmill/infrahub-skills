@@ -12,7 +12,7 @@ allowed-tools:
   - Grep
 argument-hint: "[check-name] [description...]"
 metadata:
-  version: 1.2.8
+  version: 1.2.7
   author: OpsMill
 ---
 
