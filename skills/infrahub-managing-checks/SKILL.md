@@ -12,7 +12,7 @@ allowed-tools:
   - Grep
 argument-hint: "[check-name] [description...]"
 metadata:
-  version: 1.2.7
+  version: 1.2.8
   author: OpsMill
 ---
 
@@ -182,6 +182,9 @@ Follow these steps when creating a check:
 - **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
   (git integration, caching gotchas) that apply across all
   skills
+- **[../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)**
+  -- Skill content first; how to consult `docs.infrahub.app`
+  on a genuine gap (e.g. deleting nodes)
 - **[../infrahub-managing-schemas/SKILL.md](../infrahub-managing-schemas/SKILL.md)**
   -- Schema definitions checks validate against
 - **[rules/](./rules/)** -- Individual rules organized by

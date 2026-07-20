@@ -5,7 +5,7 @@ description: >-
   DO NOT TRIGGER directly — loaded automatically by other Infrahub skills when they need shared references.
 user-invocable: false
 metadata:
-  version: 1.2.7
+  version: 1.2.8
   author: OpsMill
 ---
 
@@ -36,5 +36,6 @@ Infrahub skills. It is not meant to be invoked directly.
   - Git integration and deployment patterns
   - Recovery from partial repository syncs
   - Generated file protocol conventions
-  - Information-source priority (skill content before
-    external docs)
+  - Information-source priority (skill content first,
+    with a concrete last-resort procedure for consulting
+    `docs.infrahub.app` on a genuine gap)

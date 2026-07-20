@@ -16,7 +16,7 @@ allowed-tools:
   - Glob
   - Write
 metadata:
-  version: 1.2.7
+  version: 1.2.8
   author: OpsMill
 ---
 
@@ -164,6 +164,9 @@ full index.
   notes. **Read in steps 2-4.**
 - [examples.md](examples.md) — end-to-end walk-throughs
   for common symptom classes.
+- **[../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)**
+  -- Skill content first; how to consult `docs.infrahub.app`
+  on a genuine gap (e.g. deleting nodes)
 
 ## Anti-patterns
 
