@@ -64,4 +64,22 @@ infrahubctl schema format schemas/ --check
 Format before `schema check` / `schema load` so the file
 committed to git is already in canonical form.
 
+### Opt-in transforms
+
+By default the command only reorders keys. Three flags
+(off by default) additionally change file content — they
+are more opinionated and carry a small migration risk, so
+enable them deliberately:
+
+- `--strip-defaults` — remove keys whose value equals the
+  schema default (context-aware: `optional: true` is
+  redundant on a relationship but meaningful on an
+  attribute). Consequential fields like `branch` and
+  `state` are never stripped.
+- `--sort-by-order-weight` — sort attributes and
+  relationships ascending by `order_weight`; items without
+  one keep their authored order and go last.
+- `--backfill-order-weight` — give attributes/relationships
+  that lack an `order_weight` a single constant value.
+
 Reference: [Infrahub Schema Docs](https://docs.infrahub.app)
