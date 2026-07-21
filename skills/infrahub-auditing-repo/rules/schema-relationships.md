@@ -52,18 +52,13 @@ rejects it without explaining why.
 ## Identifier is immutable after load
 
 `identifier` (and `direction`, `branch`,
-`hierarchical`) cannot be changed once a relationship
-exists in a running instance — the loader classifies
-the change as `not_supported` and
-`infrahubctl schema check` fails with
-`'not_supported': <Kind> <rel> None`. The usual cause
-is retrofitting an explicit identifier onto a
-relationship that was first loaded without one (so
-Infrahub auto-generated `sorted(kinds).lower()`).
-When adding a missing inverse or renaming an
-identifier, reuse the forward side's existing
-identifier verbatim. Full rule, error signature, and
-fix in
+`hierarchical`) cannot change once a relationship
+exists in the instance — `infrahubctl schema check`
+fails with `'not_supported': <Kind> <rel> None`. The
+usual cause is retrofitting an explicit identifier
+onto a relationship first loaded without one. When
+adding an inverse, reuse the forward side's existing
+identifier. See
 [relationship-identifiers](../../infrahub-managing-schemas/rules/relationship-identifiers.md).
 
 ## Common Issues

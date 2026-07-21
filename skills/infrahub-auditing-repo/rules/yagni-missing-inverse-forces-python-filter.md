@@ -104,28 +104,17 @@ checks, and transforms over time.
 
 ## Fixing it: match the forward side's existing identifier
 
-When you add the inverse, it must carry the **same
-`identifier` as the forward relationship already has**
-— not a freshly-invented `peer__source` string. If
-the forward relationship is already loaded in a
-running instance without an explicit identifier,
-Infrahub auto-generated one
-(`"__".join(sorted([kind, peer])).lower()`), and the
-identifier is now immutable. Reusing that exact value
-on the new inverse connects the two into one
-bidirectional edge; inventing a new string and
-changing the forward side to match instead fails
-`infrahubctl schema check` with
-`'not_supported': <Kind> <rel> None`, because
-`identifier` cannot be changed after load.
-
-So: read the forward relationship's current
-`identifier` (from the schema file, or
-`GET /api/schema` on a live instance) and set the
-inverse to that same string. See
-[relationship-identifiers](../../infrahub-managing-schemas/rules/relationship-identifiers.md)
-("The identifier is immutable once loaded") for the
-full rule and the error signature.
+The inverse must carry the **same `identifier` as the
+forward relationship already has** — not a
+freshly-invented `peer__source` string. A forward
+relationship loaded without an explicit identifier got
+an auto-generated one, and that identifier is now
+immutable. Reuse the forward side's identifier (read
+it from the schema file, or run `infrahubctl schema
+check` and read the diff); inventing a new string and
+changing the forward side to match instead fails with
+`'not_supported': <Kind> <rel> None`. See
+[relationship-identifiers](../../infrahub-managing-schemas/rules/relationship-identifiers.md).
 
 ## Related
 
