@@ -49,9 +49,22 @@ rejects it without explaining why.
    optional defaults to `true` — flag when these
    defaults may cause confusion
 
+## Identifier is immutable after load
+
+`identifier` (and `direction`, `branch`,
+`hierarchical`) cannot change once a relationship
+exists in the instance — `infrahubctl schema check`
+fails with `'not_supported': <Kind> <rel> None`. The
+usual cause is retrofitting an explicit identifier
+onto a relationship first loaded without one. When
+adding an inverse, reuse the forward side's existing
+identifier. See
+[relationship-identifiers](../../infrahub-managing-schemas/rules/relationship-identifiers.md).
+
 ## Common Issues
 
 - `peer: Device` instead of `peer: InfraDevice`
 - Mismatched identifiers between two sides of a bidirectional relationship
+- Changing an existing relationship's `identifier` (fails with `not_supported`; remove + re-add instead)
 - Component side with `cardinality: one` (should be `many`)
 - Parent side with `cardinality: many` (should be `one`)
