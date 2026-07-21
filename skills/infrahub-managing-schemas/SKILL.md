@@ -48,7 +48,7 @@ use the first argument as the namespace and remaining arguments as node names.
 
 | Priority | Category | Prefix | Description |
 | -------- | -------- | ------ | ----------- |
-| CRITICAL | Branch-First Changes | `workflow-` | Load schema onto a branch, not the default branch |
+| CRITICAL | Workflow | `workflow-` | Load schema onto a branch, not the default branch; format files with `infrahubctl schema format` |
 | CRITICAL | Naming | `naming-` | Namespace, node, attribute naming |
 | CRITICAL | Relationships | `relationship-` | IDs, peers, component/parent, on_delete |
 | HIGH | Attributes | `attribute-` | Defaults, dropdowns, computed Jinja2, branch-agnostic, deprecated |
@@ -159,7 +159,12 @@ Follow these steps when creating or modifying a schema:
    `order_weight` per
    [rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md)
    and [rules/display-order-weight.md](./rules/display-order-weight.md).
-6. **Validate and roll out on a branch** — Run
+6. **Format the files** — Run `infrahubctl schema format`
+   to normalise key ordering before committing, so diffs
+   stay small and files read consistently. This is offline
+   (no server needed). See
+   [rules/workflow-format-command.md](./rules/workflow-format-command.md).
+7. **Validate and roll out on a branch** — Run
    `infrahubctl schema check` to fix errors per
    [validation.md](./validation.md) and
    [rules/validation-common-errors.md](./rules/validation-common-errors.md).
