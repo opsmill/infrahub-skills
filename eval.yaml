@@ -1667,9 +1667,9 @@ tasks:
 
       bundle/logs/server/infrahub-server-1.log:
       2026-07-20 09:14:52 ERROR infrahub.graphql Traceback (most recent call last):
-        File "/usr/local/lib/python3.12/site-packages/infrahub/graphql/mutations/proposed_change.py", line 142, in mutate
-        File "/usr/local/lib/python3.12/site-packages/infrahub/core/registry.py", line 88, in get_schema
-      infrahub.exceptions.SchemaNotFoundError: Unable to find the schema 'CoreProposedChange' in the registry for branch 'atl-fix-vlans-0f3aa9c2'
+        File "/usr/lib/python3.12/site-packages/infrahub/graphql/mutations/proposed_change.py", line 142, in mutate
+        File "/usr/lib/python3.12/site-packages/infrahub/core/registry.py", line 88, in get_schema
+      infrahub.exceptions.SchemaNotFoundError: schema 'CoreProposedChange' not found on branch 'atl-fix-vlans-0f3aa9c2'
 
       Save ONLY the findings report (markdown) to: output.md
     graders:
@@ -1781,7 +1781,7 @@ tasks:
       bundle/logs/task-worker/task-worker-1.log:
       Traceback (most recent call last):
         File "/usr/local/lib/python3.12/site-packages/infrahub/workers/infrahub_async.py", line 67, in setup
-      infrahub.exceptions.InitializationError: Unable to connect to the message broker at rabbitmq-7f9c4d.internal.acme.net:5672
+      infrahub.exceptions.InitializationError: Unable to connect to the message broker at rabbitmq-7f9c4d.acme.net:5672
 
       Save ONLY the report (markdown) to: output.md
     graders:
