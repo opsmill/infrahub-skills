@@ -140,6 +140,11 @@ email). If the user also wants to file a public
 GitHub issue, hand off to `infrahub-reporting-issues`
 — see
 [rules/cross-link-reporting-issues.md](rules/cross-link-reporting-issues.md).
+If the user wants a local first-pass analysis of the
+bundle (tracebacks, failures, known-issue matching)
+before or instead of the expert hand-off, continue
+with `infrahub-analyzing-diagnostics` — this skill
+only collects; the analyzer owns triage.
 
 ## Rule Categories
 

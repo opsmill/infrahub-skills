@@ -1645,6 +1645,179 @@ tasks:
       - name: no-legacy-artifacts
         check: Plan does not reference manifest.yml/flags.yml/redaction-report.txt
 
+  # --- Diagnostics Analyzer --- #
+  - name: analyzing-diagnostics-traceback-triage
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: I collected a diagnostic bundle with infrahub-collect after our
+      proposed-change UI started throwing 500s. Analyze these bundle excerpts and
+      write a findings report, including how you would check whether this is a
+      known Infrahub issue. Do NOT actually run any commands; include the exact
+      commands you would run in the report.
+
+      bundle/bundle_information.json:
+      {"deployment": {"type": "docker-compose", "project": "infrahub-prod"},
+       "collectors": [
+         {"name": "logs/server", "status": "ok"},
+         {"name": "logs/database", "status": "ok"},
+         {"name": "logs/message-queue", "status": "failed", "error": "container not running"}]}
+
+      bundle/logs/server/infrahub-server-1.log:
+      2026-07-20 09:14:52 ERROR infrahub.graphql Traceback (most recent call last):
+        File "/usr/local/lib/python3.12/site-packages/infrahub/graphql/mutations/proposed_change.py", line 142, in mutate
+        File "/usr/local/lib/python3.12/site-packages/infrahub/core/registry.py", line 88, in get_schema
+      infrahub.exceptions.SchemaNotFoundError: Unable to find the schema 'CoreProposedChange' in the registry for branch 'atl-fix-vlans-0f3aa9c2'
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_traceback_triage.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that reads the manifest first (flagging the failed
+      message-queue collector as a finding), cites bundle paths as evidence for
+      the SchemaNotFoundError traceback, proposes a `gh search issues --repo
+      opsmill/infrahub --state all` query built from stable keys (exception
+      class + schema kind, branch name stripped), stays read-only, and hands
+      filing off to infrahub-reporting-issues.
+    expectations:
+      - Reads bundle_information.json first and treats the failed message-queue collector as a finding
+      - Cites bundle/logs/... paths as evidence for each finding
+      - Searches opsmill/infrahub issues with `gh search issues --state all`
+      - Search keys keep SchemaNotFoundError but strip the volatile branch name
+      - Recommends no deployment-mutating commands and does not run `gh issue create`
+      - Cross-links infrahub-reporting-issues for filing
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: cites-bundle-evidence
+        check: Findings cite bundle/<service>/ file paths as evidence
+      - name: github-search
+        check: Report includes `gh search issues` against opsmill/infrahub
+      - name: search-state-all
+        check: Issue search uses `--state all` to cover closed issues
+      - name: search-keyword
+        check: Search keys include the stable exception class SchemaNotFoundError
+      - name: search-excludes-token
+        check: Search keys strip the volatile branch suffix 0f3aa9c2
+      - name: no-mutating-commands
+        check: Report includes no restart/delete/down commands
+      - name: no-direct-issue-filing
+        check: Report does not run `gh issue create`
+      - name: cross-link-reporting-issues
+        check: Report hands filing off to infrahub-reporting-issues
+
+  - name: analyzing-diagnostics-restart-correlation
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Our Docker Compose Infrahub deployment fell over yesterday and I
+      collected a diagnostic bundle. Here is what a sweep of the bundle shows.
+      Correlate these signals and write a findings report. Do NOT actually run
+      any commands.
+
+      bundle/bundle_information.json: all collectors succeeded (docker-compose
+      project infrahub-prod, collected 2026-07-18 14:11).
+
+      bundle/logs/database/database-1.log:
+      2026-07-18 14:02:11.408+0000 ERROR ... java.lang.OutOfMemoryError: Java heap space
+
+      bundle/logs/server/infrahub-server-1.log (41 similar lines between 14:02:19 and 14:05:40):
+      2026-07-18 14:02:19 ERROR infrahub.database Unable to connect to database: Connection refused
+
+      bundle/logs/task-worker/ contains task-worker-1.log and task-worker-1.previous.log;
+      tail of task-worker-1.previous.log:
+      2026-07-18 14:03:05 ERROR ... database connection timeout (attempt 12/12)
+      2026-07-18 14:03:07 CRITICAL worker shutting down
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_restart_correlation.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that groups the database OOM, the server connection
+      errors, and the task-worker restart into one incident on a shared
+      timeline, names the database OOM as the root and the rest as cascade,
+      treats task-worker-1.previous.log as restart evidence, cites bundle paths
+      for every claim, and recommends no restarts or other mutations.
+    expectations:
+      - References the manifest before the logs
+      - Groups all three services' signals into a single correlated incident
+      - Distinguishes the database OOM root from the cascade errors downstream
+      - Treats task-worker-1.previous.log as evidence the worker restarted
+      - Cites bundle/logs/... paths with timestamps for each signal
+      - Recommends no deployment-mutating commands
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: cites-bundle-evidence
+        check: Findings cite bundle/<service>/ file paths as evidence
+      - name: restart-evidence
+        check: Report treats the .previous.log file as restart/crash evidence
+      - name: incident-grouping
+        check: Signals are correlated into an incident with root vs cascade
+      - name: mentions-all
+        check: Report covers database, server, task-worker, and the 14:02 window
+      - name: no-mutating-commands
+        check: Report includes no restart/delete/down commands
+
+  - name: analyzing-diagnostics-issue-matching
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Our task-workers will not start after an upgrade. In the diagnostic
+      bundle I collected, every worker log ends with the traceback below. Is this
+      already a known Infrahub issue, and what should I do next? Do NOT actually
+      run any commands; write the exact commands and steps as a short report.
+
+      bundle/logs/task-worker/task-worker-1.log:
+      Traceback (most recent call last):
+        File "/usr/local/lib/python3.12/site-packages/infrahub/workers/infrahub_async.py", line 67, in setup
+      infrahub.exceptions.InitializationError: Unable to connect to the message broker at rabbitmq-7f9c4d.internal.acme.net:5672
+
+      Save ONLY the report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_issue_matching.py output.md
+        weight: 1.0
+    expected_output: >-
+      A report that cites the bundle path for the traceback, builds the GitHub
+      search from stable keys (InitializationError + message-broker wording,
+      the internal hostname stripped), searches opsmill/infrahub with
+      `gh search issues --state all`, does not file anything itself, and hands
+      any filing or commenting off to infrahub-reporting-issues.
+    expectations:
+      - Cites bundle/logs/task-worker/... as evidence for the traceback
+      - Searches opsmill/infrahub issues with `gh search issues --state all`
+      - Search keys keep InitializationError but strip the internal broker hostname
+      - Does not run `gh issue create` or any deployment-mutating command
+      - Cross-links infrahub-reporting-issues for filing or commenting
+    assertions:
+      - name: cites-bundle-evidence
+        check: Report cites bundle/<service>/ file paths as evidence
+      - name: github-search
+        check: Report includes `gh search issues` against opsmill/infrahub
+      - name: search-state-all
+        check: Issue search uses `--state all` to cover closed issues
+      - name: search-keyword
+        check: Search keys include the stable exception class InitializationError
+      - name: search-excludes-token
+        check: Search keys strip the internal hostname (acme)
+      - name: no-direct-issue-filing
+        check: Report does not run `gh issue create`
+      - name: cross-link-reporting-issues
+        check: Report hands filing off to infrahub-reporting-issues
+      - name: no-mutating-commands
+        check: Report includes no restart/delete/down commands
+
   # --- Generator Creator --- #
   - name: from-graphql-hydration-refactor
     trials: 3
