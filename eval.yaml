@@ -1882,6 +1882,40 @@ tasks:
       - name: cross-link-reporting-issues
         check: Report hands filing off to infrahub-reporting-issues
 
+  - name: analyzing-diagnostics-ask-bundle-location
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: I collected a diagnostic bundle with infrahub-collect yesterday after
+      our Infrahub UI started erroring. Analyze the bundle and tell me what is
+      wrong. Do NOT actually run any commands; write out your response to me as it
+      would appear in the conversation.
+
+      Save ONLY that response (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_ask_bundle_location.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that asks the user where the bundle is (optionally offering
+      ./infrahub_bundles/ as a hint) before any analysis, rather than scanning
+      the filesystem or assuming the collector's default output directory, and
+      that runs no commands.
+    expectations:
+      - Asks the user for the bundle path before analyzing anything
+      - Does not scan the filesystem for bundle_information.json or infrahub_bundles
+      - Does not assume the default output directory as the bundle's location
+      - Runs no deployment-mutating commands
+    assertions:
+      - name: asks-bundle-location
+        check: Response asks where the bundle is
+      - name: no-location-scan
+        check: Response neither scans for the bundle nor assumes its location
+      - name: no-mutating-commands
+        check: Response includes no restart/delete/down commands
+
   # --- Generator Creator --- #
   - name: from-graphql-hydration-refactor
     trials: 3

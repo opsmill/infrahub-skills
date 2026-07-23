@@ -196,6 +196,32 @@
           "check": "Report hands filing off to infrahub-reporting-issues"
         }
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "I collected a diagnostic bundle with infrahub-collect yesterday after\nour Infrahub UI started erroring. Analyze the bundle and tell me what is\nwrong. Do NOT actually run any commands; write out your response to me as it\nwould appear in the conversation.",
+      "expected_output": "A response that asks the user where the bundle is (optionally offering ./infrahub_bundles/ as a hint) before any analysis, rather than scanning the filesystem or assuming the collector's default output directory, and that runs no commands.",
+      "files": [],
+      "expectations": [
+        "Asks the user for the bundle path before analyzing anything",
+        "Does not scan the filesystem for bundle_information.json or infrahub_bundles",
+        "Does not assume the default output directory as the bundle's location",
+        "Runs no deployment-mutating commands"
+      ],
+      "assertions": [
+        {
+          "name": "asks-bundle-location",
+          "check": "Response asks where the bundle is"
+        },
+        {
+          "name": "no-location-scan",
+          "check": "Response neither scans for the bundle nor assumes its location"
+        },
+        {
+          "name": "no-mutating-commands",
+          "check": "Response includes no restart/delete/down commands"
+        }
+      ]
     }
   ]
 }

@@ -38,6 +38,37 @@ def _gh_search_windows(text: str) -> list[str]:
     ]
 
 
+def check_asks_bundle_location(text: str, **_: object) -> CheckResult:
+    """Response asks the user where the bundle is before analyzing."""
+    if "bundle" not in text.lower():
+        return False, "response never mentions the bundle"
+    # A sentence may wrap across lines — stop only at sentence enders.
+    for sentence in re.findall(r"[^.!?]*\?", text):
+        if re.search(r"where|path|location|director|folder", sentence, re.IGNORECASE):
+            return True, "asks for the bundle location"
+    return False, "does not ask where the bundle is"
+
+
+def check_no_location_scan(text: str, **_: object) -> CheckResult:
+    """Response neither scans for the bundle nor assumes its location.
+
+    Negated mentions ("I won't assume the default") are compliant —
+    only an actual scan command or assumption counts.
+    """
+    if re.search(r"\b(find|ls|locate|glob)\b[^\n]*(infrahub_bundles|bundle_information)", text):
+        return False, "scans the filesystem for the bundle instead of asking"
+    for m in re.finditer(r"assum\w+[^\n]{0,40}(default|infrahub_bundles|location|path)", text, re.IGNORECASE):
+        prefix = text[max(0, m.start() - 150) : m.start()]
+        if re.search(
+            r"\b(never|not|don'?t|doesn'?t|won'?t|without|rather than|instead of|avoid)\b",
+            prefix,
+            re.IGNORECASE,
+        ):
+            continue
+        return False, "assumes a bundle location instead of asking"
+    return True, "no location scanning or assumed default"
+
+
 def check_mentions_manifest(text: str, **_: object) -> CheckResult:
     """Report reads/references the bundle manifest."""
     if re.search(r"bundle_information\.json|manifest", text, re.IGNORECASE):
@@ -174,6 +205,8 @@ def check_cross_link_reporting_issues(text: str, **_: object) -> CheckResult:
 
 
 CHECKS: dict[str, CheckFn] = {
+    "asks-bundle-location": check_asks_bundle_location,
+    "no-location-scan": check_no_location_scan,
     "mentions-manifest": check_mentions_manifest,
     "mentions-version": check_mentions_version,
     "cites-bundle-evidence": check_cites_bundle_evidence,

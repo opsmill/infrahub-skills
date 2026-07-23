@@ -71,16 +71,25 @@ Do not trigger when:
 
 Follow these steps in order.
 
-### 1. Locate the bundle
+### 1. Ask for the bundle location (user-gate)
 
-Find the bundle directory (default output is
-`./infrahub_bundles/`; the user may have moved or
-extracted it elsewhere). Confirm it looks like an
-`infrahub-collect` bundle — a `bundle/` directory
+Ask the user where the bundle is — never scan the
+filesystem for it or assume the collector's default
+output directory. A machine often holds several
+bundles, and picking the wrong one produces a
+confident report about the wrong incident.
+Mentioning the default as a hint is fine
+(`./infrahub_bundles/` when `--output-dir` wasn't
+set), but the user names the path. Skip the question
+only when the user already gave a path or pasted the
+bundle contents. Once given, confirm it looks like
+an `infrahub-collect` bundle — a `bundle/` directory
 containing `bundle_information.json`. If there is no
-bundle, stop and hand off to
+bundle at all, stop and hand off to
 `infrahub-collecting-diagnostics`; do not scrape
 `docker compose logs`/`kubectl logs` as a substitute.
+See
+[rules/workflow-ask-bundle-location.md](rules/workflow-ask-bundle-location.md).
 
 ### 2. Read the manifest first, then anchor the deployment context
 
@@ -220,6 +229,10 @@ full index.
 
 ## Anti-patterns
 
+- **Deducing the bundle location.** No filesystem
+  scans, no "newest directory wins", no assuming
+  `./infrahub_bundles/`. Ask; the user names the
+  path.
 - **Diagnosing without evidence.** Every finding
   cites a bundle path and a quoted excerpt. A
   plausible story that no log line supports is
