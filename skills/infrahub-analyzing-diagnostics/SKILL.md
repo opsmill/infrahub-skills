@@ -125,6 +125,16 @@ crash cause
 `reference.md` has ready-made grep patterns per
 signal class.
 
+If the manifest shows a benchmark was collected
+(`create --benchmark`), evaluate it alongside the
+logs — the single-CPU score and the storage IOPS of
+the Neo4j/PostgreSQL volumes often decide whether a
+slowness symptom is a software issue or an
+undersized host. If it's absent and the symptom is
+performance-shaped, the report must recommend a
+next bundle with `--benchmark`. See
+[rules/triage-benchmark-results.md](rules/triage-benchmark-results.md).
+
 ### 4. Correlate into incidents
 
 Group the raw signals by timestamp and causal chain

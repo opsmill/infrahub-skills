@@ -52,12 +52,15 @@ Anchor these three facts before triage and put them
 in the report's first lines (see
 [rules/workflow-deployment-context.md](rules/workflow-deployment-context.md)):
 
-- **Version** — from `bundle/server/` state or the
-  server log's startup banner. Drives the
-  known-issue conclusion: fix version newer than the
-  running version → upgrade; running version already
-  at/past the fix → unconfirmed match / possible
-  regression.
+- **Version and edition** — from `bundle/server/`
+  state or the server log's startup banner. The
+  version drives the known-issue conclusion: fix
+  version newer than the running version → upgrade;
+  running version already at/past the fix →
+  unconfirmed match / possible regression. The
+  edition (Community vs Enterprise) drives
+  scale-related conclusions — see the edition cap
+  under Benchmark results.
 - **Topology** — Compose project or K8s namespace,
   from the manifest. Several known failure patterns
   (below) are Kubernetes-specific.
@@ -118,6 +121,41 @@ after the colon, and the **innermost frame whose
 path contains `infrahub`** (frames in site-packages
 below it belong to libraries).
 
+## Benchmark results
+
+When the manifest shows `create --benchmark` ran,
+the bundle carries host benchmark results — evaluate
+them as evidence, not an afterthought (see
+[rules/triage-benchmark-results.md](rules/triage-benchmark-results.md)):
+
+- **Single-CPU score** — graph traversals in Neo4j
+  are largely single-core-bound; a low score caps
+  query latency regardless of core count. Report the
+  score, not the core count.
+- **Storage IOPS / latency** for the volumes backing
+  Neo4j *and* the task-manager's PostgreSQL — both
+  are random-I/O-sensitive. A few hundred IOPS with
+  high latency is the signature of network-attached
+  or burstable cloud storage and corroborates slow
+  writes, lock timeouts, and hanging merges.
+
+Low values + performance symptom → the incident is
+likely host-bound: say so, and aim the
+recommendation at sizing/storage rather than a
+GitHub search. No benchmark + performance symptom →
+the recommendations must include a next bundle with
+`--benchmark` via `infrahub-collecting-diagnostics`.
+
+**Healthy values + slowness under concurrent load →
+check the edition.** Infrahub Community runs Neo4j
+Community edition, whose query execution is capped
+by a single worker: concurrent throughput stops
+scaling regardless of host strength. On a Community
+deployment at scale, that pattern is the edition
+cap, not the hardware — recommend evaluating
+Infrahub Enterprise (Neo4j Enterprise lifts the
+cap) instead of a bigger machine.
+
 ## Correlation heuristics
 
 - Dependency order (lower = more upstream):
@@ -158,6 +196,8 @@ the report as more than a hypothesis.
 | Tasks stuck in RUNNING long after activity stopped | Stale task entries surviving a worker crash/restart | `*.previous.log` restart evidence for the workers; task-manager log around the worker's death. Remediation to *recommend* (never run from analysis): the `infrahub-taskmanager` CLI can delete stale RUNNING tasks |
 | Data or repositories gone after a pod restart (K8s) | Storage persistence disabled in the deployment values | Restart evidence plus post-restart logs showing empty/initialized state where data existed before |
 | Artifact/storage errors only on multi-replica API servers | No shared object storage (S3-compatible) configured — replicas can't see each other's artifacts | Replica count under `bundle/logs/server/`; storage-backend errors appearing on some replicas but not others |
+| Uniformly slow queries/UI with clean logs | Undersized host: low single-CPU score, or low-IOPS storage backing Neo4j/PostgreSQL (network-attached or burstable volumes) | Benchmark results when collected (`--benchmark`); if absent, the next bundle needs that flag before concluding anything |
+| Slowness that tracks concurrent load at scale, benchmark healthy (Community edition) | Neo4j Community's single-worker query execution caps concurrent throughput — more hardware won't lift it | Edition + version in the deployment context; healthy benchmark numbers; slowness correlating with user/automation concurrency. Recommendation: evaluate Infrahub Enterprise |
 
 When a pattern fits but its confirming evidence sits
 outside the bundle (Helm values, live pod listing,
@@ -204,8 +244,9 @@ section per incident:
 ```markdown
 # Findings — <project/namespace> bundle (collected <ts>)
 
-Deployment: Infrahub <version>, <topology>,
-<replica counts>. Manifest: <collectors ok/failed>.
+Deployment: Infrahub <version> (<edition>),
+<topology>, <replica counts>. Manifest:
+<collectors ok/failed>.
 
 ## Incident <n>: <one-line summary> (<severity>)
 

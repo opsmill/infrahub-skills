@@ -1916,6 +1916,166 @@ tasks:
       - name: no-mutating-commands
         check: Response includes no restart/delete/down commands
 
+  - name: analyzing-diagnostics-benchmark-evaluation
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Everything in Infrahub feels slow — queries take seconds and merges
+      take minutes — but nothing seems to crash. I collected a bundle with the
+      benchmark included. Analyze these excerpts and write a findings report.
+      Do NOT actually run any commands.
+
+      bundle/bundle_information.json: all collectors succeeded, including the
+      host benchmark (docker-compose project infrahub-prod, collected 2026-07-23).
+
+      bundle/metrics/benchmark.json (from `infrahub-collect create --benchmark`):
+      {"cpu": {"cores": 8, "single_core_score": 412},
+       "storage": {"database_volume": {"randread_iops": 480, "latency_ms": 9.8},
+                   "task_manager_db_volume": {"randread_iops": 512, "latency_ms": 8.9}}}
+
+      bundle/logs/server/infrahub-server-1.log (representative, repeats all day):
+      2026-07-23 10:14:09 WARNING infrahub.graphql query DeviceList took 8211 ms
+      2026-07-23 10:15:02 WARNING infrahub.graphql query BranchDiff took 12744 ms
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_benchmark_evaluation.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that evaluates the collected benchmark as first-class
+      evidence — the single-CPU score (412) and the low storage IOPS (480 on the
+      database volume) — ties them to the uniformly slow queries as a likely
+      host-bound incident, cites bundle paths, and aims the recommendation at
+      sizing/storage rather than a code bug, with no commands executed.
+    expectations:
+      - Evaluates the benchmark results instead of ignoring them
+      - Reports the single-CPU score (412), not just the core count
+      - Reports the database volume's 480 random-read IOPS as low / storage-bound
+      - Ties the benchmark numbers to the slow-query symptom (host-bound, not a bug)
+      - Cites bundle/metrics/... and bundle/logs/... paths as evidence
+      - Runs no deployment-mutating commands and files no issue
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: cites-bundle-evidence
+        check: Findings cite bundle/<service>/ file paths as evidence
+      - name: evaluates-benchmark
+        check: Report evaluates the single-CPU score and storage IOPS
+      - name: mentions-all
+        check: Report cites the planted values 412 (CPU score) and 480 (IOPS)
+      - name: no-mutating-commands
+        check: Report includes no restart/delete/down commands
+      - name: no-direct-issue-filing
+        check: Report does not run `gh issue create`
+
+  - name: analyzing-diagnostics-benchmark-recommendation
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Infrahub has been sluggish for a week on our Docker Compose
+      deployment — the UI hangs and queries are slow, but there are no crashes.
+      I collected a bundle. Analyze these excerpts and write a findings report
+      with next steps. Do NOT actually run any commands.
+
+      bundle/bundle_information.json: log collectors succeeded for server,
+      database, task-worker; no benchmark was collected (docker-compose project
+      infrahub-prod, collected 2026-07-23 08:05).
+
+      bundle/logs/server/infrahub-server-1.log (representative, no errors):
+      2026-07-23 07:41:33 WARNING infrahub.graphql query DeviceList took 9302 ms
+      2026-07-23 07:52:18 WARNING infrahub.graphql query TopologyView took 14210 ms
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_benchmark_recommendation.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that notes the bundle has no benchmark results, avoids
+      concluding a root cause from clean-but-slow logs, and recommends
+      collecting the next bundle with `--benchmark` via
+      infrahub-collecting-diagnostics — naming the single-CPU score and the
+      storage IOPS of the Neo4j/PostgreSQL volumes as what it would answer.
+    expectations:
+      - Notes that no benchmark was collected in this bundle
+      - Does not claim a root cause from slow-but-clean logs alone
+      - Recommends a next bundle with the `--benchmark` flag
+      - Names the single-CPU score and Neo4j/PostgreSQL storage IOPS as the data it needs
+      - Hands re-collection to infrahub-collecting-diagnostics
+      - Runs no deployment-mutating commands and files no issue
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: recommends-benchmark
+        check: Report recommends `--benchmark` with the single-CPU/IOPS rationale
+      - name: cross-link-collecting-diagnostics
+        check: Report hands re-collection to infrahub-collecting-diagnostics
+      - name: no-mutating-commands
+        check: Report includes no restart/delete/down commands
+      - name: no-direct-issue-filing
+        check: Report does not run `gh issue create`
+
+  - name: analyzing-diagnostics-edition-cap
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: We run Infrahub at scale — around 200 concurrent automation clients.
+      During business hours everything slows to a crawl, but off-hours a single
+      request is fast. We already sized up the host once and it changed nothing.
+      I collected a bundle with the benchmark included. Analyze these excerpts
+      and write a findings report. Do NOT actually run any commands.
+
+      bundle/bundle_information.json: all collectors succeeded, including the
+      host benchmark (docker-compose project infrahub-prod, collected 2026-07-23).
+
+      bundle/logs/server/infrahub-server-1.log (startup banner, then load-time entries):
+      2026-07-20 06:00:02 INFO infrahub - Starting Infrahub Community 1.3.0
+      2026-07-23 09:58:11 WARNING infrahub.graphql query DeviceList took 11205 ms
+      2026-07-23 21:14:40 INFO infrahub.graphql query DeviceList took 190 ms
+
+      bundle/metrics/benchmark.json (from `infrahub-collect create --benchmark`):
+      {"cpu": {"cores": 16, "single_core_score": 1985},
+       "storage": {"database_volume": {"randread_iops": 46500, "latency_ms": 0.4}}}
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_edition_cap.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that reads the healthy benchmark (single-CPU 1985, 46500
+      IOPS) as ruling out a host-bound cause, notes the deployment runs the
+      Community edition, attributes the concurrency-shaped slowness to Neo4j
+      Community's single-worker query execution, and recommends evaluating
+      Infrahub Enterprise for this scale instead of more hardware.
+    expectations:
+      - Opens with the deployment context including the Community edition
+      - Evaluates the benchmark and concludes the host is healthy, not undersized
+      - Attributes load-correlated slowness to the Community single-worker cap
+      - Recommends evaluating Infrahub Enterprise rather than a bigger host
+      - Cites bundle/metrics/... and bundle/logs/... paths as evidence
+      - Runs no deployment-mutating commands and files no issue
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: cites-bundle-evidence
+        check: Findings cite bundle/<service>/ file paths as evidence
+      - name: evaluates-benchmark
+        check: Report evaluates the single-CPU score and storage IOPS
+      - name: edition-cap
+        check: Report explains the Community single-worker cap and raises Enterprise
+      - name: no-mutating-commands
+        check: Report includes no restart/delete/down commands
+      - name: no-direct-issue-filing
+        check: Report does not run `gh issue create`
+
   # --- Generator Creator --- #
   - name: from-graphql-hydration-refactor
     trials: 3

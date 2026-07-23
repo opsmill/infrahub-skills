@@ -131,6 +131,47 @@ def check_mentions_all(text: str, *, terms: str = "", **_: object) -> CheckResul
     return True, f"mentions all of: {wanted}"
 
 
+def check_evaluates_benchmark(text: str, **_: object) -> CheckResult:
+    """Report evaluates collected benchmark results (single-CPU + IOPS)."""
+    low = text.lower()
+    if "benchmark" not in low:
+        return False, "benchmark results never mentioned"
+    if not re.search(r"single[- ]?(cpu|core|thread)", low):
+        return False, "single-CPU score not evaluated"
+    if "iops" not in low:
+        return False, "storage IOPS not evaluated"
+    return True, "evaluates single-CPU score and storage IOPS"
+
+
+def check_recommends_benchmark(text: str, **_: object) -> CheckResult:
+    """Report recommends a --benchmark bundle and says what it answers."""
+    if not re.search(r"(?<!\w)--benchmark(?![\w-])", text):
+        return False, "does not recommend `--benchmark`"
+    low = text.lower()
+    if re.search(r"single[- ]?(cpu|core|thread)", low) and "iops" in low:
+        return True, "recommends `--benchmark` for single-CPU score and IOPS"
+    return False, "recommends `--benchmark` without the single-CPU/IOPS rationale"
+
+
+def check_edition_cap(text: str, **_: object) -> CheckResult:
+    """Report explains the Community single-worker cap and raises Enterprise."""
+    low = text.lower()
+    if "community" not in low:
+        return False, "does not name the Community edition"
+    if "enterprise" not in low:
+        return False, "does not raise the Enterprise option"
+    if re.search(r"single[- ]worker|concurren|parallel", low):
+        return True, "explains the Community single-worker cap and raises Enterprise"
+    return False, "names editions but not the single-worker/concurrency cap"
+
+
+def check_cross_link_collecting_diagnostics(text: str, **_: object) -> CheckResult:
+    """Report hands re-collection back to infrahub-collecting-diagnostics."""
+    if re.search(r"collecting-diagnostics|infrahub-collect\b", text, re.IGNORECASE):
+        return True, "cross-links infrahub-collecting-diagnostics"
+    return False, "missing infrahub-collecting-diagnostics cross-link"
+
+
 def check_github_search(text: str, **_: object) -> CheckResult:
     """Report includes a gh issue search against opsmill/infrahub."""
     if re.search(r"gh\s+search\s+issues", text) and "opsmill/infrahub" in text:
@@ -213,6 +254,10 @@ CHECKS: dict[str, CheckFn] = {
     "restart-evidence": check_restart_evidence,
     "incident-grouping": check_incident_grouping,
     "mentions-all": check_mentions_all,
+    "evaluates-benchmark": check_evaluates_benchmark,
+    "recommends-benchmark": check_recommends_benchmark,
+    "edition-cap": check_edition_cap,
+    "cross-link-collecting-diagnostics": check_cross_link_collecting_diagnostics,
     "github-search": check_github_search,
     "search-state-all": check_search_state_all,
     "search-keyword": check_search_keyword,

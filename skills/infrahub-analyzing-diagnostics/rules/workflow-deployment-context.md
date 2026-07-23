@@ -35,10 +35,15 @@ first lines, not reverse-engineered from log paths.
 
 ### What to do
 
-- Extract the running version from the bundle —
+- Extract the running version — and the edition,
+  Community or Enterprise — from the bundle:
   `bundle/server/` state, or the server log's
-  startup banner. If it cannot be determined, say so
-  explicitly rather than guessing.
+  startup banner. If either cannot be determined,
+  say so explicitly rather than guessing. The
+  edition matters for performance findings:
+  Community's database layer is capped by Neo4j
+  Community's single-worker execution, so
+  scale-related conclusions differ by edition.
 - Extract topology (Compose project vs K8s
   namespace) from the manifest, and replica counts
   from the per-replica log files under

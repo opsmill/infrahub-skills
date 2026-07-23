@@ -12,7 +12,11 @@
    service's logs for the known signal classes
    (tracebacks, ERROR/CRITICAL, panics, OOM,
    connection failures); treat `*.previous.log` as
-   restart evidence and read its tail.
+   restart evidence and read its tail. Evaluate
+   benchmark results when present; for performance
+   symptoms without them, recommend a `--benchmark`
+   bundle (single-CPU score, Neo4j/PostgreSQL
+   storage IOPS).
 
 3. **Correlation (correlate-)** -- HIGH. Group raw
    signals by timestamp and causal chain into
