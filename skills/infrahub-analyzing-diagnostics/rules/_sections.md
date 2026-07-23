@@ -3,6 +3,9 @@
 1. **Workflow (workflow-)** -- CRITICAL. Read
    `bundle_information.json` before any log;
    collection failures are findings, not gaps.
+   Anchor the deployment context (version, topology,
+   replicas) before triage — the version is what
+   turns issue matches into conclusions.
 
 2. **Triage (triage-)** -- CRITICAL. Sweep every
    service's logs for the known signal classes

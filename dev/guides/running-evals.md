@@ -201,7 +201,7 @@ each task reads).
 | infrahub-reporting-issues | 3 |
 | infrahub-auditing-repo | 15 |
 | infrahub-collecting-diagnostics | 3 |
-| infrahub-analyzing-diagnostics | 3 |
+| infrahub-analyzing-diagnostics | 4 |
 | infrahub-importing-data | 25 |
 
 `infrahub-analyzing-data` has no eval tasks yet —

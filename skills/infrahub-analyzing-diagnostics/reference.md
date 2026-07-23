@@ -46,6 +46,26 @@ Read it for:
   errors near the end of a log may continue past the
   bundle's horizon.
 
+## Deployment context
+
+Anchor these three facts before triage and put them
+in the report's first lines (see
+[rules/workflow-deployment-context.md](rules/workflow-deployment-context.md)):
+
+- **Version** — from `bundle/server/` state or the
+  server log's startup banner. Drives the
+  known-issue conclusion: fix version newer than the
+  running version → upgrade; running version already
+  at/past the fix → unconfirmed match / possible
+  regression.
+- **Topology** — Compose project or K8s namespace,
+  from the manifest. Several known failure patterns
+  (below) are Kubernetes-specific.
+- **Size** — replica counts from the per-replica
+  files under `bundle/logs/<service>/`. Multi-replica
+  API servers have their own failure pattern (shared
+  object storage).
+
 ## Signal sweep — grep patterns
 
 Run across **all** of `bundle/logs/` (`-r`), never a
@@ -82,6 +102,16 @@ to capture the exception line below the frames).
 | message-queue | RabbitMQ / NATS | connection churn, channel errors, memory watermarks |
 | cache | Redis / Valkey | `WARNING`/`# ...` lines, persistence and memory warnings |
 
+The task-manager is a Prefect server with its own
+dependency tail — a PostgreSQL database and Redis —
+so task-manager errors frequently originate there
+rather than in Infrahub code; read its log with that
+in mind. Task and worker logs are also viewable in
+the Infrahub UI's task history (internal system
+tasks excepted) — a useful fallback when the
+bundle's log window is truncated, and a way for the
+user to check state newer than the bundle.
+
 A Python traceback's most useful parts for matching:
 the **exception class** (last line), the **message**
 after the colon, and the **innermost frame whose
@@ -103,6 +133,37 @@ below it belong to libraries).
 - Log clocks are the container's own; small skews
   between services are normal. Cluster on windows,
   not exact equality.
+- The task-manager (Prefect) adds a side-branch to
+  the dependency order: it depends on its own
+  PostgreSQL and Redis. Worker symptoms (tasks not
+  starting, flows stuck) can root in that branch
+  without the main database or message-queue showing
+  anything — check task-manager logs for
+  Postgres/Redis connection errors before concluding
+  the workers themselves are at fault.
+
+## Known failure patterns
+
+Field-proven symptom-to-cause mappings. Check these
+before searching GitHub — when one fits, the search
+gets targeted (or becomes unnecessary) and the
+report can point at configuration instead of code.
+Each still needs bundle evidence before it goes in
+the report as more than a hypothesis.
+
+| Symptom | Likely cause | Where to look in the bundle |
+| ------- | ------------ | --------------------------- |
+| Triggers or computed attributes not firing (K8s) | Prefect background services not running — commonly disabled by hand-edited Helm values; the chart's env-var *list* is overridden wholesale by Helm, not merged | Manifest collector outcomes and `bundle/logs/task-manager/`: missing/empty background-service activity; no trigger-execution lines around the symptom window |
+| Merge or proposed-change crashes midway, later merges hang | Long-lived lock left behind (deadlock); the periodic cleanup task should clear it and may itself be stuck | `bundle/cache/` state for old locks; `bundle/logs/task-manager/` for the cleanup task's runs around the window |
+| Tasks stuck in RUNNING long after activity stopped | Stale task entries surviving a worker crash/restart | `*.previous.log` restart evidence for the workers; task-manager log around the worker's death. Remediation to *recommend* (never run from analysis): the `infrahub-taskmanager` CLI can delete stale RUNNING tasks |
+| Data or repositories gone after a pod restart (K8s) | Storage persistence disabled in the deployment values | Restart evidence plus post-restart logs showing empty/initialized state where data existed before |
+| Artifact/storage errors only on multi-replica API servers | No shared object storage (S3-compatible) configured — replicas can't see each other's artifacts | Replica count under `bundle/logs/server/`; storage-backend errors appearing on some replicas but not others |
+
+When a pattern fits but its confirming evidence sits
+outside the bundle (Helm values, live pod listing,
+Redis lock listing), report the hypothesis with what
+the bundle *does* show and name the missing check as
+an open question for the user or the expert.
 
 ## GitHub issue search
 
@@ -137,20 +198,28 @@ traceback is unambiguous about it (e.g.
 
 ## Findings report shape
 
-One section per incident:
+Open the report with the deployment line, then one
+section per incident:
 
 ```markdown
+# Findings — <project/namespace> bundle (collected <ts>)
+
+Deployment: Infrahub <version>, <topology>,
+<replica counts>. Manifest: <collectors ok/failed>.
+
 ## Incident <n>: <one-line summary> (<severity>)
 
 - Window: <first signal> → <last signal>
 - Root: <error> — <bundle path>
   > <quoted excerpt, 1-3 lines>
 - Cascade: <downstream effects with paths>
-- Known issue: <matched issue URL + state, or
-  "no match (queries: ...)">
-- Open questions: <what this bundle cannot answer,
-  and which `infrahub-collect create` flags a next
-  bundle would need>
+- Known issue: <matched issue URL + state; when it
+  names a fix version, the comparison against the
+  running version — or "no match (queries: ...)">
+- Open questions: <what this bundle cannot answer;
+  whether the symptom reproduces on demand and when
+  it last did; which `infrahub-collect create` flags
+  a next bundle would need>
 - Recommendation: <next step — not executed here>
 ```
 

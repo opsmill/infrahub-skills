@@ -82,7 +82,7 @@ bundle, stop and hand off to
 `infrahub-collecting-diagnostics`; do not scrape
 `docker compose logs`/`kubectl logs` as a substitute.
 
-### 2. Read the manifest first
+### 2. Read the manifest first, then anchor the deployment context
 
 Read `bundle/bundle_information.json` before opening
 any log. It records what was collected, what failed,
@@ -91,6 +91,15 @@ findings in their own right — a service whose logs
 could not be collected is often the service that is
 down. See
 [rules/workflow-manifest-first.md](rules/workflow-manifest-first.md).
+
+Then establish the deployment context — running
+Infrahub version, topology (Compose or Kubernetes),
+replica counts — and open the report with it. The
+version is what later turns a matched GitHub issue
+into a conclusion ("already fixed in X.Y.Z —
+upgrade" vs "already running the fix — possible
+regression"). See
+[rules/workflow-deployment-context.md](rules/workflow-deployment-context.md).
 
 ### 3. Sweep for error signals
 
@@ -130,10 +139,16 @@ gh search issues --repo opsmill/infrahub --state all "<stable keywords>"
 ```
 
 Present the top matches with title, state, and URL.
-See
+When a match names a fix version, compare it against
+the deployment context from step 2 before drawing a
+conclusion. See
 [rules/match-stable-search-keys.md](rules/match-stable-search-keys.md)
 for key construction and fallbacks when `gh` is
-unavailable.
+unavailable, and [reference.md](reference.md) for
+the known failure patterns worth checking before
+searching — several common symptoms have
+well-understood causes that make the search targeted
+instead of generic.
 
 ### 6. Report findings
 
@@ -144,6 +159,10 @@ and any matching GitHub issues. Every claim must
 trace back to a quoted bundle line; unknowns are
 stated as unknowns
 ([rules/report-evidence-per-finding.md](rules/report-evidence-per-finding.md)).
+Include in the open questions whether the symptom
+reproduces on demand and when it last did — a
+reproduced timestamp sharpens the incident window
+and tells the next bundle what to capture.
 The report recommends next steps but applies none —
 no restarts, no config edits
 ([rules/scope-read-only-analysis.md](rules/scope-read-only-analysis.md)).
@@ -161,7 +180,11 @@ Close with the right hand-off for what was found:
 - Deeper expert help needed → the bundle plus this
   report go to OpsMill support, following the
   review-before-sharing gate from
-  `infrahub-collecting-diagnostics`.
+  `infrahub-collecting-diagnostics`. If the findings
+  suggest a reproducer is needed, propose a minimal
+  reproducible example first; a full backup
+  (`--include-backup`) is the last resort, not the
+  default ask.
 
 See
 [rules/cross-link-skill-boundaries.md](rules/cross-link-skill-boundaries.md).

@@ -45,6 +45,15 @@ def check_mentions_manifest(text: str, **_: object) -> CheckResult:
     return False, "no reference to bundle_information.json / manifest"
 
 
+def check_mentions_version(text: str, *, version: str = "", **_: object) -> CheckResult:
+    """The running Infrahub version from the bundle is stated in the report."""
+    if not version:
+        return False, "check_mentions_version requires version kwarg"
+    if version in text:
+        return True, f"states the running version {version}"
+    return False, f"running version {version} not stated in the report"
+
+
 def check_cites_bundle_evidence(text: str, **_: object) -> CheckResult:
     """Findings cite concrete bundle file paths as evidence."""
     if re.search(
@@ -166,6 +175,7 @@ def check_cross_link_reporting_issues(text: str, **_: object) -> CheckResult:
 
 CHECKS: dict[str, CheckFn] = {
     "mentions-manifest": check_mentions_manifest,
+    "mentions-version": check_mentions_version,
     "cites-bundle-evidence": check_cites_bundle_evidence,
     "restart-evidence": check_restart_evidence,
     "incident-grouping": check_incident_grouping,

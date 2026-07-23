@@ -49,6 +49,9 @@ specific errors.
 ```markdown
 # Findings — infrahub-prod bundle (collected 2026-07-18 14:11)
 
+Deployment: docker-compose project infrahub-prod,
+1 server / 1 task-worker replica; Infrahub version
+not captured in these excerpts — open question.
 Manifest: 3/4 log collectors succeeded.
 `logs/message-queue` collection failed ("container
 not running") — treated as finding, see Incident 1.
@@ -75,7 +78,9 @@ not running") — treated as finding, see Incident 1.
 - Open questions: what drove heap usage before
   14:02 — a next bundle with `--include-queries`
   and `--benchmark` would show active queries and
-  host sizing.
+  host sizing. Does the OOM reproduce under a
+  known workload, and when did it last occur? A
+  reproduced timestamp would sharpen the window.
 - Recommendation (not executed here): hand bundle +
   this report to OpsMill support; heap sizing is
   the likely conversation.

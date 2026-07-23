@@ -34,7 +34,13 @@ log scrape replaces a proper bundle.
   `infrahub-collecting-diagnostics`, naming the
   `create` flags the findings call for
   (`--include-queries`, `--benchmark`, ...). Never
-  scrape live logs from here.
+  scrape live logs from here. Treat
+  `--include-backup` as the last resort: it exists
+  so an expert can reproduce the problem locally,
+  and a minimal reproducible example (the specific
+  schema/objects/steps from the incident) serves
+  that goal with far less data exposure — recommend
+  the MRE first.
 - **User wants to file, or comment on a matched
   issue** → hand off to `infrahub-reporting-issues`
   with the incident summary and candidate issue

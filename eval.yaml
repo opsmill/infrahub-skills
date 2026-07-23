@@ -1818,6 +1818,70 @@ tasks:
       - name: no-mutating-commands
         check: Report includes no restart/delete/down commands
 
+  - name: analyzing-diagnostics-version-context
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: After a proposed-change merge crashed halfway yesterday, every new merge
+      on our Docker Compose deployment hangs. I collected a diagnostic bundle.
+      Analyze these excerpts, tell me whether this is a known Infrahub issue, and
+      write a findings report. Do NOT actually run any commands; include the exact
+      commands you would run in the report.
+
+      bundle/bundle_information.json: all collectors succeeded (docker-compose
+      project infrahub-prod, collected 2026-07-22 09:30).
+
+      bundle/logs/server/infrahub-server-1.log (startup banner, then the failure):
+      2026-07-21 08:00:03 INFO infrahub - Starting Infrahub 1.2.4
+      2026-07-21 16:41:22 ERROR infrahub.core.merge Traceback (most recent call last):
+        File "/usr/lib/python3.12/site-packages/infrahub/core/merge.py", line 210, in merge_branch
+      infrahub.exceptions.LockAcquisitionError: Timed out acquiring lock 'branch.merge.dc3-rollout-7f2e91aa'
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_version_context.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that opens with the deployment context (Infrahub 1.2.4,
+      docker-compose, from the startup banner), cites the bundle path for the
+      LockAcquisitionError traceback, proposes a `gh search issues --repo
+      opsmill/infrahub --state all` query from stable keys (exception class, lock
+      wording — the branch suffix stripped), notes that any matched issue's fix
+      version must be compared against 1.2.4 before advising an upgrade, stays
+      read-only, and hands filing off to infrahub-reporting-issues.
+    expectations:
+      - Opens the report with the running version 1.2.4 and the Compose topology
+      - References the manifest before the logs
+      - Cites bundle/logs/... paths as evidence
+      - Searches opsmill/infrahub issues with `gh search issues --state all`
+      - Search keys keep LockAcquisitionError but strip the volatile branch suffix
+      - Compares any matched fix version against the running 1.2.4
+      - No mutating commands, no direct `gh issue create`
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: mentions-version
+        check: Report states the running Infrahub version 1.2.4
+      - name: cites-bundle-evidence
+        check: Findings cite bundle/<service>/ file paths as evidence
+      - name: github-search
+        check: Report includes `gh search issues` against opsmill/infrahub
+      - name: search-state-all
+        check: Issue search uses `--state all` to cover closed issues
+      - name: search-keyword
+        check: Search keys include the stable exception class LockAcquisitionError
+      - name: search-excludes-token
+        check: Search keys strip the volatile branch suffix 7f2e91aa
+      - name: no-mutating-commands
+        check: Report includes no restart/delete/down commands
+      - name: no-direct-issue-filing
+        check: Report does not run `gh issue create`
+      - name: cross-link-reporting-issues
+        check: Report hands filing off to infrahub-reporting-issues
+
   # --- Generator Creator --- #
   - name: from-graphql-hydration-refactor
     trials: 3
