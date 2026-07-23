@@ -42,6 +42,18 @@ pulls an OpsMill benchmark image; if it can't be
 pulled (e.g. airgapped), the tool skips that step
 with a warning rather than failing the whole run.
 
+`--include-backup` is the last resort, not a
+default: a backup exists so an expert can reproduce
+the problem locally, and a minimal reproducible
+example usually serves that goal with far less data
+exposure — offer the MRE first, add the flag only
+when support explicitly asks. A restored backup also
+carries the original git repository connections, so
+whoever loads it must do so isolated from those
+remotes (or with credentials stripped) to keep a
+local instance from syncing against — and
+potentially writing to — the real repositories.
+
 The default output directory is `./infrahub_bundles`
 if `--output-dir` isn't set.
 

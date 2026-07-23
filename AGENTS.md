@@ -47,6 +47,7 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 | `infrahub-auditing-repo` | `skills/infrahub-auditing-repo/` | Audit repository against best practices (incl. YAGNI / cost-to-fix rules) |
 | `infrahub-reporting-issues` | `skills/infrahub-reporting-issues/` | Route and prepare bug/feature reports for any opsmill/infrahub-* repo |
 | `infrahub-collecting-diagnostics` | `skills/infrahub-collecting-diagnostics/` | Collect a redacted local diagnostic bundle via the infrahub-collect tool (logs, config, version, state) for OpsMill expert hand-off |
+| `infrahub-analyzing-diagnostics` | `skills/infrahub-analyzing-diagnostics/` | Analyze a collected diagnostic bundle: triage tracebacks/failures, correlate into incidents, match against existing GitHub issues |
 | `infrahub-importing-data` | `skills/infrahub-importing-data/` | Convert CSV/TSV inputs into Infrahub object YAML and load onto a fresh branch |
 
 ### Key Directories
