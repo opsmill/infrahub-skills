@@ -98,4 +98,18 @@ mandatory). For `kind: Parent` you have to set
 `optional: false` explicitly — leaving it unset
 triggers the error above.
 
+### A clean `schema check` does not prove the pairing
+
+The Parent-side validation above only fires on
+relationships declared `kind: Parent`. Model the child
+side as a plain `kind: Attribute` (many ↔ one) instead,
+and a fresh load passes `schema check` with no
+complaint — nothing asserts the child side *must* be
+`Parent`. A green check therefore confirms the YAML is
+well-formed, not that the ownership shape is right. Use
+this as a diagnosis aid, never as permission: when a
+check passes, still verify the Component side has a
+real `kind: Parent` inverse rather than assuming the
+shape is correct.
+
 Reference: [Infrahub Schema Docs](https://docs.infrahub.app)

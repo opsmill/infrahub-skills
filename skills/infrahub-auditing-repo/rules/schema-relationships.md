@@ -54,7 +54,7 @@ rejects it without explaining why.
 `identifier` (and `direction`, `branch`,
 `hierarchical`) cannot change once a relationship
 exists in the instance — `infrahubctl schema check`
-fails with `'not_supported': <Kind> <rel> None`. The
+fails with `'not_supported': <Kind> <relationship> None`. The
 usual cause is retrofitting an explicit identifier
 onto a relationship first loaded without one. When
 adding an inverse, reuse the forward side's existing
