@@ -1,0 +1,79 @@
+skills/infrahub-analyzing-diagnostics/rules/triage-benchmark-results.md
+  s_1851ae79a1e87d::t_125f5c0dd7cfa3 43-48
+  s_1851ae79a1e87d::t_1f9d99fc8f4ab6 63-73
+  s_1851ae79a1e87d::t_ca98c04b01b9c0 130-132
+skills/infrahub-analyzing-diagnostics/rules/_sections.md
+  s_1851ae79a1e87d::t_12a4c0d683df9b 30-31
+graders/analyzing-diagnostics/check_restart_correlation.py
+  s_1851ae79a1e87d::t_33da8f65802c1e 15-16
+skills/infrahub-analyzing-diagnostics/rules/scope-read-only-analysis.md
+  s_1851ae79a1e87d::t_54477d51ae208b 37-42
+skills/infrahub-analyzing-diagnostics/rules/cross-link-skill-boundaries.md
+  s_1851ae79a1e87d::t_fb1aad70eb8d00 59-60
+skills/infrahub-analyzing-diagnostics/examples.md
+  s_1851ae79a1e87d::t_3a930277c3bc8a 122
+  s_1851ae79a1e87d::t_187fcace162215 147-153
+  s_1851ae79a1e87d::t_b24087fa346e4f 76-77
+  s_1851ae79a1e87d::t_4c1facb5f9a67a 136-140
+skills/infrahub-collecting-diagnostics/SKILL.md
+  s_1851ae79a1e87d::t_e81bb99847e942 10-13
+skills/infrahub-analyzing-diagnostics/rules/match-stable-search-keys.md
+  s_1851ae79a1e87d::t_0cdf7ee706d5b4 82,87-89
+  s_1851ae79a1e87d::t_65c94fb6b839d0 46-51,54
+  s_1851ae79a1e87d::t_c37654e8b8d35e 95-99
+  s_1851ae79a1e87d::t_25adb027ef9b17 72,76-77
+skills/infrahub-analyzing-diagnostics/reference.md
+  s_1851ae79a1e87d::t_4e1fb5ac62e7bd 185
+  s_1851ae79a1e87d::t_e080e8c5e2e2e9 8,12-20,24
+  s_1851ae79a1e87d::t_fdfcd0da485529 119-124,143-146
+  s_1851ae79a1e87d::t_f6e49b0f894a62 200-202,205
+  s_1851ae79a1e87d::t_154466bc385b97 189
+  s_1851ae79a1e87d::t_00cfb551c945a5 53-54
+dev/guides/running-evals.md
+  s_1851ae79a1e87d::t_2d369662914c93 204
+skills/infrahub-analyzing-diagnostics/rules/workflow-deployment-context.md
+  s_1851ae79a1e87d::t_f3bc42c5354381 67-69
+  s_1851ae79a1e87d::t_2a38c33bb8133f 44-46
+  s_1851ae79a1e87d::t_8ad9cd50342bdf 78
+evaluations/infrahub-analyzing-diagnostics.json
+  s_1851ae79a1e87d::t_09ae14eac039d7 7,12,80-84,99,103,142,148,297,302-303,322,333-374
+  s_1851ae79a1e87d::t_23580b5e37fcc1 375-376
+eval.yaml
+  s_1851ae79a1e87d::t_a2bc797bdf88f2 2054-2057,2061-2062
+  s_1851ae79a1e87d::t_bbed12b9db977c 2073
+  s_1851ae79a1e87d::t_680e69453ad702 2079-2138
+  s_1851ae79a1e87d::t_8676ad0fb467a5 1851-1855,1860
+  s_1851ae79a1e87d::t_4d32816e573238 1683-1686,1690
+  s_1851ae79a1e87d::t_c0ee368bc5431a 1763-1765
+  s_1851ae79a1e87d::t_0d98031c5a50cc 1796-1798,1801
+graders/analyzing-diagnostics/lib.py
+  s_1851ae79a1e87d::t_1efc68f4deb09a 28-31,33-49,68-75,79-83,87-99,106-108,110-125,127,130,133-135,137-143,148-150,165-166,172-182,196-212,214-219,221-241,243-245,249-253,258-264,293,297-301,322-323,325,331-335,338-339,341,347-362,376,400-401
+  s_1851ae79a1e87d::t_15961c1b8945ad 50-67
+  s_1851ae79a1e87d::t_2c33c8180eadd7 144-147
+  s_1851ae79a1e87d::t_9da152572ea9ed 213
+  s_1851ae79a1e87d::t_a2932bc3866c68 132,136
+  s_1851ae79a1e87d::t_943f21ae883f0f 242
+  s_1851ae79a1e87d::t_a4f5758ed7f1d3 131
+skills/infrahub-analyzing-diagnostics/SKILL.md
+  s_1851ae79a1e87d::t_76ba9ddd3a9565 4-6
+  s_1851ae79a1e87d::t_2cf9ae9682672a 157,160-161
+  s_1851ae79a1e87d::t_9f65da9cd15266 162
+graders/analyzing-diagnostics/check_service_sweep.py
+  s_1851ae79a1e87d::t_df4e1af2f99f6c 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "59ee7114d26f92d6087a846f3e137922744d9e62",
+  "prompts": {},
+  "sessions": {
+    "s_1851ae79a1e87d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1646bbfa-bcf5-4571-b503-53e015b2fa60",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
