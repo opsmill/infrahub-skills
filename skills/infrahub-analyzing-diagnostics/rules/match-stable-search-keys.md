@@ -43,11 +43,15 @@ Extract from the root error (not cascade noise):
   (module or function name) when the message alone
   is too generic.
 
-Then search both open and closed issues — a closed
-match tells the user which version has the fix:
+Then search — the default `gh search issues`
+behavior covers open and closed issues, and a closed
+match tells the user which version has the fix. Do
+not pass `--state`: it only accepts `open` or
+`closed`, so any value narrows the search to half
+the answer (and `--state all` is rejected outright):
 
 ```bash
-gh search issues --repo opsmill/infrahub --state all "SchemaNotFoundError proposed change"
+gh search issues --repo opsmill/infrahub "SchemaNotFoundError proposed change"
 ```
 
 Run a second pass with synonyms if the first returns
@@ -65,30 +69,34 @@ Root error: SchemaNotFoundError ("Unable to find the
 schema 'CoreProposedChange' in the registry for
 branch 'atl-fix-vlans-0f3aa9c2'")
 
-gh search issues --repo opsmill/infrahub --state all "SchemaNotFoundError CoreProposedChange"
+gh search issues --repo opsmill/infrahub "SchemaNotFoundError CoreProposedChange"
 ```
 
 Branch name stripped; exception class and the schema
-kind (stable across users) kept.
+kind (stable across users) kept; no `--state` flag,
+so closed-and-fixed matches surface too.
 
 ### Non-compliant
 
 ```text
-gh search issues --repo opsmill/infrahub "Unable to find the schema 'CoreProposedChange' in the registry for branch 'atl-fix-vlans-0f3aa9c2'"
+gh search issues --repo opsmill/infrahub --state open "Unable to find the schema 'CoreProposedChange' in the registry for branch 'atl-fix-vlans-0f3aa9c2'"
 ```
 
 The branch name is unique to this deployment — the
 query can only match issues this same user already
-filed. `--state all` is also missing, so a
-closed-and-fixed match would be invisible.
+filed. And `--state open` hides closed issues, so a
+closed-and-fixed match — the best possible outcome —
+would be invisible.
 
 ### Common mistakes
 
 - Quoting the entire error message verbatim,
   volatile tokens included.
-- Searching open issues only — a closed match is the
-  best possible outcome (the fix exists; check the
-  version it shipped in).
+- Passing a `--state` flag: `--state open` hides the
+  best possible outcome (a closed match means the fix
+  exists — check the version it shipped in), and
+  `--state all` is not a valid value — `gh` rejects
+  it. The default already searches both states.
 - Building keys from a cascade error (`Connection
   refused`) instead of the root — generic symptoms
   match hundreds of unrelated issues.

@@ -1,9 +1,9 @@
 ---
 name: infrahub-analyzing-diagnostics
 description: >-
-  Analyze an already-collected infrahub-collect diagnostic bundle: parse the
-  manifest, triage tracebacks and failures across service logs, correlate
-  errors into incidents, and match findings against existing GitHub issues.
+  Analyze an already-collected infrahub-collect diagnostic bundle —
+  traceback and failure triage across service logs, incident correlation,
+  and known-issue matching against opsmill/infrahub GitHub issues.
   TRIGGER when: a diagnostic bundle exists (infrahub_bundles/, bundle/,
   bundle_information.json) and the user asks what's wrong, wants the logs
   or tracebacks analyzed, asks "what does this bundle say", wants errors
@@ -154,8 +154,11 @@ message, innermost Infrahub frame — variable IDs,
 branch names, and hostnames stripped) and search:
 
 ```bash
-gh search issues --repo opsmill/infrahub --state all "<stable keywords>"
+gh search issues --repo opsmill/infrahub "<stable keywords>"
 ```
+
+The default search covers open and closed issues —
+do not pass `--state`, which would hide one half.
 
 Present the top matches with title, state, and URL.
 When a match names a fix version, compare it against

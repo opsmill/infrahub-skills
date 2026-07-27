@@ -12,7 +12,6 @@ CHECKS = [
     "mentions-manifest",
     "cites-bundle-evidence",
     "github-search",
-    "search-state-all",
     ("search-keyword", {"keyword": "SchemaNotFoundError"}),
     ("search-excludes-token", {"token": "0f3aa9c2"}),
     "no-mutating-commands",

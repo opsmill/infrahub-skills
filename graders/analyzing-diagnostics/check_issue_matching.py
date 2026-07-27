@@ -11,7 +11,6 @@ from lib import run_checks  # noqa: E402
 CHECKS = [
     "cites-bundle-evidence",
     "github-search",
-    "search-state-all",
     ("search-keyword", {"keyword": "InitializationError"}),
     ("search-excludes-token", {"token": "acme"}),
     "no-direct-issue-filing",

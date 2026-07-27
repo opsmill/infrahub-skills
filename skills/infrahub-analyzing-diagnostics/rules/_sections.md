@@ -27,7 +27,8 @@
    search keys from the stable parts of a traceback
    (exception class, normalized message, innermost
    Infrahub frame); strip volatile tokens; search
-   `opsmill/infrahub` with `--state all`.
+   `opsmill/infrahub` across open and closed issues
+   (the `gh search issues` default — no `--state`).
 
 5. **Reporting (report-)** -- CRITICAL. Every finding
    cites a bundle path plus quoted excerpt; unknowns

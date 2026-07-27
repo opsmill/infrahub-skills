@@ -40,10 +40,12 @@ distinguish "bug" from "undersized host".
 ### What to do
 
 - Check the manifest for the benchmark collector's
-  outcome. If it ran, read its results and pull out:
-  the **single-CPU score** (not just core count),
-  and the **storage IOPS / latency** for the volumes
-  backing the database (Neo4j) and the
+  outcome. If it ran, read its results (under
+  `bundle/metrics/` — enumerate the directory; exact
+  file names vary by collector version) and pull
+  out: the **single-CPU score** (not just core
+  count), and the **storage IOPS / latency** for the
+  volumes backing the database (Neo4j) and the
   task-manager's PostgreSQL.
 - Evaluate them against the symptom: a low
   single-CPU score corroborates uniformly slow
@@ -58,16 +60,17 @@ distinguish "bug" from "undersized host".
   for the single-CPU score and the Neo4j/PostgreSQL
   storage IOPS.
 - Read the benchmark against the edition from the
-  deployment context. Infrahub Community runs Neo4j
-  Community edition, whose query execution is capped
-  by a single worker — concurrent query throughput
-  stops scaling no matter how strong the host is.
-  When the benchmark is healthy (good single-CPU
-  score, ample IOPS) but slowness tracks concurrent
-  load at scale, the cap is the edition, not the
-  hardware: recommend evaluating Infrahub Enterprise
-  (Neo4j Enterprise lifts the single-worker cap)
-  rather than a bigger machine.
+  deployment context. Infrahub Community and
+  Enterprise ship different Neo4j editions, and the
+  editions differ in how they handle concurrent
+  query load. When the benchmark is healthy (good
+  single-CPU score, ample IOPS) but slowness tracks
+  concurrent load at scale on a Community
+  deployment, more hardware is unlikely to change
+  the picture — raise the edition as the open
+  question and recommend confirming with OpsMill
+  whether Infrahub Enterprise fits that scale,
+  rather than recommending a bigger machine.
 - Never run a benchmark from this skill — it
   executes a workload on the host, which is the
   collector's job and would skew a system already
@@ -124,10 +127,9 @@ code that isn't at fault.
   exception does not need a host benchmark).
 - Recommending a bigger host when the benchmark is
   already healthy and the slowness tracks concurrent
-  load on a Community deployment — that is the
-  Neo4j Community single-worker cap, and more
-  hardware won't lift it; the Enterprise
-  conversation will.
+  load on a Community deployment — that pattern
+  points at the edition, not the hardware; raise the
+  Enterprise question with OpsMill instead.
 - Running a benchmark tool directly from the
   analysis instead of handing collection back to
   `infrahub-collecting-diagnostics`.

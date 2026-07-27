@@ -5,31 +5,23 @@ fields, and GitHub search recipes. The workflow in
 [SKILL.md](SKILL.md) links here for the exact
 commands at each step.
 
-## Bundle layout (recap)
+## Bundle layout
 
 The layout is produced by `infrahub-collect create`
 and documented authoritatively in
-[../infrahub-collecting-diagnostics/reference.md](../infrahub-collecting-diagnostics/reference.md):
-
-```text
-bundle/
-├── bundle_information.json   # manifest: what was collected, what failed
-├── logs/
-│   └── <service>/            # one file per replica
-│       └── *.previous.log    # present after container restarts
-├── database/
-├── message-queue/
-├── cache/
-├── task-worker/
-├── task-manager/
-├── server/
-└── metrics/
-```
+[../infrahub-collecting-diagnostics/reference.md](../infrahub-collecting-diagnostics/reference.md)
+— read it there rather than relying on a copy here.
+What analysis needs: `bundle_information.json` sits
+at the bundle root; per-service logs live under
+`bundle/logs/<service>/` (one file per replica,
+`*.previous.log` present after restarts); per-service
+state directories (`server/`, `database/`,
+`message-queue/`, `cache/`, `task-worker/`,
+`task-manager/`, `metrics/`) sit alongside `logs/`.
 
 Analysis order: `bundle_information.json` →
 `logs/*/` (including every `*.previous.log`) → the
-per-service state directories (`server/`,
-`database/`, ...) as findings demand.
+per-service state directories as findings demand.
 
 ## Manifest
 
@@ -58,8 +50,8 @@ in the report's first lines (see
   version newer than the running version → upgrade;
   running version already at/past the fix →
   unconfirmed match / possible regression. The
-  edition (Community vs Enterprise) drives
-  scale-related conclusions — see the edition cap
+  edition (Community vs Enterprise) matters for
+  scale-related findings — see the edition question
   under Benchmark results.
 - **Topology** — Compose project or K8s namespace,
   from the manifest. Several known failure patterns
@@ -124,9 +116,12 @@ below it belong to libraries).
 ## Benchmark results
 
 When the manifest shows `create --benchmark` ran,
-the bundle carries host benchmark results — evaluate
-them as evidence, not an afterthought (see
-[rules/triage-benchmark-results.md](rules/triage-benchmark-results.md)):
+the bundle carries host benchmark results under
+`bundle/metrics/` — enumerate that directory first;
+exact file names vary by collector version. Evaluate
+the results as evidence, not an afterthought (see
+[rules/triage-benchmark-results.md](rules/triage-benchmark-results.md)
+for the full reasoning):
 
 - **Single-CPU score** — graph traversals in Neo4j
   are largely single-core-bound; a low score caps
@@ -145,16 +140,10 @@ recommendation at sizing/storage rather than a
 GitHub search. No benchmark + performance symptom →
 the recommendations must include a next bundle with
 `--benchmark` via `infrahub-collecting-diagnostics`.
-
-**Healthy values + slowness under concurrent load →
-check the edition.** Infrahub Community runs Neo4j
-Community edition, whose query execution is capped
-by a single worker: concurrent throughput stops
-scaling regardless of host strength. On a Community
-deployment at scale, that pattern is the edition
-cap, not the hardware — recommend evaluating
-Infrahub Enterprise (Neo4j Enterprise lifts the
-cap) instead of a bigger machine.
+Healthy values + slowness under concurrent load →
+raise the edition question (Community vs Enterprise)
+rather than recommending more hardware — the rule
+has the full framing.
 
 ## Correlation heuristics
 
@@ -193,11 +182,11 @@ the report as more than a hypothesis.
 | ------- | ------------ | --------------------------- |
 | Triggers or computed attributes not firing (K8s) | Prefect background services not running — commonly disabled by hand-edited Helm values; the chart's env-var *list* is overridden wholesale by Helm, not merged | Manifest collector outcomes and `bundle/logs/task-manager/`: missing/empty background-service activity; no trigger-execution lines around the symptom window |
 | Merge or proposed-change crashes midway, later merges hang | Long-lived lock left behind (deadlock); the periodic cleanup task should clear it and may itself be stuck | `bundle/cache/` state for old locks; `bundle/logs/task-manager/` for the cleanup task's runs around the window |
-| Tasks stuck in RUNNING long after activity stopped | Stale task entries surviving a worker crash/restart | `*.previous.log` restart evidence for the workers; task-manager log around the worker's death. Remediation to *recommend* (never run from analysis): the `infrahub-taskmanager` CLI can delete stale RUNNING tasks |
+| Tasks stuck in RUNNING long after activity stopped | Stale task entries surviving a worker crash/restart | `*.previous.log` restart evidence for the workers; task-manager log around the worker's death. Remediation to *recommend* (never run from analysis): clean the stale RUNNING entries via the task-manager — the exact procedure depends on the deployment, so confirm it with OpsMill support |
 | Data or repositories gone after a pod restart (K8s) | Storage persistence disabled in the deployment values | Restart evidence plus post-restart logs showing empty/initialized state where data existed before |
 | Artifact/storage errors only on multi-replica API servers | No shared object storage (S3-compatible) configured — replicas can't see each other's artifacts | Replica count under `bundle/logs/server/`; storage-backend errors appearing on some replicas but not others |
 | Uniformly slow queries/UI with clean logs | Undersized host: low single-CPU score, or low-IOPS storage backing Neo4j/PostgreSQL (network-attached or burstable volumes) | Benchmark results when collected (`--benchmark`); if absent, the next bundle needs that flag before concluding anything |
-| Slowness that tracks concurrent load at scale, benchmark healthy (Community edition) | Neo4j Community's single-worker query execution caps concurrent throughput — more hardware won't lift it | Edition + version in the deployment context; healthy benchmark numbers; slowness correlating with user/automation concurrency. Recommendation: evaluate Infrahub Enterprise |
+| Slowness that tracks concurrent load at scale, benchmark healthy (Community edition) | Edition-level scaling difference (the Neo4j edition underneath differs between Infrahub Community and Enterprise) — more hardware is unlikely to change it | Edition + version in the deployment context; healthy benchmark numbers; slowness correlating with user/automation concurrency. Recommendation: raise the edition question and confirm the Enterprise fit with OpsMill |
 
 When a pattern fits but its confirming evidence sits
 outside the bundle (Helm values, live pod listing,
@@ -208,11 +197,12 @@ an open question for the user or the expert.
 ## GitHub issue search
 
 ```bash
-# Primary — both open and closed, stable keywords only
-gh search issues --repo opsmill/infrahub --state all "<ExceptionClass> <stable message words>"
+# Primary — stable keywords only; the default search
+# covers open and closed issues (do not pass --state)
+gh search issues --repo opsmill/infrahub "<ExceptionClass> <stable message words>"
 
 # Second pass — synonyms / alternate fragment
-gh search issues --repo opsmill/infrahub --state all "<module or symptom keywords>"
+gh search issues --repo opsmill/infrahub "<module or symptom keywords>"
 ```
 
 Key construction (see

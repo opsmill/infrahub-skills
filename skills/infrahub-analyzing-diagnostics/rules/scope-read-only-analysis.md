@@ -34,6 +34,12 @@ snapshot. The same boundary that makes
 - Put remediation in the report as
   *recommendations*, each grounded in a finding —
   for the user or OpsMill support to act on.
+- Write recommendations as prose descriptions of the
+  change, not as ready-to-paste mutation commands. A
+  runnable `docker compose restart ...` line in a
+  report reads as an instruction and tends to get
+  executed against the degraded system the bundle
+  was collected to protect.
 - If live-state questions come up mid-analysis
   ("is it still crashing *now*?"), answer from the
   bundle or mark as an open question. Do not run

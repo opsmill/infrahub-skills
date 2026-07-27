@@ -13,7 +13,6 @@ CHECKS = [
     ("mentions-version", {"version": "1.2.4"}),
     "cites-bundle-evidence",
     "github-search",
-    "search-state-all",
     ("search-keyword", {"keyword": "LockAcquisitionError"}),
     ("search-excludes-token", {"token": "7f2e91aa"}),
     "no-mutating-commands",

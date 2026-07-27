@@ -4,12 +4,12 @@
     {
       "id": 1,
       "prompt": "I collected a diagnostic bundle with infrahub-collect after our\nproposed-change UI started throwing 500s. Analyze these bundle excerpts and\nwrite a findings report, including how you would check whether this is a\nknown Infrahub issue. Do NOT actually run any commands; include the exact\ncommands you would run in the report.\n\nbundle/bundle_information.json:\n{\"deployment\": {\"type\": \"docker-compose\", \"project\": \"infrahub-prod\"},\n \"collectors\": [\n   {\"name\": \"logs/server\", \"status\": \"ok\"},\n   {\"name\": \"logs/database\", \"status\": \"ok\"},\n   {\"name\": \"logs/message-queue\", \"status\": \"failed\", \"error\": \"container not running\"}]}\n\nbundle/logs/server/infrahub-server-1.log:\n2026-07-20 09:14:52 ERROR infrahub.graphql Traceback (most recent call last):\n  File \"/usr/lib/python3.12/site-packages/infrahub/graphql/mutations/proposed_change.py\", line 142, in mutate\n  File \"/usr/lib/python3.12/site-packages/infrahub/core/registry.py\", line 88, in get_schema\ninfrahub.exceptions.SchemaNotFoundError: schema 'CoreProposedChange' not found on branch 'atl-fix-vlans-0f3aa9c2'",
-      "expected_output": "A findings report that reads the manifest first (flagging the failed message-queue collector as a finding), cites bundle paths as evidence for the SchemaNotFoundError traceback, proposes a `gh search issues --repo opsmill/infrahub --state all` query built from stable keys (exception class + schema kind, branch name stripped), stays read-only, and hands filing off to infrahub-reporting-issues.",
+      "expected_output": "A findings report that reads the manifest first (flagging the failed message-queue collector as a finding), cites bundle paths as evidence for the SchemaNotFoundError traceback, proposes a `gh search issues --repo opsmill/infrahub` query built from stable keys (exception class + schema kind, branch name stripped \u2014 the default search covers open and closed issues), stays read-only, and hands filing off to infrahub-reporting-issues.",
       "files": [],
       "expectations": [
         "Reads bundle_information.json first and treats the failed message-queue collector as a finding",
         "Cites bundle/logs/... paths as evidence for each finding",
-        "Searches opsmill/infrahub issues with `gh search issues --state all`",
+        "Searches opsmill/infrahub issues with `gh search issues`",
         "Search keys keep SchemaNotFoundError but strip the volatile branch name",
         "Recommends no deployment-mutating commands and does not run `gh issue create`",
         "Cross-links infrahub-reporting-issues for filing"
@@ -26,10 +26,6 @@
         {
           "name": "github-search",
           "check": "Report includes `gh search issues` against opsmill/infrahub"
-        },
-        {
-          "name": "search-state-all",
-          "check": "Issue search uses `--state all` to cover closed issues"
         },
         {
           "name": "search-keyword",
@@ -81,7 +77,11 @@
         },
         {
           "name": "incident-grouping",
-          "check": "Signals are correlated into an incident with root vs cascade"
+          "check": "Signals collapse into one incident whose root is anchored to a bundle path, with cascade distinguished"
+        },
+        {
+          "name": "severity-labels",
+          "check": "Each incident section carries a severity label"
         },
         {
           "name": "mentions-all",
@@ -96,11 +96,11 @@
     {
       "id": 3,
       "prompt": "Our task-workers will not start after an upgrade. In the diagnostic\nbundle I collected, every worker log ends with the traceback below. Is this\nalready a known Infrahub issue, and what should I do next? Do NOT actually\nrun any commands; write the exact commands and steps as a short report.\n\nbundle/logs/task-worker/task-worker-1.log:\nTraceback (most recent call last):\n  File \"/usr/local/lib/python3.12/site-packages/infrahub/workers/infrahub_async.py\", line 67, in setup\ninfrahub.exceptions.InitializationError: Unable to connect to the message broker at rabbitmq-7f9c4d.acme.net:5672",
-      "expected_output": "A report that cites the bundle path for the traceback, builds the GitHub search from stable keys (InitializationError + message-broker wording, the internal hostname stripped), searches opsmill/infrahub with `gh search issues --state all`, does not file anything itself, and hands any filing or commenting off to infrahub-reporting-issues.",
+      "expected_output": "A report that cites the bundle path for the traceback, builds the GitHub search from stable keys (InitializationError + message-broker wording, the internal hostname stripped), searches opsmill/infrahub with `gh search issues` (open and closed by default), does not file anything itself, and hands any filing or commenting off to infrahub-reporting-issues.",
       "files": [],
       "expectations": [
         "Cites bundle/logs/task-worker/... as evidence for the traceback",
-        "Searches opsmill/infrahub issues with `gh search issues --state all`",
+        "Searches opsmill/infrahub issues with `gh search issues`",
         "Search keys keep InitializationError but strip the internal broker hostname",
         "Does not run `gh issue create` or any deployment-mutating command",
         "Cross-links infrahub-reporting-issues for filing or commenting"
@@ -113,10 +113,6 @@
         {
           "name": "github-search",
           "check": "Report includes `gh search issues` against opsmill/infrahub"
-        },
-        {
-          "name": "search-state-all",
-          "check": "Issue search uses `--state all` to cover closed issues"
         },
         {
           "name": "search-keyword",
@@ -143,13 +139,13 @@
     {
       "id": 4,
       "prompt": "After a proposed-change merge crashed halfway yesterday, every new merge\non our Docker Compose deployment hangs. I collected a diagnostic bundle.\nAnalyze these excerpts, tell me whether this is a known Infrahub issue, and\nwrite a findings report. Do NOT actually run any commands; include the exact\ncommands you would run in the report.\n\nbundle/bundle_information.json: all collectors succeeded (docker-compose\nproject infrahub-prod, collected 2026-07-22 09:30).\n\nbundle/logs/server/infrahub-server-1.log (startup banner, then the failure):\n2026-07-21 08:00:03 INFO infrahub - Starting Infrahub 1.2.4\n2026-07-21 16:41:22 ERROR infrahub.core.merge Traceback (most recent call last):\n  File \"/usr/lib/python3.12/site-packages/infrahub/core/merge.py\", line 210, in merge_branch\ninfrahub.exceptions.LockAcquisitionError: Timed out acquiring lock 'branch.merge.dc3-rollout-7f2e91aa'",
-      "expected_output": "A findings report that opens with the deployment context (Infrahub 1.2.4, docker-compose, from the startup banner), cites the bundle path for the LockAcquisitionError traceback, proposes a `gh search issues --repo opsmill/infrahub --state all` query from stable keys (exception class, lock wording \u2014 the branch suffix stripped), notes that any matched issue's fix version must be compared against 1.2.4 before advising an upgrade, stays read-only, and hands filing off to infrahub-reporting-issues.",
+      "expected_output": "A findings report that opens with the deployment context (Infrahub 1.2.4, docker-compose, from the startup banner), cites the bundle path for the LockAcquisitionError traceback, proposes a `gh search issues --repo opsmill/infrahub` query from stable keys (exception class, lock wording \u2014 the branch suffix stripped; the default search covers open and closed issues), notes that any matched issue's fix version must be compared against 1.2.4 before advising an upgrade, stays read-only, and hands filing off to infrahub-reporting-issues.",
       "files": [],
       "expectations": [
         "Opens the report with the running version 1.2.4 and the Compose topology",
         "References the manifest before the logs",
         "Cites bundle/logs/... paths as evidence",
-        "Searches opsmill/infrahub issues with `gh search issues --state all`",
+        "Searches opsmill/infrahub issues with `gh search issues`",
         "Search keys keep LockAcquisitionError but strip the volatile branch suffix",
         "Compares any matched fix version against the running 1.2.4",
         "No mutating commands, no direct `gh issue create`"
@@ -170,10 +166,6 @@
         {
           "name": "github-search",
           "check": "Report includes `gh search issues` against opsmill/infrahub"
-        },
-        {
-          "name": "search-state-all",
-          "check": "Issue search uses `--state all` to cover closed issues"
         },
         {
           "name": "search-keyword",
@@ -302,13 +294,13 @@
     {
       "id": 8,
       "prompt": "We run Infrahub at scale \u2014 around 200 concurrent automation clients.\nDuring business hours everything slows to a crawl, but off-hours a single\nrequest is fast. We already sized up the host once and it changed nothing.\nI collected a bundle with the benchmark included. Analyze these excerpts\nand write a findings report. Do NOT actually run any commands.\n\nbundle/bundle_information.json: all collectors succeeded, including the\nhost benchmark (docker-compose project infrahub-prod, collected 2026-07-23).\n\nbundle/logs/server/infrahub-server-1.log (startup banner, then load-time entries):\n2026-07-20 06:00:02 INFO infrahub - Starting Infrahub Community 1.3.0\n2026-07-23 09:58:11 WARNING infrahub.graphql query DeviceList took 11205 ms\n2026-07-23 21:14:40 INFO infrahub.graphql query DeviceList took 190 ms\n\nbundle/metrics/benchmark.json (from `infrahub-collect create --benchmark`):\n{\"cpu\": {\"cores\": 16, \"single_core_score\": 1985},\n \"storage\": {\"database_volume\": {\"randread_iops\": 46500, \"latency_ms\": 0.4}}}",
-      "expected_output": "A findings report that reads the healthy benchmark (single-CPU 1985, 46500 IOPS) as ruling out a host-bound cause, notes the deployment runs the Community edition, attributes the concurrency-shaped slowness to Neo4j Community's single-worker query execution, and recommends evaluating Infrahub Enterprise for this scale instead of more hardware.",
+      "expected_output": "A findings report that reads the healthy benchmark (single-CPU 1985, 46500 IOPS) as ruling out a host-bound cause, notes the deployment runs the Community edition, raises the edition as the open question for concurrency-shaped slowness on a healthy host, and recommends confirming with OpsMill whether Infrahub Enterprise fits this scale instead of buying more hardware.",
       "files": [],
       "expectations": [
         "Opens with the deployment context including the Community edition",
         "Evaluates the benchmark and concludes the host is healthy, not undersized",
-        "Attributes load-correlated slowness to the Community single-worker cap",
-        "Recommends evaluating Infrahub Enterprise rather than a bigger host",
+        "Ties the load-correlated slowness to the edition question rather than the hardware",
+        "Recommends confirming the Enterprise fit with OpsMill rather than a bigger host",
         "Cites bundle/metrics/... and bundle/logs/... paths as evidence",
         "Runs no deployment-mutating commands and files no issue"
       ],
@@ -327,7 +319,7 @@
         },
         {
           "name": "edition-cap",
-          "check": "Report explains the Community single-worker cap and raises Enterprise"
+          "check": "Report ties load-correlated slowness to the edition question and raises Enterprise/OpsMill"
         },
         {
           "name": "no-mutating-commands",
@@ -336,6 +328,50 @@
         {
           "name": "no-direct-issue-filing",
           "check": "Report does not run `gh issue create`"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Users report that saving changes in the Infrahub UI intermittently\nfails with a spinner that never finishes. The server must be broken. I\ncollected a diagnostic bundle. Analyze these excerpts and write a\nfindings report. Do NOT actually run any commands.\n\nbundle/bundle_information.json: all collectors succeeded (docker-compose\nproject infrahub-prod, collected 2026-07-25 10:40).\n\nbundle/logs/server/infrahub-server-1.log (representative; no ERROR lines all day):\n2026-07-25 10:11:58 WARNING infrahub.graphql query DeviceList took 2874 ms\n2026-07-25 10:19:41 WARNING infrahub.graphql query BranchList took 3105 ms\n\nbundle/logs/message-queue/message-queue-1.log:\n2026-07-25 10:11:52 ERROR memory resource limit alarm set on node rabbit@mq-1\n2026-07-25 10:11:52 ERROR publishers will be blocked until this alarm clears\n\nbundle/logs/task-worker/task-worker-1.log:\n2026-07-25 10:12:07 ERROR ... timed out waiting for reply on rpc queue (attempt 3/12)",
+      "expected_output": "A findings report that sweeps every service instead of anchoring on the server the user blamed: the root is the message-queue memory alarm blocking publishers (bundle/logs/message-queue/), with the task-worker rpc timeouts and the intermittent UI saves as cascade; the benign server WARNINGs are not promoted to a root cause. One correlated incident with severity, every claim cited to a bundle path.",
+      "files": [],
+      "expectations": [
+        "Sweeps all services in the bundle, not just the server the user blamed",
+        "Attributes the root to the message-queue memory alarm, citing bundle/logs/message-queue/",
+        "Treats the task-worker rpc timeouts and failed UI saves as cascade of the alarm",
+        "Does not promote the server's slow-query WARNINGs to the root cause",
+        "Correlates into a single incident with a severity label",
+        "Runs no deployment-mutating commands"
+      ],
+      "assertions": [
+        {
+          "name": "mentions-manifest",
+          "check": "Report references bundle_information.json / the manifest"
+        },
+        {
+          "name": "cites-bundle-evidence",
+          "check": "Findings cite bundle/<service>/ file paths as evidence"
+        },
+        {
+          "name": "root-service",
+          "check": "The incident root is attributed to the message-queue"
+        },
+        {
+          "name": "mentions-all",
+          "check": "Report covers server, message-queue, and task-worker"
+        },
+        {
+          "name": "incident-grouping",
+          "check": "Signals correlate into at most two incidents with root anchored to a bundle path"
+        },
+        {
+          "name": "severity-labels",
+          "check": "Each incident section carries a severity label"
+        },
+        {
+          "name": "no-mutating-commands",
+          "check": "Report includes no restart/delete/down commands"
         }
       ]
     }

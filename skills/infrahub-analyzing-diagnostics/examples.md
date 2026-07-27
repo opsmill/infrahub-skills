@@ -73,8 +73,8 @@ not running") — treated as finding, see Incident 1.
     message-queue log to confirm.
 - Known issue: no exact match.
   Queries tried: `gh search issues --repo
-  opsmill/infrahub --state all "OutOfMemoryError
-  neo4j heap"`; second pass "database OOM".
+  opsmill/infrahub "OutOfMemoryError neo4j heap"`;
+  second pass "database OOM".
 - Open questions: what drove heap usage before
   14:02 — a next bundle with `--include-queries`
   and `--benchmark` would show active queries and
@@ -119,7 +119,7 @@ Stable parts: exception class
 deployment).
 
 ```bash
-gh search issues --repo opsmill/infrahub --state all "SchemaNotFoundError CoreProposedChange"
+gh search issues --repo opsmill/infrahub "SchemaNotFoundError CoreProposedChange"
 ```
 
 ### Findings report (excerpt)
@@ -133,18 +133,21 @@ gh search issues --repo opsmill/infrahub --state all "SchemaNotFoundError CorePr
   > 'CoreProposedChange' in the registry for branch '...'
   Raised from infrahub/core/registry.py via
   graphql/mutations/proposed_change.py.
-- Known issue: opsmill/infrahub#4102 (closed —
-  fixed in 1.1.6) matches the traceback. Server here
-  runs 1.1.3 (bundle/server/): upgrading past 1.1.6
-  should resolve it.
+- Known issue: opsmill/infrahub#NNNN (closed —
+  fixed in 1.1.6; issue number illustrative) matches
+  the traceback. Server here runs 1.1.3
+  (bundle/server/): upgrading past 1.1.6 should
+  resolve it.
 - Next step: if you want to confirm on the issue or
   add your reproduction, continue with
   infrahub-reporting-issues — this analysis does not
   post to GitHub.
 ```
 
-The closed match is the payoff of `--state all`:
-the answer is "already fixed, upgrade", not a new
-issue. Version evidence comes from the bundle
-(`bundle/server/`), and the hand-off names the
-sibling skill instead of running `gh issue create`.
+The closed match is the payoff of covering closed
+issues — which the default `gh search issues`
+behavior already does: the answer is "already fixed,
+upgrade", not a new issue. Version evidence comes
+from the bundle (`bundle/server/`), and the hand-off
+names the sibling skill instead of running
+`gh issue create`.

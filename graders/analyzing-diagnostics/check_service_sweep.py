@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Grader for the restart-correlation findings-report eval."""
+"""Grader for the non-server service-sweep findings-report eval."""
 from __future__ import annotations
 import json
 import sys
@@ -11,10 +11,10 @@ from lib import run_checks  # noqa: E402
 CHECKS = [
     "mentions-manifest",
     "cites-bundle-evidence",
-    "restart-evidence",
-    ("incident-grouping", {"max_incidents": 1}),
+    ("root-service", {"service": "message-queue"}),
+    ("mentions-all", {"terms": "server,message-queue,task-worker"}),
+    ("incident-grouping", {"max_incidents": 2}),
     "severity-labels",
-    ("mentions-all", {"terms": "database,server,task-worker,14:02"}),
     "no-mutating-commands",
 ]
 

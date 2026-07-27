@@ -41,9 +41,9 @@ first lines, not reverse-engineered from log paths.
   startup banner. If either cannot be determined,
   say so explicitly rather than guessing. The
   edition matters for performance findings:
-  Community's database layer is capped by Neo4j
-  Community's single-worker execution, so
-  scale-related conclusions differ by edition.
+  Community and Enterprise ship different Neo4j
+  editions with different concurrent-load behavior,
+  so scale-related conclusions differ by edition.
 - Extract topology (Compose project vs K8s
   namespace) from the manifest, and replica counts
   from the per-replica log files under
@@ -64,8 +64,9 @@ Deployment: Infrahub 1.2.4, docker-compose project
 infrahub-prod, 1 server / 2 task-worker replicas
 (bundle/bundle_information.json, bundle/server/).
 
-Known issue: #5710 (closed — fixed in 1.2.2) looks
-similar, but this deployment already runs 1.2.4, so
+Known issue: #NNNN (closed — fixed in 1.2.2; issue
+number illustrative) looks similar, but this
+deployment already runs 1.2.4, so
 the match is unconfirmed — possibly a regression;
 worth noting in the hand-off rather than advising an
 upgrade.
@@ -74,7 +75,7 @@ upgrade.
 ### Non-compliant
 
 ```text
-Found closed issue #5710 (fixed in 1.2.2) matching
+Found closed issue #NNNN (fixed in 1.2.2) matching
 the traceback — upgrade to fix it.
 ```
 

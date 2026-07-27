@@ -56,7 +56,8 @@ log scrape replaces a proper bundle.
 ### Compliant
 
 ```text
-Incident 1 matches open issue opsmill/infrahub#5891.
+Incident 1 matches open issue opsmill/infrahub#NNNN
+(issue number illustrative).
 To add your reproduction as a comment, continue with
 infrahub-reporting-issues — it will keep the comment
 sanitized (versions + OS only). This report + bundle
