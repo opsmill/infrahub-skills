@@ -835,6 +835,46 @@ def check_explains_default_branch_risk_or_review(schema: dict, *, raw_text: str 
 # Check registry
 # ---------------------------------------------------------------------------
 
+def check_inverse_reuses_forward_identifier(schema: dict, **_: Any) -> tuple[bool, str]:
+    """The added inverse reuses the pre-existing forward identifier verbatim.
+
+    The task seeds an existing forward relationship whose identifier is the
+    auto-generated-looking ``dcimdevice__dciminterface``. Adding the inverse
+    must reuse that exact string on both sides. Inventing a fresh identifier
+    (e.g. ``device__interfaces``) and renaming the forward side to match is
+    the antipattern this check guards against — a rename fails on a live
+    instance with ``not_supported`` because the identifier is immutable.
+    ``check_matching_identifiers`` cannot catch it: it passes as long as both
+    sides agree, even when both were renamed to an invented value.
+    """
+    expected = "dcimdevice__dciminterface"
+    all_items = _all_nodes(schema) + _all_generics(schema)
+
+    link_idents: set[str] = set()
+    inverse_found = False
+    for node in all_items:
+        for rel in _all_rels(node):
+            peer = rel.get("peer", "")
+            name = rel.get("name", "")
+            # Relationships that form the Device <-> Interface link.
+            if peer.startswith("Dcim") and ("Device" in peer or "Interface" in peer):
+                ident = rel.get("identifier")
+                if ident:
+                    link_idents.add(ident)
+                if name == "device":
+                    inverse_found = True
+
+    if not inverse_found:
+        return False, "No inverse 'device' relationship was added on the interface side"
+    if link_idents != {expected}:
+        return False, (
+            f"Device/Interface identifiers must reuse '{expected}' verbatim; "
+            f"found {sorted(link_idents)} — inventing a new identifier and renaming "
+            "the forward side is the antipattern (immutable identifier)"
+        )
+    return True, f"Inverse reuses the forward identifier '{expected}' verbatim"
+
+
 CHECKS: dict[str, Any] = {
     "attr-min-length": check_attr_min_length,
     "dropdown-for-status": check_dropdown_for_status,
@@ -844,6 +884,7 @@ CHECKS: dict[str, Any] = {
     "display-label-singular": check_display_label_singular,
     "schema-version": check_schema_version,
     "matching-identifiers": check_matching_identifiers,
+    "inverse-reuses-forward-identifier": check_inverse_reuses_forward_identifier,
     "hierarchical-generic": check_hierarchical_generic,
     "inherit-from-generic": check_inherit_from_generic,
     "root-no-parent": check_root_no_parent,

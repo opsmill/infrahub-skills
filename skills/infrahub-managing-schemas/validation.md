@@ -153,6 +153,26 @@ Bidirectional relationships need matching identifiers:
   identifier: "device__interface"    # Must match
 ```
 
+### `'not_supported': <Kind> <relationship> None`
+
+`identifier`, `direction`, `branch`, and
+`hierarchical` are immutable once a relationship
+exists in the instance — changing any of them is
+rejected, one entry per affected side:
+
+```text
+Unable to load the schema:
+  'not_supported': IpamL2Domain vlans None, 'not_supported': IpamVLAN l2domain None
+```
+
+The usual trigger is retrofitting an explicit
+`identifier` onto a relationship first loaded without
+one. Reuse the existing identifier (or remove + re-add
+the relationship to change it). See
+[relationship-identifiers](./rules/relationship-identifiers.md)
+for how to recover the loaded value and the full
+field-mutability table.
+
 ### "Uniqueness constraint references unknown field"
 
 Use `__value` suffix for attributes in constraints:
@@ -211,7 +231,17 @@ Just add the node definition. No migration needed.
 ### Adding a Relationship
 
 Add the relationship to the schema. For bidirectional
-relationships, add both sides with matching `identifier`.
+relationships, add both sides with matching
+`identifier`. Set the `identifier` you want on this
+first load — it is immutable afterward. If you omit
+it, Infrahub derives one per side from that side's
+`(kind, peer)` sorted and lowercased (e.g.
+`ipaml2domain__ipamvlan`), and you are then stuck with
+that value (changing it later fails with
+`not_supported`). When adding an
+inverse to a relationship that already exists, reuse
+the existing side's `identifier` verbatim rather than
+inventing a new one.
 
 ### Changing Attribute Type
 
@@ -285,6 +315,7 @@ Before running `infrahubctl schema check`, verify:
       [validation-string-limits](./rules/validation-string-limits.md))
 - [ ] All relationship `peer` values use full kind (namespace + name)
 - [ ] All bidirectional relationships have matching `identifier` on both sides
+- [ ] No existing relationship's immutable fields (`identifier`, `direction`, `branch`, `hierarchical`) are being changed — see [relationship-identifiers](./rules/relationship-identifiers.md)
 - [ ] All Component relationships have a matching Parent on the other node
 - [ ] All hierarchical nodes inherit from a generic with `hierarchical: true`
 - [ ] Root hierarchical nodes have `parent: null`

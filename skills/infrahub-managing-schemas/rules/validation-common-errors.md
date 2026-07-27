@@ -60,6 +60,16 @@ Missing namespace in peer reference. See the
 Bidirectional relationship identifiers don't match. See the
 [relationship-identifiers](./relationship-identifiers.md) rule.
 
+### "'not_supported': <Kind> <relationship> None"
+
+An immutable relationship field (`identifier`,
+`direction`, `branch`, `hierarchical`) is being changed
+on a relationship that already exists — usually
+retrofitting an explicit `identifier` onto one first
+loaded without it. Reuse the existing identifier, or
+remove + re-add the relationship. See the
+[relationship-identifiers](./relationship-identifiers.md) rule.
+
 ### "Relationship of type parent must not be optional"
 
 A relationship with `kind: Parent` has `optional: true`
