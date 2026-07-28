@@ -26,6 +26,12 @@ marketplace.
 
 ## Fetching (infrahubctl first)
 
+> **Requires infrahub-sdk ≥ 1.22.2** for the discovery commands
+> (`list` / `search` / `show`); `marketplace get` needs ≥ 1.21.0. If a
+> command fails with `No such command 'marketplace'`, the installed SDK
+> is too old — upgrade it, or browse the web catalog at
+> <https://marketplace.infrahub.app/>.
+
 Prefer `infrahubctl` wherever it exposes the capability. The CLI is the
 fetch path:
 

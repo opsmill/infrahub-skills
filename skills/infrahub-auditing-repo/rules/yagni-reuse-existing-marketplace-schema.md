@@ -19,17 +19,17 @@ domain's core nodes from scratch with **no** `infrahubctl marketplace
 get` provenance and **no** `inherit_from` of a marketplace-published
 generic.
 
-Before building *any* schema, the whole marketplace should be searched
-for a published schema covering that domain — not just the handful
-below. The marketplace publishes far more than these examples (routing,
-compute, security, VLAN translation, cross-connects, and many more), so
-whenever a match exists **no modelling is needed** — reuse it. The
-marketplace is the single source of truth for reusable schemas; do
-**not** pull schemas from GitHub repositories.
+Detection is an **offline signature heuristic**: it matches the repo's
+local schema files against the static table of common
+marketplace-published domains below. It deliberately does *not* call the
+marketplace, so an audit produces identical results on any machine,
+online or airgapped. The trade-off is that it only catches the domains
+in this table — the broader "search the whole marketplace before
+modelling anything" discipline is authoring guidance, applied when
+schemas are written (managing-schemas workflow step 2), not at audit
+time.
 
-Common marketplace-published domains (illustrative only — a small slice
-of the catalog; always search the whole marketplace for whatever you
-are about to build):
+Common marketplace-published domains (the audit-time signature set):
 
 | Domain | Signature nodes/attributes |
 | ------ | -------------------------- |
@@ -59,42 +59,38 @@ schema after objects exist forces a migration.
 
 ## The fix
 
-1. Search the whole marketplace for the domain:
-   `infrahubctl marketplace search <term>` (or `list`), and note its
-   `namespace/name`.
-2. Pull it: `infrahubctl marketplace get <namespace>/<name>`.
-3. `inherit_from` the pulled generics, adding only genuinely new,
-   site-specific attributes.
+Reuse the published schema instead of redefining it: pull it with
+`infrahubctl marketplace get <namespace>/<name>`, then `inherit_from`
+the pulled generics and add only genuinely new, site-specific
+attributes. Reuse still leaves the site-specific modelling to do — it
+replaces re-deriving the domain's core, not every schema decision.
 
-CLI flags, discovery (`list` / `search` / `show`), collections, and
-the airgap fallback (`--marketplace-url` internal mirror) are
-documented once in
+Discovery (`list` / `search` / `show`), CLI flags, collections, and the
+airgap fallback (`--marketplace-url` internal mirror) are documented
+once in
 [../../infrahub-common/marketplace-reference.md](../../infrahub-common/marketplace-reference.md)
 — consult it rather than re-deriving usage here. Two constants worth
 repeating: reuse only from the marketplace (never a GitHub checkout),
 and an unreachable marketplace is a fallback path (mirror, then custom
 schema), never a reason to block schema work.
 
-Detection relies only on local schema files matched against the static
-domain list above — no network call — so audits produce identical
-results offline.
-
 ## Checks
 
 1. A schema defines ≥2 signature nodes of a marketplace-published
-   domain (e.g. `Device` + `Interface`, or `Region` + `Site`) with no
-   `infrahubctl marketplace get` provenance and no `inherit_from`
-   referencing a marketplace-published generic anywhere in the file.
+   domain from the table above (e.g. `Device` + `Interface`, or
+   `Region` + `Site`) with no `infrahubctl marketplace get` provenance
+   and no `inherit_from` referencing a marketplace-published generic
+   anywhere in the file.
 2. A custom domain node duplicating a published schema's node
-   (name + a handful of the same attributes) without inheritance.
+   (name + ≥3 of the same attribute names) without inheritance.
 
 ## What NOT to flag
 
 - Schemas pulled via `infrahubctl marketplace get` and extended with
   `inherit_from` (the pattern we want) — even if they add many custom
   attributes.
-- Genuinely novel domains with no marketplace equivalent (search the
-  whole marketplace first to be sure).
+- Domains outside the signature table above — the offline heuristic has
+  no signature for them, so it stays silent rather than guessing.
 - A single incidental node that happens to share a name (e.g. one
   `Site` node in an otherwise unrelated schema) — the rule needs a
   domain footprint (≥2 signature nodes), not a name collision.

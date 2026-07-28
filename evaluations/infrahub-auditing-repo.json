@@ -318,20 +318,20 @@
     },
     {
       "id": 11,
-      "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this schema (schemas/dcim.yml). It hand-rolls a full DCIM\ndomain (Device, Interface, Rack) from scratch, with no\n`infrahubctl marketplace get` provenance for the DCIM schema\npublished on the Infrahub Marketplace.\n\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: Device\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: serial, kind: Text, optional: true}\n    relationships:\n      - name: interfaces\n        peer: DcimInterface\n        cardinality: many\n        kind: Component\n        identifier: device__interfaces\n      - name: rack\n        peer: DcimRack\n        cardinality: one\n        kind: Attribute\n        identifier: device__rack\n  - name: Interface\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: speed, kind: Number, optional: true}\n  - name: Rack\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: height, kind: Number, optional: true}\n```\n\nSave ONLY the JSON findings to: output.json",
-      "expected_output": "JSON listing one yagni-reuse-existing-marketplace-schema finding with severity MEDIUM and ladder_step 1. The replacement should recommend `infrahubctl marketplace get` of the DCIM schema and inheriting from its generics rather than hand-rolling. Airgap note: an unreachable marketplace is a fallback (--marketplace-url pointing at an internal marketplace mirror), not a reason to skip reuse.",
+      "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit these two schema files:\n\nschemas/dcim.yml:\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: Device\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: serial, kind: Text, optional: true}\n    relationships:\n      - name: interfaces\n        peer: DcimInterface\n        cardinality: many\n        kind: Component\n        identifier: device__interfaces\n      - name: rack\n        peer: DcimRack\n        cardinality: one\n        kind: Attribute\n        identifier: device__rack\n  - name: Interface\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: speed, kind: Number, optional: true}\n  - name: Rack\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: height, kind: Number, optional: true}\n```\n\nschemas/location.yml:\n```yaml\n# Pulled with: infrahubctl marketplace get infrahub/location\nversion: \"1.0\"\nnodes:\n  - name: Region\n    namespace: Location\n    inherit_from: [LocationGeneric]\n    attributes:\n      - {name: name, kind: Text}\n  - name: Site\n    namespace: Location\n    inherit_from: [LocationGeneric]\n    attributes:\n      - {name: name, kind: Text}\n      - {name: facility_code, kind: Text, optional: true}\n```\n\nSave ONLY the JSON findings to: output.json",
+      "expected_output": "JSON listing exactly one yagni-reuse-existing-marketplace-schema finding, attributed to schemas/dcim.yml, with severity MEDIUM and ladder_step 1. schemas/location.yml must NOT be flagged \u2014 it is pulled via `infrahubctl marketplace get` and inherits from a marketplace generic, which is the reuse pattern the rule wants. The replacement should recommend `infrahubctl marketplace get` of the DCIM schema and inheriting from its generics rather than hand-rolling.",
       "files": [],
       "expectations": [
         "Output is JSON with a findings array (or an object with a findings key)",
-        "Contains a yagni-reuse-existing-marketplace-schema finding",
+        "A yagni-reuse-existing-marketplace-schema finding is emitted for schemas/dcim.yml",
         "That finding has severity MEDIUM and ladder_step 1",
-        "No yagni finding exceeds MEDIUM severity",
-        "The replacement recommends infrahubctl marketplace get and inheriting, not hand-rolling"
+        "schemas/location.yml is NOT flagged (marketplace-pulled + inherit_from is the wanted pattern)",
+        "No yagni finding exceeds MEDIUM severity"
       ],
       "assertions": [
         {
           "name": "finding-present",
-          "check": "A yagni-reuse-existing-marketplace-schema finding is emitted"
+          "check": "A yagni-reuse-existing-marketplace-schema finding is emitted for the hand-rolled DCIM schema"
         },
         {
           "name": "correct-severity",
@@ -340,6 +340,10 @@
         {
           "name": "correct-ladder-step",
           "check": "The yagni-reuse-existing-marketplace-schema finding has ladder_step 1"
+        },
+        {
+          "name": "carve-out-respected",
+          "check": "schemas/location.yml (marketplace-pulled + inherit_from) is not flagged"
         },
         {
           "name": "severity-cap",

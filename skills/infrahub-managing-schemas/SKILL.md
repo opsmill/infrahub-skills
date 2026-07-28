@@ -138,23 +138,15 @@ Follow these steps when creating or modifying a schema:
 1. **Gather requirements** — Identify the node types,
    their attributes, and how they relate to each other.
    Ask about hierarchies, dropdowns, and display needs.
-2. **Check the marketplace first** — Before building *any*
-   domain from scratch, search the whole Infrahub
-   Marketplace for a published schema that covers it, and
-   reuse it rather than re-deriving the model — if one
-   exists, no modelling is needed. Fetch with the CLI —
-   `infrahubctl marketplace get <namespace>/<name>` — and
-   `inherit_from` the result, adding only site-specific
-   attributes. For several related domains at once, pull a
-   collection (`-c`, e.g. `infrahub/routing-bgp`,
-   `infrahub/base-schemas`) instead of one schema at a
-   time. Full command reference, discovery with
-   `infrahubctl marketplace list` / `search` / `show`, and
-   airgap fallback (`--marketplace-url` internal mirror) are in
+2. **Check the marketplace first** — Before modelling
+   *any* domain from scratch, search the whole Infrahub
+   Marketplace and reuse a published schema when one
+   covers it: `infrahubctl marketplace get
+   <namespace>/<name>`, then `inherit_from` the pulled
+   generics and add only site-specific attributes.
+   Discovery, collections (`-c`), the airgap fallback,
+   and the required SDK version live in
    [../infrahub-common/marketplace-reference.md](../infrahub-common/marketplace-reference.md).
-   The auditor flags a hand-rolled domain the marketplace
-   already ships — see
-   [../infrahub-auditing-repo/rules/yagni-reuse-existing-marketplace-schema.md](../infrahub-auditing-repo/rules/yagni-reuse-existing-marketplace-schema.md).
 3. **Read relevant rules** — Read
    [rules/naming-conventions.md](./rules/naming-conventions.md)
    for naming constraints,

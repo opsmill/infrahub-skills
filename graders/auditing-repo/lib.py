@@ -125,7 +125,10 @@ def check_yagni_finding_ladder_step(
     if f is None:
         return False, f"{rule} missing — cannot check ladder_step"
     actual = f.get("ladder_step")
-    if actual == expected:
+    # Compare as strings so an int expected value matches a model that
+    # emits the step as a string ("1") or an int (1) — otherwise a
+    # correct finding false-fails on the type mismatch.
+    if str(actual) == str(expected):
         return True, f"{rule} ladder_step={actual}"
     return False, f"{rule} ladder_step={actual}, expected {expected}"
 
@@ -278,7 +281,7 @@ def _dispatch(name: str, findings: list[dict]) -> tuple[bool, str]:
     The name is ``<check>[:<arg>...]``; args are parsed positionally per the
     registry's param spec and passed to the function after ``findings``.
     """
-    parts = name.split(":", len(name))  # split fully; values carry no colons
+    parts = name.split(":")  # split fully; values carry no colons
     fn_name = parts[0]
     raw_args = parts[1:]
     entry = _CHECKS.get(fn_name)
