@@ -62,8 +62,8 @@ Properties for entries in the `nodes:` list.
 | Property | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
 | `state` | enum | `"present"` | `present` or `absent` |
-| `generate_profile` | boolean | `true` | Auto-generate Profile |
-| `generate_template` | boolean | `false` | Auto-generate Template |
+| `generate_profile` | boolean | `true` | Auto-generate Profile — see rules/extension-object-profile.md |
+| `generate_template` | boolean | `false` | Auto-generate Template — see rules/extension-object-template.md |
 
 ---
 

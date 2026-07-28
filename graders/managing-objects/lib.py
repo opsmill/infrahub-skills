@@ -25,6 +25,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 
 # ---------------------------------------------------------------------------
 # Output loading
@@ -95,6 +97,78 @@ def check_explains_default_branch_risk_or_review(text: str, **_: Any) -> tuple[b
 
 
 # ---------------------------------------------------------------------------
+# Profile assignment / Object Template checks
+# ---------------------------------------------------------------------------
+
+
+def _data_entries(text: str) -> list[dict]:
+    """Parse all object documents and return their flattened spec.data entries."""
+    if not text.strip():
+        return []
+    try:
+        docs = list(yaml.safe_load_all(text))
+    except yaml.YAMLError:
+        return []
+    entries: list[dict] = []
+    for doc in docs:
+        if not isinstance(doc, dict):
+            continue
+        spec = doc.get("spec") or {}
+        data = spec.get("data") or []
+        if isinstance(data, list):
+            entries.extend(e for e in data if isinstance(e, dict))
+    return entries
+
+
+def check_object_assigns_profiles(text: str, **_: Any) -> tuple[bool, str]:
+    """At least one object assigns a non-empty profiles: list."""
+    hits = [e for e in _data_entries(text) if isinstance(e.get("profiles"), list) and e["profiles"]]
+    if hits:
+        return True, f"{len(hits)} object(s) assign a profiles list"
+    return False, "No object assigns a profiles: list of Profile HFIDs"
+
+
+def check_object_uses_object_template(text: str, **_: Any) -> tuple[bool, str]:
+    """At least one object is created from an object_template."""
+    hits = [e for e in _data_entries(text) if e.get("object_template")]
+    if hits:
+        return True, f"{len(hits)} object(s) set object_template"
+    return False, "No object sets object_template"
+
+
+def check_object_overrides_profile_value(text: str, **_: Any) -> tuple[bool, str]:
+    """At least one profile-assigned object also sets an explicit attribute (override)."""
+    for e in _data_entries(text):
+        profs = e.get("profiles")
+        if isinstance(profs, list) and profs:
+            reserved = {"profiles", "object_template", "name"}
+            explicit = [k for k in e.keys() if k not in reserved]
+            if explicit:
+                return True, f"object with profiles overrides: {sorted(explicit)}"
+    return False, "No profile-assigned object sets an explicit override value"
+
+
+def check_object_authors_template(text: str, **_: Any) -> tuple[bool, str]:
+    """At least one document authors a template object: kind Template<Kind> + template_name."""
+    if not text.strip():
+        return False, "empty output"
+    try:
+        docs = list(yaml.safe_load_all(text))
+    except yaml.YAMLError:
+        return False, "unparseable YAML"
+    for doc in docs:
+        if not isinstance(doc, dict):
+            continue
+        spec = doc.get("spec") or {}
+        kind = str(spec.get("kind", ""))
+        data = spec.get("data") or []
+        if kind.startswith("Template") and isinstance(data, list):
+            if any(isinstance(e, dict) and e.get("template_name") for e in data):
+                return True, f"template object authored under {kind}"
+    return False, "No template object authored (kind: Template<Kind> with template_name)"
+
+
+# ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
 
@@ -102,6 +176,10 @@ def check_explains_default_branch_risk_or_review(text: str, **_: Any) -> tuple[b
 CHECKS = {
     "recommends-branch": check_recommends_branch,
     "explains-default-branch-risk-or-review": check_explains_default_branch_risk_or_review,
+    "object-assigns-profiles": check_object_assigns_profiles,
+    "object-uses-object-template": check_object_uses_object_template,
+    "object-overrides-profile-value": check_object_overrides_profile_value,
+    "object-authors-template": check_object_authors_template,
 }
 
 

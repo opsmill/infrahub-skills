@@ -5,7 +5,7 @@ description: >-
   DO NOT TRIGGER directly — loaded automatically by other Infrahub skills when they need shared references.
 user-invocable: false
 metadata:
-  version: 1.2.7
+  version: 1.2.8
   author: OpsMill
 ---
 
@@ -32,6 +32,8 @@ Infrahub skills. It is not meant to be invoked directly.
   `owner`, `is_protected`): what each field means, how
   to set it in object files, and why `source` does not
   control edit access
+- **`profiles-and-templates.md`** — The Profiles vs
+  Object Templates distinction and mechanics
 - **`rules/`** — Cross-cutting rules shared across skills:
   - Branch-first data CRUD (default to a branch, not the default branch)
   - Caching display labels in queries
@@ -39,5 +41,6 @@ Infrahub skills. It is not meant to be invoked directly.
   - Git integration and deployment patterns
   - Recovery from partial repository syncs
   - Generated file protocol conventions
-  - Information-source priority (skill content before
-    external docs)
+  - Information-source priority (skill content first,
+    with a concrete last-resort procedure for consulting
+    `docs.infrahub.app` on a genuine gap)

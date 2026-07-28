@@ -1,6 +1,0 @@
-Redaction report — 2026-05-30T12:00:00Z
-Rules version: 1.0
-Files touched: 0
-Total replacements: 0
-
-User review completed: no

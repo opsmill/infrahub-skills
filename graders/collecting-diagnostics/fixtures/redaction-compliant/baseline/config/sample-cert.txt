@@ -1,7 +1,0 @@
-# Sample certificate file
-# A PRIVATE KEY block was removed by redaction; REDACTED placeholder kept.
-# ***REDACTED:private-key***
-subject: CN=infrahub.example.com
-issuer: CN=Example CA
-not_before: 2026-01-01T00:00:00Z
-not_after:  2027-01-01T00:00:00Z

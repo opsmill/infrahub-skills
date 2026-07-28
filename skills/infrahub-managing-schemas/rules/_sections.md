@@ -43,7 +43,9 @@
    level: artifact targets
    (`inherit_from: CoreArtifactTarget`) and Object
    Templates (`generate_template: true`) — independent
-   features, kept in separate rule files.
+   features, kept in separate rule files. Profiles
+   (`generate_profile: true`) enable shared default values via
+   a companion Profile<Kind> node.
 
 8. **Uniqueness (uniqueness-)** — MEDIUM. Uniqueness
    constraint format with __value suffix for

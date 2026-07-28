@@ -1,9 +1,0 @@
----
-- id: repo-error
-  severity: warning
-  evidence:
-    file: baseline/logs/infrahub-task-worker-1.log
-    line: 100
-    excerpt: "RepositoryError: not the right signal"
-  hint: "Unrelated repo error noted; the real OOM was missed"
-  related_issues: []

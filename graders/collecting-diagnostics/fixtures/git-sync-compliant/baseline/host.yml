@@ -1,7 +1,0 @@
----
-os: "Linux 6.x"
-kernel: "6.5.0-generic"
-cpu_cores: 8
-memory_gb: 16
-docker_version: "26.1.4"
-filesystem: "ext4"

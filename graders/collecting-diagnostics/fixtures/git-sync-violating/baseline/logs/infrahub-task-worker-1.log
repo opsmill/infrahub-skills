@@ -1,3 +1,0 @@
-2026-05-29T08:15:11Z INFO  worker started replica=1
-2026-05-29T08:15:11Z INFO  connected to message-queue
-2026-05-29T08:30:24Z ERROR CommitNotFoundError: Commit abc123 not found

@@ -8,7 +8,7 @@ tags: cross-link, reporting-issues, hand-off
 
 Impact: MEDIUM
 
-At the end of the workflow (step 9, hand-off), if the
+At the end of the workflow (step 6, hand-off), if the
 user also wants to file a public GitHub issue, point
 them to `infrahub-reporting-issues`. This skill never
 files issues itself.
@@ -29,7 +29,7 @@ sensitivity bars.
 
 ### What to do
 
-At step 9 (hand-off), after the bundle is finalized,
+At step 6 (hand-off), after the bundle is finalized,
 ask the user whether they also want to file a public
 issue.
 If yes, hand off to `infrahub-reporting-issues` by
@@ -45,9 +45,11 @@ are `infrahub-reporting-issues`'s contract.
 ### Compliant
 
 ```text
-> Bundle ready at infrahub-diagnostics-20260530-120000/.
-> Hand it to OpsMill support via Discord, Slack,
-> or email — it's already redacted.
+> Bundle collected under ./infrahub_bundles/.
+> Review it first — the tool masks only key names
+> (password/secret/token/key), so scan the logs and
+> config for anything else sensitive. Then hand it to
+> OpsMill support via Discord, Slack, or email.
 >
 > If you'd like to also file a public issue, use
 > `infrahub-reporting-issues` next — it'll keep

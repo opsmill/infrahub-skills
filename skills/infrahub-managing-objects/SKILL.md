@@ -11,7 +11,7 @@ allowed-tools:
   - Bash
 argument-hint: "[kind] [object-details...]"
 metadata:
-  version: 1.2.7
+  version: 1.2.8
   author: OpsMill
 ---
 
@@ -120,7 +120,11 @@ Follow these steps when creating object data files:
    [rules/value-attributes.md](./rules/value-attributes.md)
    for attribute mapping and
    [rules/value-relationships.md](./rules/value-relationships.md)
-   for relationship references. To stamp lineage or lock
+   for relationship references. If the object should inherit
+   shared defaults from a Profile or be created from an Object
+   Template, read
+   [rules/value-profiles-templates.md](./rules/value-profiles-templates.md).
+   To stamp lineage or lock
    a value, write it as a `value` + metadata mapping —
    see [../infrahub-common/metadata-lineage.md](../infrahub-common/metadata-lineage.md)
    (remember `source` is lineage only; locking needs
@@ -156,6 +160,9 @@ Follow these steps when creating object data files:
   control edit access
 - **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
   (git integration, caching) across all skills
+- **[../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)**
+  -- Skill content first; how to consult `docs.infrahub.app`
+  on a genuine gap (e.g. deleting nodes)
 - **[../infrahub-managing-schemas/SKILL.md](../infrahub-managing-schemas/SKILL.md)**
   -- Schema definitions these objects conform to
 - **[rules/](./rules/)** -- Individual rules by category

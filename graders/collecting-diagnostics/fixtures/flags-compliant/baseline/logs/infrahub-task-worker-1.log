@@ -1,8 +1,0 @@
-2026-05-29T08:15:11Z INFO  worker started replica=1
-2026-05-29T08:20:00Z INFO  task accepted: generate-config-bundle id=42
-2026-05-29T08:20:30Z INFO  processing 12000 devices
-2026-05-29T08:25:12Z ERROR java.lang.OutOfMemoryError: Java heap space
-2026-05-29T08:25:12Z ERROR   at com.example.Generator.expand(Generator.java:188)
-2026-05-29T08:25:12Z ERROR   at com.example.Generator.run(Generator.java:42)
-2026-05-29T08:25:12Z ERROR   at java.base/java.lang.Thread.run(Thread.java:840)
-2026-05-29T08:25:13Z WARN  worker exiting with code 137

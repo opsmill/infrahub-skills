@@ -1,8 +1,0 @@
-{
-  "version": "1.9.6",
-  "edition": "community",
-  "experimental_features": {},
-  "main": {
-    "internal_address": "http://infrahub-server:8000"
-  }
-}

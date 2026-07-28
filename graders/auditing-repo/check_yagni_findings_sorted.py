@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Grader: assert all 11 yagni-* findings emit sorted by ladder_step ascending.
+"""Grader: assert all 15 yagni-* findings emit sorted by ladder_step ascending.
 
 Companion to the per-rule graders. The fixture for this task contains
-violations of all 11 yagni-* rules; the auditor must emit them in
+violations of all 15 yagni-* rules; the auditor must emit them in
 ascending ladder_step order (cheapest fix on top).
 """
 
@@ -25,8 +25,12 @@ ALL_RULES = [
     ("yagni-generator-hardcoding-data", 2, "MEDIUM"),
     ("yagni-custom-domain-primitives-instead-of-builtin", 2, "MEDIUM"),
     ("yagni-imperative-allocation-vs-resource-pool", 2, "MEDIUM"),
+    ("yagni-profile-over-default", 2, "MEDIUM"),
+    ("yagni-generator-that-should-be-template", 2, "MEDIUM"),
     ("yagni-python-validator-vs-schema-constraint", 3, "MEDIUM"),
     ("yagni-missing-inverse-forces-python-filter", 3, "MEDIUM"),
+    ("yagni-unused-generate-flag", 3, "MEDIUM"),
+    ("yagni-template-profile-confusion", 3, "MEDIUM"),
     ("yagni-denormalized-vs-indirect-relationship", 4, "LOW"),
     ("yagni-generator-query-shape-too-broad", 4, "LOW"),
     ("yagni-python-transform-that-could-be-jinja2", 5, "LOW"),

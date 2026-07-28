@@ -313,7 +313,8 @@ dataset sizes). If a query returns an unexpectedly
 empty `edges` list:
 
 1. Verify the kind name is correct using
-   `mcp__infrahub__infrahub_list_schema`
+   `mcp__infrahub__get_schema` (or the
+   `infrahub://schema` resource)
 2. Check that the filter values match exactly
    (case-sensitive for `value` fields)
 3. Try without filters to confirm data exists

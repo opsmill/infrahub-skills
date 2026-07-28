@@ -1,6 +1,0 @@
-2026-05-29T08:00:01Z INFO  server starting infrahub 1.9.6
-2026-05-29T08:00:02Z INFO  database connection established
-2026-05-29T08:00:03Z INFO  message-queue connection established
-2026-05-29T08:15:00Z INFO  GET /api/config 200
-2026-05-29T08:30:25Z WARN  Authorization: Bearer ***REDACTED:jwt***
-2026-05-29T08:30:26Z INFO  POST /graphql 200

@@ -389,6 +389,75 @@ tasks:
       - name: human-friendly-id
         check: human_friendly_id defined on each node
 
+  - name: inverse-identifier-reuse
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: A schema is already loaded into a running Infrahub instance. The DcimDevice node
+      declares a forward relationship to its interfaces, and that relationship was first loaded
+      WITHOUT an explicit identifier, so Infrahub auto-generated one: dcimdevice__dciminterface.
+      The DcimInterface node currently has NO relationship back to its device, so consumers that
+      hold an interface cannot traverse to its device.
+
+      Existing schema (do not change the DcimDevice side):
+
+        version: "1.0"
+        nodes:
+          - name: Device
+            namespace: Dcim
+            human_friendly_id: ["name__value"]
+            attributes:
+              - name: name
+                kind: Text
+            relationships:
+              - name: interfaces
+                peer: DcimInterface
+                kind: Attribute
+                cardinality: many
+                identifier: "dcimdevice__dciminterface"
+          - name: Interface
+            namespace: Dcim
+            human_friendly_id: ["name__value"]
+            attributes:
+              - name: name
+                kind: Text
+
+      Add the missing inverse `device` relationship on DcimInterface (peer DcimDevice,
+      cardinality one) so the link is traversable from both sides.
+
+      Save ONLY the final schema YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_inverse_identifier.py
+        weight: 1.0
+    expected_output: >-
+      A schema where the new DcimInterface.device relationship reuses the
+      forward side's existing identifier 'dcimdevice__dciminterface'
+      verbatim, rather than inventing a new one (e.g. 'device__interfaces')
+      and renaming the forward side — which would fail with not_supported
+      because the identifier is immutable once loaded.
+    expectations:
+      - >-
+        The new device relationship on DcimInterface has
+        identifier "dcimdevice__dciminterface" (reused verbatim)
+      - >-
+        The forward DcimDevice.interfaces identifier is left unchanged
+        (not renamed to invent a matching pair)
+      - "The device relationship peer is the full kind DcimDevice"
+      - 'Schema starts with version: "1.0"'
+    assertions:
+      - name: schema-version
+        check: "Schema starts with version: '1.0'"
+      - name: inverse-reuses-forward-identifier
+        check: >-
+          The inverse reuses the forward identifier
+          'dcimdevice__dciminterface' verbatim on both sides
+      - name: matching-identifiers
+        check: Both sides of the link share one identifier
+      - name: full-kind-references
+        check: All peer references use full Namespace+Name kind
+
   - name: computed-jinja2-name
     trials: 3
     instruction: |
@@ -539,6 +608,12 @@ tasks:
         full kind (DcimGenericDevice)
       - "human_friendly_id is defined on the concrete Device node"
       - 'Schema starts with version: "1.0"'
+      - >-
+        generate_template is understood as cloning the node AND its
+        component children, not a bare UI flag
+      - >-
+        The response keeps generate_template (structure) distinct from
+        Profiles (shared values)
     assertions:
       - name: schema-version
         check: "Schema starts with version: '1.0'"
@@ -617,6 +692,40 @@ tasks:
           alongside the CoreFileObject inheritance
       - name: human-friendly-id
         check: human_friendly_id defined on DcimNetworkDiagram
+
+  - name: schema-generate-profile
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Model a network-device inventory where many devices share the
+      same operational defaults (MTU, status, timezone) that operators want
+      to manage in one place and change centrally. Define a generic
+      GenericDevice (hostname, role) and a concrete Device node that inherits
+      from it. Enable the mechanism that lets operators define reusable
+      default-value sets and assign them to devices. Use namespace 'Dcim'.
+
+      Save ONLY the final schema YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_object_profile.py
+        weight: 1.0
+    expected_output: >-
+      A schema whose concrete Device node sets generate_profile: true (never
+      on the GenericDevice generic), inherits from DcimGenericDevice by full
+      kind, and defines human_friendly_id. The shared attributes (mtu,
+      status, timezone) are optional so Profile-supplied values apply.
+    expectations:
+      - The concrete Device node sets generate_profile: true
+      - generate_profile does NOT appear on the GenericDevice generic
+      - Attributes meant to receive Profile defaults are optional
+      - human_friendly_id is defined on the concrete Device
+      - 'Schema starts with version: "1.0"'
+    assertions:
+      - name: generate-profile-concrete-only
+        check: generate_profile true on the concrete Device, not the generic
+      - name: human-friendly-id
+        check: human_friendly_id defined on the concrete Device
 
   - name: string-length-limits
     trials: 3
@@ -1265,6 +1374,79 @@ tasks:
           the change through the proposed-change / merge / discard
           review path
 
+  - name: object-profiles-and-templates
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-objects/SKILL.md and follow its workflow and rules.
+
+      Task: Write an object data file (kind DcimDevice) that creates three
+      leaf switches. leaf-01 and leaf-02 both take their default MTU, status,
+      and timezone from a shared Profile named "datacenter-defaults" (assigned
+      by its human_friendly_id). leaf-02 must run a non-default MTU of 1500
+      while still inheriting the other defaults. leaf-03 is created from an
+      existing object template named "template-leaf-switch" and only sets its
+      own name. The file must ALSO author the template-leaf-switch template
+      object itself, under kind TemplateDcimDevice, with
+      template_name: template-leaf-switch, loaded before leaf-03 which clones
+      it.
+
+      Save ONLY the final object YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-objects/check_profiles_templates.py
+        weight: 1.0
+    expected_output: >-
+      An object file whose data entries assign profiles: [datacenter-defaults]
+      to leaf-01 and leaf-02, set an explicit mtu on leaf-02 (override), and
+      set object_template: template-leaf-switch on leaf-03.
+    expectations:
+      - leaf-01 and leaf-02 carry a profiles list referencing datacenter-defaults
+      - leaf-02 sets an explicit mtu value to override the Profile
+      - leaf-03 sets object_template referencing template-leaf-switch
+      - Profile/template references use human_friendly_id, not inline blocks
+      - A TemplateDcimDevice object authoring template-leaf-switch (template_name)
+        is present and precedes leaf-03
+    assertions:
+      - name: object-assigns-profiles
+        check: at least one object assigns a profiles list
+      - name: object-uses-object-template
+        check: at least one object sets object_template
+      - name: object-overrides-profile-value
+        check: a profile-assigned object sets an explicit override
+      - name: object-authors-template
+        check: a template object is authored under a Template<Kind> with template_name
+
+  # --- Common: documentation fallback --- #
+  - name: docs-fallback-delete-node
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-objects/SKILL.md
+      and follow its workflow and rules.
+
+      Task: How do I delete an object/node in Infrahub after I've already
+      loaded it — for example with infrahubctl or the CLI? I can't find
+      deletion in the object-authoring workflow.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/common/check_docs_fallback.py
+        weight: 1.0
+    expected_output: >-
+      A prose answer that recognizes deletion is not covered by the
+      object-authoring skill, consults docs.infrahub.app (the llms.txt
+      index, then the page's .md) for the procedure, cites the page URL,
+      and flags the answer as outside the skill's tested rules.
+    expectations:
+      - Recognizes the task is not covered by the loaded skill's rules
+      - Consults docs.infrahub.app (llms.txt index then the page .md)
+      - Cites the documentation page URL used
+      - Adds a caveat that the point is outside the skill's tested rules
+      - Does not override any skill rule
+    assertions:
+      - name: docs-fallback
+        check: Output cites a docs.infrahub.app page and flags the gap
+
   # --- Issue Reporter --- #
   - name: bug-sanitization
     instruction: |
@@ -1419,230 +1601,118 @@ tasks:
         check: Plan references opsmill/infrahub as the target repo
 
   # --- Diagnostics Collector --- #
-  # Scope: these tasks grade the *bundle artifact* — layout, manifest fields,
-  # redaction discipline, and flag emission — not collection mechanics. The
-  # prompts say "do NOT actually run any commands" because exercising real
-  # collection needs a live Infrahub instance; that path was validated live in
-  # commits 20f0ad0 / 28d48c2. The mocked command output below stands in for a
-  # real run so the graders can assert bundle shape deterministically.
-  - name: collecting-diagnostics-git-sync
+  # Scope: the skill wraps the `infrahub-collect` binary, which needs a live
+  # deployment to actually run. These tasks grade the *command plan* the model
+  # recommends — the right invocation, symptom flags, review-before-sharing
+  # caution, and hand-off — not a produced bundle.
+  - name: collecting-diagnostics-performance
+    trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-collecting-diagnostics/SKILL.md and
       follow its workflow and rules.
 
-      The user says: "My proposed change pipeline fails — the repo isn't loading
-      schemas. I'm on docker-compose with 2 task-worker replicas, infrahub 1.9.6
-      community edition."
+      Task: Infrahub feels very slow — the UI hangs and a task-worker was OOM-killed
+      on our Kubernetes deployment (namespace infrahub-prod). Walk me through
+      collecting a diagnostic bundle for OpsMill support. Do NOT actually run any
+      commands; write out the exact commands you would run and the steps.
 
-      Treat this as a simulation: do NOT actually run any commands. Instead, when
-      the workflow tells you to run a command, treat the following blocks as the
-      mocked output. Then produce the final bundle directory tree under
-      ./output_bundle/.
-
-      docker compose ps (deployment detection succeeded; compose topology):
-        infrahub-server-1            Up 2h
-        infrahub-task-worker-1       Up 2h
-        infrahub-task-worker-2       Up 30m
-        database-1                   Up 2h
-        cache-1                      Up 2h
-        message-queue-1              Up 2h
-        task-manager-1               Up 2h
-        task-manager-db-1            Up 2h
-
-      curl /api/config: {"version": "1.9.6", "edition": "community"}
-      infrahubctl version: 1.9.6
-      uname -a: Linux example 6.5.0 x86_64
-
-      docker logs infrahub-task-worker-1 (excerpt at line 4521):
-        ...
-        2026-05-29 14:22:09 ERROR CommitNotFoundError: Commit abc123 not found with GitRepository my-repo
-        ...
-
-      docker logs infrahub-task-worker-2: clean, same commit found and processed.
-
-      infrahubctl repository list:
-        my-repo  Error  https://${GITHUB_PAT}@github.com/example/my-repo.git
-
-      The user has already answered the user-gate questions: this is a git-sync
-      issue, redaction sample: redact-all for IPs and customer strings, keep
-      hostnames.
-
-      Produce the final bundle as a directory tree at ./output_bundle/. The bundle
-      must include manifest.yml, README.md, flags.yml, redaction-report.txt,
-      baseline/ with versions.yml + api-config.json + deployment.yml + host.yml +
-      logs/ containing one file per task-worker replica, and
-      category/git-sync/ with per-worker artifacts (git-tree-task-worker-1.txt,
-      git-tree-task-worker-2.txt, repositories-graphql.json).
-
-      Apply Tier 1 redaction: any password/token/secret value or URL credential
-      must be replaced with ***REDACTED:*** style markers. The GitHub PAT in the
-      repo URL must be redacted to https://***REDACTED***@github.com/...
-
-      The manifest.yml must include problem.category: git-sync,
-      deployment.worker_replicas: 2, infrahub.version: 1.9.6,
-      infrahub.edition: community, and the full bug-report-template fields
-      under problem.
-
-      The flags.yml must include an entry with id: commit-not-found, severity:
-      warning, evidence pointing to the worker-1 log, and a short hint.
+      Save ONLY the recommended command plan (markdown) to: output.md
     graders:
       - type: deterministic
-        run: python graders/collecting-diagnostics/check_git_sync_bundle.py
+        run: python graders/collecting-diagnostics/check_performance_plan.py output.md
         weight: 1.0
     expected_output: >-
-      A directory ./output_bundle/ following the bundle layout from the skill,
-      with manifest.yml claiming category: git-sync and worker_replicas: 2,
-      two per-worker log files under baseline/logs/, a category/git-sync/
-      directory with per-worker git artifacts and repositories-graphql.json,
-      and flags.yml including a commit-not-found entry. All secrets are
-      redacted (passwords, tokens, URL credentials).
+      A command plan that verifies/installs infrahub-collect, runs `environment
+      detect`, then `infrahub-collect create --benchmark` (K8s namespace targeted),
+      and cautions the user to review the bundle before sharing.
     expectations:
-      - Bundle root has manifest.yml and README.md
-      - flags.yml is present at the bundle root and is a YAML list
-      - baseline/ has versions.yml, api-config.json, deployment.yml, host.yml
-      - baseline/logs/ has one file per task-worker replica (two files here)
-      - category/git-sync/ exists with per-worker artifacts
-      - manifest.yml problem.category equals "git-sync"
-      - flags.yml contains an entry with id "commit-not-found"
-      - No file in the bundle contains an unredacted password, token, or URL credential
+      - Recommends `infrahub-collect create`
+      - Includes the `--benchmark` flag for the performance symptom
+      - Surfaces a review-before-sharing caution
+      - Does not resurrect hand-rolled manifest.yml/flags.yml artifacts
     assertions:
-      - name: bundle-has-manifest-and-readme
-        check: Bundle root contains manifest.yml and README.md
-      - name: baseline-canonical-files
-        check: baseline/ has versions.yml, api-config.json, deployment.yml, host.yml, logs/
-      - name: multi-replica-coverage
-        check: One log file per task-worker replica (two for this scenario)
-      - name: manifest-category-git-sync
-        check: manifest.yml problem.category equals git-sync
-      - name: category-dir-git-sync
-        check: category/git-sync/ directory exists and is non-empty
-      - name: commit-not-found-flag-fires
-        check: flags.yml contains an entry with id `commit-not-found`
-      - name: redaction-applied
-        check: No file contains an unredacted secret pattern (password, token, JWT, URL credential)
+      - name: mentions-create
+        check: Plan recommends `infrahub-collect create`
+      - name: benchmark-flag
+        check: Plan includes `--benchmark`
+      - name: review-before-sharing
+        check: Plan cautions to review the bundle before sharing
+      - name: no-legacy-artifacts
+        check: Plan does not reference manifest.yml/flags.yml/redaction-report.txt
 
-  - name: collecting-diagnostics-redaction
+  - name: collecting-diagnostics-db-queries
+    trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-collecting-diagnostics/SKILL.md and
-      apply the redaction rules in rules/redaction-tiers.md.
+      follow its workflow and rules.
 
-      You are given a small bundle that has been partially collected. The
-      baseline/config/compose-resolved.yml currently looks like this (raw, before
-      redaction):
+      Task: Database operations are slow and some queries seem to fail on our
+      Docker Compose deployment. Help me collect a bundle to send to OpsMill that
+      includes the information needed to diagnose the slow database queries. Do NOT
+      actually run any commands; write out the exact commands and steps.
 
-        services:
-          infrahub-server:
-            environment:
-              INFRAHUB_DB_PASSWORD: hunter2-mysql-pass
-              INFRAHUB_INITIAL_ADMIN_TOKEN: 06438eb2-8d1a-490f-9d11-3bdb6b73f329
-              INFRAHUB_SECURITY_SECRET_KEY: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
-              INFRAHUB_LOG_LEVEL: INFO
-              INFRAHUB_TELEMETRY_OPTOUT: "true"
-
-      And baseline/logs/server.log contains:
-
-        2026-05-29 10:22:15 INFO  Bound to 0.0.0.0:8000
-        2026-05-29 10:22:18 DEBUG Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sig_padding
-        2026-05-29 10:22:20 INFO  Schema loaded
-
-      And baseline/config/sample-cert.txt contains a literal block:
-
-        -----BEGIN PRIVATE KEY-----
-        MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...
-        -----END PRIVATE KEY-----
-
-      Apply Tier 1 auto-redaction. Produce the redacted bundle directory at
-      ./output_bundle/ with:
-
-      1. manifest.yml at the root with minimal but valid bug-report-template
-         fields (any category is fine; this task is about redaction, not
-         classification).
-      2. README.md at the root, 3-5 lines.
-      3. baseline/config/compose-resolved.yml — with all passwords, tokens, and
-         security keys replaced by ***REDACTED:env-key***-style markers.
-         Innocuous values (INFRAHUB_LOG_LEVEL, INFRAHUB_TELEMETRY_OPTOUT) are
-         left alone.
-      4. baseline/logs/server.log — JWT replaced with ***REDACTED:jwt***.
-      5. baseline/config/sample-cert.txt — entire BEGIN/END PRIVATE KEY block
-         removed (replaced with a placeholder note).
-      6. redaction-report.txt at the bundle root listing every redaction with
-         file path and a count summary (e.g., "compose-resolved.yml: 3 env
-         values REDACTED").
+      Save ONLY the recommended command plan (markdown) to: output.md
     graders:
       - type: deterministic
-        run: python graders/collecting-diagnostics/check_redaction_compliance.py
+        run: python graders/collecting-diagnostics/check_db_queries_plan.py output.md
         weight: 1.0
     expected_output: >-
-      A directory ./output_bundle/ where no file contains an unredacted secret
-      (password value, token value, JWT, private-key block, URL credentials),
-      with manifest.yml and README.md at the root, and a non-empty
-      redaction-report.txt listing the replacements applied.
+      A command plan that runs `infrahub-collect create --include-queries`, notes
+      that query logs may contain customer data, and cautions the user to review
+      the bundle before sharing.
     expectations:
-      - Bundle root has manifest.yml and README.md
-      - redaction-report.txt is present and lists each redaction
-      - No file contains an unredacted INFRAHUB_*_PASSWORD or _TOKEN or _SECRET_KEY value
-      - No file contains an unredacted JWT (three base64 segments)
-      - No file contains a literal BEGIN/END PRIVATE KEY block
+      - Recommends `infrahub-collect create`
+      - Includes the `--include-queries` flag for the database-query symptom
+      - Surfaces a review-before-sharing caution
+      - Does not resurrect hand-rolled manifest.yml/flags.yml artifacts
     assertions:
-      - name: redaction-report-present
-        check: redaction-report.txt is present and non-empty
-      - name: no-unredacted-secrets
-        check: >-
-          No file in the bundle contains an unredacted password, token, JWT,
-          private key block, or URL credential
+      - name: mentions-create
+        check: Plan recommends `infrahub-collect create`
+      - name: include-queries-flag
+        check: Plan includes `--include-queries`
+      - name: review-before-sharing
+        check: Plan cautions to review the bundle before sharing
+      - name: no-legacy-artifacts
+        check: Plan does not reference manifest.yml/flags.yml/redaction-report.txt
 
-  - name: collecting-diagnostics-flag-emission
+  - name: collecting-diagnostics-basic-workflow
+    trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-collecting-diagnostics/SKILL.md and
-      study rules/flag-checks-deterministic.md and the catalog at flag-checks.md.
+      follow its workflow and rules.
 
-      You have already collected a baseline. The file
-      baseline/logs/infrahub-task-worker-1.log contains (around line 1234):
+      Task: My proposed-change pipeline is failing and the repo won't load schemas
+      on our Docker Compose deployment. Walk me through collecting a diagnostic
+      bundle to hand off to OpsMill support, and tell me what to do afterwards. Do
+      NOT actually run any commands; write out the exact commands and steps.
 
-        2026-05-29 02:11:09 WARN  Garbage collection pressure
-        2026-05-29 02:11:42 ERROR java.lang.OutOfMemoryError: Java heap space
-        2026-05-29 02:11:42 ERROR Worker process terminated; restarting
-
-      Produce ./output_bundle/ containing:
-
-      1. manifest.yml — any minimal but valid bug-report-template content.
-      2. README.md — short.
-      3. baseline/logs/infrahub-task-worker-1.log — the log content as above.
-      4. flags.yml — a YAML list at the root including at minimum a correct
-         entry for the oom-in-logs flag from the catalog:
-
-         - id: oom-in-logs
-           severity: warning
-           evidence:
-             file: baseline/logs/infrahub-task-worker-1.log
-             line: 1234
-             excerpt: "java.lang.OutOfMemoryError: Java heap space"
-           hint: <one short hint sentence; do NOT claim a root-cause diagnosis>
-           related_issues: []
-
-      Do not invent flags that are not justified by the collected evidence.
-      Each entry must have id, severity (info or warning), evidence (file +
-      line + excerpt), and hint.
+      Save ONLY the recommended command plan (markdown) to: output.md
     graders:
       - type: deterministic
-        run: python graders/collecting-diagnostics/check_flag_emission.py
+        run: python graders/collecting-diagnostics/check_basic_workflow.py output.md
         weight: 1.0
     expected_output: >-
-      A directory ./output_bundle/ with manifest.yml and README.md at the
-      root, and flags.yml at the root containing a well-formed YAML list
-      that includes an entry with id "oom-in-logs", severity "warning",
-      evidence pointing to the worker log, and a short hint.
+      A command plan that verifies environment detection with `infrahub-collect
+      environment detect`, runs `infrahub-collect create`, cautions the user to
+      review the bundle before sharing, and cross-links infrahub-reporting-issues
+      for filing a public issue.
     expectations:
-      - flags.yml is a YAML list at the bundle root
-      - Each flag entry has id, severity, evidence, and hint
-      - severity is either "info" or "warning"
-      - An entry with id "oom-in-logs" is present
-      - The hint is descriptive but does not claim a root-cause diagnosis
+      - Recommends `infrahub-collect environment detect`
+      - Recommends `infrahub-collect create`
+      - Surfaces a review-before-sharing caution
+      - Cross-links infrahub-reporting-issues for a public issue
+      - Does not resurrect hand-rolled manifest.yml/flags.yml artifacts
     assertions:
-      - name: flags-yml-shape
-        check: flags.yml is a list whose entries all have id/severity/evidence/hint
-      - name: oom-in-logs-fires
-        check: flags.yml contains an entry with id `oom-in-logs`
+      - name: mentions-env-detect
+        check: Plan recommends `infrahub-collect environment detect`
+      - name: mentions-create
+        check: Plan recommends `infrahub-collect create`
+      - name: review-before-sharing
+        check: Plan cautions to review the bundle before sharing
+      - name: cross-link-reporting-issues
+        check: Plan cross-links infrahub-reporting-issues
+      - name: no-legacy-artifacts
+        check: Plan does not reference manifest.yml/flags.yml/redaction-report.txt
 
   # --- Generator Creator --- #
   - name: from-graphql-hydration-refactor
@@ -3469,6 +3539,177 @@ tasks:
       - name: severity-cap
         check: No yagni finding exceeds MEDIUM severity
 
+  - name: yagni-profile-over-default
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this schema and profile data:
+
+      schemas/dcim.yml:
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Device
+          namespace: Dcim
+          generate_profile: true
+          attributes:
+            - name: name
+              kind: Text
+            - name: timezone
+              kind: Text
+              optional: true
+      ```
+
+      objects/profiles.yml (the only Profile for DcimDevice, and its
+      timezone value is the same constant every device would use):
+      ```yaml
+      apiVersion: infrahub.app/v1
+      kind: Object
+      spec:
+        kind: ProfileDcimDevice
+        data:
+          - profile_name: global-timezone
+            timezone: UTC
+      ```
+
+      There is exactly one Profile and its value never varies across
+      objects — a plain default_value would cover it.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_profile_over_default.py
+        weight: 1.0
+    expected_output: >-
+      JSON with one yagni-profile-over-default finding (severity MEDIUM,
+      ladder_step 2) pointing at the single-value Profile, recommending an
+      attribute default_value instead.
+
+  - name: yagni-generator-should-be-template
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this generator:
+
+      File generators/leaf_ports.py (production path):
+      ```python
+      from infrahub_sdk.generator import InfrahubGenerator
+
+      class LeafPortsGenerator(InfrahubGenerator):
+          async def generate(self, data):
+              device = await self.client.create(kind="DcimDevice", data={"name": "leaf-new"})
+              await device.save(allow_upsert=True)
+              for i in range(1, 49):
+                  port = await self.client.create(
+                      kind="DcimInterface",
+                      data={"name": f"Ethernet1/{i}", "device": device, "speed": 10000},
+                  )
+                  await port.save(allow_upsert=True)
+      ```
+
+      The generator always builds the same fixed 48-port leaf with constant
+      speed and no dependence on input data — a curated Object Template that
+      users clone would replace it.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_generator_should_be_template.py
+        weight: 1.0
+    expected_output: >-
+      JSON with one yagni-generator-that-should-be-template finding (severity
+      MEDIUM, ladder_step 2) for generators/leaf_ports.py, recommending an
+      Object Template + clone instead of the imperative generator.
+
+  - name: yagni-unused-generate-flag
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this repo excerpt:
+
+      schemas/dcim.yml:
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Device
+          namespace: Dcim
+          generate_profile: true
+          generate_template: true
+          attributes:
+            - name: name
+              kind: Text
+      ```
+
+      The repo contains NO Profile instances, no profiles: assignments, no
+      template instances, and no object_template references anywhere in
+      objects/ — both flags are enabled but unused.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_unused_generate_flag.py
+        weight: 1.0
+    expected_output: >-
+      JSON with a yagni-unused-generate-flag finding (severity MEDIUM,
+      ladder_step 3) for the Device node whose generate_profile /
+      generate_template flags have no consumer in the repo.
+
+  - name: yagni-template-profile-confusion
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this setup:
+
+      schemas/dcim.yml:
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Device
+          namespace: Dcim
+          generate_template: true
+          attributes:
+            - name: name
+              kind: Text
+            - name: timezone
+              kind: Text
+              optional: true
+            - name: syslog_server
+              kind: Text
+              optional: true
+      ```
+
+      objects/templates.yml — a set of object templates whose ONLY purpose is
+      to carry the same shared timezone and syslog_server values onto every
+      cloned device (no distinct child components), so operators clone a
+      template just to get shared defaults:
+      ```yaml
+      apiVersion: infrahub.app/v1
+      kind: Object
+      spec:
+        kind: TemplateDcimDevice
+        data:
+          - template_name: standard-defaults
+            timezone: UTC
+            syslog_server: 10.0.0.53
+      ```
+
+      The template is being used to distribute shared VALUES that should be a
+      Profile (they must stay in sync across devices), not to clone structure.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_template_profile_confusion.py
+        weight: 1.0
+    expected_output: >-
+      JSON with one yagni-template-profile-confusion finding (severity MEDIUM,
+      ladder_step 3) noting the Object Template is pushing shared values that
+      belong in a Profile.
+
   - name: yagni-findings-sorted
     instruction: |
       Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
@@ -3476,7 +3717,7 @@ tasks:
       ladder_step ascending (cheapest fix on top), then by file path.
 
       Audit this minimal repo, which deliberately exhibits one of each
-      yagni-* violation. Emit ALL eleven yagni findings and order them
+      yagni-* violation. Emit ALL fifteen yagni findings and order them
       correctly.
 
       For each artifact, the violation shape and expected rule:
@@ -3515,6 +3756,21 @@ tasks:
       10. checks/check_no_unmanaged_devices.py — GraphQL already
          filters; Python is `for x in edges: log_error` →
          yagni-redundant-check-that-graphql-can-answer (step 6).
+      11. objects/device_profiles.yml — the only Profile for DcimDevice,
+          carrying a single never-varying value (timezone: UTC) that a
+          default_value would cover → yagni-profile-over-default (step 2).
+      12. generators/leaf_ports.py — generate() always builds the same
+          fixed 48-port leaf with constant speed and no dependence on
+          input data → yagni-generator-that-should-be-template (step 2).
+      13. schemas/access.yml — AccessPolicy sets generate_profile and
+          generate_template, but no ProfileAccessPolicy/TemplateAccessPolicy
+          instances, `profiles:` assignments, or object_template references
+          exist for it anywhere in the repo →
+          yagni-unused-generate-flag (step 3).
+      14. objects/device_templates.yml — an Object Template whose only
+          purpose is to push shared timezone/syslog_server VALUES onto
+          every cloned device (no distinct child components) →
+          yagni-template-profile-confusion (step 3).
 
       Save ONLY the JSON findings to: output.json
     graders:
@@ -3522,18 +3778,18 @@ tasks:
         run: python graders/auditing-repo/check_yagni_findings_sorted.py
         weight: 1.0
     expected_output: >-
-      JSON with eleven findings, one per yagni-* rule above, ordered
-      ascending by ladder_step (1, 2, 2, 2, 2, 3, 3, 4, 4, 5, 6) and
-      then by file path within each step.
+      JSON with fifteen findings, one per yagni-* rule above, ordered
+      ascending by ladder_step (1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 6)
+      and then by file path within each step.
     expectations:
       - Output is JSON with a findings array (or an object with a findings key)
-      - All eleven yagni-* rules are represented, one finding each
+      - All fifteen yagni-* rules are represented, one finding each
       - Findings are ordered by ladder_step ascending, then by file path
       - No yagni finding exceeds MEDIUM severity
     assertions:
-      - name: all-eleven-present
+      - name: all-fifteen-present
         check: >-
-          One finding is emitted for each of the eleven yagni-* rules
+          One finding is emitted for each of the fifteen yagni-* rules
       - name: sorted-by-ladder-then-file
         check: >-
           Findings are ordered by (ladder_step, file path) ascending

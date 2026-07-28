@@ -65,6 +65,8 @@ Beyond correctness, the auditor flags places where a from-scratch schema, Python
 - A check that re-implements a uniqueness, presence, or allowed-values rule the schema can enforce as a constraint
 - A Python transform that only formats strings, where a Jinja2 template would do
 - A generator that hardcodes data belonging in `objects/`, reinvents a built-in IPAM/VLAN primitive, or hand-rolls subnet/IP/VLAN/port allocation instead of using a resource pool
+- A Profile carrying a single never-varying value that an attribute `default_value` would cover, or a `generate_profile`/`generate_template` flag enabled with no consumer in the repo
+- A generator that stamps a fixed structure an Object Template could clone, or an Object Template used to push shared values (or a Profile used to clone structure) — the wrong tool for the job
 
 These findings are advisory — the code works as-is, but the cheaper option is less to maintain and stays aligned with the platform. Each one names the specific layer to move to, and they are ranked by how cheap the fix is: reusing a published marketplace schema is the cheapest win of all and ranks first, above a one-line schema change, which ranks above a full rewrite.
 
