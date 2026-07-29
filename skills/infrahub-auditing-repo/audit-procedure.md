@@ -385,10 +385,11 @@ YAGNI.
 severity follows cost-to-fix so the cheapest, most
 clear-cut wins surface loudest:
 
-- **Steps 2–3 → MEDIUM.** A one-line or structural fix:
-  inherit a built-in primitive, move data to YAML, add
-  a schema constraint or a missing inverse. Low cost,
-  unambiguous benefit.
+- **Steps 1–3 → MEDIUM.** The cheapest, most clear-cut
+  fixes: reuse an off-the-shelf marketplace schema
+  (step 1), inherit a built-in primitive, move data to
+  YAML, add a schema constraint or a missing inverse.
+  Low cost, unambiguous benefit.
 - **Steps 4–6 → LOW.** A larger rewrite where the
   Python is more defensible: re-model a relationship
   traversal, narrow a query, port a transform to
@@ -404,6 +405,13 @@ phases keep their existing order).
 
 ### 9.1 Schema rules
 
+- `yagni-reuse-existing-marketplace-schema` (step 1, MEDIUM)
+  — a marketplace-published domain (DCIM, location,
+  organization, circuits, cabling) hand-rolled from
+  scratch with no `infrahubctl marketplace get` provenance
+  or `inherit_from`. Offline signature match against those
+  domains (no network call); fix via `marketplace get` +
+  `inherit_from`.
 - `yagni-denormalized-vs-indirect-relationship` (step 4, LOW)
 - `yagni-duplicate-shape-not-extracted-to-generic` (step 2, MEDIUM)
 - `yagni-custom-domain-primitives-instead-of-builtin` (step 2, MEDIUM)

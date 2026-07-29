@@ -49,6 +49,7 @@ Plugin (plugin.json)
 │   └── infrahub-common/      ← Cross-cutting refs
 │       ├── graphql-queries.md
 │       ├── infrahub-yml-reference.md
+│       ├── marketplace-reference.md
 │       └── rules/            ← Shared rules
 │
 ├── eval.yaml                             ← skillgrade config (all skills)

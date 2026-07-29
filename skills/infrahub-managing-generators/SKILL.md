@@ -164,6 +164,9 @@ Follow these steps when creating a generator:
   -- GraphQL query writing reference
 - **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
+- **[../infrahub-common/marketplace-reference.md](../infrahub-common/marketplace-reference.md)**
+  -- reuse a marketplace-published schema for the target
+  data model before hand-rolling one to generate against
 - **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
   (git integration, caching gotchas)
 - **[../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)**
