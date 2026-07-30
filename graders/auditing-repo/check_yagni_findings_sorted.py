@@ -19,7 +19,7 @@ from lib import run_checks  # noqa: E402
 ALL_RULES = [
     # (rule, ladder_step, severity) — severity tracks the ladder, capped at
     # MEDIUM: cheap, unambiguous fixes (steps 1-3) emit MEDIUM; costlier
-    # rewrites where the Python is more defensible (steps 4-6) emit LOW.
+    # rewrites where the Python is more defensible (steps 4-7) emit LOW.
     ("yagni-reuse-existing-marketplace-schema", 1, "MEDIUM"),
     ("yagni-duplicate-shape-not-extracted-to-generic", 2, "MEDIUM"),
     ("yagni-generator-hardcoding-data", 2, "MEDIUM"),
