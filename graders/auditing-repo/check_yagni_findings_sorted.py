@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Grader: assert all 15 yagni-* findings emit sorted by ladder_step ascending.
+"""Grader: assert all 16 yagni-* findings emit sorted by ladder_step ascending.
 
 Companion to the per-rule graders. The fixture for this task contains
-violations of all 15 yagni-* rules; the auditor must emit them in
+violations of all 16 yagni-* rules; the auditor must emit them in
 ascending ladder_step order (cheapest fix on top).
 """
 
@@ -35,6 +35,7 @@ ALL_RULES = [
     ("yagni-generator-query-shape-too-broad", 4, "LOW"),
     ("yagni-python-transform-that-could-be-jinja2", 5, "LOW"),
     ("yagni-redundant-check-that-graphql-can-answer", 6, "LOW"),
+    ("yagni-untyped-python-vs-generated-protocols", 7, "LOW"),
 ]
 
 CHECKS: list[str] = []
