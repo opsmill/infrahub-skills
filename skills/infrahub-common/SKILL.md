@@ -41,6 +41,7 @@ Infrahub skills. It is not meant to be invoked directly.
   - Git integration and deployment patterns
   - Recovery from partial repository syncs
   - Generated file protocol conventions
+  - Adopting generated protocols for typed SDK calls
   - Information-source priority (skill content first,
     with a concrete last-resort procedure for consulting
     `docs.infrahub.app` on a genuine gap)
