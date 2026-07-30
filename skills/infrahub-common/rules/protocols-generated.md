@@ -50,13 +50,21 @@ files. It can read from a **running Infrahub instance**
 or directly from **local schema files**:
 
 ```bash
-# From a running Infrahub instance (async client, default)
-export INFRAHUB_ADDRESS=https://infrahub.example.com
+# From a running Infrahub instance (async client, default) — reads the
+# configured INFRAHUB_ADDRESS (defaults to http://localhost:8000)
 infrahubctl protocols --out lib/protocols.py
 
 # From local schema files (no instance needed)
 infrahubctl protocols --schemas schemas/ --out lib/protocols.py
 ```
+
+The instance address is not hardcoded — it comes from
+your environment or `infrahubctl.toml`
+(`INFRAHUB_ADDRESS`, default `http://localhost:8000`);
+confirm with `infrahubctl info` first, and prefix with
+your project's Python runner (`uv run` / `poetry run`).
+See
+[connectivity-server-check](./connectivity-server-check.md).
 
 Using `--schemas` is especially useful during
 development when iterating on schema changes without

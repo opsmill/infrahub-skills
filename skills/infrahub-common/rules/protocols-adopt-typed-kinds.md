@@ -18,8 +18,8 @@ exact line rather than a runtime failure.
 schema. The async client is the default; add `--sync` for the sync client.
 
 ```bash
-# From a running instance (async client)
-export INFRAHUB_ADDRESS=https://infrahub.example.com
+# From a running instance (async client, default) — reads the configured
+# INFRAHUB_ADDRESS (defaults to http://localhost:8000)
 infrahubctl protocols --out lib/protocols.py
 
 # From local schema files, no instance needed
@@ -28,6 +28,15 @@ infrahubctl protocols --schemas schemas/ --out lib/protocols.py
 # Sync client
 infrahubctl protocols --schemas schemas/ --sync --out lib/protocols_sync.py
 ```
+
+Prefix `infrahubctl` with your project's Python runner and confirm the
+server first — see
+[connectivity-server-check](./connectivity-server-check.md) for how
+`INFRAHUB_ADDRESS` / `INFRAHUB_API_TOKEN` are resolved (and `infrahubctl
+info` as the connectivity test) and
+[connectivity-python-environment](./connectivity-python-environment.md)
+for the `uv run` / `poetry run` prefix. The instance address is not
+hardcoded here — it comes from your environment or `infrahubctl.toml`.
 
 > The full regeneration workflow and the "never hand-edit" rule live in
 > [protocols-generated](./protocols-generated.md) — keep the two in step if
