@@ -23,7 +23,7 @@ specific to any single workflow.
    alone misses GraphQL/schema mismatches).
 
 3. **Protocols (protocols-)** -- CRITICAL. Protocol files
-   are generated code (`infrahubctl protocols generate`),
+   are generated code (`infrahubctl protocols`),
    never edit directly, regenerate after schema changes,
    supports local schema directory.
 
