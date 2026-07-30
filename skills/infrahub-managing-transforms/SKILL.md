@@ -92,6 +92,12 @@ aggregation, structural JSON re-shaping. See
 [rules/python-transform.md](./rules/python-transform.md)
 for the legitimate cases.
 
+When the transform reads objects through the SDK, type those calls with
+generated protocol classes rather than string kinds — `client.filters(NetworkLink, ...)`,
+not `kind="NetworkLink"` — so schema drift fails type-check instead of at
+runtime. See
+[protocols-adopt-typed-kinds](../infrahub-common/rules/protocols-adopt-typed-kinds.md).
+
 ## Transform Basics
 
 Two types of transforms:

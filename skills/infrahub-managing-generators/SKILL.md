@@ -95,6 +95,12 @@ objects from a design definition; see
 [rules/python-generate.md](./rules/python-generate.md)
 for the legitimate cases.
 
+Once you *are* writing Python, type your SDK calls with generated protocol
+classes rather than string kinds — `client.create(NetworkDevice, ...)`, not
+`kind="NetworkDevice"` — so a schema change fails type-check instead of at
+runtime. See
+[protocols-adopt-typed-kinds](../infrahub-common/rules/protocols-adopt-typed-kinds.md).
+
 ## Generator Basics
 
 Every generator has three components:
