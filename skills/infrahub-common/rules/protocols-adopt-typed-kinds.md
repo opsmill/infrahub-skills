@@ -26,8 +26,12 @@ infrahubctl protocols --out lib/protocols.py
 infrahubctl protocols --schemas schemas/ --out lib/protocols.py
 
 # Sync client
-infrahubctl protocols --schemas schemas/ --sync --out lib/protocols.py
+infrahubctl protocols --schemas schemas/ --sync --out lib/protocols_sync.py
 ```
+
+> The full regeneration workflow and the "never hand-edit" rule live in
+> [protocols-generated](./protocols-generated.md) — keep the two in step if
+> the CLI changes.
 
 ### Use them
 
