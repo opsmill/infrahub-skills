@@ -1,0 +1,159 @@
+# Reference
+
+## NetBox device-type fields
+
+Source of truth: the definitions schema in
+[netbox-community/devicetype-library](https://github.com/netbox-community/devicetype-library).
+
+### Top level
+
+| Field | Type | Required | Notes |
+| ----- | ---- | -------- | ----- |
+| `manufacturer` | string | yes | Becomes its own Infrahub object |
+| `model` | string | yes | The device type name |
+| `slug` | string | yes | `^[-a-z0-9_]+$`, unique library-wide — the template key |
+| `part_number` | string | no | Vendor ordering code |
+| `u_height` | number | no | Multiples of 0.5; Infrahub `Number` attributes take integers |
+| `is_full_depth` | boolean | no | Defaults to true |
+| `airflow` | string | no | `front-to-rear`, `rear-to-front`, `left-to-right`, `right-to-left`, `side-to-rear`, `rear-to-side`, `bottom-to-top`, `top-to-bottom`, `passive`, `mixed` |
+| `weight` | number | no | Paired with `weight_unit` |
+| `weight_unit` | string | no | `kg`, `g`, `lb`, `oz` |
+| `subdevice_role` | string | no | `parent` or `child` |
+| `is_powered` | boolean | no | Defaults to true |
+| `front_image` / `rear_image` | boolean | no | Whether an elevation image exists |
+| `comments` | string | no | Usually a Markdown datasheet link |
+
+### Component lists
+
+| List | Entry fields |
+| ---- | ------------ |
+| `console-ports` | `name`, `label`, `type` |
+| `console-server-ports` | `name`, `label`, `type` |
+| `power-ports` | `name`, `label`, `type`, `maximum_draw`, `allocated_draw` |
+| `power-outlets` | `name`, `label`, `type`, `power_port`, `feed_leg` |
+| `interfaces` | `name`, `label`, `type`, `mgmt_only`, `poe_mode`, `poe_type` |
+| `front-ports` | `name`, `label`, `type`, `rear_port`, `rear_port_position` |
+| `rear-ports` | `name`, `label`, `type`, `positions` |
+| `module-bays` | `name`, `label`, `position` |
+| `device-bays` | `name`, `label` |
+| `inventory-items` | `name`, `label`, `manufacturer`, `part_id` |
+
+## Infrahub object templates
+
+| Concept | Detail |
+| ------- | ------ |
+| Generated kind | `Template` + the node kind — `DcimDevice` becomes `TemplateDcimDevice` |
+| Enabled by | `generate_template: true` on the **node** (not on a generic) |
+| Identity attribute | `template_name`, unique per kind, and the `human_friendly_id` |
+| Component templates | Generated for `Component` relationships only |
+| Model data | Not on the template — on the device type object it links to |
+| Creating from one | Set `object_template: <template_name>` on the object |
+| Retroactivity | None; editing a template does not change objects already created from it |
+
+Docs:
+[Object Templates overview](https://docs.infrahub.app/object-templates/overview),
+[Use object templates](https://docs.infrahub.app/object-templates/use).
+
+## Default profile mapping (schema-library)
+
+What `scripts/mappings/schema-library.yml` binds, and
+what it cannot.
+
+### Mapped
+
+| NetBox | Infrahub | Transform |
+| ------ | -------- | --------- |
+| `manufacturer` | `OrganizationManufacturer.name` | — |
+| `model` | `DcimDeviceType.name` | — |
+| `part_number` | `DcimDeviceType.part_number` | — |
+| `description`, else `comments` | `DcimDeviceType.description` | fallback |
+| `u_height` | `DcimDeviceType.height` | `number` |
+| `is_full_depth` | `DcimDeviceType.full_depth` | `boolean` |
+| `weight` + `weight_unit` | `DcimDeviceType.weight` | `weight_kg` |
+| `slug` | `TemplateDcimDevice.template_name` | format string |
+| `interfaces[].name` | `TemplateInterfacePhysical.name` | — |
+| `interfaces[].description`, else `.label` | `TemplateInterfacePhysical.description` | fallback |
+| `interfaces[].mgmt_only: true` | `role: management` | derived |
+
+### Not mapped — reported as skipped
+
+`console-ports`, `console-server-ports`,
+`power-ports`, `power-outlets`, `front-ports`,
+`rear-ports`, `module-bays`, `device-bays`,
+`inventory-items` — schema-library models no
+equivalent node.
+
+### Not mapped — reported as dropped
+
+`airflow`, `subdevice_role`, `is_powered`,
+`front_image`, `rear_image`, and per interface
+`type`, `poe_mode`, `poe_type` — the attributes do
+not exist on the target kinds. `InterfacePhysical` in
+particular has no media-type or PoE attribute.
+
+### Mapped but shadowed
+
+Where a fallback is declared and *both* sources carry
+a value, the loser is reported as shadowed. In the
+published library that is `comments` on 188 device
+types and interface `label` on 206 entries.
+
+## Mapping profile keys
+
+| Key | Required | Meaning |
+| --- | -------- | ------- |
+| `manufacturer.kind` | yes | Infrahub kind for manufacturers |
+| `manufacturer.name_field` | yes | Attribute holding the manufacturer name |
+| `device_type.kind` | yes | Infrahub kind for device types |
+| `device_type.manufacturer_relationship` | yes | Relationship from device type to manufacturer |
+| `device_type.fields` | no | NetBox field to Infrahub attribute map |
+| `<field>.fallback` | no | Field name or ordered list tried when the primary source is empty |
+| `device_type.defaults` | no | Attributes written on every device type |
+| `template.kind` | yes | The generated `Template<Kind>` |
+| `template.template_name` | yes | Format string over the NetBox top-level fields |
+| `template.device_type_relationship` | yes | Relationship from device to device type |
+| `template.defaults` | no | Attributes written on every template |
+| `components.<list>.kind` | yes | Concrete component template kind |
+| `components.<list>.relationship` | yes | Component relationship on the parent template |
+| `components.<list>.template_name` | yes | Format string; `{template_name}` is the parent's |
+| `components.<list>.fields` | no | Per-entry field map |
+| `components.<list>.derived` | no | Conditional attributes (`when` / `value`) |
+| `components.<list>.defaults` | no | Attributes written on every entry |
+
+### Transforms
+
+| Name | Effect |
+| ---- | ------ |
+| `text` | Pass through (default) |
+| `number` | Coerce to int; non-integer values kept as float and reported |
+| `boolean` | Coerce to bool |
+| `weight_kg` | Convert using `weight_unit` into kilograms, rounded to 3 dp |
+
+## Converter CLI
+
+```text
+netbox_to_infrahub_templates.py INPUT... --mapping PROFILE --output-dir DIR
+                                [--report PATH|-]
+```
+
+| Argument | Meaning |
+| -------- | ------- |
+| `INPUT...` | Files, directories (walked recursively), or globs |
+| `--mapping` | Mapping profile YAML |
+| `--output-dir` | Where the three object files are written |
+| `--report` | Coverage report path; `-` writes it to stdout |
+
+| Exit code | Meaning |
+| --------- | ------- |
+| 0 | Converted (possibly with skipped components) |
+| 1 | Bad mapping profile, unreadable input, or malformed NetBox file |
+| 2 | No input files matched |
+
+## Output files
+
+| File | Kind | Depends on |
+| ---- | ---- | ---------- |
+| `01_manufacturers.yml` | `manufacturer.kind` | — |
+| `02_device_types.yml` | `device_type.kind` | manufacturers |
+| `03_device_templates.yml` | `template.kind` | device types |
+| `coverage-report.md` | — | — |

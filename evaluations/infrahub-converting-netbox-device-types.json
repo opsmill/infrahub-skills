@@ -1,0 +1,214 @@
+{
+  "skill_name": "infrahub-converting-netbox-device-types",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have this NetBox device-type definition saved as\n`device-types/Cisco/C9300-24P.yaml`:\n\n    ---\n    manufacturer: Cisco\n    model: Catalyst 9300-24P\n    slug: cisco-c9300-24p\n    part_number: C9300-24P\n    u_height: 1\n    is_full_depth: true\n    weight: 6.8\n    weight_unit: kg\n    interfaces:\n      - name: GigabitEthernet1/0/1\n        type: 1000base-t\n      - name: GigabitEthernet1/0/2\n        type: 1000base-t\n      - name: mgmt0\n        type: 1000base-t\n        mgmt_only: true\n\nOur schema is the OpsMill schema-library DCIM schema with\n`generate_template: true` already enabled on `DcimDevice`, so\n`TemplateDcimDevice` and `TemplateInterfacePhysical` exist.\n\nConvert it into Infrahub object templates and write the emitted files\nunder `./output_dir/` (create the directory). Do not load anything\nagainst a server.",
+      "expected_output": "A ./output_dir/ containing Infrahub object files. The template file uses spec.kind TemplateDcimDevice, every row has a template_name, the interfaces nest under a kind + data wrapper naming TemplateInterfacePhysical, and no physical model data (height, part_number, weight) appears on the template.",
+      "files": [],
+      "expectations": [
+        "Every emitted document has apiVersion infrahub.app/v1 and kind Object",
+        "The template document uses spec.kind TemplateDcimDevice, not DcimDevice",
+        "Every template row carries a template_name",
+        "Interfaces nest under a mapping with kind and data, not a bare list",
+        "The component wrapper names a Template* kind",
+        "Model data such as height and part_number is on the device type, not the template"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "template-kind",
+          "check": "Templates are authored under a Template<Kind> and every row has a template_name"
+        },
+        {
+          "name": "no-model-data-on-template",
+          "check": "height, part_number, weight, and full_depth do not appear on any template row"
+        },
+        {
+          "name": "component-kind-wrapper",
+          "check": "Component children nest under a kind + data wrapper naming a Template* kind"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Convert both of these NetBox device types into Infrahub object\ntemplates. Note that they use the same interface names as each other.\n\n`device-types/Arista/DCS-7010T-48.yaml`:\n\n    ---\n    manufacturer: Arista\n    model: DCS-7010T-48\n    slug: arista-dcs-7010t-48\n    u_height: 1\n    interfaces:\n      - name: Ethernet1\n        type: 1000base-t\n      - name: Ethernet2\n        type: 1000base-t\n      - name: Management1\n        type: 1000base-t\n        mgmt_only: true\n\n`device-types/Arista/DCS-7050TX-48.yaml`:\n\n    ---\n    manufacturer: Arista\n    model: DCS-7050TX-48\n    slug: arista-dcs-7050tx-48\n    u_height: 1\n    interfaces:\n      - name: Ethernet1\n        type: 10gbase-t\n      - name: Ethernet2\n        type: 10gbase-t\n      - name: Management1\n        type: 1000base-t\n        mgmt_only: true\n\nOur schema is the OpsMill schema-library DCIM schema with\n`generate_template: true` enabled on `DcimDevice`.\n\nWrite the emitted files under `./output_dir/` (create the directory).",
+      "expected_output": "A ./output_dir/ where both device types converted, and every component template_name is namespaced by its parent template (for example arista-dcs-7010t-48__Ethernet1) so that the Ethernet1 templates of the two device types do not collide.",
+      "files": [],
+      "expectations": [
+        "Both device types produce a template row",
+        "Parent template names derive from the NetBox slug",
+        "Every component template_name contains its parent template's name",
+        "No two component templates share a template_name"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "template-kind",
+          "check": "Templates are authored under a Template<Kind> and every row has a template_name"
+        },
+        {
+          "name": "component-names-namespaced",
+          "check": "Component template names are namespaced by their parent template and are unique across the whole output"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Convert this NetBox device type into Infrahub object templates\nfor our OpsMill schema-library DCIM schema (`generate_template: true`\nis already enabled on `DcimDevice`):\n\n    ---\n    manufacturer: Juniper\n    model: EX4300-32F\n    slug: juniper-ex4300-32f\n    part_number: EX4300-32F\n    u_height: 1\n    is_full_depth: true\n    weight: 18.0\n    weight_unit: lb\n    interfaces:\n      - name: ge-0/0/0\n        type: 1000base-x-sfp\n      - name: ge-0/0/1\n        type: 1000base-x-sfp\n\nThe manufacturer does not exist in Infrahub yet, so the output has to\ncreate it too. Write the emitted files under `./output_dir/` (create\nthe directory) so that loading them in filename order works.",
+      "expected_output": "A ./output_dir/ with numbered files in dependency order \u2014 manufacturers first, then device types, then templates \u2014 where the device type object names its manufacturer and carries the physical model data (height, part_number, weight converted to kilograms).",
+      "files": [],
+      "expectations": [
+        "Emitted files are numbered so a filename sort is a valid load order",
+        "Manufacturers are emitted before device types",
+        "Device types are emitted before templates",
+        "The device type object references its manufacturer",
+        "The device type object carries the model data, not the template"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "load-order-numbering",
+          "check": "Files are numbered so manufacturers precede device types, which precede templates"
+        },
+        {
+          "name": "device-type-object",
+          "check": "The device type object names a manufacturer and carries model data"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Convert this NetBox device type for our OpsMill schema-library\nDCIM schema (`generate_template: true` is enabled on `DcimDevice`;\nthe schema models interfaces as the only device component):\n\n    ---\n    manufacturer: Cisco\n    model: Catalyst 9500-16X\n    slug: cisco-c9500-16x\n    part_number: C9500-16X\n    u_height: 1\n    airflow: front-to-rear\n    console-ports:\n      - name: con 0\n        type: rj-45\n      - name: usb\n        type: usb-mini-b\n    power-ports:\n      - name: PSU0\n        type: iec-60320-c14\n        maximum_draw: 950\n    module-bays:\n      - name: NM slot\n        position: '1'\n    interfaces:\n      - name: TenGigabitEthernet1/0/1\n        type: 10gbase-x-sfpp\n      - name: TenGigabitEthernet1/0/2\n        type: 10gbase-x-sfpp\n\nWrite the emitted files under `./output_dir/` (create the directory).\nI need to know exactly what did not make it across.",
+      "expected_output": "A ./output_dir/ containing the object files plus a Markdown coverage report naming the component lists that were skipped (console-ports, power-ports, module-bays) and the fields that were dropped, alongside the interfaces that did convert.",
+      "files": [],
+      "expectations": [
+        "A Markdown coverage report is written into the output directory",
+        "The report names console-ports, power-ports, and module-bays as skipped",
+        "The report accounts for the interfaces that did convert",
+        "Dropped fields such as the interface type are named"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "coverage-report",
+          "check": "A Markdown report names the NetBox component lists that did not convert"
+        },
+        {
+          "name": "template-kind",
+          "check": "Templates are authored under a Template<Kind> and every row has a template_name"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "I want to import NetBox device types as object templates. Here\nis the relevant part of our current schema, `schemas/dcim.yml`:\n\n    ---\n    version: \"1.0\"\n    nodes:\n      - name: Device\n        namespace: Dcim\n        label: Device\n        inherit_from:\n          - DcimGenericDevice\n        attributes:\n          - name: name\n            kind: Text\n            unique: true\n          - name: serial\n            kind: Text\n            optional: true\n        relationships:\n          - name: interfaces\n            peer: DcimInterface\n            cardinality: many\n            kind: Component\n          - name: device_type\n            peer: DcimDeviceType\n            cardinality: one\n            kind: Attribute\n\nWork out what has to change in this schema before any converted\noutput can load, and write the corrected schema to\n`./output_dir/dcim.yml` (create the directory). Explain the change in\na `./output_dir/notes.md`.",
+      "expected_output": "A ./output_dir/dcim.yml where the DcimDevice node carries generate_template: true, plus notes explaining that the Template* kinds do not exist until that flag is set and the schema is loaded.",
+      "files": [],
+      "expectations": [
+        "The corrected schema sets generate_template true on the Device node",
+        "The flag is placed on the node, not on a generic",
+        "The notes explain that Template* kinds are generated, not hand-written",
+        "The notes note that only Component relationships generate component templates"
+      ],
+      "assertions": [
+        {
+          "name": "generate-template-prerequisite",
+          "check": "generate_template is set to true in the emitted schema or notes"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Convert these two NetBox device types into a complete, loadable\nInfrahub object-template import for our OpsMill schema-library DCIM\nschema (`generate_template: true` is already enabled on `DcimDevice`).\nNeither manufacturer exists in Infrahub yet.\n\n`device-types/Cisco/C9200-24P.yaml`:\n\n    ---\n    manufacturer: Cisco\n    model: Catalyst 9200-24P\n    slug: cisco-c9200-24p\n    part_number: C9200-24P\n    u_height: 1\n    is_full_depth: true\n    weight: 5.4\n    weight_unit: kg\n    airflow: front-to-rear\n    console-ports:\n      - name: con 0\n        type: rj-45\n    interfaces:\n      - name: GigabitEthernet1/0/1\n        type: 1000base-t\n        poe_mode: pse\n      - name: GigabitEthernet1/0/2\n        type: 1000base-t\n        poe_mode: pse\n\n`device-types/Juniper/EX2300-24T.yaml`:\n\n    ---\n    manufacturer: Juniper\n    model: EX2300-24T\n    slug: juniper-ex2300-24t\n    part_number: EX2300-24T\n    u_height: 1\n    weight: 7.5\n    weight_unit: lb\n    module-bays:\n      - name: PSU 0\n        position: '0'\n    interfaces:\n      - name: ge-0/0/0\n        type: 1000base-t\n      - name: me0\n        type: 1000base-t\n        mgmt_only: true\n\nWrite everything needed to load this under `./output_dir/` (create the\ndirectory), including a record of anything that did not convert.",
+      "expected_output": "A ./output_dir/ with numbered object files (manufacturers, device types, templates) plus a Markdown coverage report. Templates use Template* kinds with parent-namespaced component names, model data sits on the device types, and the report names the skipped console-ports and module-bays.",
+      "files": [],
+      "expectations": [
+        "Both manufacturers are created, de-duplicated, and load first",
+        "Device types carry height, part_number, and weight in kilograms",
+        "Templates use Template* kinds and carry no model data",
+        "Component templates nest under a kind + data wrapper",
+        "Component template names are namespaced by their parent",
+        "A coverage report names the skipped console-ports and module-bays"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "template-kind",
+          "check": "Templates are authored under a Template<Kind> and every row has a template_name"
+        },
+        {
+          "name": "no-model-data-on-template",
+          "check": "height, part_number, weight, and full_depth do not appear on any template row"
+        },
+        {
+          "name": "component-kind-wrapper",
+          "check": "Component children nest under a kind + data wrapper naming a Template* kind"
+        },
+        {
+          "name": "component-names-namespaced",
+          "check": "Component template names are namespaced by their parent template and are unique across the whole output"
+        },
+        {
+          "name": "device-type-object",
+          "check": "The device type object names a manufacturer and carries model data"
+        },
+        {
+          "name": "load-order-numbering",
+          "check": "Files are numbered so manufacturers precede device types, which precede templates"
+        },
+        {
+          "name": "coverage-report",
+          "check": "A Markdown report names the NetBox component lists that did not convert"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Convert this NetBox device type for our OpsMill schema-library\nDCIM schema (`generate_template: true` is enabled on `DcimDevice`).\nNote that NetBox carries two free-text fields at the device-type level\nand two per interface, while `DcimDeviceType` and `InterfacePhysical`\neach have only a single `description` attribute.\n\n    ---\n    manufacturer: Cisco\n    model: Catalyst 9200L-24T\n    slug: cisco-c9200l-24t\n    part_number: C9200L-24T-4G\n    u_height: 1\n    description: Fixed-uplink access switch for branch sites\n    comments: '[Catalyst 9200 Data Sheet](https://www.cisco.com/c/en/us/products/switches/cat9200.html)'\n    interfaces:\n      - name: GigabitEthernet1/0/1\n        type: 1000base-t\n        label: Uplink A\n        description: Primary uplink to the distribution layer\n      - name: GigabitEthernet1/0/2\n        type: 1000base-t\n        label: Uplink B\n      - name: GigabitEthernet1/0/3\n        type: 1000base-t\n        description: Spare access port\n      - name: GigabitEthernet1/0/4\n        type: 1000base-t\n\nI do not want the datasheet URL ending up as the device type's\ndescription, and I do not want to lose the interface text either.\n\nWrite the emitted files under `./output_dir/` (create the directory).",
+      "expected_output": "A ./output_dir/ where the device type description is the NetBox description (not the comments datasheet link), interfaces carry the NetBox description where present and fall back to the label where it is not, and the coverage report names the values lost to shadowing where both fields were set.",
+      "files": [],
+      "expectations": [
+        "The device type description is the NetBox description, not the comments URL",
+        "GigabitEthernet1/0/1 takes its description from the NetBox description",
+        "GigabitEthernet1/0/2 falls back to its label because it has no description",
+        "GigabitEthernet1/0/3 takes its description with no label present",
+        "The coverage report names the shadowed comments and interface label values",
+        "Neither comments nor label is reported as an unmapped dropped field"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "template-kind",
+          "check": "Templates are authored under a Template<Kind> and every row has a template_name"
+        },
+        {
+          "name": "fallback-precedence",
+          "check": "The semantic source wins, the fallback fills the gap, and shadowed values are named in the coverage report"
+        },
+        {
+          "name": "coverage-report",
+          "check": "A Markdown report names the NetBox component lists that did not convert"
+        }
+      ]
+    }
+  ]
+}
