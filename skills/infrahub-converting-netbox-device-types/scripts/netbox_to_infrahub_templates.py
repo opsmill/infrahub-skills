@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert NetBox device-type definitions into Infrahub object template YAML.
+"""Convert NetBox device and module types into Infrahub object YAML.
 
 Reads one or more NetBox ``devicetype-library`` YAML files (the format
 published at https://github.com/netbox-community/devicetype-library and
@@ -9,6 +9,13 @@ browsable via the NetBox Data Exchange) and emits Infrahub object files:
 2. Device type objects (which carry the physical model data)
 3. Object templates (``Template<Kind>``) plus their nested component
    templates
+4. Module type objects
+5. Module templates, when the profile configures them
+
+Both NetBox input families are accepted in a single pass. Device types
+and module types are told apart by the presence of ``slug``, which every
+device type carries and no module type does, so a mixed tree converts
+without being split up first. Files with no content are not written.
 
 The Infrahub side of the conversion is never hardcoded. Every kind,
 attribute name, and relationship name comes from a *mapping profile* --
@@ -96,8 +103,36 @@ NETBOX_TOP_LEVEL_FIELDS: tuple[str, ...] = (
     "weight_unit",
 )
 
+#: Every top-level scalar field a NetBox module-type file may declare.
+#: Module types carry no ``slug`` — that absence is how the two input
+#: families are told apart.
+NETBOX_MODULE_TOP_LEVEL_FIELDS: tuple[str, ...] = (
+    "manufacturer",
+    "model",
+    "part_number",
+    "comments",
+    "description",
+    "weight",
+    "weight_unit",
+    "airflow",
+    "profile",
+    "attribute_data",
+)
+
 #: Fields required by the NetBox device-type JSON schema.
 NETBOX_REQUIRED_FIELDS: tuple[str, ...] = ("manufacturer", "model", "slug")
+
+#: Fields required of a NetBox module-type.
+NETBOX_MODULE_REQUIRED_FIELDS: tuple[str, ...] = ("manufacturer", "model")
+
+DEVICE_TYPES = "device-types"
+MODULE_TYPES = "module-types"
+
+#: Token NetBox substitutes with the bay position when a module is
+#: installed. It appears in 93.9% of published module-type component names
+#: and cannot be resolved at template time, because a template is not bound
+#: to a bay.
+MODULE_POSITION_TOKEN = "{module}"
 
 #: Conversion factors from each NetBox weight unit to kilograms.
 WEIGHT_TO_KG: dict[str, float] = {
@@ -109,10 +144,14 @@ WEIGHT_TO_KG: dict[str, float] = {
 
 SUPPORTED_TRANSFORMS: tuple[str, ...] = ("text", "number", "boolean", "weight_kg")
 
+#: Emitted in dependency order. Module types depend only on manufacturers,
+#: so they sit after the device files rather than renumbering them.
 OUTPUT_FILENAMES: dict[str, str] = {
     "manufacturer": "01_manufacturers.yml",
     "device_type": "02_device_types.yml",
     "template": "03_device_templates.yml",
+    "module_type": "04_module_types.yml",
+    "module_template": "05_module_templates.yml",
 }
 
 
@@ -187,6 +226,54 @@ class ComponentMapping:
 
 
 @dataclass(frozen=True)
+class ModuleTarget:
+    """How NetBox module types map onto Infrahub kinds.
+
+    Structurally the same split as device types: a type object carrying the
+    model facts, and optionally a template carrying the components. Most
+    schemas can only do the first — the stock schema-library module type
+    has no component relationships — so the template half is optional.
+
+    Args:
+        kind: Concrete Infrahub kind for the module type object.
+        manufacturer_relationship: Relationship to the manufacturer.
+        fields: NetBox field to Infrahub attribute mappings.
+        defaults: Attributes written on every module type.
+        key_format: Format string identifying a module type; NetBox module
+            types carry no slug, and ``model`` is unique library-wide.
+        template_kind: Optional ``Template<Kind>`` for installed modules.
+        template_name_format: Format string for that template's name.
+        template_type_relationship: Relationship from module to module type.
+        template_defaults: Attributes written on every module template.
+        components: Component lists mapped onto the module template.
+        position_placeholder: Value substituted for ``{module}`` in
+            component names; ``None`` keeps the token literal.
+    """
+
+    kind: str
+    manufacturer_relationship: str
+    fields: tuple[FieldMapping, ...]
+    defaults: dict[str, Any]
+    key_format: str
+    template_kind: str | None = None
+    template_name_format: str | None = None
+    template_type_relationship: str | None = None
+    template_defaults: dict[str, Any] = field(default_factory=dict)
+    components: tuple[ComponentMapping, ...] = ()
+    position_placeholder: str | None = None
+
+    @property
+    def emits_templates(self) -> bool:
+        """True when the profile configures a module template."""
+        return bool(self.template_kind)
+
+    @property
+    def mapped_lists(self) -> set[str]:
+        """NetBox component lists this target knows how to convert."""
+        return {component.netbox_list for component in self.components}
+
+
+@dataclass(frozen=True)
 class Profile:
     """A validated mapping profile describing the target Infrahub schema."""
 
@@ -202,6 +289,7 @@ class Profile:
     template_device_type_rel: str
     template_defaults: dict[str, Any]
     components: tuple[ComponentMapping, ...]
+    modules: ModuleTarget | None = None
 
     @property
     def mapped_lists(self) -> set[str]:
@@ -300,32 +388,80 @@ def _parse_derived(raw: Any, path: str) -> tuple[DerivedField, ...]:
     return tuple(derived)
 
 
-def _parse_components(raw: Any) -> tuple[ComponentMapping, ...]:
-    """Parse the ``components:`` block of a mapping profile."""
+def _parse_components(raw: Any, path: str = "components") -> tuple[ComponentMapping, ...]:
+    """Parse a ``components:`` block of a mapping profile."""
     components: list[ComponentMapping] = []
-    for netbox_list, spec in _require_mapping(raw or {}, "components").items():
-        path = f"components.{netbox_list}"
+    for netbox_list, spec in _require_mapping(raw or {}, path).items():
+        entry_path = f"{path}.{netbox_list}"
         if netbox_list not in NETBOX_COMPONENT_LISTS:
             raise ConversionError(
-                f"Mapping profile: '{path}' is not a NetBox component list "
+                f"Mapping profile: '{entry_path}' is not a NetBox component list "
                 f"({', '.join(NETBOX_COMPONENT_LISTS)})"
             )
-        spec_map = _require_mapping(spec, path)
+        spec_map = _require_mapping(spec, entry_path)
         for required in ("kind", "relationship", "template_name"):
             if not spec_map.get(required):
-                raise ConversionError(f"Mapping profile: '{path}' needs '{required}'")
+                raise ConversionError(f"Mapping profile: '{entry_path}' needs '{required}'")
         components.append(
             ComponentMapping(
                 netbox_list=netbox_list,
                 kind=spec_map["kind"],
                 relationship=spec_map["relationship"],
                 template_name=spec_map["template_name"],
-                fields=_parse_fields(spec_map.get("fields"), f"{path}.fields"),
-                derived=_parse_derived(spec_map.get("derived"), f"{path}.derived"),
-                defaults=dict(_require_mapping(spec_map.get("defaults", {}), f"{path}.defaults")),
+                fields=_parse_fields(spec_map.get("fields"), f"{entry_path}.fields"),
+                derived=_parse_derived(spec_map.get("derived"), f"{entry_path}.derived"),
+                defaults=dict(
+                    _require_mapping(spec_map.get("defaults", {}), f"{entry_path}.defaults")
+                ),
             )
         )
     return tuple(components)
+
+
+def _parse_module_target(raw: Any) -> ModuleTarget | None:
+    """Parse the optional ``module_type`` section of a mapping profile."""
+    if raw is None:
+        return None
+    section = _require_mapping(raw, "module_type")
+    for key in ("kind", "manufacturer_relationship"):
+        if not section.get(key):
+            raise ConversionError(f"Mapping profile: 'module_type' missing required key '{key}'")
+
+    template = _require_mapping(section.get("template", {}) or {}, "module_type.template")
+    if template and not template.get("kind"):
+        raise ConversionError("Mapping profile: 'module_type.template' needs a 'kind'")
+    if template and not template.get("template_name"):
+        raise ConversionError("Mapping profile: 'module_type.template' needs a 'template_name'")
+
+    components = _parse_components(section.get("components"), path="module_type.components")
+    if components and not template:
+        raise ConversionError(
+            "Mapping profile: 'module_type.components' needs 'module_type.template' — "
+            "components hang off a module template, and most schemas have no "
+            "component relationship on the module type itself"
+        )
+
+    placeholder = section.get("position_placeholder")
+    if placeholder is not None and not isinstance(placeholder, (str, int)):
+        raise ConversionError(
+            "Mapping profile: 'module_type.position_placeholder' must be a string or number"
+        )
+
+    return ModuleTarget(
+        kind=section["kind"],
+        manufacturer_relationship=section["manufacturer_relationship"],
+        fields=_parse_fields(section.get("fields"), "module_type.fields"),
+        defaults=dict(_require_mapping(section.get("defaults", {}), "module_type.defaults")),
+        key_format=str(section.get("key", "{model}")),
+        template_kind=template.get("kind"),
+        template_name_format=template.get("template_name"),
+        template_type_relationship=template.get("module_type_relationship"),
+        template_defaults=dict(
+            _require_mapping(template.get("defaults", {}), "module_type.template.defaults")
+        ),
+        components=components,
+        position_placeholder=None if placeholder is None else str(placeholder),
+    )
 
 
 def load_profile(path: Path) -> Profile:
@@ -379,6 +515,7 @@ def load_profile(path: Path) -> Profile:
         template_device_type_rel=template["device_type_relationship"],
         template_defaults=dict(_require_mapping(template.get("defaults", {}), "template.defaults")),
         components=_parse_components(root.get("components")),
+        modules=_parse_module_target(root.get("module_type")),
     )
 
 
@@ -387,17 +524,41 @@ def load_profile(path: Path) -> Profile:
 # --------------------------------------------------------------------------
 
 
+def detect_input_kind(data: dict[str, Any]) -> str:
+    """Tell a NetBox device-type file from a module-type file.
+
+    ``slug`` is required of every device type and carried by no module
+    type — across the 1,909 published module types, none declares one — so
+    its presence is a reliable discriminator and lets a mixed tree be
+    converted in one pass.
+
+    Args:
+        data: The parsed NetBox mapping.
+
+    Returns:
+        Either ``DEVICE_TYPES`` or ``MODULE_TYPES``.
+    """
+    return DEVICE_TYPES if data.get("slug") else MODULE_TYPES
+
+
 @dataclass(frozen=True)
 class DeviceType:
-    """A parsed NetBox device-type definition.
+    """A parsed NetBox device-type or module-type definition.
 
     Args:
         source: Path the definition was read from.
         data: The raw parsed YAML mapping.
+        input_kind: Which NetBox input family this came from.
     """
 
     source: Path
     data: dict[str, Any]
+    input_kind: str = DEVICE_TYPES
+
+    @property
+    def is_module(self) -> bool:
+        """True for a NetBox module type."""
+        return self.input_kind == MODULE_TYPES
 
     @property
     def manufacturer(self) -> str:
@@ -411,8 +572,12 @@ class DeviceType:
 
     @property
     def slug(self) -> str:
-        """The NetBox slug, unique across the library."""
-        return str(self.data["slug"])
+        """The NetBox slug, unique across the library.
+
+        Module types carry none, so the model — unique across all 1,909
+        published module types — stands in as the identity.
+        """
+        return str(self.data.get("slug") or self.data["model"])
 
     def components(self, list_name: str) -> list[dict[str, Any]]:
         """Return the entries of one NetBox component list."""
@@ -478,11 +643,21 @@ def parse_device_type(path: Path) -> DeviceType:
     if not isinstance(raw, dict):
         raise ConversionError(f"{path}: expected a YAML mapping at the top level")
 
-    missing = [key for key in NETBOX_REQUIRED_FIELDS if not raw.get(key)]
+    input_kind = detect_input_kind(raw)
+    required = (
+        NETBOX_MODULE_REQUIRED_FIELDS if input_kind == MODULE_TYPES else NETBOX_REQUIRED_FIELDS
+    )
+    missing = [key for key in required if not raw.get(key)]
     if missing:
-        raise ConversionError(f"{path}: missing required NetBox field(s): {', '.join(missing)}")
+        label = "module-type" if input_kind == MODULE_TYPES else "device-type"
+        hint = (
+            " (no 'slug', so this was read as a module type)" if input_kind == MODULE_TYPES else ""
+        )
+        raise ConversionError(
+            f"{path}: missing required NetBox {label} field(s): {', '.join(missing)}{hint}"
+        )
 
-    return DeviceType(source=path, data=raw)
+    return DeviceType(source=path, data=raw, input_kind=input_kind)
 
 
 # --------------------------------------------------------------------------
@@ -649,6 +824,7 @@ class Coverage:
     dropped_fields: dict[str, list[str]] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
     shadowed: list[str] = field(default_factory=list)
+    input_kind: str = DEVICE_TYPES
 
     @property
     def is_lossless(self) -> bool:
@@ -658,48 +834,91 @@ class Coverage:
 
 @dataclass
 class Conversion:
-    """The full result of converting a batch of device types."""
+    """The full result of converting a batch of NetBox definitions."""
 
     manufacturers: list[dict[str, Any]] = field(default_factory=list)
     device_types: list[dict[str, Any]] = field(default_factory=list)
     templates: list[dict[str, Any]] = field(default_factory=list)
+    module_types: list[dict[str, Any]] = field(default_factory=list)
+    module_templates: list[dict[str, Any]] = field(default_factory=list)
     coverage: list[Coverage] = field(default_factory=list)
 
 
-def _build_device_type(device: DeviceType, profile: Profile, coverage: Coverage) -> dict[str, Any]:
-    """Build the Infrahub device-type object for one NetBox definition."""
+def _build_type_object(
+    source_type: DeviceType,
+    *,
+    fields: tuple[FieldMapping, ...],
+    defaults: dict[str, Any],
+    manufacturer_relationship: str,
+    top_level_fields: tuple[str, ...],
+    extra_consumed: set[str],
+    coverage: Coverage,
+    owner: str,
+) -> dict[str, Any]:
+    """Build the Infrahub type object for one NetBox definition.
+
+    Device types and module types differ only in which kind and fields they
+    target, so both go through here.
+
+    Args:
+        source_type: The parsed NetBox definition.
+        fields: Field mappings to apply.
+        defaults: Attributes written when not otherwise set.
+        manufacturer_relationship: Relationship naming the manufacturer.
+        top_level_fields: The NetBox field inventory to check for drops.
+        extra_consumed: Fields consumed elsewhere (e.g. by a name format).
+        coverage: Collector for notes, shadowing, and dropped fields.
+        owner: Label used in the coverage report.
+
+    Returns:
+        The Infrahub object as a mapping.
+    """
     obj: dict[str, Any] = {}
-    for mapping in profile.device_type_fields:
-        source, raw, shadowed = resolve_source(mapping, device.data)
+    for mapping in fields:
+        source, raw, shadowed = resolve_source(mapping, source_type.data)
         if source is None:
             continue
-        value, note = apply_transform(mapping, raw, device.data)
+        value, note = apply_transform(mapping, raw, source_type.data)
         obj[mapping.target] = value
         if note:
             coverage.notes.append(f"{source}: {note}")
         coverage.shadowed.extend(
-            f"device_type `{name}` lost to `{source}` on `{mapping.target}`" for name in shadowed
+            f"{owner} `{name}` lost to `{source}` on `{mapping.target}`" for name in shadowed
         )
-    obj[profile.device_type_manufacturer_rel] = device.manufacturer
-    for key, value in profile.device_type_defaults.items():
+    obj[manufacturer_relationship] = source_type.manufacturer
+    for key, value in defaults.items():
         obj.setdefault(key, value)
 
     # `manufacturer` becomes its own object, `weight_unit` is folded into the
-    # weight conversion, and template-name fields identify the template — none
-    # of those are lost, so none belong in the dropped-field report.
+    # weight conversion, and name-format fields identify the record — none of
+    # those are lost, so none belong in the dropped-field report.
     consumed = (
-        {name for mapping in profile.device_type_fields for name in mapping.sources}
+        {name for mapping in fields for name in mapping.sources}
         | {"manufacturer", "weight_unit"}
-        | format_fields(profile.template_name_format)
+        | extra_consumed
     )
     dropped = [
         key
-        for key in device.data
-        if key in NETBOX_TOP_LEVEL_FIELDS and key not in consumed and device.data[key] is not None
+        for key in source_type.data
+        if key in top_level_fields and key not in consumed and source_type.data[key] is not None
     ]
     if dropped:
-        coverage.dropped_fields["device_type"] = sorted(dropped)
+        coverage.dropped_fields[owner] = sorted(dropped)
     return obj
+
+
+def _build_device_type(device: DeviceType, profile: Profile, coverage: Coverage) -> dict[str, Any]:
+    """Build the Infrahub device-type object for one NetBox definition."""
+    return _build_type_object(
+        device,
+        fields=profile.device_type_fields,
+        defaults=profile.device_type_defaults,
+        manufacturer_relationship=profile.device_type_manufacturer_rel,
+        top_level_fields=NETBOX_TOP_LEVEL_FIELDS,
+        extra_consumed=format_fields(profile.template_name_format),
+        coverage=coverage,
+        owner="device_type",
+    )
 
 
 def _build_component(
@@ -825,6 +1044,101 @@ def convert_device_type(device: DeviceType, profile: Profile) -> tuple[dict[str,
     return template, coverage
 
 
+def _substitute_position(value: Any, placeholder: str | None) -> Any:
+    """Resolve or preserve the NetBox ``{module}`` position token."""
+    if placeholder is None or not isinstance(value, str):
+        return value
+    return value.replace(MODULE_POSITION_TOKEN, placeholder)
+
+
+def convert_module_type(
+    module: DeviceType, target: ModuleTarget
+) -> tuple[dict[str, Any], dict[str, Any] | None, Coverage]:
+    """Convert one NetBox module type into Infrahub objects.
+
+    Args:
+        module: The parsed NetBox module type.
+        target: The ``module_type`` section of the mapping profile.
+
+    Returns:
+        A ``(module_type_object, module_template_or_None, coverage)`` triple.
+
+    Raises:
+        ConversionError: If a format string references an unknown field.
+    """
+    key = _format_name(target.key_format, dict(module.data))
+    coverage = Coverage(slug=key, source=module.source, template_name=key, input_kind=MODULE_TYPES)
+
+    obj = _build_type_object(
+        module,
+        fields=target.fields,
+        defaults=target.defaults,
+        manufacturer_relationship=target.manufacturer_relationship,
+        top_level_fields=NETBOX_MODULE_TOP_LEVEL_FIELDS,
+        extra_consumed=format_fields(target.key_format),
+        coverage=coverage,
+        owner="module_type",
+    )
+
+    template: dict[str, Any] | None = None
+    if target.emits_templates:
+        template_name = _format_name(str(target.template_name_format), dict(module.data))
+        coverage.template_name = template_name
+        template = {"template_name": template_name}
+        if target.template_type_relationship:
+            template[target.template_type_relationship] = key
+        for name, value in target.template_defaults.items():
+            template.setdefault(name, value)
+
+        for component in target.components:
+            entries = module.components(component.netbox_list)
+            if not entries:
+                continue
+            children = [
+                _build_component(
+                    component,
+                    _resolve_entry_positions(entry, target.position_placeholder),
+                    template_name,
+                    coverage,
+                )
+                for entry in entries
+            ]
+            _attach_component_block(template, component, children)
+            coverage.converted[component.netbox_list] = len(children)
+            _record_dropped_component_fields(component, entries, coverage)
+
+        if target.position_placeholder is None:
+            unresolved = sum(
+                1
+                for component in target.components
+                for entry in module.components(component.netbox_list)
+                if MODULE_POSITION_TOKEN in str(entry.get("name", ""))
+            )
+            if unresolved:
+                coverage.notes.append(
+                    f"{_plural(unresolved, 'component name', 'component names')} keep the "
+                    f"literal {MODULE_POSITION_TOKEN} bay-position token; set "
+                    "module_type.position_placeholder to substitute it"
+                )
+
+    mapped = target.mapped_lists if target.emits_templates else set()
+    for list_name in NETBOX_COMPONENT_LISTS:
+        if list_name in mapped:
+            continue
+        entries = module.components(list_name)
+        if entries:
+            coverage.skipped_lists[list_name] = len(entries)
+
+    return obj, template, coverage
+
+
+def _resolve_entry_positions(entry: dict[str, Any], placeholder: str | None) -> dict[str, Any]:
+    """Return a component entry with ``{module}`` resolved where configured."""
+    if placeholder is None:
+        return entry
+    return {key: _substitute_position(value, placeholder) for key, value in entry.items()}
+
+
 def convert_all(devices: list[DeviceType], profile: Profile) -> Conversion:
     """Convert a batch of device types, de-duplicating manufacturers.
 
@@ -840,28 +1154,48 @@ def convert_all(devices: list[DeviceType], profile: Profile) -> Conversion:
     """
     result = Conversion()
     seen_manufacturers: set[str] = set()
-    seen_templates: dict[str, Path] = {}
+    seen_names: dict[str, Path] = {}
 
-    for device in devices:
-        template, coverage = convert_device_type(device, profile)
-        if template["template_name"] in seen_templates:
-            first = seen_templates[template["template_name"]]
-            raise ConversionError(
-                f"{device.source}: template_name {template['template_name']!r} "
-                f"already produced by {first}; template names must be unique"
-            )
-        seen_templates[template["template_name"]] = device.source
+    modules = [device for device in devices if device.is_module]
+    if modules and profile.modules is None:
+        raise ConversionError(
+            f"{len(modules)} module-type file(s) matched (for example {modules[0].source}), "
+            f"but mapping profile {profile.name!r} has no 'module_type' section. Add one, "
+            "or point the converter at device-types only."
+        )
 
-        if device.manufacturer not in seen_manufacturers:
-            seen_manufacturers.add(device.manufacturer)
-            result.manufacturers.append({profile.manufacturer_name_field: device.manufacturer})
+    for entry in devices:
+        if entry.is_module:
+            target = profile.modules
+            assert target is not None  # guarded above
+            obj, template, coverage = convert_module_type(entry, target)
+            _claim_name(seen_names, coverage.template_name, entry.source, "module")
+            result.module_types.append(obj)
+            if template is not None:
+                result.module_templates.append(template)
+        else:
+            template, coverage = convert_device_type(entry, profile)
+            _claim_name(seen_names, template["template_name"], entry.source, "template")
+            result.device_types.append(_build_device_type(entry, profile, coverage))
+            result.templates.append(template)
 
-        result.device_types.append(_build_device_type(device, profile, coverage))
-        result.templates.append(template)
+        if entry.manufacturer not in seen_manufacturers:
+            seen_manufacturers.add(entry.manufacturer)
+            result.manufacturers.append({profile.manufacturer_name_field: entry.manufacturer})
         result.coverage.append(coverage)
 
     result.manufacturers.sort(key=lambda obj: obj[profile.manufacturer_name_field])
     return result
+
+
+def _claim_name(seen: dict[str, Path], name: str, source: Path, label: str) -> None:
+    """Reserve an identity, refusing a collision rather than emitting both."""
+    if name in seen:
+        raise ConversionError(
+            f"{source}: {label} name {name!r} already produced by {seen[name]}; "
+            f"{label} names must be unique"
+        )
+    seen[name] = source
 
 
 # --------------------------------------------------------------------------
@@ -898,8 +1232,9 @@ def _render_coverage_row(entry: Coverage) -> str:
     """Render one device type's row in the report summary table."""
     converted = ", ".join(f"{name} ({count})" for name, count in sorted(entry.converted.items()))
     skipped = ", ".join(f"{name} ({count})" for name, count in sorted(entry.skipped_lists.items()))
+    kind = "module" if entry.input_kind == MODULE_TYPES else "device"
     return (
-        f"| `{entry.slug}` | {converted or '—'} | {skipped or '—'} | "
+        f"| `{entry.slug}` | {kind} | {converted or '—'} | {skipped or '—'} | "
         f"{'yes' if entry.is_lossless else 'no'} |"
     )
 
@@ -987,15 +1322,23 @@ def render_report(conversion: Conversion, profile: Profile) -> str:
         A Markdown report naming every skipped component list, dropped
         field, and value coercion.
     """
+    devices = [e for e in conversion.coverage if e.input_kind == DEVICE_TYPES]
+    modules = [e for e in conversion.coverage if e.input_kind == MODULE_TYPES]
     lines = [
         "# NetBox to Infrahub conversion coverage",
         "",
         f"Mapping profile: `{profile.name}`",
-        f"Device types converted: {len(conversion.coverage)}",
-        "",
-        "| Device type | Converted components | Skipped components | Lossless |",
-        "| ----------- | -------------------- | ------------------ | -------- |",
+        f"Device types converted: {len(devices)}",
     ]
+    if modules:
+        lines.append(f"Module types converted: {len(modules)}")
+    lines.extend(
+        [
+            "",
+            "| Source | Kind | Converted components | Skipped components | Lossless |",
+            "| ------ | ---- | -------------------- | ------------------ | -------- |",
+        ]
+    )
     lines.extend(_render_coverage_row(entry) for entry in conversion.coverage)
 
     lossy = [entry for entry in conversion.coverage if not entry.is_lossless or entry.notes]
@@ -1039,13 +1382,29 @@ def write_outputs(conversion: Conversion, profile: Profile, output_dir: Path) ->
         The paths written, in load order.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
-    payloads = (
+    modules = profile.modules
+    payloads: list[tuple[str, str | None, list[dict[str, Any]]]] = [
         (OUTPUT_FILENAMES["manufacturer"], profile.manufacturer_kind, conversion.manufacturers),
         (OUTPUT_FILENAMES["device_type"], profile.device_type_kind, conversion.device_types),
         (OUTPUT_FILENAMES["template"], profile.template_kind, conversion.templates),
-    )
+        (
+            OUTPUT_FILENAMES["module_type"],
+            modules.kind if modules else None,
+            conversion.module_types,
+        ),
+        (
+            OUTPUT_FILENAMES["module_template"],
+            modules.template_kind if modules else None,
+            conversion.module_templates,
+        ),
+    ]
     written: list[Path] = []
     for filename, kind, data in payloads:
+        # Skip a slot with nothing in it: converting only module types
+        # should not leave empty device files behind, and an empty
+        # spec.data is noise the loader would still walk.
+        if not data or not kind:
+            continue
         path = output_dir / filename
         path.write_text(render_object_file(kind, data), encoding="utf-8")
         written.append(path)

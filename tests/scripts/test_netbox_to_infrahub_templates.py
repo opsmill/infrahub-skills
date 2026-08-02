@@ -36,6 +36,7 @@ iter_input_files = _mod.iter_input_files
 load_profile = _mod.load_profile
 main = _mod.main
 parse_device_type = _mod.parse_device_type
+detect_input_kind = _mod.detect_input_kind
 render_object_file = _mod.render_object_file
 render_report = _mod.render_report
 write_outputs = _mod.write_outputs
@@ -177,9 +178,17 @@ def test_iter_input_files_rejects_missing_path():
 
 
 def test_parse_device_type_requires_netbox_fields(tmp_path):
-    path = _write(tmp_path, "bad.yaml", {"model": "X"})
-    with pytest.raises(ConversionError, match="missing required NetBox field"):
+    path = _write(tmp_path, "bad.yaml", {"model": "X", "slug": "x"})
+    with pytest.raises(ConversionError, match="missing required NetBox device-type field"):
         parse_device_type(path)
+
+
+def test_a_slugless_file_missing_fields_is_reported_as_a_module_type(tmp_path):
+    """Without a slug the file reads as a module type — say so in the error."""
+    path = _write(tmp_path, "bad.yaml", {"model": "X"})
+    with pytest.raises(ConversionError, match="module-type field") as excinfo:
+        parse_device_type(path)
+    assert "read as a module type" in str(excinfo.value)
 
 
 def test_parse_device_type_rejects_non_mapping(tmp_path):
@@ -807,3 +816,231 @@ def test_three_lists_can_share_one_relationship(tmp_path):
     template, _ = convert_device_type(device, profile)
 
     assert [len(b["data"]) for b in template["interfaces"]] == [3, 2, 1]
+
+
+# ---------------------------------------------------------------------------
+# NetBox module types
+# ---------------------------------------------------------------------------
+
+MODULE_TYPE = {
+    "manufacturer": "Arista",
+    "model": "AWE-5300-550-A-PS",
+    "part_number": "AWE-5300-550-A-PS",
+    "comments": "[Datasheet](https://example.com/psu.pdf)",
+    "airflow": "front-to-rear",
+    "power-ports": [{"name": "{module}", "type": "iec-60320-c14", "maximum_draw": 550}],
+    "interfaces": [{"name": "Ethernet{module}/1", "type": "10gbase-x-sfpp"}],
+}
+
+MODULE_PROFILE = {
+    "version": 1,
+    "name": "modules",
+    "manufacturer": {"kind": "OrganizationManufacturer", "name_field": "name"},
+    "device_type": {
+        "kind": "DcimDeviceType",
+        "manufacturer_relationship": "manufacturer",
+        "fields": {"model": "name"},
+    },
+    "template": {
+        "kind": "TemplateDcimDevice",
+        "template_name": "{slug}",
+        "device_type_relationship": "device_type",
+    },
+    "components": {
+        "interfaces": {
+            "kind": "TemplateInterfacePhysical",
+            "relationship": "interfaces",
+            "template_name": "{template_name}__{name}",
+            "fields": {"name": "name"},
+        }
+    },
+    "module_type": {
+        "kind": "DeviceLinecardType",
+        "manufacturer_relationship": "manufacturer",
+        "key": "{model}",
+        "fields": {
+            "model": "name",
+            "part_number": "part_number",
+            "description": {"target": "description", "fallback": "comments"},
+        },
+    },
+}
+
+
+def _module_profile(tmp_path, **overrides):
+    """Build a profile whose module_type section can be tweaked per test."""
+    payload = {**MODULE_PROFILE, "module_type": {**MODULE_PROFILE["module_type"], **overrides}}
+    return load_profile(_write(tmp_path, "modules.yml", payload))
+
+
+@pytest.fixture
+def module_profile(tmp_path):
+    return _module_profile(tmp_path)
+
+
+def test_a_file_without_a_slug_is_detected_as_a_module_type():
+    assert detect_input_kind(MODULE_TYPE) == "module-types"
+    assert detect_input_kind(C9300) == "device-types"
+
+
+def test_module_type_parses_without_a_slug(tmp_path):
+    module = parse_device_type(_write(tmp_path, "psu.yaml", MODULE_TYPE))
+    assert module.is_module
+    assert module.slug == "AWE-5300-550-A-PS"  # model stands in for the slug
+
+
+def test_module_type_converts_to_a_type_object(tmp_path, module_profile):
+    module = parse_device_type(_write(tmp_path, "psu.yaml", MODULE_TYPE))
+    conversion = convert_all([module], module_profile)
+
+    assert conversion.module_types == [
+        {
+            "name": "AWE-5300-550-A-PS",
+            "part_number": "AWE-5300-550-A-PS",
+            "description": "[Datasheet](https://example.com/psu.pdf)",
+            "manufacturer": "Arista",
+        }
+    ]
+    assert conversion.device_types == []
+    assert conversion.manufacturers == [{"name": "Arista"}]
+
+
+def test_module_components_are_skipped_without_a_template(tmp_path, module_profile):
+    """The stock module type has no component relationships — say so."""
+    module = parse_device_type(_write(tmp_path, "psu.yaml", MODULE_TYPE))
+    conversion = convert_all([module], module_profile)
+    coverage = conversion.coverage[0]
+
+    assert coverage.input_kind == "module-types"
+    assert coverage.skipped_lists == {"power-ports": 1, "interfaces": 1}
+    assert conversion.module_templates == []
+
+
+def test_module_template_carries_components_when_configured(tmp_path):
+    profile = _module_profile(
+        tmp_path,
+        template={
+            "kind": "TemplateDeviceLinecard",
+            "template_name": "mod__{model}",
+            "module_type_relationship": "linecard_type",
+        },
+        components={
+            "power-ports": {
+                "kind": "TemplateDcimPowerPort",
+                "relationship": "power_ports",
+                "template_name": "{template_name}__{name}",
+                "fields": {"name": "name"},
+            }
+        },
+    )
+    module = parse_device_type(_write(tmp_path, "psu.yaml", MODULE_TYPE))
+    conversion = convert_all([module], profile)
+
+    template = conversion.module_templates[0]
+    assert template["template_name"] == "mod__AWE-5300-550-A-PS"
+    assert template["linecard_type"] == "AWE-5300-550-A-PS"
+    assert template["power_ports"]["kind"] == "TemplateDcimPowerPort"
+    assert conversion.coverage[0].converted == {"power-ports": 1}
+
+
+def test_module_position_token_is_preserved_and_reported(tmp_path):
+    profile = _module_profile(
+        tmp_path,
+        template={"kind": "TemplateDeviceLinecard", "template_name": "mod__{model}"},
+        components={
+            "power-ports": {
+                "kind": "TemplateDcimPowerPort",
+                "relationship": "power_ports",
+                "template_name": "{template_name}__{name}",
+                "fields": {"name": "name"},
+            }
+        },
+    )
+    module = parse_device_type(_write(tmp_path, "psu.yaml", MODULE_TYPE))
+    conversion = convert_all([module], profile)
+
+    child = conversion.module_templates[0]["power_ports"]["data"][0]
+    assert child["name"] == "{module}"  # kept literal, not silently mangled
+    assert any("{module}" in note for note in conversion.coverage[0].notes)
+
+
+def test_module_position_token_is_substituted_when_configured(tmp_path):
+    profile = _module_profile(
+        tmp_path,
+        position_placeholder="3",
+        template={"kind": "TemplateDeviceLinecard", "template_name": "mod__{model}"},
+        components={
+            "power-ports": {
+                "kind": "TemplateDcimPowerPort",
+                "relationship": "power_ports",
+                "template_name": "{template_name}__{name}",
+                "fields": {"name": "name"},
+            }
+        },
+    )
+    module = parse_device_type(_write(tmp_path, "psu.yaml", MODULE_TYPE))
+    conversion = convert_all([module], profile)
+
+    child = conversion.module_templates[0]["power_ports"]["data"][0]
+    assert child["name"] == "3"
+    assert not any("{module}" in note for note in conversion.coverage[0].notes)
+
+
+def test_module_files_without_a_module_section_are_refused(tmp_path, profile):
+    module = parse_device_type(_write(tmp_path, "psu.yaml", MODULE_TYPE))
+    with pytest.raises(ConversionError, match="no 'module_type' section"):
+        convert_all([module], profile)
+
+
+def test_module_components_without_a_template_are_refused(tmp_path):
+    payload = {
+        **MODULE_PROFILE,
+        "module_type": {
+            **MODULE_PROFILE["module_type"],
+            "components": {"interfaces": {"kind": "K", "relationship": "r", "template_name": "n"}},
+        },
+    }
+    with pytest.raises(ConversionError, match="needs 'module_type.template'"):
+        load_profile(_write(tmp_path, "bad.yml", payload))
+
+
+def test_a_mixed_tree_converts_both_families(tmp_path, module_profile):
+    devices = [
+        parse_device_type(_write(tmp_path, "c9300.yaml", C9300)),
+        parse_device_type(_write(tmp_path, "psu.yaml", MODULE_TYPE)),
+    ]
+    conversion = convert_all(devices, module_profile)
+
+    assert len(conversion.device_types) == 1
+    assert len(conversion.module_types) == 1
+    assert {c.input_kind for c in conversion.coverage} == {"device-types", "module-types"}
+    # Manufacturers are pooled and de-duplicated across both families.
+    assert [m["name"] for m in conversion.manufacturers] == ["Arista", "Cisco"]
+
+
+def test_module_only_output_skips_empty_device_files(tmp_path, module_profile):
+    module = parse_device_type(_write(tmp_path, "psu.yaml", MODULE_TYPE))
+    written = write_outputs(convert_all([module], module_profile), module_profile, tmp_path / "o")
+
+    assert [p.name for p in written] == ["01_manufacturers.yml", "04_module_types.yml"]
+
+
+def test_module_report_labels_the_input_family(tmp_path, module_profile):
+    devices = [
+        parse_device_type(_write(tmp_path, "c9300.yaml", C9300)),
+        parse_device_type(_write(tmp_path, "psu.yaml", MODULE_TYPE)),
+    ]
+    report = render_report(convert_all(devices, module_profile), module_profile)
+
+    assert "Module types converted: 1" in report
+    assert "| module |" in report
+    assert "| device |" in report
+
+
+def test_duplicate_module_names_are_rejected(tmp_path, module_profile):
+    modules = [
+        parse_device_type(_write(tmp_path, "a.yaml", MODULE_TYPE)),
+        parse_device_type(_write(tmp_path, "b.yaml", dict(MODULE_TYPE, part_number="OTHER"))),
+    ]
+    with pytest.raises(ConversionError, match="module name .* already produced"):
+        convert_all(modules, module_profile)

@@ -38,6 +38,32 @@ Source of truth: the definitions schema in
 | `device-bays` | `name`, `label` |
 | `inventory-items` | `name`, `label`, `manufacturer`, `part_id` |
 
+## NetBox module-type fields
+
+A second input family, in a sibling `module-types/`
+directory. Told apart from device types by carrying no
+`slug`.
+
+| Field | Required | Notes |
+| ----- | -------- | ----- |
+| `manufacturer` | yes | 100% of published module types |
+| `model` | yes | Unique across all 1,909; stands in for the missing slug |
+| `part_number` | no | 93.8% |
+| `comments` | no | 68.6%, usually a datasheet link |
+| `description` | no | 29.0% |
+| `weight` / `weight_unit` | no | 23.0% |
+| `airflow` | no | 4.3% |
+| `profile` / `attribute_data` | no | NetBox module-type profiles; 4.2% / 2.4% |
+
+Component lists, by share of files: `interfaces`
+(41.7%), `power-ports` (35.4%), `rear-ports` (9.1%),
+`front-ports` (8.4%), `console-ports` (5.3%),
+`module-bays` (1.1%), `console-server-ports` (0.5%).
+
+**93.9% of component names contain `{module}`**, the
+bay-position token NetBox substitutes at install time.
+See `module_type.position_placeholder`.
+
 ## Infrahub object templates
 
 | Concept | Detail |
@@ -119,6 +145,16 @@ types and interface `label` on 206 entries.
 | `components.<list>.fields` | no | Per-entry field map |
 | `components.<list>.derived` | no | Conditional attributes (`when` / `value`) |
 | `components.<list>.defaults` | no | Attributes written on every entry |
+| `module_type` | no | Enables module-type conversion; without it, module files are refused |
+| `module_type.kind` | yes* | Concrete module type kind — not the generic |
+| `module_type.manufacturer_relationship` | yes* | Relationship to the manufacturer |
+| `module_type.key` | no | Identity format string, default `{model}` |
+| `module_type.fields` | no | Field map, same syntax as `device_type.fields` |
+| `module_type.position_placeholder` | no | Value substituted for `{module}`; unset keeps it literal |
+| `module_type.template` | no | Enables module templates; needed before `module_type.components` |
+| `module_type.components` | no | Component lists on the module template |
+
+`yes*` = required only when a `module_type` section is present.
 
 ### Transforms
 
@@ -156,7 +192,12 @@ netbox_to_infrahub_templates.py INPUT... --mapping PROFILE --output-dir DIR
 | `01_manufacturers.yml` | `manufacturer.kind` | — |
 | `02_device_types.yml` | `device_type.kind` | manufacturers |
 | `03_device_templates.yml` | `template.kind` | device types |
+| `04_module_types.yml` | `module_type.kind` | manufacturers |
+| `05_module_templates.yml` | `module_type.template.kind` | module types |
 | `coverage-report.md` | — | — |
+
+Files with no content are not written, so converting
+only module types emits `01` and `04` alone.
 
 ### Component relationship shape
 

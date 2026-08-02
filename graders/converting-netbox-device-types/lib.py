@@ -310,6 +310,44 @@ def check_device_type_object(parsed: dict[Path, list[dict]], **_: Any) -> tuple[
     return True, f"{len(candidates)} device type document(s) carry model data"
 
 
+def check_module_type_objects(parsed: dict[Path, list[dict]], **_: Any) -> tuple[bool, str]:
+    """Module type objects carry their model data and name a manufacturer.
+
+    A NetBox module type is mostly its component list, and most schemas have
+    no component relationship on the module type — so this asserts the parts
+    that *can* land: the model identity and the manufacturer link.
+    """
+    # Identify by the emitted filename, not the kind: a concrete module type
+    # need not have "module" in its name (DeviceLinecardType is the worked
+    # example in schema-library), so a kind-substring test misses it.
+    rows = [
+        row
+        for path, docs in parsed.items()
+        if "module_type" in path.name and "template" not in path.name
+        for doc in docs
+        if "spec" in doc
+        for row in _rows(doc)
+    ]
+    if not rows:
+        names = sorted(p.name for p in parsed)
+        return False, (
+            "No module type object file found (expected one named like "
+            f"04_module_types.yml); files present: {names}"
+        )
+
+    seen: set[str] = set()
+    for row in rows:
+        name = row.get("name")
+        if not name:
+            return False, f"Module type row {row!r} has no name"
+        if name in seen:
+            return False, f"Duplicate module type name {name!r}"
+        seen.add(str(name))
+        if not row.get("manufacturer"):
+            return False, f"Module type {name!r} does not name a manufacturer"
+    return True, f"{len(rows)} module type object(s) named and attributed"
+
+
 def check_load_order_numbering(parsed: dict[Path, list[dict]], **_: Any) -> tuple[bool, str]:
     """Emitted files are numbered so manufacturers load before templates."""
     numbered = [p for p in parsed if re.match(r"^\d+[-_]", p.name)]
@@ -485,6 +523,7 @@ CHECKS: dict[str, Callable[..., tuple[bool, str]]] = {
     "component-kind-wrapper": check_component_kind_wrapper,
     "component-names-namespaced": check_component_template_names_namespaced,
     "device-type-object": check_device_type_object,
+    "module-type-object": check_module_type_objects,
     "load-order-numbering": check_load_order_numbering,
     "coverage-report": check_coverage_report,
     "shared-relationship-blocks": check_shared_relationship_blocks,

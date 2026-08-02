@@ -245,6 +245,34 @@
           "check": "A relationship carrying several component lists keeps every block, each with a distinct kind and non-empty data"
         }
       ]
+    },
+    {
+      "id": 9,
+      "prompt": "Convert these two NetBox **module type** definitions. Note they\nare module types, not device types \u2014 they carry no `slug`.\n\n`module-types/Arista/AWE-5300-550-A-PS.yaml`:\n\n    ---\n    manufacturer: Arista\n    model: AWE-5300-550-A-PS\n    part_number: AWE-5300-550-A-PS\n    comments: '[PSU datasheet](https://example.com/psu.pdf)'\n    power-ports:\n      - name: '{module}'\n        type: iec-60320-c14\n        maximum_draw: 550\n\n`module-types/Arista/CCS-750X-48SX-LC.yaml`:\n\n    ---\n    manufacturer: Arista\n    model: CCS-750X-48SX-LC\n    part_number: CCS-750X-48SX-LC\n    interfaces:\n      - name: Ethernet{module}/1\n        type: 10gbase-x-sfpp\n      - name: Ethernet{module}/2\n        type: 10gbase-x-sfpp\n\nWe load the schema-library modules extension and have defined a\nconcrete node `DeviceLinecardType` inheriting `DeviceGenericModuleType`.\nThat node has `name`, `description`, `part_number`, and a\n`manufacturer` relationship \u2014 and, like the generic it inherits, no\ncomponent relationships at all.\n\nConvert them and write the emitted files under `./output_dir/` (create\nthe directory). Tell me what could not be carried across.",
+      "expected_output": "A ./output_dir/ with a manufacturer file and a module type file whose spec.kind is DeviceLinecardType, carrying two rows named AWE-5300-550-A-PS and CCS-750X-48SX-LC with their part numbers and manufacturer, plus a coverage report naming the power-ports and interfaces lists as skipped because the module type has no component relationship to hold them.",
+      "files": [],
+      "expectations": [
+        "The module types are recognised as module types, not device types",
+        "Each module type row carries name, part_number, and manufacturer",
+        "Module type identity comes from model, since module types carry no slug",
+        "No object template is emitted for the modules",
+        "The report names power-ports and interfaces as skipped",
+        "The response explains that the module type has no component relationships"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "module-type-object",
+          "check": "Module type objects are uniquely named and each names a manufacturer"
+        },
+        {
+          "name": "coverage-report",
+          "check": "A Markdown report names the NetBox component lists that did not convert"
+        }
+      ]
     }
   ]
 }

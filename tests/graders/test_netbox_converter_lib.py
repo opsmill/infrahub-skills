@@ -521,3 +521,82 @@ def test_empty_list_is_rejected(tmp_path):
     out = _shared_dir(tmp_path, {**SHARED_TEMPLATE, "interfaces": []})
     ok, _ = CHECKS["component-kind-wrapper"](load_output_dir(out), output_dir=out)
     assert not ok
+
+
+# ---------------------------------------------------------------------------
+# Module type objects
+# ---------------------------------------------------------------------------
+
+MODULE_ROWS = [
+    {"name": "AWE-5300-550-A-PS", "part_number": "AWE-5300-550-A-PS", "manufacturer": "Arista"},
+    {"name": "CCS-750X-48SX-LC", "part_number": "CCS-750X-48SX-LC", "manufacturer": "Arista"},
+]
+
+MODULE_REPORT = """# Coverage
+
+- Skipped `power-ports` (1 entry) — not mapped by the profile
+- Skipped `interfaces` (2 entries) — not mapped by the profile
+"""
+
+
+def _module_dir(tmp_path, rows=None, filename="04_module_types.yml"):
+    return _write_dir(
+        tmp_path,
+        {
+            "01_manufacturers.yml": _object_doc("OrganizationManufacturer", [{"name": "Arista"}]),
+            filename: _object_doc("DeviceLinecardType", MODULE_ROWS if rows is None else rows),
+            "coverage-report.md": MODULE_REPORT,
+        },
+    )
+
+
+def test_module_type_objects_pass(tmp_path):
+    out = _module_dir(tmp_path)
+    ok, message = CHECKS["module-type-object"](load_output_dir(out), output_dir=out)
+    assert ok, message
+
+
+def test_module_type_kind_need_not_contain_the_word_module(tmp_path):
+    """DeviceLinecardType is the worked concrete example — it must pass."""
+    out = _module_dir(tmp_path)
+    ok, _ = CHECKS["module-type-object"](load_output_dir(out), output_dir=out)
+    assert ok
+
+
+def test_missing_module_file_is_rejected(tmp_path):
+    out = _write_dir(
+        tmp_path,
+        {"02_device_types.yml": _object_doc("DcimDeviceType", [COMPLIANT_DEVICE_TYPE])},
+    )
+    ok, message = CHECKS["module-type-object"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "No module type object file" in message
+
+
+def test_module_template_file_is_not_mistaken_for_the_type_file(tmp_path):
+    out = _module_dir(tmp_path, filename="05_module_templates.yml")
+    ok, message = CHECKS["module-type-object"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "No module type object file" in message
+
+
+def test_module_type_without_a_manufacturer_is_rejected(tmp_path):
+    out = _module_dir(tmp_path, rows=[{"name": "X", "part_number": "X"}])
+    ok, message = CHECKS["module-type-object"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "manufacturer" in message
+
+
+def test_duplicate_module_type_names_are_rejected(tmp_path):
+    dup = [MODULE_ROWS[0], dict(MODULE_ROWS[0])]
+    out = _module_dir(tmp_path, rows=dup)
+    ok, message = CHECKS["module-type-object"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "Duplicate" in message
+
+
+def test_unnamed_module_type_is_rejected(tmp_path):
+    out = _module_dir(tmp_path, rows=[{"part_number": "X", "manufacturer": "Arista"}])
+    ok, message = CHECKS["module-type-object"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "no name" in message

@@ -1,14 +1,15 @@
 ---
 name: infrahub-converting-netbox-device-types
 description: >-
-  Converts NetBox device-type definitions (the netbox-community devicetype-library
-  format, also published via the NetBox Data Exchange / NDX) into Infrahub object
-  templates as Infrahub object YAML, using a bundled Python converter driven by a
-  schema mapping profile.
-  TRIGGER when: importing NetBox device types into Infrahub, converting
-  devicetype-library YAML, building object templates from vendor device models,
-  seeding Infrahub with device types from NDX, turning NetBox hardware definitions
-  into Template* objects.
+  Converts NetBox device-type and module-type definitions (the netbox-community
+  devicetype-library format, also published via the NetBox Data Exchange / NDX)
+  into Infrahub object templates as Infrahub object YAML, using a bundled Python
+  converter driven by a schema mapping profile.
+  TRIGGER when: importing NetBox device types or module types into Infrahub,
+  converting devicetype-library YAML, building object templates from vendor
+  device models, seeding Infrahub with device types from NDX, converting line
+  cards / PSUs / transceivers from NetBox module types, turning NetBox hardware
+  definitions into Template* objects.
   DO NOT TRIGGER when: importing CSV/TSV data (use infrahub-importing-data),
   authoring schemas from scratch (use infrahub-managing-schemas), writing ordinary
   object data files (use infrahub-managing-objects), or syncing live NetBox
@@ -83,6 +84,19 @@ because Infrahub splits what NetBox keeps together:
 The template links to the device type, so creating a
 device from the template also wires up its model.
 
+**Module types** are a second input family — line
+cards, PSUs, and transceivers, in a sibling
+`module-types/` directory. They carry no `slug`, which
+is how the converter tells the two apart, so a mixed
+tree converts in one pass. They follow the same split
+(a module type object, optionally a module template)
+and land in `04_module_types.yml` /
+`05_module_templates.yml`. Read
+[extending-your-schema.md](./extending-your-schema.md#converting-module-types)
+before promising much here: against the stock
+schema-library a module type has **no component
+relationships**, so its ports do not convert.
+
 Three facts drive almost every surprise in this
 workflow — explain them rather than assuming them:
 
@@ -145,7 +159,9 @@ attributes through a profile, so it never guesses a
 name.
 
 - Using the OpsMill schema-library? Start with
-  `scripts/mappings/schema-library.yml`.
+  `scripts/mappings/schema-library.yml`, or
+  `scripts/mappings/schema-library-modules.yml` if you
+  also want module types.
 - Custom schema? Copy `scripts/mappings/_template.yml`
   and fill it in **by reading the schema YAML**, kind
   by kind and attribute by attribute.
@@ -186,8 +202,11 @@ same 5,900+ definitions in 29 MB:
 git clone --depth 1 --filter=blob:none --sparse \
   https://github.com/netbox-community/devicetype-library.git
 cd devicetype-library
-git sparse-checkout set device-types
+git sparse-checkout set device-types module-types
 ```
+
+Drop `module-types` from that list if you only want
+devices.
 
 The converter accepts files, directories (walked
 recursively), and globs.

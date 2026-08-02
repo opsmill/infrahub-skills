@@ -130,29 +130,18 @@ serial numbers — do not.
 
 **What does map.** NetBox publishes module types as a
 **separate input directory**, `module-types/`, and those
-line up with `DeviceGenericModuleType` cleanly:
-
-```yaml
-# module-types/Arista/AWE-5300-550-A-PS.yaml
-manufacturer: Arista
-model: AWE-5300-550-A-PS
-part_number: AWE-5300-550-A-PS
-power-ports:
-  - name: '{module}'      # NetBox substitutes the bay position
-    type: iec-60320-c14
-```
-
-This converter reads `device-types/` only, so module
-types are out of scope for it today. Loading the
-modules extension and populating `DeviceGenericModuleType`
-separately is the practical path.
+line up with `DeviceGenericModuleType` cleanly. The
+converter reads them — see
+[Converting module types](#converting-module-types).
 
 **Recommendation.** If chassis matter to you:
 
-1. Load `extensions/modules/modules.yml` and add a
-   concrete node inheriting `DeviceGenericModule`.
-2. Populate module types from NetBox `module-types/`
-   by another route.
+1. Load `extensions/modules/modules.yml` and define a
+   concrete node inheriting `DeviceGenericModuleType`
+   (`experimental/modules_linecards/linecard.yml` has a
+   worked `DeviceLinecardType` / `DeviceLinecard` pair).
+2. Convert `module-types/` with the
+   `schema-library-modules.yml` profile.
 3. Model bays only if you need slot-level accounting —
    that is a new node (`name`, `position`, plus a
    Component relationship), following
@@ -162,6 +151,113 @@ If chassis are not in scope, leaving them reported as
 skipped is the right answer. Say so rather than
 producing an empty template that looks like a working
 one.
+
+## Converting module types
+
+Module types are a second NetBox input family. The
+converter tells them apart by the absence of `slug` —
+no published module type carries one — so a mixed tree
+converts in a single pass:
+
+```bash
+python scripts/netbox_to_infrahub_templates.py \
+  devicetype-library/device-types/Arista/ \
+  devicetype-library/module-types/Arista/ \
+  --mapping scripts/mappings/schema-library-modules.yml \
+  --output-dir ./generated
+```
+
+Output gains two slots; files with nothing in them are
+not written:
+
+| File | Kind |
+| ---- | ---- |
+| `04_module_types.yml` | `module_type.kind` |
+| `05_module_templates.yml` | `module_type.template.kind`, when configured |
+
+### The minimum profile
+
+```yaml
+module_type:
+  kind: DeviceLinecardType        # YOUR concrete node, not the generic
+  manufacturer_relationship: manufacturer
+  key: "{model}"                  # module types have no slug
+  fields:
+    model: name
+    part_number: part_number
+    description:
+      target: description
+      fallback: comments
+```
+
+That is all the stock schema supports, and it is worth
+being blunt about why: a NetBox module type is mostly
+its component list — the ports the module provides —
+and `DeviceGenericModuleType` has **no component
+relationships**. Every `interfaces`, `power-ports`, and
+`front-ports` entry is reported as skipped. You get a
+catalogue of module models, not their ports.
+
+### Carrying the components too
+
+Give your concrete module node a Component relationship
+that can hold ports ([Gap 1](#gap-1-a-whole-component-list-is-skipped)),
+then add the template half:
+
+```yaml
+module_type:
+  kind: DeviceLinecardType
+  manufacturer_relationship: manufacturer
+  key: "{model}"
+  position_placeholder: "1"
+  fields:
+    model: name
+  template:
+    kind: TemplateDeviceLinecard
+    template_name: "module__{model}"
+    module_type_relationship: linecard_type
+  components:
+    interfaces:
+      kind: TemplateInterfacePhysical
+      relationship: interfaces
+      template_name: "{template_name}__{name}"
+      fields:
+        name: name
+```
+
+Declaring `components` without `template` is rejected —
+components hang off a template, and without one they
+would silently go nowhere.
+
+### The `{module}` position token
+
+93.9% of published module-type component names contain
+`{module}`, which NetBox substitutes with the bay
+position when the module is installed:
+
+```yaml
+interfaces:
+  - name: Ethernet{module}/1
+power-ports:
+  - name: '{module}'
+```
+
+A template is not bound to a bay, so the token cannot
+be resolved at conversion time. Two options:
+
+- **Leave it** (default). Names keep the literal
+  `{module}`, the information survives, and the report
+  says how many names carry it. Right when something
+  downstream will substitute it.
+- **Set `position_placeholder`** to a bay position.
+  `Ethernet{module}/1` with `position_placeholder: "1"`
+  becomes `Ethernet1/1`. Right when you are modelling a
+  specific populated slot, and wrong as a blanket
+  default — it silently asserts every module sits in
+  the same bay.
+
+Neither is a substitute for modelling bays. If you need
+per-slot accuracy, the template has to be per-slot.
 
 ## Two shapes of gap
 

@@ -4409,3 +4409,76 @@ tasks:
         check: >-
           A relationship carrying several component lists keeps every block,
           each with a distinct kind and non-empty data
+
+  - name: netbox-convert-module-types
+    trials: 3
+    instruction: |
+      Read the skill at
+      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Convert these two NetBox **module type** definitions. Note they
+      are module types, not device types — they carry no `slug`.
+
+      `module-types/Arista/AWE-5300-550-A-PS.yaml`:
+
+          ---
+          manufacturer: Arista
+          model: AWE-5300-550-A-PS
+          part_number: AWE-5300-550-A-PS
+          comments: '[PSU datasheet](https://example.com/psu.pdf)'
+          power-ports:
+            - name: '{module}'
+              type: iec-60320-c14
+              maximum_draw: 550
+
+      `module-types/Arista/CCS-750X-48SX-LC.yaml`:
+
+          ---
+          manufacturer: Arista
+          model: CCS-750X-48SX-LC
+          part_number: CCS-750X-48SX-LC
+          interfaces:
+            - name: Ethernet{module}/1
+              type: 10gbase-x-sfpp
+            - name: Ethernet{module}/2
+              type: 10gbase-x-sfpp
+
+      We load the schema-library modules extension and have defined a
+      concrete node `DeviceLinecardType` inheriting `DeviceGenericModuleType`.
+      That node has `name`, `description`, `part_number`, and a
+      `manufacturer` relationship — and, like the generic it inherits, no
+      component relationships at all.
+
+      Convert them and write the emitted files under `./output_dir/` (create
+      the directory). Tell me what could not be carried across.
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_module_types.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/ with a manufacturer file and a module type file whose
+      spec.kind is DeviceLinecardType, carrying two rows named
+      AWE-5300-550-A-PS and CCS-750X-48SX-LC with their part numbers and
+      manufacturer, plus a coverage report naming the power-ports and
+      interfaces lists as skipped because the module type has no component
+      relationship to hold them.
+    expectations:
+      - The module types are recognised as module types, not device types
+      - Each module type row carries name, part_number, and manufacturer
+      - Module type identity comes from model, since module types carry no slug
+      - No object template is emitted for the modules
+      - The report names power-ports and interfaces as skipped
+      - The response explains that the module type has no component relationships
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind,
+          and spec.data list
+      - name: module-type-object
+        check: >-
+          Module type objects are uniquely named and each names a manufacturer
+      - name: coverage-report
+        check: >-
+          A Markdown report names the NetBox component lists that did not
+          convert
