@@ -114,7 +114,7 @@ types and interface `label` on 206 entries.
 | `template.device_type_relationship` | yes | Relationship from device to device type |
 | `template.defaults` | no | Attributes written on every template |
 | `components.<list>.kind` | yes | Concrete component template kind |
-| `components.<list>.relationship` | yes | Component relationship on the parent template |
+| `components.<list>.relationship` | yes | Component relationship on the parent template; several lists may share one |
 | `components.<list>.template_name` | yes | Format string; `{template_name}` is the parent's |
 | `components.<list>.fields` | no | Per-entry field map |
 | `components.<list>.derived` | no | Conditional attributes (`when` / `value`) |
@@ -157,3 +157,22 @@ netbox_to_infrahub_templates.py INPUT... --mapping PROFILE --output-dir DIR
 | `02_device_types.yml` | `device_type.kind` | manufacturers |
 | `03_device_templates.yml` | `template.kind` | device types |
 | `coverage-report.md` | — | — |
+
+### Component relationship shape
+
+One mapping on a relationship emits a mapping; several
+mappings sharing one emit a list of blocks, in profile
+order. Both are valid — the object loader resolves
+`kind` per item.
+
+```yaml
+interfaces:                        # one mapping
+  kind: TemplateInterfacePhysical
+  data: [ ... ]
+
+interfaces:                        # two mappings sharing the relationship
+  - kind: TemplateInterfacePhysical
+    data: [ ... ]
+  - kind: TemplateDcimConsoleInterface
+    data: [ ... ]
+```

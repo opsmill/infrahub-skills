@@ -428,3 +428,96 @@ def test_fallback_precedence_requires_a_report(tmp_path):
     ok, message = CHECKS["fallback-precedence"](load_output_dir(out), output_dir=out)
     assert not ok
     assert "No coverage report" in message
+
+
+# ---------------------------------------------------------------------------
+# Two NetBox lists sharing one relationship (list-of-blocks form)
+# ---------------------------------------------------------------------------
+
+SHARED_TEMPLATE = {
+    "template_name": "cisco-c9300-48p",
+    "device_type": "Catalyst 9300-48P",
+    "interfaces": [
+        {
+            "kind": "TemplateInterfacePhysical",
+            "data": [{"template_name": "cisco-c9300-48p__Gi1/0/1", "name": "Gi1/0/1"}],
+        },
+        {
+            "kind": "TemplateDcimConsoleInterface",
+            "data": [{"template_name": "cisco-c9300-48p__console__con 0", "name": "con 0"}],
+        },
+    ],
+}
+
+
+def _shared_dir(tmp_path, template=SHARED_TEMPLATE):
+    return _write_dir(
+        tmp_path,
+        {
+            "01_manufacturers.yml": _object_doc("OrganizationManufacturer", [{"name": "Cisco"}]),
+            "02_device_types.yml": _object_doc("DcimDeviceType", [COMPLIANT_DEVICE_TYPE]),
+            "03_device_templates.yml": _object_doc("TemplateDcimDevice", [template]),
+            "coverage-report.md": REPORT,
+        },
+    )
+
+
+def test_list_of_blocks_passes_the_wrapper_check(tmp_path):
+    out = _shared_dir(tmp_path)
+    ok, message = CHECKS["component-kind-wrapper"](load_output_dir(out), output_dir=out)
+    assert ok, message
+
+
+def test_bare_child_list_is_still_rejected(tmp_path):
+    """The list form must not weaken the check into accepting raw children."""
+    bare = {**SHARED_TEMPLATE, "interfaces": [{"template_name": "x", "name": "Gi1/0/1"}]}
+    out = _shared_dir(tmp_path, bare)
+    ok, message = CHECKS["component-kind-wrapper"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "bare list" in message
+
+
+def test_non_template_kind_inside_a_block_list_is_rejected(tmp_path):
+    bad = {
+        **SHARED_TEMPLATE,
+        "interfaces": [
+            {"kind": "TemplateInterfacePhysical", "data": [{"template_name": "a"}]},
+            {"kind": "DcimConsoleInterface", "data": [{"template_name": "b"}]},
+        ],
+    }
+    out = _shared_dir(tmp_path, bad)
+    ok, message = CHECKS["component-kind-wrapper"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "DcimConsoleInterface" in message
+
+
+def test_names_across_shared_blocks_are_checked(tmp_path):
+    colliding = {
+        **SHARED_TEMPLATE,
+        "interfaces": [
+            {
+                "kind": "TemplateInterfacePhysical",
+                "data": [{"template_name": "cisco-c9300-48p__dup"}],
+            },
+            {
+                "kind": "TemplateDcimConsoleInterface",
+                "data": [{"template_name": "cisco-c9300-48p__dup"}],
+            },
+        ],
+    }
+    out = _shared_dir(tmp_path, colliding)
+    ok, message = CHECKS["component-names-namespaced"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "Duplicate" in message
+
+
+def test_shared_blocks_pass_the_full_check_set(tmp_path):
+    out = _shared_dir(tmp_path)
+    result = run_checks(ALL_OUTPUT_CHECKS, out)
+    assert result["score"] == 1.0, result["details"]
+
+
+def test_empty_list_is_rejected(tmp_path):
+    out = _shared_dir(tmp_path, {**SHARED_TEMPLATE, "interfaces": []})
+    ok, _ = CHECKS["component-kind-wrapper"](load_output_dir(out), output_dir=out)
+    assert not ok

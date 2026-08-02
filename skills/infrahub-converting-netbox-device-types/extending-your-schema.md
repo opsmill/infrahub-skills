@@ -15,6 +15,154 @@ if you are unsure whether a gap is worth closing.
 > · [Attribute reference](https://docs.infrahub.app/reference/schema/attribute)
 > · [Relationship reference](https://docs.infrahub.app/reference/schema/relationship)
 
+## Check for an existing node first
+
+Before writing any schema, look for a node that already
+covers the gap. Two places to check, in this order:
+
+**1. The schema you already load.** Grep for the
+concept rather than the exact name — a console port may
+be modelled as a kind of interface:
+
+```bash
+grep -rn "ConsoleInterface\|ConsolePort\|ModuleBay" schemas/
+ls schemas/extensions/ 2>/dev/null
+```
+
+**2. The OpsMill schema-library extensions**, if the
+project builds on it:
+
+```bash
+ls schema-library/extensions/
+```
+
+| NetBox list | Existing coverage | Notes |
+| ----------- | ----------------- | ----- |
+| `console-ports` | `DcimConsoleInterface` in infrahub-demo-dc's `extensions/console/` | Inherits `DcimInterface`, so no new relationship — see [below](#console-ports-usually-need-no-schema-change) |
+| `module-bays` | Partial — `extensions/modules/` in schema-library | Models modules and module *types*, not bays — see [below](#module-bays-what-the-modules-extension-does-and-does-not-give-you) |
+| `inventory-items` | Partial — `extensions/modules/` | `DeviceGenericModuleType` covers part numbers |
+| `front-ports` / `rear-ports` | `extensions/patch_panel/` | Patch-panel oriented |
+| `interfaces` (optics) | `extensions/sfp/` | Transceivers, not interface media type |
+
+Finding one turns a schema change into a profile
+change, which is far cheaper and does not touch the
+user's source of truth.
+
+## Console ports usually need no schema change
+
+The commonest gap has the cheapest fix, because a
+console port is *a kind of interface*. Where the schema
+models it as a node inheriting the interface generic —
+as infrahub-demo-dc's `DcimConsoleInterface` does —
+the device's existing `interfaces` Component
+relationship already carries it. Infrahub therefore
+already generates `TemplateDcimConsoleInterface`, and
+only the mapping profile is missing:
+
+```yaml
+components:
+  interfaces:
+    kind: TemplateInterfacePhysical
+    relationship: interfaces
+    template_name: "{template_name}__{name}"
+    fields:
+      name: name
+  console-ports:
+    kind: TemplateDcimConsoleInterface
+    relationship: interfaces          # same relationship, by inheritance
+    template_name: "{template_name}__console__{name}"
+    fields:
+      name: name
+```
+
+Two things this depends on, both covered by
+[mapping-shared-relationships.md](./rules/mapping-shared-relationships.md):
+the two lists share one relationship, so the output has
+to accumulate blocks rather than overwrite; and their
+template names must not collide, hence the `__console__`
+infix.
+
+Residual loss: NetBox console `type` (`rj-45`,
+`usb-mini-b`) has nowhere to go —
+`DcimConsoleInterface` has `speed` and `port`, not a
+port type. One Dropdown attribute closes it if you care;
+see [Gap 2](#gap-2-a-field-is-dropped).
+
+If your schema has no console node at all, that is
+[Gap 1](#gap-1-a-whole-component-list-is-skipped).
+
+## Module bays: what the modules extension does and does not give you
+
+Modular chassis convert to an empty template — a
+DCS-7508N has 24 module bays and zero interfaces,
+because every port lives on a line card. This is the
+largest single gap in the library and the honest answer
+has three parts.
+
+**What schema-library's `extensions/modules/` provides:**
+
+| Kind | Represents | Templatable? |
+| ---- | ---------- | ------------ |
+| `DeviceGenericModule` | An *installed* module, keyed by a unique `serial_number` | **No** — a template cannot carry a per-instance unique value |
+| `DeviceGenericModuleType` | The module model (name, part number, manufacturer) | Not a device component |
+| `DcimPhysicalDevice.modules` | `Component` relationship to installed modules | Yes, generates `TemplateDeviceGenericModule` |
+
+Both are **generics**, so you also need a concrete node
+inheriting `DeviceGenericModule` before anything can be
+instantiated.
+
+**Why that does not map to NetBox module bays.** A
+NetBox module bay is a *slot* — `name`, `label`,
+`position`:
+
+```yaml
+module-bays:
+  - name: Slot 1
+    label: Supervisor
+    position: '1'
+```
+
+The extension models what is *installed*, not the slot
+that holds it, and an installed module needs a serial
+number a device-type definition cannot supply. Mapping
+bays onto `DeviceGenericModule` would mean inventing
+serial numbers — do not.
+
+**What does map.** NetBox publishes module types as a
+**separate input directory**, `module-types/`, and those
+line up with `DeviceGenericModuleType` cleanly:
+
+```yaml
+# module-types/Arista/AWE-5300-550-A-PS.yaml
+manufacturer: Arista
+model: AWE-5300-550-A-PS
+part_number: AWE-5300-550-A-PS
+power-ports:
+  - name: '{module}'      # NetBox substitutes the bay position
+    type: iec-60320-c14
+```
+
+This converter reads `device-types/` only, so module
+types are out of scope for it today. Loading the
+modules extension and populating `DeviceGenericModuleType`
+separately is the practical path.
+
+**Recommendation.** If chassis matter to you:
+
+1. Load `extensions/modules/modules.yml` and add a
+   concrete node inheriting `DeviceGenericModule`.
+2. Populate module types from NetBox `module-types/`
+   by another route.
+3. Model bays only if you need slot-level accounting —
+   that is a new node (`name`, `position`, plus a
+   Component relationship), following
+   [Gap 1](#gap-1-a-whole-component-list-is-skipped).
+
+If chassis are not in scope, leaving them reported as
+skipped is the right answer. Say so rather than
+producing an empty template that looks like a working
+one.
+
 ## Two shapes of gap
 
 The report distinguishes them, and they need different
@@ -143,20 +291,15 @@ Three of these carry a wrinkle:
 - **`front-ports`** reference a `rear_port` the same
   way, plus a position index.
 - **`module-bays`** are how modular chassis carry their
-  ports. If you convert chassis (13.5% of the library
-  produce an empty template without this), you likely
-  want NetBox *module types* too — a separate input
-  format this converter does not read.
+  ports, and the schema-library modules extension does
+  not cover them the way you would expect — see
+  [the module-bay section](#module-bays-what-the-modules-extension-does-and-does-not-give-you)
+  before modelling anything.
 
-Before adding all nine, check whether the schema-library
-already has an extension covering it:
-
-```bash
-ls schema-library/extensions/
-```
-
-`modules/`, `patch_panel/`, and `sfp/` overlap with
-several of the rows above.
+Before adding any of them, re-read
+[Check for an existing node first](#check-for-an-existing-node-first) —
+console ports and module bays in particular are usually
+better served by something that already exists.
 
 ## Gap 2: a field is dropped
 

@@ -76,9 +76,14 @@ def profile():
 
 
 def _write(tmp_path: Path, name: str, payload: dict) -> Path:
-    """Write a NetBox device-type YAML file into ``tmp_path``."""
+    """Write a NetBox device-type or profile YAML file into ``tmp_path``.
+
+    ``sort_keys=False`` matters: component blocks are emitted in the order
+    the profile declares them, so an alphabetised fixture would not reflect
+    a real authored profile.
+    """
     path = tmp_path / name
-    path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     return path
 
 
@@ -678,3 +683,127 @@ def test_dropped_field_list_is_truncated_with_a_count(tmp_path, profile):
     report = render_report(convert_all([device], profile), profile)
 
     assert "more)" in report
+
+
+# ---------------------------------------------------------------------------
+# Two NetBox lists sharing one Infrahub relationship
+# ---------------------------------------------------------------------------
+
+#: A schema whose console-port node inherits the interface generic — as
+#: infrahub-demo-dc's DcimConsoleInterface does — takes both NetBox lists on
+#: the same `interfaces` Component relationship.
+SHARED_RELATIONSHIP_PROFILE = {
+    "version": 1,
+    "name": "shared-rel",
+    "manufacturer": {"kind": "OrganizationManufacturer", "name_field": "name"},
+    "device_type": {
+        "kind": "DcimDeviceType",
+        "manufacturer_relationship": "manufacturer",
+        "fields": {"model": "name"},
+    },
+    "template": {
+        "kind": "TemplateDcimDevice",
+        "template_name": "{slug}",
+        "device_type_relationship": "device_type",
+    },
+    "components": {
+        "interfaces": {
+            "kind": "TemplateInterfacePhysical",
+            "relationship": "interfaces",
+            "template_name": "{template_name}__{name}",
+            "fields": {"name": "name"},
+        },
+        "console-ports": {
+            "kind": "TemplateDcimConsoleInterface",
+            "relationship": "interfaces",  # same relationship
+            "template_name": "{template_name}__console__{name}",
+            "fields": {"name": "name"},
+        },
+    },
+}
+
+SHARED_INPUT = {
+    "manufacturer": "Cisco",
+    "model": "Catalyst 9300-48P",
+    "slug": "cisco-c9300-48p",
+    "interfaces": [{"name": f"Gi1/0/{n}"} for n in range(1, 4)],
+    "console-ports": [{"name": "con 0"}, {"name": "usb"}],
+}
+
+
+@pytest.fixture
+def shared_profile(tmp_path):
+    """A profile mapping two NetBox lists onto one relationship."""
+    return load_profile(_write(tmp_path, "shared.yml", SHARED_RELATIONSHIP_PROFILE))
+
+
+def test_shared_relationship_keeps_both_component_lists(tmp_path, shared_profile):
+    """Regression: the second mapping used to silently erase the first."""
+    device = parse_device_type(_write(tmp_path, "c9300.yaml", SHARED_INPUT))
+    template, _ = convert_device_type(device, shared_profile)
+
+    blocks = template["interfaces"]
+    assert isinstance(blocks, list), "two mappings on one relationship must accumulate"
+    assert [b["kind"] for b in blocks] == [
+        "TemplateInterfacePhysical",
+        "TemplateDcimConsoleInterface",
+    ]
+    assert [len(b["data"]) for b in blocks] == [3, 2]
+
+
+def test_shared_relationship_emits_the_loader_list_form(tmp_path, shared_profile):
+    device = parse_device_type(_write(tmp_path, "c9300.yaml", SHARED_INPUT))
+    conversion = convert_all([device], shared_profile)
+    text = render_object_file(shared_profile.template_kind, conversion.templates)
+    row = yaml.safe_load(text)["spec"]["data"][0]
+
+    # Every item must be a mapping carrying `data`, which is what the SDK's
+    # MANY_OBJ_LIST_DICT format requires in order to resolve kind per item.
+    assert all(isinstance(item, dict) and "data" in item for item in row["interfaces"])
+
+
+def test_shared_relationship_reports_both_lists_as_converted(tmp_path, shared_profile):
+    device = parse_device_type(_write(tmp_path, "c9300.yaml", SHARED_INPUT))
+    _, coverage = convert_device_type(device, shared_profile)
+
+    assert coverage.converted == {"interfaces": 3, "console-ports": 2}
+    assert "console-ports" not in coverage.skipped_lists
+
+
+def test_shared_relationship_names_stay_unique(tmp_path, shared_profile):
+    device = parse_device_type(_write(tmp_path, "c9300.yaml", SHARED_INPUT))
+    template, _ = convert_device_type(device, shared_profile)
+
+    names = [c["template_name"] for b in template["interfaces"] for c in b["data"]]
+    assert len(names) == len(set(names)) == 5
+    assert "cisco-c9300-48p__console__con 0" in names
+
+
+def test_single_mapping_still_uses_the_plain_dict_form(tmp_path, profile):
+    """The common case stays the simpler, more readable shape."""
+    device = parse_device_type(_write(tmp_path, "c9300.yaml", C9300))
+    template, _ = convert_device_type(device, profile)
+
+    assert isinstance(template["interfaces"], dict)
+    assert template["interfaces"]["kind"] == "TemplateInterfacePhysical"
+
+
+def test_three_lists_can_share_one_relationship(tmp_path):
+    payload = dict(SHARED_RELATIONSHIP_PROFILE)
+    payload["components"] = dict(
+        payload["components"],
+        **{
+            "console-server-ports": {
+                "kind": "TemplateDcimConsoleServerInterface",
+                "relationship": "interfaces",
+                "template_name": "{template_name}__csp__{name}",
+                "fields": {"name": "name"},
+            }
+        },
+    )
+    profile = load_profile(_write(tmp_path, "three.yml", payload))
+    source = dict(SHARED_INPUT, **{"console-server-ports": [{"name": "csp0"}]})
+    device = parse_device_type(_write(tmp_path, "c9300.yaml", source))
+    template, _ = convert_device_type(device, profile)
+
+    assert [len(b["data"]) for b in template["interfaces"]] == [3, 2, 1]

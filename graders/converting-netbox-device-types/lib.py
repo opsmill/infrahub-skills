@@ -118,6 +118,38 @@ def _template_rows(parsed: dict[Path, list[dict]]) -> list[dict]:
     return [row for doc in _docs_of_kind(parsed, "Template") for row in _rows(doc)]
 
 
+def _is_component_block(value: Any) -> bool:
+    """True for a ``{kind, data}`` component block."""
+    return isinstance(value, dict) and "data" in value
+
+
+def component_blocks(row: dict) -> list[tuple[str, Any]]:
+    """Return ``(relationship, block)`` pairs for one template row.
+
+    A relationship carries either a single ``{kind, data}`` mapping or, when
+    two NetBox lists share it, a list of such blocks — the shape the object
+    loader resolves per item. Both are valid; a bare list of children is
+    not, and is deliberately left out so the wrapper check still fails it.
+    """
+    pairs: list[tuple[str, Any]] = []
+    for key, value in row.items():
+        if _is_component_block(value):
+            pairs.append((key, value))
+        elif isinstance(value, list) and value and all(_is_component_block(v) for v in value):
+            pairs.extend((key, block) for block in value)
+    return pairs
+
+
+def component_children(row: dict) -> list[tuple[str, dict]]:
+    """Return ``(relationship, child)`` pairs across every component block."""
+    return [
+        (relationship, child)
+        for relationship, block in component_blocks(row)
+        for child in block.get("data") or []
+        if isinstance(child, dict)
+    ]
+
+
 def _read_text_files(output_dir: Path, suffixes: tuple[str, ...]) -> str:
     """Return the concatenated text of every matching file in the output."""
     if not output_dir.is_dir():
@@ -207,19 +239,25 @@ def check_component_kind_wrapper(parsed: dict[Path, list[dict]], **_: Any) -> tu
             if not isinstance(value, (dict, list)):
                 continue
             if isinstance(value, list):
-                return False, (
-                    f"Component relationship {key!r} on "
-                    f"{row.get('template_name')!r} is a bare list; expected a "
-                    "mapping with 'kind' and 'data'"
-                )
-            if "data" not in value:
+                # A list is valid only when every item is a {kind, data}
+                # block — the shape two NetBox lists sharing one
+                # relationship produce. A bare list of children is not.
+                if not value or not all(_is_component_block(item) for item in value):
+                    return False, (
+                        f"Component relationship {key!r} on "
+                        f"{row.get('template_name')!r} is a bare list; expected a "
+                        "mapping with 'kind' and 'data', or a list of such blocks"
+                    )
+            elif "data" not in value:
                 return False, f"Component relationship {key!r} has no 'data' key"
-            if not str(value.get("kind", "")).startswith("Template"):
-                return False, (
-                    f"Component relationship {key!r} has kind "
-                    f"{value.get('kind')!r}; expected a Template* kind"
-                )
-            wrapped += 1
+            blocks = [value] if isinstance(value, dict) else value
+            for block in blocks:
+                if not str(block.get("kind", "")).startswith("Template"):
+                    return False, (
+                        f"Component relationship {key!r} has kind "
+                        f"{block.get('kind')!r}; expected a Template* kind"
+                    )
+                wrapped += 1
     if wrapped == 0:
         return False, "No component children were emitted under any template"
     return True, f"{wrapped} component relationship(s) correctly wrapped"
@@ -233,24 +271,19 @@ def check_component_template_names_namespaced(
     checked = 0
     for row in _template_rows(parsed):
         parent = str(row.get("template_name", ""))
-        for key, value in row.items():
-            if not isinstance(value, dict) or "data" not in value:
-                continue
-            for child in value.get("data") or []:
-                if not isinstance(child, dict):
-                    continue
-                name = child.get("template_name")
-                if not name:
-                    return False, f"A {key!r} child of {parent!r} has no template_name"
-                if parent and parent not in str(name):
-                    return False, (
-                        f"Component template {name!r} is not namespaced by its "
-                        f"parent {parent!r}; names collide across device types"
-                    )
-                if name in seen:
-                    return False, f"Duplicate component template_name {name!r}"
-                seen[str(name)] = parent
-                checked += 1
+        for relationship, child in component_children(row):
+            name = child.get("template_name")
+            if not name:
+                return False, f"A {relationship!r} child of {parent!r} has no template_name"
+            if parent and parent not in str(name):
+                return False, (
+                    f"Component template {name!r} is not namespaced by its "
+                    f"parent {parent!r}; names collide across device types"
+                )
+            if name in seen:
+                return False, f"Duplicate component template_name {name!r}"
+            seen[str(name)] = parent
+            checked += 1
     if checked == 0:
         return False, "No component templates were emitted"
     return True, f"{checked} component template name(s) unique and parent-namespaced"
@@ -330,9 +363,7 @@ def check_coverage_report(
 
     converted = set()
     for row in _template_rows(parsed):
-        for key, value in row.items():
-            if isinstance(value, dict) and "data" in value:
-                converted.add(key)
+        converted.update(relationship for relationship, _ in component_blocks(row))
 
     mentioned = [name for name in NETBOX_COMPONENT_LISTS if name in text]
     if not mentioned:
@@ -343,6 +374,48 @@ def check_coverage_report(
     if not converted and "interfaces" not in text:
         return False, "The report does not account for the interfaces list"
     return True, f"Coverage report names {len(mentioned)} component list(s)"
+
+
+def check_shared_relationship_blocks(parsed: dict[Path, list[dict]], **_: Any) -> tuple[bool, str]:
+    """Component lists sharing one relationship keep every block intact.
+
+    Two NetBox lists can legitimately land on one Infrahub relationship
+    when their peer kinds share a generic. Assigning rather than
+    accumulating makes the second erase the first while the coverage report
+    still claims both converted — silent loss the report cannot catch.
+    """
+    rows = _template_rows(parsed)
+    if not rows:
+        return False, "No Template* rows found"
+
+    shared = 0
+    for row in rows:
+        by_relationship: dict[str, list[Any]] = {}
+        for relationship, block in component_blocks(row):
+            by_relationship.setdefault(relationship, []).append(block)
+        for relationship, blocks in by_relationship.items():
+            if len(blocks) == 1:
+                continue
+            shared += 1
+            kinds = [str(block.get("kind")) for block in blocks]
+            if len(set(kinds)) != len(kinds):
+                return False, (
+                    f"Relationship {relationship!r} on {row.get('template_name')!r} "
+                    f"has duplicate block kinds {kinds}; merge them into one block"
+                )
+            for block in blocks:
+                if not block.get("data"):
+                    return False, (
+                        f"Relationship {relationship!r} on "
+                        f"{row.get('template_name')!r} has an empty "
+                        f"{block.get('kind')!r} block"
+                    )
+    if shared == 0:
+        return False, (
+            "No relationship carries more than one component block, so nothing "
+            "exercised the shared-relationship path"
+        )
+    return True, f"{shared} shared relationship(s) kept every block"
 
 
 def check_fallback_precedence(
@@ -366,14 +439,11 @@ def check_fallback_precedence(
     if not device_types:
         return False, "No device type rows found"
 
-    rows = [row for doc in _docs_of_kind(parsed, "Template") for row in _rows(doc)]
     described = [
         child
-        for row in rows
-        for value in row.values()
-        if isinstance(value, dict) and "data" in value
-        for child in value.get("data") or []
-        if isinstance(child, dict) and child.get("description")
+        for row in _template_rows(parsed)
+        for _, child in component_children(row)
+        if child.get("description")
     ]
     if not described:
         return False, (
@@ -417,6 +487,7 @@ CHECKS: dict[str, Callable[..., tuple[bool, str]]] = {
     "device-type-object": check_device_type_object,
     "load-order-numbering": check_load_order_numbering,
     "coverage-report": check_coverage_report,
+    "shared-relationship-blocks": check_shared_relationship_blocks,
     "fallback-precedence": check_fallback_precedence,
     "generate-template-prerequisite": check_generate_template_prerequisite,
 }

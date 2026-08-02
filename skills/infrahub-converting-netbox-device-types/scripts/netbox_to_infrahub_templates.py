@@ -736,6 +736,31 @@ def _build_component(
     return obj
 
 
+def _attach_component_block(
+    template: dict[str, Any], component: ComponentMapping, children: list[dict[str, Any]]
+) -> None:
+    """Attach one component block to its relationship on the template.
+
+    Several NetBox lists can legitimately land on a single Infrahub
+    relationship — a schema whose console-port node inherits the interface
+    generic takes both ``interfaces`` and ``console-ports`` on its
+    ``interfaces`` relationship. Assigning would make the second mapping
+    silently erase the first, so blocks accumulate into the list form the
+    object loader resolves per item.
+
+    The single-mapping case keeps the plain ``{kind, data}`` mapping, which
+    is the common shape and the more readable one.
+    """
+    block = {"kind": component.kind, "data": children}
+    existing = template.get(component.relationship)
+    if existing is None:
+        template[component.relationship] = block
+    elif isinstance(existing, dict):
+        template[component.relationship] = [existing, block]
+    else:
+        existing.append(block)
+
+
 def _record_dropped_component_fields(
     component: ComponentMapping, entries: list[dict[str, Any]], coverage: Coverage
 ) -> None:
@@ -786,7 +811,7 @@ def convert_device_type(device: DeviceType, profile: Profile) -> tuple[dict[str,
         children = [
             _build_component(component, entry, template_name, coverage) for entry in entries
         ]
-        template[component.relationship] = {"kind": component.kind, "data": children}
+        _attach_component_block(template, component, children)
         coverage.converted[component.netbox_list] = len(children)
         _record_dropped_component_fields(component, entries, coverage)
 

@@ -4320,3 +4320,92 @@ tasks:
         check: >-
           A Markdown report names the NetBox component lists that did not
           convert
+
+  - name: netbox-convert-shared-relationship
+    trials: 3
+    instruction: |
+      Read the skill at
+      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Convert this NetBox device type into Infrahub object templates.
+
+          ---
+          manufacturer: Cisco
+          model: Catalyst 9300-24P
+          slug: cisco-c9300-24p
+          part_number: C9300-24P
+          u_height: 1
+          console-ports:
+            - name: con 0
+              type: rj-45
+            - name: usb
+              type: usb-mini-b
+          interfaces:
+            - name: GigabitEthernet1/0/1
+              type: 1000base-t
+            - name: GigabitEthernet1/0/2
+              type: 1000base-t
+            - name: GigabitEthernet1/0/3
+              type: 1000base-t
+            - name: GigabitEthernet1/0/4
+              type: 1000base-t
+
+      Our schema is based on the OpsMill schema-library with
+      `generate_template: true` on `DcimDevice`, and it adds a console-port
+      node:
+
+          nodes:
+            - name: ConsoleInterface
+              namespace: Dcim
+              label: Console Port
+              inherit_from:
+                - DcimInterface
+              attributes:
+                - name: speed
+                  kind: Number
+                  default_value: 115200
+
+      Because `DcimConsoleInterface` inherits `DcimInterface`, it is carried
+      by the device's existing `interfaces` Component relationship — there
+      is no separate console relationship on the device.
+
+      I need every physical interface AND every console port in the output.
+      Write the emitted files under `./output_dir/` (create the directory).
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_shared_relationship.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/ whose template carries both component lists on the
+      single `interfaces` relationship, as a list of {kind, data} blocks —
+      4 TemplateInterfacePhysical children and 2 console-port children —
+      with template names that keep the two lists distinct.
+    expectations:
+      - Both console ports and all four physical interfaces appear in the output
+      - Both land on the single `interfaces` relationship
+      - The relationship carries a list of blocks, each with kind and data
+      - Neither component list overwrote the other
+      - Component template names distinguish console ports from physical interfaces
+      - Every component template name remains unique
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind,
+          and spec.data list
+      - name: template-kind
+        check: >-
+          Templates are authored under a Template<Kind> and every row has a
+          template_name
+      - name: component-kind-wrapper
+        check: >-
+          Component children nest under a kind + data wrapper naming a
+          Template* kind
+      - name: component-names-namespaced
+        check: >-
+          Component template names are namespaced by their parent template
+          and are unique across the whole output
+      - name: shared-relationship-blocks
+        check: >-
+          A relationship carrying several component lists keeps every block,
+          each with a distinct kind and non-empty data

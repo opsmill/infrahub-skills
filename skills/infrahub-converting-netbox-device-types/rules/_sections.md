@@ -15,6 +15,7 @@
 | ---- | ------ |
 | [workflow-schema-prerequisites.md](./workflow-schema-prerequisites.md) | CRITICAL |
 | [mapping-profile-driven.md](./mapping-profile-driven.md) | CRITICAL |
+| [mapping-shared-relationships.md](./mapping-shared-relationships.md) | CRITICAL |
 | [mapping-fallback-sources.md](./mapping-fallback-sources.md) | HIGH |
 | [format-template-objects.md](./format-template-objects.md) | CRITICAL |
 | [naming-template-names.md](./naming-template-names.md) | HIGH |

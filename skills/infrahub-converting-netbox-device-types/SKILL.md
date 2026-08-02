@@ -160,6 +160,19 @@ declare precedence with `fallback` rather than
 picking one and losing the other; see
 [rules/mapping-fallback-sources.md](./rules/mapping-fallback-sources.md).
 
+**Check for a node that already covers a gap before
+concluding one is missing.** A console port is often
+modelled as a node inheriting the interface generic, in
+which case it rides the device's existing `interfaces`
+relationship and needs no schema change at all — only
+a profile entry. When two lists share one relationship,
+read
+[rules/mapping-shared-relationships.md](./rules/mapping-shared-relationships.md):
+getting that wrong discards the larger list silently.
+[extending-your-schema.md](./extending-your-schema.md)
+lists what schema-library and infrahub-demo-dc already
+provide.
+
 ### 3. Get the input
 
 The library is a git repo; NDX is its browsable front
@@ -218,9 +231,18 @@ a migration against their source of truth.
 Read
 [rules/coverage-report-unmapped.md](./rules/coverage-report-unmapped.md).
 
-Also worth flagging when it applies: **modular chassis
-convert to an empty template** because their ports live
-in module bays. That is 13.5% of the published library.
+Two cases worth flagging by name when they apply:
+
+- **Modular chassis convert to an empty template** —
+  their ports live in module bays, 13.5% of the
+  published library. The schema-library modules
+  extension does not close this the way it looks like it
+  should; see
+  [extending-your-schema.md](./extending-your-schema.md#module-bays-what-the-modules-extension-does-and-does-not-give-you).
+- **Console ports are usually a profile change, not a
+  schema change** — if the schema models them as a node
+  inheriting the interface generic, they already ride
+  the `interfaces` relationship.
 
 ### 6. Load onto a branch
 

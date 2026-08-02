@@ -24,7 +24,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from lib import _docs_of_kind, _object_docs, _rows, load_output_dir, run_checks  # noqa: E402
+from lib import (  # noqa: E402
+    _object_docs,
+    _rows,
+    _template_rows,
+    component_children,
+    load_output_dir,
+    run_checks,
+)
 
 CHECKS = ["envelope", "template-kind", "fallback-precedence", "coverage-report"]
 
@@ -63,12 +70,8 @@ def check_fixture_precedence(output_dir: Path) -> tuple[bool, str]:
 
     children = {
         child.get("name"): child
-        for doc in _docs_of_kind(parsed, "Template")
-        for row in _rows(doc)
-        for value in row.values()
-        if isinstance(value, dict) and "data" in value
-        for child in value.get("data") or []
-        if isinstance(child, dict)
+        for row in _template_rows(parsed)
+        for _, child in component_children(row)
     }
     for name, expected in EXPECTED_INTERFACES.items():
         if name not in children:
