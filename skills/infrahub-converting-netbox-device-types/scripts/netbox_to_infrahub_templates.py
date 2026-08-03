@@ -56,6 +56,7 @@ import glob
 import string
 import sys
 from dataclasses import dataclass, field
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
 
@@ -142,7 +143,13 @@ WEIGHT_TO_KG: dict[str, float] = {
     "oz": 0.028349523125,
 }
 
-SUPPORTED_TRANSFORMS: tuple[str, ...] = ("text", "number", "boolean", "weight_kg")
+SUPPORTED_TRANSFORMS: tuple[str, ...] = (
+    "text",
+    "number",
+    "boolean",
+    "weight_kg",
+    "weight_g",
+)
 
 #: Emitted in dependency order. Module types depend only on manufacturers,
 #: so they sit after the device files rather than renumbering them.
@@ -665,35 +672,66 @@ def parse_device_type(path: Path) -> DeviceType:
 # --------------------------------------------------------------------------
 
 
+def _round_half_up(value: float) -> int:
+    """Round to the nearest integer, halves away from zero.
+
+    Python's built-in ``round`` uses banker's rounding, so ``round(0.5)``
+    is 0 and ``round(2.5)`` is 2. For rack units and weights that is a
+    surprising, hard-to-spot loss, so this rounds the way a reader expects.
+    """
+    return int(Decimal(str(value)).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
 def _to_number(value: Any) -> tuple[Any, str | None]:
-    """Coerce a NetBox numeric value, reporting non-integer inputs."""
+    """Coerce a NetBox numeric value to an integer.
+
+    Infrahub's ``Number`` attribute kind is integer-backed — it maps to
+    ``graphene.BigInt`` with ``infrahub = "Integer"`` — so a fractional
+    value cannot be stored and must be rounded here rather than rejected
+    at load time.
+    """
     if isinstance(value, bool):
         return int(value), None
     if isinstance(value, int):
         return value, None
-    if isinstance(value, float):
-        if value.is_integer():
-            return int(value), None
-        return value, f"non-integer value {value} kept as float"
     try:
-        return int(str(value)), None
-    except ValueError:
+        number = float(value)
+    except (TypeError, ValueError):
         return value, f"value {value!r} is not numeric and was passed through unchanged"
+    if number.is_integer():
+        return int(number), None
+    rounded = _round_half_up(number)
+    return rounded, (f"{number} rounded to {rounded} — Infrahub Number attributes hold integers")
 
 
-def _to_kilograms(value: Any, unit: Any) -> tuple[Any, str | None]:
-    """Convert a NetBox weight to kilograms, rounded to 3 decimal places."""
+def _to_weight(value: Any, unit: Any, target_unit: str) -> tuple[Any, str | None]:
+    """Convert a NetBox weight to an integer in ``target_unit``.
+
+    Integers because Infrahub has no float or decimal attribute kind. The
+    unit choice is a real trade-off and belongs in the profile: kilograms
+    match most schemas' existing attribute but round sub-kilogram hardware
+    to zero, while grams keep every value distinct.
+    """
     unit_name = str(unit or "kg").lower()
     factor = WEIGHT_TO_KG.get(unit_name)
     if factor is None:
         return value, f"unknown weight_unit {unit_name!r}; value passed through unchanged"
     try:
-        kilograms = round(float(value) * factor, 3)
+        kilograms = float(value) * factor
     except (TypeError, ValueError):
         return value, f"weight {value!r} is not numeric and was passed through unchanged"
-    if unit_name == "kg":
-        return kilograms, None
-    return kilograms, f"weight {value} {unit_name} converted to {kilograms} kg"
+
+    scaled = kilograms * 1000 if target_unit == "g" else kilograms
+    result = _round_half_up(scaled)
+
+    if result == 0 and scaled > 0:
+        return result, (
+            f"weight {value} {unit_name} rounded to 0 {target_unit} — too light to "
+            f"survive integer {target_unit}; map it to a grams attribute instead"
+        )
+    if unit_name == target_unit and float(value).is_integer():
+        return result, None
+    return result, f"weight {value} {unit_name} converted to {result} {target_unit}"
 
 
 def apply_transform(
@@ -715,7 +753,9 @@ def apply_transform(
     if mapping.transform == "boolean":
         return bool(value), None
     if mapping.transform == "weight_kg":
-        return _to_kilograms(value, source.get("weight_unit"))
+        return _to_weight(value, source.get("weight_unit"), "kg")
+    if mapping.transform == "weight_g":
+        return _to_weight(value, source.get("weight_unit"), "g")
     return value, None
 
 

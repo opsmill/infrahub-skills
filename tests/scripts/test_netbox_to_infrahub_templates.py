@@ -245,28 +245,40 @@ def test_derived_field_sets_management_role(tmp_path, profile):
     assert "role" not in children["GigabitEthernet1/0/1"]
 
 
-def test_weight_converted_to_kilograms(tmp_path, profile):
+def test_weight_converted_to_whole_kilograms(tmp_path, profile):
+    """Infrahub Number attributes are integer-backed, so no float may escape."""
     device = parse_device_type(_write(tmp_path, "ex4300.yaml", EX4300))
     conversion = convert_all([device], profile)
 
-    assert conversion.device_types[0]["weight"] == pytest.approx(7.303)
+    weight = conversion.device_types[0]["weight"]
+    assert weight == 7  # 16.1 lb -> 7.303 kg -> 7
+    assert isinstance(weight, int) and not isinstance(weight, bool)
 
 
-def test_weight_in_kg_passes_through_without_a_note(tmp_path, profile):
+def test_fractional_kg_is_rounded_and_reported(tmp_path, profile):
     device = parse_device_type(_write(tmp_path, "c9300.yaml", C9300))
     conversion = convert_all([device], profile)
 
-    assert conversion.device_types[0]["weight"] == pytest.approx(7.59)
+    assert conversion.device_types[0]["weight"] == 8  # 7.59 kg -> 8
+    assert any("7.59 kg converted to 8 kg" in note for note in conversion.coverage[0].notes)
+
+
+def test_whole_kg_passes_through_without_a_note(tmp_path, profile):
+    device = parse_device_type(_write(tmp_path, "w.yaml", dict(C9300, weight=8)))
+    conversion = convert_all([device], profile)
+
+    assert conversion.device_types[0]["weight"] == 8
     assert not any("weight" in note for note in conversion.coverage[0].notes)
 
 
-def test_fractional_u_height_is_reported(tmp_path, profile):
+def test_fractional_u_height_rounds_half_up_and_is_reported(tmp_path, profile):
+    """round() would give 0 for 0.5 — banker's rounding is the wrong default here."""
     payload = dict(C9300, u_height=0.5, slug="half-u")
     device = parse_device_type(_write(tmp_path, "half.yaml", payload))
     conversion = convert_all([device], profile)
 
-    assert conversion.device_types[0]["height"] == pytest.approx(0.5)
-    assert any("non-integer" in note for note in conversion.coverage[0].notes)
+    assert conversion.device_types[0]["height"] == 1
+    assert any("rounded to 1" in note for note in conversion.coverage[0].notes)
 
 
 def test_manufacturers_are_deduplicated_and_sorted(tmp_path, profile):
@@ -339,7 +351,7 @@ def test_report_lists_every_skip_and_coercion(tmp_path, profile):
     report = render_report(convert_all(devices, profile), profile)
 
     assert "console-ports" in report
-    assert "16.1 lb converted to 7.303 kg" in report
+    assert "16.1 lb converted to 7 kg" in report
     assert "`cisco-c9300-48p`" in report
 
 
@@ -1044,3 +1056,156 @@ def test_duplicate_module_names_are_rejected(tmp_path, module_profile):
     ]
     with pytest.raises(ConversionError, match="module name .* already produced"):
         convert_all(modules, module_profile)
+
+
+# ---------------------------------------------------------------------------
+# Integer weights (Infrahub has no float attribute kind)
+# ---------------------------------------------------------------------------
+
+
+def _weight_profile(tmp_path, transform, target="weight"):
+    payload = {
+        "version": 1,
+        "name": "weights",
+        "manufacturer": {"kind": "OrganizationManufacturer", "name_field": "name"},
+        "device_type": {
+            "kind": "DcimDeviceType",
+            "manufacturer_relationship": "manufacturer",
+            "fields": {"model": "name", "weight": {"target": target, "transform": transform}},
+        },
+        "template": {
+            "kind": "TemplateDcimDevice",
+            "template_name": "{slug}",
+            "device_type_relationship": "device_type",
+        },
+    }
+    return load_profile(_write(tmp_path, f"{transform}.yml", payload))
+
+
+def _weigh(tmp_path, profile, weight, unit="kg"):
+    payload = {
+        "manufacturer": "X",
+        "model": "M",
+        "slug": "m",
+        "weight": weight,
+        "weight_unit": unit,
+    }
+    device = parse_device_type(_write(tmp_path, "d.yaml", payload))
+    conversion = convert_all([device], profile)
+    return conversion.device_types[0], conversion.coverage[0]
+
+
+@pytest.mark.parametrize(
+    ("weight", "unit", "expected"),
+    [
+        (7.59, "kg", 8),
+        (16.1, "lb", 7),
+        (2.5, "kg", 3),  # half-up, not banker's rounding
+        (3.5, "kg", 4),
+        (500, "g", 1),  # 0.5 kg -> 1
+        (13.4, "lb", 6),
+    ],
+)
+def test_weight_kg_always_yields_an_integer(tmp_path, weight, unit, expected):
+    profile = _weight_profile(tmp_path, "weight_kg")
+    obj, _ = _weigh(tmp_path, profile, weight, unit)
+    assert obj["weight"] == expected
+    assert isinstance(obj["weight"], int)
+
+
+def test_weight_kg_rounding_to_zero_is_called_out(tmp_path):
+    """302 published device types are light enough to hit this."""
+    profile = _weight_profile(tmp_path, "weight_kg")
+    obj, coverage = _weigh(tmp_path, profile, 120, "g")
+
+    assert obj["weight"] == 0
+    note = " ".join(coverage.notes)
+    assert "rounded to 0 kg" in note
+    assert "grams attribute" in note  # points at the fix
+
+
+@pytest.mark.parametrize(
+    ("weight", "unit", "expected"),
+    [
+        (7.59, "kg", 7590),
+        (1.24, "kg", 1240),
+        (120, "g", 120),
+        (16.1, "lb", 7303),
+    ],
+)
+def test_weight_g_keeps_light_hardware_distinct(tmp_path, weight, unit, expected):
+    profile = _weight_profile(tmp_path, "weight_g", target="weight_grams")
+    obj, _ = _weigh(tmp_path, profile, weight, unit)
+    assert obj["weight_grams"] == expected
+
+
+def test_weight_g_does_not_round_light_hardware_to_zero(tmp_path):
+    profile = _weight_profile(tmp_path, "weight_g", target="weight_grams")
+    obj, coverage = _weigh(tmp_path, profile, 120, "g")
+
+    assert obj["weight_grams"] == 120
+    assert not any("rounded to 0" in note for note in coverage.notes)
+
+
+def test_unknown_weight_unit_is_passed_through_and_reported(tmp_path):
+    profile = _weight_profile(tmp_path, "weight_kg")
+    obj, coverage = _weigh(tmp_path, profile, 5, "stone")
+
+    assert obj["weight"] == 5
+    assert any("unknown weight_unit" in note for note in coverage.notes)
+
+
+def test_non_numeric_weight_is_passed_through_and_reported(tmp_path):
+    profile = _weight_profile(tmp_path, "weight_kg")
+    obj, coverage = _weigh(tmp_path, profile, "heavy")
+
+    assert obj["weight"] == "heavy"
+    assert any("not numeric" in note for note in coverage.notes)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"), [(0.5, 1), (1.5, 2), (2.5, 3), (-0.5, -1), (3.0, 3)]
+)
+def test_number_transform_rounds_half_away_from_zero(tmp_path, value, expected):
+    payload = {
+        "version": 1,
+        "name": "n",
+        "manufacturer": {"kind": "M", "name_field": "name"},
+        "device_type": {
+            "kind": "D",
+            "manufacturer_relationship": "manufacturer",
+            "fields": {"u_height": {"target": "height", "transform": "number"}},
+        },
+        "template": {
+            "kind": "T",
+            "template_name": "{slug}",
+            "device_type_relationship": "device_type",
+        },
+    }
+    profile = load_profile(_write(tmp_path, "n.yml", payload))
+    device = parse_device_type(
+        _write(
+            tmp_path, "d.yaml", {"manufacturer": "X", "model": "M", "slug": "m", "u_height": value}
+        )
+    )
+    assert convert_all([device], profile).device_types[0]["height"] == expected
+
+
+def test_no_float_reaches_any_emitted_object(tmp_path, profile):
+    """A float in a Number attribute would be rejected at load time."""
+    devices = [
+        parse_device_type(_write(tmp_path, "c9300.yaml", C9300)),
+        parse_device_type(_write(tmp_path, "ex4300.yaml", EX4300)),
+        parse_device_type(
+            _write(tmp_path, "half.yaml", dict(C9300, slug="half", u_height=1.5, weight=0.4))
+        ),
+    ]
+    conversion = convert_all(devices, profile)
+
+    def floats(obj):
+        for key, value in obj.items():
+            if isinstance(value, float):
+                yield key
+
+    for row in conversion.device_types + conversion.templates:
+        assert not list(floats(row)), f"float leaked into {row}"

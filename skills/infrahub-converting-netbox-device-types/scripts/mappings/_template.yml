@@ -39,7 +39,10 @@ device_type:
       transform: boolean
     weight:
       target: weight
-      transform: weight_kg # converts from weight_unit into kg
+      # weight_kg = whole kilograms; weight_g = whole grams. Infrahub has no
+      # float kind, so pick the unit whose integer resolution your lightest
+      # hardware survives — kilograms round sub-500g items to 0.
+      transform: weight_kg
   defaults: {} # attributes written on every device type
 
 # The object templates emitted into 03_device_templates.yml.

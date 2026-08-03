@@ -162,9 +162,33 @@ types and interface `label` on 206 entries.
 | Name | Effect |
 | ---- | ------ |
 | `text` | Pass through (default) |
-| `number` | Coerce to int; non-integer values kept as float and reported |
+| `number` | Coerce to a whole number, halves rounded away from zero |
 | `boolean` | Coerce to bool |
-| `weight_kg` | Convert using `weight_unit` into kilograms, rounded to 3 dp |
+| `weight_kg` | Convert using `weight_unit` into **whole kilograms** |
+| `weight_g` | Convert using `weight_unit` into **whole grams** |
+
+Every numeric transform emits an integer. Infrahub has
+no float or decimal attribute kind — `Number` maps to
+`graphene.BigInt` with `infrahub = "Integer"` — so a
+fractional value cannot be stored, and emitting one
+produces YAML that fails at load time rather than
+sorting badly.
+
+Rounding is half-away-from-zero, not Python's default
+banker's rounding: `0.5` becomes `1`, not `0`.
+
+### Choosing a weight unit
+
+|                                     | `weight_kg` | `weight_g`                   |
+| ----------------------------------- | ----------- | ---------------------------- |
+| Fits schema-library's `Weight (kg)` | yes         | no — needs a grams attribute |
+| Published device types rounded to 0 | **302**     | 0                            |
+| Mean error under 1 kg               | 72.8%       | none                         |
+| Mean error over 20 kg               | 0.6%        | none                         |
+
+Kilograms are fine for racked equipment and destroy
+sub-500g hardware. Every value that rounds to zero is
+named individually in the coverage report.
 
 ## Converter CLI
 

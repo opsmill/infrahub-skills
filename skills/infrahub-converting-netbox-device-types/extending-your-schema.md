@@ -501,6 +501,43 @@ Run the converter across your real input first and read
 the report — it tells you which values actually appear
 before you commit to a list.
 
+### Weight, and why it may need a second attribute
+
+Infrahub has no float attribute kind, so a weight is a
+whole number or nothing. Against schema-library's
+`Weight (kg)` that rounds **302 published device
+types** — sub-500g transceivers and access points — to
+`0`, which is worse than dropping them: a zero looks
+like data.
+
+If your inventory includes light hardware, add a grams
+attribute and map to it instead:
+
+```yaml
+extensions:
+  nodes:
+    - kind: DcimDeviceType
+      attributes:
+        - name: weight_grams
+          label: Weight (g)
+          kind: Number
+          optional: true
+          order_weight: 1650
+```
+
+```yaml
+device_type:
+  fields:
+    weight:
+      target: weight_grams
+      transform: weight_g
+```
+
+Grams keep every published weight distinct and sort
+correctly. Kilograms are fine if you only care about
+racked equipment — the report names every value that
+rounds to zero either way.
+
 Other frequently dropped top-level fields:
 
 | NetBox field | Suggested attribute | Kind |
