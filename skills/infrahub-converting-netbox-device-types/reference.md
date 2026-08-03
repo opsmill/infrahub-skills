@@ -73,6 +73,7 @@ See `module_type.position_placeholder`.
 | Identity attribute | `template_name`, unique per kind, and the `human_friendly_id` |
 | Component templates | Generated for `Component` relationships only |
 | Model data | Not on the template — on the device type object it links to |
+| Unique attributes | **Omitted from the template entirely**, which is why a node with a unique identity is still templatable |
 | Creating from one | Set `object_template: <template_name>` on the object |
 | Retroactivity | None; editing a template does not change objects already created from it |
 

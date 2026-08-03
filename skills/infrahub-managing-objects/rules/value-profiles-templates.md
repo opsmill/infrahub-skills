@@ -73,6 +73,13 @@ Author it like any other object, under the Template-prefixed kind, giving it a
 inherit. Leave off per-instance fields (serial number, management IP) — those
 differ per object, so the template does not set them.
 
+Some of them you *cannot* set: a `unique` attribute is omitted from the
+generated template entirely, and the template is keyed on `template_name`
+instead. That is why `TemplateDcimDevice` has no `name` when
+`DcimDevice.name` is unique. It also means a node is templatable even when
+its identity is a unique attribute — the value is supplied on each object
+created from the template, not on the template.
+
 ```yaml
 apiVersion: infrahub.app/v1
 kind: Object

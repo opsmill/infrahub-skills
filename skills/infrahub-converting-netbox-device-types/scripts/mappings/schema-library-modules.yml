@@ -16,15 +16,21 @@
 # What converts, and what does not:
 #
 # NetBox module types are mostly their component list — the ports the
-# module provides. DeviceGenericModuleType has NO component relationships,
-# so those lists are reported as skipped, not converted. This profile
-# therefore emits module type *records* (model, part number, manufacturer)
-# and no module templates.
+# module provides. Neither DeviceGenericModuleType nor DeviceGenericModule
+# has ANY component relationship, so those lists are reported as skipped,
+# not converted. This profile therefore emits module type *records* (model,
+# part number, manufacturer) and no module templates.
 #
-# To convert the components too, give your concrete module node a Component
-# relationship to an interface-like node, then add a `template:` block and a
-# `components:` block under `module_type:` below. See
-# ../../extending-your-schema.md.
+# What is NOT the obstacle: DeviceGenericModule.serial_number being unique
+# and the generic's human_friendly_id. Module templates work — Infrahub
+# omits unique attributes from a generated template entirely and re-keys it
+# on template_name, so a TemplateDeviceLinecard has no serial_number and is
+# created without one. The missing piece is somewhere to put the ports.
+#
+# To convert the components too: put `generate_template: true` on your
+# concrete module node, give it a Component relationship to an
+# interface-like node, then uncomment the `template:` and `components:`
+# blocks under `module_type:` below. See ../../extending-your-schema.md.
 version: 1
 name: schema-library-modules
 
@@ -91,9 +97,10 @@ module_type:
       target: description
       fallback: comments
 
-  # Uncomment once your concrete module node has a Component relationship
-  # that can hold the module's ports. Until then the component lists are
-  # reported as skipped, which is the honest outcome.
+  # Uncomment once your concrete module node carries `generate_template:
+  # true` AND a Component relationship that can hold the module's ports.
+  # Until then the component lists are reported as skipped, which is the
+  # honest outcome.
   #
   # position_placeholder: "1"   # substitutes NetBox's {module} bay token
   #

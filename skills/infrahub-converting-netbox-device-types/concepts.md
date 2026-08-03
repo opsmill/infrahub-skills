@@ -57,6 +57,57 @@ than templates alone — and why
 `02_device_types.yml` has to load before
 `03_device_templates.yml`.
 
+## Unique attributes do not exist on a template
+
+A `unique` attribute is **not copied onto the generated
+template at all**. Not optional — absent. Infrahub
+decides per attribute:
+
+```python
+@property
+def support_templates(self) -> bool:
+    return self.read_only is False and self.unique is False
+```
+
+and skips any attribute that fails it. The template is
+then re-keyed on its own identity:
+`human_friendly_id: ["template_name__value"]`,
+`uniqueness_constraints: [["template_name__value"]]`.
+
+Everything else is copied with `unique` stripped and
+`optional: true`, so nothing the template omits blocks
+creating one.
+
+This is why `TemplateDcimDevice` has no `name`:
+`DcimGenericDevice.name` is `unique: true`, so the
+template never had one. The name is supplied on the
+device you create *from* the template.
+
+### What follows from it
+
+**A node whose identity is a unique attribute is still
+templatable.** This is the single most common wrong
+conclusion, and it is worth stating plainly because it
+looks so much like a blocker:
+
+> `DeviceGenericModule.serial_number` is `unique: true`
+> and is the generic's `human_friendly_id`, so a module
+> cannot be templated.
+
+That is **false**. `TemplateDeviceLinecard` simply has
+no `serial_number` attribute, is keyed on
+`template_name`, and is created without one. The serial
+is supplied on each module instantiated from it —
+exactly as a device's `name` is.
+
+The real question is never "is this attribute unique?"
+but "does this node have a `Component` relationship
+holding the children I want the template to recreate?"
+
+> Docs:
+> [Attribute reference](https://docs.infrahub.app/reference/schema/attribute)
+> · [Object Templates overview](https://docs.infrahub.app/object-templates/overview)
+
 ## Why only some relationships become templates
 
 Infrahub generates a component template only for

@@ -103,15 +103,32 @@ has three parts.
 
 | Kind | Represents | Templatable? |
 | ---- | ---------- | ------------ |
-| `DeviceGenericModule` | An *installed* module, keyed by a unique `serial_number` | **No** — a template cannot carry a per-instance unique value |
+| `DeviceGenericModule` | An *installed* module, keyed by a unique `serial_number` | **Yes** — see below |
 | `DeviceGenericModuleType` | The module model (name, part number, manufacturer) | Not a device component |
 | `DcimPhysicalDevice.modules` | `Component` relationship to installed modules | Yes, generates `TemplateDeviceGenericModule` |
 
 Both are **generics**, so you also need a concrete node
-inheriting `DeviceGenericModule` before anything can be
-instantiated.
+inheriting them — and that node needs
+`generate_template: true` — before anything can be
+instantiated or templated.
 
-**Why that does not map to NetBox module bays.** A
+> **The unique serial number is not a blocker.** It is
+> tempting to conclude that a module cannot be templated
+> because `serial_number` is `unique: true` and is the
+> generic's `human_friendly_id`. It can. Infrahub omits
+> unique attributes from a generated template entirely
+> and re-keys it on `template_name`, so
+> `TemplateDeviceLinecard` has no `serial_number` and is
+> created without one — the serial is supplied per
+> installed module. See
+> [concepts.md](./concepts.md#unique-attributes-do-not-exist-on-a-template).
+
+**What genuinely is missing** is a component
+relationship: `DeviceGenericModule` has none, so a
+module template has nowhere to put the module's ports
+until you add one ([Gap 1](#gap-1-a-whole-component-list-is-skipped)).
+
+**Why none of this maps to NetBox module bays.** A
 NetBox module bay is a *slot* — `name`, `label`,
 `position`:
 
@@ -123,10 +140,11 @@ module-bays:
 ```
 
 The extension models what is *installed*, not the slot
-that holds it, and an installed module needs a serial
-number a device-type definition cannot supply. Mapping
-bays onto `DeviceGenericModule` would mean inventing
-serial numbers — do not.
+that holds it. A device type declares that a chassis
+*has* eight line-card slots; it says nothing about which
+line cards are in them, which is what
+`DeviceGenericModule` records. Mapping bays onto modules
+would assert an inventory the input does not contain.
 
 **What does map.** NetBox publishes module types as a
 **separate input directory**, `module-types/`, and those
@@ -193,16 +211,43 @@ module_type:
 That is all the stock schema supports, and it is worth
 being blunt about why: a NetBox module type is mostly
 its component list — the ports the module provides —
-and `DeviceGenericModuleType` has **no component
-relationships**. Every `interfaces`, `power-ports`, and
+and neither `DeviceGenericModuleType` nor
+`DeviceGenericModule` has **any component
+relationship**. Every `interfaces`, `power-ports`, and
 `front-ports` entry is reported as skipped. You get a
 catalogue of module models, not their ports.
 
+Note what is *not* the obstacle: the unique
+`serial_number`. Module templates work fine — Infrahub
+omits unique attributes from templates and keys them on
+`template_name`. The missing piece is somewhere to put
+the ports.
+
 ### Carrying the components too
 
-Give your concrete module node a Component relationship
-that can hold ports ([Gap 1](#gap-1-a-whole-component-list-is-skipped)),
-then add the template half:
+Two changes to your concrete module node:
+
+1. `generate_template: true`, so `Template<YourModule>`
+   is generated at all.
+2. A `Component` relationship that can hold ports
+   ([Gap 1](#gap-1-a-whole-component-list-is-skipped)).
+
+```yaml
+nodes:
+  - name: Linecard
+    namespace: Device
+    generate_template: true          # generates TemplateDeviceLinecard
+    inherit_from:
+      - DeviceGenericModule
+    relationships:
+      - name: interfaces
+        peer: DcimInterface
+        identifier: linecard__interface
+        cardinality: many
+        kind: Component              # generates the port sub-templates
+```
+
+Then add the template half of the profile:
 
 ```yaml
 module_type:
