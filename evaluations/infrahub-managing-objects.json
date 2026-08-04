@@ -53,6 +53,25 @@
           "check": "a template object is authored under a Template<Kind> with template_name"
         }
       ]
+    },
+    {
+      "id": 3,
+      "prompt": "How do I delete an object/node in Infrahub after I've already\nloaded it \u2014 for example with infrahubctl or the CLI? I can't find\ndeletion in the object-authoring workflow.\n\nSave your answer to: output.md",
+      "expected_output": "A prose answer that recognizes deletion is not covered by the object-authoring skill, consults docs.infrahub.app (the llms.txt index, then the page's .md) for the procedure, cites the page URL, and flags the answer as outside the skill's tested rules.",
+      "files": [],
+      "expectations": [
+        "Recognizes the task is not covered by the loaded skill's rules",
+        "Consults docs.infrahub.app (llms.txt index then the page .md)",
+        "Cites the documentation page URL used",
+        "Adds a caveat that the point is outside the skill's tested rules",
+        "Does not override any skill rule"
+      ],
+      "assertions": [
+        {
+          "name": "docs-fallback",
+          "check": "Output cites a docs.infrahub.app page and flags the gap"
+        }
+      ]
     }
   ]
 }

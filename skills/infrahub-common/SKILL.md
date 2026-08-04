@@ -5,7 +5,7 @@ description: >-
   DO NOT TRIGGER directly — loaded automatically by other Infrahub skills when they need shared references.
 user-invocable: false
 metadata:
-  version: 1.2.7
+  version: 1.2.8
   author: OpsMill
 ---
 
@@ -20,6 +20,11 @@ Infrahub skills. It is not meant to be invoked directly.
   filters, nested queries, and pagination patterns
 - **`infrahub-yml-reference.md`** — `.infrahub.yml`
   configuration file format and field reference
+- **`marketplace-reference.md`** — Infrahub Marketplace:
+  reusing published schemas and collections via
+  `infrahubctl marketplace get`, discovery with
+  `infrahubctl marketplace list` / `search` / `show`, and
+  airgap fallback. Reuse before modelling from scratch.
 - **`netbox-vs-infrahub.md`** — Field-by-field
   migration appendix for engineers porting NetBox
   queries, templates, or overlay data
@@ -36,5 +41,6 @@ Infrahub skills. It is not meant to be invoked directly.
   - Git integration and deployment patterns
   - Recovery from partial repository syncs
   - Generated file protocol conventions
-  - Information-source priority (skill content before
-    external docs)
+  - Information-source priority (skill content first,
+    with a concrete last-resort procedure for consulting
+    `docs.infrahub.app` on a genuine gap)

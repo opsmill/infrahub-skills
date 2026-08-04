@@ -1,8 +1,8 @@
 ---
 name: infrahub-managing-schemas
 description: >-
-  Creates, validates, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions.
-  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations, modeling file objects / attachments / uploads (storing PDFs, diagrams, images, certificates, documents as Infrahub objects).
+  Creates, validates, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions. Also checks the Infrahub Marketplace for an existing published schema to reuse before modelling a domain from scratch.
+  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations, looking for an existing/off-the-shelf schema or checking the marketplace for a domain (DCIM, location, routing, etc.), modeling file objects / attachments / uploads (storing PDFs, diagrams, images, certificates, documents as Infrahub objects).
   DO NOT TRIGGER when: populating data objects, writing checks/generators/transforms, querying live data.
 allowed-tools:
   - Read
@@ -11,7 +11,7 @@ allowed-tools:
   - Bash
 argument-hint: "[namespace] [node-names...]"
 metadata:
-  version: 1.2.7
+  version: 1.2.8
   author: OpsMill
 ---
 
@@ -116,6 +116,7 @@ already covers it:
 
 | Signal | Cheaper layer | See rule |
 | ------ | ------------- | -------- |
+| Building any domain from scratch (the marketplace publishes far more than DCIM / location / org — routing, security, compute, and many more) | Search the whole marketplace and reuse a published schema: `infrahubctl marketplace get <ns>/<name>` then `inherit_from` | [yagni-reuse-existing-marketplace-schema](../infrahub-auditing-repo/rules/yagni-reuse-existing-marketplace-schema.md) |
 | Copying a value onto a node that's reachable by traversing a relationship (`region_code` when `device.location.region.code` exists) | An indirect relationship traversal; let consumers follow the link | [yagni-denormalized-vs-indirect-relationship](../infrahub-auditing-repo/rules/yagni-denormalized-vs-indirect-relationship.md) |
 | Several sibling nodes repeating the same attributes and relationships | Extract a generic and `inherit_from` it | [yagni-duplicate-shape-not-extracted-to-generic](../infrahub-auditing-repo/rules/yagni-duplicate-shape-not-extracted-to-generic.md) |
 | Defining custom IP address / prefix / VLAN nodes | `inherit_from` the built-in primitive (`BuiltinIPAddress`, `BuiltinIPPrefix`, `IpamVLAN`) | [yagni-custom-domain-primitives-instead-of-builtin](../infrahub-auditing-repo/rules/yagni-custom-domain-primitives-instead-of-builtin.md) |
@@ -137,34 +138,43 @@ Follow these steps when creating or modifying a schema:
 1. **Gather requirements** — Identify the node types,
    their attributes, and how they relate to each other.
    Ask about hierarchies, dropdowns, and display needs.
-2. **Read relevant rules** — Read
+2. **Check the marketplace first** — Before modelling
+   *any* domain from scratch, search the whole Infrahub
+   Marketplace and reuse a published schema when one
+   covers it: `infrahubctl marketplace get
+   <namespace>/<name>`, then `inherit_from` the pulled
+   generics and add only site-specific attributes.
+   Discovery, collections (`-c`), the airgap fallback,
+   and the required SDK version live in
+   [../infrahub-common/marketplace-reference.md](../infrahub-common/marketplace-reference.md).
+3. **Read relevant rules** — Read
    [rules/naming-conventions.md](./rules/naming-conventions.md)
    for naming constraints,
    [rules/attribute-defaults-and-types.md](./rules/attribute-defaults-and-types.md)
    for attribute kinds and defaults, and
    [rules/relationship-identifiers.md](./rules/relationship-identifiers.md)
    for bidirectional relationship setup.
-3. **Build the schema YAML** — Start with the `$schema`
+4. **Build the schema YAML** — Start with the `$schema`
    comment and `version: "1.0"`. Define generics first
    (if any), then nodes. Apply naming, display, and
-   relationship rules from step 2.
-4. **Audit downstream consumers** — Walk the table in
+   relationship rules from step 3.
+5. **Audit downstream consumers** — Walk the table in
    "Designing for Downstream Consumers" above. If any
    node will become an artifact or generator target, add
    `CoreArtifactTarget` to its `inherit_from` now, per
    [rules/extension-artifact-target.md](./rules/extension-artifact-target.md).
    Adding it later forces a schema migration on loaded data.
-5. **Configure display properties** — Set
+6. **Configure display properties** — Set
    `human_friendly_id`, `display_label`, and
    `order_weight` per
    [rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md)
    and [rules/display-order-weight.md](./rules/display-order-weight.md).
-6. **Format the files** — Run `infrahubctl schema format`
+7. **Format the files** — Run `infrahubctl schema format`
    to normalise key ordering before committing, so diffs
    stay small and files read consistently. This is offline
    (no server needed). See
    [rules/workflow-format-command.md](./rules/workflow-format-command.md).
-7. **Validate and roll out on a branch** — Run
+8. **Validate and roll out on a branch** — Run
    `infrahubctl schema check` to fix errors per
    [validation.md](./validation.md) and
    [rules/validation-common-errors.md](./rules/validation-common-errors.md).
@@ -202,7 +212,13 @@ after data is loaded.
   commands, migration strategies, pre-validation checklist
 - **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
+- **[../infrahub-common/marketplace-reference.md](../infrahub-common/marketplace-reference.md)**
+  -- reusing published marketplace schemas and collections
+  (`infrahubctl marketplace get` / `list` / `search` / `show`, airgap)
 - **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
   (git integration, caching) across all skills
+- **[../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)**
+  -- Skill content first; how to consult `docs.infrahub.app`
+  on a genuine gap (e.g. deleting nodes)
 - **[rules/](./rules/)** -- Individual rules by category
   prefix

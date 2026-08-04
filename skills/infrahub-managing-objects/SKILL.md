@@ -11,7 +11,7 @@ allowed-tools:
   - Bash
 argument-hint: "[kind] [object-details...]"
 metadata:
-  version: 1.2.7
+  version: 1.2.8
   author: OpsMill
 ---
 
@@ -151,12 +151,18 @@ Follow these steps when creating object data files:
   patterns from production repos
 - **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
+- **[../infrahub-common/marketplace-reference.md](../infrahub-common/marketplace-reference.md)**
+  -- if the schema these objects populate came from the
+  marketplace, reuse it rather than modelling a new one
 - **[../infrahub-common/metadata-lineage.md](../infrahub-common/metadata-lineage.md)**
   -- Value metadata (`source`, `owner`, `is_protected`):
   setting lineage/ownership and why `source` does not
   control edit access
 - **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
   (git integration, caching) across all skills
+- **[../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)**
+  -- Skill content first; how to consult `docs.infrahub.app`
+  on a genuine gap (e.g. deleting nodes)
 - **[../infrahub-managing-schemas/SKILL.md](../infrahub-managing-schemas/SKILL.md)**
   -- Schema definitions these objects conform to
 - **[rules/](./rules/)** -- Individual rules by category

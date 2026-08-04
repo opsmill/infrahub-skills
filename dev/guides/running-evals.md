@@ -192,14 +192,14 @@ each task reads).
 
 | Skill | Tasks |
 | ----- | ----- |
-| infrahub-managing-schemas | 11 |
+| infrahub-managing-schemas | 12 |
 | infrahub-managing-menus | 3 |
 | infrahub-managing-checks | 2 |
 | infrahub-managing-generators | 6 |
 | infrahub-managing-transforms | 3 |
-| infrahub-managing-objects | 2 |
+| infrahub-managing-objects | 3 |
 | infrahub-reporting-issues | 3 |
-| infrahub-auditing-repo | 15 |
+| infrahub-auditing-repo | 16 |
 | infrahub-collecting-diagnostics | 3 |
 | infrahub-importing-data | 25 |
 

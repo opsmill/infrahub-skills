@@ -12,7 +12,7 @@ allowed-tools:
   - Glob
 argument-hint: "[focus-area]"
 metadata:
-  version: 1.2.7
+  version: 1.2.8
   author: OpsMill
 ---
 
@@ -78,7 +78,7 @@ report.
 | HIGH | Relationships | Bidirectional IDs, cardinality |
 | HIGH | Registration | All files registered, no orphans |
 | MEDIUM | Best Practices | human_friendly_id, display_label |
-| MEDIUM–LOW | YAGNI / Cost-to-Fix | Python doing what schema, GraphQL, Jinja2, or built-in IPAM/VLAN can do; denormalized data; un-extracted duplicate shapes. Severity tracks the cost-to-fix ladder: steps 2–3 MEDIUM, steps 4–6 LOW |
+| MEDIUM–LOW | YAGNI / Cost-to-Fix | Python doing what schema, GraphQL, Jinja2, or built-in IPAM/VLAN can do; denormalized data; un-extracted duplicate shapes; a whole domain hand-rolled when the marketplace ships it. Severity tracks the cost-to-fix ladder: steps 1–3 MEDIUM, steps 4–6 LOW |
 | MEDIUM | Deployment | Git status, bootstrap placement |
 | LOW | Patterns & Style | Code organization, naming |
 
@@ -170,6 +170,9 @@ The auditor checks rules from all skills:
   item properties, hierarchy, icons
 - **[../infrahub-common/](../infrahub-common/)** -- Git integration,
   caching, `.infrahub.yml` reference, GraphQL
+- **[../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)**
+  -- Skill content first; how to consult `docs.infrahub.app`
+  on a genuine gap (e.g. deleting nodes)
 
 ## Rules and Procedure
 

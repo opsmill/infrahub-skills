@@ -102,6 +102,21 @@ checks, and transforms over time.
   [schema-relationships](./schema-relationships.md) rule 2
   (bidirectional identifiers).
 
+## Fixing it: match the forward side's existing identifier
+
+The inverse must carry the **same `identifier` as the
+forward relationship already has** — not a
+freshly-invented `peer__source` string. A forward
+relationship loaded without an explicit identifier gets
+an auto-generated one, and that identifier is
+immutable. Reuse the forward side's identifier — read
+it from the schema file or its git history, or from the
+running instance (`GET /api/schema`); inventing a new
+string and changing the forward side to match instead
+fails with `'not_supported': <Kind> <relationship>
+None`. See
+[relationship-identifiers](../../infrahub-managing-schemas/rules/relationship-identifiers.md).
+
 ## Related
 
 - Downstream Python/query symptom:

@@ -153,6 +153,15 @@ assertions (schema version, naming, etc.) so the
 grader catches regressions in unrelated rules within
 the same task.
 
+For `infrahub-auditing-repo` yagni-* rules, don't add a
+new bespoke script — wire the shared parameterized
+grader straight from `eval.yaml`:
+`python graders/auditing-repo/check_yagni_rule.py
+<rule> <severity> <ladder-step>`. Write a dedicated
+script only when the task needs file-attribution or
+carve-out checks the parameterized grader can't express
+(see `graders/auditing-repo/check_yagni_reuse_marketplace.py`).
+
 ### 5. Verify the Grader Locally
 
 Before committing, hand-craft two fixture files —

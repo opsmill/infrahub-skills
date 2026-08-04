@@ -1,7 +1,7 @@
 ---
 title: Release 1.2.7
 sidebar_position: 1
-description: Build generators that reuse query results instead of requesting each related object separately.
+description: A CSV/TSV import skill, Profiles and Object Templates support, YAGNI audit rules, and diagnostics collection built on the infrahub-collect tool.
 ---
 
 <table>
@@ -12,11 +12,11 @@ description: Build generators that reuse query results instead of requesting eac
     </tr>
     <tr>
       <th>Release Type</th>
-      <td>Improvement</td>
+      <td>Feature</td>
     </tr>
     <tr>
       <th>Release Date</th>
-      <td>June 16th, 2026</td>
+      <td>July 27th, 2026</td>
     </tr>
     <tr>
       <th>Tag</th>
@@ -27,7 +27,44 @@ description: Build generators that reuse query results instead of requesting eac
 
 ## Release summary
 
-When you build a generator that works through the results of a query, you can now read each related object from the response it already returned instead of sending a separate request for each one. For generators that handle many objects, that means far fewer requests.
+After upgrading, you can import CSV or TSV exports as Infrahub objects on a reviewable branch, model shared defaults and repeated structure with Profiles and Object Templates, and collect a diagnostic bundle by running the `infrahub-collect` tool instead of assembling one by hand.
+
+### Import CSV and TSV exports onto a reviewable branch
+
+Turn a spreadsheet export into Infrahub objects with the new [importing-data](../skills-reference/importing-data.mdx) skill: it converts the input into object YAML that `infrahubctl object load` accepts and loads it onto a fresh branch you can review through a proposed change.
+
+* Import a single file, a folder of files, an explicit list of paths, or one large denormalized sheet, splitting the denormalized sheet across multiple kinds.
+* Map columns against the live schema only: a column with no schema home stops the import and lists the offending columns, and the schema decision is routed to managing-schemas — the skill never edits the schema and never writes to the default branch.
+
+### Model shared defaults and repeated structure with Profiles and Object Templates
+
+Enable and use Infrahub Profiles and Object Templates across the schema, data, and audit skills. The two features are easy to conflate, so the guidance leads with the distinction and keeps it consistent everywhere: Profiles share default values, Object Templates clone structure.
+
+* Enable the features on a node with `generate_profile` and `generate_template` using [managing-schemas](../skills-reference/managing-schemas.mdx), including how Object Templates handle `Component` children and `member_of_groups_for_instances` propagation, and which fields a Profile cannot carry (unique and human-friendly-ID attributes; values are static only).
+* Assign `profiles:` on objects with the documented override precedence, create objects from an `object_template`, and author the `Template<Kind>` objects themselves with [managing-objects](../skills-reference/managing-objects.mdx).
+* Four new audit rules flag a profile used where a plain schema default would do, a generator that rebuilds what a template could stamp out, an enabled `generate_*` flag no data uses, and templates and profiles used in each other's role — each paired with a creation-time nudge in the authoring skills.
+
+### Find custom Python that a cheaper layer could replace
+
+The [auditing-repo](../skills-reference/auditing-repo.mdx) skill now grades checks, transforms, and generators against a cost-to-fix ladder — drop it, reuse a built-in primitive, use a schema feature, traverse a relationship, use Jinja2, use GraphQL with a thin assert, and only then minimum Python — so an audit shows where a schema feature or a query could replace custom code.
+
+* YAGNI findings are advisory — the code works and the pipeline passes — so they never exceed MEDIUM severity; HIGH and CRITICAL stay reserved for broken references, silent failures, and deprecated fields. A one-line or structural fix (inherit a built-in, move data to YAML, add a schema constraint) grades MEDIUM; a larger rewrite where the Python is more defensible grades LOW.
+* "Before writing Python" guidance in the checks, transforms, and generators skills steers a new artifact toward the cheaper layer before the code is written, not only at audit time.
+
+### Collect a diagnostic bundle by running infrahub-collect
+
+The [collecting-diagnostics](../skills-reference/collecting-diagnostics.mdx) skill now installs and drives the released [`infrahub-collect`](https://docs.infrahub.app/backup/guides/install-collect) tool, which performs deployment detection, every-replica log collection, key-name redaction, and the bundle manifest natively — instead of walking you through assembling the bundle by hand.
+
+* Install and verify the binary, detect the Docker Compose or Kubernetes environment, and run `infrahub-collect create` with flags matched to the reported symptom.
+* Authenticate through your existing Docker or kubectl access — the collection no longer asks for an Infrahub API token.
+* Review the bundle contents before sharing: the skill keeps that human gate the tool cannot perform, then hands off to OpsMill support or cross-links reporting-issues when the hand-off becomes a public issue.
+
+### Get documentation-backed answers for tasks the skills do not cover
+
+When a request is Infrahub-related but no loaded skill's rules cover it — deleting nodes, git-integration semantics — the assistant now looks the answer up in the official documentation instead of answering from training recall.
+
+* The fallback finds the matching page through the docs' `llms.txt` index, reads that page's Markdown twin, and answers with a citation and a caveat that the point is outside the skill's tested rules.
+* A version-matched skill rule always wins over the documentation, and on a network error or a missing page the assistant flags the answer as unverified.
 
 ### Build generators that reuse query results instead of requesting each object
 
@@ -37,11 +74,39 @@ Build a generator with the managing-generators skill so that, when its query alr
 * Follow the query-coverage requirement so the response carries everything those objects need: `__typename`, `id`, and every attribute the generator changes.
 * Use the before/after example in [managing-generators](../skills-reference/managing-generators.mdx) to refactor an existing generator.
 
+## Bug fixes
+
+* The analyzing-data skill now references the Infrahub MCP server's v1.1.7 tool surface (`get_nodes`, `search_nodes`, `query_graphql`, `node_upsert`, and the session-branch tools) instead of tool names that current servers no longer expose ([#68](https://github.com/opsmill/infrahub-skills/pull/68)).
+
+## Minor changes
+
+**Documentation**
+
+* Curated release notes for every release from v0.0.1 onward published on the docs site ([#62](https://github.com/opsmill/infrahub-skills/pull/62)).
+
+**Maintenance**
+
+* Docs-site npm dependencies patched for all Dependabot-reported vulnerabilities ([#59](https://github.com/opsmill/infrahub-skills/pull/59)).
+
 ## Full changelog
 
 ### Added
 
-* `from_graphql` rule for managing-generators: build related objects from the query response instead of requesting them again ([#58](https://github.com/opsmill/infrahub-skills/pull/58)).
+* `infrahub-importing-data` skill ([#63](https://github.com/opsmill/infrahub-skills/pull/63)).
+* Profiles and Object Templates coverage across managing-schemas, managing-objects, auditing-repo, and a shared reference ([#71](https://github.com/opsmill/infrahub-skills/pull/71)).
+* YAGNI / cost-to-fix audit rules and creation-time nudges ([#64](https://github.com/opsmill/infrahub-skills/pull/64)).
+* `llms.txt` documentation-fallback procedure in `infrahub-common` ([#73](https://github.com/opsmill/infrahub-skills/pull/73)).
+* `from_graphql` rule for managing-generators ([#58](https://github.com/opsmill/infrahub-skills/pull/58)).
+* Curated release notes on the docs site ([#62](https://github.com/opsmill/infrahub-skills/pull/62)).
+
+### Changed
+
+* `infrahub-collecting-diagnostics` rewritten around the `infrahub-collect` tool ([#72](https://github.com/opsmill/infrahub-skills/pull/72)).
+
+### Fixed
+
+* analyzing-data MCP tool references updated to the v1.1.7 surface ([#68](https://github.com/opsmill/infrahub-skills/pull/68)).
+* Dependabot-reported npm vulnerabilities in the docs site ([#59](https://github.com/opsmill/infrahub-skills/pull/59)).
 
 ## Skills included
 
@@ -55,3 +120,4 @@ Build a generator with the managing-generators skill so that, when its query alr
 * infrahub-analyzing-data
 * infrahub-reporting-issues
 * infrahub-collecting-diagnostics
+* infrahub-importing-data

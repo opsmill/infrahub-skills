@@ -12,7 +12,7 @@ allowed-tools:
   - Grep
 argument-hint: "[generator-name] [description...]"
 metadata:
-  version: 1.2.7
+  version: 1.2.8
   author: OpsMill
 ---
 
@@ -164,8 +164,14 @@ Follow these steps when creating a generator:
   -- GraphQL query writing reference
 - **[../infrahub-common/infrahub-yml-reference.md](../infrahub-common/infrahub-yml-reference.md)**
   -- .infrahub.yml project configuration
+- **[../infrahub-common/marketplace-reference.md](../infrahub-common/marketplace-reference.md)**
+  -- reuse a marketplace-published schema for the target
+  data model before hand-rolling one to generate against
 - **[../infrahub-common/rules/](../infrahub-common/rules/)** -- Shared rules
   (git integration, caching gotchas)
+- **[../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)**
+  -- Skill content first; how to consult `docs.infrahub.app`
+  on a genuine gap (e.g. deleting nodes)
 - **[../infrahub-managing-schemas/SKILL.md](../infrahub-managing-schemas/SKILL.md)**
   -- Schema definitions Generators work with
 - **[rules/](./rules/)** -- Individual rules organized by
