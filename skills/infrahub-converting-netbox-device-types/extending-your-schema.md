@@ -288,7 +288,7 @@ power-ports:
 ```
 
 A template is not bound to a bay, so the token cannot
-be resolved at conversion time. Two options:
+be resolved at conversion time. Three options:
 
 - **Leave it** (default). Names keep the literal
   `{module}`, the information survives, and the report
@@ -300,9 +300,20 @@ be resolved at conversion time. Two options:
   specific populated slot, and wrong as a blanket
   default — it silently asserts every module sits in
   the same bay.
+- **Substitute it after install, with a generator.**
+  The bay position is knowable once the module is
+  installed — it is `module_bay.position` — so a
+  generator can resolve the token for real and create
+  the corresponding device interfaces. This is the
+  "something downstream" the first option defers to.
+  See
+  [generators-module-ports.md](./generators-module-ports.md);
+  the generator ships in `scripts/`.
 
-Neither is a substitute for modelling bays. If you need
-per-slot accuracy, the template has to be per-slot.
+Neither of the first two is a substitute for modelling
+bays. If you need per-slot accuracy at conversion time,
+the template has to be per-slot — or leave the token and
+let the generator resolve it per installed module.
 
 ## Two shapes of gap
 

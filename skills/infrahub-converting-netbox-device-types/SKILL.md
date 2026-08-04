@@ -97,6 +97,15 @@ before promising much here: against the stock
 schema-library a module type has **no component
 relationships**, so its ports do not convert.
 
+Module port names carry NetBox's `{module}` token, which
+no conversion can resolve — the bay position is only
+known once the module is installed. Once the
+schema-library module extensions are loaded so the ports
+import as `DeviceModulePort` declarations, the bundled
+generator resolves the token per installed module and
+creates the real device interfaces. See
+[generators-module-ports.md](./generators-module-ports.md).
+
 Three facts drive almost every surprise in this
 workflow — explain them rather than assuming them:
 
@@ -298,6 +307,7 @@ run them after any change.
 | ---- | ------------ |
 | [concepts.md](./concepts.md) | The Infrahub model is unfamiliar, or you need to explain it |
 | [extending-your-schema.md](./extending-your-schema.md) | Turning a reported gap into a schema change |
+| [generators-module-ports.md](./generators-module-ports.md) | Module ports imported as declarations and the `{module}` token needs resolving into real device interfaces |
 | [reference.md](./reference.md) | Looking up a NetBox field or its Infrahub counterpart |
 | [examples.md](./examples.md) | Needing a worked conversion, profile, or schema patch |
 | [rules/](./rules/) | Applying or checking a specific rule |
@@ -325,3 +335,4 @@ conversion.
 | Schema property reference | <https://docs.infrahub.app/reference/schema/node> |
 | Profiles vs templates | <https://docs.infrahub.app/profiles/overview> |
 | Schema from scratch (tutorial) | <https://docs.infrahub.app/academy/tutorials/build-your-first-schema> |
+| Generators (resolving `{module}` after install) | <https://docs.infrahub.app/generators/overview> |

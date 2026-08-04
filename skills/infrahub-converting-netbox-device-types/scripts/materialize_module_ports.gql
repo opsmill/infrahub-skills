@@ -1,0 +1,106 @@
+# Query feeding materialize_module_ports.py.
+#
+# Root kind: DcimDevice. `modules` and `module_bays` are extended onto the
+# DcimPhysicalDevice generic, while `name` and `interfaces` live on the
+# DcimGenericDevice generic; DcimDevice inherits both, so rooting here selects
+# all three without fragments. A schema whose physical device kind is named
+# something else needs that kind substituted here.
+#
+# Inline fragments and unions
+# ---------------------------
+# `modules` peers the GENERIC DeviceGenericModule, so the node type is a
+# GraphQL interface. Everything selected below is declared on that generic —
+# serial_number and description on the generic itself, `ports` and `module_bay`
+# extended onto it by extensions/module_port/module_port.yml and
+# extensions/module_bay/module_bay.yml — which is why they select directly.
+#
+# Fields that live only on a CONCRETE module kind require an inline fragment;
+# selecting them on the interface fails the whole query with
+# "Cannot query field 'X' on type 'DeviceGenericModule'". See
+# skills/infrahub-managing-transforms/rules/queries-union-fragments.md.
+#
+# The one such field the generator can use is DeviceLinecard.slot, a fallback
+# bay position for a linecard installed with no module_bay set. It ships
+# commented out on purpose: a fragment on a type absent from the loaded schema
+# fails the query with "Unknown type 'DeviceLinecard'", and that kind lives in
+# schema-library's *experimental* tree. Uncomment it only once DeviceLinecard is
+# loaded — the generator already reads `slot` defensively, so no code changes.
+#
+# `interfaces` peers the generic DcimInterface, but name and description are
+# declared on that generic (InterfacePhysical adds no attributes of its own),
+# so they select directly too.
+query ModulePortsForDevice($device_name: String!) {
+  DcimDevice(name__value: $device_name) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        interfaces {
+          edges {
+            node {
+              id
+              __typename
+              name {
+                value
+              }
+              description {
+                value
+              }
+            }
+          }
+        }
+        modules {
+          edges {
+            node {
+              id
+              __typename
+              serial_number {
+                value
+              }
+              module_bay {
+                node {
+                  id
+                  name {
+                    value
+                  }
+                  position {
+                    value
+                  }
+                }
+              }
+              ports {
+                edges {
+                  node {
+                    name {
+                      value
+                    }
+                    category {
+                      value
+                    }
+                    port_type {
+                      value
+                    }
+                    mgmt_only {
+                      value
+                    }
+                    maximum_draw {
+                      value
+                    }
+                  }
+                }
+              }
+              # Concrete-kind fallback position — see the header note.
+              # ... on DeviceLinecard {
+              #   slot {
+              #     value
+              #   }
+              # }
+            }
+          }
+        }
+      }
+    }
+  }
+}
