@@ -1,14 +1,12 @@
 # Infrahub Schema Creator - Rule Sections
 
-1. **Workflow (workflow-)** — CRITICAL. Apply
+1. **Branch-First Changes (workflow-)** — CRITICAL. Apply
    schema changes on a dedicated branch (`--branch`), not
    the default branch (`main` by convention), on any shared
    server. Schema loads run migrations against loaded data
    immediately and globally; a branch makes the change
    previewable, isolated, and discardable, and routes it
-   through proposed-change review. Also covers offline file
-   hygiene — running `infrahubctl schema format` to
-   normalise key ordering before check/load.
+   through proposed-change review.
 
 2. **Naming Conventions (naming-)** — CRITICAL.
    Namespace, node, generic, and attribute naming
@@ -59,7 +57,14 @@
    state: absent. Strategies for non-breaking schema
    changes.
 
-10. **Validation (validation-)** — HIGH for
+10. **File Formatting (format-)** — MEDIUM. Canonical key
+    ordering inside schema files, and the offline
+    `infrahubctl schema format` command that applies it.
+    Unformatted files reshuffle keys on every edit, so
+    diffs bury the substantive change. Cosmetic only — it
+    never changes what the schema means.
+
+11. **Validation (validation-)** — HIGH for
     string-length caps (load-time `string_too_long`
     on `description` / `label` / `identifier` /
     `deprecation`), otherwise LOW. Pre-validation

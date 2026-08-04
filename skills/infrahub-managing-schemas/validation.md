@@ -10,10 +10,13 @@
 
 ### Format Schema (Offline)
 
-Normalise the key ordering of schema files before
-checking or loading them. Unlike the commands below, this
-runs **offline** — no server required. See
-[rules/workflow-format-command.md](./rules/workflow-format-command.md).
+Normalise the key ordering of schema files before checking
+or loading them. Unlike the commands below, this runs
+**offline** — no server required, so it also works as a CI
+gate. The canonical order it writes, and how to author it
+by hand on an `infrahubctl` that predates the command, are
+in
+[rules/format-schema-files.md](./rules/format-schema-files.md).
 
 ```bash
 # Format a directory in place
@@ -22,15 +25,22 @@ infrahubctl schema format schemas/
 # Preview changes without writing
 infrahubctl schema format schemas/base/dcim.yml --diff
 
-# CI gate: exit 1 if any file is not formatted
+# CI gate: writes nothing, exits 1 if any file is not formatted
 infrahubctl schema format schemas/ --check
 ```
 
-It reorders keys within nodes, attributes, relationships,
-and choices into a canonical order (leaving list-item
-order and reserved-namespace nodes untouched). Comments,
-quoting, and inline (flow) sequences are preserved, so the
-diff is purely key reordering.
+By default the change is purely key reordering: list-item
+order, reserved-namespace nodes, comments, quoting, and
+inline (flow) sequences are all left alone. Multi-document
+files are skipped.
+
+Three flags go further and change file *content*
+(`--strip-defaults`, `--sort-by-order-weight`,
+`--backfill-order-weight`) — see `infrahubctl schema format
+--help` for what each does. Enable them deliberately;
+`--backfill-order-weight` in particular writes the flat
+constant `1000`, which conflicts with the ranges in
+[rules/display-order-weight.md](./rules/display-order-weight.md).
 
 ### Check Schema (Dry Run)
 

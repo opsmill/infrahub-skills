@@ -48,7 +48,7 @@ use the first argument as the namespace and remaining arguments as node names.
 
 | Priority | Category | Prefix | Description |
 | -------- | -------- | ------ | ----------- |
-| CRITICAL | Workflow | `workflow-` | Load schema onto a branch, not the default branch; format files with `infrahubctl schema format` |
+| CRITICAL | Branch-First Changes | `workflow-` | Load schema onto a branch, not the default branch |
 | CRITICAL | Naming | `naming-` | Namespace, node, attribute naming |
 | CRITICAL | Relationships | `relationship-` | IDs, peers, component/parent, on_delete |
 | HIGH | Attributes | `attribute-` | Defaults, dropdowns, computed Jinja2, branch-agnostic, deprecated |
@@ -57,6 +57,7 @@ use the first argument as the namespace and remaining arguments as node names.
 | MEDIUM | Extensions | `extension-` | Cross-file via extensions block, artifact targets |
 | MEDIUM | Uniqueness | `uniqueness-` | Constraint format, __value suffix |
 | MEDIUM | Migration | `migration-` | Add/remove attributes, state: absent |
+| MEDIUM | File Formatting | `format-` | Canonical key order; `infrahubctl schema format` (offline) |
 | HIGH | Validation | `validation-` | Load-time string-length caps (description / label / identifier), common error messages, pre-check checklist |
 
 ## Schema File Basics
@@ -169,11 +170,12 @@ Follow these steps when creating or modifying a schema:
    `order_weight` per
    [rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md)
    and [rules/display-order-weight.md](./rules/display-order-weight.md).
-7. **Format the files** — Run `infrahubctl schema format`
-   to normalise key ordering before committing, so diffs
-   stay small and files read consistently. This is offline
-   (no server needed). See
-   [rules/workflow-format-command.md](./rules/workflow-format-command.md).
+7. **Format the file** — Put the keys in the canonical
+   order before committing so diffs stay small. Run
+   `infrahubctl schema format` when your `infrahubctl`
+   provides it (offline, no server); otherwise author the
+   order by hand. See
+   [rules/format-schema-files.md](./rules/format-schema-files.md).
 8. **Validate and roll out on a branch** — Run
    `infrahubctl schema check` to fix errors per
    [validation.md](./validation.md) and
