@@ -298,8 +298,14 @@ schema-specific special case to the script is how it
 stops working for everyone else.
 
 Its tests live at
-`tests/scripts/test_netbox_to_infrahub_templates.py`;
-run them after any change.
+`tests/scripts/test_netbox_to_infrahub_templates.py`,
+and the module-port generator's at
+`tests/scripts/test_materialize_module_ports.py`. Run
+them after any change:
+
+```bash
+uv run invoke test
+```
 
 ## Supporting References
 

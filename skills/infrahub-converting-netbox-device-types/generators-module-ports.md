@@ -269,13 +269,13 @@ missing-bay and null-position cases, untokenised names,
 and the SDK payload shape.
 
 ```bash
-pytest tests/scripts/test_materialize_module_ports.py
+uv run invoke test          # the whole suite
+uv run --group test pytest tests/scripts/test_materialize_module_ports.py
 ```
 
-The `infrahub-sdk` pytest plugin autoloads when the SDK
-is installed and needs the SDK's own CLI extras; if it
-errors on import, run with
-`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`.
+The SDK lives in an opt-in `test` dependency group, which
+is why the `--group test` is needed when invoking pytest
+directly.
 
 Those tests pin the planning logic and the payload
 shape, and they do not cover the wire protocol. Per
