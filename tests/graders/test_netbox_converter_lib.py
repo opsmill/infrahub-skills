@@ -22,6 +22,8 @@ _spec.loader.exec_module(_mod)
 CHECKS = _mod.CHECKS
 load_output_dir = _mod.load_output_dir
 run_checks = _mod.run_checks
+component_children = _mod.component_children
+_template_rows = _mod._template_rows
 
 
 def _object_doc(kind: str, data: list[dict]) -> dict:
@@ -434,13 +436,37 @@ def test_fallback_precedence_requires_a_report(tmp_path):
 # Two NetBox lists sharing one relationship (list-of-blocks form)
 # ---------------------------------------------------------------------------
 
+#: The loadable shape for a shared relationship: a flat list, one child per
+#: item, `kind` repeated. See rules/mapping-shared-relationships.md.
 SHARED_TEMPLATE = {
     "template_name": "cisco-c9300-48p",
     "device_type": "Catalyst 9300-48P",
     "interfaces": [
         {
             "kind": "TemplateInterfacePhysical",
-            "data": [{"template_name": "cisco-c9300-48p__Gi1/0/1", "name": "Gi1/0/1"}],
+            "data": {"template_name": "cisco-c9300-48p__Gi1/0/1", "name": "Gi1/0/1"},
+        },
+        {
+            "kind": "TemplateDcimConsoleInterface",
+            "data": {"template_name": "cisco-c9300-48p__console__con 0", "name": "con 0"},
+        },
+    ],
+}
+
+#: The shape the converter emitted until a live load rejected it: children
+#: grouped per kind inside the list items. The loader hands each item's `data`
+#: to its single-object path, so this raises
+#: `AttributeError: 'list' object has no attribute 'items'`.
+GROUPED_TEMPLATE = {
+    "template_name": "cisco-c9300-48p",
+    "device_type": "Catalyst 9300-48P",
+    "interfaces": [
+        {
+            "kind": "TemplateInterfacePhysical",
+            "data": [
+                {"template_name": "cisco-c9300-48p__Gi1/0/1", "name": "Gi1/0/1"},
+                {"template_name": "cisco-c9300-48p__Gi1/0/2", "name": "Gi1/0/2"},
+            ],
         },
         {
             "kind": "TemplateDcimConsoleInterface",
@@ -481,8 +507,8 @@ def test_non_template_kind_inside_a_block_list_is_rejected(tmp_path):
     bad = {
         **SHARED_TEMPLATE,
         "interfaces": [
-            {"kind": "TemplateInterfacePhysical", "data": [{"template_name": "a"}]},
-            {"kind": "DcimConsoleInterface", "data": [{"template_name": "b"}]},
+            {"kind": "TemplateInterfacePhysical", "data": {"template_name": "a"}},
+            {"kind": "DcimConsoleInterface", "data": {"template_name": "b"}},
         ],
     }
     out = _shared_dir(tmp_path, bad)
@@ -497,11 +523,11 @@ def test_names_across_shared_blocks_are_checked(tmp_path):
         "interfaces": [
             {
                 "kind": "TemplateInterfacePhysical",
-                "data": [{"template_name": "cisco-c9300-48p__dup"}],
+                "data": {"template_name": "cisco-c9300-48p__dup"},
             },
             {
                 "kind": "TemplateDcimConsoleInterface",
-                "data": [{"template_name": "cisco-c9300-48p__dup"}],
+                "data": {"template_name": "cisco-c9300-48p__dup"},
             },
         ],
     }
@@ -515,6 +541,61 @@ def test_shared_blocks_pass_the_full_check_set(tmp_path):
     out = _shared_dir(tmp_path)
     result = run_checks(ALL_OUTPUT_CHECKS, out)
     assert result["score"] == 1.0, result["details"]
+
+
+# ---------------------------------------------------------------------------
+# shared-relationship-blocks
+#
+# Previously wired only into the eval task grader, so nothing unit-tested it —
+# which is part of why the unloadable shape survived: the check that owns this
+# concern agreed with the wrong shape and was never asked about it.
+# ---------------------------------------------------------------------------
+
+
+def test_flat_shared_relationship_passes(tmp_path):
+    out = _shared_dir(tmp_path)
+    ok, message = CHECKS["shared-relationship-blocks"](load_output_dir(out), output_dir=out)
+    assert ok, message
+
+
+def test_grouped_children_in_a_list_item_are_rejected(tmp_path):
+    """Regression for the live `'list' object has no attribute 'items'` load failure."""
+    out = _shared_dir(tmp_path, GROUPED_TEMPLATE)
+    ok, message = CHECKS["shared-relationship-blocks"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "nests a list of children" in message
+
+
+def test_grouped_children_do_not_hide_the_child_count(tmp_path):
+    """`data` as a mapping must not be counted by its keys."""
+    out = _shared_dir(tmp_path)
+    rows = _template_rows(load_output_dir(out))
+    children = [child for row in rows for _, child in component_children(row)]
+    assert len(children) == 2
+    assert {child["name"] for child in children} == {"Gi1/0/1", "con 0"}
+
+
+def test_single_kind_list_is_reported_as_not_actually_shared(tmp_path):
+    one_kind = {
+        **SHARED_TEMPLATE,
+        "interfaces": [
+            {"kind": "TemplateInterfacePhysical", "data": {"template_name": "a", "name": "a"}},
+            {"kind": "TemplateInterfacePhysical", "data": {"template_name": "b", "name": "b"}},
+        ],
+    }
+    out = _shared_dir(tmp_path, one_kind)
+    ok, message = CHECKS["shared-relationship-blocks"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "more than one peer kind" in message
+
+
+def test_unshared_output_fails_the_shared_check(compliant):
+    """The check must not pass vacuously when nothing shares a relationship."""
+    ok, message = CHECKS["shared-relationship-blocks"](
+        load_output_dir(compliant), output_dir=compliant
+    )
+    assert not ok
+    assert "more than one component block" in message
 
 
 def test_empty_list_is_rejected(tmp_path):

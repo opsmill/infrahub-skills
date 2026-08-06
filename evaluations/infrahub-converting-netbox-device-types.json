@@ -213,12 +213,12 @@
     {
       "id": 8,
       "prompt": "Convert this NetBox device type into Infrahub object templates.\n\n    ---\n    manufacturer: Cisco\n    model: Catalyst 9300-24P\n    slug: cisco-c9300-24p\n    part_number: C9300-24P\n    u_height: 1\n    console-ports:\n      - name: con 0\n        type: rj-45\n      - name: usb\n        type: usb-mini-b\n    interfaces:\n      - name: GigabitEthernet1/0/1\n        type: 1000base-t\n      - name: GigabitEthernet1/0/2\n        type: 1000base-t\n      - name: GigabitEthernet1/0/3\n        type: 1000base-t\n      - name: GigabitEthernet1/0/4\n        type: 1000base-t\n\nOur schema is based on the OpsMill schema-library with\n`generate_template: true` on `DcimDevice`, and it adds a console-port\nnode:\n\n    nodes:\n      - name: ConsoleInterface\n        namespace: Dcim\n        label: Console Port\n        inherit_from:\n          - DcimInterface\n        attributes:\n          - name: speed\n            kind: Number\n            default_value: 115200\n\nBecause `DcimConsoleInterface` inherits `DcimInterface`, it is carried\nby the device's existing `interfaces` Component relationship \u2014 there\nis no separate console relationship on the device.\n\nI need every physical interface AND every console port in the output.\nWrite the emitted files under `./output_dir/` (create the directory).",
-      "expected_output": "A ./output_dir/ whose template carries both component lists on the single `interfaces` relationship, as a list of {kind, data} blocks \u2014 4 TemplateInterfacePhysical children and 2 console-port children \u2014 with template names that keep the two lists distinct.",
+      "expected_output": "A ./output_dir/ whose template carries both component lists on the single `interfaces` relationship, as a flat list of {kind, data} items \u2014 one child per item, `kind` repeated \u2014 totalling 4 TemplateInterfacePhysical children and 2 console-port children, with template names that keep the two lists distinct.",
       "files": [],
       "expectations": [
         "Both console ports and all four physical interfaces appear in the output",
         "Both land on the single `interfaces` relationship",
-        "The relationship carries a list of blocks, each with kind and data",
+        "The relationship carries a flat list of items, each with kind and a single child mapping under data (a list of children nested inside an item does not load)",
         "Neither component list overwrote the other",
         "Component template names distinguish console ports from physical interfaces",
         "Every component template name remains unique"
@@ -242,7 +242,7 @@
         },
         {
           "name": "shared-relationship-blocks",
-          "check": "A relationship carrying several component lists keeps every block, each with a distinct kind and non-empty data"
+          "check": "A relationship carrying several component lists keeps every child, one per list item with a single child mapping under data"
         }
       ]
     },

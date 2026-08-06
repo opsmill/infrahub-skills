@@ -763,24 +763,72 @@ def test_shared_relationship_keeps_both_component_lists(tmp_path, shared_profile
     device = parse_device_type(_write(tmp_path, "c9300.yaml", SHARED_INPUT))
     template, _ = convert_device_type(device, shared_profile)
 
-    blocks = template["interfaces"]
-    assert isinstance(blocks, list), "two mappings on one relationship must accumulate"
-    assert [b["kind"] for b in blocks] == [
-        "TemplateInterfacePhysical",
-        "TemplateDcimConsoleInterface",
-    ]
-    assert [len(b["data"]) for b in blocks] == [3, 2]
+    items = template["interfaces"]
+    assert isinstance(items, list), "two mappings on one relationship must accumulate"
+    # One item per child, in profile order, with `kind` repeated per child.
+    assert [item["kind"] for item in items] == ["TemplateInterfacePhysical"] * 3 + [
+        "TemplateDcimConsoleInterface"
+    ] * 2
 
 
-def test_shared_relationship_emits_the_loader_list_form(tmp_path, shared_profile):
+def test_shared_relationship_emits_one_child_per_list_item(tmp_path, shared_profile):
+    """Regression: grouped children under a list item fail to load.
+
+    The loader classifies a list payload as MANY_OBJ_LIST_DICT and hands each
+    item's `data` to its single-object path, which iterates `data.items()`.
+    A list there raised `AttributeError: 'list' object has no attribute
+    'items'` against a live server while every unit test passed.
+    """
     device = parse_device_type(_write(tmp_path, "c9300.yaml", SHARED_INPUT))
     conversion = convert_all([device], shared_profile)
     text = render_object_file(shared_profile.template_kind, conversion.templates)
     row = yaml.safe_load(text)["spec"]["data"][0]
 
-    # Every item must be a mapping carrying `data`, which is what the SDK's
-    # MANY_OBJ_LIST_DICT format requires in order to resolve kind per item.
-    assert all(isinstance(item, dict) and "data" in item for item in row["interfaces"])
+    for item in row["interfaces"]:
+        assert isinstance(item, dict) and "data" in item, "each item needs a kind/data wrapper"
+        assert isinstance(item["data"], dict), (
+            "`data` must be one child mapping; a list here does not load"
+        )
+        assert "name" in item["data"]
+
+
+def test_shared_relationship_survives_the_sdk_loader_dispatch(tmp_path, shared_profile):
+    """Replay the object loader's own dispatch over the emitted payload.
+
+    Every other test here asserts a shape *we* chose. This one imports the
+    SDK's real classifier and reproduces what the matching branch does with
+    each item, which is what the shape has to survive. It is not a substitute
+    for `infrahubctl object load` against a server — the schema is not
+    consulted — but it is the part of the contract that can be checked offline,
+    and it is the part that was wrong.
+    """
+    from infrahub_sdk.spec.object import validate_list_of_data_dicts
+
+    device = parse_device_type(_write(tmp_path, "c9300.yaml", SHARED_INPUT))
+    conversion = convert_all([device], shared_profile)
+    row = yaml.safe_load(render_object_file(shared_profile.template_kind, conversion.templates))
+    payload = row["spec"]["data"][0]["interfaces"]
+
+    # A list whose items each carry `data` classifies as MANY_OBJ_LIST_DICT.
+    assert isinstance(payload, list)
+    assert validate_list_of_data_dicts(payload)
+
+    # That branch passes each item's `data` to the single-object path, whose
+    # first act is `for key, value in data.items()`.
+    for item in payload:
+        assert dict(item["data"].items())
+
+
+def test_shared_relationship_keeps_every_child(tmp_path, shared_profile):
+    """The flat form must not lose children while flattening."""
+    device = parse_device_type(_write(tmp_path, "c9300.yaml", SHARED_INPUT))
+    template, _ = convert_device_type(device, shared_profile)
+
+    by_kind: dict[str, int] = {}
+    for item in template["interfaces"]:
+        by_kind[item["kind"]] = by_kind.get(item["kind"], 0) + 1
+
+    assert by_kind == {"TemplateInterfacePhysical": 3, "TemplateDcimConsoleInterface": 2}
 
 
 def test_shared_relationship_reports_both_lists_as_converted(tmp_path, shared_profile):
@@ -795,7 +843,7 @@ def test_shared_relationship_names_stay_unique(tmp_path, shared_profile):
     device = parse_device_type(_write(tmp_path, "c9300.yaml", SHARED_INPUT))
     template, _ = convert_device_type(device, shared_profile)
 
-    names = [c["template_name"] for b in template["interfaces"] for c in b["data"]]
+    names = [item["data"]["template_name"] for item in template["interfaces"]]
     assert len(names) == len(set(names)) == 5
     assert "cisco-c9300-48p__console__con 0" in names
 
@@ -827,7 +875,13 @@ def test_three_lists_can_share_one_relationship(tmp_path):
     device = parse_device_type(_write(tmp_path, "c9300.yaml", source))
     template, _ = convert_device_type(device, profile)
 
-    assert [len(b["data"]) for b in template["interfaces"]] == [3, 2, 1]
+    kinds = [item["kind"] for item in template["interfaces"]]
+    assert kinds == (
+        ["TemplateInterfacePhysical"] * 3
+        + ["TemplateDcimConsoleInterface"] * 2
+        + ["TemplateDcimConsoleServerInterface"]
+    )
+    assert all(isinstance(item["data"], dict) for item in template["interfaces"])
 
 
 # ---------------------------------------------------------------------------

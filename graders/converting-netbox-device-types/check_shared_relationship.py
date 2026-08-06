@@ -4,8 +4,10 @@
 Two NetBox component lists can land on a single Infrahub relationship when
 their peer kinds share a generic — a console-port node that inherits the
 interface generic rides the device's `interfaces` relationship. The output
-must keep both, as a list of `{kind, data}` blocks the object loader
-resolves per item.
+must keep both, as a flat list of `{kind, data: <one child>}` items: the
+loader resolves `kind` per item, but hands each item's `data` to its
+single-object path, so a list of children nested inside an item fails to
+load.
 
 Fixture-specific counts live here rather than in the shared library,
 because "did anything get erased" is only decidable against a known input.
@@ -24,7 +26,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from lib import _template_rows, component_blocks, load_output_dir, run_checks  # noqa: E402
+from lib import (  # noqa: E402
+    _template_rows,
+    block_children,
+    component_blocks,
+    load_output_dir,
+    run_checks,
+)
 
 CHECKS = [
     "envelope",
@@ -49,7 +57,10 @@ def check_fixture_counts(output_dir: Path) -> tuple[bool, str]:
     for row in rows:
         for _, block in component_blocks(row):
             kind = str(block.get("kind"))
-            counts[kind] = counts.get(kind, 0) + len(block.get("data") or [])
+            # block_children, not len(block["data"]) — under the shared
+            # relationship's list form `data` is one child mapping, and
+            # len() of that would count its keys.
+            counts[kind] = counts.get(kind, 0) + len(block_children(block))
 
     physical = sum(count for kind, count in counts.items() if "Physical" in kind)
     console = sum(count for kind, count in counts.items() if "Console" in kind)

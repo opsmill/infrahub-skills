@@ -126,10 +126,10 @@ def _is_component_block(value: Any) -> bool:
 def component_blocks(row: dict) -> list[tuple[str, Any]]:
     """Return ``(relationship, block)`` pairs for one template row.
 
-    A relationship carries either a single ``{kind, data}`` mapping or, when
-    two NetBox lists share it, a list of such blocks — the shape the object
-    loader resolves per item. Both are valid; a bare list of children is
-    not, and is deliberately left out so the wrapper check still fails it.
+    A relationship carries either a single ``{kind, data: [...]}`` mapping or,
+    when two NetBox lists share it, a list of ``{kind, data: {...}}`` items.
+    Both are valid; a bare list of children is not, and is deliberately left
+    out so the wrapper check still fails it.
     """
     pairs: list[tuple[str, Any]] = []
     for key, value in row.items():
@@ -140,13 +140,27 @@ def component_blocks(row: dict) -> list[tuple[str, Any]]:
     return pairs
 
 
+def block_children(block: dict) -> list[dict]:
+    """Return the children a component block carries, in either shape.
+
+    The mapping form holds a list under ``data``; a list-form item holds one
+    child mapping. Iterating ``data`` blindly would walk a child's *keys*
+    under the list form and silently report zero children.
+    """
+    data = block.get("data")
+    if isinstance(data, dict):
+        return [data]
+    if isinstance(data, list):
+        return [child for child in data if isinstance(child, dict)]
+    return []
+
+
 def component_children(row: dict) -> list[tuple[str, dict]]:
     """Return ``(relationship, child)`` pairs across every component block."""
     return [
         (relationship, child)
         for relationship, block in component_blocks(row)
-        for child in block.get("data") or []
-        if isinstance(child, dict)
+        for child in block_children(block)
     ]
 
 
@@ -415,12 +429,23 @@ def check_coverage_report(
 
 
 def check_shared_relationship_blocks(parsed: dict[Path, list[dict]], **_: Any) -> tuple[bool, str]:
-    """Component lists sharing one relationship keep every block intact.
+    """Component lists sharing one relationship keep every child, in a loadable shape.
 
-    Two NetBox lists can legitimately land on one Infrahub relationship
-    when their peer kinds share a generic. Assigning rather than
-    accumulating makes the second erase the first while the coverage report
-    still claims both converted — silent loss the report cannot catch.
+    Two NetBox lists can legitimately land on one Infrahub relationship when
+    their peer kinds share a generic. Two things can go wrong, and both are
+    invisible in the coverage report:
+
+    1. Assigning rather than accumulating makes the second mapping erase the
+       first while the report still claims both converted.
+    2. Accumulating into the *wrong* shape. The object loader treats a list
+       payload as ``MANY_OBJ_LIST_DICT`` and hands each item's ``data``
+       straight to its single-object path, so nesting a list of children
+       inside a list item fails the load with ``AttributeError: 'list' object
+       has no attribute 'items'``. Each item must carry exactly one child.
+
+    The second is why this check inspects the shape of ``data`` rather than
+    only counting blocks: the grouped form is self-consistent and looks
+    plausible right up to the point a server rejects it.
     """
     rows = _template_rows(parsed)
     if not rows:
@@ -435,25 +460,34 @@ def check_shared_relationship_blocks(parsed: dict[Path, list[dict]], **_: Any) -
             if len(blocks) == 1:
                 continue
             shared += 1
-            kinds = [str(block.get("kind")) for block in blocks]
-            if len(set(kinds)) != len(kinds):
-                return False, (
-                    f"Relationship {relationship!r} on {row.get('template_name')!r} "
-                    f"has duplicate block kinds {kinds}; merge them into one block"
-                )
             for block in blocks:
-                if not block.get("data"):
+                if isinstance(block.get("data"), list):
+                    return False, (
+                        f"Relationship {relationship!r} on "
+                        f"{row.get('template_name')!r} nests a list of children "
+                        f"under a list item's 'data' ({block.get('kind')!r}). The "
+                        "loader passes each item's 'data' to its single-object "
+                        "path, so this fails to load — emit one child per item."
+                    )
+                if not block_children(block):
                     return False, (
                         f"Relationship {relationship!r} on "
                         f"{row.get('template_name')!r} has an empty "
                         f"{block.get('kind')!r} block"
                     )
+            kinds = {str(block.get("kind")) for block in blocks}
+            if len(kinds) < 2:
+                return False, (
+                    f"Relationship {relationship!r} on {row.get('template_name')!r} "
+                    f"carries {len(blocks)} items of one kind ({kinds}); a shared "
+                    "relationship should show more than one peer kind"
+                )
     if shared == 0:
         return False, (
             "No relationship carries more than one component block, so nothing "
             "exercised the shared-relationship path"
         )
-    return True, f"{shared} shared relationship(s) kept every block"
+    return True, f"{shared} shared relationship(s) kept every child in the loadable shape"
 
 
 def check_fallback_precedence(

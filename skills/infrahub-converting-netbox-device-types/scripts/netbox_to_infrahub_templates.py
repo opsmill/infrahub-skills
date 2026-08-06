@@ -995,6 +995,11 @@ def _build_component(
     return obj
 
 
+def _flatten_component_block(block: dict[str, Any]) -> list[dict[str, Any]]:
+    """Expand a ``{kind, data: [children]}`` block into one item per child."""
+    return [{"kind": block["kind"], "data": child} for child in block["data"]]
+
+
 def _attach_component_block(
     template: dict[str, Any], component: ComponentMapping, children: list[dict[str, Any]]
 ) -> None:
@@ -1004,20 +1009,37 @@ def _attach_component_block(
     relationship — a schema whose console-port node inherits the interface
     generic takes both ``interfaces`` and ``console-ports`` on its
     ``interfaces`` relationship. Assigning would make the second mapping
-    silently erase the first, so blocks accumulate into the list form the
-    object loader resolves per item.
+    silently erase the first, so the mappings have to accumulate.
 
-    The single-mapping case keeps the plain ``{kind, data}`` mapping, which
-    is the common shape and the more readable one.
+    The two shapes are not interchangeable, and the object loader is the
+    reason. It classifies a relationship payload before walking it
+    (``infrahub_sdk/spec/object.py``):
+
+    - a **mapping** ``{kind, data: [...]}`` is ``MANY_OBJ_DICT_LIST``, and the
+      loader iterates ``data``, so one block may hold many children;
+    - a **list** is ``MANY_OBJ_LIST_DICT``, and the loader passes each item's
+      ``data`` straight to the single-object path — so each item must carry
+      exactly one child.
+
+    Nesting a list of children inside a list item therefore fails the load
+    with ``AttributeError: 'list' object has no attribute 'items'``. So the
+    shared case emits a flat list, one child per item with ``kind`` repeated.
+
+    The single-mapping case keeps the plain ``{kind, data: [...]}`` mapping:
+    it loads correctly, it is the common path, and it is the more readable
+    of the two.
     """
-    block = {"kind": component.kind, "data": children}
     existing = template.get(component.relationship)
+
     if existing is None:
-        template[component.relationship] = block
-    elif isinstance(existing, dict):
-        template[component.relationship] = [existing, block]
-    else:
-        existing.append(block)
+        template[component.relationship] = {"kind": component.kind, "data": children}
+        return
+
+    # A second mapping landed on this relationship, so the payload has to
+    # become the list form — which means expanding whatever is already there.
+    items = _flatten_component_block(existing) if isinstance(existing, dict) else existing
+    items.extend({"kind": component.kind, "data": child} for child in children)
+    template[component.relationship] = items
 
 
 def _record_dropped_component_fields(
