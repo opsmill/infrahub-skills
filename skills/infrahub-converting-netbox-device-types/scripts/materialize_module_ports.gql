@@ -29,8 +29,13 @@
 # `interfaces` peers the generic DcimInterface, but name and description are
 # declared on that generic (InterfacePhysical adds no attributes of its own),
 # so they select directly too.
-query ModulePortsForDevice($device_name: String!) {
-  DcimDevice(name__value: $device_name) {
+# The variable is `$name`, not `$device_name`, and the name is load-bearing.
+# `infrahubctl generator` derives the query variable from the FIRST KEY of the
+# generator's `parameters` block, and that same key has to be a real attribute
+# on the target node (it does `getattr(member, key)`). `name` satisfies both;
+# `device_name` satisfies neither. See generators-module-ports.md → Registration.
+query ModulePortsForDevice($name: String!) {
+  DcimDevice(name__value: $name) {
     edges {
       node {
         id

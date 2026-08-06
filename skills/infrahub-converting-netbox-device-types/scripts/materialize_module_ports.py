@@ -101,10 +101,17 @@ Registration
         targets: devices_with_modules
         class_name: ModulePortMaterializer
         parameters:
-          device_name: name__value
+          name: name__value
+
+``parameters``' first key must be **both** an attribute on the target node and
+the variable the query declares — ``infrahubctl generator`` uses it for both,
+which is why the query's variable is ``$name`` and not ``$device_name``.
 
 ``targets`` must be a ``CoreGeneratorGroup``; a ``CoreStandardGroup`` of the
-same name parses but never triggers. See
+same name parses but never triggers. Its ``members`` cannot be populated from
+an object file, and an installed module needs ``object_template`` set at
+creation or it has no ports for this generator to resolve. Both are covered in
+``generators-module-ports.md`` → Registration / Installing a module. See also
 ``skills/infrahub-managing-generators/rules/registration-config.md``.
 
 Testing
@@ -584,7 +591,7 @@ class ModulePortMaterializer(InfrahubGenerator):
         if not devices:
             self.logger.warning(
                 "No device matched the query; nothing to materialise. Check the "
-                "generator's target group and the device_name parameter."
+                "generator's target group and the `name` query variable."
             )
             return
 

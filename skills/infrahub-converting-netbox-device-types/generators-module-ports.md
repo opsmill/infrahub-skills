@@ -242,7 +242,7 @@ generator_definitions:
     targets: devices_with_modules
     class_name: ModulePortMaterializer
     parameters:
-      device_name: name__value
+      name: name__value
 ```
 
 `generator_definitions` carries a top-level `query:` —
@@ -250,6 +250,148 @@ the opposite of `check_definitions`. `targets` must be
 a **`CoreGeneratorGroup`**; a `CoreStandardGroup` of
 the same name parses fine and then never triggers. See
 [registration-config.md](../infrahub-managing-generators/rules/registration-config.md).
+
+### The `parameters` key is doing two jobs
+
+`name: name__value` does **not** read as "bind the
+`$name` variable to the `name__value` attribute", even
+though it looks like it. Under `infrahubctl generator`
+(SDK 1.19.0, `infrahub_sdk/ctl/generator.py`) only the
+**first key** is read, and it is used twice:
+
+```python
+identifier = list(generator_config.parameters.keys())[0]
+...
+attribute = getattr(member.peer, identifier)      # 1. a node attribute name
+check_parameter = {identifier: attribute.value}   # 2. the GraphQL variable name
+```
+
+So the key must simultaneously be an attribute on every
+member of the target group **and** the variable the query
+declares. `name` is both. The value (`name__value`) is
+never read on this path.
+
+Getting it wrong is not a quiet failure, at least:
+
+```text
+$ infrahubctl generator materialize_module_ports --branch test
+Error: 'InfrahubNode' object has no attribute 'device_name'
+```
+
+> **The server does not resolve `parameters` the same
+> way.** In a proposed change the backend calls
+> `member.extract(params=generator_definition.parameters)`
+> (`backend/infrahub/proposed_change/tasks.py`), passing
+> the whole mapping rather than just its keys — so there
+> the value *is* meaningful and the key is a plain
+> variable name. `name: name__value` is chosen because it
+> satisfies both readings; a key that is not also a node
+> attribute works in-server and breaks in the CLI. Only
+> the CLI half of this is verified against source here.
+
+Passing the variable positionally skips the group and
+identifier logic altogether — useful for a one-device
+smoke test, and it ignores `targets` entirely:
+
+```bash
+infrahubctl generator materialize_module_ports name=lon-dc1-chassis-01 --branch test
+```
+
+### Populating the target group
+
+`CoreGeneratorGroup.members` peers `CoreNode`, which has
+no `human_friendly_id`, so members cannot be named in an
+object file. This looks reasonable and does not work:
+
+```yaml
+spec:
+  kind: CoreGeneratorGroup
+  data:
+    - name: devices_with_modules
+      members:
+        - lon-dc1-chassis-01      # no HFID on CoreNode to resolve against
+```
+
+```text
+['CoreGeneratorGroupUpsert'] Unable to find the node
+lon-dc1-chassis-01 / CoreNode in the database.
+```
+
+Create the group in the object file with no members, then
+add them through the SDK. `fetch()` is mandatory before
+touching the relationship, and `add()` takes **one peer
+per call** — see
+[python-multi-peer-add.md](../infrahub-managing-generators/rules/python-multi-peer-add.md):
+
+```python
+group = await client.get(
+    kind="CoreGeneratorGroup", name__value="devices_with_modules", branch=branch
+)
+await group.members.fetch()   # without this: UninitializedError — "Must call
+                              # fetch() on RelationshipManager before editing members"
+
+for device_name in ("lon-dc1-chassis-01", "lon-dc1-access-01"):
+    device = await client.get(kind="DcimDevice", name__value=device_name, branch=branch)
+    group.members.add(device)
+
+await group.save(allow_upsert=True)
+```
+
+## Installing a module
+
+The generator can only resolve ports that exist, and a
+module created the obvious way has none. Worth reading
+before concluding the generator is broken.
+
+**Ports come from the module template, and
+`object_template` applies only at creation.** Port
+declarations hang off `TemplateDeviceLinecard`, not off
+the module *type*. A `DeviceLinecard` created without
+`object_template` comes up with `ports=0`, so the
+generator finds nothing, resolves nothing, and reports a
+clean no-op — which reads as "it does not work" rather
+than "this module has no ports".
+
+```yaml
+spec:
+  kind: DeviceLinecard
+  data:
+    - serial_number: JPE-SUP2-0001
+      object_template: mod-DCS-7500-SUP2   # REQUIRED, or ports=0
+      linecard_type: DCS-7500-SUP2
+      module_type: DCS-7500-SUP2
+      module_bay: ["lon-dc1-chassis-01", "Slot 1"]
+```
+
+Adding `object_template` to a module that already exists
+and re-loading does **not** backfill the ports. The
+modules have to be deleted and recreated.
+
+**The module→device link has to be set from the device
+side.** `DeviceGenericModule.device` peers
+`DcimPhysicalDevice`, a generic with no `name` and so no
+`human_friendly_id` — there is nothing for a name in an
+object file to resolve against. Set it from
+`DcimDevice.modules` instead, whose peer
+`DeviceGenericModule` *is* keyed on `serial_number__value`.
+That document has to restate the device's mandatory
+`status` and `location`:
+
+```yaml
+spec:
+  kind: DcimDevice
+  data:
+    - name: lon-dc1-chassis-01
+      status: active
+      location: lon-dc1
+      modules:
+        - JPE-SUP2-0001
+        - JPE-SUP2-0002
+```
+
+Load order: device types and module types → templates →
+devices → module bays → modules → the group. Then run the
+generator.
 
 ## Testing
 
