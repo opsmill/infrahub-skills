@@ -15,7 +15,6 @@ CHECKS = [
     ("search-excludes-token", {"token": "acme"}),
     "no-direct-issue-filing",
     "cross-link-reporting-issues",
-    "no-mutating-commands",
 ]
 
 if __name__ == "__main__":

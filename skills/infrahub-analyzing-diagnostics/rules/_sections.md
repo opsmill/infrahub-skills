@@ -15,8 +15,7 @@
    restart evidence and read its tail. Evaluate
    benchmark results when present; for performance
    symptoms without them, recommend a `--benchmark`
-   bundle (single-CPU score, Neo4j/PostgreSQL
-   storage IOPS).
+   bundle.
 
 3. **Correlation (correlate-)** -- HIGH. Group raw
    signals by timestamp and causal chain into
@@ -26,9 +25,9 @@
 4. **Issue matching (match-)** -- HIGH. Build GitHub
    search keys from the stable parts of a traceback
    (exception class, normalized message, innermost
-   Infrahub frame); strip volatile tokens; search
-   `opsmill/infrahub` across open and closed issues
-   (the `gh search issues` default — no `--state`).
+   Infrahub frame); strip volatile tokens; open a
+   promising match for the version its fix shipped
+   in.
 
 5. **Reporting (report-)** -- CRITICAL. Every finding
    cites a bundle path plus quoted excerpt; unknowns

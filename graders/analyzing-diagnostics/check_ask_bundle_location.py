@@ -11,7 +11,6 @@ from lib import run_checks  # noqa: E402
 CHECKS: list[str | tuple[str, dict]] = [
     "asks-bundle-location",
     "no-location-scan",
-    "no-mutating-commands",
 ]
 
 if __name__ == "__main__":

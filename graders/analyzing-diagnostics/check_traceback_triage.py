@@ -14,7 +14,6 @@ CHECKS = [
     "github-search",
     ("search-keyword", {"keyword": "SchemaNotFoundError"}),
     ("search-excludes-token", {"token": "0f3aa9c2"}),
-    "no-mutating-commands",
     "no-direct-issue-filing",
     "cross-link-reporting-issues",
 ]

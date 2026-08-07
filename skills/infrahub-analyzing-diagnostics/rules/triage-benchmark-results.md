@@ -40,13 +40,15 @@ distinguish "bug" from "undersized host".
 ### What to do
 
 - Check the manifest for the benchmark collector's
-  outcome. If it ran, read its results (under
-  `bundle/metrics/` — enumerate the directory; exact
-  file names vary by collector version) and pull
-  out: the **single-CPU score** (not just core
-  count), and the **storage IOPS / latency** for the
-  volumes backing the database (Neo4j) and the
-  task-manager's PostgreSQL.
+  outcome — and for where it wrote its results. The
+  manifest entry, not a hardcoded path, is what
+  locates them; results commonly sit under
+  `bundle/metrics/`, but directory and file names
+  vary by collector version, so enumerate rather than
+  assume. If it ran, pull out: the **single-CPU
+  score** (not just core count), and the **storage
+  IOPS / latency** for the volumes backing the
+  database (Neo4j) and the task-manager's PostgreSQL.
 - Evaluate them against the symptom: a low
   single-CPU score corroborates uniformly slow
   queries; low IOPS corroborates I/O-bound patterns
@@ -118,6 +120,10 @@ code that isn't at fault.
 - Reporting core *count* instead of the single-CPU
   *score* — many slow hosts have plenty of slow
   cores.
+- Declaring "no benchmark in this bundle" because
+  `bundle/metrics/` looked empty. The manifest says
+  whether the collector ran; the output path varies
+  by collector version.
 - Evaluating IOPS only for the Neo4j volume and
   forgetting the task-manager's PostgreSQL, whose
   slowness surfaces as task/flow lag rather than

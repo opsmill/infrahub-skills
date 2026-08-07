@@ -115,11 +115,17 @@ below it belong to libraries).
 
 ## Benchmark results
 
-When the manifest shows `create --benchmark` ran,
-the bundle carries host benchmark results under
-`bundle/metrics/` — enumerate that directory first;
-exact file names vary by collector version. Evaluate
-the results as evidence, not an afterthought (see
+The manifest is what tells you a benchmark ran and
+where its output went — read the benchmark collector's
+entry rather than assuming a path. Results commonly
+land under `bundle/metrics/`, but the directory and
+file names vary by collector version, so enumerate
+before concluding a benchmark is absent: an empty or
+missing `bundle/metrics/` is not evidence that
+`--benchmark` wasn't used.
+
+Evaluate the results as evidence, not an afterthought
+(see
 [rules/triage-benchmark-results.md](rules/triage-benchmark-results.md)
 for the full reasoning):
 
@@ -134,16 +140,14 @@ for the full reasoning):
   or burstable cloud storage and corroborates slow
   writes, lock timeouts, and hanging merges.
 
-Low values + performance symptom → the incident is
-likely host-bound: say so, and aim the
-recommendation at sizing/storage rather than a
-GitHub search. No benchmark + performance symptom →
-the recommendations must include a next bundle with
-`--benchmark` via `infrahub-collecting-diagnostics`.
-Healthy values + slowness under concurrent load →
-raise the edition question (Community vs Enterprise)
-rather than recommending more hardware — the rule
-has the full framing.
+Which way the numbers point (the rule above carries
+the reasoning for each):
+
+| Benchmark | Symptom | Where the recommendation aims |
+| --------- | ------- | ----------------------------- |
+| Low score / low IOPS | Performance-shaped | Host sizing or storage — not a GitHub search |
+| Absent | Performance-shaped | A next bundle with `--benchmark` |
+| Healthy | Slowness tracking concurrent load, Community edition | The edition question, not more hardware |
 
 ## Correlation heuristics
 
@@ -197,8 +201,8 @@ an open question for the user or the expert.
 ## GitHub issue search
 
 ```bash
-# Primary — stable keywords only; the default search
-# covers open and closed issues (do not pass --state)
+# Primary — stable keywords only; no --state (see
+# rules/match-stable-search-keys.md for why)
 gh search issues --repo opsmill/infrahub "<ExceptionClass> <stable message words>"
 
 # Second pass — synonyms / alternate fragment
@@ -212,8 +216,37 @@ strip UUIDs, branch names, hostnames, IPs, file
 paths, timestamps, and object names unique to the
 deployment.
 
-Fallbacks, in order: a GitHub MCP tool if the
-environment has one; otherwise hand the user the URL:
+### Reading a match for its fix version
+
+`gh search issues` returns title, state, and URL —
+never the version a fix shipped in. The
+version-comparison conclusion
+([rules/workflow-deployment-context.md](rules/workflow-deployment-context.md))
+therefore needs a second call on each promising
+match:
+
+```bash
+gh issue view <number> --repo opsmill/infrahub \
+  --json title,state,closedAt,milestone,labels,body
+```
+
+Where a fix version usually appears, in order of
+reliability: the **milestone** on a closed issue, the
+**closing comment** or linked PR, and a release-note
+mention in the body. A close date is *not* a fix
+version — the release that carried the fix may be
+later.
+
+When the issue names no version anywhere, that is the
+finding: report the match with "fix version
+undetermined" and keep the upgrade question open.
+Recommending an upgrade to an unknown version is the
+failure this step exists to prevent.
+
+Fallback when `gh` is unavailable — this skill's
+`allowed-tools` allows `WebFetch`, so read the issue
+from its URL directly; otherwise hand the user the
+search URL:
 
 ```text
 https://github.com/opsmill/infrahub/issues?q=is%3Aissue+<keywords>

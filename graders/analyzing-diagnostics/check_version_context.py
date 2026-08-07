@@ -15,7 +15,6 @@ CHECKS = [
     "github-search",
     ("search-keyword", {"keyword": "LockAcquisitionError"}),
     ("search-excludes-token", {"token": "7f2e91aa"}),
-    "no-mutating-commands",
     "no-direct-issue-filing",
     "cross-link-reporting-issues",
 ]

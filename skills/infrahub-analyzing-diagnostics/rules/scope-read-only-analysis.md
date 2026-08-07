@@ -27,6 +27,14 @@ snapshot. The same boundary that makes
 `infrahub-collect` safe to run — read-only by design
 — makes this skill safe to run after it.
 
+Nothing enforces this mechanically. The skill's
+`allowed-tools` has to include `Bash` so `gh search
+issues` can run, which puts every mutation named here
+one command away. The boundary holds because the
+analysis keeps it, not because the harness blocks it
+— which is why it is written as a rule rather than
+left to the tool allowlist.
+
 ### What to do
 
 - Operate on bundle files (`Read`, `Grep`, `Glob`)

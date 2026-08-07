@@ -4,10 +4,11 @@ description: >-
   Analyze an already-collected infrahub-collect diagnostic bundle —
   traceback and failure triage across service logs, incident correlation,
   and known-issue matching against opsmill/infrahub GitHub issues.
-  TRIGGER when: a diagnostic bundle exists (infrahub_bundles/, bundle/,
-  bundle_information.json) and the user asks what's wrong, wants the logs
-  or tracebacks analyzed, asks "what does this bundle say", wants errors
-  triaged/correlated, or asks whether a crash is a known issue.
+  TRIGGER when: the user says they collected a diagnostic bundle, gives
+  you a bundle path, or pastes bundle contents — and asks what's wrong,
+  wants the logs or tracebacks analyzed, asks "what does this bundle
+  say", wants errors triaged/correlated, or asks whether a crash is a
+  known issue.
   DO NOT TRIGGER when: no bundle exists yet — collect one first
   (use infrahub-collecting-diagnostics), filing the issue itself
   (use infrahub-reporting-issues), or querying live data
@@ -160,17 +161,19 @@ gh search issues --repo opsmill/infrahub "<stable keywords>"
 The default search covers open and closed issues —
 do not pass `--state`, which would hide one half.
 
-Present the top matches with title, state, and URL.
-When a match names a fix version, compare it against
-the deployment context from step 2 before drawing a
-conclusion. See
+Present the top matches with title, state, and URL —
+which is all `gh search issues` returns. The fix
+version is not in that output, so open a promising
+match for it and compare it against the deployment
+context from step 2; when the issue names no version,
+say so and leave the upgrade question open. See
 [rules/match-stable-search-keys.md](rules/match-stable-search-keys.md)
 for key construction and fallbacks when `gh` is
-unavailable, and [reference.md](reference.md) for
-the known failure patterns worth checking before
-searching — several common symptoms have
-well-understood causes that make the search targeted
-instead of generic.
+unavailable, and [reference.md](reference.md) for the
+command that reads a match, plus the known failure
+patterns worth checking before searching — several
+common symptoms have well-understood causes that make
+the search targeted instead of generic.
 
 ### 6. Report findings
 

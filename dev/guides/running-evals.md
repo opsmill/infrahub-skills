@@ -197,11 +197,11 @@ each task reads).
 | infrahub-managing-checks | 2 |
 | infrahub-managing-generators | 6 |
 | infrahub-managing-transforms | 3 |
-| infrahub-managing-objects | 2 |
+| infrahub-managing-objects | 3 |
 | infrahub-reporting-issues | 3 |
 | infrahub-auditing-repo | 15 |
 | infrahub-collecting-diagnostics | 3 |
-| infrahub-analyzing-diagnostics | 9 |
+| infrahub-analyzing-diagnostics | 10 |
 | infrahub-importing-data | 25 |
 
 `infrahub-analyzing-data` has no eval tasks yet —

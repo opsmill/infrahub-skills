@@ -31,6 +31,17 @@ diagnosis costs more than no diagnosis.
 
 - For every finding: severity, the bundle path(s),
   and a 1-3 line quoted excerpt.
+- Quote the minimum span that carries the signal.
+  Log lines also carry hostnames, IPs, object and
+  branch names, and occasionally tokens or connection
+  strings — and the report travels further than the
+  bundle does (a GitHub thread, a support ticket, a
+  chat message). When a line you need contains a
+  credential-shaped string, name what it is and mask
+  the value instead of pasting it. The finished
+  report gets the same review-before-sharing
+  treatment as the bundle itself, via
+  [cross-link-skill-boundaries.md](cross-link-skill-boundaries.md).
 - Keep the causal chain explicit: which evidence
   supports which conclusion.
 - When the bundle cannot answer something (missing
@@ -70,6 +81,9 @@ index) that nothing in the bundle establishes.
 
 - Summarizing "many errors in the server log"
   without one concrete quoted line.
+- Pasting a 20-line block when two lines carry the
+  signal — every extra line is more of the user's
+  deployment leaving with the report.
 - Promoting a plausible hypothesis to a stated root
   cause because the report "needs" a conclusion.
 - Burying what could *not* be determined instead of

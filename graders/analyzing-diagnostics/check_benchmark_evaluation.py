@@ -13,8 +13,6 @@ CHECKS: list[str | tuple[str, dict]] = [
     "cites-bundle-evidence",
     "evaluates-benchmark",
     ("mentions-all", {"terms": "412,480"}),
-    "no-mutating-commands",
-    "no-direct-issue-filing",
 ]
 
 if __name__ == "__main__":

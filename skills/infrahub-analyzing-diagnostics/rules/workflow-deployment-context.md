@@ -56,6 +56,14 @@ first lines, not reverse-engineered from log paths.
   resolves it; already at or past the fix → not this
   issue, or a regression — treat the match as
   unconfirmed.
+- The fix version is not in the search results — open
+  the matched issue for it (`reference.md` has the
+  command and the places a version hides). If the
+  issue names none, report "match found, fix version
+  undetermined" and leave the upgrade question open,
+  because an upgrade recommendation with no target
+  version behind it is a guess dressed as a
+  conclusion.
 
 ### Compliant
 
@@ -94,5 +102,10 @@ real signal (possible regression) is lost.
 - Guessing the version from image tags or file
   paths when the bundle doesn't state it — mark it
   undetermined and list it as an open question.
+- Inferring a fix version from a matched issue's
+  close date, or from the search result line — the
+  search output carries only title, state, and URL,
+  and the release carrying the fix is usually later
+  than the close.
 
 Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)

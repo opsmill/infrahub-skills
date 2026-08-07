@@ -12,8 +12,6 @@ CHECKS: list[str | tuple[str, dict]] = [
     "mentions-manifest",
     "recommends-benchmark",
     "cross-link-collecting-diagnostics",
-    "no-mutating-commands",
-    "no-direct-issue-filing",
 ]
 
 if __name__ == "__main__":

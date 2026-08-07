@@ -55,12 +55,16 @@ gh search issues --repo opsmill/infrahub "SchemaNotFoundError proposed change"
 ```
 
 Run a second pass with synonyms if the first returns
-nothing. If `gh` is unavailable, fall back to a
-GitHub MCP tool if present, or give the user the
-search URL
-(`https://github.com/opsmill/infrahub/issues?q=...`).
+nothing. If `gh` is unavailable, read the issue from
+its URL with `WebFetch`, or hand the user the search
+URL (`https://github.com/opsmill/infrahub/issues?q=...`).
+
 Present the top 3-5 matches with title, state, and
-URL, and say clearly when nothing matched.
+URL, and say clearly when nothing matched. That
+output carries no fix version — see
+[reference.md](../reference.md) for the follow-up call
+that finds one, and what to report when the issue
+names none.
 
 ### Compliant
 
@@ -92,11 +96,11 @@ would be invisible.
 
 - Quoting the entire error message verbatim,
   volatile tokens included.
-- Passing a `--state` flag: `--state open` hides the
-  best possible outcome (a closed match means the fix
-  exists — check the version it shipped in), and
-  `--state all` is not a valid value — `gh` rejects
-  it. The default already searches both states.
+- Passing a `--state` flag at all (see above — the
+  default already searches both states).
+- Treating a closed match as "already fixed, upgrade"
+  without opening the issue for the version the fix
+  shipped in.
 - Building keys from a cascade error (`Connection
   refused`) instead of the root — generic symptoms
   match hundreds of unrelated issues.

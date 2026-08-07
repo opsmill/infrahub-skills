@@ -122,6 +122,20 @@ deployment).
 gh search issues --repo opsmill/infrahub "SchemaNotFoundError CoreProposedChange"
 ```
 
+That returns a closed match — title, state, URL, and
+nothing else. The fix version needs a second call:
+
+```bash
+gh issue view <number> --repo opsmill/infrahub \
+  --json title,state,closedAt,milestone,body
+```
+
+Here the milestone reads `1.1.6`, which is what makes
+the conclusion below a version comparison rather than
+a guess. Had no version turned up, the report would
+say "fix version undetermined" and leave the upgrade
+question open.
+
 ### Findings report (excerpt)
 
 ```markdown
@@ -144,10 +158,14 @@ gh search issues --repo opsmill/infrahub "SchemaNotFoundError CoreProposedChange
   post to GitHub.
 ```
 
-The closed match is the payoff of covering closed
-issues — which the default `gh search issues`
-behavior already does: the answer is "already fixed,
-upgrade", not a new issue. Version evidence comes
-from the bundle (`bundle/server/`), and the hand-off
-names the sibling skill instead of running
-`gh issue create`.
+The closed match is the payoff of searching both
+states: the answer is "already fixed, upgrade", not a
+new issue. Both halves of that conclusion are
+sourced — the running version from the bundle
+(`bundle/server/`), the fix version from the issue's
+milestone — and the hand-off names the sibling skill
+instead of running `gh issue create`.
+
+The report shapes here follow the template in
+[reference.md](reference.md); when the two disagree,
+reference.md is the one to change.
