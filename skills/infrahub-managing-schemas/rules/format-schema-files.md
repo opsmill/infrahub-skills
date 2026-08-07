@@ -189,9 +189,16 @@ The invocations, flags, and the CI gate (`--check`) live in
   mode, comments, quoting, and inline sequences like
   `[manufacturer, name__value]` are all preserved. Once
   that flag reorders list items, a standalone comment
-  sitting *between* two attributes may not follow the item
-  it described — inline comments on a value always travel
-  with it.
+  holds its *slot in the list* rather than following the
+  attribute it described — so it ends up labelling
+  whichever attribute sorts into that position, and a
+  comment near the end is left dangling after the last
+  item. A comment reading `# describes height` above a
+  re-sorted list silently comes to sit above `facility`.
+  That is worse than losing it: the file still reads as
+  documented, and now documents the wrong thing. Inline
+  comments on a value always travel with it, so prefer
+  those if you intend to use this flag.
 - Running the formatter on a multi-document YAML file and
   expecting a result. Those files are skipped, not
   reformatted.
