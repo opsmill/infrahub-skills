@@ -29,10 +29,20 @@ infrahubctl schema format schemas/base/dcim.yml --diff
 infrahubctl schema format schemas/ --check
 ```
 
-By default the change is purely key reordering: list-item
+By default the only lines that move are keys: list-item
 order, reserved-namespace nodes, comments, quoting, and
 inline (flow) sequences are all left alone. Multi-document
 files are skipped.
+
+One thing is *added* rather than moved. Any file that has
+no `# yaml-language-server: $schema=...` directive gets one
+prepended, on every run, in every mode. It is a comment, so
+the schema still means exactly what it did — but it is a
+written change, and it is the usual reason a first
+`--check` run over an existing repository reports files as
+needing reformatting even though their key order is already
+canonical. Run the formatter once to absorb the header,
+then wire up `--check`.
 
 Three flags go further and change file *content*
 (`--strip-defaults`, `--sort-by-order-weight`,

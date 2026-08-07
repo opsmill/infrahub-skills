@@ -922,8 +922,9 @@ tasks:
           extensions
       - name: entity-key-order
         check: >-
-          Every node/generic leads with name then namespace and ends
-          with attributes then relationships
+          Every node/generic leads with name then namespace (every
+          extensions.nodes entry with kind) and ends with attributes
+          then relationships
       - name: order-weight-key-last
         check: >-
           `order_weight` is the final key of each attribute and

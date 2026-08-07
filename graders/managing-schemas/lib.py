@@ -895,11 +895,23 @@ _ENTITY_TRAILING = ["attributes", "relationships"]
 # Canonical order of the keys inside a single dropdown choice.
 _CHOICE_ORDER = ["name", "label", "description", "color"]
 
+# An entry under `extensions.nodes` targets an existing kind, so `kind` leads
+# where a node would lead with name/namespace. The trailing lists are the same.
+_EXTENSION_LEADING = ["kind"]
+
 
 def _relative_order_ok(keys: list[str], canonical: list[str]) -> bool:
     """True if the canonical keys present in ``keys`` appear in canonical order."""
     present = [key for key in keys if key in canonical]
     return present == sorted(present, key=canonical.index)
+
+
+def _all_extension_nodes(schema: dict) -> list[dict]:
+    """Return the node entries declared under the top-level `extensions` block."""
+    extensions = schema.get("extensions") or {}
+    if not isinstance(extensions, dict):
+        return []
+    return extensions.get("nodes", []) or []
 
 
 def check_file_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
@@ -917,50 +929,83 @@ def check_file_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
     return True, "Top-level keys are in canonical order"
 
 
+def _entity_key_order_error(entity: dict, leading_order: list[str], label: str) -> str | None:
+    """Return an error string if one entity's keys break the canonical order."""
+    keys = list(entity.keys())
+
+    if not _relative_order_ok(keys, leading_order):
+        return (
+            f"{label}: identity keys are ordered "
+            f"{[key for key in keys if key in leading_order]}; canonical order is "
+            f"{' then '.join(leading_order)}"
+        )
+
+    leading = [key for key in keys if key in leading_order]
+    if keys[: len(leading)] != leading:
+        return f"{label}: identity keys {leading} are not first; file leads with {keys[: len(leading) + 1]}"
+
+    trailing = [key for key in keys if key in _ENTITY_TRAILING]
+    if not _relative_order_ok(keys, _ENTITY_TRAILING):
+        return f"{label}: 'relationships' precedes 'attributes'; attributes come first"
+    if trailing and keys[-len(trailing) :] != trailing:
+        return (
+            f"{label}: {trailing} must be the last key(s); the entry instead ends with "
+            f"{keys[-len(trailing) :]}"
+        )
+    return None
+
+
 def check_entity_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
-    """Nodes and generics lead with name/namespace and end with attributes/relationships."""
+    """Nodes/generics lead with name/namespace (extensions with kind) and end with the lists."""
     entities = _all_generics(schema) + _all_nodes(schema)
-    if not entities:
-        return False, "No nodes or generics found"
+    extensions = _all_extension_nodes(schema)
+    if not entities and not extensions:
+        return False, "No nodes, generics, or extensions found"
 
     for entity in entities:
         if not isinstance(entity, dict):
             continue
-        kind = _full_kind(entity) or "<unnamed>"
-        keys = list(entity.keys())
+        error = _entity_key_order_error(entity, _ENTITY_LEADING, _full_kind(entity) or "<unnamed>")
+        if error:
+            return False, error
 
-        if not _relative_order_ok(keys, _ENTITY_LEADING):
-            return False, f"{kind}: 'namespace' precedes 'name'; canonical order is name then namespace"
+    for extension in extensions:
+        if not isinstance(extension, dict):
+            continue
+        label = f"extensions.nodes[{extension.get('kind', '<unnamed>')}]"
+        error = _entity_key_order_error(extension, _EXTENSION_LEADING, label)
+        if error:
+            return False, error
 
-        leading = [key for key in keys if key in _ENTITY_LEADING]
-        if keys[: len(leading)] != leading:
-            return False, (
-                f"{kind}: identity keys {leading} are not first; found {keys[: len(leading) + 1]}"
-            )
+    counted = [f"{len(entities)} node(s)/generic(s)"]
+    if extensions:
+        counted.append(f"{len(extensions)} extension(s)")
+    return True, f"Canonical key order on {' and '.join(counted)}"
 
-        trailing = [key for key in keys if key in _ENTITY_TRAILING]
-        if not _relative_order_ok(keys, _ENTITY_TRAILING):
-            return False, f"{kind}: 'relationships' precedes 'attributes'; attributes come first"
-        if trailing and keys[-len(trailing) :] != trailing:
-            return False, (
-                f"{kind}: {trailing} must be the last key(s); file ends the node with "
-                f"{keys[-len(trailing) :]}"
-            )
 
-    return True, f"All {len(entities)} node(s)/generic(s) lead with name/namespace and end with attributes/relationships"
+def _labelled_entities(schema: dict) -> list[tuple[str, dict]]:
+    """Every node, generic, and extension entry paired with a label for messages."""
+    labelled: list[tuple[str, dict]] = [
+        (_full_kind(entity) or "<unnamed>", entity)
+        for entity in _all_generics(schema) + _all_nodes(schema)
+        if isinstance(entity, dict)
+    ]
+    labelled += [
+        (f"extensions.nodes[{extension.get('kind', '<unnamed>')}]", extension)
+        for extension in _all_extension_nodes(schema)
+        if isinstance(extension, dict)
+    ]
+    return labelled
 
 
 def check_order_weight_key_last(schema: dict, **_: Any) -> tuple[bool, str]:
     """order_weight is the final key of every attribute and relationship that has it."""
-    entities = _all_generics(schema) + _all_nodes(schema)
+    entities = _labelled_entities(schema)
     if not entities:
-        return False, "No nodes or generics found"
+        return False, "No nodes, generics, or extensions found"
 
     seen = 0
-    for entity in entities:
-        if not isinstance(entity, dict):
-            continue
-        kind = _full_kind(entity) or "<unnamed>"
+    for kind, entity in entities:
         for section, items in (("attribute", _all_attrs(entity)), ("relationship", _all_rels(entity))):
             for item in items:
                 if not isinstance(item, dict) or "order_weight" not in item:
@@ -980,12 +1025,8 @@ def check_order_weight_key_last(schema: dict, **_: Any) -> tuple[bool, str]:
 
 def check_choice_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
     """Dropdown choice keys follow name -> label -> description -> color."""
-    entities = _all_generics(schema) + _all_nodes(schema)
     seen = 0
-    for entity in entities:
-        if not isinstance(entity, dict):
-            continue
-        kind = _full_kind(entity) or "<unnamed>"
+    for kind, entity in _labelled_entities(schema):
         for attr in _all_attrs(entity):
             if not isinstance(attr, dict):
                 continue

@@ -67,6 +67,15 @@ Within a relationship: `name` → `peer` → `label` →
 Within a dropdown choice: `name` → `label` →
 `description` → `color`.
 
+Within an entry under `extensions.nodes`, the target
+`kind` leads and the lists come last: `kind` →
+`attributes` → `relationships`. The attributes and
+relationships inside it take the same order as anywhere
+else. (An extension carries nothing else worth ordering —
+[extension-cross-file.md](./extension-cross-file.md)
+explains why `attributes` and `relationships` are the only
+keys it can usefully hold.)
+
 Any key not named above keeps its position between the
 leading and trailing groups, so nothing is ever dropped.
 List *items* are never reordered — attributes and
@@ -85,6 +94,7 @@ Non-compliant — keys scattered, `order_weight` mid-block,
 
 ```yaml
 ---
+version: "1.0"
 nodes:
   - namespace: Dcim
     attributes:
@@ -109,6 +119,7 @@ Compliant — same schema, canonical order:
 
 ```yaml
 ---
+version: "1.0"
 nodes:
   - name: PatchPanel
     namespace: Dcim
@@ -184,6 +195,11 @@ The invocations, flags, and the CI gate (`--check`) live in
 - Running the formatter on a multi-document YAML file and
   expecting a result. Those files are skipped, not
   reformatted.
+- Reading a first `--check` failure as "our key order is
+  wrong". Files with no `# yaml-language-server` directive
+  get one prepended, so a repository that has never been
+  formatted fails the gate on the header alone. Format
+  once, commit, then turn the gate on.
 - Treating formatting as the review step. A canonical file
   can still be a wrong schema — `schema check` on a branch
   is what validates it, per

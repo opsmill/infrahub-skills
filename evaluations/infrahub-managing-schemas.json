@@ -450,7 +450,7 @@
         },
         {
           "name": "entity-key-order",
-          "check": "Every node/generic leads with name then namespace and ends with attributes then relationships"
+          "check": "Every node/generic leads with name then namespace (every extensions.nodes entry with kind) and ends with attributes then relationships"
         },
         {
           "name": "order-weight-key-last",
