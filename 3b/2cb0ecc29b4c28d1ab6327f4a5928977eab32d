@@ -1,0 +1,63 @@
+graders/analyzing-diagnostics/check_scope_pressure.py
+  s_2012b63eee2e93::t_4a92d6c4a02e43 1-25
+skills/infrahub-analyzing-diagnostics/rules/scope-read-only-analysis.md
+  s_2012b63eee2e93::t_8442bfa7e4ca14 30-37
+dev/guides/running-evals.md
+  s_2012b63eee2e93::t_0ceaccfb19ff69 204
+  s_2012b63eee2e93::t_2b760e004f62df 200
+skills/infrahub-analyzing-diagnostics/rules/_sections.md
+  s_2012b63eee2e93::t_355fa67817c026 28-30
+  s_2012b63eee2e93::t_6a7a7c02d05636 18
+skills/infrahub-analyzing-diagnostics/examples.md
+  s_2012b63eee2e93::t_f78cbd20e354ab 161-171
+  s_2012b63eee2e93::t_6d0cd090294b1d 125-138
+skills/infrahub-analyzing-diagnostics/reference.md
+  s_2012b63eee2e93::t_127a4bdc917e32 143-150
+  s_2012b63eee2e93::t_89685cfca9a2fd 118-128
+  s_2012b63eee2e93::t_f1a958bbfbf5b8 204-205,219-249
+skills/infrahub-analyzing-diagnostics/rules/triage-benchmark-results.md
+  s_2012b63eee2e93::t_d3bf5358b03c89 43-51
+  s_2012b63eee2e93::t_730ceae028e5c8 123-126
+skills/infrahub-analyzing-diagnostics/SKILL.md
+  s_2012b63eee2e93::t_cc2b64b62a7580 165-169,172-176
+  s_2012b63eee2e93::t_4a299811573623 164
+  s_2012b63eee2e93::t_d537563032d26d 7-11
+graders/analyzing-diagnostics/lib.py
+  s_2012b63eee2e93::t_d055f027441157 41-49
+  s_2012b63eee2e93::t_227aa319fafecd 450
+  s_2012b63eee2e93::t_bacfc07f1415e6 358-366,370-374,386-402
+  s_2012b63eee2e93::t_6e2a3231a83ac9 403-404
+skills/infrahub-analyzing-diagnostics/rules/match-stable-search-keys.md
+  s_2012b63eee2e93::t_c6c0b84c1afa2c 58-61,63-67
+  s_2012b63eee2e93::t_6b85481de0386c 99-103
+skills/infrahub-analyzing-diagnostics/rules/report-evidence-per-finding.md
+  s_2012b63eee2e93::t_6b89e0e56ea81f 84-86
+  s_2012b63eee2e93::t_f70f3617c5afe5 34-44
+eval.yaml
+  s_2012b63eee2e93::t_7bf8f2bbc4b01f 1921-1922
+  s_2012b63eee2e93::t_717beee9d23567 2116-2168
+  s_2012b63eee2e93::t_46790f8b375970 1801
+  s_2012b63eee2e93::t_a1812b41bfe5ba 1692
+  s_2012b63eee2e93::t_3fdff90c59c78b 1859
+skills/infrahub-analyzing-diagnostics/rules/workflow-deployment-context.md
+  s_2012b63eee2e93::t_57423de6796174 59-66
+  s_2012b63eee2e93::t_0175b4d1bfab49 105-109
+evaluations/infrahub-analyzing-diagnostics.json
+  s_2012b63eee2e93::t_2babc0a5b654b7 14,101,143,188,203,211,242,269,333-363
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "3b2cb0ecc29b4c28d1ab6327f4a5928977eab32d",
+  "prompts": {},
+  "sessions": {
+    "s_2012b63eee2e93": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3be6260c-31dd-4ff8-a477-04d766c6773a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
