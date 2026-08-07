@@ -1,0 +1,81 @@
+---
+# Mapping profile for the OpsMill schema-library DCIM schema
+# (https://github.com/opsmill/schema-library, base/dcim.yml).
+#
+# Prerequisite: DcimDevice must carry `generate_template: true` in your
+# schema. In the stock schema-library that line is commented out — the
+# Template* kinds below do not exist until you uncomment it and load the
+# schema.
+#
+# Coverage: schema-library models interfaces as the only device component,
+# and InterfacePhysical has no media-type or PoE attribute. The NetBox
+# console/power/module/device-bay lists and the interface `type`, `poe_mode`,
+# and `poe_type` fields therefore have nowhere to land and are reported as
+# skipped. Extend your schema and this profile together if you need them.
+version: 1
+name: schema-library
+
+manufacturer:
+  kind: OrganizationManufacturer
+  name_field: name
+
+device_type:
+  kind: DcimDeviceType
+  manufacturer_relationship: manufacturer
+  fields:
+    model: name
+    part_number: part_number
+    # NetBox has two free-text fields competing for one Infrahub attribute.
+    # `description` is the semantic match, but only ~4% of the library sets
+    # it, while ~66% sets `comments` (usually a datasheet link) — so prefer
+    # description and fall back to comments. When both are set the loser is
+    # reported as shadowed.
+    description:
+      target: description
+      fallback: comments
+    u_height:
+      target: height
+      transform: number
+    is_full_depth:
+      target: full_depth
+      transform: boolean
+    # Infrahub has no float attribute kind — Number is integer-backed — so a
+    # weight must be a whole number. Kilograms match schema-library's
+    # `Weight (kg)` attribute but round 302 published device types (sub-500g
+    # transceivers and APs) to 0; the report calls each one out. If that
+    # matters, add a grams attribute to your schema and switch to weight_g,
+    # which keeps every value distinct.
+    weight:
+      target: weight
+      transform: weight_kg
+
+template:
+  kind: TemplateDcimDevice
+  # Rendered against the NetBox top-level fields. The slug is unique across
+  # the whole devicetype-library, which makes it the safe template key.
+  template_name: "{slug}"
+  device_type_relationship: device_type
+  defaults:
+    status: active
+
+components:
+  interfaces:
+    kind: TemplateInterfacePhysical
+    relationship: interfaces
+    # Template names are uniqueness-constrained per kind, so component
+    # templates are namespaced by their parent template.
+    template_name: "{template_name}__{name}"
+    fields:
+      name: name
+      # Same competition per interface: `description` is the semantic match,
+      # `label` is the more commonly populated one.
+      description:
+        target: description
+        fallback: label
+    derived:
+      role:
+        when:
+          mgmt_only: true
+        value: management
+    defaults:
+      status: active

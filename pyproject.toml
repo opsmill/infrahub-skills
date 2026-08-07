@@ -11,6 +11,34 @@ dev = [
     "yamllint>=1.37.1",
 ]
 
+# Deliberately its own group rather than part of `dev`. The SDK drags in ~30
+# packages (pydantic-core, dulwich, netutils, ujson, ...) and the CI lint jobs
+# run `uv run rumdl check .` / `uv run yamllint`, which have no use for any of
+# them — `dev` is synced by default, this group is opt-in.
+#
+# Run the suite with `uv run invoke test`, or `uv run --group test pytest`.
+test = [
+    # Test runner for tests/ — grader libraries and the bundled skill scripts.
+    "pytest>=8.0.0",
+    # The graders and the NetBox converter parse YAML.
+    "pyyaml>=6.0.0",
+    # skills/infrahub-converting-netbox-device-types/scripts/materialize_module_ports.py
+    # subclasses InfrahubGenerator, so the SDK is needed to import the module
+    # under test. 1.19.0 is the floor that has infrahub_sdk.generator and
+    # SchemaNotFoundError where the generator expects them.
+    "infrahub-sdk>=1.19.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# infrahub-sdk ships its own pytest plugin (entry point `pytest-infrahub`) for
+# its YAML-driven resource tests. It autoloads as soon as the SDK is installed
+# and imports the SDK's CLI extras (rich, jinja2), which this repo has no other
+# reason to install — so a bare `pytest` fails at startup on ModuleNotFoundError
+# before collecting anything. Nothing here uses that plugin, so switch it off
+# rather than carrying the extras.
+addopts = "-p no:pytest-infrahub"
+
 [tool.rumdl]
 # Disabled rules (carried from .markdownlint-cli2.yaml)
 disable = ["MD013", "MD029", "MD033", "MD041"]

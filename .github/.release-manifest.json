@@ -11,6 +11,7 @@
     "infrahub-analyzing-data",
     "infrahub-reporting-issues",
     "infrahub-collecting-diagnostics",
-    "infrahub-importing-data"
+    "infrahub-importing-data",
+    "infrahub-converting-netbox-device-types"
   ]
 }
