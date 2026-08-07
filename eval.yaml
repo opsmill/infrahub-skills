@@ -860,6 +860,80 @@ tasks:
           or routes the change through the proposed-change / merge /
           discard review path
 
+  # COVERAGE: eval coverage for
+  # skills/infrahub-managing-schemas/rules/format-schema-files.md. The rule's
+  # canonical key order is what `infrahubctl schema format` writes, so the
+  # assertions inspect the authored order of the emitted YAML rather than
+  # invoking the CLI (which is not available in the eval sandbox, and is
+  # newer than the released infrahubctl the rule tells you to fall back from).
+  - name: schema-format-key-order
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Our schema reviews are drowning in noise — every edit reshuffles keys and the
+      real change gets lost, so CI now rejects any schema file that isn't in our canonical
+      key order. Add a new file for patch-panel inventory: a `DcimPatchPanel` node with a
+      unique name, a `rack_unit` position (number), a `status` dropdown (active, spare,
+      faulty), a free-text description, and a relationship to the rack it sits in
+      (`LocationRack`, one per panel, mandatory). It has to land already formatted so the
+      first review diff is clean.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_schema_format_key_order.py
+        weight: 1.0
+    expected_output: >-
+      A schema file whose keys are already in the canonical order the
+      skill documents, so a subsequent `infrahubctl schema format`
+      would be a no-op. Top-level keys run `version` then `nodes`.
+      `DcimPatchPanel` leads with `name` then `namespace`, carries
+      `human_friendly_id` and `display_label`, and ends with
+      `attributes` then `relationships` — no scalar keys trailing
+      after those lists. Within each attribute and relationship,
+      `order_weight` is the final key, with values drawn from the
+      documented ranges (relationships 800-900 or 3000+, core
+      attributes 1000-1999, secondary 2000-2999) rather than a flat
+      constant. The status dropdown's choices are ordered `name`,
+      `label`, then `color`.
+    expectations:
+      - >-
+        Top-level keys are ordered `version` before `nodes`
+      - >-
+        The node's first two keys are `name` then `namespace`, not
+        `namespace` first
+      - >-
+        `attributes` and `relationships` are the last keys on the
+        node, in that order, with no other keys after them
+      - >-
+        `order_weight` is the last key of every attribute and
+        relationship that declares one
+      - >-
+        Dropdown choices are ordered `name`, `label`, `description`,
+        `color` (subset allowed, order preserved)
+      - >-
+        order_weight values follow the documented ranges rather than a
+        single flat constant applied to everything
+    assertions:
+      - name: file-key-order
+        check: >-
+          Top-level keys follow version -> generics -> nodes ->
+          extensions
+      - name: entity-key-order
+        check: >-
+          Every node/generic leads with name then namespace (every
+          extensions.nodes entry with kind) and ends with attributes
+          then relationships
+      - name: order-weight-key-last
+        check: >-
+          `order_weight` is the final key of each attribute and
+          relationship that declares it
+      - name: choice-key-order
+        check: >-
+          Dropdown choice keys follow name -> label -> description ->
+          color
+
   # --- Check Creator --- #
   - name: global-check-registration
     trials: 3

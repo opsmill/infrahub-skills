@@ -875,6 +875,187 @@ def check_inverse_reuses_forward_identifier(schema: dict, **_: Any) -> tuple[boo
     return True, f"Inverse reuses the forward identifier '{expected}' verbatim"
 
 
+# ---------------------------------------------------------------------------
+# Canonical key order (skills/infrahub-managing-schemas/rules/format-schema-files.md)
+# ---------------------------------------------------------------------------
+#
+# PyYAML builds plain dicts, and dicts preserve insertion order, so the parsed
+# document reflects the authored key order of the file. Every check below is
+# therefore a pure structural assertion on the parsed schema — no CLI needed.
+
+# Top-level keys, in canonical order. `version` leads; the entity sections
+# follow in this order. Keys not listed are ignored.
+_FILE_ORDER = ["version", "generics", "nodes", "extensions"]
+
+# The keys an entity (node or generic) must lead with, and the two long list
+# keys it must end with.
+_ENTITY_LEADING = ["name", "namespace"]
+_ENTITY_TRAILING = ["attributes", "relationships"]
+
+# Canonical order of the keys inside a single dropdown choice.
+_CHOICE_ORDER = ["name", "label", "description", "color"]
+
+# An entry under `extensions.nodes` targets an existing kind, so `kind` leads
+# where a node would lead with name/namespace. The trailing lists are the same.
+_EXTENSION_LEADING = ["kind"]
+
+
+def _relative_order_ok(keys: list[str], canonical: list[str]) -> bool:
+    """True if the canonical keys present in ``keys`` appear in canonical order."""
+    present = [key for key in keys if key in canonical]
+    return present == sorted(present, key=canonical.index)
+
+
+def _all_extension_nodes(schema: dict) -> list[dict]:
+    """Return the node entries declared under the top-level `extensions` block."""
+    extensions = schema.get("extensions") or {}
+    if not isinstance(extensions, dict):
+        return []
+    return extensions.get("nodes", []) or []
+
+
+def check_file_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Top-level keys follow version -> generics -> nodes -> extensions."""
+    if not schema:
+        return False, "No schema content to inspect"
+
+    keys = list(schema.keys())
+    if not _relative_order_ok(keys, _FILE_ORDER):
+        present = [key for key in keys if key in _FILE_ORDER]
+        return False, (
+            f"Top-level keys are ordered {present}; canonical order is "
+            "version -> generics -> nodes -> extensions"
+        )
+    return True, "Top-level keys are in canonical order"
+
+
+def _entity_key_order_error(entity: dict, leading_order: list[str], label: str) -> str | None:
+    """Return an error string if one entity's keys break the canonical order."""
+    keys = list(entity.keys())
+
+    if not _relative_order_ok(keys, leading_order):
+        return (
+            f"{label}: identity keys are ordered "
+            f"{[key for key in keys if key in leading_order]}; canonical order is "
+            f"{' then '.join(leading_order)}"
+        )
+
+    leading = [key for key in keys if key in leading_order]
+    if keys[: len(leading)] != leading:
+        return f"{label}: identity keys {leading} are not first; file leads with {keys[: len(leading) + 1]}"
+
+    trailing = [key for key in keys if key in _ENTITY_TRAILING]
+    if not _relative_order_ok(keys, _ENTITY_TRAILING):
+        return f"{label}: 'relationships' precedes 'attributes'; attributes come first"
+    if trailing and keys[-len(trailing) :] != trailing:
+        return (
+            f"{label}: {trailing} must be the last key(s); the entry instead ends with "
+            f"{keys[-len(trailing) :]}"
+        )
+    return None
+
+
+def check_entity_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Nodes/generics lead with name/namespace (extensions with kind) and end with the lists."""
+    entities = _all_generics(schema) + _all_nodes(schema)
+    extensions = _all_extension_nodes(schema)
+    if not entities and not extensions:
+        return False, "No nodes, generics, or extensions found"
+
+    for entity in entities:
+        if not isinstance(entity, dict):
+            continue
+        error = _entity_key_order_error(entity, _ENTITY_LEADING, _full_kind(entity) or "<unnamed>")
+        if error:
+            return False, error
+
+    for extension in extensions:
+        if not isinstance(extension, dict):
+            continue
+        label = f"extensions.nodes[{extension.get('kind', '<unnamed>')}]"
+        error = _entity_key_order_error(extension, _EXTENSION_LEADING, label)
+        if error:
+            return False, error
+
+    counted = [f"{len(entities)} node(s)/generic(s)"]
+    if extensions:
+        counted.append(f"{len(extensions)} extension(s)")
+    return True, f"Canonical key order on {' and '.join(counted)}"
+
+
+def _labelled_entities(schema: dict) -> list[tuple[str, dict]]:
+    """Every node, generic, and extension entry paired with a label for messages."""
+    labelled: list[tuple[str, dict]] = [
+        (_full_kind(entity) or "<unnamed>", entity)
+        for entity in _all_generics(schema) + _all_nodes(schema)
+        if isinstance(entity, dict)
+    ]
+    labelled += [
+        (f"extensions.nodes[{extension.get('kind', '<unnamed>')}]", extension)
+        for extension in _all_extension_nodes(schema)
+        if isinstance(extension, dict)
+    ]
+    return labelled
+
+
+def check_order_weight_key_last(schema: dict, **_: Any) -> tuple[bool, str]:
+    """order_weight is the final key of every attribute and relationship that has it."""
+    entities = _labelled_entities(schema)
+    if not entities:
+        return False, "No nodes, generics, or extensions found"
+
+    seen = 0
+    for kind, entity in entities:
+        for section, items in (("attribute", _all_attrs(entity)), ("relationship", _all_rels(entity))):
+            for item in items:
+                if not isinstance(item, dict) or "order_weight" not in item:
+                    continue
+                seen += 1
+                keys = list(item.keys())
+                if keys[-1] != "order_weight":
+                    return False, (
+                        f"{kind}.{item.get('name', '<unnamed>')} ({section}): 'order_weight' is "
+                        f"followed by {keys[keys.index('order_weight') + 1 :]}; it must be the last key"
+                    )
+
+    if seen == 0:
+        return False, "No attribute or relationship declares order_weight"
+    return True, f"'order_weight' is the last key on all {seen} item(s) that declare it"
+
+
+def check_choice_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Dropdown choice keys follow name -> label -> description -> color."""
+    seen = 0
+    for kind, entity in _labelled_entities(schema):
+        for attr in _all_attrs(entity):
+            if not isinstance(attr, dict):
+                continue
+            choices = attr.get("choices")
+            if not isinstance(choices, list):
+                continue
+            for choice in choices:
+                if not isinstance(choice, dict):
+                    continue
+                seen += 1
+                keys = list(choice.keys())
+                if keys[0] != "name":
+                    return False, (
+                        f"{kind}.{attr.get('name', '<unnamed>')}: choice "
+                        f"'{choice.get('name', '?')}' does not lead with 'name' (found '{keys[0]}')"
+                    )
+                if not _relative_order_ok(keys, _CHOICE_ORDER):
+                    present = [key for key in keys if key in _CHOICE_ORDER]
+                    return False, (
+                        f"{kind}.{attr.get('name', '<unnamed>')}: choice "
+                        f"'{choice.get('name', '?')}' keys ordered {present}; canonical order is "
+                        "name -> label -> description -> color"
+                    )
+
+    if seen == 0:
+        return False, "No dropdown choices found to inspect"
+    return True, f"All {seen} dropdown choice(s) are in canonical key order"
+
+
 CHECKS: dict[str, Any] = {
     "attr-min-length": check_attr_min_length,
     "dropdown-for-status": check_dropdown_for_status,
@@ -907,6 +1088,10 @@ CHECKS: dict[str, Any] = {
     "string-limits": check_string_limits,
     "recommends-branch": check_recommends_branch,
     "explains-default-branch-risk-or-review": check_explains_default_branch_risk_or_review,
+    "file-key-order": check_file_key_order,
+    "entity-key-order": check_entity_key_order,
+    "order-weight-key-last": check_order_weight_key_last,
+    "choice-key-order": check_choice_key_order,
 }
 
 

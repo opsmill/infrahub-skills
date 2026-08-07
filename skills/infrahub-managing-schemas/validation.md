@@ -8,6 +8,50 @@
 
 ## Validation Commands
 
+### Format Schema (Offline)
+
+Normalise the key ordering of schema files before checking
+or loading them. Unlike the commands below, this runs
+**offline** — no server required, so it also works as a CI
+gate. The canonical order it writes, and how to author it
+by hand on an `infrahubctl` that predates the command, are
+in
+[rules/format-schema-files.md](./rules/format-schema-files.md).
+
+```bash
+# Format a directory in place
+infrahubctl schema format schemas/
+
+# Preview changes without writing
+infrahubctl schema format schemas/base/dcim.yml --diff
+
+# CI gate: writes nothing, exits 1 if any file is not formatted
+infrahubctl schema format schemas/ --check
+```
+
+By default the only lines that move are keys: list-item
+order, reserved-namespace nodes, comments, quoting, and
+inline (flow) sequences are all left alone. Multi-document
+files are skipped.
+
+One thing is *added* rather than moved. Any file that has
+no `# yaml-language-server: $schema=...` directive gets one
+prepended, on every run, in every mode. It is a comment, so
+the schema still means exactly what it did — but it is a
+written change, and it is the usual reason a first
+`--check` run over an existing repository reports files as
+needing reformatting even though their key order is already
+canonical. Run the formatter once to absorb the header,
+then wire up `--check`.
+
+Three flags go further and change file *content*
+(`--strip-defaults`, `--sort-by-order-weight`,
+`--backfill-order-weight`) — see `infrahubctl schema format
+--help` for what each does. Enable them deliberately;
+`--backfill-order-weight` in particular writes the flat
+constant `1000`, which conflicts with the ranges in
+[rules/display-order-weight.md](./rules/display-order-weight.md).
+
 ### Check Schema (Dry Run)
 
 Validate schema files without loading them:
