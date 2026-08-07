@@ -97,6 +97,12 @@ out-of-band reconciliations, and stateful assertions
 in [rules/python-validate.md](./rules/python-validate.md)
 are the legitimate use cases.
 
+When the check reads objects through the SDK (rather than only its GraphQL
+query), type those calls with generated protocol classes rather than string
+kinds — `client.get(DcimDevice, ...)`, not `kind="DcimDevice"`. Match the
+`--sync` protocol variant to the check's client. See
+[protocols-adopt-typed-kinds](../infrahub-common/rules/protocols-adopt-typed-kinds.md).
+
 ## Check Basics
 
 Every check has three components:

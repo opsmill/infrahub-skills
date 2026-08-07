@@ -9,7 +9,7 @@ tags: protocols, generated-code, infrahubctl, schema, checks, generators, transf
 Impact: CRITICAL
 
 Protocol files under `generated/` (or `protocols/`)
-are output from `infrahubctl protocols generate` —
+are output from `infrahubctl protocols` —
 hand-edits to them are overwritten on the next
 regeneration.
 
@@ -45,41 +45,44 @@ Infrahub schema. Common indicators:
 
 ### Generating Protocols
 
-Use `infrahubctl protocols generate` to create or
-update protocol files. The command can work against
-a **running Infrahub instance** or directly from
-**local schema files**:
+Use `infrahubctl protocols` to create or update protocol
+files. It can read from a **running Infrahub instance**
+or directly from **local schema files**:
 
 ```bash
-# Generate from a running Infrahub instance (default)
-infrahubctl protocols generate
+# From a running Infrahub instance (async client, default) — reads the
+# configured INFRAHUB_ADDRESS (defaults to http://localhost:8000)
+infrahubctl protocols --out lib/protocols.py
 
-# Generate from local schema directory (no instance needed)
-infrahubctl protocols generate --schema-dir schemas/
-
-# Generate from specific schema files
-infrahubctl protocols generate \
-  --schema-dir schemas/base/ \
-  --schema-dir schemas/extensions/
+# From local schema files (no instance needed)
+infrahubctl protocols --schemas schemas/ --out lib/protocols.py
 ```
 
-Using `--schema-dir` is especially useful during
-development when iterating on schema changes without
-needing to load them into Infrahub first.
+The instance address is not hardcoded — it comes from
+your environment or `infrahubctl.toml`
+(`INFRAHUB_ADDRESS`, default `http://localhost:8000`);
+confirm with `infrahubctl info` first, and prefix with
+your project's Python runner (`uv run` / `poetry run`).
+See
+[connectivity-server-check](./connectivity-server-check.md).
 
-The command generates both **sync** and **async**
-protocol classes. Usually only one variant is needed
--- choose based on whether your code uses the sync
-or async Infrahub SDK client. In rare cases (e.g., a
-project mixing sync utilities with async
-generators), both may be required.
+Using `--schemas` is especially useful during
+development when iterating on schema changes without
+loading them into Infrahub first. Note: local-directory
+generation does not emit Profile or Object-Template
+protocols.
+
+The async client is the default. Generate the **sync**
+variant with `--sync` when your code uses the sync SDK
+client; a project mixing sync utilities with async
+generators may need both.
 
 ```bash
-# Generate only sync protocols
-infrahubctl protocols generate --sync
+# Sync protocols
+infrahubctl protocols --schemas schemas/ --sync --out lib/protocols_sync.py
 
-# Generate only async protocols (default)
-infrahubctl protocols generate --async
+# Async protocols (default)
+infrahubctl protocols --schemas schemas/ --out lib/protocols.py
 ```
 
 ### Correct Workflow
@@ -88,7 +91,7 @@ When the schema changes, the correct sequence is:
 
 1. **Update the schema** files (YAML in `schemas/`)
 2. **Regenerate protocols**:
-   `infrahubctl protocols generate --schema-dir schemas/`
+   `infrahubctl protocols --schemas schemas/ --out lib/protocols.py`
 3. **Use the updated protocols** in checks,
    generators, and transforms
 4. **Commit** the regenerated protocol files

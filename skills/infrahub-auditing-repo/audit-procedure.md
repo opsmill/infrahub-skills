@@ -390,10 +390,11 @@ clear-cut wins surface loudest:
   (step 1), inherit a built-in primitive, move data to
   YAML, add a schema constraint or a missing inverse.
   Low cost, unambiguous benefit.
-- **Steps 4–6 → LOW.** A larger rewrite where the
+- **Steps 4–7 → LOW.** A larger rewrite where the
   Python is more defensible: re-model a relationship
   traversal, narrow a query, port a transform to
-  Jinja2, restructure a check. Still advisory, just
+  Jinja2, restructure a check, or adopt a generated
+  protocol for typed SDK access. Still advisory, just
   lower priority.
 
 The ladder steps come from each rule's `ladder_step`
@@ -472,7 +473,20 @@ phases keep their existing order).
   already allocates another resource from a pool. Do not
   flag deterministic derivations that persist no allocation.
 
-### 9.5 Output
+### 9.5 Cross-artifact Python rules (checks, transforms, generators)
+
+- `yagni-untyped-python-vs-generated-protocols` (step 7, LOW)
+  — a bare string `kind` (`kind="Foo"` or positional `"Foo"`)
+  passed to `client.create/get/all/filters/count`, or a
+  hand-built dict payload, when a generated protocol class for
+  that kind is available (a repo `protocols.py` /
+  `schema_protocols.py` / `*_sync.py` / `*_async.py`, or
+  `infrahub_sdk.protocols`). Pass the class instead for
+  author-time type checking. Attributes only — do not flag
+  relationship-only access, trivial one-offs, or code already
+  using protocol classes.
+
+### 9.6 Output
 
 When emitting YAGNI findings in `AUDIT_REPORT.md`,
 sort by `ladder_step` ascending (cheapest fix on top),
