@@ -10,6 +10,7 @@ field on `check_definitions`) lives.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -192,6 +193,173 @@ def run_checks(check_names: list[str], output_path: Path) -> dict:
         fn = CHECKS[name]
         try:
             ok, msg = fn(config)
+        except Exception as exc:  # pragma: no cover
+            ok, msg = False, f"Error running check: {exc}"
+        if ok:
+            passed_count += 1
+        entries.append({"name": name, "passed": ok, "message": msg})
+
+    total = len(check_names)
+    score = round(passed_count / total, 4) if total > 0 else 0.0
+    failed = [e["name"] for e in entries if not e["passed"]]
+    if failed:
+        details = f"{passed_count}/{total} checks passed. Failed: {', '.join(failed)}"
+    else:
+        details = f"All {total} checks passed."
+    return {"score": score, "details": details, "checks": entries}
+
+
+# ---------------------------------------------------------------------------
+# Text-based checks
+# ---------------------------------------------------------------------------
+#
+# Some rules grade the produced artifacts (a `.gql` query and a Python check
+# class), not the `.infrahub.yml` registration. Those checks take the raw
+# file text rather than a parsed config, so they live in TEXT_CHECKS and run
+# through run_text_checks. Each has the same (bool, str) contract as the
+# config checks above.
+
+
+def _last_node_block(gql: str) -> str | None:
+    """Return the balanced `{...}` body of the last `node {` in the query.
+
+    The innermost `node {` is the related node reached by traversal; its
+    selection set is where the comparison attribute must appear. Returns
+    None when there is no relationship traversal (fewer than two `node {`).
+    """
+    matches = list(re.finditer(r"node\s*{", gql))
+    if len(matches) < 2:
+        return None
+    start = matches[-1].end() - 1  # index of the opening brace
+    depth = 0
+    for i in range(start, len(gql)):
+        ch = gql[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return gql[start + 1 : i]
+    return gql[start + 1 :]  # unbalanced; grade against the remainder
+
+
+def _none_guard_blocks(py: str) -> list[str]:
+    """Return the body of each `if <parent> is None:` / `if not <parent>:` block.
+
+    Restricted to None / empty-truthiness guards so a `status not in ALLOWED`
+    comparison is not mistaken for an unresolvable-parent guard.
+    """
+    lines = py.split("\n")
+    is_none = re.compile(r"^(\s*)if\s+.+\bis\s+None\s*:\s*$")
+    is_falsy = re.compile(r"^(\s*)if\s+not\s+[\w.\(\)\[\]\"']+\s*:\s*$")
+    blocks: list[str] = []
+    for i, line in enumerate(lines):
+        m = is_none.match(line) or is_falsy.match(line)
+        if not m:
+            continue
+        indent = len(m.group(1))
+        body: list[str] = []
+        for nxt in lines[i + 1 :]:
+            if not nxt.strip():
+                continue
+            if len(nxt) - len(nxt.lstrip()) <= indent:
+                break
+            body.append(nxt)
+        blocks.append("\n".join(body))
+    return blocks
+
+
+def text_child_status_filter(gql: str, py: str) -> tuple[bool, str]:
+    """The query filters the child set by an attribute value (e.g. status__value:)."""
+    if re.search(r"\w+__value\s*:", gql):
+        return True, "Query filters children by an attribute value"
+    return False, "Query has no `<attr>__value:` filter selecting the constrained children"
+
+
+def text_traverses_related_node(gql: str, py: str) -> tuple[bool, str]:
+    """The query nests into a related node (>= 2 `node {` blocks)."""
+    opens = len(re.findall(r"node\s*{", gql))
+    if opens >= 2:
+        return True, f"Query traverses into a related node ({opens} `node {{` blocks)"
+    return False, "Query does not traverse a relationship into a nested `node {` block"
+
+
+def text_fetches_related_attribute_value(gql: str, py: str) -> tuple[bool, str]:
+    """The comparison attribute is selected inside the innermost related node.
+
+    Guards finding 1: selecting the child's own `name { value }` after the
+    nested block must not satisfy this — the value has to sit in the related
+    node's own selection set.
+    """
+    block = _last_node_block(gql)
+    if block is None:
+        return False, "No nested related node to hold the comparison attribute"
+    if re.search(r"\bvalue\b", block):
+        return True, "Innermost related node selects an attribute value (parent state is fetched)"
+    return False, "Innermost related node selects no attribute `value`; parent state is not fetched"
+
+
+def text_uses_infrahubcheck(gql: str, py: str) -> tuple[bool, str]:
+    """Python defines an InfrahubCheck subclass bound to a query."""
+    if "InfrahubCheck" in py and re.search(r"query\s*=", py):
+        return True, "Defines an InfrahubCheck with a `query =` binding"
+    return False, "No InfrahubCheck subclass with a `query =` attribute"
+
+
+def text_surfaces_violation(gql: str, py: str) -> tuple[bool, str]:
+    """validate() surfaces a mismatch via log_error (blocks the merge)."""
+    if re.search(r"log_error\s*\(", py):
+        return True, "Reports a violation with log_error"
+    return False, "validate() never calls log_error, so no violation is surfaced"
+
+
+def text_null_safe_traversal(gql: str, py: str) -> tuple[bool, str]:
+    """Each relationship hop is guarded against null (`or {}` / `.get(k, {})`)."""
+    if "or {}" in py or re.search(r"\.get\([^)]*,\s*{}\)", py):
+        return True, "Guards each relationship hop against null (`or {}` / `.get(k, {})`)"
+    return False, "No per-hop null guard (`or {}` / `.get(k, {})`) on the relationship walk"
+
+
+def text_flags_unresolvable_parent(gql: str, py: str) -> tuple[bool, str]:
+    """An unresolvable related node is flagged, not silently skipped.
+
+    Guards finding 2: `if parent is None: continue` (a skip) must fail; the
+    branch has to call log_error. Absence of any such guard also fails,
+    since the rule requires handling the unresolvable case explicitly.
+    """
+    blocks = _none_guard_blocks(py)
+    if not blocks:
+        return False, "No guard for an unresolvable related node (the rule requires flagging it)"
+    if any("log_error" in b for b in blocks):
+        return True, "Flags an unresolvable related node with log_error instead of skipping"
+    return False, "The unresolvable-parent branch skips (continue/return) without log_error"
+
+
+TEXT_CHECKS: dict[str, Any] = {
+    "child-status-filter": text_child_status_filter,
+    "traverses-related-node": text_traverses_related_node,
+    "fetches-related-attribute-value": text_fetches_related_attribute_value,
+    "uses-infrahubcheck": text_uses_infrahubcheck,
+    "surfaces-violation": text_surfaces_violation,
+    "null-safe-traversal": text_null_safe_traversal,
+    "flags-unresolvable-parent": text_flags_unresolvable_parent,
+}
+
+
+def run_text_checks(check_names: list[str], sources: dict[str, str]) -> dict:
+    """Run named TEXT_CHECKS against produced source files and return skillgrade JSON.
+
+    `sources` maps a label (e.g. "gql", "py") to that file's raw text.
+    """
+    gql = sources.get("gql", "")
+    py = sources.get("py", "")
+
+    entries: list[dict] = []
+    passed_count = 0
+    for name in check_names:
+        fn = TEXT_CHECKS[name]
+        try:
+            ok, msg = fn(gql, py)
         except Exception as exc:  # pragma: no cover
             ok, msg = False, f"Error running check: {exc}"
         if ok:

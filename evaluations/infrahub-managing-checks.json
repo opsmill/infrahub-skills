@@ -75,27 +75,28 @@
     },
     {
       "id": 3,
-      "prompt": "Write a global check that enforces install ordering. A\nDcimModule must not be `installed` while its containing chassis is\nnot yet in service. The module reaches its chassis through the\nrelationship chain installed_in (a bay) -> container (the chassis).\nFlag any DcimModule whose status is `installed` when the container's\nstatus is neither `installed` nor `maintenance`. The class is\nDcimInstallOrderingCheck and the query is named dcim_install_ordering.\n\nProduce two files:\n- the GraphQL query, saved to: output.gql\n- the Python check class, saved to: output.py",
-      "expected_output": "A GraphQL query that selects DcimModule filtered by status__value: \"installed\" and traverses installed_in -> container to fetch the chassis `status { value }`, plus a Python InfrahubCheck whose validate() unwraps that nested path (guarding each null hop with `or {}`), reports the ordering violation with log_error, and flags a module with no resolvable container rather than skipping it.",
+      "prompt": "Write a global check that stops an interface being brought into\nservice ahead of the device it belongs to. Flag any InfraInterface\nwhose status is `active` when the device it belongs to has a status\nother than `active` or `provisioning`. If an interface's device\ncannot be determined, treat that as a violation too. The class is\nInterfaceReadinessCheck and the query is named interface_readiness.\n\nProduce two files:\n- the GraphQL query, saved to: output.gql\n- the Python check class, saved to: output.py",
+      "expected_output": "A GraphQL query that selects InfraInterface filtered to the active ones and traverses to the owning device to fetch that device's `status { value }` in the same query, plus a Python InfrahubCheck whose validate() unwraps the nested path (guarding each hop against null), reports the readiness violation with log_error, and flags an interface whose device cannot be resolved rather than skipping it.",
       "files": [],
       "expectations": [
-        "The query fetches the container's status inside the query via relationship traversal (installed_in -> container -> status), not just the module's own fields \u2014 a check runs one query with no lazy fetch",
-        "validate() reads the nested container status and calls log_error when it is not installed or maintenance",
-        "The nested unwrap guards each hop against null (`or {}` / `is None`) so a dangling relationship does not crash or pass silently",
-        "A module whose container cannot be resolved is flagged, not skipped"
+        "The query fetches the owning device's status inside the query via relationship traversal, not just the interface's own fields \u2014 a check runs one query with no lazy fetch",
+        "The device status is selected inside the device's own node selection set, not merely somewhere after the nested block",
+        "validate() reads the nested device status and calls log_error when it is not active or provisioning",
+        "Each relationship hop is guarded against null (`or {}`) so a dangling relationship does not crash",
+        "An interface whose device cannot be resolved is flagged with log_error, not skipped with a bare continue/return"
       ],
       "assertions": [
         {
           "name": "child-status-filter",
-          "check": "Query filters DcimModule by status__value \"installed\""
+          "check": "Query filters the interface set by an attribute value"
         },
         {
           "name": "traverses-related-node",
-          "check": "Query nests into the related container node"
+          "check": "Query nests into the related device node"
         },
         {
           "name": "fetches-related-attribute-value",
-          "check": "The nested container node selects status value so the parent state is available to validate()"
+          "check": "The device's own (innermost) node selection set selects a status value, so the parent state is actually fetched"
         },
         {
           "name": "uses-infrahubcheck",
@@ -107,7 +108,11 @@
         },
         {
           "name": "null-safe-traversal",
-          "check": "The nested relationship walk guards against a null hop"
+          "check": "Each relationship hop is guarded against a null value"
+        },
+        {
+          "name": "flags-unresolvable-parent",
+          "check": "An unresolvable device is flagged with log_error, not skipped with a bare continue/return"
         }
       ]
     }

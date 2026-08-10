@@ -1054,13 +1054,12 @@ tasks:
     instruction: |
       Read the skill at .agents/skills/infrahub-managing-checks/SKILL.md and follow its workflow and rules.
 
-      Task: Write a global check that enforces install ordering. A
-      DcimModule must not be `installed` while its containing chassis is
-      not yet in service. The module reaches its chassis through the
-      relationship chain installed_in (a bay) -> container (the chassis).
-      Flag any DcimModule whose status is `installed` when the container's
-      status is neither `installed` nor `maintenance`. The class is
-      DcimInstallOrderingCheck and the query is named dcim_install_ordering.
+      Task: Write a global check that stops an interface being brought into
+      service ahead of the device it belongs to. Flag any InfraInterface
+      whose status is `active` when the device it belongs to has a status
+      other than `active` or `provisioning`. If an interface's device
+      cannot be determined, treat that as a violation too. The class is
+      InterfaceReadinessCheck and the query is named interface_readiness.
 
       Produce two files:
       - the GraphQL query, saved to: output.gql
@@ -1070,44 +1069,48 @@ tasks:
         run: python graders/managing-checks/check_relationship_traversal.py
         weight: 1.0
     expected_output: >-
-      A GraphQL query that selects DcimModule filtered by
-      status__value: "installed" and traverses installed_in -> container
-      to fetch the chassis `status { value }`, plus a Python
-      InfrahubCheck whose validate() unwraps that nested path (guarding
-      each null hop with `or {}`), reports the ordering violation with
-      log_error, and flags a module with no resolvable container rather
-      than skipping it.
+      A GraphQL query that selects InfraInterface filtered to the active
+      ones and traverses to the owning device to fetch that device's
+      `status { value }` in the same query, plus a Python InfrahubCheck
+      whose validate() unwraps the nested path (guarding each hop against
+      null), reports the readiness violation with log_error, and flags an
+      interface whose device cannot be resolved rather than skipping it.
     expectations:
       - >-
-        The query fetches the container's status inside the query via
-        relationship traversal (installed_in -> container -> status),
-        not just the module's own fields — a check runs one query with
-        no lazy fetch
+        The query fetches the owning device's status inside the query via
+        relationship traversal, not just the interface's own fields — a
+        check runs one query with no lazy fetch
       - >-
-        validate() reads the nested container status and calls
-        log_error when it is not installed or maintenance
+        The device status is selected inside the device's own node
+        selection set, not merely somewhere after the nested block
       - >-
-        The nested unwrap guards each hop against null (`or {}` /
-        `is None`) so a dangling relationship does not crash or pass
-        silently
+        validate() reads the nested device status and calls log_error
+        when it is not active or provisioning
       - >-
-        A module whose container cannot be resolved is flagged, not
-        skipped
+        Each relationship hop is guarded against null (`or {}`) so a
+        dangling relationship does not crash
+      - >-
+        An interface whose device cannot be resolved is flagged with
+        log_error, not skipped with a bare continue/return
     assertions:
       - name: child-status-filter
-        check: Query filters DcimModule by status__value "installed"
+        check: Query filters the interface set by an attribute value
       - name: traverses-related-node
-        check: Query nests into the related container node
+        check: Query nests into the related device node
       - name: fetches-related-attribute-value
         check: >-
-          The nested container node selects status value so the parent
-          state is available to validate()
+          The device's own (innermost) node selection set selects a
+          status value, so the parent state is actually fetched
       - name: uses-infrahubcheck
         check: Python defines an InfrahubCheck bound to the query
       - name: surfaces-violation
         check: validate() reports the violation with log_error
       - name: null-safe-traversal
-        check: The nested relationship walk guards against a null hop
+        check: Each relationship hop is guarded against a null value
+      - name: flags-unresolvable-parent
+        check: >-
+          An unresolvable device is flagged with log_error, not skipped
+          with a bare continue/return
 
   # --- Generators: relationship reference encoding --- #
   - name: generator-relationship-hfid-encoding
