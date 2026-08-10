@@ -72,6 +72,44 @@
           "check": "Targeted check_definitions entry declares both targets and parameters"
         }
       ]
+    },
+    {
+      "id": 3,
+      "prompt": "Write a global check that enforces install ordering. A\nDcimModule must not be `installed` while its containing chassis is\nnot yet in service. The module reaches its chassis through the\nrelationship chain installed_in (a bay) -> container (the chassis).\nFlag any DcimModule whose status is `installed` when the container's\nstatus is neither `installed` nor `maintenance`. The class is\nDcimInstallOrderingCheck and the query is named dcim_install_ordering.\n\nProduce two files:\n- the GraphQL query, saved to: output.gql\n- the Python check class, saved to: output.py",
+      "expected_output": "A GraphQL query that selects DcimModule filtered by status__value: \"installed\" and traverses installed_in -> container to fetch the chassis `status { value }`, plus a Python InfrahubCheck whose validate() unwraps that nested path (guarding each null hop with `or {}`), reports the ordering violation with log_error, and flags a module with no resolvable container rather than skipping it.",
+      "files": [],
+      "expectations": [
+        "The query fetches the container's status inside the query via relationship traversal (installed_in -> container -> status), not just the module's own fields \u2014 a check runs one query with no lazy fetch",
+        "validate() reads the nested container status and calls log_error when it is not installed or maintenance",
+        "The nested unwrap guards each hop against null (`or {}` / `is None`) so a dangling relationship does not crash or pass silently",
+        "A module whose container cannot be resolved is flagged, not skipped"
+      ],
+      "assertions": [
+        {
+          "name": "child-status-filter",
+          "check": "Query filters DcimModule by status__value \"installed\""
+        },
+        {
+          "name": "traverses-related-node",
+          "check": "Query nests into the related container node"
+        },
+        {
+          "name": "fetches-related-attribute-value",
+          "check": "The nested container node selects status value so the parent state is available to validate()"
+        },
+        {
+          "name": "uses-infrahubcheck",
+          "check": "Python defines an InfrahubCheck bound to the query"
+        },
+        {
+          "name": "surfaces-violation",
+          "check": "validate() reports the violation with log_error"
+        },
+        {
+          "name": "null-safe-traversal",
+          "check": "The nested relationship walk guards against a null hop"
+        }
+      ]
     }
   ]
 }

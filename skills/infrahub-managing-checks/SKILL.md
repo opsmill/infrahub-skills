@@ -57,7 +57,7 @@ Existing queries:
 | CRITICAL | Python Class | `python-` | InfrahubCheck base class, validate(), log_error/log_info |
 | HIGH | API Reference | `api-` | Class attributes, instance properties, methods, lifecycle |
 | HIGH | Registration | `registration-` | .infrahub.yml config, query name matching, parameters |
-| MEDIUM | Patterns | `patterns-` | Error collection, shared utilities, scoped validation |
+| MEDIUM | Patterns | `patterns-` | Error collection, shared utilities, scoped validation, relationship-traversal validation |
 | HIGH | Testing | `testing-` | Resources Testing Framework (YAML-driven tests), infrahubctl check commands |
 
 <!-- markdownlint-enable MD013 -->
@@ -72,6 +72,7 @@ are actually schema-side gaps:
 | --------------- | ------------------------------------- | --- |
 | Reads an attribute via GraphQL | Expose it on the schema node with the same name (`name__value`-shaped paths) | [../infrahub-managing-schemas/rules/attribute-defaults-and-types.md](../infrahub-managing-schemas/rules/attribute-defaults-and-types.md) |
 | Walks a relationship to validate related objects | Have both sides of the relationship defined with matching identifiers; otherwise the traversal returns nothing | [../infrahub-managing-schemas/rules/relationship-identifiers.md](../infrahub-managing-schemas/rules/relationship-identifiers.md) |
+| Validates a node against a related node's state (child vs parent lifecycle, peer consistency) | Fetch the related node's comparison attribute in the query by traversing the relationship; a check runs one query with no lazy fetch | [rules/patterns-relationship-traversal.md](./rules/patterns-relationship-traversal.md) |
 | Is targeted (per-object) | Register a `CoreStandardGroup` as `targets:` in `.infrahub.yml` and map `parameters:` to bind GraphQL variables | [rules/registration-config.md](./rules/registration-config.md) |
 | Needs the GraphQL response keyed to typed nodes | Select `id` and `__typename` in the query — the SDK relies on both | [../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md) |
 | Should never block a merge but only annotate | Use `self.log_info()` instead of `log_error()`; `log_warning()` does not exist | [rules/python-validate.md](./rules/python-validate.md) |
