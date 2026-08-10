@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Grader: assert all 15 yagni-* findings emit sorted by ladder_step ascending.
+"""Grader: assert all 16 yagni-* findings emit sorted by ladder_step ascending.
 
 Companion to the per-rule graders. The fixture for this task contains
-violations of all 15 yagni-* rules; the auditor must emit them in
+violations of all 16 yagni-* rules; the auditor must emit them in
 ascending ladder_step order (cheapest fix on top).
 """
 
@@ -19,7 +19,7 @@ from lib import run_checks  # noqa: E402
 ALL_RULES = [
     # (rule, ladder_step, severity) — severity tracks the ladder, capped at
     # MEDIUM: cheap, unambiguous fixes (steps 1-3) emit MEDIUM; costlier
-    # rewrites where the Python is more defensible (steps 4-6) emit LOW.
+    # rewrites where the Python is more defensible (steps 4-7) emit LOW.
     ("yagni-reuse-existing-marketplace-schema", 1, "MEDIUM"),
     ("yagni-duplicate-shape-not-extracted-to-generic", 2, "MEDIUM"),
     ("yagni-generator-hardcoding-data", 2, "MEDIUM"),
@@ -35,6 +35,7 @@ ALL_RULES = [
     ("yagni-generator-query-shape-too-broad", 4, "LOW"),
     ("yagni-python-transform-that-could-be-jinja2", 5, "LOW"),
     ("yagni-redundant-check-that-graphql-can-answer", 6, "LOW"),
+    ("yagni-untyped-python-vs-generated-protocols", 7, "LOW"),
 ]
 
 CHECKS: list[str] = []
