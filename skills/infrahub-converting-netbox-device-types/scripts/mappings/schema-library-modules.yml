@@ -1,0 +1,123 @@
+---
+# Mapping profile for the OpsMill schema-library DCIM schema *with* the
+# modules extension, covering NetBox device types AND module types.
+#
+# Prerequisites beyond the plain schema-library profile:
+#
+# 1. Load `extensions/modules/modules.yml`. It defines the generics
+#    DeviceGenericModule and DeviceGenericModuleType, plus the
+#    DcimPhysicalDevice.modules Component relationship.
+# 2. Define a CONCRETE node inheriting DeviceGenericModuleType — the
+#    extension ships generics only, and a generic cannot be instantiated.
+#    `experimental/modules_linecards/linecard.yml` has a worked example
+#    (DeviceLinecardType / DeviceLinecard); set `module_type.kind` below to
+#    whichever concrete kind you settle on.
+#
+# What converts, and what does not:
+#
+# NetBox module types are mostly their component list — the ports the
+# module provides. Neither DeviceGenericModuleType nor DeviceGenericModule
+# has ANY component relationship, so those lists are reported as skipped,
+# not converted. This profile therefore emits module type *records* (model,
+# part number, manufacturer) and no module templates.
+#
+# What is NOT the obstacle: DeviceGenericModule.serial_number being unique
+# and the generic's human_friendly_id. Module templates work — Infrahub
+# omits unique attributes from a generated template entirely and re-keys it
+# on template_name, so a TemplateDeviceLinecard has no serial_number and is
+# created without one. The missing piece is somewhere to put the ports.
+#
+# To convert the components too: put `generate_template: true` on your
+# concrete module node, give it a Component relationship to an
+# interface-like node, then uncomment the `template:` and `components:`
+# blocks under `module_type:` below. See ../../extending-your-schema.md.
+version: 1
+name: schema-library-modules
+
+manufacturer:
+  kind: OrganizationManufacturer
+  name_field: name
+
+device_type:
+  kind: DcimDeviceType
+  manufacturer_relationship: manufacturer
+  fields:
+    model: name
+    part_number: part_number
+    description:
+      target: description
+      fallback: comments
+    u_height:
+      target: height
+      transform: number
+    is_full_depth:
+      target: full_depth
+      transform: boolean
+    # Infrahub has no float attribute kind — Number is integer-backed — so a
+    # weight must be a whole number. Kilograms match schema-library's
+    # `Weight (kg)` attribute but round 302 published device types (sub-500g
+    # transceivers and APs) to 0; the report calls each one out. If that
+    # matters, add a grams attribute to your schema and switch to weight_g,
+    # which keeps every value distinct.
+    weight:
+      target: weight
+      transform: weight_kg
+
+template:
+  kind: TemplateDcimDevice
+  template_name: "{slug}"
+  device_type_relationship: device_type
+  defaults:
+    status: active
+
+components:
+  interfaces:
+    kind: TemplateInterfacePhysical
+    relationship: interfaces
+    template_name: "{template_name}__{name}"
+    fields:
+      name: name
+      description:
+        target: description
+        fallback: label
+    derived:
+      role:
+        when:
+          mgmt_only: true
+        value: management
+    defaults:
+      status: active
+
+module_type:
+  # Set this to YOUR concrete node inheriting DeviceGenericModuleType.
+  # DeviceGenericModuleType itself is a generic and cannot be instantiated.
+  kind: DeviceLinecardType
+  manufacturer_relationship: manufacturer
+  # Module types carry no slug; `model` is unique across all published
+  # module types, so it is the identity.
+  key: "{model}"
+  fields:
+    model: name
+    part_number: part_number
+    description:
+      target: description
+      fallback: comments
+
+  # Uncomment once your concrete module node carries `generate_template:
+  # true` AND a Component relationship that can hold the module's ports.
+  # Until then the component lists are reported as skipped, which is the
+  # honest outcome.
+  #
+  # position_placeholder: "1"   # substitutes NetBox's {module} bay token
+  #
+  # template:
+  #   kind: TemplateDeviceLinecard
+  #   template_name: "module__{model}"
+  #   module_type_relationship: linecard_type
+  # components:
+  #   interfaces:
+  #     kind: TemplateInterfacePhysical
+  #     relationship: interfaces
+  #     template_name: "module__{template_name}__{name}"
+  #     fields:
+  #       name: name

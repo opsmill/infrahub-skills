@@ -20,6 +20,7 @@ jobs:
       yaml: ${{ steps.changes.outputs.yaml_all }}
       skills: ${{ steps.changes.outputs.skills_all }}
       documentation: ${{ steps.changes.outputs.documentation_all }}
+      tests: ${{ steps.changes.outputs.tests_all }}
     steps:
       - uses: actions/checkout@v6
       - uses: opsmill/paths-filter@v3.0.2
@@ -50,6 +51,32 @@ jobs:
       - uses: actions/checkout@v6
       - run: pip install yamllint
       - run: yamllint -c .yamllint.yml .
+
+  # ---------------------------------------------------------------------------
+  # Run the Python test suite — grader libraries and the bundled skill scripts
+  #
+  # Matrixed over the floor and the current interpreter: pyproject declares
+  # requires-python >=3.10, and the graders and skill scripts run on
+  # contributors' own machines, so a 3.11+ only construct slipping into one is a
+  # real break rather than a hypothetical.
+  # ---------------------------------------------------------------------------
+  test:
+    needs: files-changed
+    if: needs.files-changed.outputs.tests == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+      # The test deps sit in an opt-in `test` group, kept out of `dev` so the
+      # lint jobs above do not install the SDK's dependency tree.
+      - run: uv run --group test pytest
 
   # ---------------------------------------------------------------------------
   # Build documentation (Docusaurus)

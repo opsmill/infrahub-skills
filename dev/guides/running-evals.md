@@ -202,6 +202,7 @@ each task reads).
 | infrahub-auditing-repo | 16 |
 | infrahub-collecting-diagnostics | 3 |
 | infrahub-importing-data | 25 |
+| infrahub-converting-netbox-device-types | 6 |
 
 `infrahub-analyzing-data` has no eval tasks yet —
 adding them is a good contribution. It has rules but
