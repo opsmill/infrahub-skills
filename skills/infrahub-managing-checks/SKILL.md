@@ -154,7 +154,12 @@ Follow these steps when creating a check:
 2. **Write the GraphQL query** — Create a `.gql` file
    that fetches the data to validate. Read
    [../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)
-   for query patterns.
+   for query patterns. If the rule compares a node
+   against a related node's state (child vs parent
+   lifecycle, peer consistency), the query must fetch
+   that related attribute by traversing the relationship
+   now — a check runs one query with no later fetch. See
+   [rules/patterns-relationship-traversal.md](./rules/patterns-relationship-traversal.md).
 3. **Implement the Python class** — Inherit from
    `InfrahubCheck`, implement `validate()`. Read
    [rules/python-validate.md](./rules/python-validate.md)

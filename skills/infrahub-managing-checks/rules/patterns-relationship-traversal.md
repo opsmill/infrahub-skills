@@ -18,16 +18,15 @@ violation, not a silent skip.
 
 ### Why it matters
 
-A check runs its `self.query` exactly once and receives
-the single result as `data`; there is no lazy fetch
-inside `validate()`. An attribute you did not select in
-the query is simply absent from `data`, so a check that
-selects only the child cannot see the parent's state at
-all. The naive fix — issue one extra query per node
-from inside `validate()` — is not available in the check
-execution model and would be O(n) round trips even if it
-were. The comparison attribute has to be pulled in the
-same query by walking the relationship.
+A check runs its `self.query` once and validates the
+single result in `data`. An attribute you did not select
+in the query is simply absent from `data`, so a check
+that selects only the child cannot see the parent's state
+from `data` at all. You *can* issue a follow-up read per
+node with `self.client`, but that is O(n) round trips
+that blow the check timeout on any real dataset. Pull the
+comparison attribute in the same query by walking the
+relationship instead.
 
 Both sides of the relationship must be defined with
 matching identifiers, or the traversal returns nothing

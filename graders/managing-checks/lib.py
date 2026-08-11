@@ -10,7 +10,9 @@ field on `check_definitions`) lives.
 
 from __future__ import annotations
 
+import ast
 import re
+import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -220,53 +222,57 @@ def run_checks(check_names: list[str], output_path: Path) -> dict:
 # config checks above.
 
 
-def _last_node_block(gql: str) -> str | None:
-    """Return the balanced `{...}` body of the last `node {` in the query.
+def _traversed_node_blocks(gql: str) -> list[str]:
+    """Selection set of every `node {` after the first (the filtered child's own).
 
-    The innermost `node {` is the related node reached by traversal; its
-    selection set is where the comparison attribute must appear. Returns
-    None when there is no relationship traversal (fewer than two `node {`).
+    Excluding the first `node {` keeps the child's own `name { value }` from
+    satisfying the fetch assertion, while returning *every* traversed block
+    (not only the textually last one) so a correct answer whose comparison
+    traversal is followed by a sibling selection still counts.
     """
     matches = list(re.finditer(r"node\s*{", gql))
-    if len(matches) < 2:
-        return None
-    start = matches[-1].end() - 1  # index of the opening brace
-    depth = 0
-    for i in range(start, len(gql)):
-        ch = gql[i]
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return gql[start + 1 : i]
-    return gql[start + 1 :]  # unbalanced; grade against the remainder
-
-
-def _none_guard_blocks(py: str) -> list[str]:
-    """Return the body of each `if <parent> is None:` / `if not <parent>:` block.
-
-    Restricted to None / empty-truthiness guards so a `status not in ALLOWED`
-    comparison is not mistaken for an unresolvable-parent guard.
-    """
-    lines = py.split("\n")
-    is_none = re.compile(r"^(\s*)if\s+.+\bis\s+None\s*:\s*$")
-    is_falsy = re.compile(r"^(\s*)if\s+not\s+[\w.\(\)\[\]\"']+\s*:\s*$")
     blocks: list[str] = []
-    for i, line in enumerate(lines):
-        m = is_none.match(line) or is_falsy.match(line)
-        if not m:
-            continue
-        indent = len(m.group(1))
-        body: list[str] = []
-        for nxt in lines[i + 1 :]:
-            if not nxt.strip():
-                continue
-            if len(nxt) - len(nxt.lstrip()) <= indent:
-                break
-            body.append(nxt)
-        blocks.append("\n".join(body))
+    for m in matches[1:]:
+        start = m.end() - 1  # index of the opening brace
+        depth = 0
+        for i in range(start, len(gql)):
+            ch = gql[i]
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    blocks.append(gql[start + 1 : i])
+                    break
+        else:
+            blocks.append(gql[start + 1 :])  # unbalanced; grade against the remainder
     return blocks
+
+
+def _skips_unresolvable_without_log(py: str) -> bool | None:
+    """Does any `if` branch skip (continue/return) without logging first?
+
+    Semantic, idiom-agnostic detection of the anti-pattern the rule forbids
+    (`if dev is None: continue`), instead of matching guard syntax. Returns
+    None when the source cannot be parsed, so the caller can fall back.
+    """
+    try:
+        tree = ast.parse(textwrap.dedent(py))
+    except SyntaxError:
+        return None
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.If):
+            continue
+        skips = any(isinstance(s, (ast.Continue, ast.Return)) for s in ast.walk(node))
+        logged = any(
+            isinstance(c, ast.Call)
+            and isinstance(c.func, ast.Attribute)
+            and c.func.attr == "log_error"
+            for c in ast.walk(node)
+        )
+        if skips and not logged:
+            return True
+    return False
 
 
 def text_child_status_filter(gql: str, py: str) -> tuple[bool, str]:
@@ -284,19 +290,24 @@ def text_traverses_related_node(gql: str, py: str) -> tuple[bool, str]:
     return False, "Query does not traverse a relationship into a nested `node {` block"
 
 
-def text_fetches_related_attribute_value(gql: str, py: str) -> tuple[bool, str]:
-    """The comparison attribute is selected inside the innermost related node.
+def text_fetches_related_attribute_value(
+    gql: str, py: str, attr: str = "status"
+) -> tuple[bool, str]:
+    """The *named* comparison attribute is selected inside a traversed related node.
 
-    Guards finding 1: selecting the child's own `name { value }` after the
-    nested block must not satisfy this — the value has to sit in the related
-    node's own selection set.
+    The assertion carries the rule's thesis — the comparison attribute has to
+    be pulled in the same query — so it matches the attribute by name (default
+    `status`). Fetching some other attribute (e.g. the parent's `name`) on the
+    traversed node no longer passes, and the child's own attributes are
+    excluded because the child's `node {` is skipped.
     """
-    block = _last_node_block(gql)
-    if block is None:
-        return False, "No nested related node to hold the comparison attribute"
-    if re.search(r"\bvalue\b", block):
-        return True, "Innermost related node selects an attribute value (parent state is fetched)"
-    return False, "Innermost related node selects no attribute `value`; parent state is not fetched"
+    blocks = _traversed_node_blocks(gql)
+    if not blocks:
+        return False, "Query does not traverse into a related node"
+    pattern = re.compile(rf"\b{re.escape(attr)}\s*\{{\s*value\b")
+    if any(pattern.search(b) for b in blocks):
+        return True, f"A traversed related node selects `{attr} {{ value }}` (parent state is fetched)"
+    return False, f"No traversed related node selects `{attr} {{ value }}`; the comparison attribute is not fetched"
 
 
 def text_uses_infrahubcheck(gql: str, py: str) -> tuple[bool, str]:
@@ -314,25 +325,33 @@ def text_surfaces_violation(gql: str, py: str) -> tuple[bool, str]:
 
 
 def text_null_safe_traversal(gql: str, py: str) -> tuple[bool, str]:
-    """Each relationship hop is guarded against null (`or {}` / `.get(k, {})`)."""
+    """The relationship walk uses a null-guard idiom (`or {}` / `.get(k, {})`).
+
+    Checks the idiom is present, not that every hop is covered (that would need
+    to count hops against guards); the message says what it verifies.
+    """
     if "or {}" in py or re.search(r"\.get\([^)]*,\s*{}\)", py):
-        return True, "Guards each relationship hop against null (`or {}` / `.get(k, {})`)"
-    return False, "No per-hop null guard (`or {}` / `.get(k, {})`) on the relationship walk"
+        return True, "Relationship walk uses a null guard (`or {}` / `.get(k, {})`)"
+    return False, "No null guard (`or {}` / `.get(k, {})`) on the relationship walk"
 
 
 def text_flags_unresolvable_parent(gql: str, py: str) -> tuple[bool, str]:
     """An unresolvable related node is flagged, not silently skipped.
 
-    Guards finding 2: `if parent is None: continue` (a skip) must fail; the
-    branch has to call log_error. Absence of any such guard also fails,
-    since the rule requires handling the unresolvable case explicitly.
+    Guards finding 2 semantically: any `if` branch that skips (continue/return)
+    without a log_error is the anti-pattern (`if dev is None: continue`),
+    regardless of how the condition is written. Passing also requires a
+    log_error somewhere, so the unresolvable case is actually surfaced.
     """
-    blocks = _none_guard_blocks(py)
-    if not blocks:
-        return False, "No guard for an unresolvable related node (the rule requires flagging it)"
-    if any("log_error" in b for b in blocks):
-        return True, "Flags an unresolvable related node with log_error instead of skipping"
-    return False, "The unresolvable-parent branch skips (continue/return) without log_error"
+    skips = _skips_unresolvable_without_log(py)
+    if skips is None:  # unparseable — fall back to the classic textual anti-pattern
+        classic = re.search(r"(is\s+None|if\s+not\s+[\w.\[\]()]+)\s*:\s*\n\s*(continue|return)\b", py)
+        skips = bool(classic)
+    if skips:
+        return False, "An unresolvable-relationship branch skips (continue/return) without log_error"
+    if not re.search(r"log_error\s*\(", py):
+        return False, "No log_error on the unresolvable-relationship path"
+    return True, "Flags an unresolvable related node instead of skipping it"
 
 
 TEXT_CHECKS: dict[str, Any] = {
@@ -346,10 +365,14 @@ TEXT_CHECKS: dict[str, Any] = {
 }
 
 
-def run_text_checks(check_names: list[str], sources: dict[str, str]) -> dict:
+def run_text_checks(
+    check_names: list[str], sources: dict[str, str], attr: str = "status"
+) -> dict:
     """Run named TEXT_CHECKS against produced source files and return skillgrade JSON.
 
-    `sources` maps a label (e.g. "gql", "py") to that file's raw text.
+    `sources` maps a label (e.g. "gql", "py") to that file's raw text. `attr` is
+    the comparison attribute the query must fetch on the related node, passed to
+    the fetch check so it stays generic per task rather than hardcoded.
     """
     gql = sources.get("gql", "")
     py = sources.get("py", "")
@@ -359,7 +382,10 @@ def run_text_checks(check_names: list[str], sources: dict[str, str]) -> dict:
     for name in check_names:
         fn = TEXT_CHECKS[name]
         try:
-            ok, msg = fn(gql, py)
+            if name == "fetches-related-attribute-value":
+                ok, msg = fn(gql, py, attr)
+            else:
+                ok, msg = fn(gql, py)
         except Exception as exc:  # pragma: no cover
             ok, msg = False, f"Error running check: {exc}"
         if ok:

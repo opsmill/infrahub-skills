@@ -108,7 +108,7 @@
         },
         {
           "name": "null-safe-traversal",
-          "check": "Each relationship hop is guarded against a null value"
+          "check": "The relationship walk uses a null-guard idiom (`or {}` / `.get(k, {})`)"
         },
         {
           "name": "flags-unresolvable-parent",
