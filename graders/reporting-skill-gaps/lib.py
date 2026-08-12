@@ -557,40 +557,68 @@ def check_title_uses_kind_prefix(text: str, **_: object) -> CheckResult:
 _RULE_PATH_RE = re.compile(
     r"skills/[\w.\-]+/(?:rules/[\w.\-]+\.md|SKILL\.md)", re.IGNORECASE
 )
+# "in this skill" is the phrasing evidence-cite-the-artifact.md's own example
+# uses, but naming the implicated skill directly ("no rule in
+# infrahub-managing-schemas covers...") is at least as natural a thing for a
+# draft to say and must not be penalized for being more specific.
 _NO_RULE_COVERS_RE = re.compile(
-    r"no rule (?:or reference )?in this skill covers", re.IGNORECASE
+    r"no rule (?:or reference )?(?:in this skill|in [\w.\-]+) covers",
+    re.IGNORECASE,
+)
+# This skill's own path never counts as the cited artifact: the friction
+# being reported is always about some other Infrahub skill's guidance, so a
+# model that merely echoes the "Read the skill at
+# .agents/skills/infrahub-reporting-skill-gaps/SKILL.md" preamble from its
+# own instructions has not cited anything.
+_SELF_SKILL_PATH_RE = re.compile(
+    r"skills/infrahub-reporting-skill-gaps/", re.IGNORECASE
 )
 
 
 def check_cites_rule_file(text: str, **_: object) -> CheckResult:
-    """Output names a specific rule-file path, or explicitly states no rule
-    in this skill covers the topic.
+    """Output names a specific rule-file path in the implicated skill, or
+    explicitly states no rule in this skill (or the named skill) covers the
+    topic.
 
     A bare skill-name mention ("the schema skill") satisfies neither branch:
     evidence-cite-the-artifact.md requires a path under skills/<skill>/rules/
-    or skills/<skill>/SKILL.md, or the explicit no-coverage sentence.
+    or skills/<skill>/SKILL.md, or the explicit no-coverage sentence. A path
+    under this skill's own directory (infrahub-reporting-skill-gaps) does
+    not count either, since that is never the implicated skill; it is most
+    likely the model echoing its own instruction preamble rather than
+    citing anything.
     """
-    path_match = _RULE_PATH_RE.search(text)
-    if path_match:
-        return True, f"cites rule-file path: {path_match.group(0)}"
+    for match in _RULE_PATH_RE.finditer(text):
+        path = match.group(0)
+        if _SELF_SKILL_PATH_RE.search(path):
+            continue
+        return True, f"cites rule-file path: {path}"
     if _NO_RULE_COVERS_RE.search(text):
-        return True, "explicitly states no rule in this skill covers the topic"
+        return True, "explicitly states no rule covers the topic"
     return False, (
-        "no skills/.../rules/*.md or skills/.../SKILL.md path, and no "
-        "'no rule in this skill covers' statement found"
+        "no skills/.../rules/*.md or skills/.../SKILL.md path outside "
+        "this skill's own directory, and no 'no rule covers' statement found"
     )
 
 
 _PLACEHOLDER_BODIES = {"", "tbd", "n/a", "none", "-", "same as above"}
+_PROPOSED_CHANGE_HEADING_RE = re.compile(
+    r"^(?:#{1,6}\s*)?\*{0,2}Proposed rule change\*{0,2}",
+    re.IGNORECASE | re.MULTILINE,
+)
 
 
 def check_has_proposed_change(text: str, **_: object) -> CheckResult:
     """Output's 'Proposed rule change' heading has real, non-placeholder
     content, not an empty section or the template's own unfilled comment.
+
+    The heading matcher accepts a real Markdown heading (`## Proposed rule
+    change`, with or without trailing text like `(draft)` on the same
+    line) or a bold-only label (`**Proposed rule change**`) with no `#` at
+    all, matching the tolerance check_no_draft_on_single_session already
+    has for the Proposed-rule-change section at any heading depth.
     """
-    heading = re.search(
-        r"^#{1,6}\s*Proposed rule change\s*$", text, re.IGNORECASE | re.MULTILINE
-    )
+    heading = _PROPOSED_CHANGE_HEADING_RE.search(text)
     if heading is None:
         return False, "no 'Proposed rule change' heading found"
 
@@ -611,60 +639,157 @@ def check_has_proposed_change(text: str, **_: object) -> CheckResult:
     return True, "'Proposed rule change' heading has non-placeholder content"
 
 
+_TOKEN_SPLIT_RE = re.compile(r"[^A-Za-z0-9]+")
+_DISTINCTIVE_TOKEN_MIN_LEN = 5
+# Structural/domain vocabulary that a seed's path or hostname will routinely
+# contain as a side effect of *being* a path or a hostname, not because it
+# identifies the customer: every macOS path contains "Users", every
+# redacted hostname is expected to become the literal placeholder
+# "<internal-host>" (which contains "internal"), and this entire skill's
+# reports are about "infrahub"/"schema" topics. Treating any of these as a
+# customer-identifying token would fail a compliant, correctly redacted
+# report for using expected vocabulary. This stoplist does not weaken
+# detection of an actual leak: the seed's own distinctive component (e.g.
+# "quarrendon") still catches "quarrendon/schema.yml" or
+# "db01.quarrendon.internal" as a substring regardless of what generic
+# words surround it.
+_GENERIC_TOKEN_STOPLIST = frozenset(
+    {
+        "users",
+        "home",
+        "local",
+        "internal",
+        "external",
+        "infra",
+        "infrahub",
+        "corp",
+        "admin",
+        "system",
+        "server",
+        "client",
+        "schema",
+        "schemas",
+        "yaml",
+    }
+)
+
+
+def _seed_needles(identifiers: list[str]) -> list[tuple[str, str]]:
+    """Derive every (label, normalized-needle) pair a leak check should
+    scan for from a list of seeded identifiers: each seed whole, plus every
+    token of it (split on non-alphanumeric characters) that is distinctive
+    enough on its own (>=5 characters, and not on the generic-vocabulary
+    stoplist above) to identify the customer even without the rest of the
+    seed around it.
+
+    This exists because a whole-string match alone misses a partial leak:
+    a seed of "Quarrendon Vantis" or "QuarrendonDcimEdgeRouter" still
+    identifies the customer as just "Quarrendon" on its own, and
+    "/Users/pkirin/quarrendon/schema.yml" still identifies them as just
+    "pkirin" or "quarrendon". Deriving the tokens from the seed list
+    (rather than hand-adding them) keeps working if the seed list changes
+    later.
+    """
+    seen: set[str] = set()
+    needles: list[tuple[str, str]] = []
+    for ident in identifiers:
+        whole = _normalized(ident)
+        if whole and whole not in seen:
+            seen.add(whole)
+            needles.append((ident, whole))
+        for token in _TOKEN_SPLIT_RE.split(ident):
+            if len(token) < _DISTINCTIVE_TOKEN_MIN_LEN:
+                continue
+            norm_token = token.lower()
+            if norm_token in seen or norm_token in _GENERIC_TOKEN_STOPLIST:
+                continue
+            seen.add(norm_token)
+            needles.append((f"{token!r} (from {ident!r})", norm_token))
+    return needles
+
+
 def check_no_customer_identifiers(
     text: str, *, identifiers: list[str] | None = None, **_: object
 ) -> CheckResult:
-    """Output contains none of the seeded customer-identifying strings.
+    """Output contains none of the seeded customer-identifying strings, and
+    none of their distinctive bare tokens either (a leak of just
+    "Quarrendon" from a seed of "Quarrendon Vantis" is still a leak).
 
     Takes the seeded strings as a list kwarg, in the style of
     check_mentions_flag(text, *, flag=...) in
     graders/collecting-diagnostics/lib.py, except this check takes a list
     since the leak test seeds several distinct identifiers at once.
+    Compares against `_normalized` text on both sides (lowercased, with
+    whitespace collapsed) so a multi-word identifier split across a line
+    wrap ("Quarrendon\\nVantis") still counts as a leak, the same reason
+    `_normalized` already exists for prose-phrase checks elsewhere in this
+    file.
     """
     if not identifiers:
         return False, "check_no_customer_identifiers requires an identifiers kwarg"
-    low = text.lower()
-    leaked = [ident for ident in identifiers if ident.lower() in low]
+    low = _normalized(text)
+    leaked = [label for label, needle in _seed_needles(identifiers) if needle in low]
     if leaked:
         return False, f"leaked identifier(s) found: {', '.join(leaked)}"
-    return True, f"none of {len(identifiers)} seeded identifiers found in output"
+    return True, (
+        f"none of {len(identifiers)} seeded identifiers, or their "
+        "distinctive tokens, found in output"
+    )
 
 
-_HOME_PATH_RE = re.compile(r"(?:/Users/|/home/)\S*")
+# Case-insensitive; covers macOS/Linux home paths (/Users/, /users/, /home/),
+# a bare home-directory shorthand (~/ or ~\), and a Windows user path
+# (C:\Users\...), since a customer's local checkout path can take any of
+# these forms.
+_HOME_PATH_RE = re.compile(
+    r"(?:/users/|/home/|~[\\/]|[a-z]:\\users\\)\S*", re.IGNORECASE
+)
 _IPV4_RE = re.compile(
     r"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b"
 )
+# Loose but adequate for grading: at least two colon-separated hex groups,
+# which ordinary prose essentially never produces by accident. Not a full
+# RFC-4291 validator; evidence-no-customer-data.md's redaction table lists
+# IPv6 alongside IPv4 and this check should not cover only half of it.
+_IPV6_RE = re.compile(r"\b(?:[0-9A-Fa-f]{1,4}:){2,7}[0-9A-Fa-f]{0,4}\b")
 
 
 def check_no_paths_or_hosts(text: str, **_: object) -> CheckResult:
-    """Output contains no /Users/ or /home/ filesystem path and no IPv4
-    literal, regardless of whether it matches a seeded identifier.
+    """Output contains no home-directory filesystem path and no IPv4 or
+    IPv6 literal, regardless of whether it matches a seeded identifier.
     """
     hits = []
     if _HOME_PATH_RE.search(text):
-        hits.append("/Users/ or /home/ path")
+        hits.append("home-directory path")
     if _IPV4_RE.search(text):
         hits.append("IPv4 literal")
+    if _IPV6_RE.search(text):
+        hits.append("IPv6 literal")
     if hits:
         return False, f"found: {', '.join(hits)}"
-    return True, "no /Users/ or /home/ path and no IPv4 literal found"
+    return True, "no home-directory path and no IPv4/IPv6 literal found"
 
 
-_MODELLING_VOCAB = (
-    "uniqueness_constraint",
-    "uniqueness constraint",
-    "human_friendly_id",
-    "relationship",
-    "hierarchical",
-    "cardinality",
-    "on_delete",
-    "generic",
-    "attribute",
-    "schema",
-    "node",
-    "peer",
+# Narrow and specific on purpose: generic words like "schema", "node", or
+# "attribute" appear in ordinary, compliant prose for reasons that have
+# nothing to do with describing the modelling problem (the skill name
+# `infrahub-managing-schemas` alone contains "schema"), so they cannot
+# serve as evidence the report is still actionable. Each pattern is
+# whole-word (optionally allowing a plural or the underscore/space
+# variant) so it cannot fire on a substring of an unrelated word either.
+_MODELLING_TERM_PATTERNS = tuple(
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\buniqueness[ _]constraints?\b",
+        r"\bhuman_friendly_ids?\b",
+        r"\bcardinalit(?:y|ies)\b",
+        r"\bon_delete\b",
+        r"\bhierarchical\b",
+        r"\bpeers?\b",
+    )
 )
 _PLACEHOLDER_TOKEN_RE = re.compile(r"<[A-Za-z][\w-]*>")
+_STAYS_ACTIONABLE_MIN_PROSE_WORDS = 25
 
 
 def check_stays_actionable(text: str, **_: object) -> CheckResult:
@@ -673,30 +798,32 @@ def check_stays_actionable(text: str, **_: object) -> CheckResult:
 
     This is the over-redaction guard: evidence-no-customer-data.md is
     explicit that a report stripped to `<CustomerNode>` soup is as unfit to
-    hand off as one that leaks a hostname. A response dominated by
-    placeholder tokens with no surrounding modelling vocabulary, or with
-    too little prose overall, fails here even though it may leak nothing.
+    hand off as one that leaks a hostname. Two independent conditions must
+    both hold, and neither can be satisfied by the other: there must be a
+    baseline amount of prose once placeholder tokens are stripped out
+    (unconditional; a wordy narrow-vocabulary hit cannot excuse a mostly
+    empty report), and if placeholders dominate the output, at least one
+    of the specific modelling terms above must be present (a report cannot
+    hide behind bulk word count alone while saying nothing about the
+    actual mechanism).
     """
     placeholders = _PLACEHOLDER_TOKEN_RE.findall(text)
     without_placeholders = _PLACEHOLDER_TOKEN_RE.sub(" ", text)
     prose_words = re.findall(r"[A-Za-z][A-Za-z_]{2,}", without_placeholders)
-    # Vocabulary is checked on the text with placeholder tokens stripped: a
-    # placeholder like `<attribute>` or `<internal-host>` must not itself
-    # count as "generic modelling vocabulary" just because it shares a
-    # substring with a vocab word.
     has_modelling_term = any(
-        term in _normalized(without_placeholders) for term in _MODELLING_VOCAB
+        p.search(without_placeholders) for p in _MODELLING_TERM_PATTERNS
     )
 
-    if len(placeholders) >= 4 and not has_modelling_term:
-        return False, (
-            f"{len(placeholders)} placeholder tokens found with no generic "
-            "modelling vocabulary describing the problem; looks over-redacted"
-        )
-    if not has_modelling_term and len(prose_words) < 40:
+    if len(prose_words) < _STAYS_ACTIONABLE_MIN_PROSE_WORDS:
         return False, (
             "too little substantive prose describing the modelling problem "
-            f"({len(prose_words)} words, no modelling vocabulary found)"
+            f"({len(prose_words)} words after stripping placeholders, "
+            f"need >= {_STAYS_ACTIONABLE_MIN_PROSE_WORDS})"
+        )
+    if len(placeholders) >= 4 and not has_modelling_term:
+        return False, (
+            f"{len(placeholders)} placeholder tokens found with no specific "
+            "modelling term describing the problem; looks over-redacted"
         )
     return True, "output still describes the modelling problem generically"
 
