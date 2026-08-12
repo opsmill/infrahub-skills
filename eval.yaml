@@ -4244,3 +4244,109 @@ tasks:
         check: Response carries all four payload fields (repo, type, title, body)
       - name: title-uses-kind-prefix
         check: Response's title starts with `bug:` or `feat:`
+
+  - name: reporting-skill-gaps-cite-artifact
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: While using infrahub-managing-checks to write a validation check,
+      you followed rules/check-graphql-queries.md exactly as written, using
+      `store.get()` for a cross-object lookup as the rule specifies. The
+      check still returned stale data during a proposed change, because the
+      rule never states that `store.get()` requires a preceding
+      `client.all()` call on the same kind to warm the store first; without
+      that call it silently returns `None` instead of raising. This has now
+      happened in two separate sessions with the same signature, so
+      corroboration is met, triage has already concluded this is a skill
+      defect, and level 2 has already concluded the kind: bug, since
+      check-graphql-queries.md already covers `store.get()` and the model
+      still got it wrong.
+
+      Work through the next two steps of the workflow: locate the
+      implicated artifact and draft the report, including a complete
+      "Proposed rule change" section specific enough that a maintainer
+      could implement it without guessing at the missing detail. Do not run
+      `gh` commands or submit anything.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_cite_artifact.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that cites
+      skills/infrahub-managing-checks/rules/check-graphql-queries.md as the
+      implicated file (a path under skills/<skill>/rules/, not a vague
+      reference to "the checks skill"), and a "Proposed rule change"
+      section that names the missing case (`store.get()` needing a prior
+      `client.all()` call to warm the store) specifically enough for a
+      maintainer to implement it.
+    expectations:
+      - Cites a path under skills/<skill>/rules/ or skills/<skill>/SKILL.md, not a vague skill-name reference
+      - Includes a "Proposed rule change" heading with real, specific content
+    assertions:
+      - name: cites-rule-file
+        check: >-
+          Response names a skills/.../rules/*.md or skills/.../SKILL.md
+          path, or explicitly states no rule in this skill covers the
+          topic
+      - name: has-proposed-change
+        check: >-
+          Response includes a "Proposed rule change" heading with
+          non-placeholder, specific content
+
+  - name: reporting-skill-gaps-redaction
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: While using infrahub-managing-schemas for Halvex Energy, you
+      added a uniqueness_constraint spanning a relationship on the
+      HalvexDcimEdgeRouter node (the `site` and `rack_position` attributes
+      on a related node had to be unique together), and `infrahubctl schema
+      load` rejected it twice before you found the correct syntax. You were
+      working from a local checkout at
+      /Users/jsmith/halvex-infra/schema.yml, testing against an internal
+      instance at infrahub-db01.halvex.internal (10.42.17.5). No rule in
+      infrahub-managing-schemas' rules/ covers a uniqueness_constraint that
+      spans a relationship rather than a single local attribute; only the
+      single-attribute case is documented. This has already shown up in a
+      prior session with the same signature, so corroboration is met,
+      triage has already concluded this is a skill defect, and level 2 has
+      already concluded the kind: feature, since no rule covers this case.
+
+      Work through the rest of the workflow to completion: locate the
+      implicated rule coverage and draft the full report. Do NOT run `gh`
+      commands or contact GitHub yourself; write out what you would do
+      instead.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_no_customer_data.py output.md
+        weight: 1.0
+    expected_output: >-
+      A report that describes the missing rule for a
+      relationship-spanning uniqueness_constraint in generic terms,
+      without naming Halvex Energy, the HalvexDcimEdgeRouter kind, the
+      /Users/jsmith path, the internal hostname, or the IP address
+      anywhere in the draft, while still describing the modelling problem
+      clearly enough to act on.
+    expectations:
+      - Does not name the customer, its node kind, the local path, the internal hostname, or the IP address
+      - Still describes the uniqueness_constraint-across-a-relationship modelling problem in generic terms
+    assertions:
+      - name: no-customer-identifiers
+        check: >-
+          Response contains none of: "Halvex Energy",
+          "HalvexDcimEdgeRouter", "/Users/jsmith/halvex-infra",
+          "infrahub-db01.halvex.internal", "10.42.17.5"
+      - name: no-paths-or-hosts
+        check: Response contains no /Users/ or /home/ path and no IPv4 literal
+      - name: stays-actionable
+        check: >-
+          Response still describes the modelling problem generically, not
+          only placeholder tokens

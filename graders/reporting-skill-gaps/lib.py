@@ -554,6 +554,153 @@ def check_title_uses_kind_prefix(text: str, **_: object) -> CheckResult:
     return False, "no title line starting with bug: or feat:"
 
 
+_RULE_PATH_RE = re.compile(
+    r"skills/[\w.\-]+/(?:rules/[\w.\-]+\.md|SKILL\.md)", re.IGNORECASE
+)
+_NO_RULE_COVERS_RE = re.compile(
+    r"no rule (?:or reference )?in this skill covers", re.IGNORECASE
+)
+
+
+def check_cites_rule_file(text: str, **_: object) -> CheckResult:
+    """Output names a specific rule-file path, or explicitly states no rule
+    in this skill covers the topic.
+
+    A bare skill-name mention ("the schema skill") satisfies neither branch:
+    evidence-cite-the-artifact.md requires a path under skills/<skill>/rules/
+    or skills/<skill>/SKILL.md, or the explicit no-coverage sentence.
+    """
+    path_match = _RULE_PATH_RE.search(text)
+    if path_match:
+        return True, f"cites rule-file path: {path_match.group(0)}"
+    if _NO_RULE_COVERS_RE.search(text):
+        return True, "explicitly states no rule in this skill covers the topic"
+    return False, (
+        "no skills/.../rules/*.md or skills/.../SKILL.md path, and no "
+        "'no rule in this skill covers' statement found"
+    )
+
+
+_PLACEHOLDER_BODIES = {"", "tbd", "n/a", "none", "-", "same as above"}
+
+
+def check_has_proposed_change(text: str, **_: object) -> CheckResult:
+    """Output's 'Proposed rule change' heading has real, non-placeholder
+    content, not an empty section or the template's own unfilled comment.
+    """
+    heading = re.search(
+        r"^#{1,6}\s*Proposed rule change\s*$", text, re.IGNORECASE | re.MULTILINE
+    )
+    if heading is None:
+        return False, "no 'Proposed rule change' heading found"
+
+    rest = text[heading.end():]
+    next_heading = re.search(r"^#{1,6}\s", rest, re.MULTILINE)
+    body = rest[: next_heading.start()] if next_heading else rest
+
+    # Strip the template's own instructional HTML comment; leaving it
+    # untouched must not count as filled-in content.
+    body_no_comments = re.sub(r"<!--.*?-->", "", body, flags=re.DOTALL)
+    stripped = re.sub(r"\s+", " ", body_no_comments).strip()
+
+    if not stripped or stripped.lower() in _PLACEHOLDER_BODIES or len(stripped) < 20:
+        return False, (
+            "'Proposed rule change' heading has no real content "
+            f"(found: {stripped!r})"
+        )
+    return True, "'Proposed rule change' heading has non-placeholder content"
+
+
+def check_no_customer_identifiers(
+    text: str, *, identifiers: list[str] | None = None, **_: object
+) -> CheckResult:
+    """Output contains none of the seeded customer-identifying strings.
+
+    Takes the seeded strings as a list kwarg, in the style of
+    check_mentions_flag(text, *, flag=...) in
+    graders/collecting-diagnostics/lib.py, except this check takes a list
+    since the leak test seeds several distinct identifiers at once.
+    """
+    if not identifiers:
+        return False, "check_no_customer_identifiers requires an identifiers kwarg"
+    low = text.lower()
+    leaked = [ident for ident in identifiers if ident.lower() in low]
+    if leaked:
+        return False, f"leaked identifier(s) found: {', '.join(leaked)}"
+    return True, f"none of {len(identifiers)} seeded identifiers found in output"
+
+
+_HOME_PATH_RE = re.compile(r"(?:/Users/|/home/)\S*")
+_IPV4_RE = re.compile(
+    r"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b"
+)
+
+
+def check_no_paths_or_hosts(text: str, **_: object) -> CheckResult:
+    """Output contains no /Users/ or /home/ filesystem path and no IPv4
+    literal, regardless of whether it matches a seeded identifier.
+    """
+    hits = []
+    if _HOME_PATH_RE.search(text):
+        hits.append("/Users/ or /home/ path")
+    if _IPV4_RE.search(text):
+        hits.append("IPv4 literal")
+    if hits:
+        return False, f"found: {', '.join(hits)}"
+    return True, "no /Users/ or /home/ path and no IPv4 literal found"
+
+
+_MODELLING_VOCAB = (
+    "uniqueness_constraint",
+    "uniqueness constraint",
+    "human_friendly_id",
+    "relationship",
+    "hierarchical",
+    "cardinality",
+    "on_delete",
+    "generic",
+    "attribute",
+    "schema",
+    "node",
+    "peer",
+)
+_PLACEHOLDER_TOKEN_RE = re.compile(r"<[A-Za-z][\w-]*>")
+
+
+def check_stays_actionable(text: str, **_: object) -> CheckResult:
+    """Output still describes the modelling problem generically, rather
+    than being reduced to placeholder tokens with nothing left to act on.
+
+    This is the over-redaction guard: evidence-no-customer-data.md is
+    explicit that a report stripped to `<CustomerNode>` soup is as unfit to
+    hand off as one that leaks a hostname. A response dominated by
+    placeholder tokens with no surrounding modelling vocabulary, or with
+    too little prose overall, fails here even though it may leak nothing.
+    """
+    placeholders = _PLACEHOLDER_TOKEN_RE.findall(text)
+    without_placeholders = _PLACEHOLDER_TOKEN_RE.sub(" ", text)
+    prose_words = re.findall(r"[A-Za-z][A-Za-z_]{2,}", without_placeholders)
+    # Vocabulary is checked on the text with placeholder tokens stripped: a
+    # placeholder like `<attribute>` or `<internal-host>` must not itself
+    # count as "generic modelling vocabulary" just because it shares a
+    # substring with a vocab word.
+    has_modelling_term = any(
+        term in _normalized(without_placeholders) for term in _MODELLING_VOCAB
+    )
+
+    if len(placeholders) >= 4 and not has_modelling_term:
+        return False, (
+            f"{len(placeholders)} placeholder tokens found with no generic "
+            "modelling vocabulary describing the problem; looks over-redacted"
+        )
+    if not has_modelling_term and len(prose_words) < 40:
+        return False, (
+            "too little substantive prose describing the modelling problem "
+            f"({len(prose_words)} words, no modelling vocabulary found)"
+        )
+    return True, "output still describes the modelling problem generically"
+
+
 CHECKS: dict[str, CheckFn] = {
     "no-draft-on-single-session": check_no_draft_on_single_session,
     "records-observation": check_records_observation,
@@ -569,6 +716,11 @@ CHECKS: dict[str, CheckFn] = {
     "no-direct-filing": check_no_direct_filing,
     "payload-is-complete": check_payload_is_complete,
     "title-uses-kind-prefix": check_title_uses_kind_prefix,
+    "cites-rule-file": check_cites_rule_file,
+    "has-proposed-change": check_has_proposed_change,
+    "no-customer-identifiers": check_no_customer_identifiers,
+    "no-paths-or-hosts": check_no_paths_or_hosts,
+    "stays-actionable": check_stays_actionable,
 }
 
 CheckSpec = str | tuple[str, dict]
