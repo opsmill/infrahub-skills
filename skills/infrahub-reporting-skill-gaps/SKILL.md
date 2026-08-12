@@ -92,9 +92,14 @@ a bug (a rule or reference covers the topic and the
 model still got it wrong), a feature (no rule covers the
 topic, and a docs escape either found the answer or
 never happened), or a docs gap (no rule covers the
-topic, and a docs escape happened but still failed to
-answer it). This decides the title prefix used when
-drafting in step 6. See
+topic, a docs escape happened but still failed to answer
+it, and the underlying behavior is settled). That last
+condition is a gate, not a detail: if the workflow is
+still being defined or is deliberately undocumented,
+there is nothing to document yet, so do not draft at
+all, record an observation, and stop. This decides the
+title prefix and target repo used for drafting, in step
+6 below. See
 [rules/workflow-bug-vs-feature.md](rules/workflow-bug-vs-feature.md).
 
 ### 4. Hand off if product
@@ -117,14 +122,16 @@ in coverage, is not ready. See
 ### 6. Draft and redact
 
 Fill [templates/skill-friction.md](templates/skill-friction.md),
-using the `bug:`/`feat:`/`docs:` title prefix decided in
-step 3b. Redact anything that identifies the user's
-infrastructure or organization per
+using the `bug:`/`feat:`/`bug(docs):` title prefix
+decided in step 3b. Redact anything that identifies the
+user's infrastructure or organization per
 [rules/evidence-no-customer-data.md](rules/evidence-no-customer-data.md).
 This is security-critical and applies before the draft
-ever leaves this skill. This produces three of the four
-handoff fields (`type`, `title`, `body`); `repo` is
-always `opsmill/infrahub-skills`.
+ever leaves this skill. This produces the four handoff
+fields (`repo`, `type`, `title`, `body`); `repo` is
+`opsmill/infrahub-skills` for bug or feature, or
+`opsmill/infrahub` for docs gap, since Infrahub's own
+documentation lives there and not in the skills repo.
 
 ### 7. Hand off
 

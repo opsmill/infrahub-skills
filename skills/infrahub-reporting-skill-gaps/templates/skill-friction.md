@@ -10,12 +10,23 @@ Title prefix carries the level-2 classification: bug:
 when a rule or reference already covers the topic and
 the model still got it wrong, feat: when no rule covers
 it and a docs escape either found the answer or never
-happened at all, docs: when no rule covers it and a docs
-escape happened but still failed to answer the question.
-See rules/workflow-bug-vs-feature.md. This title, and
-the body below, are handed to infrahub-reporting-issues
+happened at all, bug(docs): when no rule covers it, a
+docs escape happened but still failed to answer the
+question, AND the underlying behavior is settled (the
+settled-behavior gate; if it is not, do not draft at all,
+see rules/workflow-bug-vs-feature.md). See
+rules/workflow-bug-vs-feature.md. This title, and the
+body below, are handed to infrahub-reporting-issues
 as-is; see rules/workflow-handoff-to-reporting.md. Do
 not file this directly.
+
+bug: and feat: both target opsmill/infrahub-skills.
+bug(docs): targets opsmill/infrahub instead, since
+Infrahub's own documentation lives there, and its title
+drops the [skill] segment: `bug(docs): [what the
+documentation is missing]`, with no skill name, since
+that context means nothing to opsmill/infrahub's
+maintainers.
 
 For a feature, "Docs the model had to leave the skill
 for" is the most useful section: the fetched page paths
@@ -30,10 +41,11 @@ since that is the specification for the documentation
 that needs writing before any rule can cite it.
 -->
 
-# [bug|feat|docs]: [skill]: [what the guidance is missing]
+# [bug|feat]: [skill]: [what the guidance is missing]
 
 **Skill**: [skill directory, e.g. infrahub-managing-schemas]
 **Type**: [bug | feature | docs gap]
+**Repo**: [opsmill/infrahub-skills for bug/feature | opsmill/infrahub for docs gap]
 **Recurrence**: [number of corroborating sessions, or the explicit user confirmation that stood in for a second session]
 
 ## What was being attempted

@@ -47,12 +47,17 @@ a bug, because the fallback rule in
 only authorizes it once the skill's own files were
 checked and found silent. What matters beyond that is
 **what happened after the fetch**: an escape that found
-the answer points at a feature, an escape that still
-failed to answer the question points at a docs gap, and
-no escape at all defaults to feature with the docs
-status left unverified. See
+the answer points at a feature, filed against
+`opsmill/infrahub-skills` like a bug; an escape that
+still failed to answer the question points at a docs
+gap, filed against `opsmill/infrahub` instead, since
+that is where Infrahub's own documentation lives, and
+only once the underlying behavior is settled; and no
+escape at all defaults to feature with the docs status
+left unverified. See
 [rules/workflow-bug-vs-feature.md](rules/workflow-bug-vs-feature.md)
-for the full three-way reading.
+for the full three-way reading and the settled-behavior
+gate.
 
 Fetches of `marketplace.infrahub.app` and
 `infrahub.opsmill.io` are **not** friction. Several

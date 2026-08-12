@@ -3992,8 +3992,8 @@ tasks:
       - name: no-draft-on-single-session
         check: >-
           Report does not draft an issue title (`bug:`,
-          `feat:`, or `docs:`) or a proposed rule change
-          section from a single session
+          `feat:`, or `bug(docs):`) or a proposed rule
+          change section from a single session
       - name: records-observation
         check: Report mentions recording an observation in notes.jsonl
       - name: states-gate-reason
@@ -4070,7 +4070,7 @@ tasks:
       Save your answer to: output.md
     graders:
       - type: deterministic
-        run: python graders/reporting-skill-gaps/check_bug_vs_feature.py output.md
+        run: python graders/reporting-skill-gaps/check_bug_vs_feature.py output.md --expected-kind=feature
         weight: 1.0
     expected_output: >-
       A response that classifies the kind as a gap the skill's own material
@@ -4129,7 +4129,7 @@ tasks:
       - States the classification explicitly (skill defect, product defect, or neither)
       - Ties the classification to whether a rule change would have prevented the failure
       - Hands off to infrahub-reporting-issues
-      - Drafts no bug:/feat:/docs: issue and names no opsmill/infrahub-skills filing target
+      - Drafts no bug:/feat:/bug(docs): issue and names no opsmill/infrahub-skills filing target
     assertions:
       - name: states-classification
         check: Response names one of skill defect, product defect, or neither
@@ -4141,7 +4141,7 @@ tasks:
         check: Response references infrahub-reporting-issues
       - name: no-skills-issue-for-product-bug
         check: >-
-          Response contains no bug:/feat:/docs: title line and no
+          Response contains no bug:/feat:/bug(docs): title line and no
           opsmill/infrahub-skills filing target
 
   - name: reporting-skill-gaps-existing-rule-bug
@@ -4169,7 +4169,7 @@ tasks:
       Save your answer to: output.md
     graders:
       - type: deterministic
-        run: python graders/reporting-skill-gaps/check_bug_vs_feature.py output.md
+        run: python graders/reporting-skill-gaps/check_bug_vs_feature.py output.md --expected-kind=bug
         weight: 1.0
     expected_output: >-
       A response that classifies the kind as the rule already covering the
@@ -4200,8 +4200,9 @@ tasks:
 
       Task: While using infrahub-managing-generators, a generator needed to
       read an attribute two relationship hops away from the object it was
-      generating for, through an intermediate peer. You read
-      patterns-common.md, python-generate.md, and
+      generating for, through an intermediate peer, a shape Infrahub's
+      GraphQL API has supported and left unchanged for several releases.
+      You read patterns-common.md, python-generate.md, and
       python-relationship-references.md in the generators skill, and
       infrahub-common's graphql-queries.md reference, in full, before
       writing any code. None of them say anything about traversing more
@@ -4217,21 +4218,22 @@ tasks:
       This friction has already been corroborated (a second session hit the
       same traversal problem last week) and triage has already concluded
       this is a skill defect. Work through the next step: decide the kind
-      and state the title you would use for the report, with reasoning,
-      including which page path you reached and what it did or did not
-      answer. Do not run `gh` commands or submit anything.
+      and state the title and target repo you would use for the report,
+      with reasoning, including which page path you reached and what it
+      did or did not answer. Do not run `gh` commands or submit anything.
 
       Save your answer to: output.md
     graders:
       - type: deterministic
-        run: python graders/reporting-skill-gaps/check_bug_vs_feature.py output.md
+        run: python graders/reporting-skill-gaps/check_bug_vs_feature.py output.md --expected-kind=docs-gap
         weight: 1.0
     expected_output: >-
       A response that recognizes no rule anywhere covers multi-hop
       relationship traversal, that the docs.infrahub.app/llms.txt escape
       happened only after the skill's own material and infrahub-common were
       checked, and that the page it pointed at still did not address the
-      multi-hop case, gives the matching docs: title, and records the
+      multi-hop case, gives the matching bug(docs): title targeting
+      opsmill/infrahub rather than the skills repo, and records the
       fetched page path and what it failed to answer.
     expectations:
       - Names the kind explicitly and uses a matching title prefix
@@ -4248,6 +4250,53 @@ tasks:
       - name: cites-escape-outcome
         check: >-
           Response states whether the docs escape resolved the problem or not
+
+  - name: reporting-skill-gaps-docs-gap-unsettled
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: While using infrahub-managing-transforms, a transform needed
+      to target a preview attribute-computation mode that the CLI's own
+      `--help` output labels "shape not finalized, subject to change
+      release to release." You read patterns-common.md and every other
+      rule in the transforms skill in full, and none of them mention this
+      mode. You fetched https://docs.infrahub.app/llms.txt, which had no
+      page addressing it at all, so you worked out an invocation that
+      happened to run by reading the CLI's own `--help` text and the
+      changelog entry that introduced the flag.
+
+      This friction has already been corroborated (a second session hit
+      the same gap) and triage has already concluded this is a skill
+      defect. Work through the next step: decide the kind and what to do
+      next. Do not run `gh` commands or submit anything.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_docs_gap_gate.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that recognizes no rule covers this, that the docs
+      escape turned up nothing, and that the CLI's own text marks the
+      mode's shape as still changing rather than settled, so the
+      settled-behavior gate is not satisfied: it does not draft a
+      bug(docs): title or a Proposed rule change section, records an
+      `observed` entry in notes.jsonl instead, and ties that decision to
+      the gate.
+    expectations:
+      - Does not draft a bug(docs) issue title or a Proposed rule change section
+      - Ties the decision to the settled-behavior gate (behavior still changing, not settled)
+      - Mentions recording the observation in notes.jsonl
+    assertions:
+      - name: no-docs-gap-when-unsettled
+        check: >-
+          Response does not draft a bug(docs): title or Proposed rule
+          change section, and ties the decision to the settled-behavior
+          gate
+      - name: records-observation
+        check: Response mentions recording an observation in notes.jsonl
 
   - name: reporting-skill-gaps-handoff
     trials: 3
@@ -4300,7 +4349,7 @@ tasks:
       - name: payload-is-complete
         check: Response carries all four payload fields (repo, type, title, body)
       - name: title-uses-kind-prefix
-        check: Response's title starts with `bug:`, `feat:`, or `docs:`
+        check: Response's title starts with `bug:`, `feat:`, or `bug(docs):`
 
   - name: reporting-skill-gaps-cite-artifact
     trials: 3

@@ -40,6 +40,16 @@ everything else integrates with.
 **Issue templates**: `bug_report.yml`,
 `feature_request.yml`, `task.yml`
 
+**Title convention**: ordinarily the shared
+`<area>: <imperative summary>` convention. A payload
+arriving via the skill-gap intake from
+[infrahub-reporting-skill-gaps](../infrahub-reporting-skill-gaps/SKILL.md)
+is the one exception: its title is used as-is,
+`bug(docs): <summary>`, no `<area>` segment, since that
+payload already decided its own title format before
+handing off. See this skill's own "Skill-gap intake"
+section in [SKILL.md](SKILL.md).
+
 **URL**: <https://github.com/opsmill/infrahub>
 
 ---

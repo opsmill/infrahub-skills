@@ -41,11 +41,11 @@ entirely out of things visible in the transcript.
 **Does the skill already claim to do this, and if not,
 did an escape to the docs resolve it?**
 
-| Evidence | Kind | Title prefix |
-| -------- | ---- | ------------- |
-| A rule or reference covers the topic, and the model still got it wrong | Bug | `bug:` |
-| No rule covers it. The model escaped to `docs.infrahub.app`, found the answer, and succeeded | Feature | `feat:` |
-| No rule covers it. The model escaped to `docs.infrahub.app` and still failed, or the docs page it reached did not address the problem | Docs gap | `docs:` |
+| Evidence | Kind | Repo | Title prefix |
+| -------- | ---- | ---- | ------------- |
+| A rule or reference covers the topic, and the model still got it wrong | Bug | `opsmill/infrahub-skills` | `bug:` |
+| No rule covers it. The model escaped to `docs.infrahub.app`, found the answer, and succeeded | Feature | `opsmill/infrahub-skills` | `feat:` |
+| No rule covers it. The model escaped to `docs.infrahub.app` and still failed, or the docs page it reached did not address the problem, and the behavior is settled (see the gate below) | Docs gap | `opsmill/infrahub` | `bug(docs):` |
 
 Feature and docs gap start from the same first sentence
 ("no rule covers this"). What tells them apart is the
@@ -59,6 +59,17 @@ in the report either way: for a feature it is the
 citation a new rule needs, for a docs gap it is the
 specification for the documentation that has to be
 written first.
+
+Bug and feature both stay inside `opsmill/infrahub-skills`:
+the file that needs writing or fixing lives there. A docs
+gap leaves it. Infrahub's own documentation lives in
+`opsmill/infrahub`, not the skills repo, so a docs-gap
+report has to go where the people who maintain that
+documentation will actually see it. Filing a docs gap
+against the skills repo sends it to maintainers with no
+power to fix it, the same mistake
+[workflow-handoff-product-bugs.md](workflow-handoff-product-bugs.md)
+already guards against for product defects.
 
 This is the same determination
 [evidence-cite-the-artifact.md](evidence-cite-the-artifact.md)
@@ -87,6 +98,33 @@ model that gets enum defaults wrong against that rule
 is looking at a feature or docs gap, not a bug, no
 matter how closely the rule's topic sits next to the
 failure.
+
+### The settled-behavior gate (docs gap only)
+
+A `bug(docs):` issue asks an Infrahub maintainer to write
+down an answer. That is only a fair ask when an answer
+already exists to write down: the topic is something
+Infrahub genuinely supports, and its behavior is settled.
+File `bug(docs):` only under those conditions.
+
+When the workflow itself is still being defined, or is
+deliberately left undocumented (an experimental flag, an
+internal-only mechanism, a shape still changing release
+to release), there is nothing to document yet. Filing
+anyway sends a maintainer a request they cannot fulfill,
+the same failure mode as filing from a single
+uncorroborated session: a report that might not even
+describe a stable target. Record an `observed` entry in
+the notes file and stop, exactly as the corroboration
+gate does when it does not corroborate.
+
+This gate applies to docs gaps only. A bug or a feature
+both describe the skill's own guidance, which the skill
+can improve regardless of whether Infrahub's own behavior
+has finished changing. Only a docs gap asks a second
+party, an Infrahub maintainer, to produce something new,
+so only a docs gap needs to confirm there is something
+settled to produce before asking.
 
 ### When no escape happened at all
 
@@ -165,16 +203,19 @@ error against the GraphQL schema. Filing as a feature
 since no rule anywhere covers this.
 ```
 
-Filed as a feature when the escape happened and still
-failed to answer the question. A maintainer picks this
-up expecting to write a rule that cites
-`/guides/graphql/relationships`, and finds that page
-says nothing about the problem. The rule they need to
-write cannot exist yet, because the documentation it
-would cite does not exist yet either. This is a docs
-gap: `docs: infrahub-managing-generators: no
-documentation on multi-hop relationship traversal in a
-GraphQL query`.
+Filed as a feature against `opsmill/infrahub-skills` when
+the escape happened and still failed to answer the
+question. A maintainer there picks this up expecting to
+write a rule that cites `/guides/graphql/relationships`,
+and finds that page says nothing about the problem. The
+rule they need to write cannot exist yet, because the
+documentation it would cite does not exist yet either,
+and the skills repo has no power to write Infrahub's own
+docs besides. Assuming multi-hop traversal is something
+Infrahub genuinely supports today (the settled-behavior
+gate above), this is a docs gap, filed against
+`opsmill/infrahub` instead: `bug(docs): no documentation
+on multi-hop relationship traversal in a GraphQL query`.
 
 ### Correct
 
@@ -201,12 +242,16 @@ finishing that read, which pointed at
 page's Markdown twin too, but it did not address
 multi-hop traversal either; the page only covers
 single-hop peer reads. I worked it out by reading the
-GraphQL schema directly through trial and error. Since
-no rule covers this and the docs page did not address
-the case, this is a docs gap:
+GraphQL schema directly through trial and error.
+Multi-hop traversal is something Infrahub genuinely
+supports and its behavior is settled, just undocumented,
+so the settled-behavior gate is satisfied. Since no rule
+covers this and the docs page did not address the case,
+this is a docs gap, filed against opsmill/infrahub
+rather than the skills repo:
 
-docs: infrahub-managing-generators: no documentation
-on multi-hop relationship traversal in a GraphQL query
+bug(docs): no documentation on multi-hop relationship
+traversal in a GraphQL query
 ```
 
 Reference:

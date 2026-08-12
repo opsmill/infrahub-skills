@@ -48,8 +48,8 @@ post-escape-outcome test that tells them apart, rather than duplicating
 it here.
 
 If a draft cites a specific rule file but titles itself `feat:` or
-`docs:`, or states no rule covers the topic but titles itself `bug:`,
-the two rules disagree and the draft is not ready. Resolve the
+`bug(docs):`, or states no rule covers the topic but titles itself
+`bug:`, the two rules disagree and the draft is not ready. Resolve the
 disagreement before handing off, and let the citation win: it is grounded
 in a file that either exists or does not, not in how the friction felt.
 

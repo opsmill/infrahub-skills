@@ -27,17 +27,27 @@ def _normalized(text: str) -> str:
     return re.sub(r"\s+", " ", text.lower())
 
 
-# Level-2 title tag. It has moved three times: `[skill-friction]` first,
+# Level-2 title tag. It has moved four times: `[skill-friction]` first,
 # then `[skill-bug]`/`[skill-feature]` once level-2 kind splitting shipped,
 # then a bare `bug:`/`feat:` line prefix once filing moved to
-# infrahub-reporting-issues, and now a third kind, `docs:`, sits between
-# them once "no rule covers it" split into feature (a docs escape resolved
-# the problem) and docs gap (the escape still failed). Anchored to the
-# start of a markdown line (optionally after heading hashes or a bold-open
-# marker) so ordinary prose like "there's a bug: the counter increments
-# twice" does not false-match; a real title occupies its own line.
+# infrahub-reporting-issues, then a bare `docs:` sat between them once
+# "no rule covers it" split into feature (a docs escape resolved the
+# problem) and docs gap (the escape still failed), and now the docs-gap
+# tag is `bug(docs):` instead of `docs:`, because a docs gap routes to
+# opsmill/infrahub (Infrahub's docs live there, not in the skills repo)
+# and that repo's own issue convention already uses a bare `Docs:` prefix
+# for something else entirely (an area label on an ordinary bug/feature
+# title, per infrahub-reporting-issues' shared convention); `bug(docs):`
+# avoids colliding with that unrelated meaning. `bug\(docs\)` is listed
+# before the bare `bug` alternative so the parenthesized form is tried
+# first, though regex backtracking would find it either way. Anchored to
+# the start of a markdown line (optionally after heading hashes or a
+# bold-open marker) so ordinary prose like "there's a bug: the counter
+# increments twice" does not false-match; a real title occupies its own
+# line.
 _TITLE_TAG_RE = re.compile(
-    r"^\s*(?:#{1,6}\s*)?(?:\*\*)?(bug|feat|docs):\s*\S", re.IGNORECASE | re.MULTILINE
+    r"^\s*(?:#{1,6}\s*)?(?:\*\*)?(bug\(docs\)|bug|feat):\s*\S",
+    re.IGNORECASE | re.MULTILINE,
 )
 
 
@@ -54,7 +64,7 @@ def check_no_draft_on_single_session(text: str, **_: object) -> CheckResult:
     if has_issue_title or has_proposed_rule_change:
         hits = []
         if has_issue_title:
-            hits.append("bug:/feat:/docs: title line")
+            hits.append("bug:/feat:/bug(docs): title line")
         if has_proposed_rule_change:
             hits.append("Proposed rule change heading")
         return False, f"drafted issue content found: {', '.join(hits)}"
@@ -199,16 +209,22 @@ def _term_is_negated(text: str, term: str) -> bool:
 # with stating the kind, so a bare-word match would false-positive on
 # almost every response that also discusses a feature or docs-gap escape.
 # The negation-search term for "docs gap" uses `\s+` between the two words
-# so it still matches if a line wrap inserts a newline between them.
+# so it still matches if a line wrap inserts a newline between them. The
+# docs-gap tag value is `bug(docs)`, not `docs`, matching the routing fix:
+# a docs gap files against opsmill/infrahub under a title that reads
+# `bug(docs): <summary>`.
 _KIND_SPECS: tuple[tuple[str, str, str, str], ...] = (
     ("bug", "bug", r"\bbug\b", "bug"),
     ("feature", "feat", r"\bfeature\b", "feature"),
-    ("docs gap", "docs", r"\bdocs\s+gap\b", r"docs\s+gap"),
+    ("docs gap", "bug(docs)", r"\bdocs\s+gap\b", r"docs\s+gap"),
 )
 _KIND_TAG_BY_NAME = {name: tag for name, tag, _, _ in _KIND_SPECS}
+_VALID_EXPECTED_KINDS = frozenset(name for name, _, _, _ in _KIND_SPECS)
 
 
-def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
+def check_states_bug_or_feature(
+    text: str, *, expected_kind: str | None = None, **_: object
+) -> CheckResult:
     """Output names the level-2 kind explicitly (bug, feature, or docs gap)
     and uses the matching title prefix. `\\bbug\\b` does not match inside
     "debug" (the boundary before "b" fails when preceded by "de").
@@ -231,16 +247,31 @@ def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
     real-newline-preserving lowercase, not `_normalized`, so the
     line-anchored strip actually lines up) so a `bug:` title's own
     substring "bug" is never counted as a prose mention; a `feat:` tag
-    never contains the word "feature" and a `docs:` tag never contains
-    "docs gap", but the substitution strips all three prefixes for
-    symmetry.
+    never contains the word "feature" and a `bug(docs):` tag never
+    contains "docs gap", but the substitution strips all three prefixes
+    for symmetry.
+
+    `expected_kind`, when given (one of "bug", "feature", "docs gap"), is
+    the kind this scenario's own evidence actually supports, independent
+    of whatever the drafted output claims. Without it, this check only
+    verifies *internal* consistency: that the title tag agrees with the
+    prose conclusion. That is not the same as being *right*: a response
+    that misclassifies a scenario but stays internally consistent (tags
+    itself `feat:` and says "feature" throughout, when the evidence is a
+    docs gap) passed this check with a perfect score before
+    `expected_kind` existed. Each level-2 eval task now passes its own
+    scenario's correct kind here, so an internally-consistent but wrong
+    answer is caught instead of scoring full marks.
     """
     low = text.lower()
     tag_match = _TITLE_TAG_RE.search(text)
     tag_value = tag_match.group(1).lower() if tag_match else None
 
     prose = re.sub(
-        r"^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:bug|feat|docs):\s*", " ", low, flags=re.MULTILINE
+        r"^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:bug\(docs\)|bug|feat):\s*",
+        " ",
+        low,
+        flags=re.MULTILINE,
     )
 
     named = [name for name, _, pattern, _ in _KIND_SPECS if re.search(pattern, prose)]
@@ -248,7 +279,7 @@ def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
     if not named:
         return False, "no explicit bug/feature/docs gap classification named"
     if tag_value not in _KIND_TAG_BY_NAME.values():
-        return False, "kind named but no bug:/feat:/docs: title prefix found"
+        return False, "kind named but no bug:/feat:/bug(docs): title prefix found"
 
     if len(named) == 1:
         stated = named[0]
@@ -267,6 +298,13 @@ def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
     if tag_value != expected_tag:
         return False, (
             f"stated kind is {stated} but title prefix uses {tag_value}:"
+        )
+
+    if expected_kind is not None and stated != expected_kind:
+        return False, (
+            f"stated kind is {stated} (title prefix and prose agree with "
+            f"each other), but this scenario's evidence supports "
+            f"{expected_kind}"
         )
     return True, f"names {stated} and uses matching {expected_tag}: title prefix"
 
@@ -369,7 +407,7 @@ def check_justifies_kind_by_coverage(text: str, **_: object) -> CheckResult:
     answer ("this took eleven round trips so it is a bug") by reasoning
     about how bad the friction felt rather than about coverage.
 
-    For a `docs:` classification, coverage alone ("no rule covers this")
+    For a `bug(docs):` classification, coverage alone ("no rule covers this")
     is necessary but not sufficient: a feature draft says exactly the same
     thing about coverage, and the only sentence that tells the two apart
     is whether the docs escape resolved the problem or not. So a docs-gap
@@ -393,7 +431,7 @@ def check_justifies_kind_by_coverage(text: str, **_: object) -> CheckResult:
         return False, "justifies kind by severity/round-trips rather than rule coverage"
 
     tag_match = _TITLE_TAG_RE.search(text)
-    is_docs = bool(tag_match and tag_match.group(1).lower() == "docs")
+    is_docs = bool(tag_match and tag_match.group(1).lower() == "bug(docs)")
     if is_docs:
         has_failed_outcome = any(p in low for p in _ESCAPE_FAILED_PATTERNS)
         if has_coverage and has_failed_outcome:
@@ -531,6 +569,86 @@ def check_cites_escape_outcome(text: str, **_: object) -> CheckResult:
     )
 
 
+# The settled-behavior gate: a bug(docs): issue asks an Infrahub
+# maintainer to write down an answer, so it is only actionable when an
+# answer already exists to write down. When the topic itself is still
+# being designed, or is deliberately left undocumented, there is nothing
+# to document yet, and the correct move mirrors the corroboration gate:
+# record an observation and stop, rather than file a request nobody can
+# fulfill.
+_UNSETTLED_GATE_REASON_PATTERNS = (
+    "nothing to document yet",
+    "nothing yet to document",
+    "still being defined",
+    "still being designed",
+    "still under active design",
+    "still under design",
+    "still evolving",
+    "still in flux",
+    "still changing",
+    "not finalized",
+    "not yet finalized",
+    "shape not finalized",
+    "subject to change",
+    "deliberately undocumented",
+    "intentionally undocumented",
+    "not yet settled",
+    "behavior is not settled",
+    "behaviour is not settled",
+    "no settled behavior to document",
+    "no settled behaviour to document",
+    "not settled enough to document",
+    "nothing settled to document",
+    "not stable enough to document",
+    "settled-behavior gate",
+    "settled-behaviour gate",
+)
+
+
+def check_no_docs_gap_when_unsettled(text: str, **_: object) -> CheckResult:
+    """Output does not draft a `bug(docs):` issue (or its Proposed rule
+    change section) when the underlying behavior is still being designed
+    or is deliberately undocumented by design.
+
+    Mirrors `check_no_draft_on_single_session`'s shape: that check holds
+    the corroboration gate, this one holds the settled-behavior gate a
+    docs-gap classification alone must also pass. A `bug(docs):` issue
+    asks a maintainer to write down an answer; when the workflow itself
+    is unsettled, no answer exists yet, and filing anyway sends a
+    maintainer a request they cannot fulfill. A response that correctly
+    withholds the draft must also say why, the same way the
+    corroboration-gate check requires a stated reason rather than a bare
+    "not filing this."
+    """
+    has_docs_tag = any(
+        m.group(1).lower() == "bug(docs)" for m in _TITLE_TAG_RE.finditer(text)
+    )
+    has_proposed_rule_change = re.search(
+        r"^#{2,}\s*Proposed rule change", text, re.IGNORECASE | re.MULTILINE
+    ) is not None
+    if has_docs_tag or has_proposed_rule_change:
+        hits = []
+        if has_docs_tag:
+            hits.append("bug(docs): title line")
+        if has_proposed_rule_change:
+            hits.append("Proposed rule change heading")
+        return False, (
+            f"drafted a docs-gap issue despite unsettled behavior: {', '.join(hits)}"
+        )
+
+    low = _normalized(text)
+    hits = [p for p in _UNSETTLED_GATE_REASON_PATTERNS if p in low]
+    if hits:
+        return True, (
+            "correctly withheld the docs-gap draft and cited the "
+            f"settled-behavior gate (matched: {hits[0]!r})"
+        )
+    return False, (
+        "no bug(docs): draft was made, but no reason tied to the "
+        "settled-behavior gate was given"
+    )
+
+
 def check_hands_off_to_reporting_issues(text: str, **_: object) -> CheckResult:
     """Output references infrahub-reporting-issues for the product-defect handoff."""
     if "infrahub-reporting-issues" in text:
@@ -559,15 +677,29 @@ def check_no_skills_issue_for_product_bug(text: str, **_: object) -> CheckResult
     off instead of filing against opsmill/infrahub-skills") is the correct,
     expected phrasing and must not fail this check; only an unnegated use as
     an actual filing target counts as a violation. Checks for the current
-    `bug:`/`feat:`/`docs:` title tag (moved here from
+    `bug:`/`feat:`/`bug(docs):` title tag (moved here from
     `[skill-bug]`/`[skill-feature]` when filing handed off to
     infrahub-reporting-issues); a product-bug draft that reached the
     drafting stage at all is the violation this guards against, regardless
     of which generation of the tag, or which of the three kinds, it used.
+
+    A docs-gap draft legitimately targets `opsmill/infrahub`, a different
+    repo from the one this check guards against, so it cannot collide
+    with the second branch below: that branch only matches the literal
+    string `opsmill/infrahub-skills`, which is not a substring relationship
+    with plain `opsmill/infrahub` in the direction that matters here (a
+    docs-gap draft naming only the bare `opsmill/infrahub` repo does not
+    contain the longer `-skills` string, so it never trips this branch on
+    its own). This check is only ever run against the product-bug
+    scenario, where no level-2 tag of any kind should appear at all
+    (product defects hand off to infrahub-reporting-issues before any
+    kind is even decided), so the first branch's "any tag at all is a
+    violation" behavior is correct regardless of which repo a hypothetical
+    tagged draft would have named.
     """
     hits = []
     if _TITLE_TAG_RE.search(text):
-        hits.append("bug:/feat:/docs: title line")
+        hits.append("bug:/feat:/bug(docs): title line")
 
     for match in re.finditer(r"opsmill/infrahub-skills", text):
         window = text[max(0, match.start() - 40) : match.start()].lower()
@@ -664,19 +796,45 @@ _PAYLOAD_BODY_MARKERS = (
 )
 
 
+# `repo` is no longer a single fixed string: a bug or feature payload
+# targets opsmill/infrahub-skills, but a docs-gap payload targets
+# opsmill/infrahub (Infrahub's documentation lives in the main repo, not
+# the skills repo). `opsmill/infrahub-skills` contains `opsmill/infrahub`
+# as a literal substring, so a naive "does opsmill/infrahub appear
+# anywhere" check would pass a docs-gap payload that only ever mentions
+# the skills repo: exactly the routing mistake this whole fix exists to
+# catch. `_REPO_MAIN_RE`'s negative lookahead requires `opsmill/infrahub`
+# NOT be immediately followed by `-skills`, so it only matches a genuine,
+# standalone mention of the main repo.
+_REPO_SKILLS_RE = re.compile(r"opsmill/infrahub-skills", re.IGNORECASE)
+_REPO_MAIN_RE = re.compile(r"opsmill/infrahub(?!-skills)\b", re.IGNORECASE)
+
+
 def check_payload_is_complete(text: str, **_: object) -> CheckResult:
-    """Output carries all four handoff payload fields: repo, type, title, body."""
+    """Output carries all four handoff payload fields: repo, type, title, body.
+
+    The expected repo is read off the drafted title tag: `bug(docs):`
+    expects `opsmill/infrahub`, anything else (including no tag at all,
+    preserving the old fixed-repo assumption) expects
+    `opsmill/infrahub-skills`.
+    """
     low = _normalized(text)
     missing = []
 
-    if "opsmill/infrahub-skills" not in low:
-        missing.append("repo (opsmill/infrahub-skills)")
+    tag_match = _TITLE_TAG_RE.search(text)
+    tag_value = tag_match.group(1).lower() if tag_match else None
+    if tag_value == "bug(docs)":
+        if _REPO_MAIN_RE.search(low) is None:
+            missing.append("repo (opsmill/infrahub)")
+    else:
+        if _REPO_SKILLS_RE.search(low) is None:
+            missing.append("repo (opsmill/infrahub-skills)")
 
     if re.search(r"\btype\b\s*[:\-]?\s*(bug|feature|docs gap)\b", low) is None:
         missing.append("type (bug/feature/docs gap)")
 
     if _TITLE_TAG_RE.search(text) is None:
-        missing.append("title (bug:/feat:/docs: prefix)")
+        missing.append("title (bug:/feat:/bug(docs): prefix)")
 
     if not any(marker in low for marker in _PAYLOAD_BODY_MARKERS):
         missing.append("body (no drafted section found)")
@@ -687,11 +845,11 @@ def check_payload_is_complete(text: str, **_: object) -> CheckResult:
 
 
 def check_title_uses_kind_prefix(text: str, **_: object) -> CheckResult:
-    """Output's title starts with bug:, feat:, or docs:."""
+    """Output's title starts with bug:, feat:, or bug(docs):."""
     match = _TITLE_TAG_RE.search(text)
     if match:
         return True, f"title uses {match.group(1).lower()}: prefix"
-    return False, "no title line starting with bug:, feat:, or docs:"
+    return False, "no title line starting with bug:, feat:, or bug(docs):"
 
 
 _RULE_PATH_RE = re.compile(
@@ -978,6 +1136,7 @@ CHECKS: dict[str, CheckFn] = {
     "justifies-kind-by-coverage": check_justifies_kind_by_coverage,
     "cites-escape-as-feature-evidence": check_cites_escape_as_feature_evidence,
     "cites-escape-outcome": check_cites_escape_outcome,
+    "no-docs-gap-when-unsettled": check_no_docs_gap_when_unsettled,
     "hands-off-to-reporting-issues": check_hands_off_to_reporting_issues,
     "no-skills-issue-for-product-bug": check_no_skills_issue_for_product_bug,
     "hands-off-to-reporting-issues-for-filing": check_hands_off_to_reporting_issues_for_filing,

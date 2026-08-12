@@ -14,9 +14,14 @@ and let it drive submission from there.
 
 ### The payload
 
-`{repo, type, title, body}`, where `repo` is always
-`opsmill/infrahub-skills` and `type` is `bug`,
-`feature`, or `docs gap`.
+`{repo, type, title, body}`, where `type` is `bug`,
+`feature`, or `docs gap`, and `repo` follows the kind:
+`opsmill/infrahub-skills` for a bug or a feature,
+`opsmill/infrahub` for a docs gap, since Infrahub's own
+documentation lives there, not in the skills repo. See
+[workflow-bug-vs-feature.md](workflow-bug-vs-feature.md)
+for the routing table and the settled-behavior gate a
+docs gap must also pass before it is drafted at all.
 
 ### Why it matters
 
@@ -84,6 +89,34 @@ Handing off to infrahub-reporting-issues with:
 
   repo: opsmill/infrahub-skills
   type: feature
+  title: (the line above)
+  body: (the full report, including the section above)
+
+infrahub-reporting-issues will search for duplicates,
+show the draft for review, and handle submission from
+here.
+```
+
+A docs-gap handoff targets the other repo, and drops the
+`[skill]` segment from the title since it means nothing
+to `opsmill/infrahub`'s maintainers:
+
+```text
+Draft complete and redacted:
+
+bug(docs): no documentation on multi-hop relationship
+traversal in a GraphQL query
+
+## Proposed rule change
+Document cursor-based multi-hop relationship traversal
+in a GraphQL query, since Infrahub supports it today and
+its behavior is settled; only the documentation is
+missing.
+
+Handing off to infrahub-reporting-issues with:
+
+  repo: opsmill/infrahub
+  type: docs gap
   title: (the line above)
   body: (the full report, including the section above)
 

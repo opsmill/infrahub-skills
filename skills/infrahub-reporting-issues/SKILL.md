@@ -66,18 +66,26 @@ this skill.
 
 This skill may also be invoked directly by
 `infrahub-reporting-skill-gaps` with a prepared payload:
-`{repo, type, title, body}`. For that caller, `repo` is
-always `opsmill/infrahub-skills`, and `type` is `bug` or
-`feature`, already decided by that skill's two-level
-triage.
+`{repo, type, title, body}`. For that caller, `type` is
+`bug`, `feature`, or `docs gap`, already decided by that
+skill's two-level triage, and `repo` follows the kind:
+`opsmill/infrahub-skills` for `bug`/`feature`, or
+`opsmill/infrahub` for `docs gap`, since Infrahub's own
+documentation lives in the main repo, not the skills
+repo. Titles use `bug(docs):` for the docs-gap case,
+without a `[skill]` segment, since the originating skill
+means nothing to `opsmill/infrahub`'s maintainers; see
+[reference.md](reference.md) for that repo's own title
+notes and the `bug:`/`feat:` convention this pairs with.
 
 When invoked this way, classification (step 2) and
 routing (step 3) are already decided, skip them. Skip
 environment info gathering (step 5) too; it collects
-Infrahub server, SDK, and OS versions, which do not
-apply to a report about a skill's own guidance. Start at
-step 4 (search for duplicates), using the caller's title
-and body as the render for step 6 instead of a generic
+Infrahub server, SDK, and OS versions, which apply to
+neither a report about a skill's own guidance nor a
+report about missing documentation. Start at step 4
+(search for duplicates), using the caller's title and
+body as the render for step 6 instead of a generic
 template. Continue through steps 7-9 as normal: review
 gate, submission method, confirm.
 
