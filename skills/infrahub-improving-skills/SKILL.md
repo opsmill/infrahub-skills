@@ -75,12 +75,21 @@ problem. Otherwise append an `observed` note to the
 notes file and stop; do not draft an issue yet. See
 [rules/workflow-corroboration-gate.md](rules/workflow-corroboration-gate.md).
 
-### 3. Triage
+### 3. Triage: level 1, routing
 
 Decide whether the friction is a skill defect, a
 product defect, or neither. Only skill defects continue
-to drafting. See
+to level 2 and drafting. See
 [rules/workflow-triage-classification.md](rules/workflow-triage-classification.md).
+
+### 3b. Triage: level 2, bug or feature
+
+For a skill defect, decide whether it is a bug (a rule
+or reference covers the topic and the model still got
+it wrong) or a feature (no rule or reference covers the
+topic). This decides the title prefix used in step 7.
+See
+[rules/workflow-bug-vs-feature.md](rules/workflow-bug-vs-feature.md).
 
 ### 4. Hand off if product
 

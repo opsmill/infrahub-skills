@@ -3991,11 +3991,203 @@ tasks:
     assertions:
       - name: no-draft-on-single-session
         check: >-
-          Report does not draft an issue title (`[skill-friction]`) or a
-          proposed rule change section from a single session
+          Report does not draft an issue title (`[skill-bug]` or
+          `[skill-feature]`) or a proposed rule change section from a
+          single session
       - name: records-observation
         check: Report mentions recording an observation in notes.jsonl
       - name: states-gate-reason
         check: >-
           Report ties the decision to stop back to the corroboration gate
           (only one session, no prior occurrence, not seen before)
+
+  - name: improving-skills-triage
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-improving-skills/SKILL.md and
+      follow its workflow and rules.
+
+      Task: This friction has now shown up in two separate sessions with
+      infrahub-managing-generators. Both times, a generator needed to read an
+      attribute two relationship hops away from the object it was generating
+      for (through an intermediate peer). Both sessions produced a Python
+      traceback from an invalid attribute path on the first attempt, and it
+      took manual trial and error against the GraphQL schema to find the
+      working traversal. Checking the generator skill's loaded rules and the
+      shared infrahub-common references turned up nothing that addresses
+      reading an attribute more than one relationship hop away.
+
+      Corroboration is already met (two sessions, same signature). Work
+      through the next step of the workflow: state the triage classification
+      for this friction and justify it. Do not draft an issue or run `gh`
+      commands yet.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/improving-skills/check_triage.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that states the classification (skill defect, since the
+      guidance gap on multi-hop attribute reads is what caused the repeated
+      failure) and justifies it by asking whether a rule change would have
+      prevented the friction, not by how disruptive the tracebacks were.
+    expectations:
+      - States the classification explicitly (skill defect, product defect, or neither)
+      - Ties the classification to whether a rule change would have prevented the friction
+    assertions:
+      - name: states-classification
+        check: Response names one of skill defect, product defect, or neither
+      - name: justifies-classification
+        check: >-
+          Response gives a reason tied to whether a rule change would have
+          prevented the friction
+
+  - name: improving-skills-feature-gap
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-improving-skills/SKILL.md and
+      follow its workflow and rules.
+
+      Task: While using infrahub-managing-generators, a generator needed to
+      page through a related object set of more than a hundred items using
+      GraphQL cursor-based pagination inside its query. You read
+      patterns-common.md, python-generate.md, and python-relationship-references.md
+      in the generators skill, and infrahub-common's graphql-queries.md
+      reference, in full, before writing any code. None of them say anything
+      about cursor-based pagination. You then used your web-fetch tool on
+      https://docs.infrahub.app/llms.txt with a targeted question about
+      paginating a GraphQL query, which pointed at a specific documentation
+      page; you fetched that page's Markdown twin and used it to write the
+      pagination loop, which then worked on the first try.
+
+      This friction has already been corroborated (a second session hit the
+      same gap last week) and triage has already concluded this is a skill
+      defect. Work through the next step: decide the kind and state the
+      title you would use for the report, with reasoning. Do not run `gh`
+      commands or submit anything.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/improving-skills/check_bug_vs_feature.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that classifies the kind as a gap the skill's own material
+      never covered (using the docs.infrahub.app/llms.txt fetch that only
+      happened after the skill's own files and infrahub-common were checked
+      as the reason), gives the matching [skill-feature] title, and carries
+      the fetched documentation page's path into the report.
+    expectations:
+      - Names the kind explicitly and uses a matching title prefix
+      - Ties the kind to whether a rule or reference already covers the topic, not to how disruptive it was
+      - Names the docs/llms.txt fetch as the reason for that kind
+    assertions:
+      - name: states-bug-or-feature
+        check: Response names the kind explicitly and uses the matching title prefix
+      - name: justifies-kind-by-coverage
+        check: >-
+          Response ties the kind to whether a rule already covers the topic,
+          not to severity or effort
+      - name: cites-escape-as-feature-evidence
+        check: >-
+          Response names the docs/llms.txt fetch as the reason the kind is
+          a gap the skill never covered
+
+  - name: improving-skills-product-bug
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-improving-skills/SKILL.md and
+      follow its workflow and rules.
+
+      Task: While using infrahub-managing-schemas, you followed
+      rules/relationship-on-delete.md exactly as written to set an
+      on_delete behavior on a relationship, matching its example verbatim.
+      `infrahubctl schema load` accepted the schema, but the running
+      instance then returned an unhandled 500 Internal Server Error the
+      first time an object using that relationship was deleted, with a
+      stack trace pointing into Infrahub's own delete-cascade code, not into
+      anything the schema file specified. This has now happened in two
+      separate sessions with the same stack trace signature, so corroboration
+      is met.
+
+      Work through the workflow from triage onward and decide what to do
+      next. Do NOT actually run `gh` commands; write out what you would do
+      instead.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/improving-skills/check_product_handoff.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that classifies this as a product defect, since the
+      guidance was followed correctly and Infrahub itself misbehaved, and
+      hands off to infrahub-reporting-issues instead of drafting a
+      skill-friction issue against opsmill/infrahub-skills.
+    expectations:
+      - States the classification explicitly (skill defect, product defect, or neither)
+      - Ties the classification to whether a rule change would have prevented the failure
+      - Hands off to infrahub-reporting-issues
+      - Drafts no [skill-bug]/[skill-feature] issue and names no opsmill/infrahub-skills filing target
+    assertions:
+      - name: states-classification
+        check: Response names one of skill defect, product defect, or neither
+      - name: justifies-classification
+        check: >-
+          Response gives a reason tied to whether a rule change would have
+          prevented the failure
+      - name: hands-off-to-reporting-issues
+        check: Response references infrahub-reporting-issues
+      - name: no-skills-issue-for-product-bug
+        check: >-
+          Response contains no [skill-bug]/[skill-feature] title line and no
+          opsmill/infrahub-skills filing target
+
+  - name: improving-skills-existing-rule-bug
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-improving-skills/SKILL.md and
+      follow its workflow and rules.
+
+      Task: While using infrahub-managing-schemas to set up a bidirectional
+      relationship where one side peers a generic rather than a concrete
+      kind, you read rules/relationship-identifiers.md in full before
+      writing the schema. On the first attempt you left the identifier off
+      both sides, the schema loaded without error, but the relationship
+      silently split into two unrelated one-directional links, exactly the
+      symptom the rule describes. Only on a second read of the same rule
+      file did you notice it says a generic peer on either side requires an
+      explicit matching identifier on both sides. This has already shown up
+      in two sessions with the same pattern, so corroboration is met, and
+      triage has already concluded this is a skill defect.
+
+      Work through the next step: decide the kind and state the title you
+      would use for the report, with reasoning. Do not run `gh` commands or
+      submit anything.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/improving-skills/check_bug_vs_feature.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that classifies the kind as the rule already covering the
+      generic-peer requirement, with the model still missing it on the
+      first pass, gives the matching [skill-bug] title naming
+      relationship-identifiers.md, and does not justify the kind by how many
+      reads or attempts it took.
+    expectations:
+      - Names the kind explicitly and uses a matching title prefix
+      - Names relationship-identifiers.md as the rule that already covers the topic
+      - Ties the kind to rule coverage, not to how many attempts it took
+    assertions:
+      - name: states-bug-or-feature
+        check: Response names the kind explicitly and uses the matching title prefix
+      - name: justifies-kind-by-coverage
+        check: >-
+          Response ties the kind to whether a rule already covers the topic,
+          not to severity or effort
+      - name: cites-escape-as-feature-evidence
+        check: >-
+          No docs/llms.txt escape occurred, so this check passes vacuously

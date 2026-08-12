@@ -20,20 +20,31 @@ CheckResult = tuple[bool, str]
 CheckFn = Callable[..., CheckResult]
 
 
+def _normalized(text: str) -> str:
+    """Lowercase and collapse whitespace so a multi-word phrase still
+    matches when a model wraps its prose across a line break.
+    """
+    return re.sub(r"\s+", " ", text.lower())
+
+
 def check_no_draft_on_single_session(text: str, **_: object) -> CheckResult:
     """Output does not draft a full issue from a single, uncorroborated session."""
-    has_issue_title = re.search(r"\[skill-friction\]", text) is not None
+    # Matches either level-2 title prefix. The tag used to be the single
+    # literal `[skill-friction]`; Task 3 split it into `[skill-bug]` and
+    # `[skill-feature]`, so both must be checked here or a drafted issue
+    # with the newer tag would slip past this gate undetected.
+    has_issue_title = re.search(r"\[skill-(?:bug|feature)\]", text) is not None
     # Match the template's "Proposed rule change" heading at any depth of two
     # or more `#` (the real template uses `##`; do not require the literal
-    # `[skill-friction]` tag to have survived, since a paraphrased draft is
-    # still a draft).
+    # title tag to have survived, since a paraphrased draft is still a
+    # draft).
     has_proposed_rule_change = re.search(
         r"^#{2,}\s*Proposed rule change", text, re.IGNORECASE | re.MULTILINE
     ) is not None
     if has_issue_title or has_proposed_rule_change:
         hits = []
         if has_issue_title:
-            hits.append("[skill-friction] title line")
+            hits.append("[skill-bug]/[skill-feature] title line")
         if has_proposed_rule_change:
             hits.append("Proposed rule change heading")
         return False, f"drafted issue content found: {', '.join(hits)}"
@@ -87,10 +98,249 @@ def check_states_gate_reason(text: str, **_: object) -> CheckResult:
     return False, "no phrase tying the decision to a single session / lack of corroboration"
 
 
+_NEITHER_PATTERNS = (
+    r"\bneither\b.{0,80}\b(?:skill defect|product defect)\b",
+    r"\bclassif\w*\s*[:\-]?\s*neither\b",
+    r"\bis neither\b",
+)
+
+
+def check_states_classification(text: str, **_: object) -> CheckResult:
+    """Output names one of the three level-1 outcomes explicitly."""
+    low = _normalized(text)
+    if "skill defect" in low:
+        return True, "names classification: skill defect"
+    if "product defect" in low:
+        return True, "names classification: product defect"
+    if any(re.search(p, low) for p in _NEITHER_PATTERNS):
+        return True, "names classification: neither"
+    return False, (
+        "no explicit 'skill defect' / 'product defect' / 'neither' "
+        "classification found"
+    )
+
+
+_RULE_CHANGE_REASON_PATTERNS = (
+    "rule change would have prevented",
+    "a rule would have prevented",
+    "better guidance would have prevented",
+    "would not have prevented this",
+    "would not have prevented the",
+    "no rule change would have helped",
+    "guidance was correct",
+    "followed the skill correctly",
+    "guidance was missing",
+    "guidance was wrong",
+    "guidance was unclear",
+    "would a rule change have prevented",
+    "rule change would prevent",
+    "rule change would not have changed",
+)
+
+
+def check_justifies_classification(text: str, **_: object) -> CheckResult:
+    """Output ties the level-1 classification to whether a rule change would
+    have prevented the friction, not merely to how the classification felt.
+    """
+    low = _normalized(text)
+    hits = [p for p in _RULE_CHANGE_REASON_PATTERNS if p in low]
+    if hits:
+        return True, (
+            "ties classification to whether a rule change would have "
+            f"prevented it (matched: {hits[0]!r})"
+        )
+    return False, (
+        "no reasoning tied to whether a rule change would have prevented "
+        "the friction"
+    )
+
+
+def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
+    """Output names the level-2 kind explicitly and uses the matching title
+    prefix. `\\bbug\\b` does not match inside "debug" (the boundary before
+    "b" fails when preceded by "de").
+    """
+    low = _normalized(text)
+    named_bug = re.search(r"\bbug\b", low) is not None
+    named_feature = re.search(r"\bfeature\b", low) is not None
+    has_bug_tag = "[skill-bug]" in text
+    has_feature_tag = "[skill-feature]" in text
+
+    if not (named_bug or named_feature):
+        return False, "no explicit bug/feature classification named"
+    if not (has_bug_tag or has_feature_tag):
+        return False, "kind named but no [skill-bug]/[skill-feature] title prefix found"
+
+    if named_bug and not named_feature:
+        if not has_bug_tag:
+            return False, "names bug but title prefix uses [skill-feature]"
+        return True, "names bug and uses matching [skill-bug] title prefix"
+    if named_feature and not named_bug:
+        if not has_feature_tag:
+            return False, "names feature but title prefix uses [skill-bug]"
+        return True, "names feature and uses matching [skill-feature] title prefix"
+
+    return True, "names both bug and feature terms with a matching title prefix present"
+
+
+_COVERAGE_PATTERNS = (
+    "already covers",
+    "covers this topic",
+    "covers the topic",
+    "no rule covers",
+    "no rule addresses",
+    "no reference covers",
+    "not covered by any rule",
+    "no rule or reference covers",
+    "does not cover this",
+    "doesn't cover this",
+    "skill already claims",
+    "already claims to do this",
+    "already claim this ground",
+    "rule exists for this",
+    "a rule covers",
+    "no existing rule",
+    "nothing in the skill covers",
+    "the skill never claimed",
+    "never claimed this ground",
+    "does the skill already claim",
+)
+
+_SEVERITY_PATTERNS = (
+    "round trips",
+    "round-trips",
+    "many attempts",
+    "number of attempts",
+    "user frustration",
+    "how frustrating",
+    "so many retries",
+    "took so long",
+    "took many tries",
+    "severity of",
+    "because it took",
+    "given how much friction",
+    "amount of friction",
+    "how bad the friction felt",
+)
+
+
+def check_justifies_kind_by_coverage(text: str, **_: object) -> CheckResult:
+    """Output ties bug-vs-feature to whether a rule already covers the
+    topic, not to severity, round-trip count, or user frustration.
+
+    Rejects the failure mode where a response reaches a defensible-looking
+    answer ("this took eleven round trips so it is a bug") by reasoning
+    about how bad the friction felt rather than about coverage.
+    """
+    low = _normalized(text)
+    has_coverage = any(p in low for p in _COVERAGE_PATTERNS)
+
+    severity_as_reason = False
+    for pattern in _SEVERITY_PATTERNS:
+        idx = low.find(pattern)
+        if idx == -1:
+            continue
+        window = low[max(0, idx - 120) : idx + 120]
+        if "bug" in window or "feature" in window or "because" in window or "so it is" in window or "so this is" in window:
+            severity_as_reason = True
+            break
+
+    if severity_as_reason and not has_coverage:
+        return False, "justifies kind by severity/round-trips rather than rule coverage"
+    if has_coverage:
+        return True, "ties kind to whether a rule or reference already covers the topic"
+    return False, "no coverage-based justification found for the bug/feature kind"
+
+
+_FEATURE_REASON_PATTERNS = (
+    "no rule covers",
+    "not covered by any rule",
+    "no rule or reference covers",
+    "skill's own files",
+    "the skill did not cover",
+    "skill never covered",
+    "gap in the skill",
+    "gap in coverage",
+    "silent on this",
+    "genuinely silent",
+    "never claimed this ground",
+    "the skill never claimed",
+)
+
+
+def check_cites_escape_as_feature_evidence(text: str, **_: object) -> CheckResult:
+    """When the output shows a docs/llms.txt escape, it must name that
+    escape as the reason the kind is feature. Vacuously passes when the
+    output shows no escape at all, since the check does not apply then.
+    """
+    low = _normalized(text)
+    has_escape = "llms.txt" in low or "docs.infrahub.app" in low
+    if not has_escape:
+        return True, "no docs/llms.txt escape evidence present; check not applicable"
+
+    tied_to_feature = "feature" in low and any(p in low for p in _FEATURE_REASON_PATTERNS)
+    if tied_to_feature:
+        return True, "names the docs/llms.txt escape as the reason for a feature classification"
+    return False, "docs/llms.txt escape present but not tied to a feature classification"
+
+
+def check_hands_off_to_reporting_issues(text: str, **_: object) -> CheckResult:
+    """Output references infrahub-reporting-issues for the product-defect handoff."""
+    if "infrahub-reporting-issues" in text:
+        return True, "references infrahub-reporting-issues"
+    return False, "no reference to infrahub-reporting-issues"
+
+
+_NO_SKILLS_REPO_NEGATIONS = (
+    "not",
+    "instead of",
+    "rather than",
+    "never",
+    "don't",
+    "do not",
+    "avoid",
+    "without",
+    "isn't",
+    "won't",
+)
+
+
+def check_no_skills_issue_for_product_bug(text: str, **_: object) -> CheckResult:
+    """Output drafts nothing against opsmill/infrahub-skills for a product bug.
+
+    A mention of `opsmill/infrahub-skills` in a negated context ("handing
+    off instead of filing against opsmill/infrahub-skills") is the correct,
+    expected phrasing and must not fail this check; only an unnegated use as
+    an actual filing target counts as a violation.
+    """
+    hits = []
+    if "[skill-bug]" in text:
+        hits.append("[skill-bug] title line")
+    if "[skill-feature]" in text:
+        hits.append("[skill-feature] title line")
+
+    for match in re.finditer(r"opsmill/infrahub-skills", text):
+        window = text[max(0, match.start() - 40) : match.start()].lower()
+        if not any(neg in window for neg in _NO_SKILLS_REPO_NEGATIONS):
+            hits.append("opsmill/infrahub-skills used as a filing target")
+            break
+
+    if hits:
+        return False, f"found skills-repo issue content: {', '.join(hits)}"
+    return True, "no skill-repo title tag and no opsmill/infrahub-skills filing target"
+
+
 CHECKS: dict[str, CheckFn] = {
     "no-draft-on-single-session": check_no_draft_on_single_session,
     "records-observation": check_records_observation,
     "states-gate-reason": check_states_gate_reason,
+    "states-classification": check_states_classification,
+    "justifies-classification": check_justifies_classification,
+    "states-bug-or-feature": check_states_bug_or_feature,
+    "justifies-kind-by-coverage": check_justifies_kind_by_coverage,
+    "cites-escape-as-feature-evidence": check_cites_escape_as_feature_evidence,
+    "hands-off-to-reporting-issues": check_hands_off_to_reporting_issues,
+    "no-skills-issue-for-product-bug": check_no_skills_issue_for_product_bug,
 }
 
 CheckSpec = str | tuple[str, dict]

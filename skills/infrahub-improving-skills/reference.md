@@ -36,9 +36,18 @@ Friction shows up in a transcript as:
 - `tool_result` blocks carrying `is_error`
 - repeated user turns restating the same ask in
   different words
-- fetches of `docs.infrahub.app` or
+- fetches of `docs.infrahub.app`, `llms.txt`, or
   `schema.infrahub.app` after the relevant skill file
   was already read
+
+A fetch of `llms.txt` or a `docs.infrahub.app` page is
+an escape marker, not just friction: it points at a
+feature rather than a bug, because the fallback rule in
+[workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)
+only authorizes it once the skill's own files were
+checked and found silent. See
+[rules/workflow-bug-vs-feature.md](rules/workflow-bug-vs-feature.md)
+for how that signal feeds the bug-vs-feature call.
 
 Fetches of `marketplace.infrahub.app` and
 `infrahub.opsmill.io` are **not** friction. Several
@@ -58,7 +67,7 @@ Append-only. One JSON object per line. Fields:
 | `skill` | The Infrahub skill directory implicated, e.g. `infrahub-managing-schemas` |
 | `signature` | A short fingerprint of the friction, for matching against future occurrences |
 | `transcript_path` | Path to the session transcript this note was drawn from, if any |
-| `status` | One of `observed`, `filed`, `skipped`, `deferred` |
+| `status` | One of `observed`, `filed`, `skipped`, `deferred`, `handed-off` |
 
 `signature` exists only to help a later session
 recognize a recurring pattern quickly. It is not a

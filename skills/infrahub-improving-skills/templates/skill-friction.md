@@ -5,11 +5,25 @@ this is shown to the user. Every section except
 "Proposed rule change" may be deleted when it does not
 apply to this report. Use generic phrasing throughout:
 no customer names, node kinds, hostnames, or paths.
+
+Title prefix carries the level-2 classification:
+[skill-bug] when a rule or reference already covers the
+topic and the model still got it wrong, [skill-feature]
+when no rule or reference covers it. See
+rules/workflow-bug-vs-feature.md.
+
+For a feature, "Docs the model had to leave the skill
+for" is the most useful section: the fetched page paths
+are the specification for the rule a maintainer needs
+to write. For a bug, "Rules consulted" carries the
+weight: it names the file that claimed the ground and
+still let the model down.
 -->
 
-# [skill-friction] [skill]: [what the guidance is missing]
+# [skill-bug|skill-feature] [skill]: [what the guidance is missing]
 
 **Skill**: [skill directory, e.g. infrahub-managing-schemas]
+**Type**: [bug | feature]
 **Recurrence**: [number of corroborating sessions, or the explicit user confirmation that stood in for a second session]
 
 ## What was being attempted
