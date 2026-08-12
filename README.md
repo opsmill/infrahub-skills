@@ -215,6 +215,7 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 │   ├── infrahub-analyzing-data/    # Live data analysis (MCP)
 │   ├── infrahub-auditing-repo/     # Best-practice audits
 │   ├── infrahub-reporting-issues/  # Ecosystem issue reporting
+│   ├── infrahub-reporting-skill-gaps/ # Skill-friction issue drafting
 │   ├── infrahub-collecting-diagnostics/ # Diagnostic-bundle collection for support hand-off
 │   └── infrahub-importing-data/    # CSV/TSV → Infrahub objects
 ├── CLAUDE.md
