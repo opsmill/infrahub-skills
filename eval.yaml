@@ -3991,9 +3991,9 @@ tasks:
     assertions:
       - name: no-draft-on-single-session
         check: >-
-          Report does not draft an issue title (`bug:` or
-          `feat:`) or a proposed rule change section from a
-          single session
+          Report does not draft an issue title (`bug:`,
+          `feat:`, or `docs:`) or a proposed rule change
+          section from a single session
       - name: records-observation
         check: Report mentions recording an observation in notes.jsonl
       - name: states-gate-reason
@@ -4129,7 +4129,7 @@ tasks:
       - States the classification explicitly (skill defect, product defect, or neither)
       - Ties the classification to whether a rule change would have prevented the failure
       - Hands off to infrahub-reporting-issues
-      - Drafts no bug:/feat: issue and names no opsmill/infrahub-skills filing target
+      - Drafts no bug:/feat:/docs: issue and names no opsmill/infrahub-skills filing target
     assertions:
       - name: states-classification
         check: Response names one of skill defect, product defect, or neither
@@ -4141,7 +4141,7 @@ tasks:
         check: Response references infrahub-reporting-issues
       - name: no-skills-issue-for-product-bug
         check: >-
-          Response contains no bug:/feat: title line and no
+          Response contains no bug:/feat:/docs: title line and no
           opsmill/infrahub-skills filing target
 
   - name: reporting-skill-gaps-existing-rule-bug
@@ -4300,7 +4300,7 @@ tasks:
       - name: payload-is-complete
         check: Response carries all four payload fields (repo, type, title, body)
       - name: title-uses-kind-prefix
-        check: Response's title starts with `bug:` or `feat:`
+        check: Response's title starts with `bug:`, `feat:`, or `docs:`
 
   - name: reporting-skill-gaps-cite-artifact
     trials: 3

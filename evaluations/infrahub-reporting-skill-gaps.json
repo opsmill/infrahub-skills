@@ -14,7 +14,7 @@
       "assertions": [
         {
           "name": "no-draft-on-single-session",
-          "check": "Report does not draft an issue title (`bug:` or `feat:`) or a proposed rule change section from a single session"
+          "check": "Report does not draft an issue title (`bug:`, `feat:`, or `docs:`) or a proposed rule change section from a single session"
         },
         {
           "name": "records-observation",
@@ -81,7 +81,7 @@
         "Ties the classification to whether a rule change would have prevented the failure",
         "Hands off to infrahub-reporting-issues",
         {
-          "Drafts no bug:/feat": "issue and names no opsmill/infrahub-skills filing target"
+          "Drafts no bug:/feat:/docs": "issue and names no opsmill/infrahub-skills filing target"
         }
       ],
       "assertions": [
@@ -99,7 +99,7 @@
         },
         {
           "name": "no-skills-issue-for-product-bug",
-          "check": "Response contains no bug:/feat: title line and no opsmill/infrahub-skills filing target"
+          "check": "Response contains no bug:/feat:/docs: title line and no opsmill/infrahub-skills filing target"
         }
       ]
     },
@@ -180,7 +180,7 @@
         },
         {
           "name": "title-uses-kind-prefix",
-          "check": "Response's title starts with `bug:` or `feat:`"
+          "check": "Response's title starts with `bug:`, `feat:`, or `docs:`"
         }
       ]
     },

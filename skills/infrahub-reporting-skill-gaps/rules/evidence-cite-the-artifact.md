@@ -34,19 +34,24 @@ that only describes symptoms turns it into a search through every rule
 file in the implicated skill, repeating the exact investigation step 5 of
 this skill's workflow already did.
 
-### Agreement with bug vs. feature
+### Agreement with bug vs. feature vs. docs gap
 
 [workflow-bug-vs-feature.md](workflow-bug-vs-feature.md) asks "does the
-skill already claim to do this?" and answers it from the classification
-side: a rule that covers the topic and still let the model down is a bug,
-no coverage anywhere is a feature. This rule asks the same question from
-the citation side, and the two must agree. Naming a file means bug.
-Finding none means feature. If a draft cites a specific rule file but
-titles itself `feat:`, or states no rule covers the topic but titles
-itself `bug:`, the two rules disagree and the draft is not ready. Resolve
-the disagreement before handing off, and let the citation win: it is
-grounded in a file that either exists or does not, not in how the
-friction felt.
+skill already claim to do this, and if not, did an escape to the docs
+resolve it?" and answers it from the classification side. This rule asks
+the first half of that same question from the citation side, and the two
+must agree on it: naming a file means bug, finding none means feature
+*or* docs gap. Which of those two the other rule decides is not this
+rule's concern; see
+[workflow-bug-vs-feature.md](workflow-bug-vs-feature.md) for the
+post-escape-outcome test that tells them apart, rather than duplicating
+it here.
+
+If a draft cites a specific rule file but titles itself `feat:` or
+`docs:`, or states no rule covers the topic but titles itself `bug:`,
+the two rules disagree and the draft is not ready. Resolve the
+disagreement before handing off, and let the citation win: it is grounded
+in a file that either exists or does not, not in how the friction felt.
 
 ### Incorrect
 
@@ -74,4 +79,4 @@ the exact failure it describes.
 ```
 
 Reference: [workflow-bug-vs-feature.md](workflow-bug-vs-feature.md) for
-the bug/feature discriminator this rule shares.
+the bug/feature/docs-gap discriminator this rule shares.

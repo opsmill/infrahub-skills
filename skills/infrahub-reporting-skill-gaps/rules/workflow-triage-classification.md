@@ -26,7 +26,7 @@ something they have no power to fix.
 
 | Classification | Meaning | Next step |
 | --------------- | ------- | --------- |
-| Skill defect | The guidance was missing, wrong, or unclear, and better guidance would have prevented the friction | Continue to level 2 (bug vs. feature) |
+| Skill defect | The guidance was missing, wrong, or unclear, and better guidance would have prevented the friction | Continue to level 2 (bug vs. feature vs. docs gap) |
 | Product defect | The guidance was correct and Infrahub did the wrong thing | Hand off, see [workflow-handoff-product-bugs.md](workflow-handoff-product-bugs.md) |
 | Neither | Transient, environmental, or user-specific | Record and stop |
 

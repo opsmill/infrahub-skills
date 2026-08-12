@@ -15,8 +15,8 @@ and let it drive submission from there.
 ### The payload
 
 `{repo, type, title, body}`, where `repo` is always
-`opsmill/infrahub-skills` and `type` is `bug` or
-`feature`.
+`opsmill/infrahub-skills` and `type` is `bug`,
+`feature`, or `docs gap`.
 
 ### Why it matters
 
