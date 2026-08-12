@@ -3956,3 +3956,44 @@ tasks:
           Findings are ordered by (ladder_step, file path) ascending
       - name: severity-cap
         check: No yagni finding exceeds MEDIUM severity
+
+  # --- Skill Improver --- #
+  - name: improving-skills-single-session
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-improving-skills/SKILL.md and
+      follow its workflow and rules.
+
+      Task: In this session, you used infrahub-managing-schemas to add a new
+      attribute with an enum default value to a node. Getting the syntax right
+      took four attempts: two failed schema loads, and two re-reads of the
+      rules file before the enum default value was finally accepted. The user
+      now says: "That took way too many tries, can you report the friction?"
+
+      Prepare the skill-improvement report by following the skill's workflow.
+      Do NOT actually run `gh` commands or submit anything to GitHub; write out
+      what you would do at each step instead.
+
+      Save the report to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/improving-skills/check_corroboration_gate.py output.md
+        weight: 1.0
+    expected_output: >-
+      A report that recognizes this is a single, uncorroborated session: it
+      does not draft a GitHub issue title or a proposed rule change, records
+      an `observed` entry in notes.jsonl, and tells the user plainly that
+      nothing was filed.
+    expectations:
+      - Does not draft an issue title or a proposed rule change from one session
+      - Mentions recording the observation in notes.jsonl
+      - States plainly that nothing was filed
+    assertions:
+      - name: no-draft-on-single-session
+        check: >-
+          Report does not draft an issue title (`[skill-friction]`) or a
+          proposed rule change section from a single session
+      - name: records-observation
+        check: Report mentions recording an observation in notes.jsonl
+      - name: states-not-filed
+        check: Report states plainly that nothing was filed

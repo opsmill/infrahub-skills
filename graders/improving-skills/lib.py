@@ -12,15 +12,67 @@ ingests it identically.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Callable
 
 CheckResult = tuple[bool, str]
 CheckFn = Callable[..., CheckResult]
 
-# Tasks 2 through 5 populate this dict with the corroboration, triage,
-# handoff, duplicate-search, consent-gate, and evidence-redaction checks.
-CHECKS: dict[str, CheckFn] = {}
+
+def check_no_draft_on_single_session(text: str, **_: object) -> CheckResult:
+    """Output does not draft a full issue from a single, uncorroborated session."""
+    has_issue_title = re.search(r"\[skill-friction\]", text) is not None
+    has_proposed_rule_change = re.search(r"###\s*Proposed rule change", text, re.IGNORECASE) is not None
+    if has_issue_title or has_proposed_rule_change:
+        hits = []
+        if has_issue_title:
+            hits.append("[skill-friction] title line")
+        if has_proposed_rule_change:
+            hits.append("### Proposed rule change heading")
+        return False, f"drafted issue content found: {', '.join(hits)}"
+    return True, "no drafted issue title or proposed-rule-change section"
+
+
+def check_records_observation(text: str, **_: object) -> CheckResult:
+    """Output records the friction as an observation for future corroboration."""
+    low = text.lower()
+    if "notes.jsonl" in low:
+        return True, "mentions notes.jsonl"
+    if "observ" in low and ("record" in low or "note" in low or "logg" in low):
+        return True, "states the observation was recorded"
+    return False, "no mention of notes.jsonl or a recorded observation"
+
+
+def check_states_not_filed(text: str, **_: object) -> CheckResult:
+    """Output states plainly that nothing was filed."""
+    low = text.lower()
+    patterns = (
+        "nothing was filed",
+        "nothing filed",
+        "no issue was filed",
+        "no issue filed",
+        "not filed",
+        "no issue was opened",
+        "no issue opened",
+        "did not open an issue",
+        "will not open an issue",
+        "will not file",
+        "won't file",
+        "not going to file",
+        "i will not draft",
+    )
+    hits = [p for p in patterns if p in low]
+    if hits:
+        return True, f"states plainly that nothing was filed (matched: {hits[0]!r})"
+    return False, "no plain statement that nothing was filed"
+
+
+CHECKS: dict[str, CheckFn] = {
+    "no-draft-on-single-session": check_no_draft_on_single_session,
+    "records-observation": check_records_observation,
+    "states-not-filed": check_states_not_filed,
+}
 
 CheckSpec = str | tuple[str, dict]
 
