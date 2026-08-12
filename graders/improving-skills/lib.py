@@ -155,12 +155,30 @@ def check_justifies_classification(text: str, **_: object) -> CheckResult:
     )
 
 
-def _last_match_start(text: str, pattern: str) -> int:
-    """Return the start index of the last regex match, or -1 if none."""
-    pos = -1
-    for m in re.finditer(pattern, text):
-        pos = m.start()
-    return pos
+_NEGATION_WORDS = (
+    "not",
+    "isn't",
+    "isnt",
+    "never",
+    "rather than",
+    "as opposed to",
+    "instead of",
+)
+
+
+def _term_is_negated(text: str, term: str) -> bool:
+    """True when a negation word attaches to `term` within a few words.
+
+    Catches both natural orders of contrastive phrasing alike: "not a bug,
+    it's a feature" (negation precedes the rejected term) and "this is a
+    bug, not a feature" (negation still precedes whichever term it
+    rejects, just later in the sentence). Position in the sentence does
+    not matter; only which term the negation word is actually attached to
+    does.
+    """
+    alternation = "|".join(re.escape(w) for w in _NEGATION_WORDS)
+    pattern = rf"(?:{alternation})\b(?:\s+\w+){{0,3}}\s+{term}\b"
+    return re.search(pattern, text) is not None
 
 
 def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
@@ -168,13 +186,16 @@ def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
     prefix. `\\bbug\\b` does not match inside "debug" (the boundary before
     "b" fails when preceded by "de").
 
-    Contrastive phrasing ("this is not a bug, it's a feature") mentions both
-    terms. Naming is resolved by whichever term was mentioned last in the
-    prose, since that is the stated conclusion, not whichever term happened
-    to appear first while being ruled out. The tag brackets themselves are
-    stripped before this scan so a `[skill-bug]` tag does not get counted as
-    a prose mention of "bug" and mask a "feature" conclusion stated right
-    next to it.
+    Contrastive phrasing mentions both terms, in either order: "not a bug,
+    it's a feature" or "this is a bug, not a feature" are equally natural,
+    so position cannot resolve which term is the stated conclusion. This
+    instead finds whichever term carries an attached negation ("not a
+    bug", "rather than a feature") and treats the *other* term as the
+    conclusion. When neither term is clearly negated, or both are, the
+    check fails outright rather than guessing: a check that silently
+    passes an unresolvable case is worse than one that says so. The tag
+    brackets are stripped before this scan so a `[skill-bug]` tag's own
+    substring "bug" is never counted as a prose mention.
     """
     low = _normalized(text)
     prose = re.sub(r"\[skill-(?:bug|feature)\]", " ", low)
@@ -189,9 +210,18 @@ def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
         return False, "kind named but no [skill-bug]/[skill-feature] title prefix found"
 
     if named_bug and named_feature:
-        last_bug = _last_match_start(prose, r"\bbug\b")
-        last_feature = _last_match_start(prose, r"\bfeature\b")
-        stated = "bug" if last_bug > last_feature else "feature"
+        bug_negated = _term_is_negated(prose, "bug")
+        feature_negated = _term_is_negated(prose, "feature")
+        if bug_negated and not feature_negated:
+            stated = "feature"
+        elif feature_negated and not bug_negated:
+            stated = "bug"
+        else:
+            return False, (
+                "both bug and feature are named but neither is clearly "
+                "negated (or both are); cannot resolve which is the "
+                "stated conclusion"
+            )
     elif named_bug:
         stated = "bug"
     else:
@@ -199,10 +229,10 @@ def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
 
     if stated == "bug":
         if not has_bug_tag:
-            return False, "stated kind is bug (last mentioned) but title prefix uses [skill-feature]"
+            return False, "stated kind is bug but title prefix uses [skill-feature]"
         return True, "names bug and uses matching [skill-bug] title prefix"
     if not has_feature_tag:
-        return False, "stated kind is feature (last mentioned) but title prefix uses [skill-bug]"
+        return False, "stated kind is feature but title prefix uses [skill-bug]"
     return True, "names feature and uses matching [skill-feature] title prefix"
 
 
