@@ -4,8 +4,9 @@ description: >-
   Turns friction from an Infrahub skill session into a reviewed GitHub issue against opsmill/infrahub-skills.
   Infrahub skills fail quietly: a missing or unclear rule does not crash, it produces extra round trips and
   repeated user nudges. This skill gathers evidence of that friction, checks it is corroborated, works out
-  whether the skill or the underlying product is at fault, and drafts a proposed rule change. It stops at a
-  user review gate and never submits without explicit approval.
+  whether the skill or the underlying product is at fault, and drafts a proposed rule change. It never files
+  anything itself: it hands the redacted draft to infrahub-reporting-issues, which shows it to the user and
+  gets explicit approval before any submission.
   TRIGGER when: accepting a friction offer, the user says "report skill friction", asks why an Infrahub skill
   kept failing or needed so many retries, or wants a gap in an Infrahub skill's guidance reported.
   DO NOT TRIGGER when: reporting a bug in Infrahub itself or any other opsmill/infrahub-* product (use
@@ -21,7 +22,7 @@ metadata:
   author: OpsMill
 ---
 
-# Skill Gap Reporter
+# Infrahub Skill Gap Reporter
 
 ## Overview
 
@@ -30,11 +31,13 @@ crash; it produces eleven round trips and four user
 nudges before the model finds the right answer on its
 own. This skill works out which rule was missing,
 wrong, or unclear, and drafts an improvement as a
-GitHub issue against `opsmill/infrahub-skills`. It
-does **not** auto-submit: it prepares a complete
-draft and stops at the user's review gate. Submission
-only happens after the user explicitly approves the
-title and body.
+GitHub issue report against `opsmill/infrahub-skills`.
+It does **not** file anything itself: it prepares a
+complete, redacted draft and hands it to
+[infrahub-reporting-issues](../infrahub-reporting-issues/SKILL.md),
+which owns the 11-repo registry, duplicate search, the
+consent gate, submission-method choice, and
+confirmation. This skill's job ends at the handoff.
 
 ## When to Use
 
@@ -87,7 +90,7 @@ to level 2 and drafting. See
 For a skill defect, decide whether it is a bug (a rule
 or reference covers the topic and the model still got
 it wrong) or a feature (no rule or reference covers the
-topic). This decides the title prefix used in step 7.
+topic). This decides the title prefix used in step 6.
 See
 [rules/workflow-bug-vs-feature.md](rules/workflow-bug-vs-feature.md).
 
@@ -108,46 +111,39 @@ draft that cannot name the implicated file, or the gap
 in coverage, is not ready. See
 [rules/evidence-cite-the-artifact.md](rules/evidence-cite-the-artifact.md).
 
-### 6. Search duplicates
+### 6. Draft and redact
 
-Before drafting, check whether this friction is already
-tracked:
-
-```bash
-gh search issues --repo opsmill/infrahub-skills --state all "<keywords>"
-```
-
-See [rules/workflow-duplicate-search.md](rules/workflow-duplicate-search.md)
-for keyword selection and what to do on a match.
-
-### 7. Draft
-
-Fill [templates/skill-friction.md](templates/skill-friction.md).
-Redact anything that identifies the user's
+Fill [templates/skill-friction.md](templates/skill-friction.md),
+using the `bug:`/`feat:` title prefix decided in step
+3b. Redact anything that identifies the user's
 infrastructure or organization per
 [rules/evidence-no-customer-data.md](rules/evidence-no-customer-data.md).
-This is security-critical and applies before the
-draft is ever shown.
+This is security-critical and applies before the draft
+ever leaves this skill. This produces three of the four
+handoff fields (`type`, `title`, `body`); `repo` is
+always `opsmill/infrahub-skills`.
 
-### 8. Review gate
+### 7. Hand off
 
-Show the user the full title and body exactly as they
-would be submitted. Get explicit approval before doing
-anything else. See
-[rules/workflow-consent-gate.md](rules/workflow-consent-gate.md).
+Invoke [infrahub-reporting-issues](../infrahub-reporting-issues/SKILL.md)
+with the payload `{repo, type, title, body}`. That skill
+owns duplicate search, the review gate, submission-method
+choice, and confirmation from here; never file directly.
+See [rules/workflow-handoff-to-reporting.md](rules/workflow-handoff-to-reporting.md).
 
-### 9. Record the outcome
+### 8. Record the outcome
 
-Append the final status (filed, skipped, deferred) to
-the notes file described in [reference.md](reference.md)
-so a future session can find this decision instead of
+Append the final status (filed, skipped, deferred)
+reported back from the hand-off to the notes file
+described in [reference.md](reference.md) so a future
+session can find this decision instead of
 re-litigating it.
 
 ## Rule Categories
 
 | Prefix | Category | Description |
 | --------- | -------- | ----------- |
-| `workflow-` | Workflow | Ordering and gating: corroboration, triage, handoff, duplicate search, consent. Skipping one produces noise in the maintainers' tracker |
+| `workflow-` | Workflow | Ordering and gating: corroboration, triage, and handoff (to `infrahub-reporting-issues`, either for a product defect or to file a skill defect). Skipping one produces noise in the maintainers' tracker or a second, drifting filing pipeline |
 | `evidence-` | Evidence | What may and may not appear in a filed issue. Security-critical: issue bodies are public and cannot be retracted |
 
 See [rules/_sections.md](rules/_sections.md) for the
@@ -159,10 +155,13 @@ index.
   priority, transcript discovery, and the notes file
   schema. **Read this in step 1.**
 - [templates/skill-friction.md](templates/skill-friction.md):
-  the draft template filled in step 7.
+  the draft template filled in step 6.
 - [rules/evidence-no-customer-data.md](rules/evidence-no-customer-data.md):
-  what to redact before showing a draft. Security-critical;
+  what to redact before drafting. Security-critical;
   read this before every draft.
+- [rules/workflow-handoff-to-reporting.md](rules/workflow-handoff-to-reporting.md):
+  hand the payload to `infrahub-reporting-issues`; never
+  file directly. Read this before step 7.
 - **[../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)**
   -- Skill content first; how to consult `docs.infrahub.app`
   on a genuine gap
@@ -184,6 +183,9 @@ index.
   messages carry file paths, hostnames, and node kinds
   that identify a customer's infrastructure. Paraphrase,
   don't paste.
-- **Submitting without showing the body.** The review
-  gate in step 8 is not optional. A surprise GitHub
-  issue on a public repo is hard to unwind.
+- **Filing directly instead of handing off.** This
+  skill has no consent gate, no duplicate search, and no
+  submission method of its own. Running `gh issue create`
+  here, or claiming an issue was filed, bypasses the one
+  review gate `infrahub-reporting-issues` provides and
+  risks a second, unreviewed submission.

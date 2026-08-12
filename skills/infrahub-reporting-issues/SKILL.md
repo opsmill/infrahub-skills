@@ -53,6 +53,25 @@ hasn't expressed an intent to file an issue. Filing
 is the action that distinguishes this skill from
 general troubleshooting.
 
+## Skill-gap intake
+
+This skill may also be invoked directly by
+`infrahub-reporting-skill-gaps` with a prepared payload:
+`{repo, type, title, body}`. For that caller, `repo` is
+always `opsmill/infrahub-skills`, and `type` is `bug` or
+`feature`, already decided by that skill's two-level
+triage.
+
+When invoked this way, classification (step 2) and
+routing (step 3) are already decided, skip them. Skip
+environment info gathering (step 5) too; it collects
+Infrahub server, SDK, and OS versions, which do not
+apply to a report about a skill's own guidance. Start at
+step 4 (search for duplicates), using the caller's title
+and body as the render for step 6 instead of a generic
+template. Continue through steps 7-9 as normal: review
+gate, submission method, confirm.
+
 ## Workflow
 
 Follow these steps in order. Stop at every user-gate
@@ -144,10 +163,21 @@ Show the user the top 3-5 matches with title, state
 > "Is your issue covered by any of these? If yes,
 > we'll add a comment instead of opening a new one."
 
-If a match exists, switch to **comment mode**:
-prepare a comment that adds the user's new
-information (their version, reproduction, etc.) to
-the existing issue. Otherwise, proceed.
+If a match exists, switch to **comment mode** and
+choose one of two paths. State which one to the user:
+
+1. **Complement**: this occurrence adds information
+   the existing issue lacks, such as a different
+   trigger, a second affected skill or component, or a
+   new failure shape. Comment with the new information
+   only; do not restate what the issue already says.
+2. **Plus one**: this occurrence adds nothing new.
+   Post a short comment recording another hit, so
+   maintainers can gauge frequency, without repeating
+   the existing description.
+
+Either way, give the user the issue URL. Otherwise,
+proceed to draft a new issue.
 
 ### 5. Gather environment info (bugs only)
 

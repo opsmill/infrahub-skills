@@ -1,16 +1,19 @@
 <!--
 Skill-friction template for opsmill/infrahub-skills.
 Every bracketed placeholder must be replaced before
-this is shown to the user. Every section except
-"Proposed rule change" may be deleted when it does not
-apply to this report. Use generic phrasing throughout:
-no customer names, node kinds, hostnames, or paths.
+this is handed off. Every section except "Proposed rule
+change" may be deleted when it does not apply to this
+report. Use generic phrasing throughout: no customer
+names, node kinds, hostnames, or paths.
 
-Title prefix carries the level-2 classification:
-[skill-bug] when a rule or reference already covers the
-topic and the model still got it wrong, [skill-feature]
-when no rule or reference covers it. See
-rules/workflow-bug-vs-feature.md.
+Title prefix carries the level-2 classification: bug:
+when a rule or reference already covers the topic and
+the model still got it wrong, feat: when no rule or
+reference covers it. See rules/workflow-bug-vs-feature.md.
+This title, and the body below, are handed to
+infrahub-reporting-issues as-is; see
+rules/workflow-handoff-to-reporting.md. Do not file
+this directly.
 
 For a feature, "Docs the model had to leave the skill
 for" is the most useful section: the fetched page paths
@@ -20,7 +23,7 @@ weight: it names the file that claimed the ground and
 still let the model down.
 -->
 
-# [skill-bug|skill-feature] [skill]: [what the guidance is missing]
+# [bug|feat]: [skill]: [what the guidance is missing]
 
 **Skill**: [skill directory, e.g. infrahub-managing-schemas]
 **Type**: [bug | feature]

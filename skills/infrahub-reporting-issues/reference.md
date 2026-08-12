@@ -240,6 +240,12 @@ themselves (schema, objects, checks, etc.).
 
 **Issue templates**: none — use generic templates.
 
+**Title convention**: this repo does not use the shared
+`<area>: <imperative summary>` convention. Titles are
+`bug: <summary>` or `feat: <summary>`, matching the
+two-level classification `infrahub-reporting-skill-gaps`
+already decided before handing off.
+
 **URL**: <https://github.com/opsmill/infrahub-skills>
 
 ## Template availability summary

@@ -27,13 +27,21 @@ def _normalized(text: str) -> str:
     return re.sub(r"\s+", " ", text.lower())
 
 
+# Level-2 title tag. It has moved twice: `[skill-friction]` first, then
+# `[skill-bug]`/`[skill-feature]` once level-2 kind splitting shipped, and
+# now a bare `bug:`/`feat:` line prefix once filing moved to
+# infrahub-reporting-issues. Anchored to the start of a markdown line
+# (optionally after heading hashes or a bold-open marker) so ordinary prose
+# like "there's a bug: the counter increments twice" does not false-match;
+# a real title occupies its own line.
+_TITLE_TAG_RE = re.compile(
+    r"^\s*(?:#{1,6}\s*)?(?:\*\*)?(bug|feat):\s*\S", re.IGNORECASE | re.MULTILINE
+)
+
+
 def check_no_draft_on_single_session(text: str, **_: object) -> CheckResult:
     """Output does not draft a full issue from a single, uncorroborated session."""
-    # Matches either level-2 title prefix. The tag used to be the single
-    # literal `[skill-friction]`; Task 3 split it into `[skill-bug]` and
-    # `[skill-feature]`, so both must be checked here or a drafted issue
-    # with the newer tag would slip past this gate undetected.
-    has_issue_title = re.search(r"\[skill-(?:bug|feature)\]", text) is not None
+    has_issue_title = _TITLE_TAG_RE.search(text) is not None
     # Match the template's "Proposed rule change" heading at any depth of two
     # or more `#` (the real template uses `##`; do not require the literal
     # title tag to have survived, since a paraphrased draft is still a
@@ -44,7 +52,7 @@ def check_no_draft_on_single_session(text: str, **_: object) -> CheckResult:
     if has_issue_title or has_proposed_rule_change:
         hits = []
         if has_issue_title:
-            hits.append("[skill-bug]/[skill-feature] title line")
+            hits.append("bug:/feat: title line")
         if has_proposed_rule_change:
             hits.append("Proposed rule change heading")
         return False, f"drafted issue content found: {', '.join(hits)}"
@@ -193,21 +201,26 @@ def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
     bug", "rather than a feature") and treats the *other* term as the
     conclusion. When neither term is clearly negated, or both are, the
     check fails outright rather than guessing: a check that silently
-    passes an unresolvable case is worse than one that says so. The tag
-    brackets are stripped before this scan so a `[skill-bug]` tag's own
-    substring "bug" is never counted as a prose mention.
+    passes an unresolvable case is worse than one that says so. The title
+    tag itself is stripped before this scan (using a real-newline-preserving
+    lowercase, not `_normalized`, so the line-anchored strip actually lines
+    up) so a `bug:` title's own substring "bug" is never counted as a prose
+    mention; a `feat:` tag never contains the word "feature" so it needs no
+    stripping, but the substitution covers both for symmetry.
     """
-    low = _normalized(text)
-    prose = re.sub(r"\[skill-(?:bug|feature)\]", " ", low)
+    low = text.lower()
+    tag_match = _TITLE_TAG_RE.search(text)
+    has_bug_tag = bool(tag_match and tag_match.group(1).lower() == "bug")
+    has_feature_tag = bool(tag_match and tag_match.group(1).lower() == "feat")
+
+    prose = re.sub(r"^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:bug|feat):\s*", " ", low, flags=re.MULTILINE)
     named_bug = re.search(r"\bbug\b", prose) is not None
     named_feature = re.search(r"\bfeature\b", prose) is not None
-    has_bug_tag = "[skill-bug]" in text
-    has_feature_tag = "[skill-feature]" in text
 
     if not (named_bug or named_feature):
         return False, "no explicit bug/feature classification named"
     if not (has_bug_tag or has_feature_tag):
-        return False, "kind named but no [skill-bug]/[skill-feature] title prefix found"
+        return False, "kind named but no bug:/feat: title prefix found"
 
     if named_bug and named_feature:
         bug_negated = _term_is_negated(prose, "bug")
@@ -229,11 +242,11 @@ def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
 
     if stated == "bug":
         if not has_bug_tag:
-            return False, "stated kind is bug but title prefix uses [skill-feature]"
-        return True, "names bug and uses matching [skill-bug] title prefix"
+            return False, "stated kind is bug but title prefix uses feat:"
+        return True, "names bug and uses matching bug: title prefix"
     if not has_feature_tag:
-        return False, "stated kind is feature but title prefix uses [skill-bug]"
-    return True, "names feature and uses matching [skill-feature] title prefix"
+        return False, "stated kind is feature but title prefix uses bug:"
+    return True, "names feature and uses matching feat: title prefix"
 
 
 _COVERAGE_PATTERNS = (
@@ -406,13 +419,15 @@ def check_no_skills_issue_for_product_bug(text: str, **_: object) -> CheckResult
     A mention of `opsmill/infrahub-skills` in a negated context ("handing
     off instead of filing against opsmill/infrahub-skills") is the correct,
     expected phrasing and must not fail this check; only an unnegated use as
-    an actual filing target counts as a violation.
+    an actual filing target counts as a violation. Checks for the current
+    `bug:`/`feat:` title tag (moved here from `[skill-bug]`/`[skill-feature]`
+    when filing handed off to infrahub-reporting-issues); a product-bug
+    draft that reached the drafting stage at all is the violation this
+    guards against, regardless of which generation of the tag it used.
     """
     hits = []
-    if "[skill-bug]" in text:
-        hits.append("[skill-bug] title line")
-    if "[skill-feature]" in text:
-        hits.append("[skill-feature] title line")
+    if _TITLE_TAG_RE.search(text):
+        hits.append("bug:/feat: title line")
 
     for match in re.finditer(r"opsmill/infrahub-skills", text):
         window = text[max(0, match.start() - 40) : match.start()].lower()
@@ -423,6 +438,120 @@ def check_no_skills_issue_for_product_bug(text: str, **_: object) -> CheckResult
     if hits:
         return False, f"found skills-repo issue content: {', '.join(hits)}"
     return True, "no skill-repo title tag and no opsmill/infrahub-skills filing target"
+
+
+_HANDOFF_VERBS = (
+    "hand off",
+    "handing off",
+    "handed off",
+    "hands off",
+    "invoke",
+    "invoking",
+    "invoked",
+    "delegate",
+    "delegating",
+    "pass to",
+    "passing to",
+    "give to",
+    "giving to",
+)
+
+
+def check_hands_off_to_reporting_issues_for_filing(text: str, **_: object) -> CheckResult:
+    """Output invokes or names infrahub-reporting-issues as the filer.
+
+    Distinct from `hands-off-to-reporting-issues` (the product-defect
+    check): this requires a hand-off verb near the mention, not just any
+    mention, so a response that only name-drops the other skill in passing
+    (without actually routing to it) does not pass on the strength of the
+    substring alone.
+    """
+    low = _normalized(text)
+    if "infrahub-reporting-issues" not in low:
+        return False, "no reference to infrahub-reporting-issues"
+    if any(v in low for v in _HANDOFF_VERBS):
+        return True, "invokes/hands off to infrahub-reporting-issues for filing"
+    return False, "mentions infrahub-reporting-issues but does not hand off to it"
+
+
+_FILED_CLAIM_PATTERNS = (
+    "issue has been filed",
+    "issue was filed",
+    "i've filed",
+    "i have filed",
+    "filed the issue",
+    "successfully filed",
+    "issue #",
+    "opened the issue",
+    "submitted the issue",
+    "issue is now open",
+    "created the issue",
+)
+
+
+def check_no_direct_filing(text: str, **_: object) -> CheckResult:
+    """Output never files directly and never claims a filing happened.
+
+    The failure mode this catches: a response that correctly hands off to
+    infrahub-reporting-issues but then also runs (or prints, "for
+    reference") a `gh issue create`/`gh search issues` command itself, or
+    states outright that an issue was filed. A legitimate hand-off response
+    will mention infrahub-reporting-issues and describe what it does,
+    which may include the words "file" or "submit" in the future tense
+    ("it will file this"); that must not trip this check. Only an actual
+    `gh` invocation or a past-tense filing claim does.
+    """
+    low = _normalized(text)
+    hits = []
+    if re.search(r"\bgh issue create\b", low):
+        hits.append("gh issue create")
+    if re.search(r"\bgh search issues\b", low):
+        hits.append("gh search issues")
+    for phrase in _FILED_CLAIM_PATTERNS:
+        if phrase in low:
+            hits.append(f"claim of filing ({phrase!r})")
+            break
+    if hits:
+        return False, f"direct filing behavior found: {', '.join(hits)}"
+    return True, "no direct filing behavior found"
+
+
+_PAYLOAD_BODY_MARKERS = (
+    "what was being attempted",
+    "rules consulted",
+    "where it went wrong",
+    "proposed rule change",
+)
+
+
+def check_payload_is_complete(text: str, **_: object) -> CheckResult:
+    """Output carries all four handoff payload fields: repo, type, title, body."""
+    low = _normalized(text)
+    missing = []
+
+    if "opsmill/infrahub-skills" not in low:
+        missing.append("repo (opsmill/infrahub-skills)")
+
+    if re.search(r"\btype\b\s*[:\-]?\s*(bug|feature)\b", low) is None:
+        missing.append("type (bug/feature)")
+
+    if _TITLE_TAG_RE.search(text) is None:
+        missing.append("title (bug:/feat: prefix)")
+
+    if not any(marker in low for marker in _PAYLOAD_BODY_MARKERS):
+        missing.append("body (no drafted section found)")
+
+    if missing:
+        return False, f"payload missing: {', '.join(missing)}"
+    return True, "payload carries repo, type, title, and body"
+
+
+def check_title_uses_kind_prefix(text: str, **_: object) -> CheckResult:
+    """Output's title starts with bug: or feat:."""
+    match = _TITLE_TAG_RE.search(text)
+    if match:
+        return True, f"title uses {match.group(1).lower()}: prefix"
+    return False, "no title line starting with bug: or feat:"
 
 
 CHECKS: dict[str, CheckFn] = {
@@ -436,6 +565,10 @@ CHECKS: dict[str, CheckFn] = {
     "cites-escape-as-feature-evidence": check_cites_escape_as_feature_evidence,
     "hands-off-to-reporting-issues": check_hands_off_to_reporting_issues,
     "no-skills-issue-for-product-bug": check_no_skills_issue_for_product_bug,
+    "hands-off-to-reporting-issues-for-filing": check_hands_off_to_reporting_issues_for_filing,
+    "no-direct-filing": check_no_direct_filing,
+    "payload-is-complete": check_payload_is_complete,
+    "title-uses-kind-prefix": check_title_uses_kind_prefix,
 }
 
 CheckSpec = str | tuple[str, dict]

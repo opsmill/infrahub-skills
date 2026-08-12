@@ -6,5 +6,5 @@ concerns get standalone rule files with eval coverage.
 
 | Prefix | Category | Description |
 | ---------- | -------- | ----------- |
-| `workflow-` | Workflow | Ordering and gating: corroboration, triage, handoff, duplicate search, consent. Skipping one produces noise in the maintainers' tracker. |
+| `workflow-` | Workflow | Ordering and gating: corroboration, triage, and handoff (to `infrahub-reporting-issues`, either for a product defect or to file a skill defect). Skipping one produces noise in the maintainers' tracker or a second, drifting filing pipeline. |
 | `evidence-` | Evidence | What may and may not appear in a filed issue. Security-critical: issue bodies are public and cannot be retracted. |

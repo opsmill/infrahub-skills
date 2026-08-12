@@ -4191,3 +4191,56 @@ tasks:
       - name: cites-escape-as-feature-evidence
         check: >-
           No docs/llms.txt escape occurred, so this check passes vacuously
+
+  - name: reporting-skill-gaps-handoff
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: This friction has now shown up in two separate sessions with
+      infrahub-managing-checks. Both times, a validation check needed to
+      import a GraphQL fragment defined in another check module in the same
+      repository, and both sessions took two failed check runs to find the
+      correct relative import path. Checking this skill's loaded rules and
+      the shared infrahub-common references turned up nothing that
+      addresses sharing a fragment across check files.
+
+      Corroboration is already met (two sessions, same signature). Triage
+      has already concluded this is a skill defect, and level 2 has already
+      concluded the kind: no rule or reference anywhere covers fragment
+      sharing across check modules, so this is a gap the skill's own
+      material never claimed.
+
+      Work through the rest of the workflow to completion: locate the
+      implicated rule coverage, draft the report, redact anything that
+      identifies the user's infrastructure, and take this as far as this
+      skill's own steps go. Do NOT run `gh` commands or contact GitHub
+      yourself; write out what you would do instead.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_handoff_to_reporting.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that drafts a complete report (repo opsmill/infrahub-skills,
+      type feature, a title starting with `feat:`, and a filled-in body),
+      then hands the payload to infrahub-reporting-issues instead of running
+      `gh issue create` or claiming an issue was filed itself.
+    expectations:
+      - Hands off to infrahub-reporting-issues to file, rather than filing directly
+      - Runs no `gh` commands itself and claims no issue was filed
+      - Carries a complete payload (repo, type, title, body)
+      - Uses a title starting with `feat:`
+    assertions:
+      - name: hands-off-to-reporting-issues-for-filing
+        check: Response invokes or names infrahub-reporting-issues as the filer
+      - name: no-direct-filing
+        check: >-
+          Response contains no `gh issue create`, no `gh search issues`, and
+          no claim that an issue was filed
+      - name: payload-is-complete
+        check: Response carries all four payload fields (repo, type, title, body)
+      - name: title-uses-kind-prefix
+        check: Response's title starts with `bug:` or `feat:`
