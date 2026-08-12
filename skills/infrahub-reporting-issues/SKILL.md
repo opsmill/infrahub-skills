@@ -53,6 +53,15 @@ hasn't expressed an intent to file an issue. Filing
 is the action that distinguishes this skill from
 general troubleshooting.
 
+Do not trigger directly when the friction is with an
+Infrahub *skill's* own guidance (a rule that's wrong,
+missing, or confusing) rather than the Infrahub
+product itself. That belongs to
+[infrahub-reporting-skill-gaps](../infrahub-reporting-skill-gaps/SKILL.md),
+which corroborates the friction across sessions and
+decides bug vs. feature before handing a payload to
+this skill.
+
 ## Skill-gap intake
 
 This skill may also be invoked directly by
