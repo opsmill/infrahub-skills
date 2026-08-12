@@ -27,15 +27,17 @@ def _normalized(text: str) -> str:
     return re.sub(r"\s+", " ", text.lower())
 
 
-# Level-2 title tag. It has moved twice: `[skill-friction]` first, then
-# `[skill-bug]`/`[skill-feature]` once level-2 kind splitting shipped, and
-# now a bare `bug:`/`feat:` line prefix once filing moved to
-# infrahub-reporting-issues. Anchored to the start of a markdown line
-# (optionally after heading hashes or a bold-open marker) so ordinary prose
-# like "there's a bug: the counter increments twice" does not false-match;
-# a real title occupies its own line.
+# Level-2 title tag. It has moved three times: `[skill-friction]` first,
+# then `[skill-bug]`/`[skill-feature]` once level-2 kind splitting shipped,
+# then a bare `bug:`/`feat:` line prefix once filing moved to
+# infrahub-reporting-issues, and now a third kind, `docs:`, sits between
+# them once "no rule covers it" split into feature (a docs escape resolved
+# the problem) and docs gap (the escape still failed). Anchored to the
+# start of a markdown line (optionally after heading hashes or a bold-open
+# marker) so ordinary prose like "there's a bug: the counter increments
+# twice" does not false-match; a real title occupies its own line.
 _TITLE_TAG_RE = re.compile(
-    r"^\s*(?:#{1,6}\s*)?(?:\*\*)?(bug|feat):\s*\S", re.IGNORECASE | re.MULTILINE
+    r"^\s*(?:#{1,6}\s*)?(?:\*\*)?(bug|feat|docs):\s*\S", re.IGNORECASE | re.MULTILINE
 )
 
 
@@ -52,7 +54,7 @@ def check_no_draft_on_single_session(text: str, **_: object) -> CheckResult:
     if has_issue_title or has_proposed_rule_change:
         hits = []
         if has_issue_title:
-            hits.append("bug:/feat: title line")
+            hits.append("bug:/feat:/docs: title line")
         if has_proposed_rule_change:
             hits.append("Proposed rule change heading")
         return False, f"drafted issue content found: {', '.join(hits)}"
@@ -189,64 +191,84 @@ def _term_is_negated(text: str, term: str) -> bool:
     return re.search(pattern, text) is not None
 
 
-def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
-    """Output names the level-2 kind explicitly and uses the matching title
-    prefix. `\\bbug\\b` does not match inside "debug" (the boundary before
-    "b" fails when preceded by "de").
+# Each level-2 kind, in the order the classification table lists them:
+# (prose label, title-tag value, detection regex, negation-search term).
+# "docs gap" is matched as the two-word phrase, never the bare word "docs":
+# "docs" alone appears constantly in compliant prose ("docs.infrahub.app",
+# "the docs page", "fetched the docs") for reasons that have nothing to do
+# with stating the kind, so a bare-word match would false-positive on
+# almost every response that also discusses a feature or docs-gap escape.
+# The negation-search term for "docs gap" uses `\s+` between the two words
+# so it still matches if a line wrap inserts a newline between them.
+_KIND_SPECS: tuple[tuple[str, str, str, str], ...] = (
+    ("bug", "bug", r"\bbug\b", "bug"),
+    ("feature", "feat", r"\bfeature\b", "feature"),
+    ("docs gap", "docs", r"\bdocs\s+gap\b", r"docs\s+gap"),
+)
+_KIND_TAG_BY_NAME = {name: tag for name, tag, _, _ in _KIND_SPECS}
 
-    Contrastive phrasing mentions both terms, in either order: "not a bug,
-    it's a feature" or "this is a bug, not a feature" are equally natural,
-    so position cannot resolve which term is the stated conclusion. This
-    instead finds whichever term carries an attached negation ("not a
-    bug", "rather than a feature") and treats the *other* term as the
-    conclusion. When neither term is clearly negated, or both are, the
-    check fails outright rather than guessing: a check that silently
-    passes an unresolvable case is worse than one that says so. The title
-    tag itself is stripped before this scan (using a real-newline-preserving
-    lowercase, not `_normalized`, so the line-anchored strip actually lines
-    up) so a `bug:` title's own substring "bug" is never counted as a prose
-    mention; a `feat:` tag never contains the word "feature" so it needs no
-    stripping, but the substitution covers both for symmetry.
+
+def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
+    """Output names the level-2 kind explicitly (bug, feature, or docs gap)
+    and uses the matching title prefix. `\\bbug\\b` does not match inside
+    "debug" (the boundary before "b" fails when preceded by "de").
+
+    Contrastive phrasing can name two or all three terms, in any order:
+    "not a bug, it's a feature", "this is a bug, not a feature", "not a
+    bug and not a feature, it is a docs gap", "it's a docs gap, not a bug,
+    not a feature" are all equally natural, so position cannot resolve
+    which term is the stated conclusion. This instead finds which named
+    terms carry an attached negation ("not a bug", "rather than a
+    feature") and treats the conclusion as whichever named term is the
+    sole one *without* a negation attached: with two terms named, exactly
+    one of them must be negated; with three, exactly two. Any other split
+    (zero negated when two are named; anything other than exactly two
+    negated when three are named) is unresolvable and the check fails
+    outright rather than guessing: a check that silently passes an
+    unresolvable case is worse than one that says so.
+
+    The title tag itself is stripped before this scan (using a
+    real-newline-preserving lowercase, not `_normalized`, so the
+    line-anchored strip actually lines up) so a `bug:` title's own
+    substring "bug" is never counted as a prose mention; a `feat:` tag
+    never contains the word "feature" and a `docs:` tag never contains
+    "docs gap", but the substitution strips all three prefixes for
+    symmetry.
     """
     low = text.lower()
     tag_match = _TITLE_TAG_RE.search(text)
-    has_bug_tag = bool(tag_match and tag_match.group(1).lower() == "bug")
-    has_feature_tag = bool(tag_match and tag_match.group(1).lower() == "feat")
+    tag_value = tag_match.group(1).lower() if tag_match else None
 
-    prose = re.sub(r"^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:bug|feat):\s*", " ", low, flags=re.MULTILINE)
-    named_bug = re.search(r"\bbug\b", prose) is not None
-    named_feature = re.search(r"\bfeature\b", prose) is not None
+    prose = re.sub(
+        r"^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:bug|feat|docs):\s*", " ", low, flags=re.MULTILINE
+    )
 
-    if not (named_bug or named_feature):
-        return False, "no explicit bug/feature classification named"
-    if not (has_bug_tag or has_feature_tag):
-        return False, "kind named but no bug:/feat: title prefix found"
+    named = [name for name, _, pattern, _ in _KIND_SPECS if re.search(pattern, prose)]
 
-    if named_bug and named_feature:
-        bug_negated = _term_is_negated(prose, "bug")
-        feature_negated = _term_is_negated(prose, "feature")
-        if bug_negated and not feature_negated:
-            stated = "feature"
-        elif feature_negated and not bug_negated:
-            stated = "bug"
-        else:
-            return False, (
-                "both bug and feature are named but neither is clearly "
-                "negated (or both are); cannot resolve which is the "
-                "stated conclusion"
-            )
-    elif named_bug:
-        stated = "bug"
+    if not named:
+        return False, "no explicit bug/feature/docs gap classification named"
+    if tag_value not in _KIND_TAG_BY_NAME.values():
+        return False, "kind named but no bug:/feat:/docs: title prefix found"
+
+    if len(named) == 1:
+        stated = named[0]
     else:
-        stated = "feature"
+        term_by_name = {name: term for name, _, _, term in _KIND_SPECS}
+        negated = {name: _term_is_negated(prose, term_by_name[name]) for name in named}
+        unnegated = [name for name in named if not negated[name]]
+        if len(unnegated) != 1:
+            return False, (
+                f"{', '.join(named)} are all named but the negation pattern "
+                "does not resolve to exactly one stated conclusion"
+            )
+        stated = unnegated[0]
 
-    if stated == "bug":
-        if not has_bug_tag:
-            return False, "stated kind is bug but title prefix uses feat:"
-        return True, "names bug and uses matching bug: title prefix"
-    if not has_feature_tag:
-        return False, "stated kind is feature but title prefix uses bug:"
-    return True, "names feature and uses matching feat: title prefix"
+    expected_tag = _KIND_TAG_BY_NAME[stated]
+    if tag_value != expected_tag:
+        return False, (
+            f"stated kind is {stated} but title prefix uses {tag_value}:"
+        )
+    return True, f"names {stated} and uses matching {expected_tag}: title prefix"
 
 
 _COVERAGE_PATTERNS = (
@@ -290,13 +312,69 @@ _SEVERITY_PATTERNS = (
 )
 
 
+# Whether a docs escape (llms.txt or a docs.infrahub.app page reached
+# through it) resolved the problem or not. This is the sentence the
+# feature/docs-gap split rests on: "no rule covers it" is common to both,
+# and only the post-escape outcome tells them apart. Kept broad but
+# distinct from each other (a sample matching both is treated as
+# self-contradictory by check_cites_escape_outcome below, not silently
+# resolved either way).
+_ESCAPE_RESOLVED_PATTERNS = (
+    "found the answer",
+    "which answered it",
+    "that answered it",
+    "the page answered",
+    "answered the question",
+    "which resolved the problem",
+    "that resolved the problem",
+    "which resolved this",
+    "that resolved this",
+    "worked after reading",
+    "succeeded after",
+    "which worked on the first try",
+    "and it worked",
+)
+_ESCAPE_FAILED_PATTERNS = (
+    "still failed",
+    "still could not",
+    "still couldn't",
+    "did not address",
+    "didn't address",
+    "does not address",
+    "doesn't address",
+    "did not answer",
+    "didn't answer",
+    "does not answer",
+    "doesn't answer",
+    "no answer there either",
+    "did not address the problem",
+    "remained unresolved",
+    "still unresolved",
+    "did not resolve",
+    "didn't resolve",
+    "did not help",
+    "didn't help",
+    "page did not cover",
+    "page didn't cover",
+    "page did not address",
+)
+
+
 def check_justifies_kind_by_coverage(text: str, **_: object) -> CheckResult:
-    """Output ties bug-vs-feature to whether a rule already covers the
-    topic, not to severity, round-trip count, or user frustration.
+    """Output ties bug-vs-feature-vs-docs-gap to whether a rule already
+    covers the topic, not to severity, round-trip count, or user
+    frustration.
 
     Rejects the failure mode where a response reaches a defensible-looking
     answer ("this took eleven round trips so it is a bug") by reasoning
     about how bad the friction felt rather than about coverage.
+
+    For a `docs:` classification, coverage alone ("no rule covers this")
+    is necessary but not sufficient: a feature draft says exactly the same
+    thing about coverage, and the only sentence that tells the two apart
+    is whether the docs escape resolved the problem or not. So a docs-gap
+    draft must also state that the escape failed; coverage language
+    without that outcome is treated the same as no justification at all.
     """
     low = _normalized(text)
     has_coverage = any(p in low for p in _COVERAGE_PATTERNS)
@@ -313,6 +391,24 @@ def check_justifies_kind_by_coverage(text: str, **_: object) -> CheckResult:
 
     if severity_as_reason and not has_coverage:
         return False, "justifies kind by severity/round-trips rather than rule coverage"
+
+    tag_match = _TITLE_TAG_RE.search(text)
+    is_docs = bool(tag_match and tag_match.group(1).lower() == "docs")
+    if is_docs:
+        has_failed_outcome = any(p in low for p in _ESCAPE_FAILED_PATTERNS)
+        if has_coverage and has_failed_outcome:
+            return True, (
+                "ties docs-gap kind to coverage plus the post-escape "
+                "failure outcome"
+            )
+        if has_coverage and not has_failed_outcome:
+            return False, (
+                "docs-gap kind justified by coverage alone; missing the "
+                "post-escape failure outcome that distinguishes it from "
+                "a feature"
+            )
+        return False, "no coverage-based justification found for the docs-gap kind"
+
     if has_coverage:
         return True, "ties kind to whether a rule or reference already covers the topic"
     return False, "no coverage-based justification found for the bug/feature kind"
@@ -392,6 +488,49 @@ def check_cites_escape_as_feature_evidence(text: str, **_: object) -> CheckResul
     )
 
 
+def check_cites_escape_outcome(text: str, **_: object) -> CheckResult:
+    """When the evidence shows a docs/llms.txt escape, output states
+    whether that escape resolved the problem.
+
+    This is the sentence the whole feature/docs-gap split rests on: an
+    escape alone only establishes that the skill's own material was
+    checked and found silent. Whether the outcome is feature or docs gap
+    depends entirely on what happened after the fetch, and this check
+    exists to catch a draft that narrates the escape but never says which
+    way it landed. Disqualified under the ordering caution the same way
+    `cites_escape_as_feature_evidence` is: an escape that happened before
+    the skill's own rules were read is a behavior defect, not evidence of
+    either outcome, so its resolution status is moot and this check does
+    not require one. Vacuously passes when no escape is present at all.
+    """
+    low = _normalized(text)
+    has_escape = "llms.txt" in low or "docs.infrahub.app" in low
+    if not has_escape:
+        return True, "no docs/llms.txt escape evidence present; check not applicable"
+
+    disqualified = any(p in low for p in _ORDERING_DISQUALIFIED_PATTERNS) or any(
+        re.search(p, low) for p in _ORDERING_DISQUALIFIED_REGEXES
+    )
+    if disqualified:
+        return True, (
+            "escape present but disqualified under the ordering caution; "
+            "outcome not required"
+        )
+
+    resolved = any(p in low for p in _ESCAPE_RESOLVED_PATTERNS)
+    failed = any(p in low for p in _ESCAPE_FAILED_PATTERNS)
+    if resolved and failed:
+        return False, "escape outcome contradicts itself: both resolved and failed language present"
+    if resolved:
+        return True, "states the escape resolved the problem"
+    if failed:
+        return True, "states the escape did not resolve the problem"
+    return False, (
+        "docs/llms.txt escape present but no statement of whether it "
+        "resolved the problem"
+    )
+
+
 def check_hands_off_to_reporting_issues(text: str, **_: object) -> CheckResult:
     """Output references infrahub-reporting-issues for the product-defect handoff."""
     if "infrahub-reporting-issues" in text:
@@ -420,14 +559,15 @@ def check_no_skills_issue_for_product_bug(text: str, **_: object) -> CheckResult
     off instead of filing against opsmill/infrahub-skills") is the correct,
     expected phrasing and must not fail this check; only an unnegated use as
     an actual filing target counts as a violation. Checks for the current
-    `bug:`/`feat:` title tag (moved here from `[skill-bug]`/`[skill-feature]`
-    when filing handed off to infrahub-reporting-issues); a product-bug
-    draft that reached the drafting stage at all is the violation this
-    guards against, regardless of which generation of the tag it used.
+    `bug:`/`feat:`/`docs:` title tag (moved here from
+    `[skill-bug]`/`[skill-feature]` when filing handed off to
+    infrahub-reporting-issues); a product-bug draft that reached the
+    drafting stage at all is the violation this guards against, regardless
+    of which generation of the tag, or which of the three kinds, it used.
     """
     hits = []
     if _TITLE_TAG_RE.search(text):
-        hits.append("bug:/feat: title line")
+        hits.append("bug:/feat:/docs: title line")
 
     for match in re.finditer(r"opsmill/infrahub-skills", text):
         window = text[max(0, match.start() - 40) : match.start()].lower()
@@ -532,11 +672,11 @@ def check_payload_is_complete(text: str, **_: object) -> CheckResult:
     if "opsmill/infrahub-skills" not in low:
         missing.append("repo (opsmill/infrahub-skills)")
 
-    if re.search(r"\btype\b\s*[:\-]?\s*(bug|feature)\b", low) is None:
-        missing.append("type (bug/feature)")
+    if re.search(r"\btype\b\s*[:\-]?\s*(bug|feature|docs gap)\b", low) is None:
+        missing.append("type (bug/feature/docs gap)")
 
     if _TITLE_TAG_RE.search(text) is None:
-        missing.append("title (bug:/feat: prefix)")
+        missing.append("title (bug:/feat:/docs: prefix)")
 
     if not any(marker in low for marker in _PAYLOAD_BODY_MARKERS):
         missing.append("body (no drafted section found)")
@@ -547,11 +687,11 @@ def check_payload_is_complete(text: str, **_: object) -> CheckResult:
 
 
 def check_title_uses_kind_prefix(text: str, **_: object) -> CheckResult:
-    """Output's title starts with bug: or feat:."""
+    """Output's title starts with bug:, feat:, or docs:."""
     match = _TITLE_TAG_RE.search(text)
     if match:
         return True, f"title uses {match.group(1).lower()}: prefix"
-    return False, "no title line starting with bug: or feat:"
+    return False, "no title line starting with bug:, feat:, or docs:"
 
 
 _RULE_PATH_RE = re.compile(
@@ -837,6 +977,7 @@ CHECKS: dict[str, CheckFn] = {
     "states-bug-or-feature": check_states_bug_or_feature,
     "justifies-kind-by-coverage": check_justifies_kind_by_coverage,
     "cites-escape-as-feature-evidence": check_cites_escape_as_feature_evidence,
+    "cites-escape-outcome": check_cites_escape_outcome,
     "hands-off-to-reporting-issues": check_hands_off_to_reporting_issues,
     "no-skills-issue-for-product-bug": check_no_skills_issue_for_product_bug,
     "hands-off-to-reporting-issues-for-filing": check_hands_off_to_reporting_issues_for_filing,

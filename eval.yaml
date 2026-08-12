@@ -4192,6 +4192,63 @@ tasks:
         check: >-
           No docs/llms.txt escape occurred, so this check passes vacuously
 
+  - name: reporting-skill-gaps-docs-gap
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: While using infrahub-managing-generators, a generator needed to
+      read an attribute two relationship hops away from the object it was
+      generating for, through an intermediate peer. You read
+      patterns-common.md, python-generate.md, and
+      python-relationship-references.md in the generators skill, and
+      infrahub-common's graphql-queries.md reference, in full, before
+      writing any code. None of them say anything about traversing more
+      than one relationship hop in a GraphQL query. You then used your
+      web-fetch tool on https://docs.infrahub.app/llms.txt with a targeted
+      question about multi-hop relationship traversal, which pointed at a
+      specific documentation page; you fetched that page's Markdown twin,
+      but its content only walked through a single relationship hop and
+      never addressed traversing a second one. You ended up working out the
+      correct query shape by reading the GraphQL schema directly and trying
+      several field paths until one resolved.
+
+      This friction has already been corroborated (a second session hit the
+      same traversal problem last week) and triage has already concluded
+      this is a skill defect. Work through the next step: decide the kind
+      and state the title you would use for the report, with reasoning,
+      including which page path you reached and what it did or did not
+      answer. Do not run `gh` commands or submit anything.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_bug_vs_feature.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that recognizes no rule anywhere covers multi-hop
+      relationship traversal, that the docs.infrahub.app/llms.txt escape
+      happened only after the skill's own material and infrahub-common were
+      checked, and that the page it pointed at still did not address the
+      multi-hop case, gives the matching docs: title, and records the
+      fetched page path and what it failed to answer.
+    expectations:
+      - Names the kind explicitly and uses a matching title prefix
+      - Ties the kind to whether a rule already covers the topic, not to effort or round trips
+      - States plainly whether the docs escape resolved the problem
+      - Records the specific page path reached and what it did not answer
+    assertions:
+      - name: states-bug-or-feature
+        check: Response names the kind explicitly and uses the matching title prefix
+      - name: justifies-kind-by-coverage
+        check: >-
+          Response ties the kind to whether a rule already covers the topic
+          plus the post-escape outcome, not to severity or effort
+      - name: cites-escape-outcome
+        check: >-
+          Response states whether the docs escape resolved the problem or not
+
   - name: reporting-skill-gaps-handoff
     trials: 3
     instruction: |

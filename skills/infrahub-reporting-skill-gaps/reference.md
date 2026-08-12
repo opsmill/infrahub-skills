@@ -41,13 +41,18 @@ Friction shows up in a transcript as:
   was already read
 
 A fetch of `llms.txt` or a `docs.infrahub.app` page is
-an escape marker, not just friction: it points at a
-feature rather than a bug, because the fallback rule in
+an escape marker, not just friction: it points away from
+a bug, because the fallback rule in
 [workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)
 only authorizes it once the skill's own files were
-checked and found silent. See
+checked and found silent. What matters beyond that is
+**what happened after the fetch**: an escape that found
+the answer points at a feature, an escape that still
+failed to answer the question points at a docs gap, and
+no escape at all defaults to feature with the docs
+status left unverified. See
 [rules/workflow-bug-vs-feature.md](rules/workflow-bug-vs-feature.md)
-for how that signal feeds the bug-vs-feature call.
+for the full three-way reading.
 
 Fetches of `marketplace.infrahub.app` and
 `infrahub.opsmill.io` are **not** friction. Several

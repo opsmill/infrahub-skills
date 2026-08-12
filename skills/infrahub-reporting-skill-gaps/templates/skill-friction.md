@@ -8,25 +8,32 @@ names, node kinds, hostnames, or paths.
 
 Title prefix carries the level-2 classification: bug:
 when a rule or reference already covers the topic and
-the model still got it wrong, feat: when no rule or
-reference covers it. See rules/workflow-bug-vs-feature.md.
-This title, and the body below, are handed to
-infrahub-reporting-issues as-is; see
-rules/workflow-handoff-to-reporting.md. Do not file
-this directly.
+the model still got it wrong, feat: when no rule covers
+it and a docs escape either found the answer or never
+happened at all, docs: when no rule covers it and a docs
+escape happened but still failed to answer the question.
+See rules/workflow-bug-vs-feature.md. This title, and
+the body below, are handed to infrahub-reporting-issues
+as-is; see rules/workflow-handoff-to-reporting.md. Do
+not file this directly.
 
 For a feature, "Docs the model had to leave the skill
 for" is the most useful section: the fetched page paths
 are the specification for the rule a maintainer needs
 to write. For a bug, "Rules consulted" carries the
 weight: it names the file that claimed the ground and
-still let the model down.
+still let the model down. For a docs gap, "Docs the
+model had to leave the skill for" carries the weight
+again, but the other way around: record which pages were
+reached and specifically what they failed to answer,
+since that is the specification for the documentation
+that needs writing before any rule can cite it.
 -->
 
-# [bug|feat]: [skill]: [what the guidance is missing]
+# [bug|feat|docs]: [skill]: [what the guidance is missing]
 
 **Skill**: [skill directory, e.g. infrahub-managing-schemas]
-**Type**: [bug | feature]
+**Type**: [bug | feature | docs gap]
 **Recurrence**: [number of corroborating sessions, or the explicit user confirmation that stood in for a second session]
 
 ## What was being attempted

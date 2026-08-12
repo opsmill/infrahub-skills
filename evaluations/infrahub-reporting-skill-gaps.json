@@ -130,6 +130,32 @@
     },
     {
       "id": 6,
+      "prompt": "While using infrahub-managing-generators, a generator needed to\nread an attribute two relationship hops away from the object it was\ngenerating for, through an intermediate peer. You read\npatterns-common.md, python-generate.md, and\npython-relationship-references.md in the generators skill, and\ninfrahub-common's graphql-queries.md reference, in full, before\nwriting any code. None of them say anything about traversing more\nthan one relationship hop in a GraphQL query. You then used your\nweb-fetch tool on https://docs.infrahub.app/llms.txt with a targeted\nquestion about multi-hop relationship traversal, which pointed at a\nspecific documentation page; you fetched that page's Markdown twin,\nbut its content only walked through a single relationship hop and\nnever addressed traversing a second one. You ended up working out the\ncorrect query shape by reading the GraphQL schema directly and trying\nseveral field paths until one resolved.\n\nThis friction has already been corroborated (a second session hit the\nsame traversal problem last week) and triage has already concluded\nthis is a skill defect. Work through the next step: decide the kind\nand state the title you would use for the report, with reasoning,\nincluding which page path you reached and what it did or did not\nanswer. Do not run `gh` commands or submit anything.\n\nSave your answer to: output.md",
+      "expected_output": "A response that recognizes no rule anywhere covers multi-hop relationship traversal, that the docs.infrahub.app/llms.txt escape happened only after the skill's own material and infrahub-common were checked, and that the page it pointed at still did not address the multi-hop case, gives the matching docs: title, and records the fetched page path and what it failed to answer.",
+      "files": [],
+      "expectations": [
+        "Names the kind explicitly and uses a matching title prefix",
+        "Ties the kind to whether a rule already covers the topic, not to effort or round trips",
+        "States plainly whether the docs escape resolved the problem",
+        "Records the specific page path reached and what it did not answer"
+      ],
+      "assertions": [
+        {
+          "name": "states-bug-or-feature",
+          "check": "Response names the kind explicitly and uses the matching title prefix"
+        },
+        {
+          "name": "justifies-kind-by-coverage",
+          "check": "Response ties the kind to whether a rule already covers the topic plus the post-escape outcome, not to severity or effort"
+        },
+        {
+          "name": "cites-escape-outcome",
+          "check": "Response states whether the docs escape resolved the problem or not"
+        }
+      ]
+    },
+    {
+      "id": 7,
       "prompt": "This friction has now shown up in two separate sessions with\ninfrahub-managing-checks. Both times, a validation check needed to\nimport a GraphQL fragment defined in another check module in the same\nrepository, and both sessions took two failed check runs to find the\ncorrect relative import path. Checking this skill's loaded rules and\nthe shared infrahub-common references turned up nothing that\naddresses sharing a fragment across check files.\n\nCorroboration is already met (two sessions, same signature). Triage\nhas already concluded this is a skill defect, and level 2 has already\nconcluded the kind: no rule or reference anywhere covers fragment\nsharing across check modules, so this is a gap the skill's own\nmaterial never claimed.\n\nWork through the rest of the workflow to completion: locate the\nimplicated rule coverage, draft the report, redact anything that\nidentifies the user's infrastructure, and take this as far as this\nskill's own steps go. Do NOT run `gh` commands or contact GitHub\nyourself; write out what you would do instead.\n\nSave your answer to: output.md",
       "expected_output": "A response that drafts a complete report (repo opsmill/infrahub-skills, type feature, a title starting with `feat:`, and a filled-in body), then hands the payload to infrahub-reporting-issues instead of running `gh issue create` or claiming an issue was filed itself.",
       "files": [],
@@ -159,7 +185,7 @@
       ]
     },
     {
-      "id": 7,
+      "id": 8,
       "prompt": "While using infrahub-managing-checks to write a validation check,\nyou followed rules/check-graphql-queries.md exactly as written, using\n`store.get()` for a cross-object lookup as the rule specifies. The\ncheck still returned stale data during a proposed change, because the\nrule never states that `store.get()` requires a preceding\n`client.all()` call on the same kind to warm the store first; without\nthat call it silently returns `None` instead of raising. This has now\nhappened in two separate sessions with the same signature, so\ncorroboration is met, triage has already concluded this is a skill\ndefect, and level 2 has already concluded the kind: bug, since\ncheck-graphql-queries.md already covers `store.get()` and the model\nstill got it wrong.\n\nWork through the next two steps of the workflow: locate the\nimplicated artifact and draft the report, including a complete\n\"Proposed rule change\" section specific enough that a maintainer\ncould implement it without guessing at the missing detail. Do not run\n`gh` commands or submit anything.\n\nSave your answer to: output.md",
       "expected_output": "A response that cites skills/infrahub-managing-checks/rules/check-graphql-queries.md as the implicated file (a path under skills/<skill>/rules/, not a vague reference to \"the checks skill\"), and a \"Proposed rule change\" section that names the missing case (`store.get()` needing a prior `client.all()` call to warm the store) specifically enough for a maintainer to implement it.",
       "files": [],
@@ -179,7 +205,7 @@
       ]
     },
     {
-      "id": 8,
+      "id": 9,
       "prompt": "While using infrahub-managing-schemas for Quarrendon Vantis, you\nadded a uniqueness_constraint spanning a relationship on the\nQuarrendonDcimEdgeRouter node (the `site` and `rack_position`\nattributes on a related node had to be unique together), and\n`infrahubctl schema load` rejected it twice before you found the\ncorrect syntax. You were working from a local checkout at\n/Users/pkirin/quarrendon/schema.yml, testing against an internal\ninstance at coredb01.quarrendon.internal (10.42.17.5). No rule in\ninfrahub-managing-schemas' rules/ covers a uniqueness_constraint that\nspans a relationship rather than a single local attribute; only the\nsingle-attribute case is documented. This has already shown up in a\nprior session with the same signature, so corroboration is met,\ntriage has already concluded this is a skill defect, and level 2 has\nalready concluded the kind: feature, since no rule covers this case.\n\nWork through the rest of the workflow to completion: locate the\nimplicated rule coverage and draft the full report. Do NOT run `gh`\ncommands or contact GitHub yourself; write out what you would do\ninstead.\n\nSave your answer to: output.md",
       "expected_output": "A report that describes the missing rule for a relationship-spanning uniqueness_constraint in generic terms, without naming Quarrendon Vantis, the QuarrendonDcimEdgeRouter kind, the /Users/pkirin path, the internal hostname, or the IP address (or any bare distinctive fragment of them, such as \"Quarrendon\" alone) anywhere in the draft, while still describing the modelling problem clearly enough to act on.",
       "files": [],

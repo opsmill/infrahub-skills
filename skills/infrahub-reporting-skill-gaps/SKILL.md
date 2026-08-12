@@ -85,13 +85,16 @@ product defect, or neither. Only skill defects continue
 to level 2 and drafting. See
 [rules/workflow-triage-classification.md](rules/workflow-triage-classification.md).
 
-### 3b. Triage: level 2, bug or feature
+### 3b. Triage: level 2, bug, feature, or docs gap
 
-For a skill defect, decide whether it is a bug (a rule
-or reference covers the topic and the model still got
-it wrong) or a feature (no rule or reference covers the
-topic). This decides the title prefix used in step 6.
-See
+For a skill defect, decide the kind from three outcomes:
+a bug (a rule or reference covers the topic and the
+model still got it wrong), a feature (no rule covers the
+topic, and a docs escape either found the answer or
+never happened), or a docs gap (no rule covers the
+topic, and a docs escape happened but still failed to
+answer it). This decides the title prefix used when
+drafting in step 6. See
 [rules/workflow-bug-vs-feature.md](rules/workflow-bug-vs-feature.md).
 
 ### 4. Hand off if product
@@ -114,8 +117,8 @@ in coverage, is not ready. See
 ### 6. Draft and redact
 
 Fill [templates/skill-friction.md](templates/skill-friction.md),
-using the `bug:`/`feat:` title prefix decided in step
-3b. Redact anything that identifies the user's
+using the `bug:`/`feat:`/`docs:` title prefix decided in
+step 3b. Redact anything that identifies the user's
 infrastructure or organization per
 [rules/evidence-no-customer-data.md](rules/evidence-no-customer-data.md).
 This is security-critical and applies before the draft
