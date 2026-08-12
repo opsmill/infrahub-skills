@@ -3958,10 +3958,10 @@ tasks:
         check: No yagni finding exceeds MEDIUM severity
 
   # --- Skill Improver --- #
-  - name: improving-skills-single-session
+  - name: reporting-skill-gaps-single-session
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-improving-skills/SKILL.md and
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: In this session, you used infrahub-managing-schemas to add a new
@@ -3977,7 +3977,7 @@ tasks:
       Save the report to: output.md
     graders:
       - type: deterministic
-        run: python graders/improving-skills/check_corroboration_gate.py output.md
+        run: python graders/reporting-skill-gaps/check_corroboration_gate.py output.md
         weight: 1.0
     expected_output: >-
       A report that recognizes this is a single, uncorroborated session: it
@@ -4001,10 +4001,10 @@ tasks:
           Report ties the decision to stop back to the corroboration gate
           (only one session, no prior occurrence, not seen before)
 
-  - name: improving-skills-triage
+  - name: reporting-skill-gaps-triage
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-improving-skills/SKILL.md and
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: This friction has now shown up in two separate sessions with
@@ -4025,7 +4025,7 @@ tasks:
       Save your answer to: output.md
     graders:
       - type: deterministic
-        run: python graders/improving-skills/check_triage.py output.md
+        run: python graders/reporting-skill-gaps/check_triage.py output.md
         weight: 1.0
     expected_output: >-
       A response that states the classification (skill defect, since the
@@ -4043,10 +4043,10 @@ tasks:
           Response gives a reason tied to whether a rule change would have
           prevented the friction
 
-  - name: improving-skills-feature-gap
+  - name: reporting-skill-gaps-feature-gap
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-improving-skills/SKILL.md and
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: While using infrahub-managing-generators, a generator needed to
@@ -4070,7 +4070,7 @@ tasks:
       Save your answer to: output.md
     graders:
       - type: deterministic
-        run: python graders/improving-skills/check_bug_vs_feature.py output.md
+        run: python graders/reporting-skill-gaps/check_bug_vs_feature.py output.md
         weight: 1.0
     expected_output: >-
       A response that classifies the kind as a gap the skill's own material
@@ -4094,10 +4094,10 @@ tasks:
           Response names the docs/llms.txt fetch as the reason the kind is
           a gap the skill never covered
 
-  - name: improving-skills-product-bug
+  - name: reporting-skill-gaps-product-bug
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-improving-skills/SKILL.md and
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: While using infrahub-managing-schemas, you followed
@@ -4118,7 +4118,7 @@ tasks:
       Save your answer to: output.md
     graders:
       - type: deterministic
-        run: python graders/improving-skills/check_product_handoff.py output.md
+        run: python graders/reporting-skill-gaps/check_product_handoff.py output.md
         weight: 1.0
     expected_output: >-
       A response that classifies this as a product defect, since the
@@ -4144,10 +4144,10 @@ tasks:
           Response contains no [skill-bug]/[skill-feature] title line and no
           opsmill/infrahub-skills filing target
 
-  - name: improving-skills-existing-rule-bug
+  - name: reporting-skill-gaps-existing-rule-bug
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-improving-skills/SKILL.md and
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: While using infrahub-managing-schemas to set up a bidirectional
@@ -4169,7 +4169,7 @@ tasks:
       Save your answer to: output.md
     graders:
       - type: deterministic
-        run: python graders/improving-skills/check_bug_vs_feature.py output.md
+        run: python graders/reporting-skill-gaps/check_bug_vs_feature.py output.md
         weight: 1.0
     expected_output: >-
       A response that classifies the kind as the rule already covering the

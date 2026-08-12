@@ -1,4 +1,4 @@
-"""Shared grader library for the infrahub-improving-skills skill.
+"""Shared grader library for the infrahub-reporting-skill-gaps skill.
 
 These graders read the model's drafted issue text from ``output.md`` and
 check that the skill's rules were followed: corroboration was checked before

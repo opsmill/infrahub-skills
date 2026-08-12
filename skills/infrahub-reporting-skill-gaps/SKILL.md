@@ -1,5 +1,5 @@
 ---
-name: infrahub-improving-skills
+name: infrahub-reporting-skill-gaps
 description: >-
   Turns friction from an Infrahub skill session into a reviewed GitHub issue against opsmill/infrahub-skills.
   Infrahub skills fail quietly: a missing or unclear rule does not crash, it produces extra round trips and
@@ -7,7 +7,7 @@ description: >-
   whether the skill or the underlying product is at fault, and drafts a proposed rule change. It stops at a
   user review gate and never submits without explicit approval.
   TRIGGER when: accepting a friction offer, the user says "report skill friction", asks why an Infrahub skill
-  kept failing or needed so many retries, or wants to improve or fix an Infrahub skill's guidance.
+  kept failing or needed so many retries, or wants a gap in an Infrahub skill's guidance reported.
   DO NOT TRIGGER when: reporting a bug in Infrahub itself or any other opsmill/infrahub-* product (use
   infrahub-reporting-issues instead), or for ordinary Infrahub work where nothing went wrong.
 allowed-tools:
