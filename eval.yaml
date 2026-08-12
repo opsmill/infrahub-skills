@@ -3982,12 +3982,12 @@ tasks:
     expected_output: >-
       A report that recognizes this is a single, uncorroborated session: it
       does not draft a GitHub issue title or a proposed rule change, records
-      an `observed` entry in notes.jsonl, and tells the user plainly that
-      nothing was filed.
+      an `observed` entry in notes.jsonl, and ties the decision to stop back
+      to the lack of corroboration (only one session, not seen before).
     expectations:
       - Does not draft an issue title or a proposed rule change from one session
       - Mentions recording the observation in notes.jsonl
-      - States plainly that nothing was filed
+      - Names the corroboration gate as the reason nothing was drafted
     assertions:
       - name: no-draft-on-single-session
         check: >-
@@ -3995,5 +3995,7 @@ tasks:
           proposed rule change section from a single session
       - name: records-observation
         check: Report mentions recording an observation in notes.jsonl
-      - name: states-not-filed
-        check: Report states plainly that nothing was filed
+      - name: states-gate-reason
+        check: >-
+          Report ties the decision to stop back to the corroboration gate
+          (only one session, no prior occurrence, not seen before)

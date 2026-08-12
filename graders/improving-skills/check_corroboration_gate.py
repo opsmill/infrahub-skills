@@ -11,7 +11,7 @@ from lib import run_checks  # noqa: E402
 CHECKS = [
     "no-draft-on-single-session",
     "records-observation",
-    "states-not-filed",
+    "states-gate-reason",
 ]
 
 if __name__ == "__main__":

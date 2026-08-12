@@ -23,13 +23,19 @@ CheckFn = Callable[..., CheckResult]
 def check_no_draft_on_single_session(text: str, **_: object) -> CheckResult:
     """Output does not draft a full issue from a single, uncorroborated session."""
     has_issue_title = re.search(r"\[skill-friction\]", text) is not None
-    has_proposed_rule_change = re.search(r"###\s*Proposed rule change", text, re.IGNORECASE) is not None
+    # Match the template's "Proposed rule change" heading at any depth of two
+    # or more `#` (the real template uses `##`; do not require the literal
+    # `[skill-friction]` tag to have survived, since a paraphrased draft is
+    # still a draft).
+    has_proposed_rule_change = re.search(
+        r"^#{2,}\s*Proposed rule change", text, re.IGNORECASE | re.MULTILINE
+    ) is not None
     if has_issue_title or has_proposed_rule_change:
         hits = []
         if has_issue_title:
             hits.append("[skill-friction] title line")
         if has_proposed_rule_change:
-            hits.append("### Proposed rule change heading")
+            hits.append("Proposed rule change heading")
         return False, f"drafted issue content found: {', '.join(hits)}"
     return True, "no drafted issue title or proposed-rule-change section"
 
@@ -44,34 +50,47 @@ def check_records_observation(text: str, **_: object) -> CheckResult:
     return False, "no mention of notes.jsonl or a recorded observation"
 
 
-def check_states_not_filed(text: str, **_: object) -> CheckResult:
-    """Output states plainly that nothing was filed."""
+def check_states_gate_reason(text: str, **_: object) -> CheckResult:
+    """Output ties the decision to stop back to the corroboration gate itself.
+
+    A response that merely narrates "I have not filed this" says nothing
+    about why. The eval prompt already tells the model not to run `gh`,
+    so that phrasing appears regardless of whether the gate was correctly
+    applied. This check instead looks for language that names the actual
+    reason: only one session, no prior occurrence, not corroborated.
+    """
     low = text.lower()
     patterns = (
-        "nothing was filed",
-        "nothing filed",
-        "no issue was filed",
-        "no issue filed",
-        "not filed",
-        "no issue was opened",
-        "no issue opened",
-        "did not open an issue",
-        "will not open an issue",
-        "will not file",
-        "won't file",
-        "not going to file",
-        "i will not draft",
+        "only one session",
+        "only one occurrence",
+        "no prior occurrence",
+        "first time seeing this",
+        "first time i've seen this",
+        "first time i have seen this",
+        "not seen before",
+        "haven't seen this before",
+        "have not seen this before",
+        "single occurrence",
+        "single session",
+        "one session isn't enough",
+        "one session is not enough",
+        "not enough to corroborate",
+        "not corroborated",
+        "not yet corroborated",
+        "no corroboration",
+        "no second session",
+        "no second occurrence",
     )
     hits = [p for p in patterns if p in low]
     if hits:
-        return True, f"states plainly that nothing was filed (matched: {hits[0]!r})"
-    return False, "no plain statement that nothing was filed"
+        return True, f"ties the decision to the corroboration gate (matched: {hits[0]!r})"
+    return False, "no phrase tying the decision to a single session / lack of corroboration"
 
 
 CHECKS: dict[str, CheckFn] = {
     "no-draft-on-single-session": check_no_draft_on_single_session,
     "records-observation": check_records_observation,
-    "states-not-filed": check_states_not_filed,
+    "states-gate-reason": check_states_gate_reason,
 }
 
 CheckSpec = str | tuple[str, dict]
