@@ -35,7 +35,7 @@ the relevant `opsmill/infrahub-*` product repo) does.
    was attempted, what Infrahub returned, and the exact
    request that failed.
 3. Append a note to the notes file
-   (`~/.infrahub-skills/improving/notes.jsonl`, see
+   (`~/.infrahub-skills/reporting-skill-gaps/notes.jsonl`, see
    [reference.md](../reference.md)) recording the
    hand-off with `status: handed-off`, so a future
    session recognizes this signature was already routed

@@ -23,7 +23,7 @@ Corroboration is met by either:
 
 A single confusing exchange, however severe, does not meet either bar on its own.
 
-When corroboration is not met, do not draft an issue. Append one `observed` line to `~/.infrahub-skills/improving/notes.jsonl` and tell the user plainly that the observation was recorded and nothing was filed. This is not a failure state; it is the common case on first sighting.
+When corroboration is not met, do not draft an issue. Append one `observed` line to `~/.infrahub-skills/reporting-skill-gaps/notes.jsonl` and tell the user plainly that the observation was recorded and nothing was filed. This is not a failure state; it is the common case on first sighting.
 
 This gate is also why step 9 matters. Once the workflow reaches a final status, filed, skipped, or deferred, write it back to the same notes file. A signature already resolved that way should not be re-raised as new the next time it is seen; the next session should find the prior decision instead of re-litigating it.
 

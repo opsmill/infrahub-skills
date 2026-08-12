@@ -1,4 +1,4 @@
-# Skill Improver Rule Sections
+# Skill Gap Reporter Rule Sections
 
 This skill keeps most of its guidance inline in
 `SKILL.md`. Only ordering and security-critical

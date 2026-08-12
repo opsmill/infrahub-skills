@@ -21,7 +21,7 @@ metadata:
   author: OpsMill
 ---
 
-# Infrahub Skill Improver
+# Skill Gap Reporter
 
 ## Overview
 

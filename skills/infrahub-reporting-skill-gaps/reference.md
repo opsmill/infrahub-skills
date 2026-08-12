@@ -12,7 +12,7 @@ gives enough evidence to corroborate the friction.
 | -------- | ------ | ----------- |
 | 1 | Current conversation | Always the first source. Most friction reports come from the session already in progress |
 | 2 | `~/.claude/projects/<slug>/*.jsonl` | When the user points at a past session. See Transcript discovery below |
-| 3 | Notes file (`~/.infrahub-skills/improving/notes.jsonl`) | To check for a prior `observed` note on the same signature, not as primary evidence |
+| 3 | Notes file (`~/.infrahub-skills/reporting-skill-gaps/notes.jsonl`) | To check for a prior `observed` note on the same signature, not as primary evidence |
 
 The transcript format under `~/.claude/projects/` is
 not a public API. It can change without notice between
@@ -57,7 +57,7 @@ analysis). Do not flag them.
 
 ## Notes file
 
-Location: `~/.infrahub-skills/improving/notes.jsonl`.
+Location: `~/.infrahub-skills/reporting-skill-gaps/notes.jsonl`.
 
 Append-only. One JSON object per line. Fields:
 

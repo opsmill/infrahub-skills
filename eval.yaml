@@ -3957,7 +3957,7 @@ tasks:
       - name: severity-cap
         check: No yagni finding exceeds MEDIUM severity
 
-  # --- Skill Improver --- #
+  # --- Skill Gap Reporter --- #
   - name: reporting-skill-gaps-single-session
     trials: 3
     instruction: |
