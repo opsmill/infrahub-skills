@@ -46,7 +46,7 @@ the relevant `opsmill/infrahub-*` product repo) does.
 ```text
 Drafting the skill-friction issue now:
 
-[skill-bug] infrahub-managing-schemas: schema load 500s
+bug: infrahub-managing-schemas: schema load 500s
 
 ... (full draft body written) ...
 

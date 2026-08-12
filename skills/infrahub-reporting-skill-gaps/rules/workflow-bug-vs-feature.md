@@ -27,8 +27,8 @@ was never wrong in the first place.
 
 | Answer | Kind | Title prefix |
 | ------ | ---- | ------------- |
-| A rule or reference covers the topic, and the model still got it wrong | Bug | `[skill-bug]` |
-| No rule or reference covers the topic | Feature | `[skill-feature]` |
+| A rule or reference covers the topic, and the model still got it wrong | Bug | `bug:` |
+| No rule or reference covers the topic | Feature | `feat:` |
 
 This is the same determination
 [evidence-cite-the-artifact.md](evidence-cite-the-artifact.md)
@@ -81,7 +81,7 @@ Two cautions:
 ### Incorrect
 
 ```text
-[skill-bug] infrahub-managing-generators: pagination guidance wrong
+bug: infrahub-managing-generators: pagination guidance wrong
 
 No rule in this skill's rules/ or in infrahub-common
 mentions cursor-based pagination for a generator's
@@ -106,7 +106,7 @@ after finishing that read, which pointed at
 .md twin and found the answer there. The skill's own
 files never claimed this ground, so this is a feature:
 
-[skill-feature] infrahub-managing-generators: no guidance
+feat: infrahub-managing-generators: no guidance
 on paginating a generator's GraphQL query
 ```
 

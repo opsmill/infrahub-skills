@@ -3991,8 +3991,8 @@ tasks:
     assertions:
       - name: no-draft-on-single-session
         check: >-
-          Report does not draft an issue title (`[skill-bug]` or
-          `[skill-feature]`) or a proposed rule change section from a
+          Report does not draft an issue title (`bug:` or
+          `feat:`) or a proposed rule change section from a
           single session
       - name: records-observation
         check: Report mentions recording an observation in notes.jsonl
@@ -4076,7 +4076,7 @@ tasks:
       A response that classifies the kind as a gap the skill's own material
       never covered (using the docs.infrahub.app/llms.txt fetch that only
       happened after the skill's own files and infrahub-common were checked
-      as the reason), gives the matching [skill-feature] title, and carries
+      as the reason), gives the matching feat: title, and carries
       the fetched documentation page's path into the report.
     expectations:
       - Names the kind explicitly and uses a matching title prefix
@@ -4129,7 +4129,7 @@ tasks:
       - States the classification explicitly (skill defect, product defect, or neither)
       - Ties the classification to whether a rule change would have prevented the failure
       - Hands off to infrahub-reporting-issues
-      - Drafts no [skill-bug]/[skill-feature] issue and names no opsmill/infrahub-skills filing target
+      - Drafts no bug:/feat: issue and names no opsmill/infrahub-skills filing target
     assertions:
       - name: states-classification
         check: Response names one of skill defect, product defect, or neither
@@ -4141,7 +4141,7 @@ tasks:
         check: Response references infrahub-reporting-issues
       - name: no-skills-issue-for-product-bug
         check: >-
-          Response contains no [skill-bug]/[skill-feature] title line and no
+          Response contains no bug:/feat: title line and no
           opsmill/infrahub-skills filing target
 
   - name: reporting-skill-gaps-existing-rule-bug
@@ -4174,7 +4174,7 @@ tasks:
     expected_output: >-
       A response that classifies the kind as the rule already covering the
       generic-peer requirement, with the model still missing it on the
-      first pass, gives the matching [skill-bug] title naming
+      first pass, gives the matching bug: title naming
       relationship-identifiers.md, and does not justify the kind by how many
       reads or attempts it took.
     expectations:

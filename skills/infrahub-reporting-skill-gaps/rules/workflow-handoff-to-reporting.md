@@ -71,13 +71,21 @@ was actually reviewed or checked for duplicates.
 ### Correct
 
 ```text
-Draft complete and redacted. Handing off to
-infrahub-reporting-issues with:
+Draft complete and redacted:
+
+feat: infrahub-managing-checks: no guidance on sharing GraphQL fragments across check files
+
+## Proposed rule change
+Add a rule file describing how to import a fragment
+defined in another check module, with a compliant
+example.
+
+Handing off to infrahub-reporting-issues with:
 
   repo: opsmill/infrahub-skills
   type: feature
-  title: feat: infrahub-managing-checks: no guidance on sharing GraphQL fragments across check files
-  body: <full redacted report>
+  title: (the line above)
+  body: (the full report, including the section above)
 
 infrahub-reporting-issues will search for duplicates,
 show the draft for review, and handle submission from
