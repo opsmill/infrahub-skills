@@ -155,14 +155,31 @@ def check_justifies_classification(text: str, **_: object) -> CheckResult:
     )
 
 
+def _last_match_start(text: str, pattern: str) -> int:
+    """Return the start index of the last regex match, or -1 if none."""
+    pos = -1
+    for m in re.finditer(pattern, text):
+        pos = m.start()
+    return pos
+
+
 def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
     """Output names the level-2 kind explicitly and uses the matching title
     prefix. `\\bbug\\b` does not match inside "debug" (the boundary before
     "b" fails when preceded by "de").
+
+    Contrastive phrasing ("this is not a bug, it's a feature") mentions both
+    terms. Naming is resolved by whichever term was mentioned last in the
+    prose, since that is the stated conclusion, not whichever term happened
+    to appear first while being ruled out. The tag brackets themselves are
+    stripped before this scan so a `[skill-bug]` tag does not get counted as
+    a prose mention of "bug" and mask a "feature" conclusion stated right
+    next to it.
     """
     low = _normalized(text)
-    named_bug = re.search(r"\bbug\b", low) is not None
-    named_feature = re.search(r"\bfeature\b", low) is not None
+    prose = re.sub(r"\[skill-(?:bug|feature)\]", " ", low)
+    named_bug = re.search(r"\bbug\b", prose) is not None
+    named_feature = re.search(r"\bfeature\b", prose) is not None
     has_bug_tag = "[skill-bug]" in text
     has_feature_tag = "[skill-feature]" in text
 
@@ -171,16 +188,22 @@ def check_states_bug_or_feature(text: str, **_: object) -> CheckResult:
     if not (has_bug_tag or has_feature_tag):
         return False, "kind named but no [skill-bug]/[skill-feature] title prefix found"
 
-    if named_bug and not named_feature:
-        if not has_bug_tag:
-            return False, "names bug but title prefix uses [skill-feature]"
-        return True, "names bug and uses matching [skill-bug] title prefix"
-    if named_feature and not named_bug:
-        if not has_feature_tag:
-            return False, "names feature but title prefix uses [skill-bug]"
-        return True, "names feature and uses matching [skill-feature] title prefix"
+    if named_bug and named_feature:
+        last_bug = _last_match_start(prose, r"\bbug\b")
+        last_feature = _last_match_start(prose, r"\bfeature\b")
+        stated = "bug" if last_bug > last_feature else "feature"
+    elif named_bug:
+        stated = "bug"
+    else:
+        stated = "feature"
 
-    return True, "names both bug and feature terms with a matching title prefix present"
+    if stated == "bug":
+        if not has_bug_tag:
+            return False, "stated kind is bug (last mentioned) but title prefix uses [skill-feature]"
+        return True, "names bug and uses matching [skill-bug] title prefix"
+    if not has_feature_tag:
+        return False, "stated kind is feature (last mentioned) but title prefix uses [skill-bug]"
+    return True, "names feature and uses matching [skill-feature] title prefix"
 
 
 _COVERAGE_PATTERNS = (
@@ -267,21 +290,63 @@ _FEATURE_REASON_PATTERNS = (
     "the skill never claimed",
 )
 
+# workflow-bug-vs-feature.md's ordering caution: an escape that happened
+# before the model read the skill's own rules is not a feature signal, it
+# is the model skipping step 1 of the priority rule. A response that
+# mentions an escape but explicitly disqualifies it this way is rule
+# compliant and must not be penalized for failing to tie the (correctly
+# disqualified) escape to a feature conclusion.
+_ORDERING_DISQUALIFIED_PATTERNS = (
+    "not a feature signal",
+    "not feature evidence",
+    "doesn't count as feature evidence",
+    "does not count as feature evidence",
+    "skipped step 1",
+    "skipping step 1",
+    "before checking the skill's own",
+    "before checking whether the skill",
+)
+_ORDERING_DISQUALIFIED_REGEXES = (
+    # Anchored to a word that names the disqualification itself ("escape",
+    # or "happened before" describing the fetch's timing relative to
+    # reading), not merely to "before" appearing near "skill's own"
+    # anywhere in the text. A response that just narrates fetching before
+    # opening the skill's own rules, without drawing the ordering
+    # conclusion, must still fail: it never says the escape does not count.
+    r"escape (?:happened|occurred)\b.{0,40}before",
+    r"happened before\b.{0,40}(?:read|open|check)",
+)
+
 
 def check_cites_escape_as_feature_evidence(text: str, **_: object) -> CheckResult:
-    """When the output shows a docs/llms.txt escape, it must name that
-    escape as the reason the kind is feature. Vacuously passes when the
-    output shows no escape at all, since the check does not apply then.
+    """When the output shows a docs/llms.txt escape, it must either name
+    that escape as the reason the kind is feature, or explicitly disqualify
+    it under the ordering caution (the escape happened before the skill's
+    own files were read, so it is a behavior defect, not a coverage gap).
+    Vacuously passes when the output shows no escape at all, since the
+    check does not apply then.
     """
     low = _normalized(text)
     has_escape = "llms.txt" in low or "docs.infrahub.app" in low
     if not has_escape:
         return True, "no docs/llms.txt escape evidence present; check not applicable"
 
+    disqualified = any(p in low for p in _ORDERING_DISQUALIFIED_PATTERNS) or any(
+        re.search(p, low) for p in _ORDERING_DISQUALIFIED_REGEXES
+    )
+    if disqualified:
+        return True, (
+            "escape present but correctly disqualified as feature evidence "
+            "under the ordering caution"
+        )
+
     tied_to_feature = "feature" in low and any(p in low for p in _FEATURE_REASON_PATTERNS)
     if tied_to_feature:
         return True, "names the docs/llms.txt escape as the reason for a feature classification"
-    return False, "docs/llms.txt escape present but not tied to a feature classification"
+    return False, (
+        "docs/llms.txt escape present but not tied to a feature "
+        "classification, and not disqualified by the ordering caution"
+    )
 
 
 def check_hands_off_to_reporting_issues(text: str, **_: object) -> CheckResult:
