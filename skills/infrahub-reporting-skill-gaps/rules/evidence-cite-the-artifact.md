@@ -16,8 +16,8 @@ states plainly that no such file exists yet.
 Only two things satisfy this rule:
 
 - A path under `skills/<skill>/rules/`, or the skill's own
-  `skills/<skill>/SKILL.md`, naming the file a maintainer should edit —
-  for example
+  `skills/<skill>/SKILL.md`, naming the file a maintainer should edit.
+  For example:
   `skills/infrahub-managing-schemas/rules/relationship-identifiers.md`.
 - The sentence "No rule in this skill covers `<topic>`," stating plainly
   that the gap is the absence of a file, not a fault in one that exists.

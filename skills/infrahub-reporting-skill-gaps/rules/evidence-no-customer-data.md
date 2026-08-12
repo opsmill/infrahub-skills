@@ -69,7 +69,7 @@ remaining characters are still enough to identify or replay it.
 
 Redaction removes identity, not information. A report reduced to
 `<CustomerNode>` repeated with no surrounding description is
-unactionable — the maintainer cannot tell what modelling problem it is
+unactionable: the maintainer cannot tell what modelling problem it is
 even describing. Paraphrase the structure of the problem generically
 instead of deleting it:
 
@@ -77,8 +77,8 @@ instead of deleting it:
   constraint spanning a relationship."
 - Instead of pasting the customer's attribute name, write "an attribute
   encoding a business-specific identifier."
-- Keep the schema mechanism intact — which constraint, which relationship
-  shape, which validation step failed — only the customer's own names are
+- Keep the schema mechanism intact: which constraint, which relationship
+  shape, which validation step failed. Only the customer's own names are
   the problem.
 
 A draft that fails this half of the rule is as unfit to hand off as one
@@ -124,8 +124,8 @@ specific has been deleted along with the customer's identity.
   "the router node at Acme kept rejecting the schema."
 - Treating "the schema skill" as sufficient redaction of a rule file's
   path, when [evidence-cite-the-artifact.md](evidence-cite-the-artifact.md)
-  requires the real path — that rule and this one govern different
-  content in the same draft; the path is allowed and required, the
+  requires the real path. That rule and this one govern different
+  content in the same draft: the path is allowed and required, the
   customer's names around it are not.
 - Redacting every noun to a placeholder rather than paraphrasing the
   modelling problem, producing a draft that leaks nothing and explains
