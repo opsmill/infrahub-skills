@@ -251,18 +251,28 @@ def check_states_bug_or_feature(
     contains "docs gap", but the substitution strips all three prefixes
     for symmetry.
 
-    `expected_kind`, when given (one of "bug", "feature", "docs gap"), is
-    the kind this scenario's own evidence actually supports, independent
-    of whatever the drafted output claims. Without it, this check only
-    verifies *internal* consistency: that the title tag agrees with the
-    prose conclusion. That is not the same as being *right*: a response
-    that misclassifies a scenario but stays internally consistent (tags
-    itself `feat:` and says "feature" throughout, when the evidence is a
-    docs gap) passed this check with a perfect score before
-    `expected_kind` existed. Each level-2 eval task now passes its own
-    scenario's correct kind here, so an internally-consistent but wrong
-    answer is caught instead of scoring full marks.
+    `expected_kind`, when given (one of "bug", "feature", "docs gap";
+    see `_VALID_EXPECTED_KINDS`), is the kind this scenario's own
+    evidence actually supports, independent of whatever the drafted
+    output claims. Without it, this check only verifies *internal*
+    consistency: that the title tag agrees with the prose conclusion.
+    That is not the same as being *right*: a response that misclassifies
+    a scenario but stays internally consistent (tags itself `feat:` and
+    says "feature" throughout, when the evidence is a docs gap) passed
+    this check with a perfect score before `expected_kind` existed. Each
+    level-2 eval task now passes its own scenario's correct kind here,
+    so an internally-consistent but wrong answer is caught instead of
+    scoring full marks. A typo in `expected_kind` itself (a label not in
+    `_VALID_EXPECTED_KINDS`) raises rather than silently comparing
+    against a value `stated` can never equal, which would otherwise fail
+    every draft for this scenario without ever saying why: a caller-side
+    bug dressed up as a model-side one.
     """
+    if expected_kind is not None and expected_kind not in _VALID_EXPECTED_KINDS:
+        raise ValueError(
+            f"expected_kind={expected_kind!r} is not one of "
+            f"{sorted(_VALID_EXPECTED_KINDS)}"
+        )
     low = text.lower()
     tag_match = _TITLE_TAG_RE.search(text)
     tag_value = tag_match.group(1).lower() if tag_match else None
@@ -606,34 +616,39 @@ _UNSETTLED_GATE_REASON_PATTERNS = (
 
 
 def check_no_docs_gap_when_unsettled(text: str, **_: object) -> CheckResult:
-    """Output does not draft a `bug(docs):` issue (or its Proposed rule
+    """Output does not draft *any* level-2 issue (or its Proposed rule
     change section) when the underlying behavior is still being designed
     or is deliberately undocumented by design.
 
-    Mirrors `check_no_draft_on_single_session`'s shape: that check holds
-    the corroboration gate, this one holds the settled-behavior gate a
-    docs-gap classification alone must also pass. A `bug(docs):` issue
-    asks a maintainer to write down an answer; when the workflow itself
-    is unsettled, no answer exists yet, and filing anyway sends a
-    maintainer a request they cannot fulfill. A response that correctly
-    withholds the draft must also say why, the same way the
-    corroboration-gate check requires a stated reason rather than a bare
-    "not filing this."
+    Mirrors `check_no_draft_on_single_session`'s shape and, per its
+    stricter precedent, its title-tag test: any `_TITLE_TAG_RE` match
+    counts as a violation, not just `bug(docs):`. An earlier version of
+    this check only flagged `bug(docs):`, which meant a `feat:` (or
+    `bug:`) title drafted for the exact same unsettled scenario sailed
+    through as "correctly withheld", satisfying the reason-phrase branch
+    on the scenario's own wording while a full draft sat right there.
+    That is wrong for every kind, not just docs gap: when the escape
+    happened and failed, the three-way table already says docs gap
+    before the gate is even reached, so a `feat:`/`bug:` draft of the
+    same friction is simply a wrong classification wearing a different
+    tag, not a compliant alternative. In an unsettled scenario, no
+    level-2 draft of any kind is correct; only "record an observation
+    and stop" is. A response that correctly withholds the draft must
+    also say why, the same way the corroboration-gate check requires a
+    stated reason rather than a bare "not filing this."
     """
-    has_docs_tag = any(
-        m.group(1).lower() == "bug(docs)" for m in _TITLE_TAG_RE.finditer(text)
-    )
+    has_tag = _TITLE_TAG_RE.search(text) is not None
     has_proposed_rule_change = re.search(
         r"^#{2,}\s*Proposed rule change", text, re.IGNORECASE | re.MULTILINE
     ) is not None
-    if has_docs_tag or has_proposed_rule_change:
+    if has_tag or has_proposed_rule_change:
         hits = []
-        if has_docs_tag:
-            hits.append("bug(docs): title line")
+        if has_tag:
+            hits.append("bug:/feat:/bug(docs): title line")
         if has_proposed_rule_change:
             hits.append("Proposed rule change heading")
         return False, (
-            f"drafted a docs-gap issue despite unsettled behavior: {', '.join(hits)}"
+            f"drafted a level-2 issue despite unsettled behavior: {', '.join(hits)}"
         )
 
     low = _normalized(text)
@@ -644,7 +659,7 @@ def check_no_docs_gap_when_unsettled(text: str, **_: object) -> CheckResult:
             f"settled-behavior gate (matched: {hits[0]!r})"
         )
     return False, (
-        "no bug(docs): draft was made, but no reason tied to the "
+        "no level-2 draft was made, but no reason tied to the "
         "settled-behavior gate was given"
     )
 
@@ -804,10 +819,14 @@ _PAYLOAD_BODY_MARKERS = (
 # anywhere" check would pass a docs-gap payload that only ever mentions
 # the skills repo: exactly the routing mistake this whole fix exists to
 # catch. `_REPO_MAIN_RE`'s negative lookahead requires `opsmill/infrahub`
-# NOT be immediately followed by `-skills`, so it only matches a genuine,
-# standalone mention of the main repo.
+# NOT be immediately followed by a hyphen at all, not just not `-skills`:
+# the ecosystem has several other `opsmill/infrahub-<suffix>` repos
+# (`-sdk-python`, `-ansible`, `-vscode`, `-helm`, `-mcp`, `-backup`,
+# `-sync`), and a docs-gap payload naming any of those is just as wrong a
+# destination as naming the skills repo. `(?!-)\b` matches only a
+# standalone `opsmill/infrahub` with no repo suffix at all.
 _REPO_SKILLS_RE = re.compile(r"opsmill/infrahub-skills", re.IGNORECASE)
-_REPO_MAIN_RE = re.compile(r"opsmill/infrahub(?!-skills)\b", re.IGNORECASE)
+_REPO_MAIN_RE = re.compile(r"opsmill/infrahub(?!-)\b", re.IGNORECASE)
 
 
 def check_payload_is_complete(text: str, **_: object) -> CheckResult:

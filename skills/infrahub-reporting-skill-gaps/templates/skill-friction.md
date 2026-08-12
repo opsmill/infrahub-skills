@@ -1,5 +1,7 @@
 <!--
-Skill-friction template for opsmill/infrahub-skills.
+Skill-friction template. A bug or feature report targets
+opsmill/infrahub-skills; a docs-gap report targets
+opsmill/infrahub instead, see the routing note below.
 Every bracketed placeholder must be replaced before
 this is handed off. Every section except "Proposed rule
 change" may be deleted when it does not apply to this
@@ -42,6 +44,8 @@ that needs writing before any rule can cite it.
 -->
 
 # [bug|feat]: [skill]: [what the guidance is missing]
+<!-- For a docs gap instead, drop the [skill] segment:
+`bug(docs): [what the documentation is missing]`. -->
 
 **Skill**: [skill directory, e.g. infrahub-managing-schemas]
 **Type**: [bug | feature | docs gap]
