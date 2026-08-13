@@ -3,10 +3,10 @@ name: infrahub-reporting-skill-gaps
 description: >-
   Turns friction from an Infrahub skill session into a reviewed GitHub issue against opsmill/infrahub-skills.
   Infrahub skills fail quietly: a missing or unclear rule does not crash, it produces extra round trips and
-  repeated user nudges. This skill gathers evidence of that friction, checks it is corroborated, works out
-  whether the skill or the underlying product is at fault, and drafts a proposed rule change. It never files
-  anything itself: it hands the redacted draft to infrahub-reporting-issues, which shows it to the user and
-  gets explicit approval before any submission.
+  repeated user nudges. This skill gathers evidence of that friction, checks the tracker for an existing
+  report, works out whether the skill or the underlying product is at fault, and drafts a proposed rule
+  change. It never files anything itself: it hands the redacted draft to infrahub-reporting-issues, which
+  shows it to the user and gets explicit approval before any submission.
   TRIGGER when: accepting a friction offer, the user says "report skill friction", asks why an Infrahub skill
   kept failing or needed so many retries, or wants a gap in an Infrahub skill's guidance reported.
   DO NOT TRIGGER when: reporting a bug in Infrahub itself or any other opsmill/infrahub-* product (use
@@ -67,16 +67,22 @@ confirmation.
 Start with the current conversation. Only look at a
 past session's transcript when the user points at one.
 Read [reference.md](reference.md) for how transcript
-discovery works and where the notes file lives.
+discovery works and what counts as a friction signal.
 
-### 2. Check corroboration
+### 2. Check the tracker
 
-A single confusing exchange is not evidence of a rule
-gap. Require two sessions hitting the same friction, or
-an explicit user confirmation that this is a recurring
-problem. Otherwise append an `observed` note to the
-notes file and stop; do not draft an issue yet. See
-[rules/workflow-corroboration-gate.md](rules/workflow-corroboration-gate.md).
+Search `opsmill/infrahub-skills` for an existing report
+of the same friction before drafting anything. The
+tracker, not this machine, is the shared record: a
+skill's users do not share a repo, a directory, or a
+laptop, so a prior local session is a weak and often
+absent signal.
+
+The search decides the shape of the report, never
+whether there is one. A match means draft a comment on
+that issue; no match means draft a new issue carrying
+an explicit confidence label. See
+[rules/workflow-tracker-first.md](rules/workflow-tracker-first.md).
 
 ### 3. Triage: level 1, routing
 
@@ -97,7 +103,7 @@ it, and the underlying behavior is settled). That last
 condition is a gate, not a detail: if the workflow is
 still being defined or is deliberately undocumented,
 there is nothing to document yet, so do not draft at
-all, record an observation, and stop. This decides the
+all, tell the user why, and stop. This decides the
 title prefix and target repo used for drafting, in step
 6 below. See
 [rules/workflow-bug-vs-feature.md](rules/workflow-bug-vs-feature.md).
@@ -123,8 +129,9 @@ in coverage, is not ready. See
 
 Fill [templates/skill-friction.md](templates/skill-friction.md),
 using the `bug:`/`feat:`/`bug(docs):` title prefix
-decided in step 3b. Redact anything that identifies the
-user's infrastructure or organization per
+decided in step 3b and the confidence label decided in
+step 2. Redact anything that identifies the user's
+infrastructure or organization per
 [rules/evidence-no-customer-data.md](rules/evidence-no-customer-data.md).
 This is security-critical and applies before the draft
 ever leaves this skill. This produces the four handoff
@@ -133,27 +140,32 @@ fields (`repo`, `type`, `title`, `body`); `repo` is
 `opsmill/infrahub` for docs gap, since Infrahub's own
 documentation lives there and not in the skills repo.
 
+When step 2 found a match, draft a comment instead: no
+title, no repeated problem statement, only the new
+evidence this session adds.
+
 ### 7. Hand off
 
 Invoke [infrahub-reporting-issues](../infrahub-reporting-issues/SKILL.md)
-with the payload `{repo, type, title, body}`. That skill
-owns duplicate search, the review gate, submission-method
-choice, and confirmation from here; never file directly.
-See [rules/workflow-handoff-to-reporting.md](rules/workflow-handoff-to-reporting.md).
+with the payload `{repo, type, title, body}`, or with
+`{repo, issue, body}` for a comment on an existing
+issue. That skill owns duplicate search, the review
+gate, submission-method choice, and confirmation from
+here; never file directly. See
+[rules/workflow-handoff-to-reporting.md](rules/workflow-handoff-to-reporting.md).
 
-### 8. Record the outcome
+### 8. Report the outcome
 
-Append the final status (filed, skipped, deferred)
-reported back from the hand-off to the notes file
-described in [reference.md](reference.md) so a future
-session can find this decision instead of
-re-litigating it.
+Tell the user plainly what happened: filed, commented,
+skipped, or deferred, with the issue URL when the
+hand-off returned one. The tracker is the durable
+record; this skill keeps no local state of its own.
 
 ## Rule Categories
 
 | Prefix | Category | Description |
 | --------- | -------- | ----------- |
-| `workflow-` | Workflow | Ordering and gating: corroboration, triage, and handoff (to `infrahub-reporting-issues`, either for a product defect or to file a skill defect). Skipping one produces noise in the maintainers' tracker or a second, drifting filing pipeline |
+| `workflow-` | Workflow | Ordering and gating: the tracker check, triage, and handoff (to `infrahub-reporting-issues`, either for a product defect or to file a skill defect). Skipping one produces noise in the maintainers' tracker or a second, drifting filing pipeline |
 | `evidence-` | Evidence | What may and may not appear in a filed issue. Security-critical: issue bodies are public and cannot be retracted |
 
 See [rules/_sections.md](rules/_sections.md) for the
@@ -162,10 +174,13 @@ index.
 ## Supporting References
 
 - [reference.md](reference.md): evidence source
-  priority, transcript discovery, and the notes file
-  schema. **Read this in step 1.**
+  priority, transcript discovery, and friction signals.
+  **Read this in step 1.**
 - [templates/skill-friction.md](templates/skill-friction.md):
   the draft template filled in step 6.
+- [rules/workflow-tracker-first.md](rules/workflow-tracker-first.md):
+  search the tracker before drafting, and label the
+  confidence of what you draft. Read this in step 2.
 - [rules/evidence-no-customer-data.md](rules/evidence-no-customer-data.md):
   what to redact before drafting. Security-critical;
   read this before every draft.
@@ -186,9 +201,19 @@ index.
 - **Filing when the implicated skill is unknown.** If
   step 5 cannot name a skill and a rule file (or the
   absence of one), the report is not ready to draft.
-- **Drafting off a single session.** The corroboration
-  gate in step 2 is not optional. One confusing exchange
-  is noise; a pattern is signal.
+- **Drafting without checking the tracker.** Step 2 is
+  not optional. A report drafted blind either duplicates
+  an open issue or throws away the one place a second
+  observer would have found it.
+- **Filing a duplicate instead of commenting.** When an
+  issue already covers the friction, a second issue
+  splits the evidence across two threads. The comment is
+  the more valuable artifact: it is the corroboration
+  the maintainer needs.
+- **Suppressing a first sighting.** A single observation
+  is weak evidence, not zero evidence. Label it
+  `unconfirmed` and let the maintainer judge; silence
+  guarantees the second observer never finds it.
 - **Pasting raw error text without redaction.** Error
   messages carry file paths, hostnames, and node kinds
   that identify a customer's infrastructure. Paraphrase,

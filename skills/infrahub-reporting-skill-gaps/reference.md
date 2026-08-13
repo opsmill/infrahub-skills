@@ -1,4 +1,4 @@
-# Evidence and Notes Reference
+# Evidence Reference
 
 Read this in step 1 of the workflow, before gathering
 any evidence.
@@ -6,30 +6,42 @@ any evidence.
 ## Evidence sources
 
 Consult sources in this order. Stop as soon as one
-gives enough evidence to corroborate the friction.
+gives enough evidence to describe the friction.
 
 | Priority | Source | When to use |
 | -------- | ------ | ----------- |
 | 1 | Current conversation | Always the first source. Most friction reports come from the session already in progress |
-| 2 | `~/.claude/projects/<slug>/*.jsonl` | When the user points at a past session. See Transcript discovery below |
-| 3 | Notes file (`~/.infrahub-skills/reporting-skill-gaps/notes.jsonl`) | To check for a prior `observed` note on the same signature, not as primary evidence |
+| 2 | `~/.claude/projects/*/*.jsonl` | Optional. Only when the user points at a past session. See Transcript discovery below |
+
+There is no third source, and no local record of past
+reports. The shared record is the issue tracker, read
+in step 2; see
+[rules/workflow-tracker-first.md](rules/workflow-tracker-first.md).
 
 The transcript format under `~/.claude/projects/` is
 not a public API. It can change without notice between
 Claude Code releases. If a transcript file cannot be
-parsed, fall back to the current conversation and say
-so to the user plainly. Do not guess at a schema that
-may no longer apply.
+parsed, skip it, fall back to the current conversation,
+and say so to the user plainly. Do not guess at a
+schema that may no longer apply, and do not treat a
+missing transcript as a reason to stop.
 
 ## Transcript discovery
 
-The project slug is the working directory path with
-every `/` replaced by `-`. To list the most recent
-sessions for the current project:
+Transcripts are grouped by working directory, which
+does not correspond to anything meaningful here: one
+repo spread across worktrees or clones produces many
+directories, and a skill's users share none of them.
+So search across all of them rather than deriving one
+path:
 
 ```bash
-ls -t ~/.claude/projects/"$(pwd | tr '/' '-')"/*.jsonl 2>/dev/null | head -10
+grep -rl "<term from the friction>" ~/.claude/projects/*/*.jsonl 2>/dev/null | head
 ```
+
+This is a convenience for finding a session the user
+already remembers. It is never required, and its
+absence never blocks a report.
 
 Friction shows up in a transcript as:
 
@@ -64,24 +76,3 @@ Fetches of `marketplace.infrahub.app` and
 skills instruct fetching those URLs as part of their
 normal workflow (marketplace reuse, live data
 analysis). Do not flag them.
-
-## Notes file
-
-Location: `~/.infrahub-skills/reporting-skill-gaps/notes.jsonl`.
-
-Append-only. One JSON object per line. Fields:
-
-| Field | Meaning |
-| ----- | ------- |
-| `ts` | ISO 8601 timestamp of the note |
-| `skill` | The Infrahub skill directory implicated, e.g. `infrahub-managing-schemas` |
-| `signature` | A short fingerprint of the friction, for matching against future occurrences |
-| `transcript_path` | Path to the session transcript this note was drawn from, if any |
-| `status` | One of `observed`, `filed`, `skipped`, `deferred`, `handed-off` |
-
-`signature` exists only to help a later session
-recognize a recurring pattern quickly. It is not a
-substitute for evidence. When drafting an issue,
-always re-read `transcript_path` rather than trusting
-the signature alone. A matching signature does not
-guarantee the underlying cause is the same.

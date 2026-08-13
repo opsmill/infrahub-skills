@@ -126,6 +126,7 @@ here.
 ```
 
 Reference:
-[reference.md](../reference.md) for the notes file
-schema; [workflow-bug-vs-feature.md](workflow-bug-vs-feature.md)
+[workflow-tracker-first.md](workflow-tracker-first.md)
+for the comment-on-existing-issue payload shape;
+[workflow-bug-vs-feature.md](workflow-bug-vs-feature.md)
 for how `type` was decided.

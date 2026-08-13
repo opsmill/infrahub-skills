@@ -111,12 +111,17 @@ When the workflow itself is still being defined, or is
 deliberately left undocumented (an experimental flag, an
 internal-only mechanism, a shape still changing release
 to release), there is nothing to document yet. Filing
-anyway sends a maintainer a request they cannot fulfill,
-the same failure mode as filing from a single
-uncorroborated session: a report that might not even
-describe a stable target. Record an `observed` entry in
-the notes file and stop, exactly as the corroboration
-gate does when it does not corroborate.
+anyway sends a maintainer a request they cannot fulfill:
+a report against a target that is still moving. Do not
+draft. Tell the user which behavior is unsettled and
+why that blocks a docs report, so the decision is
+visible and can be revisited once the behavior lands.
+
+This is the one place the workflow stops without
+producing a report. It is not a confidence question,
+which [workflow-tracker-first.md](workflow-tracker-first.md)
+answers with a label rather than with silence. It is
+the absence of a stable thing to document at all.
 
 This gate applies to docs gaps only. A bug or a feature
 both describe the skill's own guidance, which the skill

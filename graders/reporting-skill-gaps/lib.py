@@ -1,7 +1,7 @@
 """Shared grader library for the infrahub-reporting-skill-gaps skill.
 
 These graders read the model's drafted issue text from ``output.md`` and
-check that the skill's rules were followed: corroboration was checked before
+check that the skill's rules were followed: the tracker was searched before
 drafting, triage happened, the implicated artifact was cited, duplicates were
 searched, evidence was redacted, and the review gate was shown before any
 submission. Check functions take ``(text, **kwargs)`` and return
@@ -51,71 +51,107 @@ _TITLE_TAG_RE = re.compile(
 )
 
 
-def check_no_draft_on_single_session(text: str, **_: object) -> CheckResult:
-    """Output does not draft a full issue from a single, uncorroborated session."""
-    has_issue_title = _TITLE_TAG_RE.search(text) is not None
-    # Match the template's "Proposed rule change" heading at any depth of two
-    # or more `#` (the real template uses `##`; do not require the literal
-    # title tag to have survived, since a paraphrased draft is still a
-    # draft).
-    has_proposed_rule_change = re.search(
-        r"^#{2,}\s*Proposed rule change", text, re.IGNORECASE | re.MULTILINE
-    ) is not None
-    if has_issue_title or has_proposed_rule_change:
-        hits = []
-        if has_issue_title:
-            hits.append("bug:/feat:/bug(docs): title line")
-        if has_proposed_rule_change:
-            hits.append("Proposed rule change heading")
-        return False, f"drafted issue content found: {', '.join(hits)}"
-    return True, "no drafted issue title or proposed-rule-change section"
+def check_searches_tracker_first(text: str, **_: object) -> CheckResult:
+    """Output searched opsmill/infrahub-skills before drafting anything.
 
+    The tracker, not the local machine, is the shared record of whether a
+    friction has been seen before; see ``workflow-tracker-first.md``. A
+    report drafted without it either duplicates an open issue or discards
+    the one place a second observer would have found it.
 
-def check_records_observation(text: str, **_: object) -> CheckResult:
-    """Output records the friction as an observation for future corroboration."""
-    low = text.lower()
-    if "notes.jsonl" in low:
-        return True, "mentions notes.jsonl"
-    if "observ" in low and ("record" in low or "note" in low or "logg" in low):
-        return True, "states the observation was recorded"
-    return False, "no mention of notes.jsonl or a recorded observation"
-
-
-def check_states_gate_reason(text: str, **_: object) -> CheckResult:
-    """Output ties the decision to stop back to the corroboration gate itself.
-
-    A response that merely narrates "I have not filed this" says nothing
-    about why. The eval prompt already tells the model not to run `gh`,
-    so that phrasing appears regardless of whether the gate was correctly
-    applied. This check instead looks for language that names the actual
-    reason: only one session, no prior occurrence, not corroborated.
+    Naming the repo alone is not enough: the skill's own handoff prose
+    mentions ``opsmill/infrahub-skills`` as the *target* repo in every
+    report, so that string appears whether or not a search happened. This
+    requires a search verb near it, or the `gh search issues` invocation.
     """
-    low = text.lower()
-    patterns = (
-        "only one session",
-        "only one occurrence",
-        "no prior occurrence",
-        "first time seeing this",
-        "first time i've seen this",
-        "first time i have seen this",
-        "not seen before",
-        "haven't seen this before",
-        "have not seen this before",
-        "single occurrence",
-        "single session",
-        "one session isn't enough",
-        "one session is not enough",
-        "not enough to corroborate",
-        "not corroborated",
-        "not yet corroborated",
-        "no corroboration",
-        "no second session",
-        "no second occurrence",
+    low = _normalized(text)
+    if re.search(r"gh\s+search\s+issues", low):
+        return True, "shows the gh search issues invocation"
+    search_verbs = (
+        "search", "searched", "searching", "looked for", "looking for",
+        "checked the tracker", "checked for an existing", "queried",
     )
-    hits = [p for p in patterns if p in low]
+    target_terms = (
+        "opsmill/infrahub-skills", "the tracker", "existing issue",
+        "existing issues", "open issue", "open issues",
+    )
+    for verb in search_verbs:
+        for target in target_terms:
+            # Either order, within a sentence's worth of characters.
+            if re.search(
+                rf"{re.escape(verb)}.{{0,120}}{re.escape(target)}", low
+            ) or re.search(
+                rf"{re.escape(target)}.{{0,120}}{re.escape(verb)}", low
+            ):
+                return True, (
+                    f"states the tracker was searched (matched: {verb!r} + {target!r})"
+                )
+    return False, "no statement that the tracker was searched before drafting"
+
+
+_CONFIDENCE_RECURRING = (
+    "recurring",
+    "happened before",
+    "seen this before",
+    "second session",
+    "second occurrence",
+    "user confirmed",
+)
+
+_CONFIDENCE_UNCONFIRMED = (
+    "unconfirmed",
+    "single observation",
+    "single sighting",
+    "first sighting",
+    "one session",
+    "only one occurrence",
+    "not yet corroborated",
+)
+
+
+def check_marks_confidence(text: str, **_: object) -> CheckResult:
+    """Output labels how strong the evidence is, rather than hiding it.
+
+    Replaces the old corroboration gate, which suppressed first sightings
+    entirely. Suppression is worse than a thin issue: an observation that
+    is never written down cannot be recovered, and the second observer on
+    another machine sees a first sighting too. The report is always
+    produced; what changes is the label it carries.
+    """
+    low = _normalized(text)
+    recurring = [p for p in _CONFIDENCE_RECURRING if p in low]
+    unconfirmed = [p for p in _CONFIDENCE_UNCONFIRMED if p in low]
+    if unconfirmed:
+        return True, f"labelled as an unconfirmed observation (matched: {unconfirmed[0]!r})"
+    if recurring:
+        return True, f"labelled as recurring (matched: {recurring[0]!r})"
+    return False, "no confidence label (neither recurring nor unconfirmed) in the report"
+
+
+def check_comments_not_duplicates(text: str, **_: object) -> CheckResult:
+    """When the tracker already covers the friction, output drafts a comment.
+
+    A second issue splits the evidence across two threads and buries the
+    corroboration a maintainer needs. The comment is the more valuable
+    artifact, so a drafted title here is a failure even though a title is
+    correct in every no-match scenario.
+    """
+    has_title = _TITLE_TAG_RE.search(text) is not None
+    low = _normalized(text)
+    comment_terms = (
+        "comment on", "add a comment", "adding a comment", "drafted a comment",
+        "draft a comment", "gh issue comment", "comment rather than",
+        "comment instead of",
+    )
+    hits = [p for p in comment_terms if p in low]
+    if has_title:
+        return False, (
+            "drafted a new issue title despite an existing issue covering "
+            "the friction; a comment was expected"
+        )
     if hits:
-        return True, f"ties the decision to the corroboration gate (matched: {hits[0]!r})"
-    return False, "no phrase tying the decision to a single session / lack of corroboration"
+        return True, f"drafts a comment on the existing issue (matched: {hits[0]!r})"
+    return False, "no drafted comment on the existing issue, and no new title either"
 
 
 _NEITHER_PATTERNS = (
@@ -620,9 +656,8 @@ def check_no_docs_gap_when_unsettled(text: str, **_: object) -> CheckResult:
     change section) when the underlying behavior is still being designed
     or is deliberately undocumented by design.
 
-    Mirrors `check_no_draft_on_single_session`'s shape and, per its
-    stricter precedent, its title-tag test: any `_TITLE_TAG_RE` match
-    counts as a violation, not just `bug(docs):`. An earlier version of
+    Uses a strict title-tag test: any `_TITLE_TAG_RE` match counts as a
+    violation, not just `bug(docs):`. An earlier version of
     this check only flagged `bug(docs):`, which meant a `feat:` (or
     `bug:`) title drafted for the exact same unsettled scenario sailed
     through as "correctly withheld", satisfying the reason-phrase branch
@@ -632,10 +667,13 @@ def check_no_docs_gap_when_unsettled(text: str, **_: object) -> CheckResult:
     before the gate is even reached, so a `feat:`/`bug:` draft of the
     same friction is simply a wrong classification wearing a different
     tag, not a compliant alternative. In an unsettled scenario, no
-    level-2 draft of any kind is correct; only "record an observation
-    and stop" is. A response that correctly withholds the draft must
-    also say why, the same way the corroboration-gate check requires a
-    stated reason rather than a bare "not filing this."
+    level-2 draft of any kind is correct; only "explain why and stop"
+    is. This is the one place the workflow stops without producing a
+    report, and it is not a confidence question: `check_marks_confidence`
+    answers those with a label rather than with silence. Here there is no
+    stable behavior to document at all. A response that correctly
+    withholds the draft must still say why, rather than a bare "not
+    filing this."
     """
     has_tag = _TITLE_TAG_RE.search(text) is not None
     has_proposed_rule_change = re.search(
@@ -1146,9 +1184,9 @@ def check_stays_actionable(text: str, **_: object) -> CheckResult:
 
 
 CHECKS: dict[str, CheckFn] = {
-    "no-draft-on-single-session": check_no_draft_on_single_session,
-    "records-observation": check_records_observation,
-    "states-gate-reason": check_states_gate_reason,
+    "searches-tracker-first": check_searches_tracker_first,
+    "marks-confidence": check_marks_confidence,
+    "comments-not-duplicates": check_comments_not_duplicates,
     "states-classification": check_states_classification,
     "justifies-classification": check_justifies_classification,
     "states-bug-or-feature": check_states_bug_or_feature,

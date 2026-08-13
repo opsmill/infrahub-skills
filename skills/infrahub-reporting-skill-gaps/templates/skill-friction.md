@@ -50,7 +50,14 @@ that needs writing before any rule can cite it.
 **Skill**: [skill directory, e.g. infrahub-managing-schemas]
 **Type**: [bug | feature | docs gap]
 **Repo**: [opsmill/infrahub-skills for bug/feature | opsmill/infrahub for docs gap]
-**Recurrence**: [number of corroborating sessions, or the explicit user confirmation that stood in for a second session]
+**Confidence**: [recurring | unconfirmed single observation]
+<!-- Set from the step 2 tracker check. `recurring` when the
+user confirmed this has happened before; `unconfirmed single
+observation` otherwise. Never omit this line: it is what
+lets a maintainer weigh the report, and what lets a second
+observer recognize their own case in it. See
+rules/workflow-tracker-first.md. -->
+**Tracker search**: [the query run against opsmill/infrahub-skills, and its result]
 
 ## What was being attempted
 

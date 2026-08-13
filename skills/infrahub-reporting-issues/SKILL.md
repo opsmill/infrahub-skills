@@ -58,7 +58,7 @@ Infrahub *skill's* own guidance (a rule that's wrong,
 missing, or confusing) rather than the Infrahub
 product itself. That belongs to
 [infrahub-reporting-skill-gaps](../infrahub-reporting-skill-gaps/SKILL.md),
-which corroborates the friction across sessions and
+which checks the tracker for an existing report and
 decides bug vs. feature before handing a payload to
 this skill.
 
@@ -77,6 +77,15 @@ without a `[skill]` segment, since the originating skill
 means nothing to `opsmill/infrahub`'s maintainers; see
 [reference.md](reference.md) for that repo's own title
 notes and the `bug:`/`feat:` convention this pairs with.
+
+That caller may instead send `{repo, issue, body}`,
+a comment on an issue it already found. Treat `issue`
+as the target, skip step 4 (the caller has already
+searched, and a comment cannot be a duplicate of the
+thread it belongs to), and post with
+`gh issue comment` at step 8 rather than
+`gh issue create`. The review gate at step 7 still
+applies, unchanged.
 
 When invoked this way, classification (step 2) and
 routing (step 3) are already decided, skip them. Skip

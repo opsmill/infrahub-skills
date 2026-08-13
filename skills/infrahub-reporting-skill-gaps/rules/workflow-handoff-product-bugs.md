@@ -34,12 +34,9 @@ the relevant `opsmill/infrahub-*` product repo) does.
    description, in the terms that skill expects: what
    was attempted, what Infrahub returned, and the exact
    request that failed.
-3. Append a note to the notes file
-   (`~/.infrahub-skills/reporting-skill-gaps/notes.jsonl`, see
-   [reference.md](../reference.md)) recording the
-   hand-off with `status: handed-off`, so a future
-   session recognizes this signature was already routed
-   and does not re-triage it from scratch.
+3. Tell the user the hand-off happened and name the
+   repo it went to, so the routing decision is visible
+   rather than silent.
 
 ### Incorrect
 
@@ -68,9 +65,7 @@ Infrahub returned an unexpected 500 on a well-formed
 request, so that's a product defect, not a skill gap.
 Handing off to infrahub-reporting-issues to draft this
 against the correct repo instead of opsmill/infrahub-skills.
-Recorded the hand-off in notes.jsonl (status: handed-off).
 ```
 
-Reference: [reference.md](../reference.md) for the notes
-file schema; [workflow-triage-classification.md](workflow-triage-classification.md)
+Reference: [workflow-triage-classification.md](workflow-triage-classification.md)
 for the classification this hand-off follows from.

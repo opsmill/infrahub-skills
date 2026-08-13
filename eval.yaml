@@ -3958,7 +3958,7 @@ tasks:
         check: No yagni finding exceeds MEDIUM severity
 
   # --- Skill Gap Reporter --- #
-  - name: reporting-skill-gaps-single-session
+  - name: reporting-skill-gaps-tracker-no-match
     trials: 3
     instruction: |
       Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
@@ -3970,6 +3970,10 @@ tasks:
       rules file before the enum default value was finally accepted. The user
       now says: "That took way too many tries, can you report the friction?"
 
+      This is the first time you have seen this friction, and the user does
+      not recall hitting it before. Assume a search of opsmill/infrahub-skills
+      returns no issue covering enum attribute default values.
+
       Prepare the skill-improvement report by following the skill's workflow.
       Do NOT actually run `gh` commands or submit anything to GitHub; write out
       what you would do at each step instead.
@@ -3977,29 +3981,75 @@ tasks:
       Save the report to: output.md
     graders:
       - type: deterministic
-        run: python graders/reporting-skill-gaps/check_corroboration_gate.py output.md
+        run: python graders/reporting-skill-gaps/check_tracker_first.py output.md
         weight: 1.0
     expected_output: >-
-      A report that recognizes this is a single, uncorroborated session: it
-      does not draft a GitHub issue title or a proposed rule change, records
-      an `observed` entry in notes.jsonl, and ties the decision to stop back
-      to the lack of corroboration (only one session, not seen before).
+      A report that searches opsmill/infrahub-skills before drafting, finds no
+      existing issue, and drafts anyway while labelling the evidence as an
+      unconfirmed single observation rather than claiming a pattern. It names
+      the implicated rule file, or states plainly that no rule covers the topic.
     expectations:
-      - Does not draft an issue title or a proposed rule change from one session
-      - Mentions recording the observation in notes.jsonl
-      - Names the corroboration gate as the reason nothing was drafted
+      - States that the tracker was searched before anything was drafted
+      - Labels the report an unconfirmed single observation rather than suppressing it
+      - Names the implicated rule file, or that no rule covers the topic
     assertions:
-      - name: no-draft-on-single-session
+      - name: searches-tracker-first
         check: >-
-          Report does not draft an issue title (`bug:`,
-          `feat:`, or `bug(docs):`) or a proposed rule
-          change section from a single session
-      - name: records-observation
-        check: Report mentions recording an observation in notes.jsonl
-      - name: states-gate-reason
+          Report states that opsmill/infrahub-skills was searched for an
+          existing issue before drafting
+      - name: marks-confidence
         check: >-
-          Report ties the decision to stop back to the corroboration gate
-          (only one session, no prior occurrence, not seen before)
+          Report carries an explicit confidence label, here an unconfirmed
+          single observation
+      - name: cites-rule-file
+        check: >-
+          Report names a rule file under skills/<skill>/rules/, or states
+          that no rule in the skill covers the topic
+
+  - name: reporting-skill-gaps-tracker-match
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: In this session, you used infrahub-managing-schemas to add a new
+      attribute with an enum default value to a node, and the syntax took four
+      attempts to get right. The user says: "That took way too many tries, can
+      you report the friction?"
+
+      Assume a search of opsmill/infrahub-skills returns issue #142,
+      "bug: infrahub-managing-schemas: enum attribute default value syntax is
+      not covered by any rule", still open. Your session adds one thing that
+      issue does not record: the failure also occurs on schema load, not only
+      on validation.
+
+      Work out what to prepare and prepare it. Do NOT actually run `gh`
+      commands or submit anything to GitHub; write out what you would do
+      instead.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_tracker_match.py output.md
+        weight: 1.0
+    expected_output: >-
+      An answer that searched the tracker, found issue #142 already covers the
+      friction, and therefore drafts a comment carrying only the new evidence
+      from this session instead of a second issue. It does not draft a `bug:`,
+      `feat:`, or `bug(docs):` title.
+    expectations:
+      - States that the tracker was searched and issue #142 already covers this
+      - Drafts a comment on the existing issue rather than a new issue
+      - Does not draft a new issue title
+    assertions:
+      - name: searches-tracker-first
+        check: >-
+          Report states that opsmill/infrahub-skills was searched for an
+          existing issue before drafting
+      - name: comments-not-duplicates
+        check: >-
+          Report drafts a comment on the existing issue and does not draft a
+          new issue title
 
   - name: reporting-skill-gaps-triage
     trials: 3
@@ -4267,10 +4317,10 @@ tasks:
       happened to run by reading the CLI's own `--help` text and the
       changelog entry that introduced the flag.
 
-      This friction has already been corroborated (a second session hit
-      the same gap) and triage has already concluded this is a skill
-      defect. Work through the next step: decide the kind and what to do
-      next. Do not run `gh` commands or submit anything.
+      The user confirms they have hit this same gap before, and triage
+      has already concluded this is a skill defect. Work through the next
+      step: decide the kind and what to do next. Do not run `gh` commands
+      or submit anything.
 
       Save your answer to: output.md
     graders:
@@ -4282,21 +4332,20 @@ tasks:
       escape turned up nothing, and that the CLI's own text marks the
       mode's shape as still changing rather than settled, so the
       settled-behavior gate is not satisfied: it does not draft a
-      bug(docs): title or a Proposed rule change section, records an
-      `observed` entry in notes.jsonl instead, and ties that decision to
-      the gate.
+      bug(docs): title or a Proposed rule change section, explains to the
+      user which behavior is unsettled, and ties that decision to the
+      gate. Note this is the one place the workflow stops without a
+      report, and it is not a confidence question.
     expectations:
       - Does not draft a bug(docs) issue title or a Proposed rule change section
       - Ties the decision to the settled-behavior gate (behavior still changing, not settled)
-      - Mentions recording the observation in notes.jsonl
+      - Explains which behavior is unsettled rather than stopping silently
     assertions:
       - name: no-docs-gap-when-unsettled
         check: >-
           Response does not draft a bug(docs): title or Proposed rule
           change section, and ties the decision to the settled-behavior
           gate
-      - name: records-observation
-        check: Response mentions recording an observation in notes.jsonl
 
   - name: reporting-skill-gaps-handoff
     trials: 3
