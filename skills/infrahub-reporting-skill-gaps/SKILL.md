@@ -1,7 +1,7 @@
 ---
 name: infrahub-reporting-skill-gaps
 description: >-
-  Turns friction from an Infrahub skill session into a reviewed GitHub issue against opsmill/infrahub-skills.
+  Turns friction from an Infrahub skill session into a reviewed GitHub issue about an Infrahub skill's guidance.
   Infrahub skills fail quietly: a missing or unclear rule does not crash, it produces extra round trips and
   repeated user nudges. This skill gathers evidence of that friction, checks the tracker for an existing
   report, works out whether the skill or the underlying product is at fault, and drafts a proposed rule
@@ -30,14 +30,14 @@ Infrahub skills fail quietly. A missing rule does not
 crash; it produces eleven round trips and four user
 nudges before the model finds the right answer on its
 own. This skill works out which rule was missing,
-wrong, or unclear, and drafts an improvement as a
-GitHub issue report against `opsmill/infrahub-skills`.
-It does **not** file anything itself: it prepares a
-complete, redacted draft and hands it to
+wrong, or unclear, and drafts the improvement as an issue
+report. It does **not** file anything itself, and it does
+not decide where the report goes: it prepares a complete,
+redacted draft and hands it to
 [infrahub-reporting-issues](../infrahub-reporting-issues/SKILL.md),
-which owns the 11-repo registry, the consent gate,
-submission-method choice, and confirmation. This skill's
-job ends at the handoff.
+which owns the 11-repo registry and the routing, the
+consent gate, submission-method choice, and confirmation.
+This skill's job ends at the handoff.
 
 ## When to Use
 
@@ -62,12 +62,35 @@ Follow these steps in order. Stop at every gate step;
 never proceed past one without explicit
 confirmation.
 
-### 1. Gather evidence
+### 1. Detect and confirm the gap
 
 Start with the current conversation. Only look at a
 past session's transcript when the user points at one.
 Read [reference.md](reference.md) for how transcript
-discovery works and what counts as a friction signal.
+discovery works and where the signals live.
+
+Then work the detection ladder in order, and stop as
+soon as the friction is described:
+
+1. **Verifier verdict.** Find a red-to-green transition
+   on the same target (`infrahubctl schema load`,
+   `object load`, `check run`, `transform run`, a
+   `pytest` run). It is the strongest evidence there is,
+   because no self-assessment produced it. It only
+   counts when the skill was loaded before the first
+   attempt.
+2. **Coverage read.** `ls skills/<skill>/rules/` and
+   grep the topic. This names the file, or its absence.
+3. **Correction delta.** Diff the first authored version
+   against the accepted one. That delta is the proposed
+   rule change, not a paraphrase of it.
+4. **Session-shape counters.** Retries, edit churn,
+   repeated asks, a docs escape. These open an
+   investigation and never close one.
+
+A draft supported only by counters is not ready: say
+which probe came up empty and stop. See
+[rules/evidence-detection-ladder.md](rules/evidence-detection-ladder.md).
 
 ### 2. Check the tracker
 
@@ -112,11 +135,11 @@ instead of drafting a skill-friction issue. See
 
 ### 5. Locate the artifact
 
-Find the specific rule file, or lack of one, that
-should have prevented the friction. Run
-`ls skills/<skill>/rules/` and grep for the topic. A
-draft that cannot name the implicated file, or the gap
-in coverage, is not ready. See
+Name the specific rule file, or lack of one, that should
+have prevented the friction. Probe B in step 1 already
+ran this read; this step is where its result becomes a
+citation. A draft that cannot name the implicated file,
+or the gap in coverage, is not ready. See
 [rules/evidence-cite-the-artifact.md](rules/evidence-cite-the-artifact.md).
 
 ### 6. Draft and redact
@@ -128,11 +151,10 @@ step 2. Redact anything that identifies the user's
 infrastructure or organization per
 [rules/evidence-no-customer-data.md](rules/evidence-no-customer-data.md).
 This is security-critical and applies before the draft
-ever leaves this skill. This produces the four handoff
-fields (`repo`, `type`, `title`, `body`); `repo` is
-`opsmill/infrahub-skills` for bug or feature, or
-`opsmill/infrahub` for docs gap, since Infrahub's own
-documentation lives there and not in the skills repo.
+ever leaves this skill. This produces the three handoff
+fields `type`, `title`, and `body`. It does **not**
+produce a target repository: naming one is not this
+skill's call, and the draft must not contain one.
 
 When step 2 found a match, draft a comment instead: no
 title, no repeated problem statement, only the new
@@ -141,20 +163,22 @@ evidence this session adds.
 ### 7. Hand off
 
 Invoke [infrahub-reporting-issues](../infrahub-reporting-issues/SKILL.md)
-with the payload `{repo, type, title, body, searched,
-issue?}`, where `searched` names the repo step 2
-searched and `issue` is set only when it matched. That
-skill owns the review gate, submission-method choice,
-and confirmation from here; never file or comment
-directly. See
+with the payload `{type, title, body, searched, issue?}`,
+where `searched` names the repo step 2 searched and
+`issue` is set only when it matched. There is no `repo`
+field: that skill resolves the destination from `type`
+against its own registry, and owns the review gate,
+submission-method choice, and confirmation from here.
+Never file or comment directly. See
 [rules/workflow-handoff-to-reporting.md](rules/workflow-handoff-to-reporting.md).
 
-### 8. Report the outcome
+### 8. Relay the outcome
 
-Tell the user plainly what happened: filed, commented,
-skipped, or deferred, with the issue URL when the
-hand-off returned one. The tracker is the durable
-record; this skill keeps no local state of its own.
+One line on what the hand-off returned, with the issue
+URL if it produced one. The receiver already confirmed
+with the user; this is a relay, not a second
+confirmation. The tracker is the durable record; this
+skill keeps no local state of its own.
 
 ## Rule Categories
 
@@ -171,6 +195,9 @@ index.
 - [reference.md](reference.md): evidence source
   priority, transcript discovery, and friction signals.
   **Read this in step 1.**
+- [rules/evidence-detection-ladder.md](rules/evidence-detection-ladder.md):
+  the four probes that establish a gap exists, and why
+  counters alone never do. Read this in step 1.
 - [templates/skill-friction.md](templates/skill-friction.md):
   the draft template filled in step 6.
 - [rules/workflow-tracker-first.md](rules/workflow-tracker-first.md):
@@ -196,6 +223,12 @@ index.
 - **Filing when the implicated skill is unknown.** If
   step 5 cannot name a skill and a rule file (or the
   absence of one), the report is not ready to draft.
+- **Filing a retry count.** Round trips, nudges, and
+  edit churn measure a session, not a ruleset. They rise
+  for reasons that have nothing to do with the skill: an
+  unclear request, a slow instance, a user changing
+  their mind. They open an investigation; a verifier
+  verdict or a coverage read closes it.
 - **Drafting without checking the tracker.** Step 2 is
   not optional. A report drafted blind either duplicates
   an open issue or throws away the one place a second

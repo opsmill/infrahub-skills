@@ -4269,9 +4269,9 @@ tasks:
       The tracker has already been searched and no open issue covers this,
       and triage has already concluded
       this is a skill defect. Work through the next step: decide the kind
-      and state the title and target repo you would use for the report,
-      with reasoning, including which page path you reached and what it
-      did or did not answer. Do not run `gh` commands or submit anything.
+      and state the title you would use for the report, with reasoning,
+      including which page path you reached and what it did or did not
+      answer. Do not run `gh` commands or submit anything.
 
       Save your answer to: output.md
     graders:
@@ -4283,9 +4283,10 @@ tasks:
       relationship traversal, that the docs.infrahub.app/llms.txt escape
       happened only after the skill's own material and infrahub-common were
       checked, and that the page it pointed at still did not address the
-      multi-hop case, gives the matching bug(docs): title targeting
-      opsmill/infrahub rather than the skills repo, and records the
-      fetched page path and what it failed to answer.
+      multi-hop case, gives the matching bug(docs): title, and records the
+      fetched page path and what it failed to answer. The kind is what
+      routes the report, so the response need not, and should not, name a
+      target repository.
     expectations:
       - Names the kind explicitly and uses a matching title prefix
       - Ties the kind to whether a rule already covers the topic, not to effort or round trips
@@ -4380,24 +4381,33 @@ tasks:
         run: python graders/reporting-skill-gaps/check_handoff_to_reporting.py output.md
         weight: 1.0
     expected_output: >-
-      A response that drafts a complete report (repo opsmill/infrahub-skills,
-      type feature, a title starting with `feat:`, and a filled-in body),
-      then hands the payload to infrahub-reporting-issues instead of running
-      `gh issue create` or claiming an issue was filed itself.
+      A response that drafts a complete report (type feature, a title
+      starting with `feat:`, a filled-in body, and `searched` naming the
+      tracker already checked), then hands the payload to
+      infrahub-reporting-issues instead of running `gh issue create` or
+      claiming an issue was filed itself. It names no target repository:
+      routing belongs to the receiver, which resolves it from the type.
     expectations:
       - Hands off to infrahub-reporting-issues to file, rather than filing directly
-      - Runs no `gh` commands itself and claims no issue was filed
-      - Carries a complete payload (repo, type, title, body)
+      - Runs no `gh` write commands itself and claims no issue was filed
+      - Carries a complete payload (type, title, body, searched)
+      - Names no repository as the filing destination
       - Uses a title starting with `feat:`
     assertions:
       - name: hands-off-to-reporting-issues-for-filing
         check: Response invokes or names infrahub-reporting-issues as the filer
       - name: no-direct-filing
         check: >-
-          Response contains no `gh issue create`, no `gh search issues`, and
+          Response contains no `gh issue create`, no `gh issue comment`, and
           no claim that an issue was filed
       - name: payload-is-complete
-        check: Response carries all four payload fields (repo, type, title, body)
+        check: >-
+          Response carries the payload fields type, title, body, and
+          searched
+      - name: leaves-routing-to-reporter
+        check: >-
+          Response names no repository as the filing destination, leaving
+          routing to infrahub-reporting-issues
       - name: title-uses-kind-prefix
         check: Response's title starts with `bug:`, `feat:`, or `bug(docs):`
 
@@ -4452,6 +4462,102 @@ tasks:
         check: >-
           Response includes a "Proposed rule change" heading with
           non-placeholder, specific content
+
+  - name: reporting-skill-gaps-detection-verifier
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: You used infrahub-managing-schemas to add a relationship whose
+      peer is a generic. You read the skill's rules first, then wrote the
+      schema file. `infrahubctl schema load` rejected it twice with a
+      duplicate-identifier validation error. On the third attempt it loaded
+      cleanly, after you added an explicit `identifier` on the generic side
+      of the relationship. The instance was reachable throughout and
+      authentication never failed. This has now come up in two separate
+      sessions, the tracker has already been searched with no match, and
+      triage has already concluded this is a skill defect.
+
+      Work through the detection ladder and draft the report. Do not run
+      `gh` commands or submit anything.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_detection_ladder.py output.md
+        weight: 1.0
+    expected_output: >-
+      A report grounded in the verifier verdict: it names the
+      `infrahubctl schema load` failure and the later pass, cites the
+      implicated rule file under skills/infrahub-managing-schemas/rules/
+      (or states plainly that no rule covers the generic-peer case), states
+      both the form that was rejected and the form that was accepted, and
+      turns that delta into a specific "Proposed rule change" section.
+    expectations:
+      - Names the verifier command and its failed-then-passed transition
+      - Cites a path under skills/<skill>/rules/, or states no rule covers the case
+      - States both the rejected form and the accepted form
+      - Includes a "Proposed rule change" heading with real, specific content
+    assertions:
+      - name: cites-verifier-outcome
+        check: >-
+          Response names a verifier command (infrahubctl schema load or
+          similar) and its failed-then-passed transition
+      - name: cites-rule-file
+        check: >-
+          Response names a skills/.../rules/*.md or skills/.../SKILL.md
+          path, or explicitly states no rule in this skill covers the topic
+      - name: states-correction-delta
+        check: >-
+          Response states both the form that failed and the form that was
+          accepted
+      - name: has-proposed-change
+        check: >-
+          Response includes a "Proposed rule change" heading with
+          non-placeholder, specific content
+
+  - name: reporting-skill-gaps-detection-counters-only
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: A session using infrahub-managing-generators felt slow. Looking
+      back at it: the same generator file was edited four times, two tool
+      calls returned errors, and the user restated the same request twice
+      before saying "this is taking forever, report the friction."
+
+      That is all the evidence there is. No verifier was ever run, so
+      nothing failed and later passed. The errors were transport-level
+      timeouts against the instance, not validation rejections. The session
+      never settled on a topic specific enough to grep the generators
+      skill's `rules/` directory for, so no rule file (and no confirmed
+      absence of one) can be named.
+
+      Decide what to do and write out your reasoning. Do not run `gh`
+      commands or submit anything.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_counters_not_evidence.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that drafts nothing: no `bug:`/`feat:`/`bug(docs):` title
+      line and no "Proposed rule change" section. It states that
+      session-shape counters open an investigation rather than closing one,
+      and names what is missing (no verifier verdict, no coverage read that
+      resolves to a file or its absence).
+    expectations:
+      - Drafts no title line and no "Proposed rule change" section
+      - Says why the counters alone are not enough, naming the missing probe
+    assertions:
+      - name: no-draft-without-detection-evidence
+        check: >-
+          Response drafts no report and explains that counters alone are
+          not evidence, naming the missing verifier verdict or coverage
+          read
 
   - name: reporting-skill-gaps-redaction
     trials: 3

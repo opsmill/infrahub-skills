@@ -41,11 +41,17 @@ entirely out of things visible in the transcript.
 **Does the skill already claim to do this, and if not,
 did an escape to the docs resolve it?**
 
-| Evidence | Kind | Repo | Title prefix |
-| -------- | ---- | ---- | ------------- |
-| A rule or reference covers the topic, and the model still got it wrong | Bug | `opsmill/infrahub-skills` | `bug:` |
-| No rule covers it. The model escaped to `docs.infrahub.app`, found the answer, and succeeded | Feature | `opsmill/infrahub-skills` | `feat:` |
-| No rule covers it. The model escaped to `docs.infrahub.app` and still failed, or the docs page it reached did not address the problem, and the behavior is settled (see the gate below) | Docs gap | `opsmill/infrahub` | `bug(docs):` |
+| Evidence | Kind | Title prefix |
+| -------- | ---- | ------------- |
+| A rule or reference covers the topic, and the model still got it wrong | Bug | `bug:` |
+| No rule covers it. The model escaped to `docs.infrahub.app`, found the answer, and succeeded | Feature | `feat:` |
+| No rule covers it. The model escaped to `docs.infrahub.app` and still failed, or the docs page it reached did not address the problem, and the behavior is settled (see the gate below) | Docs gap | `bug(docs):` |
+
+The kind is this rule's decision. The destination is not:
+`infrahub-reporting-issues` resolves the repo from the
+kind against its own registry, and this skill never names
+one. See
+[workflow-handoff-to-reporting.md](workflow-handoff-to-reporting.md).
 
 Feature and docs gap start from the same first sentence
 ("no rule covers this"). What tells them apart is the
@@ -60,16 +66,17 @@ citation a new rule needs, for a docs gap it is the
 specification for the documentation that has to be
 written first.
 
-Bug and feature both stay inside `opsmill/infrahub-skills`:
-the file that needs writing or fixing lives there. A docs
-gap leaves it. Infrahub's own documentation lives in
-`opsmill/infrahub`, not the skills repo, so a docs-gap
-report has to go where the people who maintain that
-documentation will actually see it. Filing a docs gap
-against the skills repo sends it to maintainers with no
-power to fix it, the same mistake
+Bug and feature both stay with the skills maintainers:
+the file that needs writing or fixing is a rule file. A
+docs gap does not. Infrahub's own documentation is not
+the skills repo's to write, so a docs gap has to reach
+the people who maintain that documentation instead.
+Sending it to maintainers with no power to fix it is the
+same mistake
 [workflow-handoff-product-bugs.md](workflow-handoff-product-bugs.md)
-already guards against for product defects.
+already guards against for product defects. Getting it
+there is the receiver's job; saying which kind it is, so
+the receiver can, is this rule's.
 
 This is the same determination
 [evidence-cite-the-artifact.md](evidence-cite-the-artifact.md)
@@ -208,19 +215,19 @@ error against the GraphQL schema. Filing as a feature
 since no rule anywhere covers this.
 ```
 
-Filed as a feature against `opsmill/infrahub-skills` when
-the escape happened and still failed to answer the
-question. A maintainer there picks this up expecting to
-write a rule that cites `/guides/graphql/relationships`,
-and finds that page says nothing about the problem. The
-rule they need to write cannot exist yet, because the
-documentation it would cite does not exist yet either,
-and the skills repo has no power to write Infrahub's own
-docs besides. Assuming multi-hop traversal is something
-Infrahub genuinely supports today (the settled-behavior
-gate above), this is a docs gap, filed against
-`opsmill/infrahub` instead: `bug(docs): no documentation
-on multi-hop relationship traversal in a GraphQL query`.
+Typed as a feature when the escape happened and still
+failed to answer the question. A skills maintainer picks
+this up expecting to write a rule that cites
+`/guides/graphql/relationships`, and finds that page says
+nothing about the problem. The rule they need to write
+cannot exist yet, because the documentation it would cite
+does not exist yet either, and writing Infrahub's own
+docs is not theirs to do besides. Assuming multi-hop
+traversal is something Infrahub genuinely supports today
+(the settled-behavior gate above), this is a docs gap:
+`bug(docs): no documentation on multi-hop relationship
+traversal in a GraphQL query`. The kind is what routes
+it; naming a repo here is not this rule's call.
 
 ### Correct
 
@@ -252,8 +259,8 @@ Multi-hop traversal is something Infrahub genuinely
 supports and its behavior is settled, just undocumented,
 so the settled-behavior gate is satisfied. Since no rule
 covers this and the docs page did not address the case,
-this is a docs gap, filed against opsmill/infrahub
-rather than the skills repo:
+this is a docs gap, which is what will route it away from
+the skills maintainers:
 
 bug(docs): no documentation on multi-hop relationship
 traversal in a GraphQL query

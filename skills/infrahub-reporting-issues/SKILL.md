@@ -66,16 +66,30 @@ this skill.
 
 This skill may also be invoked directly by
 `infrahub-reporting-skill-gaps` with a prepared payload:
-`{repo, type, title, body, searched, issue?}`. For that
-caller, `type` is
-`bug`, `feature`, or `docs gap`, already decided by that
-skill's two-level triage, and `repo` follows the kind:
-`opsmill/infrahub-skills` for `bug`/`feature`, or
-`opsmill/infrahub` for `docs gap`, since Infrahub's own
-documentation lives in the main repo, not the skills
-repo. Titles use `bug(docs):` for the docs-gap case,
-without a `[skill]` segment, since the originating skill
-means nothing to `opsmill/infrahub`'s maintainers; see
+`{type, title, body, searched, issue?}`. For that caller,
+`type` is `bug`, `feature`, or `docs gap`, already decided
+by that skill's two-level triage.
+
+**The payload carries no `repo`, and routing is yours.**
+That caller deliberately names no destination, so this
+table is the only place the mapping lives:
+
+| `type` | Repo |
+| ------ | ---- |
+| `bug` | `opsmill/infrahub-skills` |
+| `feature` | `opsmill/infrahub-skills` |
+| `docs gap` | `opsmill/infrahub` |
+
+A bug or a feature is about a rule file, which lives in
+the skills repo. A docs gap is about Infrahub's own
+documentation, which lives in the main repo, and the
+skills maintainers have no power to write it. Resolve the
+repo from this table before step 4, then continue as
+though step 3 had run.
+
+Titles use `bug(docs):` for the docs-gap case, without a
+`[skill]` segment, since the originating skill means
+nothing to `opsmill/infrahub`'s maintainers; see
 [reference.md](reference.md) for that repo's own title
 notes and the `bug:`/`feat:` convention this pairs with.
 
@@ -86,18 +100,21 @@ issue: treat it as the target, render `body` as a
 comment, and post with `gh issue comment` at step 8
 rather than `gh issue create`.
 
-**Step 4 depends on `searched`.** Skip it when
-`searched` equals `repo`: the caller has already run
-that exact search, and repeating it risks a second
+**Step 4 depends on `searched`.** Skip it when `searched`
+equals the repo you just resolved: the caller has already
+run that exact search, and repeating it risks a second
 answer that contradicts the one already written into
 `body`. Run it as normal when they differ, which is the
 docs-gap case: the caller searches
-`opsmill/infrahub-skills` before it knows the kind, but
-a docs gap routes to `opsmill/infrahub`, so that
-tracker has not been checked by anyone yet.
+`opsmill/infrahub-skills` before it knows the kind, but a
+docs gap routes to `opsmill/infrahub`, so that tracker has
+not been checked by anyone yet.
 
-When invoked this way, classification (step 2) and
-routing (step 3) are already decided, skip them. Skip
+When invoked this way, classification (step 2) is already
+decided, skip it. Step 3's detection logic does not apply
+either; the table above replaces it, and there is nothing
+to confirm with the user since the kind was already
+established from the session's own evidence. Skip
 environment info gathering (step 5) too; it collects
 Infrahub server, SDK, and OS versions, which apply to
 neither a report about a skill's own guidance nor a

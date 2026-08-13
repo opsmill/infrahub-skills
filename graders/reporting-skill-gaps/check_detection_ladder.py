@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Grader for the skill-defect handoff-to-reporting-issues eval."""
+"""Grader for the evidence-detection-ladder eval (verifier-verdict path)."""
 from __future__ import annotations
 import json
 import sys
@@ -9,11 +9,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import run_checks  # noqa: E402
 
 CHECKS = [
-    "hands-off-to-reporting-issues-for-filing",
-    "no-direct-filing",
-    "payload-is-complete",
-    "leaves-routing-to-reporter",
-    "title-uses-kind-prefix",
+    "cites-verifier-outcome",
+    "cites-rule-file",
+    "states-correction-delta",
+    "has-proposed-change",
 ]
 
 if __name__ == "__main__":

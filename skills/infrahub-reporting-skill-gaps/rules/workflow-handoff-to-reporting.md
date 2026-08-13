@@ -14,19 +14,23 @@ and let it drive submission from there.
 
 ### The payload
 
-`{repo, type, title, body, searched, issue?}`, where
-`type` is `bug`, `feature`, or `docs gap`, and `repo`
-follows the kind: `opsmill/infrahub-skills` for a bug or
-a feature, `opsmill/infrahub` for a docs gap, since
-Infrahub's own documentation lives there, not in the
-skills repo. See
+`{type, title, body, searched, issue?}`, where `type` is
+`bug`, `feature`, or `docs gap`. See
 [workflow-bug-vs-feature.md](workflow-bug-vs-feature.md)
-for the routing table and the settled-behavior gate a
-docs gap must also pass before it is drafted at all.
+for how `type` was decided and the settled-behavior gate
+a docs gap must also pass before it is drafted at all.
+
+**No `repo` field.** This skill never names a filing
+destination. The receiver resolves the repo from `type`
+against its own registry; see its Skill-gap intake
+section. Routing is the one thing it owns outright, and a
+copy of the mapping here is a copy that goes stale the
+first time the destination changes.
 
 `searched` names the repo this skill already searched at
 step 2, so the receiver knows whether its own duplicate
-search is redundant or still owed. `issue` is optional:
+search is redundant or still owed. That is a statement of
+what was read, not a destination. `issue` is optional:
 present, it carries the number of the issue the step-2
 search matched, and `body` is a comment rather than a
 new issue. One payload with an optional field, not two
@@ -56,6 +60,7 @@ and two answers that can disagree in public.
 ### What this skill must NOT do
 
 - Run `gh issue create` or `gh issue comment`.
+- Name the repo the issue will be filed against.
 - Ask the user how they want to submit.
 - Claim that an issue was filed, commented on, or
   otherwise submitted.
@@ -110,19 +115,20 @@ example.
 
 Handing off to infrahub-reporting-issues with:
 
-  repo: opsmill/infrahub-skills
   type: feature
   title: (the line above)
   body: (the full report, including the section above)
+  searched: opsmill/infrahub-skills (no match)
 
-infrahub-reporting-issues will search for duplicates,
-show the draft for review, and handle submission from
-here.
+infrahub-reporting-issues resolves the target repo from
+the type, shows the draft for review, and handles
+submission from here.
 ```
 
-A docs-gap handoff targets the other repo, and drops the
-`[skill]` segment from the title since it means nothing
-to `opsmill/infrahub`'s maintainers:
+A docs-gap handoff carries a different `type`, which is
+what routes it elsewhere, and drops the `[skill]` segment
+from the title since the originating skill means nothing
+to the maintainers who will receive it:
 
 ```text
 Draft complete and redacted:
@@ -138,14 +144,15 @@ missing.
 
 Handing off to infrahub-reporting-issues with:
 
-  repo: opsmill/infrahub
   type: docs gap
   title: (the line above)
   body: (the full report, including the section above)
+  searched: opsmill/infrahub-skills (no match)
 
-infrahub-reporting-issues will search for duplicates,
-show the draft for review, and handle submission from
-here.
+A docs gap does not belong to the skills repo, so the
+receiver's own duplicate search is still owed against
+wherever it routes this. It will run that search, show
+the draft for review, and handle submission from here.
 ```
 
 Reference:

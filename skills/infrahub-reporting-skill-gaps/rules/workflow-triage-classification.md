@@ -15,9 +15,10 @@ defect, product defect, or neither.
 ### Why it matters
 
 Drafting first and classifying later produces a draft
-that gets thrown away, or worse, filed against the
-wrong repo. Triage decides which repo the report goes
-to, and whether it should be written at all. Getting
+that gets thrown away, or worse, one routed to the wrong
+maintainers. Triage decides which kind of report this is,
+which is what the receiver routes on, and whether it
+should be written at all. Getting
 this step wrong either buries a real product bug in a
 docs-only tracker, or asks skill maintainers to fix
 something they have no power to fix.

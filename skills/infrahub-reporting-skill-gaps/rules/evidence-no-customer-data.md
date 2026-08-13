@@ -8,8 +8,8 @@ tags: evidence, redaction, privacy
 
 Impact: CRITICAL
 
-A skill-friction report is filed against a public repository,
-`opsmill/infrahub-skills`. Once it is filed it is indexed and cannot be
+A skill-friction report is filed against a public repository, whichever one
+the receiver routes it to. Once it is filed it is indexed and cannot be
 reliably retracted. This rule governs what the friction narrative may say
 about the customer's schema, environment, and infrastructure before it is
 handed off in step 6.

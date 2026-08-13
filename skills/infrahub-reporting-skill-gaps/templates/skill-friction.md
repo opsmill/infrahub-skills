@@ -1,12 +1,15 @@
 <!--
-Skill-friction template. A bug or feature report targets
-opsmill/infrahub-skills; a docs-gap report targets
-opsmill/infrahub instead, see the routing note below.
-Every bracketed placeholder must be replaced before
-this is handed off. Every section except "Proposed rule
-change" may be deleted when it does not apply to this
-report. Use generic phrasing throughout: no customer
-names, node kinds, hostnames, or paths.
+Skill-friction template. Every bracketed placeholder must
+be replaced before this is handed off. Every section
+except "Proposed rule change" may be deleted when it does
+not apply to this report. Use generic phrasing
+throughout: no customer names, node kinds, hostnames, or
+paths.
+
+This template names no target repository, on purpose. The
+title prefix carries the kind, and
+infrahub-reporting-issues resolves the destination from
+it; see rules/workflow-handoff-to-reporting.md.
 
 Title prefix carries the level-2 classification: bug:
 when a rule or reference already covers the topic and
@@ -22,13 +25,12 @@ body below, are handed to infrahub-reporting-issues
 as-is; see rules/workflow-handoff-to-reporting.md. Do
 not file this directly.
 
-bug: and feat: both target opsmill/infrahub-skills.
-bug(docs): targets opsmill/infrahub instead, since
-Infrahub's own documentation lives there, and its title
-drops the [skill] segment: `bug(docs): [what the
-documentation is missing]`, with no skill name, since
-that context means nothing to opsmill/infrahub's
-maintainers.
+A bug(docs): title drops the [skill] segment:
+`bug(docs): [what the documentation is missing]`, with no
+skill name, since the originating skill means nothing to
+the maintainers who receive it. infrahub-reporting-issues'
+reference.md documents that convention and why this
+prefix reads the way it does; do not restate it here.
 
 For a feature, "Docs the model had to leave the skill
 for" is the most useful section: the fetched page paths
@@ -49,7 +51,8 @@ that needs writing before any rule can cite it.
 
 **Skill**: [skill directory, e.g. infrahub-managing-schemas]
 **Type**: [bug | feature | docs gap]
-**Repo**: [opsmill/infrahub-skills for bug/feature | opsmill/infrahub for docs gap]
+<!-- No Repo line. The receiver resolves the destination
+from Type; see rules/workflow-handoff-to-reporting.md. -->
 **Confidence**: [recurring | unconfirmed single observation]
 <!-- Set from the step 2 tracker check. `recurring` when the
 user confirmed this has happened before; `unconfirmed single

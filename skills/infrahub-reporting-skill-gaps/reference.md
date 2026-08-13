@@ -45,12 +45,28 @@ absence never blocks a report.
 
 Friction shows up in a transcript as:
 
-- `tool_result` blocks carrying `is_error`
+- a verifier that failed and later passed on the same
+  target: `infrahubctl schema load`, `schema validate`,
+  `object load`, `check run`, `transform run`, or a
+  `pytest` run of a check's or transform's tests
+- `tool_result` blocks carrying `is_error`, two or more
+  on the same tool and target
+- three or more edits to one artifact inside a single
+  task
 - repeated user turns restating the same ask in
-  different words
+  different words, or correcting the previous answer
 - fetches of `docs.infrahub.app`, `llms.txt`, or
   `schema.infrahub.app` after the relevant skill file
   was already read
+- four or more rule files read before the first edit,
+  which points at discoverability rather than coverage
+
+The first entry is a verdict; the rest are counters.
+Only the verdict, paired with a coverage read of the
+skill's `rules/`, establishes that a gap exists. The
+counters say where to look. See
+[rules/evidence-detection-ladder.md](rules/evidence-detection-ladder.md)
+for the full ladder and the thresholds' role in it.
 
 A fetch of `llms.txt` or a `docs.infrahub.app` page is
 an escape marker, not just friction: it points away from
@@ -59,14 +75,13 @@ a bug, because the fallback rule in
 only authorizes it once the skill's own files were
 checked and found silent. What matters beyond that is
 **what happened after the fetch**: an escape that found
-the answer points at a feature, filed against
-`opsmill/infrahub-skills` like a bug; an escape that
-still failed to answer the question points at a docs
-gap, filed against `opsmill/infrahub` instead, since
-that is where Infrahub's own documentation lives, and
+the answer points at a feature; an escape that still
+failed to answer the question points at a docs gap, and
 only once the underlying behavior is settled; and no
 escape at all defaults to feature with the docs status
-left unverified. See
+left unverified. The kind is what routes the report, and
+the receiver resolves that; this skill names no
+destination. See
 [rules/workflow-bug-vs-feature.md](rules/workflow-bug-vs-feature.md)
 for the full three-way reading and the settled-behavior
 gate.

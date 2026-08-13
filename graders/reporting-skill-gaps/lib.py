@@ -745,6 +745,224 @@ def check_no_docs_gap_when_unsettled(text: str, **_: object) -> CheckResult:
     )
 
 
+# Probe A of the detection ladder: the verifier verdict. These are the
+# commands whose exit status is ground truth about whether the guidance was
+# sufficient, as opposed to the model's own account of how the session went.
+# The bare `schema load` / `object load` forms are listed alongside the full
+# `infrahubctl` invocations because a redacted report often paraphrases the
+# command rather than pasting it, and paraphrasing is what
+# evidence-no-customer-data.md asks for.
+_VERIFIER_CMD_RE = re.compile(
+    r"infrahubctl\s+(?:schema\s+(?:load|validate|check)|object\s+load"
+    r"|check\s+run|transform\s+run|generator\s+run)"
+    r"|\bpytest\b"
+    r"|\bschema\s+(?:load|validate)\b"
+    r"|\bobject\s+load\b",
+    re.IGNORECASE,
+)
+
+# A single phrase carrying the whole red-to-green transition. Matching one
+# of these is sufficient on its own; otherwise a fail marker and a pass
+# marker must both appear.
+_VERIFIER_TRANSITION_PATTERNS = (
+    "red to green",
+    "red-to-green",
+    "failing to passing",
+    "failed then passed",
+    "failed, then passed",
+    "rejected then accepted",
+    "rejected, then accepted",
+)
+_VERIFIER_FAIL_PATTERNS = (
+    "failed",
+    "rejected",
+    "errored",
+    "returned an error",
+    "did not validate",
+    "would not load",
+    "refused",
+)
+_VERIFIER_PASS_PATTERNS = (
+    "then passed",
+    "then succeeded",
+    "passed after",
+    "succeeded after",
+    "accepted after",
+    "loaded after",
+    "was accepted",
+    "loaded cleanly",
+    "validated cleanly",
+    "loaded successfully",
+    "passed once",
+    "accepted once",
+    "worked once",
+    "passed on the second",
+    "passed on the third",
+)
+
+
+def check_cites_verifier_outcome(text: str, **_: object) -> CheckResult:
+    """Output grounds the friction in a verifier that failed and later passed.
+
+    This is probe A of ``evidence-detection-ladder.md``, and the reason the
+    ladder exists: a skill session has no declared-intent artifact to diff
+    against, so the only non-self-reported oracle available is Infrahub's
+    own exit status. Naming the command without the transition is not
+    enough; a command that only ever failed leaves open whether better
+    guidance would have changed anything, which is precisely the level-1
+    triage question.
+    """
+    low = _normalized(text)
+    if not _VERIFIER_CMD_RE.search(low):
+        return False, (
+            "no verifier command named (infrahubctl schema/object/check/"
+            "transform run, or pytest)"
+        )
+    hit = next((p for p in _VERIFIER_TRANSITION_PATTERNS if p in low), None)
+    if hit:
+        return True, f"names a verifier red-to-green transition (matched: {hit!r})"
+    fail_hit = next((p for p in _VERIFIER_FAIL_PATTERNS if p in low), None)
+    pass_hit = next((p for p in _VERIFIER_PASS_PATTERNS if p in low), None)
+    if fail_hit and pass_hit:
+        return True, (
+            f"names a verifier failure ({fail_hit!r}) and a later pass "
+            f"({pass_hit!r})"
+        )
+    missing = "later pass" if fail_hit else "failure"
+    return False, (
+        f"names a verifier command but no {missing}; the red-to-green "
+        "transition is what makes it evidence"
+    )
+
+
+# Probe C: the correction delta. A report that states both the form that
+# failed and the form that was accepted hands the maintainer the rule text
+# rather than a description of it.
+_FIRST_ATTEMPT_PATTERNS = (
+    "first attempt",
+    "first try",
+    "initial version",
+    "initially",
+    "first draft",
+    "originally",
+    "the rejected",
+    "that failed",
+    "which failed",
+    "before the fix",
+    "what was written first",
+)
+_FINAL_FORM_PATTERNS = (
+    "the accepted version",
+    "the accepted file",
+    "the working version",
+    "that passed",
+    "which passed",
+    "after adding",
+    "after changing",
+    "after setting",
+    "once added",
+    "once an",
+    "once the",
+    "the fix was",
+    "corrected to",
+    "changed to",
+    "final version",
+    "what finally worked",
+)
+
+
+def check_states_correction_delta(text: str, **_: object) -> CheckResult:
+    """Output names both the form that failed and the form that was accepted.
+
+    Probe C of ``evidence-detection-ladder.md``. The delta between the two
+    *is* the proposed rule change in the concrete terms a maintainer can
+    apply. A report that says only "I fixed it" makes the maintainer
+    reconstruct the fix from the symptom, which is the same reverse
+    engineering ``evidence-cite-the-artifact.md`` exists to prevent on the
+    file-location side.
+    """
+    low = _normalized(text)
+    first = next((p for p in _FIRST_ATTEMPT_PATTERNS if p in low), None)
+    final = next((p for p in _FINAL_FORM_PATTERNS if p in low), None)
+    if first and final:
+        return True, (
+            f"states the failing form ({first!r}) and the accepted form "
+            f"({final!r})"
+        )
+    if first:
+        return False, "names the failing attempt but not what the accepted version changed"
+    if final:
+        return False, "names the accepted version but not the failing attempt it replaced"
+    return False, "no before/after correction delta stated"
+
+
+# Probe D: counters open an investigation and never close one. When they are
+# the only support available, the correct output withholds the draft and says
+# which probe came up empty.
+_COUNTERS_INSUFFICIENT_PATTERNS = (
+    "not evidence",
+    "not enough to draft",
+    "not enough evidence",
+    "insufficient evidence",
+    "not ready to draft",
+    "opens an investigation",
+    "only opens",
+    "counters alone",
+    "counters only",
+    "round-trip count alone",
+    "round trip count alone",
+    "retry count alone",
+    "no verifier",
+    "cannot name",
+    "could not name",
+    "can't name",
+    "no rule file",
+    "no identifiable",
+    "trigger, not",
+    "trigger rather than",
+    "which probe came up empty",
+    "came up empty",
+    "no coverage read",
+    "not a verdict",
+)
+
+
+def check_no_draft_without_detection_evidence(text: str, **_: object) -> CheckResult:
+    """Output drafts nothing when session-shape counters are the only support.
+
+    The failure mode: a retry count converted into a claim about guidance.
+    Counters rise for reasons unrelated to the skill (an unclear request, a
+    slow instance, a user changing their mind), so a draft resting on them
+    alone puts an unactionable report in the maintainers' tracker.
+
+    Distinct from ``check_marks_confidence``, which is what a thin but real
+    observation gets: a label, never silence. Here there is no identified
+    gap to label at all, so the correct move is to name the probe that came
+    up empty and stop. A response that correctly withholds the draft must
+    still say why, rather than a bare "not filing this."
+    """
+    hits = []
+    if _TITLE_TAG_RE.search(text):
+        hits.append("bug:/feat:/bug(docs): title line")
+    if _PROPOSED_CHANGE_HEADING_RE.search(text):
+        hits.append("Proposed rule change heading")
+    if hits:
+        return False, (
+            f"drafted a report on session-shape counters alone: {', '.join(hits)}"
+        )
+
+    low = _normalized(text)
+    reason = next((p for p in _COUNTERS_INSUFFICIENT_PATTERNS if p in low), None)
+    if reason:
+        return True, (
+            f"withheld the draft and named what is missing (matched: {reason!r})"
+        )
+    return False, (
+        "no draft was made, but no reason tied to the missing verifier "
+        "verdict or coverage read was given"
+    )
+
+
 def check_hands_off_to_reporting_issues(text: str, **_: object) -> CheckResult:
     """Output references infrahub-reporting-issues for the product-defect handoff."""
     if "infrahub-reporting-issues" in text:
@@ -900,45 +1118,36 @@ _PAYLOAD_BODY_MARKERS = (
 )
 
 
-# `repo` is no longer a single fixed string: a bug or feature payload
-# targets opsmill/infrahub-skills, but a docs-gap payload targets
-# opsmill/infrahub (Infrahub's documentation lives in the main repo, not
-# the skills repo). `opsmill/infrahub-skills` contains `opsmill/infrahub`
-# as a literal substring, so a naive "does opsmill/infrahub appear
-# anywhere" check would pass a docs-gap payload that only ever mentions
-# the skills repo: exactly the routing mistake this whole fix exists to
-# catch. `_REPO_MAIN_RE`'s negative lookahead requires `opsmill/infrahub`
-# NOT be immediately followed by a hyphen at all, not just not `-skills`:
-# the ecosystem has several other `opsmill/infrahub-<suffix>` repos
-# (`-sdk-python`, `-ansible`, `-vscode`, `-helm`, `-mcp`, `-backup`,
-# `-sync`), and a docs-gap payload naming any of those is just as wrong a
-# destination as naming the skills repo. `(?!-)\b` matches only a
-# standalone `opsmill/infrahub` with no repo suffix at all.
 _REPO_SKILLS_RE = re.compile(r"opsmill/infrahub-skills", re.IGNORECASE)
+# `opsmill/infrahub-skills` contains `opsmill/infrahub` as a literal
+# substring, so matching the main repo needs a negative lookahead for any
+# hyphen at all, not just `-skills`: the ecosystem has several other
+# `opsmill/infrahub-<suffix>` repos (`-sdk-python`, `-ansible`, `-vscode`,
+# `-helm`, `-mcp`, `-backup`, `-sync`). `(?!-)\b` matches only a standalone
+# `opsmill/infrahub` with no repo suffix at all.
 _REPO_MAIN_RE = re.compile(r"opsmill/infrahub(?!-)\b", re.IGNORECASE)
+_ANY_OPSMILL_REPO_RE = re.compile(r"opsmill/infrahub(?:-[\w.\-]+)?", re.IGNORECASE)
 
 
 def check_payload_is_complete(text: str, **_: object) -> CheckResult:
-    """Output carries all four handoff payload fields: repo, type, title, body.
+    """Output carries the handoff payload fields: type, title, body, searched.
 
-    The expected repo is read off the drafted title tag: `bug(docs):`
-    expects `opsmill/infrahub`, anything else (including no tag at all,
-    preserving the old fixed-repo assumption) expects
-    `opsmill/infrahub-skills`.
+    There is no `repo` field to check for, and its absence is not an
+    omission: `workflow-handoff-to-reporting.md` makes routing the
+    receiver's alone, so a payload naming a destination is a violation
+    rather than a completeness win. `check_leaves_routing_to_reporter`
+    enforces that side; this check only verifies the four fields the caller
+    does owe.
     """
     low = _normalized(text)
     missing = []
 
-    tag_match = _TITLE_TAG_RE.search(text)
-    tag_value = tag_match.group(1).lower() if tag_match else None
-    if tag_value == "bug(docs)":
-        if _REPO_MAIN_RE.search(low) is None:
-            missing.append("repo (opsmill/infrahub)")
-    else:
-        if _REPO_SKILLS_RE.search(low) is None:
-            missing.append("repo (opsmill/infrahub-skills)")
-
-    if re.search(r"\btype\b\s*[:\-]?\s*(bug|feature|docs gap)\b", low) is None:
+    # `\*{0,2}` on both sides of the field name: the template renders this
+    # line as `**Type**: feature`, and a draft that fills the template
+    # rather than writing a bare `type: feature` payload block is carrying
+    # the field just as much. Without the bold tolerance the check failed
+    # every compliant template render.
+    if re.search(r"\*{0,2}\btype\b\*{0,2}\s*[:\-]?\s*(bug|feature|docs gap)\b", low) is None:
         missing.append("type (bug/feature/docs gap)")
 
     if _TITLE_TAG_RE.search(text) is None:
@@ -947,9 +1156,100 @@ def check_payload_is_complete(text: str, **_: object) -> CheckResult:
     if not any(marker in low for marker in _PAYLOAD_BODY_MARKERS):
         missing.append("body (no drafted section found)")
 
+    if not any(p in low for p in _SEARCHED_FIELD_PATTERNS):
+        missing.append("searched (no named tracker search to pass on)")
+
     if missing:
         return False, f"payload missing: {', '.join(missing)}"
-    return True, "payload carries repo, type, title, and body"
+    return True, "payload carries type, title, body, and searched"
+
+
+# The `searched` field: which tracker the caller already checked, so the
+# receiver knows whether its own duplicate search is redundant or still
+# owed. Naming the repo here is a statement about what was read, which is
+# why `check_leaves_routing_to_reporter` tolerates it.
+_SEARCHED_FIELD_PATTERNS = (
+    "searched",
+    "searched:",
+    "tracker search",
+    "already been searched",
+    "no match",
+)
+
+
+# The filing-destination guard. `searched` legitimately names a repo, so a
+# bare "does a repo string appear" test would fail every compliant payload.
+# What matters is the *use*: naming a tracker that was read is fine, naming
+# where the issue will be filed is not. These are the phrasings that mean
+# the latter, matched with the repo string inside a sentence's worth of
+# characters in either order, the same windowed approach
+# `_TRACKER_SEARCH_RE` uses.
+_ROUTING_VERBS = (
+    r"fil(?:e|ed|ing)\s+(?:it\s+|this\s+)?against",
+    r"fil(?:e|ed|ing)\s+(?:it\s+|this\s+)?(?:to|in|under)",
+    r"targets?",
+    r"targeting",
+    r"destination",
+    r"goes\s+to",
+    r"belongs\s+in",
+    r"repo\s*[:\-]",
+    r"repository\s*[:\-]",
+    r"open(?:ed|ing)?\s+(?:it\s+|this\s+)?(?:against|in)",
+    r"submit(?:ted|ting)?\s+(?:it\s+|this\s+)?to",
+)
+_ROUTING_USE_RE = re.compile(
+    "(?:(?:{v}).{{0,60}}(?:{r}))|(?:(?:{r}).{{0,60}}(?:{v}))".format(
+        v="|".join(_ROUTING_VERBS),
+        r=r"opsmill/infrahub(?:-[\w.\-]+)?",
+    ),
+    re.IGNORECASE,
+)
+# A `**Repo**:` / `Repo:` line in the drafted payload, which the template no
+# longer carries. Matched separately from the windowed test because the
+# field can be filled without any verb near it at all.
+_REPO_FIELD_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?\*{0,2}repo(?:sitory)?\*{0,2}\s*[:\-]\s*\S",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def check_leaves_routing_to_reporter(text: str, **_: object) -> CheckResult:
+    """Output names no filing destination anywhere.
+
+    The boundary this enforces: the caller decides the *kind*, and
+    `infrahub-reporting-issues` resolves the repo from it against the one
+    registry that owns routing. A destination named here is a second copy
+    of that mapping, and the copy is what goes stale when the destination
+    changes.
+
+    Deliberately tolerant of a repo string used to say what was *read*:
+    the `searched` field names `opsmill/infrahub-skills` in every compliant
+    payload, and a negated mention ("handing off rather than filing against
+    the skills repo") is the correct phrasing that
+    `workflow-handoff-product-bugs.md` asks for. Only a repo used as a
+    target trips this.
+    """
+    hits = []
+    field = _REPO_FIELD_RE.search(text)
+    if field:
+        hits.append(f"repo field ({field.group(0).strip()[:40]!r})")
+
+    for match in _ROUTING_USE_RE.finditer(text):
+        window_start = max(0, match.start() - 40)
+        preceding = text[window_start : match.start()].lower()
+        if any(neg in preceding for neg in _NO_SKILLS_REPO_NEGATIONS):
+            continue
+        hits.append(f"repo named as a target ({match.group(0)[:50]!r})")
+        break
+
+    if hits:
+        return False, (
+            f"names a filing destination, which is the receiver's to "
+            f"resolve: {', '.join(hits)}"
+        )
+    if _ANY_OPSMILL_REPO_RE.search(text):
+        return True, "mentions a repo only as a search target or in a negated context"
+    return True, "names no repo at all"
 
 
 def check_title_uses_kind_prefix(text: str, **_: object) -> CheckResult:
@@ -1247,11 +1547,15 @@ CHECKS: dict[str, CheckFn] = {
     "cites-escape-as-feature-evidence": check_cites_escape_as_feature_evidence,
     "cites-escape-outcome": check_cites_escape_outcome,
     "no-docs-gap-when-unsettled": check_no_docs_gap_when_unsettled,
+    "cites-verifier-outcome": check_cites_verifier_outcome,
+    "states-correction-delta": check_states_correction_delta,
+    "no-draft-without-detection-evidence": check_no_draft_without_detection_evidence,
     "hands-off-to-reporting-issues": check_hands_off_to_reporting_issues,
     "no-skills-issue-for-product-bug": check_no_skills_issue_for_product_bug,
     "hands-off-to-reporting-issues-for-filing": check_hands_off_to_reporting_issues_for_filing,
     "no-direct-filing": check_no_direct_filing,
     "payload-is-complete": check_payload_is_complete,
+    "leaves-routing-to-reporter": check_leaves_routing_to_reporter,
     "title-uses-kind-prefix": check_title_uses_kind_prefix,
     "cites-rule-file": check_cites_rule_file,
     "has-proposed-change": check_has_proposed_change,
