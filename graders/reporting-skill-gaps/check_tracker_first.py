@@ -15,7 +15,11 @@ from lib import run_checks  # noqa: E402
 
 CHECKS = [
     "searches-tracker-first",
-    "marks-confidence",
+    # The scenario is a first sighting, so `recurring` is the wrong label
+    # even though it is a label. Pinning the expectation is what stops an
+    # internally-consistent-but-wrong report from scoring full marks; see
+    # the `--expected-kind` precedent in check_bug_vs_feature.py.
+    ("marks-confidence", {"expected": "unconfirmed"}),
     "cites-rule-file",
 ]
 

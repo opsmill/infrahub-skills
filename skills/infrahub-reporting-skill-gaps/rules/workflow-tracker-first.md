@@ -13,25 +13,17 @@ whether there is one.
 
 ### Why it matters
 
-An earlier version of this rule blocked on local
-corroboration: two sessions on this machine, or nothing
-gets drafted. That gate cannot pass. Sessions are
-partitioned by working directory, and a skill's users
-share none of it. Two clones, two worktrees, two
-customer repos, a laptop and a devbox, or two engineers
-hitting the same missing rule all read as first
-sightings forever.
+A skill's users share no repo, directory, or laptop, so
+local session history cannot answer "has anyone seen
+this before". Only the tracker can: it is shared, it
+survives a wiped machine, and a maintainer reading it
+has the view no single session ever has.
 
-Worse, the gate suppresses exactly what it claims to
-look for. A first sighting recorded nowhere public
-means the second observer, on another machine, also
-sees a first sighting and is also suppressed. The
-pattern becomes undetectable by construction.
-
-The tracker has none of these problems. It is shared,
-it is global, it survives a wiped laptop, and a
-maintainer reading it has the view no single session
-ever has.
+This is also why a first sighting still gets written
+down. An observation recorded nowhere public is
+unrecoverable, and the next person to hit it starts
+from zero, which makes the pattern undetectable by
+construction.
 
 ### What to do
 
@@ -88,24 +80,18 @@ person to hit it starts from zero.
 ### Correct
 
 ```text
-I searched opsmill/infrahub-skills and found no open issue covering
-enum default values in schema attributes. This is a single observation,
-so the draft says so explicitly rather than claiming a pattern.
-
-bug: infrahub-managing-schemas: enum attribute default value syntax
-  is not covered by any rule
-
-> Confidence: unconfirmed single observation.
+I searched opsmill/infrahub-skills. Issue #142 already covers this
+friction, so rather than filing a duplicate I've drafted a comment
+adding what this session showed that the issue does not yet record:
+the failure also occurs on schema load, not only on validation.
 ```
 
-### Also correct
-
-```text
-Issue #142 already covers this friction. Rather than filing a duplicate,
-I've drafted a comment adding what this session showed that the issue
-does not yet record: the failure also occurs on schema load, not only
-on validation.
-```
+The no-match branch is the same search followed by a
+new issue whose body carries
+`**Confidence**: unconfirmed single observation`.
 
 Reference: [reference.md](../reference.md) for evidence
-sources and friction signals.
+sources and friction signals;
+[workflow-handoff-to-reporting.md](workflow-handoff-to-reporting.md)
+for the `searched` and `issue` fields this step fills in
+the handoff payload.

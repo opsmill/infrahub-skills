@@ -66,7 +66,8 @@ this skill.
 
 This skill may also be invoked directly by
 `infrahub-reporting-skill-gaps` with a prepared payload:
-`{repo, type, title, body}`. For that caller, `type` is
+`{repo, type, title, body, searched, issue?}`. For that
+caller, `type` is
 `bug`, `feature`, or `docs gap`, already decided by that
 skill's two-level triage, and `repo` follows the kind:
 `opsmill/infrahub-skills` for `bug`/`feature`, or
@@ -78,25 +79,32 @@ means nothing to `opsmill/infrahub`'s maintainers; see
 [reference.md](reference.md) for that repo's own title
 notes and the `bug:`/`feat:` convention this pairs with.
 
-That caller may instead send `{repo, issue, body}`,
-a comment on an issue it already found. Treat `issue`
-as the target, skip step 4 (the caller has already
-searched, and a comment cannot be a duplicate of the
-thread it belongs to), and post with
-`gh issue comment` at step 8 rather than
-`gh issue create`. The review gate at step 7 still
-applies, unchanged.
+`searched` names the repo the caller already searched
+at its own step 2, and `issue` is optional. When
+`issue` is present, the caller matched an existing
+issue: treat it as the target, render `body` as a
+comment, and post with `gh issue comment` at step 8
+rather than `gh issue create`.
+
+**Step 4 depends on `searched`.** Skip it when
+`searched` equals `repo`: the caller has already run
+that exact search, and repeating it risks a second
+answer that contradicts the one already written into
+`body`. Run it as normal when they differ, which is the
+docs-gap case: the caller searches
+`opsmill/infrahub-skills` before it knows the kind, but
+a docs gap routes to `opsmill/infrahub`, so that
+tracker has not been checked by anyone yet.
 
 When invoked this way, classification (step 2) and
 routing (step 3) are already decided, skip them. Skip
 environment info gathering (step 5) too; it collects
 Infrahub server, SDK, and OS versions, which apply to
 neither a report about a skill's own guidance nor a
-report about missing documentation. Start at step 4
-(search for duplicates), using the caller's title and
-body as the render for step 6 instead of a generic
-template. Continue through steps 7-9 as normal: review
-gate, submission method, confirm.
+report about missing documentation. Use the caller's
+title and body as the render for step 6 instead of a
+generic template. Continue through steps 7-9 as normal:
+review gate, submission method, confirm.
 
 ## Workflow
 
@@ -294,18 +302,19 @@ until they explicitly approve the content.
 ### 8. Pick a submission method
 
 Once content is approved, ask the user how they want
-to submit:
+to submit. The commands differ for a new issue and a
+comment; pick the column that matches what step 7
+showed:
 
-1. **`gh issue create`** — direct via the CLI. Use
-   `gh issue create --repo <owner/repo> --title
-   "..." --body "..."`. Show the resulting URL.
-2. **MCP GitHub server** — if the user has a GitHub
-   MCP server, use it. Confirm the tool name with
-   the user before invoking.
-3. **Manual** — print the title and body as
-   copy-paste-ready markdown, plus the "New issue"
-   URL for the target repo:
-   `https://github.com/<owner>/<repo>/issues/new`.
+| Method | New issue | Comment on an existing issue |
+| ------ | --------- | ---------------------------- |
+| **CLI** | `gh issue create --repo <owner/repo> --title "..." --body "..."` | `gh issue comment <number> --repo <owner/repo> --body "..."` |
+| **MCP GitHub server** | Use it if the user has one. Confirm the tool name before invoking. | Same, using the server's comment tool. |
+| **Manual** | Print title and body as copy-paste-ready markdown, plus `https://github.com/<owner>/<repo>/issues/new`. | Print the body as copy-paste-ready markdown, plus `https://github.com/<owner>/<repo>/issues/<number>`. |
+
+A comment carries no title. If the render still has
+one, step 6 built the wrong artifact; go back rather
+than pasting a title into a comment body.
 
 Never assume a default — always ask. After the user
 picks a method, execute it.
@@ -314,8 +323,9 @@ picks a method, execute it.
 
 After submission, give the user:
 
-- The new issue URL (for gh/MCP submissions)
-- A one-line summary of what was filed
+- The issue URL, or the comment's permalink when the
+  submission was a comment (for gh/MCP submissions)
+- A one-line summary of what was filed or commented
 - A reminder that they can subscribe to the issue
   for updates
 

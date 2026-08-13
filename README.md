@@ -108,7 +108,7 @@ A team already running Infrahub who needs to continue extending it — adding sc
 | **analyzing-data** | Query and correlate live Infrahub data via the MCP server (requires MCP connection) |
 | **auditing-repo** | Audit your repository against Infrahub best practices |
 | **reporting-issues** | Route a bug or feature request to the right Infrahub-ecosystem repo (SDK, Ansible, VS Code, MCP, etc.) and prepare a sanitized draft for review |
-| **reporting-skill-gaps** | Turn corroborated friction with an Infrahub skill into a bug or feature issue, drafted here and filed via `reporting-issues` |
+| **reporting-skill-gaps** | Turn friction with an Infrahub skill into a bug or feature issue, checked against the tracker for an existing report, drafted here and filed via `reporting-issues` |
 | **collecting-diagnostics** | When Infrahub is misbehaving, use the infrahub-collect tool to gather logs, config, and state into a bundle, review it, and hand it to OpsMill support |
 | **importing-data** | Convert CSV/TSV inputs into Infrahub object YAML, validate, and load onto a fresh branch |
 

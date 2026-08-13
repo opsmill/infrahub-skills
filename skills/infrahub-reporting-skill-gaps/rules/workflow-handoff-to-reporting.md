@@ -14,46 +14,69 @@ and let it drive submission from there.
 
 ### The payload
 
-`{repo, type, title, body}`, where `type` is `bug`,
-`feature`, or `docs gap`, and `repo` follows the kind:
-`opsmill/infrahub-skills` for a bug or a feature,
-`opsmill/infrahub` for a docs gap, since Infrahub's own
-documentation lives there, not in the skills repo. See
+`{repo, type, title, body, searched, issue?}`, where
+`type` is `bug`, `feature`, or `docs gap`, and `repo`
+follows the kind: `opsmill/infrahub-skills` for a bug or
+a feature, `opsmill/infrahub` for a docs gap, since
+Infrahub's own documentation lives there, not in the
+skills repo. See
 [workflow-bug-vs-feature.md](workflow-bug-vs-feature.md)
 for the routing table and the settled-behavior gate a
 docs gap must also pass before it is drafted at all.
 
+`searched` names the repo this skill already searched at
+step 2, so the receiver knows whether its own duplicate
+search is redundant or still owed. `issue` is optional:
+present, it carries the number of the issue the step-2
+search matched, and `body` is a comment rather than a
+new issue. One payload with an optional field, not two
+shapes, so every field the receiver already handles
+keeps working unchanged.
+
 ### Why it matters
 
 `infrahub-reporting-issues` already owns the 11-repo
-registry, duplicate search, comment mode, the consent
-gate, submission-method choice, and confirmation. A
-second filing pipeline built here would duplicate all
-of that and then drift from it: when the repo registry
-changes, or the submission method changes, only one of
-the two pipelines gets updated, and the other quietly
-goes stale.
+registry, the consent gate, submission-method choice,
+comment mode, and confirmation. A second filing pipeline
+built here would duplicate all of that and then drift
+from it: when the repo registry changes, or the
+submission method changes, only one of the two pipelines
+gets updated, and the other quietly goes stale.
+
+Duplicate search is the one exception, and it is a
+narrow one. This skill has to know whether an issue
+already exists *before* it drafts, because the answer
+decides whether the draft is a comment or a new issue
+and what confidence label it carries; see
+[workflow-tracker-first.md](workflow-tracker-first.md).
+The receiver searches late, just before filing. Passing
+`searched` is what keeps that from becoming two searches
+and two answers that can disagree in public.
 
 ### What this skill must NOT do
 
-- Run `gh issue create`.
-- Run `gh search issues`.
+- Run `gh issue create` or `gh issue comment`.
 - Ask the user how they want to submit.
 - Claim that an issue was filed, commented on, or
   otherwise submitted.
 
 Every one of those belongs to
 `infrahub-reporting-issues`. Doing them here produces
-two consent gates, two duplicate searches, and a user
-asked the same question twice.
+two consent gates and a user asked the same question
+twice.
+
+`gh search issues` is **not** on that list. Step 2
+requires it. Searching reads; only writing to GitHub is
+reserved for the receiver.
 
 ### What this skill MUST do
 
 Produce a complete, redacted body and title, then
 invoke `infrahub-reporting-issues` with the payload and
-let it drive from there: duplicate search, the review
-gate, submission method, and confirmation are all its
-job now.
+let it drive from there: the review gate, submission
+method, and confirmation are all its job now, as is any
+duplicate search still owed for a repo `searched` does
+not name.
 
 ### Incorrect
 
@@ -127,6 +150,6 @@ here.
 
 Reference:
 [workflow-tracker-first.md](workflow-tracker-first.md)
-for the comment-on-existing-issue payload shape;
+for the step-2 search that fills `searched` and `issue`;
 [workflow-bug-vs-feature.md](workflow-bug-vs-feature.md)
 for how `type` was decided.

@@ -50,6 +50,36 @@ _TITLE_TAG_RE = re.compile(
     re.IGNORECASE | re.MULTILINE,
 )
 
+# The tracker search the skill runs at step 2. `check_no_direct_filing`
+# shares this pattern so the two checks cannot drift into disagreeing
+# about whether narrating this command is compliant: it is required here
+# and explicitly allowed there, unlike `gh issue create`/`gh issue
+# comment`, which remain the sibling skill's alone.
+_TRACKER_SEARCH_CMD_RE = re.compile(r"gh\s+search\s+issues", re.IGNORECASE)
+
+_TRACKER_SEARCH_VERBS = ("search", "check", "look(?:ed|ing)\\s+for", "quer")
+_TRACKER_TARGETS = (
+    "opsmill/infrahub-skills", "the tracker", "existing issue", "open issue",
+)
+
+# Verb and target within a sentence's worth of characters, in either
+# order. One precompiled alternation rather than a verb x target loop:
+# the loop rebuilt up to 96 interpolated patterns per call and, worse,
+# could not match "checked the tracker" without a fused verb entry.
+_TRACKER_SEARCH_RE = re.compile(
+    "(?:(?:{v}).{{0,120}}(?:{t}))|(?:(?:{t}).{{0,120}}(?:{v}))".format(
+        v="|".join(_TRACKER_SEARCH_VERBS),
+        t="|".join(re.escape(t) for t in _TRACKER_TARGETS),
+    ),
+    re.IGNORECASE,
+)
+
+_COMMENT_TERMS = (
+    "comment on", "add a comment", "adding a comment", "drafted a comment",
+    "draft a comment", "gh issue comment", "comment rather than",
+    "comment instead of",
+)
+
 
 def check_searches_tracker_first(text: str, **_: object) -> CheckResult:
     """Output searched opsmill/infrahub-skills before drafting anything.
@@ -61,55 +91,50 @@ def check_searches_tracker_first(text: str, **_: object) -> CheckResult:
 
     Naming the repo alone is not enough: the skill's own handoff prose
     mentions ``opsmill/infrahub-skills`` as the *target* repo in every
-    report, so that string appears whether or not a search happened. This
-    requires a search verb near it, or the `gh search issues` invocation.
+    report, so that string appears whether or not a search happened. A
+    search verb must appear near it, in either order.
+
+    Stems only in the verb list: matching is unanchored substring, so
+    ``search`` already subsumes ``searched``/``searching``, and listing
+    both would be dead entries that read as meaningful. ``check`` is a
+    stem too, which is what makes the common "I checked the tracker"
+    phrasing match without needing a fused verb+target entry.
     """
-    low = _normalized(text)
-    if re.search(r"gh\s+search\s+issues", low):
+    if _TRACKER_SEARCH_CMD_RE.search(text):
         return True, "shows the gh search issues invocation"
-    search_verbs = (
-        "search", "searched", "searching", "looked for", "looking for",
-        "checked the tracker", "checked for an existing", "queried",
-    )
-    target_terms = (
-        "opsmill/infrahub-skills", "the tracker", "existing issue",
-        "existing issues", "open issue", "open issues",
-    )
-    for verb in search_verbs:
-        for target in target_terms:
-            # Either order, within a sentence's worth of characters.
-            if re.search(
-                rf"{re.escape(verb)}.{{0,120}}{re.escape(target)}", low
-            ) or re.search(
-                rf"{re.escape(target)}.{{0,120}}{re.escape(verb)}", low
-            ):
-                return True, (
-                    f"states the tracker was searched (matched: {verb!r} + {target!r})"
-                )
+    hit = _TRACKER_SEARCH_RE.search(_normalized(text))
+    if hit:
+        return True, f"states the tracker was searched (matched: {hit.group(0)[:60]!r})"
     return False, "no statement that the tracker was searched before drafting"
 
 
-_CONFIDENCE_RECURRING = (
-    "recurring",
-    "happened before",
-    "seen this before",
-    "second session",
-    "second occurrence",
-    "user confirmed",
+_CONFIDENCE_LABELS: dict[str, tuple[str, ...]] = {
+    "recurring": (
+        "recurring",
+        "happened before",
+        "seen this before",
+        "second session",
+        "second occurrence",
+    ),
+    "unconfirmed": (
+        "unconfirmed",
+        "single observation",
+        "single sighting",
+        "first sighting",
+        "only one occurrence",
+    ),
+}
+
+# The template ships `**Confidence**: [recurring | unconfirmed single
+# observation]`, which contains phrases from *both* label sets. An
+# unfilled placeholder is not a labelled report, so it must fail rather
+# than satisfy the check by accident.
+_UNFILLED_CONFIDENCE_RE = re.compile(
+    r"confidence\W{0,4}\[[^\]]*\|", re.IGNORECASE
 )
 
-_CONFIDENCE_UNCONFIRMED = (
-    "unconfirmed",
-    "single observation",
-    "single sighting",
-    "first sighting",
-    "one session",
-    "only one occurrence",
-    "not yet corroborated",
-)
 
-
-def check_marks_confidence(text: str, **_: object) -> CheckResult:
+def check_marks_confidence(text: str, expected: str | None = None, **_: object) -> CheckResult:
     """Output labels how strong the evidence is, rather than hiding it.
 
     Replaces the old corroboration gate, which suppressed first sightings
@@ -117,15 +142,31 @@ def check_marks_confidence(text: str, **_: object) -> CheckResult:
     is never written down cannot be recovered, and the second observer on
     another machine sees a first sighting too. The report is always
     produced; what changes is the label it carries.
+
+    ``expected`` names the label the scenario calls for, following the
+    ``expected_kind`` precedent in ``check_states_bug_or_feature``: a
+    report that confidently claims ``recurring`` on a first sighting is
+    internally consistent and wrong, which is exactly the failure a
+    label-agnostic check cannot see.
     """
     low = _normalized(text)
-    recurring = [p for p in _CONFIDENCE_RECURRING if p in low]
-    unconfirmed = [p for p in _CONFIDENCE_UNCONFIRMED if p in low]
-    if unconfirmed:
-        return True, f"labelled as an unconfirmed observation (matched: {unconfirmed[0]!r})"
-    if recurring:
-        return True, f"labelled as recurring (matched: {recurring[0]!r})"
-    return False, "no confidence label (neither recurring nor unconfirmed) in the report"
+    if _UNFILLED_CONFIDENCE_RE.search(low):
+        return False, "confidence line is still an unfilled template placeholder"
+    found = {
+        label: next((p for p in phrases if p in low), None)
+        for label, phrases in _CONFIDENCE_LABELS.items()
+    }
+    hits = {label: p for label, p in found.items() if p is not None}
+    if not hits:
+        return False, "no confidence label (neither recurring nor unconfirmed) in the report"
+    if expected is None:
+        label, phrase = next(iter(hits.items()))
+        return True, f"labelled {label} (matched: {phrase!r})"
+    if expected not in hits:
+        return False, (
+            f"expected a {expected!r} label; found {sorted(hits) or 'none'}"
+        )
+    return True, f"labelled {expected} (matched: {hits[expected]!r})"
 
 
 def check_comments_not_duplicates(text: str, **_: object) -> CheckResult:
@@ -135,22 +176,24 @@ def check_comments_not_duplicates(text: str, **_: object) -> CheckResult:
     corroboration a maintainer needs. The comment is the more valuable
     artifact, so a drafted title here is a failure even though a title is
     correct in every no-match scenario.
+
+    Tests the proposed-rule-change heading as well as the title tag: a
+    paraphrased draft that loses the tag but keeps the section is still a
+    second issue, which is the duplicate this check exists to catch.
     """
-    has_title = _TITLE_TAG_RE.search(text) is not None
-    low = _normalized(text)
-    comment_terms = (
-        "comment on", "add a comment", "adding a comment", "drafted a comment",
-        "draft a comment", "gh issue comment", "comment rather than",
-        "comment instead of",
-    )
-    hits = [p for p in comment_terms if p in low]
-    if has_title:
+    drafted = []
+    if _TITLE_TAG_RE.search(text):
+        drafted.append("bug:/feat:/bug(docs): title line")
+    if _PROPOSED_CHANGE_HEADING_RE.search(text):
+        drafted.append("Proposed rule change heading")
+    if drafted:
         return False, (
-            "drafted a new issue title despite an existing issue covering "
-            "the friction; a comment was expected"
+            f"drafted new-issue content despite an existing issue covering the "
+            f"friction ({', '.join(drafted)}); a comment was expected"
         )
-    if hits:
-        return True, f"drafts a comment on the existing issue (matched: {hits[0]!r})"
+    hit = next((p for p in _COMMENT_TERMS if p in _normalized(text)), None)
+    if hit:
+        return True, f"drafts a comment on the existing issue (matched: {hit!r})"
     return False, "no drafted comment on the existing issue, and no new title either"
 
 
@@ -619,9 +662,11 @@ def check_cites_escape_outcome(text: str, **_: object) -> CheckResult:
 # maintainer to write down an answer, so it is only actionable when an
 # answer already exists to write down. When the topic itself is still
 # being designed, or is deliberately left undocumented, there is nothing
-# to document yet, and the correct move mirrors the corroboration gate:
-# record an observation and stop, rather than file a request nobody can
-# fulfill.
+# to document yet, and the correct move is to explain which behavior is
+# unsettled and stop, rather than file a request nobody can fulfill. This
+# is the one place the workflow stops without producing a report; it is
+# not a confidence question, which `check_marks_confidence` answers with
+# a label rather than with silence.
 _UNSETTLED_GATE_REASON_PATTERNS = (
     "nothing to document yet",
     "nothing yet to document",
@@ -676,9 +721,7 @@ def check_no_docs_gap_when_unsettled(text: str, **_: object) -> CheckResult:
     filing this."
     """
     has_tag = _TITLE_TAG_RE.search(text) is not None
-    has_proposed_rule_change = re.search(
-        r"^#{2,}\s*Proposed rule change", text, re.IGNORECASE | re.MULTILINE
-    ) is not None
+    has_proposed_rule_change = _PROPOSED_CHANGE_HEADING_RE.search(text) is not None
     if has_tag or has_proposed_rule_change:
         hits = []
         if has_tag:
@@ -819,19 +862,27 @@ def check_no_direct_filing(text: str, **_: object) -> CheckResult:
 
     The failure mode this catches: a response that correctly hands off to
     infrahub-reporting-issues but then also runs (or prints, "for
-    reference") a `gh issue create`/`gh search issues` command itself, or
+    reference") a `gh issue create`/`gh issue comment` command itself, or
     states outright that an issue was filed. A legitimate hand-off response
     will mention infrahub-reporting-issues and describe what it does,
     which may include the words "file" or "submit" in the future tense
     ("it will file this"); that must not trip this check. Only an actual
     `gh` invocation or a past-tense filing claim does.
+
+    `gh search issues` is deliberately absent from that list. It used to
+    be a violation, back when duplicate search belonged wholly to the
+    sibling skill. The step-2 tracker check now requires this skill to run
+    it (see `check_searches_tracker_first` and
+    `rules/workflow-tracker-first.md`), so penalizing it here would fail
+    the very output the tracker-first graders demand. Searching is not
+    filing: what stays forbidden is anything that *writes* to GitHub.
     """
     low = _normalized(text)
     hits = []
     if re.search(r"\bgh issue create\b", low):
         hits.append("gh issue create")
-    if re.search(r"\bgh search issues\b", low):
-        hits.append("gh search issues")
+    if re.search(r"\bgh issue comment\b", low):
+        hits.append("gh issue comment")
     for phrase in _FILED_CLAIM_PATTERNS:
         if phrase in low:
             hits.append(f"claim of filing ({phrase!r})")
@@ -970,8 +1021,10 @@ def check_has_proposed_change(text: str, **_: object) -> CheckResult:
     The heading matcher accepts a real Markdown heading (`## Proposed rule
     change`, with or without trailing text like `(draft)` on the same
     line) or a bold-only label (`**Proposed rule change**`) with no `#` at
-    all, matching the tolerance check_no_draft_on_single_session already
-    has for the Proposed-rule-change section at any heading depth.
+    all. `check_no_docs_gap_when_unsettled` and
+    `check_comments_not_duplicates` share the same constant, so the
+    tolerance stays identical across every check that has to recognize a
+    drafted Proposed-rule-change section.
     """
     heading = _PROPOSED_CHANGE_HEADING_RE.search(text)
     if heading is None:

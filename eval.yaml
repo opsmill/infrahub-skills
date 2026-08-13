@@ -4067,7 +4067,7 @@ tasks:
       shared infrahub-common references turned up nothing that addresses
       reading an attribute more than one relationship hop away.
 
-      Corroboration is already met (two sessions, same signature). Work
+      The tracker has already been searched and no open issue covers this. Work
       through the next step of the workflow: state the triage classification
       for this friction and justify it. Do not draft an issue or run `gh`
       commands yet.
@@ -4111,8 +4111,8 @@ tasks:
       page; you fetched that page's Markdown twin and used it to write the
       pagination loop, which then worked on the first try.
 
-      This friction has already been corroborated (a second session hit the
-      same gap last week) and triage has already concluded this is a skill
+      The tracker has already been searched and no open issue covers this,
+      and triage has already concluded this is a skill
       defect. Work through the next step: decide the kind and state the
       title you would use for the report, with reasoning. Do not run `gh`
       commands or submit anything.
@@ -4158,8 +4158,8 @@ tasks:
       first time an object using that relationship was deleted, with a
       stack trace pointing into Infrahub's own delete-cascade code, not into
       anything the schema file specified. This has now happened in two
-      separate sessions with the same stack trace signature, so corroboration
-      is met.
+      separate sessions, and the tracker has already been searched with no
+      open issue covering it.
 
       Work through the workflow from triage onward and decide what to do
       next. Do NOT actually run `gh` commands; write out what you would do
@@ -4209,8 +4209,9 @@ tasks:
       symptom the rule describes. Only on a second read of the same rule
       file did you notice it says a generic peer on either side requires an
       explicit matching identifier on both sides. This has already shown up
-      in two sessions with the same pattern, so corroboration is met, and
-      triage has already concluded this is a skill defect.
+      in two sessions with the same pattern, the tracker has already been
+      searched with no match, and triage has already concluded this is a
+      skill defect.
 
       Work through the next step: decide the kind and state the title you
       would use for the report, with reasoning. Do not run `gh` commands or
@@ -4265,8 +4266,8 @@ tasks:
       correct query shape by reading the GraphQL schema directly and trying
       several field paths until one resolved.
 
-      This friction has already been corroborated (a second session hit the
-      same traversal problem last week) and triage has already concluded
+      The tracker has already been searched and no open issue covers this,
+      and triage has already concluded
       this is a skill defect. Work through the next step: decide the kind
       and state the title and target repo you would use for the report,
       with reasoning, including which page path you reached and what it
@@ -4361,7 +4362,7 @@ tasks:
       the shared infrahub-common references turned up nothing that
       addresses sharing a fragment across check files.
 
-      Corroboration is already met (two sessions, same signature). Triage
+      The tracker has already been searched with no match. Triage
       has already concluded this is a skill defect, and level 2 has already
       concluded the kind: no rule or reference anywhere covers fragment
       sharing across check modules, so this is a gap the skill's own
@@ -4413,8 +4414,8 @@ tasks:
       rule never states that `store.get()` requires a preceding
       `client.all()` call on the same kind to warm the store first; without
       that call it silently returns `None` instead of raising. This has now
-      happened in two separate sessions with the same signature, so
-      corroboration is met, triage has already concluded this is a skill
+      happened in two separate sessions, the tracker has already been
+      searched with no match, triage has already concluded this is a skill
       defect, and level 2 has already concluded the kind: bug, since
       check-graphql-queries.md already covers `store.get()` and the model
       still got it wrong.
@@ -4469,7 +4470,7 @@ tasks:
       infrahub-managing-schemas' rules/ covers a uniqueness_constraint that
       spans a relationship rather than a single local attribute; only the
       single-attribute case is documented. This has already shown up in a
-      prior session with the same signature, so corroboration is met,
+      prior session, the tracker has already been searched with no match,
       triage has already concluded this is a skill defect, and level 2 has
       already concluded the kind: feature, since no rule covers this case.
 

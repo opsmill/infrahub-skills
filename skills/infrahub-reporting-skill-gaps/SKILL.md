@@ -35,9 +35,9 @@ GitHub issue report against `opsmill/infrahub-skills`.
 It does **not** file anything itself: it prepares a
 complete, redacted draft and hands it to
 [infrahub-reporting-issues](../infrahub-reporting-issues/SKILL.md),
-which owns the 11-repo registry, duplicate search, the
-consent gate, submission-method choice, and
-confirmation. This skill's job ends at the handoff.
+which owns the 11-repo registry, the consent gate,
+submission-method choice, and confirmation. This skill's
+job ends at the handoff.
 
 ## When to Use
 
@@ -71,17 +71,11 @@ discovery works and what counts as a friction signal.
 
 ### 2. Check the tracker
 
-Search `opsmill/infrahub-skills` for an existing report
-of the same friction before drafting anything. The
-tracker, not this machine, is the shared record: a
-skill's users do not share a repo, a directory, or a
-laptop, so a prior local session is a weak and often
-absent signal.
-
-The search decides the shape of the report, never
-whether there is one. A match means draft a comment on
-that issue; no match means draft a new issue carrying
-an explicit confidence label. See
+Search `opsmill/infrahub-skills` before drafting
+anything. The search decides the shape of the report,
+never whether there is one: a match means a comment on
+that issue, no match means a new issue with an explicit
+confidence label. See
 [rules/workflow-tracker-first.md](rules/workflow-tracker-first.md).
 
 ### 3. Triage: level 1, routing
@@ -147,11 +141,12 @@ evidence this session adds.
 ### 7. Hand off
 
 Invoke [infrahub-reporting-issues](../infrahub-reporting-issues/SKILL.md)
-with the payload `{repo, type, title, body}`, or with
-`{repo, issue, body}` for a comment on an existing
-issue. That skill owns duplicate search, the review
-gate, submission-method choice, and confirmation from
-here; never file directly. See
+with the payload `{repo, type, title, body, searched,
+issue?}`, where `searched` names the repo step 2
+searched and `issue` is set only when it matched. That
+skill owns the review gate, submission-method choice,
+and confirmation from here; never file or comment
+directly. See
 [rules/workflow-handoff-to-reporting.md](rules/workflow-handoff-to-reporting.md).
 
 ### 8. Report the outcome
