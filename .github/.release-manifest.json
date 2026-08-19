@@ -11,6 +11,7 @@
     "infrahub-analyzing-data",
     "infrahub-reporting-issues",
     "infrahub-collecting-diagnostics",
+    "infrahub-analyzing-diagnostics",
     "infrahub-importing-data"
   ]
 }
