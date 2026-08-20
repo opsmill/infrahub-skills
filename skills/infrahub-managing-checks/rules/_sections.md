@@ -23,6 +23,8 @@
 
 5. **Patterns (patterns-)** -- MEDIUM. Error collection
    before logging, shared utility functions (common.py),
-   scoped validation for performance on large datasets.
+   scoped validation for performance on large datasets,
+   relationship-traversal validation (comparing a node
+   against a related node's fetched state).
 
 6. **Testing (testing-)** -- HIGH. Resources Testing Framework (YAML-driven pytest tests: smoke, unit, integration), infrahubctl check commands. Always create tests alongside new checks.
