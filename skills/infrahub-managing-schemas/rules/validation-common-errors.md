@@ -97,6 +97,34 @@ references. See
 Wrong format in constraints. See the
 [uniqueness-constraints](./uniqueness-constraints.md) rule.
 
+### "cannot use \<name\> relationship, relationship must be mandatory"
+
+A relationship named in `uniqueness_constraints` has
+`optional: true` (or no explicit value — relationships
+default to optional). Set `optional: false` on it.
+
+If you never wrote a constraint naming that
+relationship, check the node's `human_friendly_id`: an
+HFID becomes a uniqueness constraint, so the error is
+reported against `uniqueness_constraints` either way.
+See [uniqueness-constraints](./uniqueness-constraints.md).
+
+### "cannot use \<name\> relationship, relationship must be of cardinality one"
+
+A relationship named in `uniqueness_constraints` has
+`cardinality: many` (the default). Scoped uniqueness
+needs a single peer — set `cardinality: one`, or drop
+the relationship from the constraint. See
+[uniqueness-constraints](./uniqueness-constraints.md).
+
+### "cannot use attributes of related node, only the relationship"
+
+A `uniqueness_constraints` entry used a peer-attribute
+path such as `rack__name__value`. Constraints take the
+bare relationship name (`rack`). Peer-attribute paths
+are valid in `human_friendly_id`, not here. See
+[uniqueness-constraints](./uniqueness-constraints.md).
+
 ### "Unable to load the schema:" with empty body
 
 When `infrahubctl schema load` prints
@@ -146,6 +174,10 @@ Before running `infrahubctl schema check`, verify:
 - [ ] All Dropdown attributes have `choices` defined
 - [ ] `human_friendly_id` is set on user-facing nodes
 - [ ] `uniqueness_constraints` use `__value` for attributes
+- [ ] Every relationship named in a
+  `uniqueness_constraints` entry (or reached by a
+  `human_friendly_id` path) has `optional: false` and
+  `cardinality: one`
 - [ ] The `$schema` comment is present for IDE validation
 
 ```bash

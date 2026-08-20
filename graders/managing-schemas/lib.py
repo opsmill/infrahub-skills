@@ -1056,6 +1056,82 @@ def check_choice_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
     return True, f"All {seen} dropdown choice(s) are in canonical key order"
 
 
+def _resolve_rel(schema: dict, node: dict, name: str) -> dict | None:
+    """Find relationship ``name`` on ``node`` or on any generic it inherits from."""
+    for rel in _all_rels(node):
+        if rel.get("name") == name:
+            return rel
+    generics = {_full_kind(g): g for g in _all_generics(schema)}
+    for parent_kind in node.get("inherit_from", []) or []:
+        parent = generics.get(parent_kind)
+        if not parent:
+            continue
+        for rel in _all_rels(parent):
+            if rel.get("name") == name:
+                return rel
+    return None
+
+
+def check_uniqueness_rel_mandatory(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Relationships reached by uniqueness_constraints or human_friendly_id must be
+    mandatory and single-valued.
+
+    Server-validated: a relationship named in a constraint must have
+    `optional: false` and `cardinality: one`, and must be referenced by its bare
+    name rather than a peer-attribute path. A human_friendly_id is converted into
+    a uniqueness constraint, so the same requirement reaches its relationships.
+    """
+    all_items = _all_nodes(schema) + _all_generics(schema)
+    bad: list[str] = []
+    found_any = False
+
+    for node in all_items:
+        ref = _full_kind(node)
+        targets: list[tuple[str, str]] = []
+
+        for entry in node.get("uniqueness_constraints") or []:
+            for token in entry or []:
+                if not isinstance(token, str):
+                    continue
+                head = token.split("__", 1)[0]
+                if "__" in token:
+                    # A peer-attribute path is only a violation when the head
+                    # actually names a relationship; otherwise it is an attribute.
+                    if _resolve_rel(schema, node, head) is not None:
+                        bad.append(
+                            f"{ref}.uniqueness_constraints uses peer-attribute path "
+                            f"{token!r}; use the bare relationship name {head!r}"
+                        )
+                    continue
+                targets.append(("uniqueness_constraints", head))
+
+        for token in node.get("human_friendly_id") or []:
+            if not isinstance(token, str):
+                continue
+            head = token.split("__", 1)[0]
+            if _resolve_rel(schema, node, head) is not None:
+                targets.append(("human_friendly_id", head))
+
+        for source, rel_name in targets:
+            rel = _resolve_rel(schema, node, rel_name)
+            if rel is None:
+                # Bare token naming an attribute (or an unresolvable inherited
+                # field) — not this check's concern.
+                continue
+            found_any = True
+            where = f"{ref}.{rel_name} (via {source})"
+            if rel.get("optional", True) is not False:
+                bad.append(f"{where} missing optional: false")
+            if rel.get("cardinality") != "one":
+                bad.append(f"{where} cardinality is {rel.get('cardinality')!r}, expected 'one'")
+
+    if bad:
+        return False, "; ".join(bad)
+    if not found_any:
+        return False, "No relationship reached by uniqueness_constraints or human_friendly_id found"
+    return True, "All relationships used for uniqueness are mandatory and cardinality: one"
+
+
 CHECKS: dict[str, Any] = {
     "attr-min-length": check_attr_min_length,
     "dropdown-for-status": check_dropdown_for_status,
@@ -1074,6 +1150,7 @@ CHECKS: dict[str, Any] = {
     "attribute-kind-relationships": check_attribute_kind_relationships,
     "endpoint-device-relationship": check_endpoint_device_relationship,
     "parent-rel-optional-false": check_parent_rel_optional_false,
+    "uniqueness-rel-mandatory": check_uniqueness_rel_mandatory,
     "parent-rel-single": check_parent_rel_single,
     "computed-jinja2-readonly": check_computed_jinja2_readonly,
     "computed-jinja2-kind": check_computed_jinja2_kind,
