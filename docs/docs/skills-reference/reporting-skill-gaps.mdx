@@ -1,0 +1,118 @@
+---
+title: Skill Gap Reporter
+sidebar_position: 12
+---
+
+The Skill Gap Reporter turns friction with an Infrahub skill into a reviewed GitHub issue against [`opsmill/infrahub-skills`](https://github.com/opsmill/infrahub-skills). Infrahub skills fail quietly: a missing or unclear rule does not crash, it produces extra round trips and repeated nudges from you until the model finds the answer on its own. This skill works out which rule was missing, wrong, or unclear, checks the tracker for an existing report, and drafts a proposed rule change. It never files anything itself: it hands the redacted draft to the [Issue Reporter](./reporting-issues.mdx), which shows it to you and gets explicit approval before any submission.
+
+## When to use
+
+- A skill took far more attempts than it should have, and you want the friction reported
+- You want to know why a skill kept getting the same thing wrong
+- A skill's guidance is missing something and you want the gap fixed upstream
+- You accepted an offer to report friction at the end of a session
+
+Do not use it for a bug in Infrahub itself, the SDK, or any other `opsmill/infrahub-*` product. That belongs to the Issue Reporter. It is also not for ordinary work that finished without friction.
+
+## What it produces
+
+- A named artifact: the rule file that should have prevented the friction, or a plain statement that no rule covers the topic
+- A proposed rule change, so a maintainer does not have to reverse-engineer the fix from a symptom
+- A comment on the existing issue, or a new issue carrying an explicit confidence label
+- A redacted body, with anything identifying your infrastructure removed before the draft leaves the skill
+- A hand-off to the Issue Reporter, which owns the review gate and submission
+
+## Example prompts
+
+- "That took way too many tries, can you report the friction?"
+- "Report skill friction."
+- "Why did the schema skill keep getting relationship cardinality wrong?"
+- "We hit this same gap last week too, please file it."
+
+## How it spots the friction
+
+The current conversation is always the first and usually the only source. A past session's transcript under `~/.claude/projects/` is read only when you point at one, and its absence never blocks a report.
+
+Three things count as friction:
+
+| Signal | What it looks like |
+| ------ | ------------------ |
+| Failed tool calls | `tool_result` blocks carrying `is_error` |
+| Repeated nudges | You restating the same ask in different words |
+| A docs escape | A fetch of `docs.infrahub.app`, `llms.txt`, or `schema.infrahub.app` **after** the relevant skill file was already read |
+
+Fetches of `marketplace.infrahub.app` and `infrahub.opsmill.io` are not friction. Several skills fetch those as part of normal work, so flagging them would be noise.
+
+## How it routes
+
+Routing happens on two levels, and only skill defects reach a draft.
+
+**Level 1 decides who owns the problem.** A skill defect continues; a product defect stops here and hands off to the Issue Reporter for the right `opsmill/infrahub-*` repo, because the skills repo has no power to fix Infrahub itself; anything else stops with an explanation.
+
+**Level 2 decides the kind**, which sets both the title prefix and the target repo. The docs escape is what separates the three, and what matters is not that it happened but what happened after it:
+
+| Situation | Kind | Title | Repo |
+| --------- | ---- | ----- | ---- |
+| A rule already covers the topic and the model still got it wrong | Bug | `bug:` | `opsmill/infrahub-skills` |
+| No rule covers it, and the escape found the answer (or never happened) | Feature | `feat:` | `opsmill/infrahub-skills` |
+| No rule covers it, the escape happened and still failed to answer | Docs gap | `bug(docs):` | `opsmill/infrahub` |
+
+A docs gap routes to `opsmill/infrahub` because Infrahub's own documentation lives there, not in the skills repo. It also has to clear a **settled-behavior gate**: if the workflow is still being designed or is deliberately undocumented, there is nothing to write down yet, so the skill stops and tells you which behavior is unsettled. That is the only point in the workflow that ends without a report.
+
+## How the tracker check shapes the report
+
+Before anything is drafted, `opsmill/infrahub-skills` is searched. The result decides the **shape** of the report, never whether there is one:
+
+| Tracker result | What you get |
+| -------------- | ------------ |
+| An issue already covers it | A comment on that issue, carrying only what this session adds |
+| No match, and you confirm it has happened before | A new issue labelled `recurring` |
+| No match, first time seeing it | A new issue labelled `unconfirmed single observation` |
+
+A single observation is weak evidence, not zero evidence. It gets labelled honestly and left for a maintainer to weigh. A thin issue takes seconds to close; an observation that was never written down cannot be recovered, and the next person to hit the same gap would start from zero.
+
+## The method, end to end
+
+1. **Gather evidence** from the current conversation
+2. **Check the tracker** for an existing report, which decides comment vs. new issue
+3. **Triage level 1**, skill defect or product defect
+4. **Hand off** to the Issue Reporter if the product is at fault, and stop
+5. **Triage level 2**, bug, feature, or docs gap
+6. **Locate the artifact** by listing `skills/<skill>/rules/` and grepping for the topic, so the report names a file rather than a symptom
+7. **Draft and redact**, removing anything identifying your infrastructure
+8. **Hand off** the payload for review and submission
+9. **Report the outcome** back to you, with the URL when there is one
+
+## Key rules enforced
+
+- **Tracker first** — a skill's users share no repo, directory, or laptop, so local session history cannot answer "has anyone seen this before"
+- **Comment, don't duplicate** — a second issue splits the evidence across two threads
+- **Never suppress a first sighting** — the report is always produced, with a confidence label rather than silence
+- **Cite the artifact** — the draft names a file under `skills/<skill>/rules/`, or states plainly that no rule covers the topic; "the schema skill" gives a maintainer a search, not a starting point
+- **Redact before drafting** — error messages carry file paths, hostnames, and node kinds; issue bodies are public and cannot be retracted
+- **Never file directly** — this skill has no consent gate and no submission method of its own
+
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --------- | --------------------------- |
+| Drafting without checking the tracker | Searches first, so the draft is a comment when an issue already exists |
+| Staying silent because it only happened once | Files it, labelled an unconfirmed single observation |
+| Filing a symptom with no proposed fix | Names the rule file to create or edit, and what it should say |
+| Filing an Infrahub server bug against the skills repo | Routes it to the Issue Reporter for the correct product repo |
+| Calling it a skill gap when the docs are what's missing | Files `bug(docs):` against `opsmill/infrahub` instead |
+| Pasting raw error text | Paraphrases, so hostnames and node kinds do not reach a public issue |
+
+## What it needs
+
+The tracker search uses the GitHub CLI:
+
+```bash
+gh search issues --repo opsmill/infrahub-skills --state all "<skill name> <friction in plain terms>"
+```
+
+If `gh` is unavailable or unauthenticated, the skill says so and asks you directly whether you have hit the problem before, rather than guessing.
+
+:::note
+This skill drafts and hands off. Every submission goes through the Issue Reporter's review gate, so nothing reaches GitHub until you have seen the exact title and body and approved them.
+:::

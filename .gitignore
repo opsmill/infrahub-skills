@@ -77,3 +77,6 @@ docs/build/
 credentials.json
 secrets.yaml
 .claude/
+
+# Superpowers workspaces (never commit)
+.superpowers/

@@ -108,6 +108,7 @@ A team already running Infrahub who needs to continue extending it — adding sc
 | **analyzing-data** | Query and correlate live Infrahub data via the MCP server (requires MCP connection) |
 | **auditing-repo** | Audit your repository against Infrahub best practices |
 | **reporting-issues** | Route a bug or feature request to the right Infrahub-ecosystem repo (SDK, Ansible, VS Code, MCP, etc.) and prepare a sanitized draft for review |
+| **reporting-skill-gaps** | Turn friction with an Infrahub skill into a bug or feature issue, checked against the tracker for an existing report, drafted here and filed via `reporting-issues` |
 | **collecting-diagnostics** | When Infrahub is misbehaving, use the infrahub-collect tool to gather logs, config, and state into a bundle, review it, and hand it to OpsMill support |
 | **analyzing-diagnostics** | Analyze a collected diagnostic bundle: triage tracebacks and failures, correlate errors into incidents, and match findings against existing GitHub issues |
 | **importing-data** | Convert CSV/TSV inputs into Infrahub object YAML, validate, and load onto a fresh branch |
@@ -215,6 +216,7 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 │   ├── infrahub-analyzing-data/    # Live data analysis (MCP)
 │   ├── infrahub-auditing-repo/     # Best-practice audits
 │   ├── infrahub-reporting-issues/  # Ecosystem issue reporting
+│   ├── infrahub-reporting-skill-gaps/ # Skill-friction issue drafting
 │   ├── infrahub-collecting-diagnostics/ # Diagnostic-bundle collection for support hand-off
 │   ├── infrahub-analyzing-diagnostics/ # Bundle triage, correlation, and known-issue matching
 │   └── infrahub-importing-data/    # CSV/TSV → Infrahub objects

@@ -1,0 +1,110 @@
+---
+title: Issue Reporter
+sidebar_position: 11
+---
+
+The Issue Reporter files a bug report or feature request against the correct repository in the Infrahub ecosystem. There are 11 candidate repos and most people do not know which one owns their problem, so the skill reads your working directory for cues, proposes a target, searches for duplicates, and drafts an issue that matches that repo's intake form. It never auto-submits: it stops at a review gate and submits only after you approve both the content and the method.
+
+## When to use
+
+- You think you have found a bug in Infrahub or one of its components
+- You want to request a feature and do not know where it belongs
+- You are not sure which repo owns the problem you are seeing
+- You want an issue drafted properly before it goes on a public tracker
+
+Do not use it while you are still debugging locally with no intention of filing. Filing is what separates this skill from ordinary troubleshooting. For friction with an Infrahub *skill's* own guidance, use the [Skill Gap Reporter](./reporting-skill-gaps.mdx) instead, which drafts the report and hands it here.
+
+## What it produces
+
+- A routing decision with a one-sentence rationale, presented for you to confirm or correct
+- A duplicate search across open and closed issues, with the top matches shown to you
+- Either a new issue or a comment on the existing one that already covers your problem
+- For bugs, a minimal environment section: product versions, OS and architecture, runtime version
+- A body rendered against the target repo's own issue template when it has one
+- The issue or comment URL after submission
+
+## Example prompts
+
+- "I think I found a bug in Infrahub"
+- "How do I report this issue?"
+- "I'd like to request a feature for the Ansible collection"
+- "Where should I file this?"
+- "This isn't working, I want to open a ticket"
+
+## Where issues get routed
+
+| Repo | Owns |
+| ---- | ---- |
+| `opsmill/infrahub` | The platform, and the default fallback |
+| `opsmill/infrahub-sdk-python` | The Python SDK |
+| `opsmill/infrahub-vscode` | The VS Code extension |
+| `opsmill/infrahub-ansible` | The Ansible collection |
+| `opsmill/nornir-infrahub` | The Nornir plugin |
+| `opsmill/infrahub-helm` | The Helm chart |
+| `opsmill/infrahub-mcp` | The MCP server |
+| `opsmill/schema-library` | The schema library |
+| `opsmill/infrahub-backup` | The backup CLI |
+| `opsmill/infrahub-sync` | The sync tool |
+| `opsmill/infrahub-skills` | This plugin |
+
+**When routing is ambiguous, it defaults to `opsmill/infrahub`.** The main repo can re-route an incoming issue to a sub-repo far more easily than a sub-repo can send it back, so erring toward the platform is the cheaper mistake.
+
+## Key rules enforced
+
+- **Never submit without approval** — the review gate shows you the target repo, the final title, the full body, and whether this is a new issue or a comment, before anything is posted
+- **Default to main when unsure** — ambiguous cues, equally matching repos, or your own uncertainty all route to `opsmill/infrahub`
+- **Search before filing** — open and closed issues both, with a second pass using synonyms when the first returns nothing
+- **Comment instead of duplicating** — when a match exists, the skill either complements the issue with genuinely new information or records a short "another hit" so maintainers can gauge frequency
+- **Minimal environment info** — versions, OS, and architecture only; no file paths, no project structure, no verbatim logs, no env dumps, no `docker compose ps` output
+- **Unknown beats guessed** — a version that cannot be determined cleanly is marked `unknown` rather than inferred by running broader discovery commands
+- **Support questions are not issues** — "how do I do X?" is routed to Discord or GitHub Discussions
+
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --------- | --------------------------- |
+| Filing in a sub-repo when the symptom is ambiguous | Files in `opsmill/infrahub` and lets maintainers re-route |
+| Opening a duplicate | Adds a comment to the existing issue with the new information |
+| Pasting full logs or `docker compose` output | Collects versions, OS, and architecture, nothing more |
+| Filing a support question as a bug | Points you to Discord or Discussions |
+| Guessing a version number | Marks it `unknown` |
+| Submitting before you have read it | Stops at the review gate until you explicitly approve |
+
+## Finding your versions
+
+For bugs, the skill collects the relevant version. These are the commands it uses:
+
+| Component | Command |
+| --------- | ------- |
+| Infrahub server | `infrahubctl --version`, or the `image:` tag in your compose file |
+| Python SDK | `pip show infrahub-sdk` |
+| Ansible collection | `ansible-galaxy collection list opsmill.infrahub` |
+| Nornir plugin | `pip show nornir-infrahub` |
+| Helm chart | `helm list -n <namespace>` |
+| infrahub-sync | `infrahub-sync --version` |
+| infrahub-backup | `infrahub-backup --version` |
+| MCP server | MCP client config, or `pip show infrahub-mcp` |
+| VS Code extension | Extensions panel in VS Code |
+| Skills plugin | `version` field in `.claude-plugin/plugin.json` |
+
+## Submitting
+
+Once you approve the content, the skill asks how you want to submit. All three methods work for a new issue or a comment on an existing one:
+
+```bash
+# New issue
+gh issue create --repo <owner/repo> --title "..." --body "..."
+
+# Comment on an existing issue
+gh issue comment <number> --repo <owner/repo> --body "..."
+```
+
+A GitHub MCP server is used instead when you have one, and manual mode prints copy-paste-ready markdown plus the right URL.
+
+:::warning
+Issue bodies are public and cannot be retracted. Error messages carry file paths, hostnames, and node kinds that identify your infrastructure, so the skill paraphrases rather than pasting. Read the draft at the review gate with that in mind.
+:::
+
+:::tip
+If Infrahub is broken rather than misbehaving in a specific, reportable way, the [Diagnostics Collector](./collecting-diagnostics.mdx) gathers a redacted bundle for OpsMill support instead. The two are complementary: a public issue for a reproducible defect, a private bundle for a broken deployment.
+:::
