@@ -195,12 +195,13 @@
     {
       "id": 9,
       "prompt": "This friction has now shown up in two separate sessions with\ninfrahub-managing-checks. Both times, a validation check needed to\nimport a GraphQL fragment defined in another check module in the same\nrepository, and both sessions took two failed check runs to find the\ncorrect relative import path. Checking this skill's loaded rules and\nthe shared infrahub-common references turned up nothing that\naddresses sharing a fragment across check files.\n\nThe tracker has already been searched with no match. Triage\nhas already concluded this is a skill defect, and level 2 has already\nconcluded the kind: no rule or reference anywhere covers fragment\nsharing across check modules, so this is a gap the skill's own\nmaterial never claimed.\n\nWork through the rest of the workflow to completion: locate the\nimplicated rule coverage, draft the report, redact anything that\nidentifies the user's infrastructure, and take this as far as this\nskill's own steps go. Do NOT run `gh` commands or contact GitHub\nyourself; write out what you would do instead.\n\nSave your answer to: output.md",
-      "expected_output": "A response that drafts a complete report (type feature, a title starting with `feat:`, a filled-in body, and `searched` naming the tracker already checked), then hands the payload to infrahub-reporting-issues instead of running `gh issue create` or claiming an issue was filed itself. It names no target repository: routing belongs to the receiver, which resolves it from the type.",
+      "expected_output": "A response that drafts a complete report (type feature, a title starting with `feat:`, a filled-in body, `searched` naming the tracker already checked, and a Skills version header read from the implicated skill's own frontmatter), then hands the payload to infrahub-reporting-issues instead of running `gh issue create` or claiming an issue was filed itself. It names no target repository: routing belongs to the receiver, which resolves it from the type.",
       "files": [],
       "expectations": [
         "Hands off to infrahub-reporting-issues to file, rather than filing directly",
         "Runs no `gh` write commands itself and claims no issue was filed",
         "Carries a complete payload (type, title, body, searched)",
+        "Records the skills-plugin version whose guidance failed",
         "Names no repository as the filing destination",
         "Uses a title starting with `feat:`"
       ],
@@ -216,6 +217,10 @@
         {
           "name": "payload-is-complete",
           "check": "Response carries the payload fields type, title, body, and searched"
+        },
+        {
+          "name": "states-skills-version",
+          "check": "Response's header records the skills-plugin version whose guidance failed, or `unknown`"
         },
         {
           "name": "leaves-routing-to-reporter",

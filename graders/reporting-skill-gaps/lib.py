@@ -963,6 +963,49 @@ def check_no_draft_without_detection_evidence(text: str, **_: object) -> CheckRe
     )
 
 
+# The skills-plugin version whose guidance failed. Matched as its own
+# header line so ordinary prose that happens to mention a version ("this
+# worked in 1.2.7") cannot satisfy it. `unknown` is an accepted value:
+# reading the version can genuinely fail (an installed plugin with no
+# readable manifest), and saying so beats a guess that sends a maintainer
+# to the wrong revision of the rule. The bold markers are optional, the
+# same tolerance `check_payload_is_complete` needs for `**Type**:`.
+_SKILLS_VERSION_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?\*{0,2}skills?\s+version\*{0,2}\s*[:\-]\s*"
+    r"[`\'\"]?(v?\d+\.\d+(?:\.\d+)?|unknown)",
+    re.IGNORECASE | re.MULTILINE,
+)
+# The template's own unfilled placeholder. Leaving it in place is not a
+# filled field, the same trap `_UNFILLED_CONFIDENCE_RE` guards for.
+_UNFILLED_VERSION_RE = re.compile(
+    r"skills?\s+version\*{0,2}\s*[:\-]\s*\[", re.IGNORECASE
+)
+
+
+def check_states_skills_version(text: str, **_: object) -> CheckResult:
+    """Output's header records the skills-plugin version whose guidance failed.
+
+    A rule file changes between releases. Without the version, a maintainer
+    opening the cited file cannot tell whether they are looking at the
+    guidance that failed or at a revision that already fixed it, which
+    turns a five-minute fix back into an investigation.
+
+    Accepts `unknown` as a value. The version is read from the implicated
+    skill's own SKILL.md frontmatter, and that read can fail; an explicit
+    `unknown` is honest, while a plausible-looking guess is worse than
+    nothing.
+    """
+    if _UNFILLED_VERSION_RE.search(text):
+        return False, "skills-version line is still an unfilled template placeholder"
+    match = _SKILLS_VERSION_RE.search(text)
+    if match:
+        return True, f"records the skills version ({match.group(1)!r})"
+    return False, (
+        "no skills-version header line found; a maintainer cannot tell "
+        "which revision of the rule failed"
+    )
+
+
 def check_hands_off_to_reporting_issues(text: str, **_: object) -> CheckResult:
     """Output references infrahub-reporting-issues for the product-defect handoff."""
     if "infrahub-reporting-issues" in text:
@@ -1555,6 +1598,7 @@ CHECKS: dict[str, CheckFn] = {
     "hands-off-to-reporting-issues-for-filing": check_hands_off_to_reporting_issues_for_filing,
     "no-direct-filing": check_no_direct_filing,
     "payload-is-complete": check_payload_is_complete,
+    "states-skills-version": check_states_skills_version,
     "leaves-routing-to-reporter": check_leaves_routing_to_reporter,
     "title-uses-kind-prefix": check_title_uses_kind_prefix,
     "cites-rule-file": check_cites_rule_file,

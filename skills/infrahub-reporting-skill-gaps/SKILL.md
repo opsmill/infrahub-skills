@@ -121,8 +121,8 @@ condition is a gate, not a detail: if the workflow is
 still being defined or is deliberately undocumented,
 there is nothing to document yet, so do not draft at
 all, tell the user why, and stop. This decides the
-title prefix and target repo used for drafting, in step
-6 below. See
+title prefix used for drafting in step 6, and it is what
+the receiver routes on. See
 [rules/workflow-bug-vs-feature.md](rules/workflow-bug-vs-feature.md).
 
 ### 4. Hand off if product
@@ -151,10 +151,19 @@ step 2. Redact anything that identifies the user's
 infrastructure or organization per
 [rules/evidence-no-customer-data.md](rules/evidence-no-customer-data.md).
 This is security-critical and applies before the draft
-ever leaves this skill. This produces the three handoff
-fields `type`, `title`, and `body`. It does **not**
-produce a target repository: naming one is not this
-skill's call, and the draft must not contain one.
+ever leaves this skill.
+
+The header carries the skills-plugin version whose
+guidance failed, read from `metadata.version` in the
+implicated skill's own SKILL.md frontmatter. Without it a
+maintainer cannot tell whether the rule they are looking
+at is the one that failed. Write `unknown` if it cannot be
+read; never guess.
+
+This produces the three handoff fields `type`, `title`,
+and `body`. It does **not** produce a target repository:
+naming one is not this skill's call, and the draft must
+not contain one.
 
 When step 2 found a match, draft a comment instead: no
 title, no repeated problem statement, only the new

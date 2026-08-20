@@ -60,6 +60,14 @@ observation` otherwise. Never omit this line: it is what
 lets a maintainer weigh the report, and what lets a second
 observer recognize their own case in it. See
 rules/workflow-tracker-first.md. -->
+**Skills version**: [the version of the skills plugin whose guidance failed]
+<!-- Read `metadata.version` from the implicated skill's own
+SKILL.md frontmatter; all skills in this plugin share one
+version. If the skill was loaded from an installed plugin
+rather than a checkout, read `version` from
+.claude-plugin/plugin.json instead. If neither is readable,
+write `unknown` rather than guessing: a wrong version sends
+a maintainer to the wrong revision of the rule. -->
 **Tracker search**: [the query run against opsmill/infrahub-skills, and its result]
 
 ## What was being attempted

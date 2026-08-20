@@ -12,6 +12,7 @@ CHECKS = [
     "hands-off-to-reporting-issues-for-filing",
     "no-direct-filing",
     "payload-is-complete",
+    "states-skills-version",
     "leaves-routing-to-reporter",
     "title-uses-kind-prefix",
 ]
