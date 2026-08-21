@@ -19,8 +19,11 @@
 5. **Artifacts (artifacts-)** -- HIGH. Connecting
    transforms to output files via artifact_definitions,
    content types, targets (CoreArtifactTarget),
-   parameter mapping, and async regeneration polling
-   (the /api/artifact/generate endpoint is fire-and-forget).
+   parameter mapping, async regeneration polling
+   (the /api/artifact/generate endpoint is fire-and-forget),
+   and declaring the transform's dependency closure with
+   `watch.files` so regeneration triggers on the right
+   file changes and only those.
 
 6. **API Reference (api-)** -- HIGH. Class attributes
    (query, timeout), instance properties (client,
