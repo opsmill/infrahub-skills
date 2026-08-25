@@ -49,6 +49,12 @@ generator_definitions:
     parameters:
       # Maps $name to target's name attribute
       name: name__value
+    # Always present. List every first-party module the
+    # generator imports and every file it reads at runtime;
+    # [] if there are none. See
+    # rules/registration-watch-dependencies.md
+    watch:
+      files: []
 ```
 
 ### Field Reference

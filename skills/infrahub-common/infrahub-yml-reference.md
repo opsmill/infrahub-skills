@@ -319,6 +319,12 @@ python_transforms:
   - name: spine
     class_name: Spine
     file_path: transforms/spine.py
+    # Imports transforms/common.py and renders a template it
+    # selects at runtime; neither is auto-detected.
+    watch:
+      files:
+        - transforms/common.py
+        - templates/configs/spines/
 
 generator_definitions:
   - name: create_dc
@@ -328,6 +334,10 @@ generator_definitions:
     class_name: DCTopologyGenerator
     parameters:
       name: name__value
+    # Self-contained, but the key is still present: without it
+    # the generator re-runs on every commit.
+    watch:
+      files: []
 
 queries:
   - name: topology_dc

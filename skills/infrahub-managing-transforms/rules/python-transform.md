@@ -72,6 +72,12 @@ python_transforms:
   - name: my_transform
     class_name: MyTransform
     file_path: transforms/my_transform.py
+    # Always present on a Python transform. List every
+    # first-party module it imports and every file it reads at
+    # runtime; [] if there are none. See
+    # rules/artifacts-watch-dependencies.md
+    watch:
+      files: []
 ```
 
 ### Key Rules
