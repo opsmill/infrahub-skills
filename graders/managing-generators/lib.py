@@ -1,6 +1,6 @@
 """Shared grader library for infrahub-managing-generators evaluations.
 
-This library backs two grader families that share one ``run_checks`` entry
+This library backs three grader families that share one ``run_checks`` entry
 point, dispatched by the output file's suffix:
 
 * **AST / relationship checks** (relationship references, multi-peer add,
@@ -18,6 +18,12 @@ point, dispatched by the output file's suffix:
   re-fetches (``InfrahubNode.from_graphql`` instead of ``self.client.get``)
   and that the query was extended with ``__typename``. These checks take a
   single ``output`` dict.
+
+* **watch.files checks** parse an ``.infrahub.yml`` manifest (``output.yml``)
+  and inspect the ``generator_definitions`` entries: whether each declares a
+  ``watch`` block at all, whether it is the object form, and whether it names
+  every first-party dependency the Generator imports. These checks take the
+  parsed mapping as a single ``output`` dict.
 
 Usage (in a per-task grader script)::
 
@@ -44,6 +50,8 @@ import ast
 import re
 from pathlib import Path
 from typing import Any, Iterator
+
+import yaml
 
 
 # ---------------------------------------------------------------------------
@@ -740,6 +748,193 @@ def check_graphql_block_present(output: dict, **_: Any) -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
+# watch.files checks (registration-watch-dependencies) — output.yml family
+# ---------------------------------------------------------------------------
+#
+# Fixture-coupled: the eval task hands the model a repo whose generators/
+# holds generate_fabric.py (importing the sibling .fabric_generator_query
+# plus my_package.generator from src/) and the self-contained
+# generate_rack.py, and asks for the generator_definitions registration.
+
+_YAML_FENCE = re.compile(r"^```(?:yaml|yml)\s*\n(.*?)^```", re.MULTILINE | re.DOTALL)
+
+
+def load_output_yaml(path: Path) -> dict:
+    """Load an ``.infrahub.yml`` manifest and return the parsed mapping.
+
+    Returns ``{}`` when the file is missing, unparseable, or not a mapping.
+    A document wrapped in a ```yaml fence is unwrapped first, so a model
+    that formats its answer as a code block still grades.
+    """
+    try:
+        raw = Path(path).read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError):
+        return {}
+    fence = _YAML_FENCE.search(raw)
+    if fence:
+        raw = fence.group(1)
+    try:
+        doc = yaml.safe_load(raw)
+    except yaml.YAMLError:
+        return {}
+    return doc if isinstance(doc, dict) else {}
+
+
+def _generator_entries(yml_doc: dict) -> list[dict]:
+    items = yml_doc.get("generator_definitions") or []
+    if not isinstance(items, list):
+        return []
+    return [item for item in items if isinstance(item, dict)]
+
+
+def _generator_named(yml_doc: dict, name: str) -> dict | None:
+    for entry in _generator_entries(yml_doc):
+        if entry.get("name") == name:
+            return entry
+    return None
+
+
+def canonical_watch_path(path: str) -> str:
+    """Normalize a watch entry the way Infrahub's canonicalizer does."""
+    normalized = str(path).replace("\\", "/")
+    while True:
+        previous = normalized
+        normalized = normalized.lstrip("/").removeprefix("./").rstrip("/")
+        if normalized == previous:
+            return normalized
+
+
+def watch_files(entry: dict) -> list[str] | None:
+    """Return an entry's canonicalized ``watch.files``.
+
+    ``None`` means no ``watch`` key at all — the case that leaves the
+    fingerprint folding in the commit id — or a ``watch`` in a shape
+    Infrahub rejects at import, which ``check_gen_watch_object_form``
+    reports separately.
+    """
+    if "watch" not in entry:
+        return None
+    watch = entry["watch"]
+    if not isinstance(watch, dict):
+        return None
+    files = watch.get("files")
+    if not isinstance(files, list):
+        return None
+    return [canonical_watch_path(f) for f in files if isinstance(f, str)]
+
+
+def _covers(files: list[str], target: str) -> bool:
+    """True if ``target`` is named outright or sits under a declared directory."""
+    target = canonical_watch_path(target)
+    return any(target == f or target.startswith(f"{f}/") for f in files)
+
+
+def check_gen_watch_present(output: dict) -> tuple[bool, str]:
+    """Every generator_definitions entry must carry a watch key."""
+    entries = _generator_entries(output)
+    if not entries:
+        return False, "No generator_definitions entries found to inspect"
+    missing = [e.get("name", "<unnamed>") for e in entries if "watch" not in e]
+    if missing:
+        return False, (
+            f"generator_definitions entries with no watch key: {', '.join(missing)} — "
+            "these re-run on every commit"
+        )
+    return True, f"All {len(entries)} generator_definitions entries declare watch"
+
+
+def check_gen_watch_object_form(output: dict) -> tuple[bool, str]:
+    """Every watch must be ``{files: [...]}``; the bare-list form fails import."""
+    for entry in _generator_entries(output):
+        if "watch" not in entry:
+            continue
+        name = entry.get("name", "<unnamed>")
+        watch = entry["watch"]
+        if not isinstance(watch, dict):
+            return False, (
+                f"{name}: watch is {type(watch).__name__}, not an object — the "
+                "bare-list form is rejected when the repository is imported"
+            )
+        unknown = set(watch) - {"files"}
+        if unknown:
+            return False, f"{name}: unknown key(s) under watch: {sorted(unknown)}"
+        if not isinstance(watch.get("files"), list):
+            return False, f"{name}: watch.files is not a list"
+    return True, "Every watch block uses the object form with a files list"
+
+
+def check_gen_watch_declares_sibling_query_model(output: dict) -> tuple[bool, str]:
+    """generate_fabric imports .fabric_generator_query, so it must be declared.
+
+    Being a sibling is not coverage: imports are never followed, and the
+    directory listing that used to include siblings is being withdrawn
+    (opsmill/infrahub#9644).
+    """
+    entry = _generator_named(output, "generate_fabric")
+    if entry is None:
+        return False, "No generator_definitions entry named generate_fabric"
+    files = watch_files(entry)
+    if files is None:
+        return False, "generate_fabric declares no usable watch.files"
+    if _covers(files, "generators/fabric_generator_query.py"):
+        return True, "generate_fabric declares its sibling query model"
+    return False, (
+        "generate_fabric does not declare the sibling module it imports "
+        f"(generators/fabric_generator_query.py); watch.files = {files}"
+    )
+
+
+def check_gen_watch_declares_shared_package(output: dict) -> tuple[bool, str]:
+    """generate_fabric imports my_package.generator, which lives under src/."""
+    entry = _generator_named(output, "generate_fabric")
+    if entry is None:
+        return False, "No generator_definitions entry named generate_fabric"
+    files = watch_files(entry)
+    if files is None:
+        return False, "generate_fabric declares no usable watch.files"
+    if _covers(files, "src/my_package/generator.py"):
+        return True, "generate_fabric declares the shared src/ package it imports"
+    return False, (
+        "generate_fabric does not declare src/my_package/generator.py (or the "
+        f"package holding it); watch.files = {files}"
+    )
+
+
+def check_gen_watch_no_third_party(output: dict) -> tuple[bool, str]:
+    """Installed packages are not tracked repo files and never belong in watch."""
+    third_party = ("infrahub_sdk", "site-packages", "pydantic", "httpx")
+    for entry in _generator_entries(output):
+        files = watch_files(entry) or []
+        for path in files:
+            if any(token in path for token in third_party):
+                return False, (
+                    f"{entry.get('name', '<unnamed>')}: watch.files names an installed "
+                    f"dependency ({path}), which is not a tracked repository file"
+                )
+    return True, "No watch entry names an installed dependency"
+
+
+def check_gen_watch_empty_for_self_contained(output: dict) -> tuple[bool, str]:
+    """generate_rack has no first-party import, so it declares an empty list.
+
+    ``files: []`` is the assertion that there is nothing to declare, and is
+    what stops the commit id being folded into the fingerprint.
+    """
+    entry = _generator_named(output, "generate_rack")
+    if entry is None:
+        return False, "No generator_definitions entry named generate_rack"
+    files = watch_files(entry)
+    if files is None:
+        return False, "generate_rack declares no usable watch.files (expected [])"
+    if files == []:
+        return True, "generate_rack declares an explicit empty watch.files"
+    return False, (
+        "generate_rack imports nothing first-party, so watch.files should be empty; "
+        f"got {files}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
 
@@ -762,6 +957,13 @@ CHECKS: dict[str, Any] = {
     "query-has-typename": check_query_has_typename,
     "python-block-present": check_python_block_present,
     "graphql-block-present": check_graphql_block_present,
+    # watch.files family (output.yml)
+    "gen-watch-present": check_gen_watch_present,
+    "gen-watch-object-form": check_gen_watch_object_form,
+    "gen-watch-declares-sibling-query-model": check_gen_watch_declares_sibling_query_model,
+    "gen-watch-declares-shared-package": check_gen_watch_declares_shared_package,
+    "gen-watch-no-third-party": check_gen_watch_no_third_party,
+    "gen-watch-empty-for-self-contained": check_gen_watch_empty_for_self_contained,
 }
 
 
@@ -775,19 +977,24 @@ def run_checks(check_names: list[str], output_path: Path) -> dict:
 
     Dispatch is by the output file's suffix: ``.md`` routes to the
     Markdown/dict family (from_graphql hydration checks, which receive the
-    ``load_output`` dict), anything else to the Python/AST family (which
-    receive ``(tree, raw_text=...)`` from ``load_output_py``). A grader
-    script requests only checks from its own family and passes the matching
-    path, so the two never mix within one call.
+    ``load_output`` dict), ``.yml`` / ``.yaml`` to the manifest family
+    (watch.files checks, which receive the parsed mapping), anything else
+    to the Python/AST family (which receive ``(tree, raw_text=...)`` from
+    ``load_output_py``). A grader script requests only checks from its own
+    family and passes the matching path, so they never mix within one call.
 
     Returns skillgrade JSON: ``{"score": float, "details": str,
     "checks": [...]}``.
 
     Raises ``KeyError`` if any name in ``check_names`` is not in ``CHECKS``.
     """
-    markdown_mode = Path(output_path).suffix.lower() == ".md"
+    suffix = Path(output_path).suffix.lower()
+    markdown_mode = suffix == ".md"
+    yaml_mode = suffix in (".yml", ".yaml")
     if markdown_mode:
         output = load_output(output_path)
+    elif yaml_mode:
+        output = load_output_yaml(output_path)
     else:
         tree, raw = load_output_py(output_path)
 
@@ -797,7 +1004,7 @@ def run_checks(check_names: list[str], output_path: Path) -> dict:
     for name in check_names:
         fn = CHECKS[name]  # raises KeyError for unknown names
         try:
-            if markdown_mode:
+            if markdown_mode or yaml_mode:
                 ok, msg = fn(output)
             else:
                 ok, msg = fn(tree, raw_text=raw)

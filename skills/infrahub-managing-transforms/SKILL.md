@@ -69,6 +69,8 @@ someone is waiting for the output.
 | Picks a template per device by platform/role | The schema must expose that platform/role as a real attribute or relationship — string-matching on `display_label` is brittle | [../infrahub-managing-schemas/rules/display-human-friendly-id.md](../infrahub-managing-schemas/rules/display-human-friendly-id.md) |
 | Is referenced from `artifact_definitions.transformation` | The transform's registered `name` must match the `transformation:` field exactly — mismatch produces "transformation not found" at render time | [rules/artifacts-definitions.md](./rules/artifacts-definitions.md) |
 | Uses Jinja2 (not Python) | Register under `jinja2_transforms` with a top-level `query:` field — `python_transforms` binds query on the class, the two keys are not interchangeable | [rules/api-reference.md](./rules/api-reference.md) |
+| Is a Python transform | Carry a `watch:` block naming every first-party module it imports — sibling modules included, since imports are never followed. Without the key, Infrahub cannot trust the dependency list and re-renders the artifacts on every commit | [rules/artifacts-watch-dependencies.md](./rules/artifacts-watch-dependencies.md) |
+| Reads a data file at runtime, or includes a template by variable name | Name those paths in `watch.files` — detection cannot see a path that exists only as a string, so the artifacts go stale on a change with no error raised | [rules/artifacts-watch-dependencies.md](./rules/artifacts-watch-dependencies.md) |
 
 ## Before writing Python
 
@@ -144,6 +146,15 @@ Follow these steps when creating a transform:
 5. **Register in .infrahub.yml** — Add under
    `python_transforms` or `jinja2_transforms`. See
    [rules/api-reference.md](./rules/api-reference.md).
+   Then declare the transform's dependencies with
+   `watch.files`: read the entry point's imports and
+   runtime file reads, and name every first-party path
+   they resolve to. A Python transform should always
+   carry the key — `files: []` when it genuinely has no
+   dependency beyond its own file. Read
+   [rules/artifacts-watch-dependencies.md](./rules/artifacts-watch-dependencies.md),
+   which also covers reviewing an existing `watch` block
+   for entries that are missing, stale, or wrong.
 6. **Add tests** — Create YAML-driven test definitions
    (smoke, unit, integration) alongside the transform so
    it is validated automatically in the proposed change

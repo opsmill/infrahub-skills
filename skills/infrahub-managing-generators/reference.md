@@ -172,6 +172,8 @@ generator_definitions:
     query: pop_topology                  # REQUIRED at this level (unlike check_definitions)
     parameters:
       design: name__value
+    watch:                               # Always present; imports are never auto-detected
+      files: []                          # [] asserts there is nothing to declare
 ```
 
 Critical shape difference vs `check_definitions`:

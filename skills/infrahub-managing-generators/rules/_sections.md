@@ -23,7 +23,9 @@
 5. **Registration (registration-)** -- HIGH.
    .infrahub.yml generator_definitions config, query name
    matching, targets (CoreGeneratorGroup), parameters
-   mapping.
+   mapping, and declaring the Generator's dependency
+   closure with `watch.files` so it re-runs on the right
+   file changes and only those.
 
 6. **Patterns (patterns-)** -- MEDIUM. Data cleaning helper,
    batch object creation, using the local store for

@@ -146,6 +146,45 @@
           "check": "__typename appears inside the bgp_neighbors selection in the updated GraphQL query"
         }
       ]
+    },
+    {
+      "id": 7,
+      "prompt": "Register these two new Generators in `.infrahub.yml`. Both target\ngroups already exist as CoreGeneratorGroups, and both GraphQL queries are\nalready declared in the `queries:` section under the names used below.\n\nRepository layout:\n\n```text\ngenerators/generate_fabric.py\ngenerators/fabric_generator_query.py\ngenerators/generate_rack.py\nsrc/my_package/generator.py\nsrc/my_package/protocols.py\n```\n\ngenerators/generate_fabric.py:\n```python\nfrom infrahub_sdk.generator import InfrahubGenerator\n\nfrom my_package.generator import GeneratorMixin\n\nfrom .fabric_generator_query import FabricGeneratorQuery\n\n\nclass FabricGenerator(InfrahubGenerator, GeneratorMixin):\n    async def generate(self, data: dict) -> None:\n        parsed = FabricGeneratorQuery(**data)\n        await self.build_fabric(parsed.fabric)\n```\n\nUses query `generate_fabric`, targets group `fabrics`, and maps the query\nvariable `fabric_name` to the target's name attribute.\n\ngenerators/generate_rack.py:\n```python\nfrom infrahub_sdk.generator import InfrahubGenerator\n\n\nclass RackGenerator(InfrahubGenerator):\n    async def generate(self, data: dict) -> None:\n        rack = data[\"LocationRack\"][\"edges\"][0][\"node\"]\n        for position in range(1, 43):\n            unit = await self.client.create(\n                kind=\"LocationRackUnit\",\n                data={\"position\": position, \"rack\": rack[\"id\"]},\n            )\n            await unit.save(allow_upsert=True)\n```\n\nUses query `generate_rack`, targets group `racks`, and maps the query\nvariable `rack_name` to the target's name attribute.",
+      "expected_output": "A generator_definitions section with both Generators registered (query, targets, class_name, parameters) and an accurate watch block on each: generate_fabric naming generators/fabric_generator_query.py and src/my_package/, and generate_rack \u2014 which imports nothing first-party \u2014 carrying an explicit empty files list rather than no watch key at all.",
+      "files": [],
+      "expectations": [
+        "Both generator_definitions entries carry a watch key",
+        "generate_fabric declares generators/fabric_generator_query.py",
+        "generate_fabric declares src/my_package/ (or the module within it)",
+        "generate_rack declares watch.files as an empty list",
+        "No watch entry names infrahub_sdk or another installed package"
+      ],
+      "assertions": [
+        {
+          "name": "gen-watch-present",
+          "check": "Every generator_definitions entry has a watch key, since a missing one folds the commit id into the fingerprint and re-runs the Generator on every commit"
+        },
+        {
+          "name": "gen-watch-object-form",
+          "check": "Every watch block is the object form {files: [...]}, not a bare list"
+        },
+        {
+          "name": "gen-watch-declares-sibling-query-model",
+          "check": "generate_fabric declares generators/fabric_generator_query.py, the sibling module it imports"
+        },
+        {
+          "name": "gen-watch-declares-shared-package",
+          "check": "generate_fabric declares src/my_package/ (or the module within it) that it imports"
+        },
+        {
+          "name": "gen-watch-no-third-party",
+          "check": "No watch entry names an installed dependency such as infrahub_sdk"
+        },
+        {
+          "name": "gen-watch-empty-for-self-contained",
+          "check": "generate_rack, which has no first-party import, declares watch.files as []"
+        }
+      ]
     }
   ]
 }

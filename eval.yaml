@@ -1390,6 +1390,130 @@ tasks:
           A call passes kind="CoreArtifact" (read of artifact state
           after the POST)
 
+  - name: transform-watch-dependencies
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-transforms/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Two things are wrong with our artifacts. Every artifact in the repo
+      re-renders on every commit, even for changes that have nothing to do with
+      it. And last week we edited src/my_package/formatting.py and the device
+      config artifact kept its old content until someone touched the transform
+      itself. Fix the transform registration in `.infrahub.yml`.
+
+      Repository layout:
+
+      ```text
+      transforms/device_config.py
+      transforms/device_config_query.py
+      transforms/interface_names.py
+      templates/startup_config_arista.j2
+      templates/startup_config_cisco.j2
+      templates/partials/header.j2
+      src/my_package/formatting.py
+      ```
+
+      transforms/device_config.py — class DeviceConfig, renders a banner:
+      ```python
+      from infrahub_sdk.transforms import InfrahubTransform
+
+      from my_package.formatting import render_banner
+
+      from .device_config_query import DeviceConfigQuery
+      ```
+
+      transforms/interface_names.py — class InterfaceNames, reshapes the query
+      response into a dict:
+      ```python
+      from infrahub_sdk.transforms import InfrahubTransform
+      ```
+
+      templates/startup_config_arista.j2 (every include names its template
+      directly):
+      ```jinja
+      {% include "templates/partials/header.j2" %}
+      ```
+
+      templates/startup_config_cisco.j2 (the partial is chosen at render time):
+      ```jinja
+      {% include partial_name %}
+      ```
+
+      The current `.infrahub.yml` transform sections:
+      ```yaml
+      python_transforms:
+        - name: device_config
+          class_name: DeviceConfig
+          file_path: transforms/device_config.py
+          watch:
+            files:
+              - transforms/
+        - name: interface_names
+          class_name: InterfaceNames
+          file_path: transforms/interface_names.py
+
+      jinja2_transforms:
+        - name: arista_startup_config
+          query: device_startup_config
+          template_path: templates/startup_config_arista.j2
+          watch:
+            files:
+              - templates/
+        - name: cisco_startup_config
+          query: device_startup_config
+          template_path: templates/startup_config_cisco.j2
+      ```
+
+      Save ONLY the corrected `python_transforms` and `jinja2_transforms`
+      sections to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-transforms/check_watch_dependencies.py
+        weight: 1.0
+    expected_output: >-
+      The two transform sections with an accurate watch block per entry:
+      device_config naming transforms/device_config_query.py and
+      src/my_package/ instead of the whole transforms/ directory,
+      interface_names carrying an explicit empty files list, the
+      literal-include Arista template dropping its superfluous watch, and the
+      Cisco template declaring templates/partials/ for the include it resolves
+      at render time.
+    expectations:
+      - "Every python_transforms entry carries a watch key"
+      - "device_config declares both the sibling query model and src/my_package/"
+      - "interface_names declares watch.files as an empty list"
+      - "arista_startup_config carries no watch entries (its closure is complete)"
+      - "cisco_startup_config declares templates/partials/"
+    assertions:
+      - name: watch-present-on-python-transforms
+        check: >-
+          Every python_transforms entry has a watch key, since a missing one
+          folds the commit id into the fingerprint
+      - name: watch-uses-object-form
+        check: >-
+          Every watch block is the object form {files: [...]}, not a bare list
+      - name: watch-declares-sibling-import
+        check: >-
+          device_config declares transforms/device_config_query.py, the sibling
+          module it imports
+      - name: watch-declares-outside-package-import
+        check: >-
+          device_config declares src/my_package/ (or the module within it) that
+          it imports
+      - name: watch-empty-for-self-contained
+        check: >-
+          interface_names, which has no first-party import, declares
+          watch.files as []
+      - name: watch-omitted-for-static-jinja2
+        check: >-
+          arista_startup_config has no watch entries, since its includes are
+          all literal and its closure is already complete
+      - name: watch-declares-dynamic-jinja2-partials
+        check: >-
+          cisco_startup_config declares templates/partials/, which its
+          variable include can reach
+
   # --- Transforms: pre-merge GraphQL dry-run --- #
   # Backs the shared rule
   # skills/infrahub-common/rules/deployment-gql-dry-run.md. Hosted under
@@ -2478,6 +2602,105 @@ tasks:
         check: >-
           __typename appears inside the bgp_neighbors selection in
           the updated GraphQL query
+
+  - name: generator-watch-dependencies
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Register these two new Generators in `.infrahub.yml`. Both target
+      groups already exist as CoreGeneratorGroups, and both GraphQL queries are
+      already declared in the `queries:` section under the names used below.
+
+      Repository layout:
+
+      ```text
+      generators/generate_fabric.py
+      generators/fabric_generator_query.py
+      generators/generate_rack.py
+      src/my_package/generator.py
+      src/my_package/protocols.py
+      ```
+
+      generators/generate_fabric.py:
+      ```python
+      from infrahub_sdk.generator import InfrahubGenerator
+
+      from my_package.generator import GeneratorMixin
+
+      from .fabric_generator_query import FabricGeneratorQuery
+
+
+      class FabricGenerator(InfrahubGenerator, GeneratorMixin):
+          async def generate(self, data: dict) -> None:
+              parsed = FabricGeneratorQuery(**data)
+              await self.build_fabric(parsed.fabric)
+      ```
+
+      Uses query `generate_fabric`, targets group `fabrics`, and maps the query
+      variable `fabric_name` to the target's name attribute.
+
+      generators/generate_rack.py:
+      ```python
+      from infrahub_sdk.generator import InfrahubGenerator
+
+
+      class RackGenerator(InfrahubGenerator):
+          async def generate(self, data: dict) -> None:
+              rack = data["LocationRack"]["edges"][0]["node"]
+              for position in range(1, 43):
+                  unit = await self.client.create(
+                      kind="LocationRackUnit",
+                      data={"position": position, "rack": rack["id"]},
+                  )
+                  await unit.save(allow_upsert=True)
+      ```
+
+      Uses query `generate_rack`, targets group `racks`, and maps the query
+      variable `rack_name` to the target's name attribute.
+
+      Save ONLY the `generator_definitions` section to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_watch_dependencies.py
+        weight: 1.0
+    expected_output: >-
+      A generator_definitions section with both Generators registered (query,
+      targets, class_name, parameters) and an accurate watch block on each:
+      generate_fabric naming generators/fabric_generator_query.py and
+      src/my_package/, and generate_rack — which imports nothing first-party —
+      carrying an explicit empty files list rather than no watch key at all.
+    expectations:
+      - "Both generator_definitions entries carry a watch key"
+      - "generate_fabric declares generators/fabric_generator_query.py"
+      - "generate_fabric declares src/my_package/ (or the module within it)"
+      - "generate_rack declares watch.files as an empty list"
+      - "No watch entry names infrahub_sdk or another installed package"
+    assertions:
+      - name: gen-watch-present
+        check: >-
+          Every generator_definitions entry has a watch key, since a missing
+          one folds the commit id into the fingerprint and re-runs the
+          Generator on every commit
+      - name: gen-watch-object-form
+        check: >-
+          Every watch block is the object form {files: [...]}, not a bare list
+      - name: gen-watch-declares-sibling-query-model
+        check: >-
+          generate_fabric declares generators/fabric_generator_query.py, the
+          sibling module it imports
+      - name: gen-watch-declares-shared-package
+        check: >-
+          generate_fabric declares src/my_package/ (or the module within it)
+          that it imports
+      - name: gen-watch-no-third-party
+        check: >-
+          No watch entry names an installed dependency such as infrahub_sdk
+      - name: gen-watch-empty-for-self-contained
+        check: >-
+          generate_rack, which has no first-party import, declares
+          watch.files as []
 
   # --- CSV Import --- #
   - name: csv-import-single-kind-envelope

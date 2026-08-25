@@ -172,6 +172,11 @@ generator_definitions:
     class_name: PopTopologyGenerator
     parameters:
       name: name__value
+    # Imports .common for TopologyCreator and clean_data.
+    # Imports are never followed, so the sibling is declared.
+    watch:
+      files:
+        - generators/common.py
 ```
 
 ---
@@ -348,6 +353,10 @@ generator_definitions:
     class_name: WidgetGenerator
     parameters:
       name: name__value
+    # Self-contained generator. The key is still present:
+    # without it the generator re-runs on every commit.
+    watch:
+      files: []
 ```
 
 ---
@@ -388,6 +397,9 @@ generator_definitions:
     class_name: TypedGenerator
     # Enable SDK object conversion
     convert_query_response: true
+    # Nothing first-party imported, nothing read at runtime.
+    watch:
+      files: []
     parameters:
       name: name__value
 ```
