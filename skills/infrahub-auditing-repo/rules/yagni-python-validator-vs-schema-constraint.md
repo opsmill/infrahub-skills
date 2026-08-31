@@ -42,11 +42,43 @@ guess which one is authoritative.
 5. Python checks asserting that a relationship has exactly one peer
    when the schema already declares `cardinality: one`.
 
+## Naming the replacement precisely
+
+The suggested replacement has to say **which kind** the
+constraint goes on, because the layer changes the
+semantics:
+
+- **On a concrete kind**, the constraint is scoped to
+  that kind.
+- **On a generic**, it is enforced across *every* kind
+  that inherits it, and a concrete kind cannot narrow
+  it back. Two objects of different implementers then
+  cannot share the constrained values.
+
+So "move this uniqueness check into the schema" is an
+incomplete finding if the check only ever ran against
+one kind and the obvious home looks like a shared
+generic. Say the concrete kind unless the intent really
+is estate-wide uniqueness.
+
+The same applies to the relationship form: a
+relationship is only usable in a constraint if it is
+cardinality one, mandatory, and referenced bare. If the
+check guards an *optional* relationship, the schema
+cannot express it and the finding does not apply. See
+[../../infrahub-managing-schemas/rules/uniqueness-constraints.md](../../infrahub-managing-schemas/rules/uniqueness-constraints.md).
+
 ## What NOT to flag
 
 - Cross-node business rules ("device count per location equals
   rack-unit total"). These require relationship traversal and cannot
   be expressed as single-attribute schema constraints.
+- Uniqueness checks over an **optional** relationship, or over a
+  `cardinality: many` relationship. The schema rejects both at load,
+  so there is no cheaper layer to move to.
+- Uniqueness checks over an **optional attribute** where more than one
+  row legitimately leaves it unset. An unset value is compared as the
+  literal `"NULL"`, so the constraint would permit only one such row.
 - Stateful checks that depend on prior-branch data or out-of-band
   state.
 - Checks that emit warnings via `level: WARN` rather than errors —

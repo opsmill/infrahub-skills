@@ -1,7 +1,7 @@
 ---
 title: Set human_friendly_id on Nodes
 impact: HIGH
-tags: display, human_friendly_id, identity
+tags: display, human_friendly_id, identity, generics, inheritance
 ---
 
 ## Set human_friendly_id on Nodes
@@ -75,6 +75,42 @@ human_friendly_id:
   - device_type__model__value
   - name__value
 ```
+
+### Scope on a generic: it resolves across every implementer
+
+A `human_friendly_id` declared on a generic resolves
+across **every kind that inherits it**, exactly like
+`uniqueness_constraints`. So an upsert of one kind can
+match an existing object of a *sibling* kind that
+happens to share the same identifying values.
+
+The error does not say so. On a non-default branch it
+reads:
+
+```text
+Node <id> / <SiblingKind> uses this human-friendly ID, but does not exist on
+this branch. Please rebase this branch to access <id> / <SiblingKind>
+```
+
+**The rebase advice is wrong.** The node exists; it is
+simply not of the kind being upserted. The upsert path
+looks the matched node up using the kind *you* asked
+for, fails to find it under that kind, and reports the
+miss as a stale branch. The `<id>` quoted belongs to
+the sibling's object, and the kind named beside it is
+the clue the message never explains. On the default
+branch the same situation raises a plain not-found
+instead.
+
+If two implementers of a generic legitimately share
+identifying values, the `human_friendly_id` belongs on
+each concrete kind rather than on the generic.
+
+Keep it distinct from `uniqueness_constraints`: they are
+two mechanisms with the same scope and different
+failures, and telling them apart from the error text
+alone is hard. See
+[uniqueness-constraints.md](uniqueness-constraints.md).
 
 Pair with `display_label` for UI rendering (supports Jinja2):
 

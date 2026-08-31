@@ -1056,8 +1056,165 @@ def check_choice_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
     return True, f"All {seen} dropdown choice(s) are in canonical key order"
 
 
+# ---------------------------------------------------------------------------
+# Uniqueness constraint format and scope
+#
+# Verified against Infrahub 1.11.0 via the in-memory schema validator: a
+# relationship is usable in a constraint only when it is cardinality one,
+# mandatory, and referenced bare. Each violation has its own load-time
+# message, so all of these are hard failures rather than style points.
+# ---------------------------------------------------------------------------
+
+
+def _entities(schema: dict) -> list[tuple[str, dict]]:
+    """Yield ``(section, entity)`` for every node and generic in the schema."""
+    out: list[tuple[str, dict]] = []
+    for section in ("generics", "nodes"):
+        for entity in schema.get(section) or []:
+            if isinstance(entity, dict):
+                out.append((section, entity))
+    return out
+
+
+def _constraint_fields(entity: dict) -> list[str]:
+    """Flatten every field path named in an entity's uniqueness_constraints."""
+    fields: list[str] = []
+    for group in entity.get("uniqueness_constraints") or []:
+        if isinstance(group, list):
+            fields.extend(f for f in group if isinstance(f, str))
+    return fields
+
+
+def _resolved_members(schema: dict, entity: dict) -> tuple[set[str], dict[str, dict]]:
+    """Return ``(attribute_names, relationships_by_name)`` including inherited.
+
+    A constraint on a concrete kind routinely names a field the kind gets
+    from its generic, so a per-entity view alone sees neither the attribute
+    nor the relationship and silently checks nothing. Inherited members are
+    merged in from every generic listed in ``inherit_from``, with the kind's
+    own declarations winning.
+    """
+    generics_by_kind: dict[str, dict] = {}
+    for generic in schema.get("generics") or []:
+        if not isinstance(generic, dict):
+            continue
+        namespace = generic.get("namespace", "")
+        name = generic.get("name", "")
+        generics_by_kind[f"{namespace}{name}"] = generic
+
+    attrs: set[str] = set()
+    rels: dict[str, dict] = {}
+
+    for parent_kind in entity.get("inherit_from") or []:
+        parent = generics_by_kind.get(parent_kind)
+        if not parent:
+            continue
+        attrs |= {
+            a["name"] for a in (parent.get("attributes") or [])
+            if isinstance(a, dict) and a.get("name")
+        }
+        for r in parent.get("relationships") or []:
+            if isinstance(r, dict) and r.get("name"):
+                rels[r["name"]] = r
+
+    attrs |= {
+        a["name"] for a in (entity.get("attributes") or [])
+        if isinstance(a, dict) and a.get("name")
+    }
+    for r in entity.get("relationships") or []:
+        if isinstance(r, dict) and r.get("name"):
+            rels[r["name"]] = r
+
+    return attrs, rels
+
+
+def check_uniqueness_attr_value_suffix(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Attribute paths in a constraint must end in ``__value``.
+
+    A bare attribute name is rejected at load with "invalid attribute, it
+    must end with one of the following properties: value".
+    """
+    problems: list[str] = []
+    for _section, entity in _entities(schema):
+        attr_names, rels = _resolved_members(schema, entity)
+        for field in _constraint_fields(entity):
+            head = field.split("__")[0]
+            if head in attr_names and not field.endswith("__value"):
+                problems.append(f"{entity.get('name')}.{field} (attribute needs __value)")
+            if head in rels and "__" in field:
+                problems.append(
+                    f"{entity.get('name')}.{field} (relationship must be bare)"
+                )
+            if head not in attr_names and head not in rels:
+                problems.append(
+                    f"{entity.get('name')}.{field} names no known attribute or relationship"
+                )
+    if problems:
+        return False, "malformed constraint field(s): " + "; ".join(problems)
+    return True, "constraint fields use __value for attributes and bare relationships"
+
+
+def check_uniqueness_rel_mandatory(schema: dict, **_: Any) -> tuple[bool, str]:
+    """A relationship used in a constraint must be cardinality one and mandatory.
+
+    Both are load-time rejections. The mandatory one is the expensive
+    mistake, because a constraint designed against an optional relationship
+    looks reasonable and only fails after the surrounding model is written.
+    """
+    problems: list[str] = []
+    for _section, entity in _entities(schema):
+        _attrs, rels = _resolved_members(schema, entity)
+        for field in _constraint_fields(entity):
+            rel = rels.get(field)
+            if rel is None:
+                continue  # an attribute path, not a relationship
+            if rel.get("cardinality") != "one":
+                problems.append(
+                    f"{entity.get('name')}.{field} cardinality="
+                    f"{rel.get('cardinality')!r}, must be one"
+                )
+            if rel.get("optional") is not False:
+                problems.append(
+                    f"{entity.get('name')}.{field} optional="
+                    f"{rel.get('optional')!r}, must be false"
+                )
+    if problems:
+        return False, "; ".join(problems)
+    return True, "constrained relationships are cardinality one and mandatory"
+
+
+def check_uniqueness_not_on_generic(schema: dict, **_: Any) -> tuple[bool, str]:
+    """No generic declares uniqueness_constraints; each concrete kind does.
+
+    For a split where the new kinds are allowed to reuse each other's
+    values, the constraint has to sit on the concrete kinds. On the generic
+    it spans every implementer, and a concrete kind cannot narrow it back.
+    """
+    offenders = [
+        entity.get("name")
+        for section, entity in _entities(schema)
+        if section == "generics" and entity.get("uniqueness_constraints")
+    ]
+    if offenders:
+        return False, (
+            f"generic(s) declare uniqueness_constraints: {offenders}. "
+            "A constraint on a generic spans every implementer"
+        )
+    concrete = [
+        entity.get("name")
+        for section, entity in _entities(schema)
+        if section == "nodes" and entity.get("uniqueness_constraints")
+    ]
+    if not concrete:
+        return False, "no uniqueness_constraints declared on any concrete kind"
+    return True, f"constraint scoped to concrete kind(s): {concrete}"
+
+
 CHECKS: dict[str, Any] = {
     "attr-min-length": check_attr_min_length,
+    "uniqueness-attr-value-suffix": check_uniqueness_attr_value_suffix,
+    "uniqueness-rel-mandatory": check_uniqueness_rel_mandatory,
+    "uniqueness-not-on-generic": check_uniqueness_not_on_generic,
     "dropdown-for-status": check_dropdown_for_status,
     "no-deprecated-string": check_no_deprecated_string,
     "full-kind-references": check_full_kind_references,

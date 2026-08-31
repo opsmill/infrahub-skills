@@ -934,6 +934,70 @@ tasks:
           Dropdown choice keys follow name -> label -> description ->
           color
 
+  - name: uniqueness-scope-per-kind
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      and follow its workflow and rules.
+
+      Task: I have one node kind `NetEndpoint` and I am splitting it into
+      two more specific kinds, optical and ethernet, both inheriting a
+      shared `NetEndpoint` generic. Each endpoint sits in a rack.
+
+      The rule I need enforced: an endpoint name must be unique within its
+      rack **for its own kind**. An optical endpoint named `e1` in rack-a
+      and an ethernet endpoint named `e1` in rack-a must both be allowed to
+      exist at the same time, because during the migration I want to load
+      the new kinds while the old data is still present and verify before
+      deleting anything.
+
+      Write the schema: the generic, a `LocRack` node, and the two concrete
+      kinds. Put the uniqueness rule wherever it actually produces the
+      behaviour I described.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_uniqueness_scope.py
+        weight: 1.0
+    expected_output: >-
+      A schema where `uniqueness_constraints: [["parent", "name__value"]]`
+      is declared on EACH concrete kind and NOT on the shared generic,
+      because a constraint on a generic is enforced across every kind that
+      inherits it and a concrete kind cannot narrow it back. The rack
+      relationship must be `cardinality: one` with `optional: false`, since
+      a relationship used in a constraint has to be mandatory. The
+      attribute is referenced as `name__value` and the relationship bare.
+    expectations:
+      - >-
+        The uniqueness constraint is on each concrete kind, not on the
+        shared generic
+      - >-
+        Explains that a constraint on a generic spans every implementer, so
+        the two kinds would collide
+      - >-
+        The constrained relationship is cardinality one and optional false,
+        because an optional relationship is rejected at load
+      - Attribute referenced as name__value, relationship referenced bare
+      - Peers use full Namespace+Name kinds
+    assertions:
+      - name: uniqueness-not-on-generic
+        check: >-
+          No generic declares uniqueness_constraints; each concrete kind
+          declares its own
+      - name: uniqueness-rel-mandatory
+        check: >-
+          Every relationship named in a constraint is cardinality one and
+          optional false
+      - name: uniqueness-attr-value-suffix
+        check: >-
+          Attribute paths in constraints end in __value and relationships
+          are referenced bare
+      - name: schema-version
+        check: File declares version "1.0"
+      - name: full-kind-references
+        check: Relationship peers use full Namespace+Name kinds
+
   # --- Check Creator --- #
   - name: global-check-registration
     trials: 3

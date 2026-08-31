@@ -10,6 +10,7 @@ infrastructure modeling scenarios.
 - [Organization Schema (Simplest Pattern)](#organization-schema-simplest-pattern)
 - [Hierarchical Location Schema](#hierarchical-location-schema)
 - [Device Management with Generics and Inheritance](#device-management-with-generics-and-inheritance)
+- [Uniqueness Scope: Generic vs Concrete Kind](#uniqueness-scope-generic-vs-concrete-kind)
 - [Component Pattern (Modules/Slots)](#component-pattern-modulesslots)
 - [IPAM Schema (Inheriting Built-in Types)](#ipam-schema-inheriting-built-in-types)
 - [Extensions Pattern (Cross-File Relationships)](#extensions-pattern-cross-file-relationships)
@@ -512,6 +513,159 @@ nodes:
 - `display_label` uses Jinja2 to combine manufacturer + model
 
 ---
+
+## Uniqueness Scope: Generic vs Concrete Kind
+
+The layer a `uniqueness_constraints` entry sits on
+changes what it means, and the schema loads either way.
+Verified against Infrahub 1.11.0.
+
+### On a generic: enforced across every implementer
+
+```yaml
+---
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+version: "1.0"
+
+generics:
+  - name: Endpoint
+    namespace: Net
+    human_friendly_id:
+      - parent__name__value
+      - name__value
+      - media__value
+    uniqueness_constraints:
+      # Spans ALL implementers, not each one separately.
+      - ["parent", "name__value"]
+    attributes:
+      - name: name
+        kind: Text
+      - name: media
+        kind: Text
+    relationships:
+      - name: parent
+        peer: LocRack
+        kind: Parent
+        cardinality: one
+        optional: false        # required: a constrained rel must be mandatory
+        identifier: rack__endpoints
+
+nodes:
+  - name: Rack
+    namespace: Loc
+    human_friendly_id:
+      - name__value
+    attributes:
+      - name: name
+        kind: Text
+
+  - name: OpticalEndpoint
+    namespace: Net
+    inherit_from:
+      - NetEndpoint
+
+  - name: EthernetEndpoint
+    namespace: Net
+    inherit_from:
+      - NetEndpoint
+```
+
+Loading these two objects in order:
+
+```yaml
+# 1. Succeeds
+- kind: NetOpticalEndpoint
+  data:
+    - name: e1
+      media: fibre
+      parent: rack-a
+
+# 2. REJECTED, even though the kind differs
+- kind: NetEthernetEndpoint
+  data:
+    - name: e1
+      media: copper
+      parent: rack-a
+```
+
+```text
+Violates uniqueness constraint 'parent-name'
+```
+
+The two objects differ in kind and differ in `media`,
+so their `human_friendly_id` values differ too. They
+collide only on the constrained pair, which is declared
+in exactly one place.
+
+**Declaring `uniqueness_constraints` on
+`NetEthernetEndpoint` does not fix this.** A concrete
+kind cannot narrow what it inherits; its own constraints
+are checked *in addition to* the generic's.
+
+### On each concrete kind: scoped per kind
+
+Move the constraint down when the implementers are
+allowed to overlap:
+
+```yaml
+generics:
+  - name: Endpoint
+    namespace: Net
+    # no uniqueness_constraints here
+    attributes:
+      - name: name
+        kind: Text
+
+nodes:
+  - name: OpticalEndpoint
+    namespace: Net
+    inherit_from:
+      - NetEndpoint
+    uniqueness_constraints:
+      - ["parent", "name__value"]
+
+  - name: EthernetEndpoint
+    namespace: Net
+    inherit_from:
+      - NetEndpoint
+    uniqueness_constraints:
+      - ["parent", "name__value"]
+```
+
+Now `e1` may exist once per kind per rack.
+
+### Why this decides a migration's load order
+
+Splitting one kind into several that share a generic:
+
+| Constraint lives on | Old and new instances | Consequence |
+| ------------------- | --------------------- | ----------- |
+| the generic | collide | old rows must be deleted **before** the new ones load; a half-finished migration leaves neither set complete |
+| each concrete kind | coexist | both sets can run side by side while the change is verified, old rows removed last |
+
+Where both would work, putting the constraint on the
+concrete kinds buys a reversible migration.
+
+### The same trap through `human_friendly_id`
+
+The generic above deliberately puts a third attribute
+(`media`) in its `human_friendly_id`, so the two objects
+have *different* human-friendly IDs while sharing the
+constrained pair. Without that separation the two
+mechanisms are easy to confuse, because a generic's
+`human_friendly_id` also resolves across every
+implementer, and it fails with a message about
+rebasing:
+
+```text
+Node <id> / NetOpticalEndpoint uses this human-friendly ID, but does not
+exist on this branch. Please rebase this branch to access <id> / NetOpticalEndpoint
+```
+
+That is not a branch problem. The upsert of the
+Ethernet kind matched the Optical object, then failed
+to load it under the kind it asked for. See
+[rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md).
 
 ## Component Pattern (Modules/Slots)
 
