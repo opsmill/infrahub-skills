@@ -1056,8 +1056,101 @@ def check_choice_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
     return True, f"All {seen} dropdown choice(s) are in canonical key order"
 
 
+
+# ---------------------------------------------------------------------------
+# Cardinality consequences
+#
+# Verified against the validator: `cardinality: one` forces max_count 1, so
+# the inbound cap on a peer comes from that PEER's declaration on the same
+# identifier. Widening only your own side loads cleanly and does not lift the
+# cap. Renaming while widening trips the identifier-uniqueness check.
+# ---------------------------------------------------------------------------
+
+
+def _rels_by_identifier(schema: dict) -> dict[str, list[tuple[str, dict]]]:
+    """Map identifier -> [(owning kind, relationship), ...] across the file."""
+    out: dict[str, list[tuple[str, dict]]] = {}
+    for section in ("generics", "nodes"):
+        for entity in schema.get(section) or []:
+            if not isinstance(entity, dict):
+                continue
+            kind = f"{entity.get('namespace', '')}{entity.get('name', '')}"
+            for rel in entity.get("relationships") or []:
+                if isinstance(rel, dict) and rel.get("identifier"):
+                    out.setdefault(rel["identifier"], []).append((kind, rel))
+    return out
+
+
+def check_identifier_unique_per_direction(schema: dict, **_: Any) -> tuple[bool, str]:
+    """One relationship per identifier per kind.
+
+    Two declarations sharing an identifier on the same kind are rejected at
+    load. The usual cause is widening a cardinality and renaming to a plural
+    in the same change, leaving both declarations behind.
+    """
+    problems: list[str] = []
+    for identifier, entries in _rels_by_identifier(schema).items():
+        per_kind: dict[str, list[str]] = {}
+        for kind, rel in entries:
+            per_kind.setdefault(kind, []).append(rel.get("name", "?"))
+        for kind, names in per_kind.items():
+            if len(names) > 1:
+                problems.append(f"{kind} declares {names} on identifier {identifier!r}")
+    if problems:
+        return False, "; ".join(problems)
+    return True, "each kind declares at most one relationship per identifier"
+
+
+def check_shared_peer_widened_on_peer_side(schema: dict, **_: Any) -> tuple[bool, str]:
+    """A peer meant to be shared must not be capped by its own side.
+
+    If both ends of an identifier are `cardinality: one`, only one object can
+    ever hold that peer, enforced at write time. To let several objects share
+    it, the PEER's side has to be `many`.
+    """
+    problems: list[str] = []
+    checked = 0
+    for identifier, entries in _rels_by_identifier(schema).items():
+        if len(entries) < 2:
+            continue
+        checked += 1
+        ones = [
+            f"{kind}.{rel.get('name')}"
+            for kind, rel in entries
+            if rel.get("cardinality") == "one"
+        ]
+        if len(ones) == len(entries):
+            problems.append(
+                f"identifier {identifier!r}: both sides are cardinality one "
+                f"({ones}), so at most one object can hold that peer"
+            )
+    if problems:
+        return False, "; ".join(problems)
+    if checked == 0:
+        return False, "no identifier has both sides declared, so no cap is expressible"
+    return True, f"{checked} reciprocal identifier(s) not capped on both sides"
+
+
+def check_many_max_count_valid(schema: dict, **_: Any) -> tuple[bool, str]:
+    """`max_count: 1` on a cardinality-many relationship is rejected at load."""
+    problems: list[str] = []
+    for _identifier, entries in _rels_by_identifier(schema).items():
+        for kind, rel in entries:
+            if rel.get("cardinality") == "many" and rel.get("max_count") == 1:
+                problems.append(
+                    f"{kind}.{rel.get('name')} is cardinality many with max_count 1; "
+                    "use cardinality one for a genuine cap of one"
+                )
+    if problems:
+        return False, "; ".join(problems)
+    return True, "no cardinality-many relationship carries max_count 1"
+
+
 CHECKS: dict[str, Any] = {
     "attr-min-length": check_attr_min_length,
+    "identifier-unique-per-direction": check_identifier_unique_per_direction,
+    "shared-peer-widened-on-peer-side": check_shared_peer_widened_on_peer_side,
+    "many-max-count-valid": check_many_max_count_valid,
     "dropdown-for-status": check_dropdown_for_status,
     "no-deprecated-string": check_no_deprecated_string,
     "full-kind-references": check_full_kind_references,

@@ -72,6 +72,38 @@ checks, and transforms over time.
    different schema file. Include every `extensions:` block in the
    inverse inventory before deciding a rel is unmatched.
 
+## The recommended inverse must specify a cardinality, and say why
+
+Adding an inverse is not shape-neutral. The finding has
+to name the cardinality and justify it, because both
+values carry consequences the reader will otherwise meet
+later:
+
+- **`cardinality: one` on the inverse creates an inbound
+  cap.** The cap on how many objects may hold a peer
+  through an identifier comes from *that peer's* side. So
+  the inverse you are recommending is exactly the
+  declaration that limits it, and getting it wrong caps
+  the estate at one inbound reference, enforced at
+  **write** time with `schema check` reporting the schema
+  valid.
+- **Either value fixes a GraphQL selection shape.**
+  `one` selects as `{ node { … } }`, `many` as
+  `{ edges { node { … } } }`. Choosing wrong and changing
+  it later breaks every stored query that selects the
+  relationship.
+
+Default to `many` on the inverse unless the domain really
+admits at most one, which is the safer error: being wrong
+in the `many` direction shows in the UI on the first
+object, being wrong in the `one` direction shows in
+production on the second.
+
+See
+[../../infrahub-managing-schemas/rules/relationship-cardinality-consequences.md](../../infrahub-managing-schemas/rules/relationship-cardinality-consequences.md)
+and
+[../../infrahub-common/graphql-queries.md](../../infrahub-common/graphql-queries.md).
+
 ## What NOT to flag
 
 - `kind: Parent` and `kind: Component` relationships — structural

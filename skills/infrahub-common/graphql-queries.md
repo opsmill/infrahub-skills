@@ -236,6 +236,94 @@ tags {
 }
 ```
 
+### Cardinality Decides the Shape
+
+**Which of the two shapes above a relationship takes is
+decided by its `cardinality`.** Nothing else selects
+between them:
+
+| Cardinality | GraphQL type | Selection |
+| ----------- | ------------ | --------- |
+| `one` | `NestedEdged<Kind>` | `rel { node { … } }` |
+| `many` | `NestedPaginated<Kind>` | `rel { edges { node { … } } }`, plus `count` |
+
+`count` exists only on the `many` shape.
+
+On a hierarchical kind the generated fields do not follow
+what you declared: `parent` is always node-shaped, while
+`children`, `ancestors` and `descendants` are always
+edges-shaped.
+
+#### Changing a cardinality is a query migration
+
+Because cardinality selects the shape, **changing a
+relationship's cardinality breaks every existing query
+that selects it.** A repository may have a dozen across
+checks, transforms and generators. The failure is a
+server error, not a validation message, and it names an
+internal wrapper type rather than the relationship or the
+schema change:
+
+```text
+Cannot query field 'edges' on type 'NestedEdged<Kind>'
+```
+
+The reverse migration gives the mirror:
+
+```text
+Cannot query field 'node' on type 'NestedPaginated<Kind>'
+```
+
+`NestedEdged<Kind>` and `NestedPaginated<Kind>` appear
+nowhere in your schema, your `.gql` files, or the
+documentation, so a reader who has just widened a
+cardinality has no reason to connect the two. That is the
+whole reason this is worth writing down.
+
+The procedure:
+
+```bash
+# 1. Before loading the schema change, find every query that selects it
+grep -rn "<relationship_name>" queries/
+
+# 2. Migrate each hit between the two shapes above
+# 3. Dry-run every hit afterwards — see
+#    rules/deployment-gql-dry-run.md for which command per transform type
+```
+
+A `.gql` file cannot be unit tested, so a query that has
+stopped executing is invisible to an offline suite. In
+the reported case a transform was returning nothing at
+all and it was found only because a later task happened
+to dry-run it.
+
+### Stored Queries Are Part of a Schema Change's Blast Radius
+
+Cardinality is one trigger. The general statement:
+**every stored query that selects a field is invalidated
+when that field changes or goes away.** Removing an
+attribute or a relationship does it too.
+
+Which failure you get depends only on whether the `.gql`
+file itself changed:
+
+| The `.gql` file | Where it fails |
+| --------------- | -------------- |
+| unchanged | the stored query stays in place and fails **at execution**, whenever something next runs it |
+| changed, or the repository re-imported from scratch | **at repository import**, because creating the query object validates the text against the live schema: `Query is not valid, …` |
+
+The import-time failure names **the query**, not the
+schema change that invalidated it, so a destroy-and-reload
+cycle can fail twice before the cause is found. Nothing
+fails at the step you made the change in: `schema check`
+passes, `schema load` passes, and the break appears one
+command later in a subsystem that does not mention
+attributes.
+
+So before removing or retyping any field, grep `queries/`
+for it. Treat that as an explicit precondition step, not
+as something to remember.
+
 ### Inline Fragments (Generics/Polymorphism)
 
 When querying a Generic type that has multiple concrete

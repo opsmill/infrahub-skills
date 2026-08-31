@@ -934,6 +934,95 @@ tasks:
           Dropdown choice keys follow name -> label -> description ->
           color
 
+  - name: cardinality-shared-peer
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      and follow its workflow and rules.
+
+      Task: I have this working schema. Today each service gets its own
+      wavelength:
+
+      ```yaml
+      nodes:
+        - name: Wavelength
+          namespace: Net
+          attributes:
+            - name: name
+              kind: Text
+          relationships:
+            - name: service
+              peer: NetService
+              cardinality: one
+              optional: true
+              identifier: service__wavelength
+        - name: Service
+          namespace: Net
+          attributes:
+            - name: name
+              kind: Text
+          relationships:
+            - name: wavelength
+              peer: NetWavelength
+              cardinality: one
+              optional: true
+              identifier: service__wavelength
+      ```
+
+      A new requirement says several services must be able to share one
+      wavelength. The first service provisions fine and the second one
+      fails at write time.
+
+      Give me the corrected schema. Also tell me, in YAML comments, what
+      else in the repository this change breaks, because I have `.gql`
+      files that select `wavelength`.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_cardinality_sharing.py
+        weight: 1.0
+    expected_output: >-
+      A schema where the WAVELENGTH side is widened to cardinality many,
+      because the inbound cap comes from the peer's own declaration on that
+      identifier; widening only the Service side loads cleanly and does not
+      lift the cap. The widened relationship must keep its singular name,
+      since renaming to a plural in the same change leaves two
+      declarations on one identifier and is rejected at load. Comments
+      should note that cardinality selects the GraphQL shape, so every
+      stored query selecting the relationship must migrate between
+      `{ node { … } }` and `{ edges { node { … } } }`.
+    expectations:
+      - >-
+        The Wavelength side is widened to cardinality many, not only the
+        Service side
+      - >-
+        Explains that the inbound cap comes from the peer's own
+        declaration on that identifier
+      - >-
+        The widened relationship keeps its singular name, with a comment
+        explaining why
+      - >-
+        States that changing cardinality breaks every stored query
+        selecting the relationship, and names the two selection shapes
+      - >-
+        Notes the cap is enforced at write time and that schema check
+        reports the schema valid either way
+    assertions:
+      - name: shared-peer-widened-on-peer-side
+        check: >-
+          Not both sides of the identifier are cardinality one, so the
+          peer can be shared
+      - name: identifier-unique-per-direction
+        check: >-
+          No kind declares two relationships on the same identifier
+      - name: many-max-count-valid
+        check: No cardinality-many relationship carries max_count 1
+      - name: schema-version
+        check: File declares version "1.0"
+      - name: matching-identifiers
+        check: Both sides of the relationship share one identifier
+
   # --- Check Creator --- #
   - name: global-check-registration
     trials: 3
