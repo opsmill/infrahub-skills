@@ -1312,6 +1312,82 @@ tasks:
         The guidance notes that unit tests on the input dict do not cover
         SDK call shape
 
+  - name: generator-traversal-and-shared-object
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md
+      and follow its workflow and rules.
+
+      Task: Write a generator that provisions a service. It runs once per
+      service (one target per service) and has two jobs:
+
+      1. **Find the routes.** Discover the candidate paths between the
+         service's `endpoint_a` and `endpoint_z`, then create one `NetLeg`
+         per path. Use the platform's traversal rather than walking the
+         graph yourself. Note that every endpoint points at a shared
+         `NetSegmentType` catalog object, and my first attempt returned
+         routes that hopped through that catalog object and joined
+         endpoints with no physical connection between them.
+
+      2. **Nest under a shared trunk.** Every service nests its legs under
+         one `NetContainer` named `shared-trunk`, which is the same object
+         for every service.
+
+      Also show me the object-data snippet that puts my `NetTopology`
+      objects into the `topologies_dc` generator target group.
+
+      Save the generator, the object-data snippet, and your explanation to:
+      output.md
+      Put the generator in a ```python fence and the object data in a
+      ```yaml fence.
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_traversal_and_ownership.py
+        weight: 1.0
+    expected_output: >-
+      A generator constraining the traversal by `relationship_filter`
+      (schema identifiers, not relationship names) plus a `max_depth`,
+      because kind filtering restricts which nodes appear rather than which
+      edges are followed and so does not stop the walk crossing the shared
+      catalog object. It must check `truncated_at_depth` before using the
+      paths. The shared `NetContainer` must be saved with
+      `update_group_context=False`, since the tracking group is per target
+      and every save (upsert included) claims the node, so whichever
+      service stops writing it would delete it and orphan the other
+      services' legs. Group membership must be written from the member side
+      with `member_of_groups`.
+    expectations:
+      - >-
+        Uses traverse_paths (or path_exists), not a hand-written per-hop
+        walk
+      - >-
+        Constrains by relationship_filter with schema identifiers
+        (containing __), plus a max_depth
+      - >-
+        Does NOT use included_kinds as a whitelist; explains it only
+        re-includes kinds excluded by default
+      - Checks truncated_at_depth before acting on the returned paths
+      - >-
+        Saves the shared NetContainer with update_group_context=False, and
+        explains that an upsert otherwise claims ownership
+      - >-
+        Object data assigns membership via member_of_groups on the member,
+        not via members on the group
+    assertions:
+      - name: traversal-uses-relationship-filter
+        check: >-
+          Traversal constrained by relationship_filter using schema
+          identifiers, and included_kinds is not used as a whitelist
+      - name: traversal-checks-truncation
+        check: truncated_at_depth is checked before the paths are used
+      - name: shared-save-opts-out-of-tracking
+        check: >-
+          The shared object is saved with update_group_context=False
+      - name: group-membership-from-member-side
+        check: >-
+          Membership is assigned via member_of_groups, not via members on
+          the group
+
   # --- Transforms: union-typed relationship queries --- #
   - name: transform-query-union-fragments
     trials: 3

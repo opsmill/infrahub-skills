@@ -110,6 +110,38 @@
     },
     {
       "id": 6,
+      "prompt": "Write a generator that provisions a service. It runs once per\nservice (one target per service) and has two jobs:\n\n1. **Find the routes.** Discover the candidate paths between the\n   service's `endpoint_a` and `endpoint_z`, then create one `NetLeg`\n   per path. Use the platform's traversal rather than walking the\n   graph yourself. Note that every endpoint points at a shared\n   `NetSegmentType` catalog object, and my first attempt returned\n   routes that hopped through that catalog object and joined\n   endpoints with no physical connection between them.\n\n2. **Nest under a shared trunk.** Every service nests its legs under\n   one `NetContainer` named `shared-trunk`, which is the same object\n   for every service.\n\nAlso show me the object-data snippet that puts my `NetTopology`\nobjects into the `topologies_dc` generator target group.\n\nSave the generator, the object-data snippet, and your explanation to:\noutput.md\nPut the generator in a ```python fence and the object data in a\n```yaml fence.",
+      "expected_output": "A generator constraining the traversal by `relationship_filter` (schema identifiers, not relationship names) plus a `max_depth`, because kind filtering restricts which nodes appear rather than which edges are followed and so does not stop the walk crossing the shared catalog object. It must check `truncated_at_depth` before using the paths. The shared `NetContainer` must be saved with `update_group_context=False`, since the tracking group is per target and every save (upsert included) claims the node, so whichever service stops writing it would delete it and orphan the other services' legs. Group membership must be written from the member side with `member_of_groups`.",
+      "files": [],
+      "expectations": [
+        "Uses traverse_paths (or path_exists), not a hand-written per-hop walk",
+        "Constrains by relationship_filter with schema identifiers (containing __), plus a max_depth",
+        "Does NOT use included_kinds as a whitelist; explains it only re-includes kinds excluded by default",
+        "Checks truncated_at_depth before acting on the returned paths",
+        "Saves the shared NetContainer with update_group_context=False, and explains that an upsert otherwise claims ownership",
+        "Object data assigns membership via member_of_groups on the member, not via members on the group"
+      ],
+      "assertions": [
+        {
+          "name": "traversal-uses-relationship-filter",
+          "check": "Traversal constrained by relationship_filter using schema identifiers, and included_kinds is not used as a whitelist"
+        },
+        {
+          "name": "traversal-checks-truncation",
+          "check": "truncated_at_depth is checked before the paths are used"
+        },
+        {
+          "name": "shared-save-opts-out-of-tracking",
+          "check": "The shared object is saved with update_group_context=False"
+        },
+        {
+          "name": "group-membership-from-member-side",
+          "check": "Membership is assigned via member_of_groups, not via members on the group"
+        }
+      ]
+    },
+    {
+      "id": 7,
       "prompt": "Refactor an existing generator that performs an N+1 fetch\npattern into one that uses response-driven hydration. The\ngenerator flips the `drained` attribute on every BGP neighbor of\na target interface when a maintenance event fires. Today it\niterates the cascade query's `bgp_neighbors.edges` and re-fetches\neach peer via `self.client.get(...)`. That's `1 + N` round trips\nper run; for a maintenance event touching 30 neighbors it's 31\nmutations worth of latency.\n\nCurrent GraphQL query (queries/drain.gql), shown indented:\n\n    query drain($name: String!) {\n      NetworkMaintenanceEvent(name__value: $name) {\n        edges {\n          node {\n            target_interface {\n              node {\n                bgp_neighbors {\n                  edges {\n                    node {\n                      id\n                      hfid\n                      drained { value }\n                    }\n                  }\n                }\n              }\n            }\n          }\n        }\n      }\n    }\n\nCurrent generator (generators/drain.py), shown indented:\n\n    from infrahub_sdk.generator import InfrahubGenerator\n\n\n    class DrainBgpNeighborsGenerator(InfrahubGenerator):\n        async def generate(self, data: dict) -> None:\n            event = data[\"NetworkMaintenanceEvent\"][\"edges\"][0][\"node\"]\n            target = event[\"target_interface\"][\"node\"]\n            for edge in target[\"bgp_neighbors\"][\"edges\"]:\n                peer = await self.client.get(\n                    kind=\"NetworkBgpNeighbor\",\n                    hfid=edge[\"node\"][\"hfid\"],\n                )\n                peer.drained.value = True\n                await peer.save(allow_upsert=True)\n\nRefactor the generator so the loop body does zero re-fetches via\nresponse-driven hydration, and update the query so the refactor\nworks.",
       "expected_output": "A refactored generator that uses InfrahubNode.from_graphql to hydrate each iterated peer (no self.client.get inside the loop body), plus an updated GraphQL query with __typename added under the iterated peer's node selection.",
       "files": [],

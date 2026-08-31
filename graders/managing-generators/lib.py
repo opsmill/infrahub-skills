@@ -743,7 +743,116 @@ def check_graphql_block_present(output: dict, **_: Any) -> tuple[bool, str]:
 # CHECKS registry
 # ---------------------------------------------------------------------------
 
+
+# ---------------------------------------------------------------------------
+# Path traversal, shared-object ownership, group membership
+#
+# Verified against Infrahub 1.11.0 / SDK 1.23.1:
+#   * `included_kinds` re-includes DEFAULT exclusions; the whitelist is
+#     `kind_filter`, and neither stops the walk crossing a shared reference
+#     object. Only `relationship_filter` does.
+#   * `relationship_filter` takes schema identifiers, not relationship names.
+#   * `save()` adds the node to the run's group unconditionally after the
+#     create-or-update, so an upsert of a shared object claims it.
+#   * `CoreGroup.members` peers `CoreNode`, which has no default_filter, so
+#     membership cannot be resolved by name from the group side.
+# ---------------------------------------------------------------------------
+
+
+def check_traversal_uses_relationship_filter(
+    output: dict, **_: Any
+) -> tuple[bool, str]:
+    """A traversal must be constrained by relationship identifier.
+
+    Kind filtering restricts which nodes may appear, not which edges are
+    followed, so a shared low-cardinality reference object still bridges
+    unrelated subgraphs and the traversal returns structurally valid
+    nonsense.
+    """
+    py = output.get("python", "")
+    if "traverse_paths" not in py and "path_exists" not in py:
+        return False, "no traverse_paths / path_exists call found"
+    if "relationship_filter" not in py:
+        return False, (
+            "traversal is not constrained by relationship_filter; kind "
+            "filtering does not stop the walk crossing a shared node"
+        )
+    if re.search(r"included_kinds\s*=", py):
+        return False, (
+            "uses included_kinds as a whitelist; it only re-includes kinds "
+            "excluded by default. The whitelist is kind_filter"
+        )
+    # A relationship identifier contains `__`; a bare name does not.
+    match = re.search(r"relationship_filter\s*=\s*\[([^\]]*)\]", py, re.S)
+    if match and "__" not in match.group(1):
+        return False, (
+            "relationship_filter appears to hold relationship names; it "
+            "takes schema identifiers such as `device__interface`"
+        )
+    return True, "traversal constrained by relationship_filter"
+
+
+def check_traversal_checks_truncation(output: dict, **_: Any) -> tuple[bool, str]:
+    """`truncated_at_depth` must be checked before acting on the paths.
+
+    It is the only shape-level signal that the result is incomplete; a
+    truncated result is otherwise indistinguishable from a complete one.
+    """
+    py = output.get("python", "")
+    if "traverse_paths" not in py:
+        return True, "no traverse_paths call, truncation not applicable"
+    if "truncated_at_depth" not in py:
+        return False, (
+            "does not check truncated_at_depth, so a search that ran out of "
+            "budget is treated as a complete answer"
+        )
+    return True, "checks truncated_at_depth before using the paths"
+
+
+def check_shared_save_opts_out_of_tracking(
+    output: dict, **_: Any
+) -> tuple[bool, str]:
+    """A save of an object reachable from more than one target must opt out.
+
+    Every save() adds the node to the run's group, upserts included, so two
+    targets both claim it and whichever stops writing it deletes it.
+    """
+    py = output.get("python", "")
+    if "save(" not in py:
+        return False, "no save() call found"
+    if "update_group_context=False" not in py.replace(" ", ""):
+        return False, (
+            "no save() opts out of tracking with update_group_context=False; "
+            "an upsert of a shared object claims it just as a create does"
+        )
+    return True, "shared object saved with update_group_context=False"
+
+
+def check_group_membership_from_member_side(
+    output: dict, **_: Any
+) -> tuple[bool, str]:
+    """Group membership in object data is written from the member side.
+
+    `CoreGroup.members` peers `CoreNode`, which has no attributes and no
+    default_filter, so a member name has nothing to resolve against.
+    """
+    raw = output.get("raw", "")
+    if "member_of_groups" in raw:
+        return True, "membership assigned from the member side"
+    if re.search(r"^\s*members:", raw, re.M):
+        return False, (
+            "assigns membership from the group side via `members:`; the peer "
+            "is CoreNode, which cannot be resolved by name. Use "
+            "member_of_groups on each member"
+        )
+    return False, "no group membership assignment found"
+
+
 CHECKS: dict[str, Any] = {
+    "traversal-uses-relationship-filter": check_traversal_uses_relationship_filter,
+    "traversal-checks-truncation": check_traversal_checks_truncation,
+    "shared-save-opts-out-of-tracking": check_shared_save_opts_out_of_tracking,
+    "group-membership-from-member-side": check_group_membership_from_member_side,
     # AST / relationship family (output.py)
     "relationship-hfid-form-correct": check_relationship_hfid_form_correct,
     "no-bare-string-relationship": check_no_bare_string_relationship,
