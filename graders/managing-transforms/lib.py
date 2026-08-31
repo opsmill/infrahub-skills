@@ -381,6 +381,106 @@ def check_dry_run_before_merge(md_text: str = "", **_: Any) -> tuple[bool, str]:
 # CHECKS registry
 # ---------------------------------------------------------------------------
 
+
+# ---------------------------------------------------------------------------
+# Artifact content types
+#
+# `serialize_artifact_content` special-cases a dict ONLY for
+# application/json and application/yaml; every other content type passes the
+# payload through `str()`. So a dict returned for image/svg+xml is stored as
+# a Python repr, silently. Verified against Infrahub 1.11.0.
+# ---------------------------------------------------------------------------
+
+_DICT_SERIALISED_TYPES = ("application/json", "application/yaml")
+
+
+def _transform_returns(tree: ast.Module | None) -> list[ast.expr]:
+    """Return every returned expression inside a `transform` method."""
+    returns: list[ast.expr] = []
+    if tree is None:
+        return returns
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == "transform":
+            for inner in ast.walk(node):
+                if isinstance(inner, ast.Return) and inner.value is not None:
+                    returns.append(inner.value)
+    return returns
+
+
+def check_artifact_content_type_declared(
+    md_text: str = "", **_: Any
+) -> tuple[bool, str]:
+    """The artifact definition must declare a real content_type.
+
+    All eight values are supported; the point of the check is that the
+    non-text one is reachable and gets used when the output is a diagram.
+    """
+    match = re.search(r"content_type:\s*[\"']?([\w./+-]+)", md_text)
+    if not match:
+        return False, "no content_type declared in the artifact definition"
+    value = match.group(1)
+    if value != "image/svg+xml":
+        return False, f"content_type is {value!r}, expected image/svg+xml for a diagram"
+    return True, "content_type: image/svg+xml"
+
+
+def check_svg_transform_returns_str(
+    tree: ast.Module | None = None, py_raw: str = "", **_: Any
+) -> tuple[bool, str]:
+    """A transform for a str-serialised content type must return a string.
+
+    Only application/json and application/yaml turn a dict into structured
+    output. Returning a dict for image/svg+xml stores `str(dict)` with no
+    error, so the artifact looks populated and is a Python repr.
+    """
+    if tree is None:
+        return False, "transform file missing or has a syntax error"
+
+    dict_returns: list[str] = []
+    for expr in _transform_returns(tree):
+        if isinstance(expr, ast.Dict):
+            dict_returns.append("dict literal")
+        elif isinstance(expr, ast.Call) and isinstance(expr.func, ast.Name) and expr.func.id == "dict":
+            dict_returns.append("dict() call")
+    if dict_returns:
+        return False, (
+            f"transform returns a {', '.join(dict_returns)}; image/svg+xml is "
+            "serialised with str(), so a dict is stored as its Python repr"
+        )
+
+    # The declared return annotation is the clearest positive signal.
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+            and node.name == "transform"
+            and isinstance(node.returns, ast.Name)
+            and node.returns.id == "str"
+        ):
+            return True, "transform is annotated -> str"
+
+    if not _transform_returns(tree):
+        return False, "no return statement found in a `transform` method"
+    return True, "transform returns no dict (annotation not declared)"
+
+
+def check_no_yaml_dict_confusion(md_text: str = "", py_raw: str = "", **_: Any) -> tuple[bool, str]:
+    """Guard the inverse error: a dict-returning transform on a str type.
+
+    Passes when the declared content_type is one of the two that serialise a
+    dict, or when the source shows no sign of building a dict payload.
+    """
+    match = re.search(r"content_type:\s*[\"']?([\w./+-]+)", md_text)
+    value = match.group(1) if match else ""
+    if value in _DICT_SERIALISED_TYPES:
+        return True, f"{value} does serialise a dict"
+    if re.search(r"return\s*\{", py_raw):
+        return False, (
+            f"returns a dict literal while content_type is {value!r}, which "
+            "is serialised with str()"
+        )
+    return True, f"no dict payload returned for {value or 'the declared type'}"
+
+
 CHECKS: dict[str, Any] = {
     "query-uses-inline-fragments-for-location": check_query_uses_inline_fragments_for_location,
     "query-no-direct-field-on-union-location": check_query_no_direct_field_on_union_location,
@@ -389,6 +489,9 @@ CHECKS: dict[str, Any] = {
     "polls-coreartifact-after-post": check_polls_coreartifact_after_post,
     "dry-run-executes-query": check_dry_run_executes_query,
     "dry-run-before-merge": check_dry_run_before_merge,
+    "artifact-content-type-declared": check_artifact_content_type_declared,
+    "svg-transform-returns-str": check_svg_transform_returns_str,
+    "no-yaml-dict-confusion": check_no_yaml_dict_confusion,
 }
 
 

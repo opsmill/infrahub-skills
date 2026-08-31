@@ -68,6 +68,33 @@
           "check": "Plan frames the dry-run as a pre-merge / pre-PR step"
         }
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "I want an artifact that delivers a generated **rack elevation\ndiagram** \u2014 an SVG drawing, one per rack. I looked at the transform\nexamples and they all produce plain text or CSV, so I assumed\nartifacts can only carry text and that I would have to serve the\ndiagram some other way.\n\nCan an artifact deliver a diagram? If it can, build it: the\ntransform and the registration. Each rack has a `height` in rack\nunits and `devices` with a `position` and a `device_type.height`.\n\nSave the transform to: output.py\nSave the `.infrahub.yml` registration to: output.md",
+      "expected_output": "A confirmation that artifacts do support diagrams, an `artifact_definitions` entry with `content_type: image/svg+xml`, and a transform whose `transform` method returns a **string** of SVG markup. Returning a dict would be wrong: only application/json and application/yaml serialise a dict, every other content type passes the payload through str(), so a dict would be stored as its Python repr with no error.",
+      "files": [],
+      "expectations": [
+        "Confirms an artifact can carry a diagram; image/svg+xml is one of the eight supported content types",
+        "The artifact definition declares content_type image/svg+xml",
+        "The transform returns a string of SVG markup, annotated -> str, not a dict",
+        "States that only application/json and application/yaml serialise a dict, and that other types go through str()",
+        "The target group's node inherits CoreArtifactTarget on the concrete node"
+      ],
+      "assertions": [
+        {
+          "name": "artifact-content-type-declared",
+          "check": "The artifact definition declares content_type image/svg+xml"
+        },
+        {
+          "name": "svg-transform-returns-str",
+          "check": "The transform method returns a string, not a dict literal or a dict() call"
+        },
+        {
+          "name": "no-yaml-dict-confusion",
+          "check": "No dict payload is returned for a content type that is serialised with str()"
+        }
+      ]
     }
   ]
 }

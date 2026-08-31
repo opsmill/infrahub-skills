@@ -62,6 +62,17 @@ on the schema attribute):
 | `application/hcl`  | Terraform / HCL config               |
 | `image/svg+xml`    | Generated diagrams (topology, racks) |
 
+> **This table is the authority, not the examples.**
+> All eight values are supported. Worked examples
+> across these skills use only `text/plain` and
+> `text/csv`, so a capability documented here can look
+> undocumented if you pattern-match the examples
+> instead of reading this table. `image/svg+xml` in
+> particular is the one most often assumed
+> unsupported, because it is the only value that is
+> not text. It is supported; see the worked example in
+> [../examples.md](../examples.md).
+>
 > **Use `application/yaml`, not `text/yaml`.** The
 > server validates `content_type` against the
 > enum above and rejects anything outside it at
@@ -69,6 +80,42 @@ on the schema attribute):
 > A typo here doesn't fail one artifact — every
 > `artifact_definitions` entry using it fails on
 > first sync.
+
+### What the Content Type Does to Your Return Value
+
+`content_type` is not only a served MIME type. It
+selects how the transform's return value is
+serialised, and the rule is narrower than it looks:
+
+| Returned | With `application/json` | With `application/yaml` | With any other type |
+| -------- | ----------------------- | ----------------------- | ------------------- |
+| `dict` | serialised as JSON | serialised as YAML | **`str(dict)`** — a Python repr, silently |
+| `str` | stored as-is | stored as-is | stored as-is |
+| `None` | error | error | error |
+
+**Only `application/json` and `application/yaml`
+special-case a dictionary.** Every one of the other
+six passes the payload through `str()`, so returning a
+`dict` for `text/csv` or `image/svg+xml` writes
+`{'a': 1}` into the artifact body with no error and no
+warning. That is the failure worth remembering: it is
+silent, and the artifact looks populated.
+
+Returning nothing at all is the one case that does
+fail loudly:
+
+```text
+The transform at <location> did not return a payload
+```
+
+So for the six string types — including
+`image/svg+xml` — **the transform must return a
+string.** Build the markup or the text yourself and
+return it.
+
+Related:
+[../reference.md](../reference.md) carries the
+return-type matrix per transform class.
 
 ### Target Requirements
 
