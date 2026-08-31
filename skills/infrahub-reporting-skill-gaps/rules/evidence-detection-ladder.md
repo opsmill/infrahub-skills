@@ -15,10 +15,12 @@ the four probes below in order.
 
 ### Probe A: verifier verdict
 
-Look for a red-to-green transition on the same target: `infrahubctl schema
-load`, `infrahubctl schema validate`, `infrahubctl object load`,
-`infrahubctl check run`, `infrahubctl transform run`, or a `pytest` run of a
-check's or transform's tests. Something that failed and later passed is the
+Look for a red-to-green transition on the same target:
+`infrahubctl schema format --check` (offline),
+`infrahubctl schema check` or `infrahubctl schema load` (needs a server),
+`infrahubctl object validate` or `infrahubctl object load`,
+`infrahubctl check <name>`, `infrahubctl transform <name>`, or a `pytest`
+run of a check's or transform's tests. Something that failed and later passed is the
 strongest evidence available, because no self-assessment produced it. The
 failing output names the topic; the passing version names the fix.
 

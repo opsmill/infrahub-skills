@@ -46,8 +46,9 @@ absence never blocks a report.
 Friction shows up in a transcript as:
 
 - a verifier that failed and later passed on the same
-  target: `infrahubctl schema load`, `schema validate`,
-  `object load`, `check run`, `transform run`, or a
+  target: `schema format --check` (offline), `schema check`
+  or `schema load` (needs a server), `object validate` or
+  `object load`, `check <name>`, `transform <name>`, or a
   `pytest` run of a check's or transform's tests
 - `tool_result` blocks carrying `is_error`, two or more
   on the same tool and target

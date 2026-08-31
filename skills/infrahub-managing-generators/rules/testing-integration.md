@@ -26,10 +26,13 @@ declaring it done.**
 
 After the generator is implemented and unit-tested:
 
-1. ``infrahubctl generator list`` — confirm the new definition
-   registered.
-2. ``infrahubctl generator run <name> <target-id>`` — execute
-   the generator against a real branch.
+1. ``infrahubctl generator --list`` — confirm the new
+   definition registered. ``--list`` is a flag; there is no
+   ``generator list`` subcommand, and a bare word there is read
+   as the name of a generator to run.
+2. ``infrahubctl generator <name> <target-id>`` — execute the
+   generator against a real branch. The name is a positional
+   argument, not a ``run`` subcommand.
 3. Verify the created objects exist via the UI or a GraphQL
    query. Confirm relationships resolve.
 4. If anything fails, fix and re-run before moving on.
