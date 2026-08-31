@@ -1056,8 +1056,188 @@ def check_choice_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
     return True, f"All {seen} dropdown choice(s) are in canonical key order"
 
 
+
+# ---------------------------------------------------------------------------
+# Generic inheritance semantics
+#
+# All three verified against Infrahub's in-memory schema validator: order_by
+# on a generic resolves only against that generic's own declarations; an
+# inherited Dropdown override must restate kind + the full choice list, and a
+# mismatched list loads silently; an inherited relationship's peer is fixed.
+# ---------------------------------------------------------------------------
+
+
+def _entities(schema: dict) -> list[tuple[str, dict]]:
+    """Yield ``(section, entity)`` for every node and generic in the schema."""
+    out: list[tuple[str, dict]] = []
+    for section in ("generics", "nodes"):
+        for entity in schema.get(section) or []:
+            if isinstance(entity, dict):
+                out.append((section, entity))
+    return out
+
+
+def _generic_map(schema: dict) -> dict[str, dict]:
+    """Return generics keyed by full kind."""
+    return {
+        f"{g.get('namespace', '')}{g.get('name', '')}": g
+        for g in (schema.get("generics") or [])
+        if isinstance(g, dict)
+    }
+
+
+def check_order_by_resolves_locally(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Every order_by entry must resolve against the schema that declares it.
+
+    A generic is the source of inheritance, so it has no inherited fields to
+    resolve against. Naming an attribute only the implementers declare is
+    rejected at load with "attribute '<name>' not defined on this schema".
+    """
+    problems: list[str] = []
+    seen = 0
+    for section, entity in _entities(schema):
+        entries = entity.get("order_by") or []
+        if not entries:
+            continue
+        seen += 1
+        own_attrs = {
+            a["name"] for a in (entity.get("attributes") or [])
+            if isinstance(a, dict) and a.get("name")
+        }
+        own_rels = {
+            r["name"] for r in (entity.get("relationships") or [])
+            if isinstance(r, dict) and r.get("name")
+        }
+        for entry in entries:
+            if not isinstance(entry, str):
+                continue
+            if entry.startswith("node_metadata__"):
+                field = entry.split("__", 1)[1]
+                if field not in {"created_at", "updated_at"}:
+                    problems.append(
+                        f"{entity.get('name')}.order_by {entry!r}: unknown metadata field"
+                    )
+                continue
+            head = entry.split("__")[0]
+            if head in own_attrs or head in own_rels:
+                continue
+            # On a node an inherited field is legitimate; on a generic it is not.
+            if section == "generics":
+                problems.append(
+                    f"{entity.get('name')}.order_by {entry!r}: "
+                    f"{head!r} is not declared on this generic"
+                )
+    if problems:
+        return False, "; ".join(problems)
+    if seen == 0:
+        return False, "no order_by declared anywhere"
+    return True, "order_by entries resolve against their declaring schema"
+
+
+def check_dropdown_override_complete(schema: dict, **_: Any) -> tuple[bool, str]:
+    """A Dropdown override must restate `kind` and the generic's full choice list.
+
+    Omitting choices is rejected at load; a shorter or longer list loads
+    silently and fails later at object-write time, so an exact match is the
+    only safe shape.
+    """
+    generic_dropdowns: dict[str, dict[str, list]] = {}
+    for kind, generic in _generic_map(schema).items():
+        for attr in generic.get("attributes") or []:
+            if isinstance(attr, dict) and attr.get("kind") == "Dropdown":
+                generic_dropdowns.setdefault(kind, {})[attr["name"]] = [
+                    c.get("name") for c in (attr.get("choices") or [])
+                    if isinstance(c, dict)
+                ]
+
+    if not generic_dropdowns:
+        return False, "no Dropdown declared on any generic"
+
+    problems: list[str] = []
+    overrides = 0
+    for node in schema.get("nodes") or []:
+        if not isinstance(node, dict):
+            continue
+        inherited: dict[str, list] = {}
+        for parent_kind in node.get("inherit_from") or []:
+            inherited.update(generic_dropdowns.get(parent_kind, {}))
+        for attr in node.get("attributes") or []:
+            if not isinstance(attr, dict) or attr.get("name") not in inherited:
+                continue
+            overrides += 1
+            name = attr["name"]
+            expected = inherited[name]
+            if attr.get("kind") != "Dropdown":
+                problems.append(
+                    f"{node.get('name')}.{name} override kind="
+                    f"{attr.get('kind')!r}, must restate Dropdown"
+                )
+                continue
+            actual = [
+                c.get("name") for c in (attr.get("choices") or [])
+                if isinstance(c, dict)
+            ]
+            if not actual:
+                problems.append(
+                    f"{node.get('name')}.{name} override omits choices "
+                    "(rejected at load)"
+                )
+            elif sorted(actual) != sorted(expected):
+                problems.append(
+                    f"{node.get('name')}.{name} choices {actual} != generic's "
+                    f"{expected} (loads silently, fails at write time)"
+                )
+    if problems:
+        return False, "; ".join(problems)
+    if overrides == 0:
+        return False, "no inherited Dropdown was overridden"
+    return True, f"{overrides} Dropdown override(s) restate kind and the full choice list"
+
+
+def check_inherited_peer_unchanged(schema: dict, **_: Any) -> tuple[bool, str]:
+    """No kind may redeclare an inherited relationship with a different peer.
+
+    Rejected at `infrahubctl schema check` from either side. Hierarchy
+    relationships are exempt, so they are skipped here too.
+    """
+    generic_rels: dict[str, dict[str, dict]] = {
+        kind: {
+            r["name"]: r for r in (generic.get("relationships") or [])
+            if isinstance(r, dict) and r.get("name")
+        }
+        for kind, generic in _generic_map(schema).items()
+    }
+
+    problems: list[str] = []
+    for node in schema.get("nodes") or []:
+        if not isinstance(node, dict):
+            continue
+        inherited: dict[str, dict] = {}
+        for parent_kind in node.get("inherit_from") or []:
+            inherited.update(generic_rels.get(parent_kind, {}))
+        for rel in node.get("relationships") or []:
+            if not isinstance(rel, dict):
+                continue
+            parent_rel = inherited.get(rel.get("name"))
+            if parent_rel is None:
+                continue
+            if "Hierarchy" in (rel.get("kind", ""), parent_rel.get("kind", "")):
+                continue  # exempt
+            if rel.get("peer") != parent_rel.get("peer"):
+                problems.append(
+                    f"{node.get('name')}.{rel['name']} peer={rel.get('peer')!r} "
+                    f"but inherited peer is {parent_rel.get('peer')!r}"
+                )
+    if problems:
+        return False, "inherited peer narrowed: " + "; ".join(problems)
+    return True, "no inherited relationship peer is narrowed"
+
+
 CHECKS: dict[str, Any] = {
     "attr-min-length": check_attr_min_length,
+    "order-by-resolves-locally": check_order_by_resolves_locally,
+    "dropdown-override-complete": check_dropdown_override_complete,
+    "inherited-peer-unchanged": check_inherited_peer_unchanged,
     "dropdown-for-status": check_dropdown_for_status,
     "no-deprecated-string": check_no_deprecated_string,
     "full-kind-references": check_full_kind_references,

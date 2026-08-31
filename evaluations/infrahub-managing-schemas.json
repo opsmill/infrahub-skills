@@ -461,6 +461,41 @@
           "check": "Dropdown choice keys follow name -> label -> description -> color"
         }
       ]
+    },
+    {
+      "id": 14,
+      "prompt": "Model ports and devices with two flat generics, `DcimDevice`\nand `DcimPort`, plus one concrete kind on each side (`DcimSwitch`\nand `DcimOpticalPort`). Requirements:\n\n1. `DcimPort` has a `media` Dropdown with choices `fibre` and\n   `copper`. Optical ports are always fibre, so I want that to be\n   the default on `DcimOpticalPort` and not repeated in every\n   object file.\n2. Ports list in name order by default. Devices have no natural\n   sort key, but I still want a stable order for them.\n3. An optical port should only ever attach to a switch. Express\n   that in the schema if the schema can express it; if it cannot,\n   say so and tell me where the rule has to live instead.",
+      "expected_output": "A schema where DcimOpticalPort's media override restates kind: Dropdown AND the complete choices list alongside default_value: fibre, because omitting choices is rejected at load and a partial list loads silently. order_by on DcimPort names name__value (which DcimPort itself declares), while DcimDevice uses node_metadata__updated_at or node_metadata__created_at since it declares no sort key of its own. Requirement 3 is NOT expressed by narrowing the inherited peer: that is rejected from either side, so the answer should say the pairing must live in a Python check or go unenforced.",
+      "files": [],
+      "expectations": [
+        "The media override restates kind: Dropdown and both choices, not just default_value",
+        "order_by on DcimPort names an attribute DcimPort itself declares",
+        "DcimDevice orders by node_metadata__created_at or node_metadata__updated_at rather than by an attribute it does not declare",
+        "No kind redeclares an inherited relationship with a narrowed peer",
+        "States that kind-to-kind pairing between two generic-typed families is not expressible, and names a check as the place it must live"
+      ],
+      "assertions": [
+        {
+          "name": "dropdown-override-complete",
+          "check": "The inherited Dropdown override restates kind and the generic's full choice list"
+        },
+        {
+          "name": "order-by-resolves-locally",
+          "check": "Every order_by entry resolves against the schema that declares it, metadata entries included"
+        },
+        {
+          "name": "inherited-peer-unchanged",
+          "check": "No inherited relationship peer is narrowed on any kind"
+        },
+        {
+          "name": "schema-version",
+          "check": "File declares version \"1.0\""
+        },
+        {
+          "name": "full-kind-references",
+          "check": "Relationship peers use full Namespace+Name kinds"
+        }
+      ]
     }
   ]
 }

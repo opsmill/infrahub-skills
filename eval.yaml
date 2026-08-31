@@ -934,6 +934,75 @@ tasks:
           Dropdown choice keys follow name -> label -> description ->
           color
 
+  - name: generic-inheritance-limits
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      and follow its workflow and rules.
+
+      Task: Model ports and devices with two flat generics, `DcimDevice`
+      and `DcimPort`, plus one concrete kind on each side (`DcimSwitch`
+      and `DcimOpticalPort`). Requirements:
+
+      1. `DcimPort` has a `media` Dropdown with choices `fibre` and
+         `copper`. Optical ports are always fibre, so I want that to be
+         the default on `DcimOpticalPort` and not repeated in every
+         object file.
+      2. Ports list in name order by default. Devices have no natural
+         sort key, but I still want a stable order for them.
+      3. An optical port should only ever attach to a switch. Express
+         that in the schema if the schema can express it; if it cannot,
+         say so and tell me where the rule has to live instead.
+
+      Save ONLY the final YAML to: output.yml, and put any explanation
+      in YAML comments inside that file.
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_generic_inheritance.py
+        weight: 1.0
+    expected_output: >-
+      A schema where DcimOpticalPort's media override restates
+      kind: Dropdown AND the complete choices list alongside
+      default_value: fibre, because omitting choices is rejected at load
+      and a partial list loads silently. order_by on DcimPort names
+      name__value (which DcimPort itself declares), while DcimDevice uses
+      node_metadata__updated_at or node_metadata__created_at since it
+      declares no sort key of its own. Requirement 3 is NOT expressed by
+      narrowing the inherited peer: that is rejected from either side, so
+      the answer should say the pairing must live in a Python check or go
+      unenforced.
+    expectations:
+      - >-
+        The media override restates kind: Dropdown and both choices, not
+        just default_value
+      - >-
+        order_by on DcimPort names an attribute DcimPort itself declares
+      - >-
+        DcimDevice orders by node_metadata__created_at or
+        node_metadata__updated_at rather than by an attribute it does not
+        declare
+      - >-
+        No kind redeclares an inherited relationship with a narrowed peer
+      - >-
+        States that kind-to-kind pairing between two generic-typed
+        families is not expressible, and names a check as the place it
+        must live
+    assertions:
+      - name: dropdown-override-complete
+        check: >-
+          The inherited Dropdown override restates kind and the generic's
+          full choice list
+      - name: order-by-resolves-locally
+        check: >-
+          Every order_by entry resolves against the schema that declares
+          it, metadata entries included
+      - name: inherited-peer-unchanged
+        check: No inherited relationship peer is narrowed on any kind
+      - name: schema-version
+        check: File declares version "1.0"
+      - name: full-kind-references
+        check: Relationship peers use full Namespace+Name kinds
+
   # --- Check Creator --- #
   - name: global-check-registration
     trials: 3
