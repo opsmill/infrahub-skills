@@ -934,6 +934,74 @@ tasks:
           Dropdown choice keys follow name -> label -> description ->
           color
 
+  - name: reuse-kind-availability
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      and follow its workflow and rules.
+
+      Task: I need a `NetEndpoint` node. Each endpoint is tagged, and each
+      one sits at a site.
+
+      For the site, I want to reuse the location generic everyone uses
+      rather than modelling locations myself. A colleague told me it is
+      built into Infrahub, so I can just peer it.
+
+      A teammate also looked at the published location file and rejected
+      reusing any of it, because one of the generics in that file drags in
+      a whole second device hierarchy we do not want.
+
+      Write the schema. Tell me in YAML comments whether the location
+      generic really is built in, and what reusing it commits this
+      repository to.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_reuse_kind_availability.py
+        weight: 1.0
+    expected_output: >-
+      A schema peering BuiltinTag (which is genuinely core) and a
+      marketplace-published location generic, with comments correcting the
+      "built into Infrahub" premise: the Builtin namespace ships only
+      BuiltinIPAddress, BuiltinIPNamespace, BuiltinIPPrefix and
+      BuiltinTag, and there is no location kind in the platform core. The
+      file must record `infrahubctl marketplace get <namespace>/<name>`
+      provenance with a version, state that the fetched files are
+      committed and loaded first, and note that the teammate's blanket
+      rejection was wrong because a published file is evaluated per
+      generic, not as a unit.
+    expectations:
+      - >-
+        States that the location generic is NOT platform core, and that
+        the Builtin namespace ships only four kinds
+      - >-
+        Records `infrahubctl marketplace get` provenance including a
+        version
+      - >-
+        States that reusing it makes it a dependency the repository must
+        carry, committed and loaded before this schema
+      - >-
+        Corrects the teammate: a published file is evaluated per generic,
+        so an expensive sibling is not a reason to reject a cheap
+        candidate
+      - >-
+        Names a command to confirm a kind exists, such as
+        `infrahubctl schema list`
+      - BuiltinTag is used correctly as a genuinely core kind
+    assertions:
+      - name: external-kinds-core-or-sourced
+        check: >-
+          Every kind referenced but not defined is either genuinely
+          platform core or carries marketplace provenance; no invented
+          Builtin* kind
+      - name: records-marketplace-provenance
+        check: Provenance records the marketplace identifier and a version
+      - name: schema-version
+        check: File declares version "1.0"
+      - name: full-kind-references
+        check: Relationship peers use full Namespace+Name kinds
+
   # --- Check Creator --- #
   - name: global-check-registration
     trials: 3

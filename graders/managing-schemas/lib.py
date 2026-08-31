@@ -1056,8 +1056,114 @@ def check_choice_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
     return True, f"All {seen} dropdown choice(s) are in canonical key order"
 
 
+
+
+def _entities(schema: dict) -> list[tuple[str, dict]]:
+    """Yield ``(section, entity)`` for every node and generic in the schema."""
+    out: list[tuple[str, dict]] = []
+    for section in ("generics", "nodes"):
+        for entity in schema.get(section) or []:
+            if isinstance(entity, dict):
+                out.append((section, entity))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Reuse and generic membership
+#
+# The Builtin namespace on a bare instance is exactly four kinds; there is no
+# location kind in the platform core. A marketplace kind is a carried
+# dependency, so inheriting one without provenance produces a schema that
+# loads where it was developed and fails on a clean instance.
+# ---------------------------------------------------------------------------
+
+_PLATFORM_CORE_PREFIXES = ("Core", "Builtin", "Ipam", "Profile", "Template", "Internal")
+
+# Every kind the Builtin namespace actually ships. Anything else spelled
+# Builtin* is not core, whatever it looks like.
+_BUILTIN_KINDS = {
+    "BuiltinIPAddress",
+    "BuiltinIPNamespace",
+    "BuiltinIPPrefix",
+    "BuiltinTag",
+}
+
+
+def _referenced_external_kinds(schema: dict) -> set[str]:
+    """Kinds referenced but not defined in this schema file."""
+    defined = {
+        f"{e.get('namespace', '')}{e.get('name', '')}"
+        for _section, e in _entities(schema)
+    }
+    referenced: set[str] = set()
+    for _section, entity in _entities(schema):
+        referenced.update(entity.get("inherit_from") or [])
+        for field in ("parent", "children", "menu_placement"):
+            value = entity.get(field)
+            if isinstance(value, str) and value:
+                referenced.add(value)
+        for rel in entity.get("relationships") or []:
+            if isinstance(rel, dict) and rel.get("peer"):
+                referenced.add(rel["peer"])
+    return {k for k in referenced if k and k not in defined}
+
+
+def check_external_kinds_are_core_or_sourced(
+    schema: dict, *, raw_text: str = "", **_: Any
+) -> tuple[bool, str]:
+    """Every kind referenced but not defined must be core, or carry provenance.
+
+    A `Builtin*` spelling that is not one of the four real Builtin kinds is
+    the specific trap: it reads as a platform guarantee and is not one.
+    Marketplace-sourced kinds are fine, but the file has to record where
+    they came from so a clean deploy loads them first.
+    """
+    external = _referenced_external_kinds(schema)
+    if not external:
+        return True, "no external kinds referenced"
+
+    has_provenance = "marketplace get" in raw_text
+
+    problems: list[str] = []
+    for kind in sorted(external):
+        if kind.startswith("Builtin"):
+            if kind not in _BUILTIN_KINDS:
+                problems.append(
+                    f"{kind} is spelled like a core Builtin kind but the "
+                    f"Builtin namespace ships only {sorted(_BUILTIN_KINDS)}"
+                )
+            continue
+        if kind.startswith(_PLATFORM_CORE_PREFIXES):
+            continue
+        if not has_provenance:
+            problems.append(
+                f"{kind} is neither platform core nor defined here, and the "
+                "file records no `infrahubctl marketplace get` provenance"
+            )
+    if problems:
+        return False, "; ".join(problems)
+    return True, f"external kinds accounted for: {sorted(external)}"
+
+
+def check_records_marketplace_provenance(
+    schema: dict, *, raw_text: str = "", **_: Any
+) -> tuple[bool, str]:
+    """A reused or vendored shape must record identifier and version.
+
+    Without both, nobody can tell later whether the local copy has drifted
+    from upstream or was changed on purpose.
+    """
+    if "marketplace get" not in raw_text:
+        return False, "no `infrahubctl marketplace get` provenance recorded"
+    if not re.search(r"-v\s+\d|version[:= ]\s*\d", raw_text):
+        return False, "provenance names no version"
+    return True, "provenance records the marketplace identifier and a version"
+
+
 CHECKS: dict[str, Any] = {
     "attr-min-length": check_attr_min_length,
+    "external-kinds-core-or-sourced": check_external_kinds_are_core_or_sourced,
+    "records-marketplace-provenance": check_records_marketplace_provenance,
     "dropdown-for-status": check_dropdown_for_status,
     "no-deprecated-string": check_no_deprecated_string,
     "full-kind-references": check_full_kind_references,
