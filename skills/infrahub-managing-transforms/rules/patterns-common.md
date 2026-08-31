@@ -89,4 +89,21 @@ class Spine(InfrahubTransform):
         # ... render config ...
 ```
 
+### Sharing a Module With Checks and Other Artifact Types
+
+The helper module above lives in this artifact's own
+directory, and a relative import reaches it only from
+here. If the same logic is needed by a check or another
+artifact type, a relative import **cannot** span
+directories: the module has to be installed into the
+worker image as a package.
+
+The full pattern, including the three `uv` flags whose
+absence each fails differently, is documented once in
+[../../infrahub-managing-checks/rules/patterns-shared-module.md](../../infrahub-managing-checks/rules/patterns-shared-module.md).
+Read it there rather than re-deriving it.
+
+Reach for it on the **second** consumer of the logic,
+not in anticipation of one.
+
 Reference: [examples.md](../examples.md) for complete transform examples.

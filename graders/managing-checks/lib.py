@@ -13,6 +13,8 @@ from __future__ import annotations
 import ast
 import re
 import textwrap
+import ast
+import re
 from pathlib import Path
 from typing import Any
 
@@ -56,6 +58,100 @@ def load_output(path: Path) -> tuple[dict, str]:
 # ---------------------------------------------------------------------------
 # Individual check functions
 # ---------------------------------------------------------------------------
+
+
+def load_output_py(path: Path) -> tuple[ast.Module | None, str]:
+    """Load a Python check file and return ``(parsed_tree, raw_text)``.
+
+    ``(None, "")`` when absent, ``(None, raw)`` on a syntax error, so the
+    checks below can distinguish "no file" from "unparseable file".
+    """
+    try:
+        raw = Path(path).read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError):
+        return None, ""
+    try:
+        return ast.parse(raw), raw
+    except SyntaxError:
+        return None, raw
+
+
+# ---------------------------------------------------------------------------
+# Error-surface checks
+#
+# The server hard-codes status_code=200 on every executed GraphQL request and
+# puts rejections in the body's `errors` array, so branching on the status
+# code fails OPEN: the check passes on the case it exists to catch. The SDK's
+# execute_graphql already raises GraphQLError when `"errors" in response`, so
+# the fix is to use it. Verified against Infrahub 1.11.0 / SDK 1.23.1.
+# ---------------------------------------------------------------------------
+
+_RAW_HTTP_MARKERS = ("httpx.", "requests.", "urllib.request", "aiohttp.")
+
+
+def check_uses_sdk_execute_graphql(
+    _config: dict | None = None, *, py_raw: str = "", **_: Any
+) -> tuple[bool, str]:
+    """Follow-up calls must go through the SDK client, which raises on errors."""
+    if not py_raw:
+        return False, "no Python source found"
+    if "execute_graphql" not in py_raw:
+        return False, "does not call self.client.execute_graphql"
+    raw_http = [m for m in _RAW_HTTP_MARKERS if m in py_raw]
+    if raw_http:
+        return False, f"uses raw HTTP ({sorted(raw_http)}) instead of the SDK client"
+    return True, "uses self.client.execute_graphql"
+
+
+def check_no_status_code_branch(
+    _config: dict | None = None, *, py_raw: str = "", **_: Any
+) -> tuple[bool, str]:
+    """Branching on an HTTP status code to detect a rejection fails open."""
+    if not py_raw:
+        return False, "no Python source found"
+    if re.search(r"status_code", py_raw):
+        return False, (
+            "branches on status_code; every executed GraphQL request returns "
+            "200 even when the body carries errors"
+        )
+    return True, "does not branch on a status code"
+
+
+def check_catches_graphql_error(
+    _config: dict | None = None, *, tree: ast.Module | None = None, py_raw: str = "", **_: Any
+) -> tuple[bool, str]:
+    """A rejection must be handled as a raised GraphQLError, and logged as an error."""
+    if tree is None:
+        return False, "check file missing or has a syntax error"
+    handlers = [n for n in ast.walk(tree) if isinstance(n, ast.ExceptHandler)]
+    if not handlers:
+        return False, "no except handler; a rejection raises GraphQLError"
+
+    names: list[str] = []
+    for handler in handlers:
+        node = handler.type
+        if isinstance(node, ast.Name):
+            names.append(node.id)
+        elif isinstance(node, ast.Attribute):
+            names.append(node.attr)
+        elif isinstance(node, ast.Tuple):
+            names.extend(
+                e.id if isinstance(e, ast.Name) else getattr(e, "attr", "?")
+                for e in node.elts
+            )
+        elif node is None:
+            names.append("bare except")
+
+    if "GraphQLError" not in names:
+        return False, f"catches {names} but not GraphQLError"
+    if "Exception" in names or "bare except" in names:
+        return False, (
+            f"catches {names}; a broad handler around execute_graphql "
+            "reintroduces fail-open"
+        )
+    if "log_error" not in py_raw:
+        return False, "catches GraphQLError but never calls log_error, so the check still passes"
+    return True, "catches GraphQLError and logs an error"
 
 
 def check_check_definitions_present(config: dict, **_: Any) -> tuple[bool, str]:
@@ -171,6 +267,9 @@ def check_targeted_has_targets_and_parameters(
 # ---------------------------------------------------------------------------
 
 CHECKS: dict[str, Any] = {
+    "uses-sdk-execute-graphql": check_uses_sdk_execute_graphql,
+    "no-status-code-branch": check_no_status_code_branch,
+    "catches-graphql-error": check_catches_graphql_error,
     "check-definitions-present": check_check_definitions_present,
     "no-query-field-in-check-def": check_no_query_field_in_check_def,
     "only-allowed-fields-in-check-def": check_only_allowed_fields_in_check_def,
@@ -185,16 +284,25 @@ CHECKS: dict[str, Any] = {
 # ---------------------------------------------------------------------------
 
 
-def run_checks(check_names: list[str], output_path: Path) -> dict:
-    """Run named checks against an .infrahub.yml output and return skillgrade JSON."""
+def run_checks(
+    check_names: list[str],
+    output_path: Path,
+    py_path: Path | None = None,
+) -> dict:
+    """Run named checks against an .infrahub.yml output and return skillgrade JSON.
+
+    ``py_path`` is optional: error-surface checks inspect a Python check file
+    rather than the config, and receive it as ``tree`` / ``py_raw``.
+    """
     config, _ = load_output(output_path)
+    tree, py_raw = load_output_py(py_path) if py_path else (None, "")
 
     entries: list[dict] = []
     passed_count = 0
     for name in check_names:
         fn = CHECKS[name]
         try:
-            ok, msg = fn(config)
+            ok, msg = fn(config, tree=tree, py_raw=py_raw)
         except Exception as exc:  # pragma: no cover
             ok, msg = False, f"Error running check: {exc}"
         if ok:
@@ -355,6 +463,9 @@ def text_flags_unresolvable_parent(gql: str, py: str) -> tuple[bool, str]:
 
 
 TEXT_CHECKS: dict[str, Any] = {
+    "uses-sdk-execute-graphql": check_uses_sdk_execute_graphql,
+    "no-status-code-branch": check_no_status_code_branch,
+    "catches-graphql-error": check_catches_graphql_error,
     "child-status-filter": text_child_status_filter,
     "traverses-related-node": text_traverses_related_node,
     "fetches-related-attribute-value": text_fetches_related_attribute_value,

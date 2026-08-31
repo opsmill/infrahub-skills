@@ -115,6 +115,34 @@
           "check": "An unresolvable device is flagged with log_error, not skipped with a bare continue/return"
         }
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "Write a check that has to distinguish two different problems on\na `NetVlan`:\n\n1. a `vlan_id` that is present but outside our allowed range, which\n   the check can see for itself, and\n2. a `vlan_id` the **server** refuses, because the schema has an\n   attribute bound on it.\n\nFor case 2 the check needs to attempt the write and observe whether\nthe server accepted it.\n\nMy first attempt did this and it passed on everything, including\nvalues I know are rejected:\n\n```python\nresp = httpx.post(f\"{url}/graphql/{branch}\", json={\"query\": mutation})\nif resp.status_code == 200:\n    self.log_info(message=\"accepted\")\nelse:\n    self.log_error(message=\"rejected\")\n```\n\nTell me why that passes, and write the correct check.\n\nSave the check to: output.py\nSave the `.infrahub.yml` registration to: output.yml",
+      "expected_output": "An explanation that every executed GraphQL request returns HTTP 200 and puts rejections in the body's `errors` array, so branching on the status code takes the success branch on a rejection and the check fails open. The correct check uses `self.client.execute_graphql`, which raises `GraphQLError` when the response carries errors, catches that specific exception, and calls `log_error`. It must not catch bare `Exception`, which reintroduces fail-open.",
+      "files": [],
+      "expectations": [
+        "Explains that an executed GraphQL request always returns 200 and carries rejections in the body's errors array",
+        "States that branching on the status code fails OPEN: the check passes on the case it exists to catch",
+        "Uses self.client.execute_graphql rather than raw httpx or requests",
+        "Catches GraphQLError specifically, not bare Exception, and calls log_error in the handler",
+        "Handles the locally-detectable out-of-range case separately, since only a server rejection raises",
+        "Recommends a test asserting the check FAILS on a known-bad value, since a fail-open check looks identical to a passing one"
+      ],
+      "assertions": [
+        {
+          "name": "uses-sdk-execute-graphql",
+          "check": "Uses self.client.execute_graphql and no raw HTTP client"
+        },
+        {
+          "name": "no-status-code-branch",
+          "check": "Does not branch on an HTTP status code"
+        },
+        {
+          "name": "catches-graphql-error",
+          "check": "Catches GraphQLError specifically (not Exception or a bare except) and calls log_error in the handler"
+        }
+      ]
     }
   ]
 }
