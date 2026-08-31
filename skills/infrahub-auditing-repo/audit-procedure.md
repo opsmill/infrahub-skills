@@ -4,6 +4,34 @@ This document defines the step-by-step audit procedure.
 When running an audit, follow each phase in order and
 collect findings into a structured report.
 
+## Phase 0: The audit is read-only (CRITICAL)
+
+Read
+[rules/audit-is-read-only.md](./rules/audit-is-read-only.md)
+before Phase 1. It is not a phase you walk; it is the
+constraint every phase runs under.
+
+The short form:
+
+- Do not write to the working tree or the index.
+- Do not run `git checkout`, `git restore`,
+  `git stash`, `git clean`, `git reset` or `git rm`
+  against the tree, **including to undo your own side
+  effect**.
+- To read another revision, use
+  `git show <ref>:<path>`, `git diff <ref> -- <path>`
+  or `git cat-file`. None of them touch the tree.
+- Before running a repository script for its output,
+  read it and establish whether it writes. A flag
+  named `--check` is not a guarantee. If you cannot
+  establish it, skip the check and record why.
+- If you have already dirtied the tree, name the paths
+  in the report and leave them alone.
+
+Record the tree's condition in the report either way,
+because uncommitted changes bound what the findings
+are worth.
+
 ## Phase 1: Project Structure (CRITICAL)
 
 ### 1.1 Check `.infrahub.yml` exists

@@ -26,6 +26,19 @@ plugin. Produces a structured report covering schemas,
 objects, checks, generators, transforms, menus,
 `.infrahub.yml` configuration, and deployment readiness.
 
+**The audit is read-only.** It never writes to the
+working tree or the index, and it never runs
+`git checkout`, `git restore`, `git stash`,
+`git clean`, `git reset` or `git rm`, including to
+undo its own side effect. An audit is most useful on a
+tree that holds uncommitted work, which is exactly the
+tree where a write cannot be undone. See
+[rules/audit-is-read-only.md](./rules/audit-is-read-only.md)
+and Phase 0 of the procedure. The `Bash` tool is
+granted for read-only inspection (`git show`,
+`git diff`, `git ls-tree`, `find`, `grep`), not for
+changing state.
+
 ## Project Context
 
 Project structure:
@@ -59,17 +72,19 @@ When invoked, the auditor:
 
 The phased procedure that ties these steps together
 lives in [audit-procedure.md](./audit-procedure.md) —
-read that file when running an audit. It defines the
-nine phases (project structure → schema → objects →
-Python components → cross-references → registration →
-best practices → deployment → YAGNI / cost-to-fix)
-and the per-finding severity levels used in the final
-report.
+read that file when running an audit. It opens with
+Phase 0, the read-only constraint every other phase
+runs under, then defines the nine phases (project
+structure → schema → objects → Python components →
+cross-references → registration → best practices →
+deployment → YAGNI / cost-to-fix) and the per-finding
+severity levels used in the final report.
 
 ## Audit Categories
 
 | Priority | Category | What It Checks |
 | -------- | -------- | -------------- |
+| CRITICAL | Conduct | The audit writes nothing; constrains the auditor, not the repo |
 | CRITICAL | Project Structure | `.infrahub.yml` exists, paths valid |
 | CRITICAL | Schema Validation | Naming, relationships, deprecated fields |
 | CRITICAL | Object Validation | YAML structure, value types, refs |
@@ -102,6 +117,8 @@ The report is written to `AUDIT_REPORT.md` in the project root with this structu
 
 - Total findings: N
 - Critical: N | High: N | Medium: N | Low: N | Info: N
+- Working tree at audit time: clean | N uncommitted files
+- Tree modified by this audit: no | yes, listing paths
 
 ## Project Structure
 

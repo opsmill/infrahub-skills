@@ -5,6 +5,7 @@ contains the checks to perform and the expected outcomes.
 
 | Priority | Category | Prefix | Description |
 | -------- | -------- | ------ | ----------- |
+| CRITICAL | Conduct | `audit-` | How the audit itself must behave. Constrains the auditor, not the repository |
 | CRITICAL | Structure | `structure-` | .infrahub.yml, file paths |
 | CRITICAL | Schema | `schema-` | Naming, relationships, deprecated fields |
 | CRITICAL | Objects | `objects-` | YAML format, values, refs |
