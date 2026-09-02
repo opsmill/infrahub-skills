@@ -76,25 +76,41 @@ _GQL_FENCE = re.compile(
     r"^```(?:graphql|gql)\s*\n(.*?)^```",
     re.MULTILINE | re.DOTALL,
 )
+_YAML_FENCE = re.compile(
+    r"^```(?:yaml|yml)\s*\n(.*?)^```",
+    re.MULTILINE | re.DOTALL,
+)
 
 
 def load_output(path: Path) -> dict[str, str]:
     """Load the model's output.md and return its fenced blocks.
 
-    Returns a dict with keys ``python``, ``graphql``, ``raw``. Missing
-    blocks resolve to empty strings; ``raw`` is always the full file
-    content (or "" if unreadable).
+    Returns a dict with keys ``python``, ``python_all``, ``graphql``,
+    ``yaml``, ``raw``. Missing blocks resolve to empty strings; ``raw`` is
+    always the full file content (or "" if unreadable).
+
+    ``python`` is the first ``python`` fence. ``python_all`` is every
+    ``python`` fence that parses on its own, concatenated: an answer that
+    presents a WRONG/RIGHT contrast, or splits the generator across two
+    fences, must be graded on all of it rather than on whichever block
+    happened to come first. Blocks that do not parse are dropped so one
+    pseudo-code snippet cannot make the whole concatenation unparseable.
     """
+    empty = {"python": "", "python_all": "", "graphql": "", "yaml": "", "raw": ""}
     try:
         raw = Path(path).read_text(encoding="utf-8")
     except (FileNotFoundError, OSError):
-        return {"python": "", "graphql": "", "raw": ""}
+        return empty
 
-    py = _PY_FENCE.search(raw)
+    py_blocks = [m.group(1) for m in _PY_FENCE.finditer(raw)]
+    parseable = [b for b in py_blocks if _parse_python(b) is not None]
     gql = _GQL_FENCE.search(raw)
+    yaml_blocks = [m.group(1) for m in _YAML_FENCE.finditer(raw)]
     return {
-        "python": py.group(1) if py else "",
+        "python": py_blocks[0] if py_blocks else "",
+        "python_all": "\n\n".join(parseable),
         "graphql": gql.group(1) if gql else "",
+        "yaml": "\n".join(yaml_blocks),
         "raw": raw,
     }
 
@@ -759,6 +775,127 @@ def check_graphql_block_present(output: dict, **_: Any) -> tuple[bool, str]:
 # ---------------------------------------------------------------------------
 
 
+# The shared, low-cardinality object in the eval's scenario: reachable from
+# every service target, so no single run may claim it.
+_SHARED_KIND = "NetContainer"
+
+
+def _answer_tree(output: dict) -> ast.Module | None:
+    """Parse every python fence in the answer as one module.
+
+    Grading only the first fence lets a WRONG/RIGHT contrast pair, or a
+    generator split across two blocks, be judged on the wrong half.
+    """
+    return _parse_python(output.get("python_all") or output.get("python", ""))
+
+
+def _calls_to(tree: ast.Module, methods: set[str]) -> list[ast.Call]:
+    """Return every ``<expr>.<method>(...)`` call for the named methods."""
+    return [
+        c for c in _iter_calls(tree)
+        if isinstance(c.func, ast.Attribute) and c.func.attr in methods
+    ]
+
+
+def _resolve_str_list(node: ast.AST, tree: ast.Module) -> tuple[bool, list[str]]:
+    """Resolve ``node`` to a list of string constants.
+
+    Follows one level of variable indirection so ``relationship_filter=RELS``
+    is judged on what ``RELS`` holds. Returns ``(False, [])`` when the value
+    cannot be determined, which callers treat as indeterminate rather than
+    wrong.
+    """
+    if isinstance(node, ast.List):
+        values = [
+            e.value for e in node.elts
+            if isinstance(e, ast.Constant) and isinstance(e.value, str)
+        ]
+        return (True, values) if values else (False, [])
+    if isinstance(node, ast.Name):
+        for stmt in ast.walk(tree):
+            if isinstance(stmt, ast.Assign):
+                targets, value = stmt.targets, stmt.value
+            elif isinstance(stmt, ast.AnnAssign):
+                targets, value = [stmt.target], stmt.value
+            else:
+                continue
+            if value is None:
+                continue
+            for tgt in targets:
+                if isinstance(tgt, ast.Name) and tgt.id == node.id:
+                    if isinstance(value, ast.List):
+                        return _resolve_str_list(value, tree)
+    return False, []
+
+
+def _kind_of_call(call: ast.Call) -> str | None:
+    """Return the kind a create/get call targets, string or protocol class."""
+    kind = get_kwarg(call, "kind")
+    if isinstance(kind, ast.Constant) and isinstance(kind.value, str):
+        return kind.value
+    if isinstance(kind, ast.Name):
+        return kind.id
+    if call.args:
+        first = call.args[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            return first.value
+        if isinstance(first, ast.Name):
+            return first.id
+    return None
+
+
+def _save_calls(tree: ast.Module) -> list[ast.Call]:
+    return _calls_to(tree, {"save"})
+
+
+def _save_opts_out(call: ast.Call) -> bool:
+    """True if the save passes ``update_group_context=False``."""
+    value = get_kwarg(call, "update_group_context")
+    return isinstance(value, ast.Constant) and value.value is False
+
+
+def _vars_bound_to_kind(tree: ast.Module, kind: str) -> set[str]:
+    """Names assigned from a create/get of ``kind`` (``await`` unwrapped)."""
+    names: set[str] = set()
+    for stmt in ast.walk(tree):
+        if isinstance(stmt, ast.Assign):
+            targets, value = stmt.targets, stmt.value
+        elif isinstance(stmt, ast.AnnAssign):
+            targets, value = [stmt.target], stmt.value
+        else:
+            continue
+        if isinstance(value, ast.Await):
+            value = value.value
+        if not isinstance(value, ast.Call):
+            continue
+        func = value.func
+        if not (isinstance(func, ast.Attribute) and func.attr in {"create", "get", "upsert"}):
+            continue
+        if _kind_of_call(value) != kind:
+            continue
+        for tgt in targets:
+            if isinstance(tgt, ast.Name):
+                names.add(tgt.id)
+    return names
+
+
+def _iterates_attribute(tree: ast.Module, attr: str) -> bool:
+    """True if a for-loop or comprehension iterates over ``<expr>.<attr>``."""
+    def _touches(node: ast.AST) -> bool:
+        return any(
+            isinstance(n, ast.Attribute) and n.attr == attr
+            for n in ast.walk(node)
+        )
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.For, ast.AsyncFor)) and _touches(node.iter):
+            return True
+        if isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp, ast.DictComp)):
+            if any(_touches(gen.iter) for gen in node.generators):
+                return True
+    return False
+
+
 def check_traversal_uses_relationship_filter(
     output: dict, **_: Any
 ) -> tuple[bool, str]:
@@ -768,64 +905,143 @@ def check_traversal_uses_relationship_filter(
     followed, so a shared low-cardinality reference object still bridges
     unrelated subgraphs and the traversal returns structurally valid
     nonsense.
+
+    Matched against the parsed call, not the raw text, so an explanatory
+    comment cannot pass or fail the check on the model's behalf.
     """
-    py = output.get("python", "")
-    if "traverse_paths" not in py and "path_exists" not in py:
+    tree = _answer_tree(output)
+    if tree is None:
+        return False, "no parseable Python block found"
+
+    calls = _calls_to(tree, {"traverse_paths", "path_exists"})
+    if not calls:
         return False, "no traverse_paths / path_exists call found"
-    if "relationship_filter" not in py:
-        return False, (
-            "traversal is not constrained by relationship_filter; kind "
-            "filtering does not stop the walk crossing a shared node"
-        )
-    if re.search(r"included_kinds\s*=", py):
-        return False, (
-            "uses included_kinds as a whitelist; it only re-includes kinds "
-            "excluded by default. The whitelist is kind_filter"
-        )
-    # A relationship identifier contains `__`; a bare name does not.
-    match = re.search(r"relationship_filter\s*=\s*\[([^\]]*)\]", py, re.S)
-    if match and "__" not in match.group(1):
-        return False, (
-            "relationship_filter appears to hold relationship names; it "
-            "takes schema identifiers such as `device__interface`"
-        )
-    return True, "traversal constrained by relationship_filter"
+
+    for call in calls:
+        if get_kwarg(call, "included_kinds") is not None:
+            return False, (
+                "passes included_kinds to the traversal; it only re-includes "
+                "kinds excluded by default, so it is not a whitelist. The "
+                "whitelist is kind_filter"
+            )
+
+    reasons: list[str] = []
+    for call in calls:
+        rel = get_kwarg(call, "relationship_filter")
+        if rel is None:
+            reasons.append(
+                "a traversal call is not constrained by relationship_filter; "
+                "kind filtering does not stop the walk crossing a shared node"
+            )
+            continue
+        # A relationship identifier contains `__`; a per-side name does not.
+        resolved, values = _resolve_str_list(rel, tree)
+        if resolved and not any("__" in v for v in values):
+            reasons.append(
+                f"relationship_filter holds relationship names "
+                f"({', '.join(values)}); it takes schema identifiers such as "
+                "`device__interface`"
+            )
+            continue
+        return True, "traversal constrained by relationship_filter"
+
+    return False, "; ".join(reasons)
 
 
-def check_traversal_checks_truncation(output: dict, **_: Any) -> tuple[bool, str]:
-    """`truncated_at_depth` must be checked before acting on the paths.
+def check_traversal_enumerates_and_checks_truncation(
+    output: dict, **_: Any
+) -> tuple[bool, str]:
+    """The traversal must enumerate the paths and check for truncation.
 
-    It is the only shape-level signal that the result is incomplete; a
-    truncated result is otherwise indistinguishable from a complete one.
+    The task needs one leg per discovered path. ``path_exists`` returns a
+    bool, so it answers a different question and cannot enumerate anything;
+    an answer built on it alone sidesteps the requirement. Once
+    ``traverse_paths`` is used, ``truncated_at_depth`` is the only
+    shape-level signal that the result is incomplete.
     """
-    py = output.get("python", "")
-    if "traverse_paths" not in py:
-        return True, "no traverse_paths call, truncation not applicable"
-    if "truncated_at_depth" not in py:
+    tree = _answer_tree(output)
+    if tree is None:
+        return False, "no parseable Python block found"
+
+    if not _calls_to(tree, {"traverse_paths"}):
+        if _calls_to(tree, {"path_exists"}):
+            return False, (
+                "only path_exists is used; it returns a bool, so it cannot "
+                "enumerate the paths the task needs one leg per"
+            )
+        return False, "no traverse_paths call found"
+
+    if not _iterates_attribute(tree, "paths"):
+        return False, (
+            "never iterates the returned .paths, so no leg is created per "
+            "discovered path"
+        )
+
+    if not any(
+        isinstance(n, ast.Attribute) and n.attr == "truncated_at_depth"
+        for n in ast.walk(tree)
+    ):
         return False, (
             "does not check truncated_at_depth, so a search that ran out of "
             "budget is treated as a complete answer"
         )
-    return True, "checks truncated_at_depth before using the paths"
+    return True, "enumerates .paths and checks truncated_at_depth"
 
 
 def check_shared_save_opts_out_of_tracking(
     output: dict, **_: Any
 ) -> tuple[bool, str]:
-    """A save of an object reachable from more than one target must opt out.
+    """Only the shared object's save may opt out of tracking.
 
     Every save() adds the node to the run's group, upserts included, so two
-    targets both claim it and whichever stops writing it deletes it.
+    targets both claim a shared object and whichever stops writing it
+    deletes it. The opt-out is bound to that one save: applying it to every
+    save disables the per-target cleanup the tracking group exists for.
+    Creating the shared object outside the generator is the other accepted
+    answer, so an answer that never writes it passes too.
     """
-    py = output.get("python", "")
-    if "save(" not in py:
+    tree = _answer_tree(output)
+    if tree is None:
+        return False, "no parseable Python block found"
+
+    saves = _save_calls(tree)
+    if not saves:
         return False, "no save() call found"
-    if "update_group_context=False" not in py.replace(" ", ""):
+
+    opted_out = [c for c in saves if _save_opts_out(c)]
+    if len(opted_out) == len(saves):
         return False, (
-            "no save() opts out of tracking with update_group_context=False; "
-            "an upsert of a shared object claims it just as a create does"
+            f"every save() sets update_group_context=False, which opts the "
+            f"whole run out of tracking and disables the per-target cleanup. "
+            f"Only the shared {_SHARED_KIND} may opt out"
         )
-    return True, "shared object saved with update_group_context=False"
+
+    shared_vars = _vars_bound_to_kind(tree, _SHARED_KIND)
+    if not shared_vars:
+        return True, (
+            f"the generator never creates the shared {_SHARED_KIND}, so the "
+            "run cannot claim it (owned outside the generator)"
+        )
+
+    shared_saves = [
+        c for c in saves
+        if isinstance(c.func, ast.Attribute)
+        and isinstance(c.func.value, ast.Name)
+        and c.func.value.id in shared_vars
+    ]
+    if not shared_saves:
+        return True, (
+            f"the shared {_SHARED_KIND} is referenced but never saved, so the "
+            "run does not claim it"
+        )
+
+    if not all(_save_opts_out(c) for c in shared_saves):
+        return False, (
+            f"the shared {_SHARED_KIND} is saved without "
+            "update_group_context=False; an upsert claims ownership just as a "
+            "create does"
+        )
+    return True, f"the shared {_SHARED_KIND} is saved with update_group_context=False"
 
 
 def check_group_membership_from_member_side(
@@ -835,22 +1051,32 @@ def check_group_membership_from_member_side(
 
     `CoreGroup.members` peers `CoreNode`, which has no attributes and no
     default_filter, so a member name has nothing to resolve against.
+
+    Read from the YAML fence only. Scanning the whole answer would let the
+    prose that explains `member_of_groups` pass an object-data snippet that
+    actually uses the group-side form.
     """
-    raw = output.get("raw", "")
-    if "member_of_groups" in raw:
-        return True, "membership assigned from the member side"
-    if re.search(r"^\s*members:", raw, re.M):
+    yaml_block = output.get("yaml", "")
+    if not yaml_block.strip():
+        return False, "no ```yaml object-data block found"
+
+    group_side = re.search(r"^\s*-?\s*members\s*:", yaml_block, re.M)
+    member_side = re.search(r"^\s*-?\s*member_of_groups\s*:", yaml_block, re.M)
+
+    if group_side:
         return False, (
-            "assigns membership from the group side via `members:`; the peer "
-            "is CoreNode, which cannot be resolved by name. Use "
-            "member_of_groups on each member"
+            "the object data assigns membership from the group side via "
+            "`members:`; the peer is CoreNode, which cannot be resolved by "
+            "name. Use member_of_groups on each member"
         )
-    return False, "no group membership assignment found"
+    if member_side:
+        return True, "membership assigned from the member side"
+    return False, "no group membership assignment found in the YAML block"
 
 
 CHECKS: dict[str, Any] = {
     "traversal-uses-relationship-filter": check_traversal_uses_relationship_filter,
-    "traversal-checks-truncation": check_traversal_checks_truncation,
+    "traversal-enumerates-and-checks-truncation": check_traversal_enumerates_and_checks_truncation,
     "shared-save-opts-out-of-tracking": check_shared_save_opts_out_of_tracking,
     "group-membership-from-member-side": check_group_membership_from_member_side,
     # AST / relationship family (output.py)

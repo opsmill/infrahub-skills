@@ -152,10 +152,20 @@ Follow these steps when creating a generator:
    [rules/patterns-hydration.md](./rules/patterns-hydration.md)
    for the decision tree, detection heuristic, and refactor
    recipe.
-6. **Register in .infrahub.yml** — Add under
+6. **Constrain any graph walk**. If `generate()` needs
+   the routes between two nodes, use the SDK's
+   `traverse_paths` rather than a hand-written per-hop
+   walk, and constrain it by relationship identifier plus
+   a depth bound. Kind filtering restricts which *nodes*
+   may appear, not which *edges* are followed, so a shared
+   reference object still bridges unrelated subgraphs and
+   the walk returns structurally valid nonsense. Read
+   [rules/patterns-path-traversal.md](./rules/patterns-path-traversal.md)
+   for the parameter semantics and the truncation signal.
+7. **Register in .infrahub.yml** — Add under
    `generator_definitions` with the target group. See
    [rules/registration-config.md](./rules/registration-config.md).
-7. **Test** — Run `infrahubctl generator` to validate.
+8. **Test** — Run `infrahubctl generator` to validate.
    See [rules/testing-commands.md](./rules/testing-commands.md).
 
 ## Supporting References

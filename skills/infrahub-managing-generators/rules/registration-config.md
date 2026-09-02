@@ -149,9 +149,20 @@ So check it rather than assuming:
 # Does the group exist, and what is in it?
 infrahubctl object get CoreGeneratorGroup --branch mybranch
 
-# Did the generator actually dispatch?
+# Is the generator registered, and which group does it target?
 infrahubctl generator --list
+
+# Did a run actually happen?
+infrahubctl task list --include-logs
 ```
+
+`infrahubctl generator --list` reads
+`generator_definitions` out of `.infrahub.yml` and
+prints each name, file, class and target. It never
+contacts the server, so it says nothing about whether
+the group resolved or a run was enqueued. For that, read
+the task list above, or the proposed change's pipeline
+output.
 
 In CI, assert non-emptiness explicitly. "The pipeline
 passed" and "the generator ran" are different claims.

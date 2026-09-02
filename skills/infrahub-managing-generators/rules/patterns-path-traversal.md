@@ -152,7 +152,8 @@ walk:
 
 ```python
 EXPECTED = {("endpoint-a", "segment-1", "endpoint-z")}
-assert {tuple(h.display_label for h in p.hops) for p in result.paths} == EXPECTED
+# A hop carries `node` and `relationship`; the label lives on the node.
+assert {tuple(h.node.display_label for h in p.hops) for p in result.paths} == EXPECTED
 ```
 
 Do this once, in a test, against a fixture graph. It is

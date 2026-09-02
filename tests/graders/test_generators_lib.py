@@ -397,3 +397,244 @@ def test_preflight_or_upsert_fails_on_unsafe():
     tree = ast.parse(SRC_UNSAFE)
     ok, _ = _mod.CHECKS["preflight-or-upsert"](tree)
     assert not ok
+
+
+# ---------------------------------------------------------------------------
+# Path traversal, shared-object ownership, group membership (output.md family)
+# ---------------------------------------------------------------------------
+
+GEN_GOOD = """
+class RouteBuilder(InfrahubGenerator):
+    async def generate(self, data: dict) -> None:
+        service = data["NetService"]["edges"][0]["node"]
+        result = await self.client.traverse_paths(
+            source=service["endpoint_a"]["node"]["id"],
+            destination=service["endpoint_z"]["node"]["id"],
+            relationship_filter=["netendpoint__netsegment"],
+            max_depth=6,
+            shortest_paths_only=False,
+        )
+        if result.truncated_at_depth is not None:
+            raise ValueError("truncated")
+        container = await self.client.create(kind="NetContainer", data={"name": "shared-trunk"})
+        await container.save(allow_upsert=True, update_group_context=False)
+        for path in result.paths:
+            leg = await self.client.create(kind="NetLeg", data={"container": container})
+            await leg.save(allow_upsert=True)
+"""
+
+YAML_MEMBER_SIDE = """
+- kind: NetTopology
+  data:
+    - name: dc1-fabric
+      member_of_groups:
+        - topologies_dc
+"""
+
+YAML_GROUP_SIDE = """
+- kind: CoreGeneratorGroup
+  data:
+    - name: topologies_dc
+      members:
+        - dc1-fabric
+"""
+
+
+def _answer(tmp_path, *, python=GEN_GOOD, yaml=YAML_MEMBER_SIDE, extra_python=None, prose=""):
+    """Build an output.md and return the parsed load_output dict."""
+    parts = []
+    if prose:
+        parts.append(prose)
+    parts.append("```python\n" + python.strip() + "\n```")
+    if extra_python:
+        parts.append("```python\n" + extra_python.strip() + "\n```")
+    parts.append("```yaml\n" + yaml.strip() + "\n```")
+    path = tmp_path / "output.md"
+    path.write_text("\n\n".join(parts), encoding="utf-8")
+    return _mod.load_output(path)
+
+
+def _check(name, output):
+    return _mod.CHECKS[name](output)
+
+
+# --- traversal-uses-relationship-filter ---
+
+def test_relationship_filter_passes_on_schema_identifiers(tmp_path):
+    ok, _ = _check("traversal-uses-relationship-filter", _answer(tmp_path))
+    assert ok
+
+
+def test_relationship_filter_resolves_through_a_variable(tmp_path):
+    """`relationship_filter=RELS` must be judged on what RELS holds."""
+    src = 'RELS = ["interfaces"]\n' + GEN_GOOD.replace(
+        'relationship_filter=["netendpoint__netsegment"]', "relationship_filter=RELS"
+    )
+    ok, msg = _check("traversal-uses-relationship-filter", _answer(tmp_path, python=src))
+    assert not ok
+    assert "relationship names" in msg
+
+
+def test_relationship_filter_accepts_variable_holding_identifiers(tmp_path):
+    src = 'RELS = ["netendpoint__netsegment"]\n' + GEN_GOOD.replace(
+        'relationship_filter=["netendpoint__netsegment"]', "relationship_filter=RELS"
+    )
+    ok, _ = _check("traversal-uses-relationship-filter", _answer(tmp_path, python=src))
+    assert ok
+
+
+def test_included_kinds_in_a_comment_does_not_fail(tmp_path):
+    """The check reads the parsed call, so prose about included_kinds is not a use."""
+    src = GEN_GOOD.replace("max_depth=6,", "max_depth=6,  # included_kinds is not a whitelist")
+    ok, _ = _check("traversal-uses-relationship-filter", _answer(tmp_path, python=src))
+    assert ok
+
+
+def test_included_kinds_passed_to_the_call_fails(tmp_path):
+    src = GEN_GOOD.replace("max_depth=6,", 'max_depth=6, included_kinds=["NetSegmentType"],')
+    ok, msg = _check("traversal-uses-relationship-filter", _answer(tmp_path, python=src))
+    assert not ok
+    assert "included_kinds" in msg
+
+
+def test_all_python_fences_are_graded_not_just_the_first(tmp_path):
+    """A WRONG/RIGHT contrast pair must not be graded on the WRONG half."""
+    output = _answer(
+        tmp_path,
+        python='relationship_filter = ["interfaces"]  # WRONG: a relationship name',
+        extra_python=GEN_GOOD,
+    )
+    ok, _ = _check("traversal-uses-relationship-filter", output)
+    assert ok
+
+
+def test_kind_filter_alone_fails(tmp_path):
+    src = GEN_GOOD.replace(
+        'relationship_filter=["netendpoint__netsegment"],', 'kind_filter=["NetSegment"],'
+    )
+    ok, _ = _check("traversal-uses-relationship-filter", _answer(tmp_path, python=src))
+    assert not ok
+
+
+# --- traversal-enumerates-and-checks-truncation ---
+
+def test_traversal_enumerates_and_checks_truncation_passes(tmp_path):
+    ok, _ = _check("traversal-enumerates-and-checks-truncation", _answer(tmp_path))
+    assert ok
+
+
+def test_path_exists_alone_cannot_enumerate_paths(tmp_path):
+    """path_exists returns a bool, so it cannot produce one leg per path."""
+    src = """
+class RouteBuilder(InfrahubGenerator):
+    async def generate(self, data: dict) -> None:
+        if not await self.client.path_exists(
+            source=a, destination=z,
+            relationship_filter=["netendpoint__netsegment"], max_depth=6,
+        ):
+            return
+        leg = await self.client.create(kind="NetLeg", data={})
+        await leg.save(allow_upsert=True)
+"""
+    ok, msg = _check("traversal-enumerates-and-checks-truncation", _answer(tmp_path, python=src))
+    assert not ok
+    assert "path_exists" in msg
+
+
+def test_traversal_without_iterating_paths_fails(tmp_path):
+    src = GEN_GOOD.replace("for path in result.paths:", "for path in [1]:")
+    ok, _ = _check("traversal-enumerates-and-checks-truncation", _answer(tmp_path, python=src))
+    assert not ok
+
+
+def test_traversal_without_truncation_check_fails(tmp_path):
+    src = GEN_GOOD.replace(
+        'if result.truncated_at_depth is not None:\n            raise ValueError("truncated")',
+        "pass",
+    )
+    ok, _ = _check("traversal-enumerates-and-checks-truncation", _answer(tmp_path, python=src))
+    assert not ok
+
+
+# --- shared-save-opts-out-of-tracking ---
+
+def test_shared_save_opt_out_passes_when_bound_to_the_shared_object(tmp_path):
+    ok, _ = _check("shared-save-opts-out-of-tracking", _answer(tmp_path))
+    assert ok
+
+
+def test_blanket_opt_out_on_every_save_fails(tmp_path):
+    """Opting every save out disables the per-target cleanup."""
+    src = GEN_GOOD.replace(
+        "await leg.save(allow_upsert=True)",
+        "await leg.save(allow_upsert=True, update_group_context=False)",
+    )
+    ok, msg = _check("shared-save-opts-out-of-tracking", _answer(tmp_path, python=src))
+    assert not ok
+    assert "every save()" in msg
+
+
+def test_shared_object_created_outside_the_generator_passes(tmp_path):
+    """Creating the shared object elsewhere is the other accepted answer."""
+    src = """
+class RouteBuilder(InfrahubGenerator):
+    async def generate(self, data: dict) -> None:
+        result = await self.client.traverse_paths(
+            source=a, destination=z,
+            relationship_filter=["netendpoint__netsegment"], max_depth=6,
+        )
+        if result.truncated_at_depth is not None:
+            raise ValueError("truncated")
+        for path in result.paths:
+            leg = await self.client.create(kind="NetLeg", data={})
+            await leg.save(allow_upsert=True)
+"""
+    ok, _ = _check("shared-save-opts-out-of-tracking", _answer(tmp_path, python=src))
+    assert ok
+
+
+def test_shared_object_saved_without_opt_out_fails(tmp_path):
+    src = GEN_GOOD.replace(
+        "await container.save(allow_upsert=True, update_group_context=False)",
+        "await container.save(allow_upsert=True)",
+    )
+    ok, _ = _check("shared-save-opts-out-of-tracking", _answer(tmp_path, python=src))
+    assert not ok
+
+
+def test_opt_out_on_the_wrong_save_fails(tmp_path):
+    """The flag on a per-target leg does not protect the shared object."""
+    src = GEN_GOOD.replace(
+        "await container.save(allow_upsert=True, update_group_context=False)",
+        "await container.save(allow_upsert=True)",
+    ).replace(
+        "await leg.save(allow_upsert=True)",
+        "await leg.save(allow_upsert=True, update_group_context=False)",
+    )
+    ok, _ = _check("shared-save-opts-out-of-tracking", _answer(tmp_path, python=src))
+    assert not ok
+
+
+# --- group-membership-from-member-side ---
+
+def test_group_membership_member_side_passes(tmp_path):
+    ok, _ = _check("group-membership-from-member-side", _answer(tmp_path))
+    assert ok
+
+
+def test_group_side_yaml_fails_even_when_prose_mentions_member_of_groups(tmp_path):
+    """The check reads the YAML fence, not the explanation around it."""
+    output = _answer(
+        tmp_path,
+        yaml=YAML_GROUP_SIDE,
+        prose="Membership must be written from the member side with member_of_groups.",
+    )
+    ok, msg = _check("group-membership-from-member-side", output)
+    assert not ok
+    assert "group side" in msg
+
+
+def test_missing_membership_in_yaml_fails(tmp_path):
+    output = _answer(tmp_path, yaml="- kind: NetTopology\n  data:\n    - name: dc1")
+    ok, _ = _check("group-membership-from-member-side", output)
+    assert not ok
