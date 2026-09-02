@@ -36,7 +36,8 @@ CLI_ACCEPTED = [
         id="two-spans-are-not-one-command",
     ),
     pytest.param(
-        "```bash\n# infrahubctl reads the token from the environment\ninfrahubctl info\n```",
+        "```bash\n# infrahubctl reads the token from the environment\n"  # cli-check: ignore
+        "infrahubctl info\n```",
         id="comment-inside-a-fence-is-prose",
     ),
     pytest.param(
@@ -52,12 +53,14 @@ def test_cli_commands_exist_accepts(text):
     assert ok, msg
 
 
+# These are the invented forms the check exists to reject, so the fixtures
+# have to spell them out. cli-check: ignore
 CLI_REJECTED = [
     pytest.param("", id="empty-output"),
     pytest.param("A plan with no commands in it at all.", id="names-no-command"),
-    pytest.param("```\ninfrahubctl check run my_check\n```", id="invented-run"),
-    pytest.param("Run `infrahubctl schema validate schemas/`.", id="invented-group-sub"),
-    pytest.param("Run `infrahubctl generator list`.", id="invented-list"),
+    pytest.param("```\ninfrahubctl check run my_check\n```", id="invented-run"),  # cli-check: ignore
+    pytest.param("Run `infrahubctl schema validate schemas/`.", id="invented-group-sub"),  # cli-check: ignore
+    pytest.param("Run `infrahubctl generator list`.", id="invented-list"),  # cli-check: ignore
 ]
 
 

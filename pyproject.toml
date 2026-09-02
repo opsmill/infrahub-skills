@@ -9,6 +9,8 @@ dev = [
     "rumdl",
     "invoke>=2.2.0",
     "yamllint>=1.37.1",
+    "pytest>=8.0.0",
+    "pyyaml>=6.0",
 ]
 
 [tool.rumdl]
