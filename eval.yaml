@@ -1439,6 +1439,79 @@ tasks:
       - name: dry-run-before-merge
         check: Plan frames the dry-run as a pre-merge / pre-PR step
 
+  # --- Transforms: artifact content types --- #
+  # NOTE: the discriminator is the return shape, not the content type.
+  # The prompt hands the model a ready-made dict payload and asks it to
+  # return that, which is the silent failure the rule exists to prevent:
+  # only application/json and application/yaml serialise a dict, so a dict
+  # under image/svg+xml is stored as its Python repr with no error. A
+  # baseline follows the user's dict framing; the skill refuses it and
+  # builds the markup instead.
+  - name: artifact-svg-content-type
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-transforms/SKILL.md
+      and follow its workflow and rules.
+
+      Task: I want an artifact that delivers a generated **rack elevation
+      drawing** — a scale picture of the rack front, one per rack, that a
+      field engineer opens in a browser and that stays sharp when they
+      zoom in. I looked at the transform examples and they all produce
+      plain text or CSV, so I assumed artifacts can only carry text and
+      that I would have to serve the picture some other way.
+
+      Can an artifact deliver a drawing like that? If it can, build it:
+      pick the content type, then write the transform and the
+      registration. Each rack has a `height` in rack units and `devices`
+      with a `position` and a `device_type.height`.
+
+      I already compute the geometry as a dict (`{"width": 220,
+      "height": 900, "slots": [{"y": 40, "h": 40, "label": "leaf-01"}]}`),
+      so just return that dict from the transform and let Infrahub render
+      it as the drawing. Keep the transform short.
+
+      Save the transform to: output.py
+      Save the `.infrahub.yml` registration to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/managing-transforms/check_svg_artifact.py
+        weight: 1.0
+    expected_output: >-
+      A confirmation that artifacts do support diagrams, an
+      `artifact_definitions` entry with `content_type: image/svg+xml`, and
+      a transform whose `transform` method returns a **string** of SVG
+      markup. The requested dict return is refused and the geometry is
+      rendered into markup instead: only application/json and
+      application/yaml serialise a dict, every other content type passes
+      the payload through str(), so the dict would be stored as its Python
+      repr with no error.
+    expectations:
+      - >-
+        Confirms an artifact can carry a drawing, and picks image/svg+xml
+        as the content type without being told to: it is one of the eight
+        supported values and the only vector one
+      - The artifact definition declares content_type image/svg+xml
+      - >-
+        Refuses to return the geometry dict and renders it into an SVG
+        string instead
+      - >-
+        States that only application/json and application/yaml serialise
+        a dict, and that other types go through str()
+      - >-
+        The target group's node inherits CoreArtifactTarget on the
+        concrete node
+    assertions:
+      - name: artifact-content-type-declared
+        check: The artifact definition declares content_type image/svg+xml
+      - name: svg-transform-returns-str
+        check: >-
+          The transform returns a string, not the geometry dict, whether
+          returned as a literal or through a local variable
+      - name: svg-markup-in-output
+        check: >-
+          The source builds real SVG markup: an <svg root element and the
+          svg namespace
+
   # --- Object Creator --- #
   # NOTE: regression guard, not a discrimination test. Baselines (no skill)
   # already apply branch discipline for object loads even under pressure, and

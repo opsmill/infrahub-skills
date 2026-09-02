@@ -102,10 +102,10 @@ runtime. See
 
 Two types of transforms:
 
-| Type       | Output            | Entry Point                     |
-| ---------- | ----------------- | ------------------------------- |
-| **Python** | JSON/dict or text | `InfrahubTransform.transform()` |
-| **Jinja2** | Text              | `.j2` template file             |
+| Type       | Output                                                                                                                                   | Entry Point                     |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| **Python** | Whatever the artifact's `content_type` asks for: a `dict` only under `application/json` or `application/yaml`, a `str` for the other six | `InfrahubTransform.transform()` |
+| **Jinja2** | Text                                                                                                                                     | `.j2` template file             |
 
 ```python
 from infrahub_sdk.transforms import InfrahubTransform
@@ -113,6 +113,10 @@ from infrahub_sdk.transforms import InfrahubTransform
 class MyTransform(InfrahubTransform):
     query = "my_query"
 
+    # Returns a dict, so the artifact definition has to declare
+    # content_type: application/json (or application/yaml). Under any
+    # other content type this dict is stored as str(dict), with no
+    # error. See rules/artifacts-definitions.md.
     async def transform(self, data: dict) -> dict:
         device = data["DcimDevice"]["edges"][0]["node"]
         return {"hostname": device["name"]["value"]}
@@ -155,9 +159,13 @@ Follow these steps when creating a transform:
 
 ## Supporting References
 
+- **[rules/artifacts-definitions.md](./rules/artifacts-definitions.md)**
+  -- The eight `content_type` values and how each
+  serialises the transform's return value. Authority on
+  which return type a content type accepts
 - **[reference.md](./reference.md)** -- Class API,
-  lifecycle, return-type matrix, `.infrahub.yml`
-  registration shapes, filter env overview
+  lifecycle, `.infrahub.yml` registration shapes,
+  filter env overview
 - **[examples.md](./examples.md)** -- Complete transform
   patterns (Python, Jinja2, hybrid, CSV)
 - **[../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)**

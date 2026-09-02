@@ -9,6 +9,7 @@ Real-world examples extracted from production Infrahub repositories.
 - [3. Jinja2 Transform (ContainerLab Topology)](#3-jinja2-transform-containerlab-topology)
 - [4. Minimal Python Transform Template](#4-minimal-python-transform-template)
 - [5. Shared Transform Utilities](#5-shared-transform-utilities)
+- [6. SVG Diagram Artifact (`image/svg+xml`)](#6-svg-diagram-artifact-imagesvgxml)
 - [Complete File Structure](#complete-file-structure)
 
 ---
@@ -609,6 +610,174 @@ topology:
       image: ceos:latest
   links:
 ```
+
+---
+
+## 6. SVG Diagram Artifact (`image/svg+xml`)
+
+Every other example here uses `text/plain` or
+`text/csv`. This one exists because `image/svg+xml` is
+the content type most often assumed unsupported: it is
+the only one of the eight whose output is a picture, so scanning
+examples gives the wrong answer. It is supported, and an
+artifact can deliver a generated diagram.
+
+The shape to remember: **the transform returns a
+string.** Only `application/json` and `application/yaml`
+special-case a `dict`; every other content type passes
+the payload through `str()`, so returning a dict here
+would write a Python repr into the artifact body with no
+error. See
+[rules/artifacts-definitions.md](./rules/artifacts-definitions.md).
+
+### Query: `queries/topology/rack_elevation.gql`
+
+```graphql
+query RackElevation($rack: String!) {
+  LocationRack(name__value: $rack) {
+    edges {
+      node {
+        name { value }
+        height { value }
+        devices {
+          edges {
+            node {
+              name { value }
+              position { value }
+              device_type {
+                node {
+                  height { value }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Transform: `transforms/rack_elevation.py`
+
+```python
+from infrahub_sdk.transforms import InfrahubTransform
+
+UNIT_HEIGHT = 20
+UNIT_WIDTH = 220
+MARGIN = 40
+
+
+class RackElevation(InfrahubTransform):
+    query = "rack_elevation"
+
+    async def transform(self, data: dict) -> str:
+        """Return an SVG rack elevation.
+
+        Returns a str, not a dict: `image/svg+xml` is serialised with
+        `str()`, so a dict would be stored as its Python repr.
+        """
+        rack = data["LocationRack"]["edges"][0]["node"]
+        units = rack["height"]["value"]
+        height = units * UNIT_HEIGHT + 2 * MARGIN
+        width = UNIT_WIDTH + 2 * MARGIN
+
+        parts: list[str] = [
+            f'<svg xmlns="http://www.w3.org/2000/svg" '
+            f'width="{width}" height="{height}" '
+            f'viewBox="0 0 {width} {height}">',
+            f'<rect x="{MARGIN}" y="{MARGIN}" width="{UNIT_WIDTH}" '
+            f'height="{units * UNIT_HEIGHT}" fill="none" stroke="#333"/>',
+        ]
+
+        # Rack unit 1 is at the bottom, so invert for screen coordinates.
+        for u in range(units):
+            y = MARGIN + (units - u - 1) * UNIT_HEIGHT
+            parts.append(
+                f'<text x="{MARGIN - 8}" y="{y + 14}" font-size="10" '
+                f'text-anchor="end" fill="#888">{u + 1}</text>'
+            )
+
+        for edge in rack["devices"]["edges"]:
+            device = edge["node"]
+            position = device["position"]["value"]
+            if position is None:
+                continue  # unracked device: nothing to draw
+            span = device["device_type"]["node"]["height"]["value"] or 1
+            y = MARGIN + (units - position - span + 1) * UNIT_HEIGHT
+            parts.append(
+                f'<rect x="{MARGIN}" y="{y}" width="{UNIT_WIDTH}" '
+                f'height="{span * UNIT_HEIGHT}" fill="#cfe3f7" stroke="#333"/>'
+            )
+            parts.append(
+                f'<text x="{MARGIN + 8}" y="{y + 14}" font-size="11">'
+                f'{_escape(device["name"]["value"])}</text>'
+            )
+
+        parts.append("</svg>")
+        return "\n".join(parts)
+
+
+def _escape(value: str) -> str:
+    """Escape the five XML entities. Device names carry `&` and `<` in practice."""
+    return (
+        value.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&apos;")
+    )
+```
+
+### Config: `.infrahub.yml`
+
+```yaml
+---
+queries:
+  - name: rack_elevation
+    file_path: "queries/topology/rack_elevation.gql"
+
+python_transforms:
+  - name: rack_elevation
+    class_name: RackElevation
+    file_path: "transforms/rack_elevation.py"
+
+artifact_definitions:
+  - name: rack_elevation
+    artifact_name: "Rack Elevation"
+    content_type: image/svg+xml       # not text/plain — the artifact IS a diagram
+    targets: racks                    # group of LocationRack objects
+    transformation: rack_elevation    # exact-name match to the transform above
+    parameters:
+      rack: name__value               # each target's name into $rack
+```
+
+The target group's members must inherit
+`CoreArtifactTarget` on the concrete node, as with any
+artifact:
+
+```yaml
+nodes:
+  - name: Rack
+    namespace: Location
+    inherit_from:
+      - CoreArtifactTarget
+```
+
+### Why a Python transform rather than Jinja2
+
+Either works, and Jinja2 is the cheaper layer when the
+output is a fixed shape with values substituted in. Pick
+Python when the geometry has to be *computed* — here the
+`y` coordinate depends on rack height, device position
+and device height together, and units are numbered bottom
+-up while SVG coordinates run top-down. Expressing that
+arithmetic in a template is where a Jinja2 diagram
+template stops being readable.
+
+If your diagram is a static layout with substituted
+labels, register it under `jinja2_transforms` instead and
+keep the same `artifact_definitions` entry.
 
 ---
 

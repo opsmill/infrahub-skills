@@ -381,6 +381,323 @@ def check_dry_run_before_merge(md_text: str = "", **_: Any) -> tuple[bool, str]:
 # CHECKS registry
 # ---------------------------------------------------------------------------
 
+
+# ---------------------------------------------------------------------------
+# Artifact content types
+#
+# `serialize_artifact_content` special-cases a dict ONLY for
+# application/json and application/yaml; every other content type passes the
+# payload through `str()`. So a dict returned for image/svg+xml is stored as
+# a Python repr, silently. Verified against Infrahub 1.11.0.
+# ---------------------------------------------------------------------------
+
+# Attribute calls whose result is a string regardless of the receiver.
+_STRING_METHODS = frozenset(
+    {"join", "format", "strip", "lstrip", "rstrip", "replace", "upper", "lower"}
+)
+
+
+def _find_transform_def(
+    tree: ast.Module | None,
+) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+    """Return the `transform` method definition, if the source has one."""
+    if tree is None:
+        return None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == "transform":
+            return node
+    return None
+
+
+def _transform_returns(tree: ast.Module | None) -> list[ast.expr]:
+    """Return every returned expression inside a `transform` method.
+
+    Nested function definitions inside `transform` are skipped: their
+    returns describe the helper, not the transform's own payload.
+    """
+    func = _find_transform_def(tree)
+    if func is None:
+        return []
+    returns: list[ast.expr] = []
+    nested = {
+        n
+        for child in func.body
+        for n in ast.walk(child)
+        if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda)
+    }
+    nested_returns = {
+        r for n in nested for r in ast.walk(n) if isinstance(r, ast.Return)
+    }
+    for inner in ast.walk(func):
+        if (
+            isinstance(inner, ast.Return)
+            and inner.value is not None
+            and inner not in nested_returns
+        ):
+            returns.append(inner.value)
+    return returns
+
+
+def _local_assignments(
+    func: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> dict[str, list[ast.expr]]:
+    """Map each local name to every expression assigned to it."""
+    assigned: dict[str, list[ast.expr]] = {}
+    for node in ast.walk(func):
+        targets: list[ast.expr] = []
+        value: ast.expr | None = None
+        if isinstance(node, ast.Assign):
+            targets, value = list(node.targets), node.value
+        elif isinstance(node, (ast.AnnAssign, ast.AugAssign)) and node.value is not None:
+            targets, value = [node.target], node.value
+        if value is None:
+            continue
+        for target in targets:
+            if isinstance(target, ast.Name):
+                assigned.setdefault(target.id, []).append(value)
+    return assigned
+
+
+def _module_functions(tree: ast.Module | None) -> dict[str, ast.expr]:
+    """Every function defined in the file, by name.
+
+    `return geom(data)` where `geom` builds the dict is the same defect as
+    returning the dict literal; without resolving the call it classifies as
+    "unknown" and slips through.
+    """
+    if tree is None:
+        return {}
+    return {
+        node.name: node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+
+
+def _classify_function(
+    func: ast.FunctionDef | ast.AsyncFunctionDef,
+    functions: dict[str, ast.expr],
+    depth: int,
+) -> str:
+    """Classify what a function returns, from its own return statements."""
+    kinds = set()
+    local = _local_assignments(func)
+    for node in ast.walk(func):
+        if isinstance(node, ast.Return) and node.value is not None:
+            kinds.add(_classify_expr(node.value, local, depth + 1, functions))
+    if not kinds:
+        return "unknown"
+    if "dict" in kinds:
+        return "dict"
+    return "str" if kinds == {"str"} else "unknown"
+
+
+def _classify_expr(
+    expr: ast.expr,
+    assigned: dict[str, list[ast.expr]],
+    depth: int = 0,
+    functions: dict[str, ast.expr] | None = None,
+) -> str:
+    """Classify an expression as ``"dict"``, ``"str"`` or ``"unknown"``.
+
+    Names are resolved back to their local assignments, so a dict built
+    into a variable and then returned is still classified as a dict, and
+    calls to functions defined in the same file are resolved to what those
+    functions return.
+    """
+    functions = functions or {}
+    if depth > 6:
+        return "unknown"
+    if isinstance(expr, (ast.Dict, ast.DictComp)):
+        return "dict"
+    if isinstance(expr, ast.Constant):
+        return "str" if isinstance(expr.value, str) else "unknown"
+    if isinstance(expr, ast.JoinedStr):
+        return "str"
+    if isinstance(expr, ast.Call):
+        func = expr.func
+        if isinstance(func, ast.Name):
+            if func.id == "dict":
+                return "dict"
+            if func.id in ("str", "format"):
+                return "str"
+            target = functions.get(func.id)
+            if target is not None:
+                return _classify_function(target, functions, depth)
+        if isinstance(func, ast.Attribute):
+            if func.attr in _STRING_METHODS:
+                return "str"
+            if func.attr == "dumps":
+                return "str"
+            # `.copy()` / `deepcopy()` hand back what they were given.
+            if func.attr in ("copy", "deepcopy"):
+                return _classify_expr(func.value, assigned, depth + 1, functions)
+            target = functions.get(func.attr)
+            if target is not None:
+                return _classify_function(target, functions, depth)
+        return "unknown"
+    if isinstance(expr, ast.BinOp):
+        left = _classify_expr(expr.left, assigned, depth + 1, functions)
+        right = _classify_expr(expr.right, assigned, depth + 1, functions)
+        if "dict" in (left, right):
+            return "dict"
+        return "str" if "str" in (left, right) else "unknown"
+    if isinstance(expr, ast.Name):
+        kinds = {
+            _classify_expr(value, assigned, depth + 1, functions)
+            for value in assigned.get(expr.id, [])
+        }
+        if "dict" in kinds:
+            return "dict"
+        if kinds == {"str"}:
+            return "str"
+        return "unknown"
+    if isinstance(expr, ast.IfExp):
+        kinds = {
+            _classify_expr(expr.body, assigned, depth + 1, functions),
+            _classify_expr(expr.orelse, assigned, depth + 1, functions),
+        }
+        if "dict" in kinds:
+            return "dict"
+        return "str" if kinds == {"str"} else "unknown"
+    return "unknown"
+
+
+def _docstring_nodes(tree: ast.Module) -> set[int]:
+    """ids of the Constant nodes that are docstrings, not values."""
+    out: set[int] = set()
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if not isinstance(
+            node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+        ) or not body:
+            continue
+        first = body[0]
+        if (isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant)
+                and isinstance(first.value.value, str)):
+            out.add(id(first.value))
+    return out
+
+
+def _string_literals(tree: ast.Module | None) -> list[str]:
+    """Every string literal in the module that is used as a value.
+
+    Docstrings are excluded: a docstring saying the transform renders
+    `<svg xmlns=...>` is evidence that the markup appears in the file, not
+    that it is built or returned. A dict-returning transform whose
+    docstring quotes an SVG root satisfied this check.
+    """
+    if tree is None:
+        return []
+    docstrings = _docstring_nodes(tree)
+    out: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if id(node) not in docstrings:
+                out.append(node.value)
+        elif isinstance(node, ast.JoinedStr):
+            out.extend(
+                v.value
+                for v in node.values
+                if isinstance(v, ast.Constant) and isinstance(v.value, str)
+            )
+    return out
+
+
+def check_artifact_content_type_declared(
+    md_text: str = "", **_: Any
+) -> tuple[bool, str]:
+    """The artifact definition must declare a real content_type.
+
+    All eight values are supported; the point of the check is that the
+    non-text one is reachable and gets used when the output is a diagram.
+    """
+    match = re.search(r"content_type:\s*[\"']?([\w./+-]+)", md_text)
+    if not match:
+        return False, "no content_type declared in the artifact definition"
+    value = match.group(1)
+    if value != "image/svg+xml":
+        return False, f"content_type is {value!r}, expected image/svg+xml for a diagram"
+    return True, "content_type: image/svg+xml"
+
+
+def check_svg_transform_returns_str(
+    tree: ast.Module | None = None, py_raw: str = "", **_: Any
+) -> tuple[bool, str]:
+    """A transform for a str-serialised content type must return a string.
+
+    Only application/json and application/yaml turn a dict into structured
+    output. Returning a dict for image/svg+xml stores `str(dict)` with no
+    error, so the artifact looks populated and is a Python repr.
+
+    A dict assembled into a local variable and then returned counts as a
+    dict return: the returned name is resolved back to its assignments.
+    Passing needs positive evidence — a `-> str` annotation, or every
+    return resolving to a string expression.
+    """
+    if tree is None:
+        return False, "transform file missing or has a syntax error"
+
+    func = _find_transform_def(tree)
+    if func is None:
+        return False, "no `transform` method found"
+
+    returns = _transform_returns(tree)
+    if not returns:
+        return False, "no return statement found in the `transform` method"
+
+    assigned = _local_assignments(func)
+    functions = _module_functions(tree)
+    kinds = [_classify_expr(expr, assigned, functions=functions) for expr in returns]
+    if "dict" in kinds:
+        return False, (
+            "transform returns a dict; image/svg+xml is serialised with "
+            "str(), so a dict is stored as its Python repr"
+        )
+    # A `-> str` annotation is a claim about the return, not the return.
+    # Python does not enforce it, so `-> str` on a method that returns
+    # `geom(data)` is exactly the defect this check exists to catch. What
+    # counts is where the returned expression actually resolves.
+    if all(kind == "str" for kind in kinds):
+        annotated = isinstance(func.returns, ast.Name) and func.returns.id == "str"
+        suffix = " and annotated -> str" if annotated else ""
+        return True, f"every return resolves to a string expression{suffix}"
+    return False, (
+        "cannot show the transform returns a string: the returned "
+        f"expression(s) resolve to {sorted(set(kinds))}. An `-> str` "
+        "annotation is not evidence, because nothing enforces it"
+    )
+
+
+_SVG_ROOT_RE = re.compile(r"<svg\b", re.IGNORECASE)
+_SVG_NS_RE = re.compile(r"xmlns\s*=\s*[\"']?http://www\.w3\.org/2000/svg")
+
+
+def check_svg_markup_in_output(
+    tree: ast.Module | None = None, py_raw: str = "", **_: Any
+) -> tuple[bool, str]:
+    """The transform must actually build SVG markup.
+
+    Independent of the return-shape check: a transform can return a
+    string of the wrong thing (a repr, a text table) and still satisfy
+    the annotation. Helpers count, so this scans the whole module's
+    string literals rather than the transform body.
+    """
+    if tree is None:
+        return False, "transform file missing or has a syntax error"
+    literals = "\n".join(_string_literals(tree))
+    missing: list[str] = []
+    if not _SVG_ROOT_RE.search(literals):
+        missing.append("an `<svg` root element")
+    if not _SVG_NS_RE.search(literals):
+        missing.append("the xmlns=http://www.w3.org/2000/svg namespace")
+    if missing:
+        return False, (
+            f"no SVG markup built in the source: missing {' and '.join(missing)}"
+        )
+    return True, "builds SVG markup with an <svg root and the svg namespace"
+
+
 CHECKS: dict[str, Any] = {
     "query-uses-inline-fragments-for-location": check_query_uses_inline_fragments_for_location,
     "query-no-direct-field-on-union-location": check_query_no_direct_field_on_union_location,
@@ -389,6 +706,9 @@ CHECKS: dict[str, Any] = {
     "polls-coreartifact-after-post": check_polls_coreartifact_after_post,
     "dry-run-executes-query": check_dry_run_executes_query,
     "dry-run-before-merge": check_dry_run_before_merge,
+    "artifact-content-type-declared": check_artifact_content_type_declared,
+    "svg-transform-returns-str": check_svg_transform_returns_str,
+    "svg-markup-in-output": check_svg_markup_in_output,
 }
 
 
