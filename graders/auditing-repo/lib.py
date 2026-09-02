@@ -43,6 +43,7 @@ Usage (in a per-task grader script)::
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -83,12 +84,15 @@ def load_output(path: Path) -> tuple[list[dict], str]:
     return [], raw
 
 
+def _find_all(findings: list[dict], rule: str) -> list[dict]:
+    """Every finding matching the given rule name."""
+    return [f for f in findings if isinstance(f, dict) and f.get("rule") == rule]
+
+
 def _find(findings: list[dict], rule: str) -> dict | None:
     """Return the first finding matching the given rule name, or None."""
-    for f in findings:
-        if isinstance(f, dict) and f.get("rule") == rule:
-            return f
-    return None
+    matches = _find_all(findings, rule)
+    return matches[0] if matches else None
 
 
 # ---------------------------------------------------------------------------
@@ -127,29 +131,55 @@ def check_yagni_replacement_mentions(
     layer changes the semantics, so a replacement that names the shared
     generic is a different (and wider) change than the check performed.
     """
-    f = _find(findings, rule)
-    if f is None:
+    texts = [str(f.get("replacement", "")) for f in _find_all(findings, rule)]
+    if not texts:
         return False, f"{rule} missing, cannot check replacement"
-    text = str(f.get("replacement", ""))
-    if substring.lower() in text.lower():
+    if any(substring.lower() in t.lower() for t in texts):
         return True, f"{rule} replacement names {substring!r}"
-    return False, f"{rule} replacement does not name {substring!r}: {text!r}"
+    return False, f"{rule} replacement does not name {substring!r}: {texts!r}"
 
 
-def check_yagni_replacement_excludes(
-    findings: list[dict], rule: str, substring: str
+# Contrast markers. A replacement reading "on DcimSwitch. Do NOT put it on
+# the shared DcimGenericDevice generic, because that would also bar
+# DcimRouter" is the *best* answer to this rule, which teaches naming the
+# replacement precisely. A blind substring test rejects it.
+_CONTRAST_MARKERS = re.compile(
+    r"\b(not|never|instead of|rather than|avoid|don't|do not|no longer|"
+    r"would (?:also|widen|apply)|which would|wrong|incorrect)\b",
+    re.IGNORECASE,
+)
+
+
+def check_yagni_replacement_target(
+    findings: list[dict], rule: str, wanted: str, unwanted: str
 ) -> tuple[bool, str]:
-    """Assert the named rule's suggested replacement does NOT name ``substring``."""
-    f = _find(findings, rule)
-    if f is None:
+    """Assert the replacement recommends ``wanted``, not ``unwanted``.
+
+    The layer a uniqueness constraint lands on changes its semantics, so a
+    replacement that puts it on the shared generic is a wider change than
+    the check it replaces. What matters is which kind is *recommended*, not
+    whether the other one is mentioned: naming the generic to rule it out
+    is the clearest form the replacement can take.
+
+    ``unwanted`` may appear as long as every sentence naming it also
+    carries a contrast marker.
+    """
+    matches = _find_all(findings, rule)
+    if not matches:
         return False, f"{rule} missing, cannot check replacement"
-    text = str(f.get("replacement", ""))
-    if substring.lower() in text.lower():
-        return False, (
-            f"{rule} replacement names {substring!r}, which would put the "
-            f"constraint on the wrong layer: {text!r}"
-        )
-    return True, f"{rule} replacement avoids {substring!r}"
+    texts = [str(f.get("replacement", "")) for f in matches]
+    if not any(wanted.lower() in t.lower() for t in texts):
+        return False, f"{rule} replacement does not name {wanted!r}: {texts!r}"
+    for text in texts:
+        for sentence in re.split(r"(?<=[.;])\s+", text):
+            if unwanted.lower() not in sentence.lower():
+                continue
+            if not _CONTRAST_MARKERS.search(sentence):
+                return False, (
+                    f"{rule} replacement recommends {unwanted!r}, which would "
+                    f"put the constraint on the wrong layer: {sentence!r}"
+                )
+    return True, f"{rule} replacement targets {wanted!r}, not {unwanted!r}"
 
 
 def check_yagni_finding_severity(
@@ -273,14 +303,19 @@ def check_yagni_finding_file(
     Multi-artifact tasks have a production file that must be flagged and an
     exempt file that must not; presence/severity checks alone pass even when
     the finding points at the wrong file. This pins the attribution.
+
+    Every finding for the rule is considered, not only the first: a run
+    that happens to list them in a different order was otherwise graded on
+    whichever one came out on top.
     """
-    f = _find(findings, rule)
-    if f is None:
+    matches = _find_all(findings, rule)
+    if not matches:
         return False, f"{rule} missing — cannot check file"
-    fpath = str(f.get("file", ""))
-    if substring in fpath:
-        return True, f"{rule} file={fpath}"
-    return False, f"{rule} file={fpath!r} does not contain {substring!r}"
+    paths = [str(f.get("file", "")) for f in matches]
+    hit = [p for p in paths if substring in p]
+    if hit:
+        return True, f"{rule} file={hit[0]}"
+    return False, f"{rule} file(s)={paths!r} contain none matching {substring!r}"
 
 
 def check_yagni_no_finding_on_file(
@@ -315,7 +350,9 @@ _CHECKS: dict[str, tuple[Any, list[str]]] = {
     "yagni-finding-present": (check_yagni_finding_present, ["str"]),
     "yagni-finding-absent": (check_yagni_finding_absent, ["str"]),
     "yagni-replacement-mentions": (check_yagni_replacement_mentions, ["str", "str"]),
-    "yagni-replacement-excludes": (check_yagni_replacement_excludes, ["str", "str"]),
+    "yagni-replacement-target": (
+        check_yagni_replacement_target, ["str", "str", "str"]
+    ),
     "yagni-finding-severity": (check_yagni_finding_severity, ["str", "str"]),
     "yagni-finding-ladder-step": (check_yagni_finding_ladder_step, ["str", "int"]),
     "yagni-finding-file": (check_yagni_finding_file, ["str", "str"]),

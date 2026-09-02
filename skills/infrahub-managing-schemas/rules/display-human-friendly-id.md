@@ -113,12 +113,21 @@ identifying values, the `human_friendly_id` belongs on
 each concrete kind rather than on the generic.
 
 That also means moving a `uniqueness_constraints` entry
-off a generic and onto its concrete kinds is only half
-the job: an HFID left behind on the generic puts the
+off a generic and onto its concrete kinds is only part
+of the job. Three keys compile into a generic-scoped
+uniqueness constraint, not one:
+
+1. `uniqueness_constraints` itself
+2. `human_friendly_id`
+3. any attribute with `unique: true`
+
+Any one of them left behind on the generic puts the
 same cross-kind check straight back, and the load error
 then names a `uniqueness_constraints` entry that does
-not appear in the file. Move both together. See
-[uniqueness-constraints.md](uniqueness-constraints.md).
+not appear in the file. **Move all three together.**
+[uniqueness-constraints.md](uniqueness-constraints.md)
+is the rule that owns this; read it before moving
+anything.
 
 Pair with `display_label` for UI rendering (supports Jinja2):
 

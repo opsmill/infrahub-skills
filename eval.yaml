@@ -964,7 +964,10 @@ tasks:
       A schema where `uniqueness_constraints: [["parent", "name__value"]]`
       is declared on BOTH concrete kinds and NOT on the shared generic,
       because a constraint on a generic is enforced across every kind that
-      inherits it and a concrete kind cannot narrow it back. The generic
+      inherits it and a concrete kind cannot narrow it back. Declaring the
+      moved constraint as a `human_friendly_id` on the concrete kinds is
+      equally correct: it compiles into the same `uniqueness_constraints`
+      on the layer that declares it. The generic
       must also carry no `human_friendly_id` and no attribute with
       `unique: true`: both compile into `uniqueness_constraints` on the
       layer that declares them, so either one on the generic reinstates
@@ -985,9 +988,23 @@ tasks:
       - >-
         The constrained relationship is cardinality one and optional false,
         because an optional relationship is rejected at load
+      - >-
+        The constraint pairs the rack relationship with name__value, so it
+        scopes the name within the rack rather than across the estate
+      - >-
+        No optional attribute appears in a constraint: an unset value is
+        compared as the literal "NULL" and collides
       - Attribute referenced as name__value, relationship referenced bare
       - Peers use full Namespace+Name kinds
     assertions:
+      - name: uniqueness-scopes-by-relationship
+        check: >-
+          Each concrete kind's constraint pairs a relationship with an
+          attribute path, so it scopes the name within the rack
+      - name: uniqueness-no-optional-attr
+        check: >-
+          No constrained attribute is optional, since an unset value is
+          compared as "NULL" rather than skipped
       - name: uniqueness-not-on-generic
         check: >-
           The inherited generic declares no uniqueness_constraints, no

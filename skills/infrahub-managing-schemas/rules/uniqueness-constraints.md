@@ -74,8 +74,10 @@ committed to. If the relationship genuinely has to be
 optional, the constraint cannot express the rule and it
 belongs in a check.
 
+WRONG. `rack` is optional, so this is rejected at
+load:
+
 ```yaml
-# WRONG: rack is optional, so this is rejected at load
 - name: Pdu
   namespace: Dcim
   uniqueness_constraints:
@@ -85,8 +87,16 @@ belongs in a check.
       peer: DcimRack
       cardinality: one
       optional: true          # <- makes the constraint invalid
+```
 
-# RIGHT: mandatory, cardinality one, referenced bare
+RIGHT. Mandatory, cardinality one, referenced bare:
+
+```yaml
+- name: Pdu
+  namespace: Dcim
+  uniqueness_constraints:
+    - ["rack", "name__value"]
+  relationships:
     - name: rack
       peer: DcimRack
       cardinality: one
@@ -106,9 +116,13 @@ the constraint.
 
 ### Scope: a constraint on a generic spans every implementer
 
+An **implementer** is a concrete node kind that lists a
+generic in its `inherit_from`. The word is used
+throughout this rule for that, and nothing else.
+
 **A constraint declared on a generic is enforced across
-every kind that inherits it, not per kind.** Two
-objects of different inheriting kinds cannot share the
+every implementer, not per kind.** Two objects of
+different implementing kinds cannot share the
 constrained values.
 
 ```yaml

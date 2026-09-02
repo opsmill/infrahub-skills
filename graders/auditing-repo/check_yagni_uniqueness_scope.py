@@ -34,8 +34,7 @@ CHECKS = [
     f"yagni-finding-severity:{RULE}:MEDIUM",
     f"yagni-finding-ladder-step:{RULE}:3",
     f"yagni-finding-file:{RULE}:check_switch_name_unique",
-    f"yagni-replacement-mentions:{RULE}:DcimSwitch",
-    f"yagni-replacement-excludes:{RULE}:DcimGenericDevice",
+    f"yagni-replacement-target:{RULE}:DcimSwitch:DcimGenericDevice",
     "yagni-finding-file-excludes:check_pdu_rack_unique",
     "yagni-no-above-medium",
 ]

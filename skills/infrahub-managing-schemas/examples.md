@@ -525,7 +525,8 @@ nodes:
 
 The layer a `uniqueness_constraints` entry sits on
 changes what it means, and the schema loads either way.
-Verified against Infrahub 1.11.0.
+Verified against Infrahub `1.10.8+19` (the 1.11.0 development
+line) using the in-memory schema validator.
 
 ### On a generic: enforced across every implementer
 
@@ -625,7 +626,9 @@ generics:
   - name: Endpoint
     namespace: Net
     # No uniqueness_constraints, no human_friendly_id, and no
-    # attribute with `unique: true`. All three land on the generic.
+    # attribute with `unique: true`. All three would be enforced
+    # across every implementer from here, so all three go on the
+    # concrete kinds below instead.
     attributes:
       - name: name
         kind: Text
