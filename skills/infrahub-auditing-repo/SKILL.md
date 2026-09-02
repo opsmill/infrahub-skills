@@ -10,6 +10,7 @@ allowed-tools:
   - Bash
   - Grep
   - Glob
+  - Write
 argument-hint: "[focus-area]"
 metadata:
   version: 1.2.8
@@ -26,18 +27,21 @@ plugin. Produces a structured report covering schemas,
 objects, checks, generators, transforms, menus,
 `.infrahub.yml` configuration, and deployment readiness.
 
-**The audit is read-only.** It never writes to the
-working tree or the index, and it never runs
-`git checkout`, `git restore`, `git stash`,
-`git clean`, `git reset` or `git rm`, including to
-undo its own side effect. An audit is most useful on a
-tree that holds uncommitted work, which is exactly the
-tree where a write cannot be undone. See
+**The audit is read-only.** The one file it writes is
+its own report, `AUDIT_REPORT.md`. Nothing else in the
+working tree or the index is touched, and no
+destructive git command is run against them, including
+to undo the audit's own side effect. An audit is most
+useful on a tree that holds uncommitted work, which is
+exactly the tree where a write cannot be undone.
+
 [rules/audit-is-read-only.md](./rules/audit-is-read-only.md)
-and Phase 0 of the procedure. The `Bash` tool is
-granted for read-only inspection (`git show`,
-`git diff`, `git ls-tree`, `find`, `grep`), not for
-changing state.
+holds the canonical lists: which git commands are
+forbidden and which read another revision without
+touching the tree. Read it, and Phase 0 of the
+procedure, before Phase 1. The `Bash` tool is granted
+for read-only inspection, not for changing state;
+`Write` is granted for the report file only.
 
 ## Project Context
 
@@ -84,7 +88,7 @@ severity levels used in the final report.
 
 | Priority | Category | What It Checks |
 | -------- | -------- | -------------- |
-| CRITICAL | Conduct | The audit writes nothing; constrains the auditor, not the repo |
+| CRITICAL | Conduct | The audit writes nothing but its report; constrains the auditor, not the repo |
 | CRITICAL | Project Structure | `.infrahub.yml` exists, paths valid |
 | CRITICAL | Schema Validation | Naming, relationships, deprecated fields |
 | CRITICAL | Object Validation | YAML structure, value types, refs |
@@ -119,6 +123,7 @@ The report is written to `AUDIT_REPORT.md` in the project root with this structu
 - Critical: N | High: N | Medium: N | Low: N | Info: N
 - Working tree at audit time: clean | N uncommitted files
 - Tree modified by this audit: no | yes, listing paths
+  (the report file itself does not count)
 
 ## Project Structure
 

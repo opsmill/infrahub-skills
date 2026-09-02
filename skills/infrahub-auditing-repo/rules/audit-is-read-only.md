@@ -47,9 +47,19 @@ auditor that modifying the tree was worth mentioning.
 
 ## Checks
 
+Both command lists below are canonical. `SKILL.md`,
+`audit-procedure.md` and the graders point at them
+instead of restating them, so an edit here is the only
+edit needed.
+
 1. **Never write to the tree or the index.** No file
-   creation, edit, move, or delete outside the report
-   file itself.
+   creation, edit, move, or delete. The single
+   exception is the report file, `AUDIT_REPORT.md`,
+   which is the audit's deliverable and does not count
+   as modifying the tree. Git is not the only way to
+   break this: `rm`, `mv`, `cp`, `touch`, `sed -i` and
+   a `>` redirect into a repository path are all
+   writes, and none of them are undoable either.
 2. **Never run a destructive git command against a
    tree being audited**, *including to undo your own
    side effect*:
@@ -57,12 +67,16 @@ auditor that modifying the tree was worth mentioning.
    ```text
    git checkout      git restore     git stash
    git clean         git reset       git rm
+   git switch        git mv          git add
+   git commit
    ```
 
-   The "including to undo your own side effect"
-   clause is the load-bearing half. A revert run in
-   the belief that it is tidying up is still a
-   delete.
+   The first six rewrite or delete tree content. The
+   last four move content into the index or history,
+   which is still a write the user did not ask for.
+   The "including to undo your own side effect" clause
+   is the load-bearing half. A revert run in the belief
+   that it is tidying up is still a delete.
 3. **Read another revision with a read-only command.**
    All of these read without touching the tree:
 
@@ -75,6 +89,8 @@ auditor that modifying the tree was worth mentioning.
 
    This is how you compare committed content against
    a dirty tree without stashing anything.
+   `git status --porcelain` and `git log` are read-only
+   too; they just do not reach file content.
 4. **Before running any repository script for its
    output, establish whether it writes.** Read the
    script. A flag named `--check`, `--dry-run`, or

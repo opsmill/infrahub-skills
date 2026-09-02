@@ -11,16 +11,20 @@ Read
 before Phase 1. It is not a phase you walk; it is the
 constraint every phase runs under.
 
+The rule holds the canonical command lists, forbidden
+and permitted. They are not restated here, so prose and
+graders stay on one source of truth.
+
 The short form:
 
-- Do not write to the working tree or the index.
-- Do not run `git checkout`, `git restore`,
-  `git stash`, `git clean`, `git reset` or `git rm`
-  against the tree, **including to undo your own side
-  effect**.
-- To read another revision, use
-  `git show <ref>:<path>`, `git diff <ref> -- <path>`
-  or `git cat-file`. None of them touch the tree.
+- Do not write to the working tree or the index. The
+  report file (`AUDIT_REPORT.md`) is the only file the
+  audit creates.
+- Do not run any git command from the rule's forbidden
+  list against the tree, **including to undo your own
+  side effect**.
+- To read another revision, use one of the read-only
+  commands the rule lists. None of them touch the tree.
 - Before running a repository script for its output,
   read it and establish whether it writes. A flag
   named `--check` is not a guarantee. If you cannot

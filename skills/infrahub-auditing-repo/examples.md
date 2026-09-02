@@ -14,7 +14,7 @@ is the rule these implement.
 | What does this file look like as committed? | `git show HEAD:objects/racks.yml` |
 | What did the audit's target change? | `git diff HEAD -- generators/` |
 | Which files existed at that revision? | `git ls-tree -r --name-only HEAD objects/` |
-| Does committed output match committed input? | `git show HEAD:generators/build_racks.py > /dev/null` then reason from the source; do not run it against the tree |
+| Does committed output match committed input? | `git show HEAD:generators/build_racks.py`, then reason from the source; do not run it against the tree |
 
 The wrong shape, and the one that has already
 destroyed work:
