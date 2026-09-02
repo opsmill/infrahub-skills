@@ -12,7 +12,7 @@ from lib import run_checks  # noqa: E402
 
 CHECKS = [
     "traversal-uses-relationship-filter",
-    "traversal-checks-truncation",
+    "traversal-enumerates-and-checks-truncation",
     "shared-save-opts-out-of-tracking",
     "group-membership-from-member-side",
 ]

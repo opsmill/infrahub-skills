@@ -114,29 +114,29 @@
       "expected_output": "A generator constraining the traversal by `relationship_filter` (schema identifiers, not relationship names) plus a `max_depth`, because kind filtering restricts which nodes appear rather than which edges are followed and so does not stop the walk crossing the shared catalog object. It must check `truncated_at_depth` before using the paths. The shared `NetContainer` must be saved with `update_group_context=False`, since the tracking group is per target and every save (upsert included) claims the node, so whichever service stops writing it would delete it and orphan the other services' legs. Group membership must be written from the member side with `member_of_groups`.",
       "files": [],
       "expectations": [
-        "Uses traverse_paths (or path_exists), not a hand-written per-hop walk",
+        "Uses traverse_paths and iterates the returned paths to create one leg per path, not a hand-written per-hop walk and not path_exists alone (it returns a bool and cannot enumerate paths)",
         "Constrains by relationship_filter with schema identifiers (containing __), plus a max_depth",
-        "Does NOT use included_kinds as a whitelist; explains it only re-includes kinds excluded by default",
+        "Does NOT pass included_kinds to the traversal; explains it only re-includes kinds excluded by default",
         "Checks truncated_at_depth before acting on the returned paths",
-        "Saves the shared NetContainer with update_group_context=False, and explains that an upsert otherwise claims ownership",
+        "Saves the shared NetContainer with update_group_context=False while leaving the per-service legs tracked, and explains that an upsert otherwise claims ownership",
         "Object data assigns membership via member_of_groups on the member, not via members on the group"
       ],
       "assertions": [
         {
           "name": "traversal-uses-relationship-filter",
-          "check": "Traversal constrained by relationship_filter using schema identifiers, and included_kinds is not used as a whitelist"
+          "check": "The traverse_paths / path_exists call passes relationship_filter holding schema identifiers, and does not pass included_kinds"
         },
         {
-          "name": "traversal-checks-truncation",
-          "check": "truncated_at_depth is checked before the paths are used"
+          "name": "traversal-enumerates-and-checks-truncation",
+          "check": "traverse_paths is used, its .paths are iterated, and truncated_at_depth is checked before the paths are used"
         },
         {
           "name": "shared-save-opts-out-of-tracking",
-          "check": "The shared object is saved with update_group_context=False"
+          "check": "The shared NetContainer's own save sets update_group_context=False (or it is created outside the generator), and not every save carries the flag"
         },
         {
           "name": "group-membership-from-member-side",
-          "check": "Membership is assigned via member_of_groups, not via members on the group"
+          "check": "The YAML object data assigns membership via member_of_groups, not via members on the group"
         }
       ]
     },
