@@ -934,6 +934,83 @@ tasks:
           Dropdown choice keys follow name -> label -> description ->
           color
 
+  - name: generic-inheritance-limits
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      and follow its workflow and rules.
+
+      Task: Model ports and devices with two flat generics, `DcimDevice`
+      and `DcimPort`, plus one concrete kind on each side (`DcimSwitch`
+      and `DcimOpticalPort`). Requirements:
+
+      1. `DcimPort` has a `media` Dropdown with choices `fibre` and
+         `copper`. Optical ports are always fibre, so I want that to be
+         the default on `DcimOpticalPort` and not repeated in every
+         object file.
+
+      1b. Every port attaches to exactly one device, and that is true of
+         all ports, so the port-to-device relationship belongs on the
+         `DcimPort` generic. Give it a matching side on `DcimDevice`.
+      2. Ports list in name order by default. Devices have no natural
+         sort key, but I still want a stable order for them.
+      3. An optical port should only ever attach to a switch. Express
+         that in the schema if the schema can express it; if it cannot,
+         say so and tell me where the rule has to live instead.
+
+      Save ONLY the final YAML to: output.yml, and put any explanation
+      in YAML comments inside that file.
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_generic_inheritance.py
+        weight: 1.0
+    expected_output: >-
+      A schema where DcimOpticalPort's media override restates
+      kind: Dropdown AND the complete choices list alongside
+      default_value: fibre, because omitting choices is rejected at load
+      and a partial list loads silently. order_by on DcimPort names
+      name__value (which DcimPort itself declares), while DcimDevice uses
+      node_metadata__updated_at or node_metadata__created_at since it
+      declares no sort key of its own. Requirement 3 is NOT expressed by
+      narrowing the inherited peer: that is rejected from either side, so
+      the answer should say the pairing must live in a Python check or go
+      unenforced.
+    expectations:
+      - >-
+        The media override restates kind: Dropdown and both choices, not
+        just default_value
+      - >-
+        order_by on DcimPort names an attribute DcimPort itself declares
+      - >-
+        DcimDevice orders by node_metadata__created_at or
+        node_metadata__updated_at rather than by an attribute it does not
+        declare
+      - >-
+        No kind redeclares an inherited relationship with a narrowed peer
+      - >-
+        States that kind-to-kind pairing between two generic-typed
+        families is not expressible, and names a check as the place it
+        must live
+    assertions:
+      - name: dropdown-override-complete
+        check: >-
+          The inherited Dropdown override restates kind and the generic's
+          full choice list
+      - name: order-by-resolves-locally
+        check: >-
+          Every order_by entry resolves against the schema that declares
+          it, metadata entries included
+      - name: inherited-peer-unchanged
+        check: No inherited relationship peer is narrowed on any kind
+      - name: pairing-note-present
+        check: >-
+          A comment states the kind-to-kind pairing is not expressible in
+          the schema and names a check as where it must live
+      - name: schema-version
+        check: File declares version "1.0"
+      - name: full-kind-references
+        check: Relationship peers use full Namespace+Name kinds
+
   # --- Check Creator --- #
   - name: global-check-registration
     trials: 3
@@ -3936,6 +4013,102 @@ tasks:
         check: The yagni-duplicate-shape-not-extracted-to-generic finding has severity MEDIUM
       - name: correct-ladder-step
         check: The yagni-duplicate-shape-not-extracted-to-generic finding has ladder_step 2
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
+
+  - name: yagni-duplicate-shape-paired-rel
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this schema (schemas/ports.yml) — three port nodes each
+      repeating the same six attributes, and each with a `device`
+      relationship pointing at a different peer:
+
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: OpticalPort
+          namespace: Dcim
+          attributes:
+            - {name: name, kind: Text}
+            - {name: serial, kind: Text}
+            - {name: connector, kind: Text}
+            - {name: vendor, kind: Text}
+            - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}
+            - {name: notes, kind: Text, optional: true}
+          relationships:
+            - name: device
+              peer: DcimOpticalDevice
+              cardinality: one
+              identifier: opticalport__device
+        - name: CopperPort
+          namespace: Dcim
+          attributes:
+            - {name: name, kind: Text}
+            - {name: serial, kind: Text}
+            - {name: connector, kind: Text}
+            - {name: vendor, kind: Text}
+            - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}
+            - {name: notes, kind: Text, optional: true}
+          relationships:
+            - name: device
+              peer: DcimCopperDevice
+              cardinality: one
+              identifier: copperport__device
+        - name: VirtualPort
+          namespace: Dcim
+          attributes:
+            - {name: name, kind: Text}
+            - {name: serial, kind: Text}
+            - {name: connector, kind: Text}
+            - {name: vendor, kind: Text}
+            - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}
+            - {name: notes, kind: Text, optional: true}
+          relationships:
+            - name: device
+              peer: DcimVirtualDevice
+              cardinality: one
+              identifier: virtualport__device
+      ```
+
+      Each port kind attaches to exactly one device kind, and the schema
+      is currently enforcing that pairing.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_duplicate_shape_paired_rel.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-duplicate-shape-not-extracted-to-generic
+      finding with severity MEDIUM and ladder_step 2, covering the six
+      duplicated attributes. Its replacement must leave the `device`
+      relationship on the concrete kinds and say why: a relationship
+      hoisted onto a generic has its peer frozen there, so the per-kind
+      pairing would stop being expressible in the schema.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-duplicate-shape-not-extracted-to-generic finding
+      - That finding has severity MEDIUM and ladder_step 2
+      - >-
+        The replacement hoists the duplicated attributes but not the
+        `device` relationship
+      - >-
+        The finding states that a relationship on a generic has its peer
+        fixed for every implementer
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-duplicate-shape-not-extracted-to-generic finding is emitted
+      - name: correct-severity
+        check: The yagni-duplicate-shape-not-extracted-to-generic finding has severity MEDIUM
+      - name: correct-ladder-step
+        check: The yagni-duplicate-shape-not-extracted-to-generic finding has ladder_step 2
+      - name: discloses-frozen-peer
+        check: >-
+          The finding says the paired `device` relationship stays on the
+          concrete kinds because a generic freezes its peer
       - name: severity-cap
         check: No yagni finding exceeds MEDIUM severity
 

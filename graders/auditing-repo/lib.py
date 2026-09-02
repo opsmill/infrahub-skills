@@ -43,6 +43,7 @@ Usage (in a per-task grader script)::
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -235,6 +236,99 @@ def check_yagni_finding_file(
     return False, f"{rule} file={fpath!r} does not contain {substring!r}"
 
 
+# Named keyword groups a finding's prose must hit. Colon-encoded check names
+# cannot carry a regex, so eval.yaml names a group and the patterns live here.
+_REPLACEMENT_KEYWORD_GROUPS: dict[str, list[re.Pattern[str]]] = {
+    # yagni-duplicate-shape-not-extracted-to-generic must disclose that a
+    # relationship hoisted onto a generic has its peer frozen there, and must
+    # leave a precisely paired relationship on the concrete kinds.
+    "paired-relationship-stays-put": [
+        re.compile(r"\bpeer\b[^.\n]{0,80}\b(?:frozen|fixed|locked|immutable|same peer)\b", re.IGNORECASE),
+        re.compile(r"\b(?:same|identical|fixed|frozen)\s+peer\b", re.IGNORECASE),
+        # "leave/keep the relationship" only counts when the destination is
+        # named and it is the concrete kind. Without the destination,
+        # "keep the device relationships there too" -- meaning on the
+        # generic -- matched, which is the antipattern.
+        re.compile(
+            r"\b(?:leave|keep|retain)\b[^.\n]{0,80}\brelationships?\b[^.\n]{0,60}"
+            r"\bon\b[^.\n]{0,30}\b(?:concrete|node|each|per-kind|implementer|"
+            r"individual|specific)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(r"\b(?:do not|don't|not|never)\b[^.\n]{0,40}\b(?:hoist|move|extract|lift)\b[^.\n]{0,60}\brelationships?\b", re.IGNORECASE),
+        re.compile(r"\brelationships?\b[^.\n]{0,60}\b(?:stays?|remains?)\b[^.\n]{0,60}\b(?:concrete|node|kind)", re.IGNORECASE),
+        re.compile(r"\bpairing\b[^.\n]{0,100}\b(?:inexpressible|not expressible|unenforced|check)\b", re.IGNORECASE),
+    ],
+}
+
+# Words that turn a following recommendation into a warning. "Do not hoist
+# the device relationship" and "hoisting it would freeze the peer" both
+# name the antipattern in order to rule it out.
+_NEGATED_RECOMMENDATION = re.compile(
+    r"\b(?:do not|don't|never|not|avoid|resist|instead of|rather than|"
+    r"would|could|cannot|can't|must not|should not|shouldn't|if you)\b",
+    re.IGNORECASE,
+)
+
+# A positive match is not enough on its own. A finding can disclose the
+# frozen-peer cost in one sentence and still recommend hoisting the
+# relationship in the next, which is the recommendation the rule forbids.
+_REPLACEMENT_DISQUALIFIERS: dict[str, list[re.Pattern[str]]] = {
+    "paired-relationship-stays-put": [
+        re.compile(
+            r"\b(?:hoist|move|lift|extract|pull|put|place|keep|leave)\b"
+            r"[^.\n]{0,60}\brelationships?\b[^.\n]{0,60}"
+            r"\b(?:on|onto|to|into|up to)\s+(?:the\s+)?generic\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\bgeneric\b[^.\n]{0,60}\b(?:with|including|and)\b[^.\n]{0,40}"
+            r"\brelationships?\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\brelationships?\b[^.\n]{0,40}\b(?:there|on it)\b[^.\n]{0,20}\btoo\b",
+            re.IGNORECASE,
+        ),
+    ],
+}
+
+
+def check_yagni_finding_replacement_mentions(
+    findings: list[dict], rule: str, group: str
+) -> tuple[bool, str]:
+    """Assert the named rule's finding prose discloses a required cost.
+
+    Presence, severity and ladder_step all pass on a finding that says only
+    "extract a generic". The rule requires the finding to name what the
+    extraction costs, so this reads the finding's own text.
+    """
+    patterns = _REPLACEMENT_KEYWORD_GROUPS.get(group)
+    if patterns is None:
+        return False, f"unknown keyword group: {group}"
+    f = _find(findings, rule)
+    if f is None:
+        return False, f"{rule} missing — cannot check its prose"
+    text = " ".join(
+        str(f.get(field, "")) for field in ("replacement", "description", "message", "detail", "recommendation")
+    )
+    for sentence in re.split(r"(?<=[.;:])\s+|\n", text):
+        for bad in _REPLACEMENT_DISQUALIFIERS.get(group, []):
+            hit = bad.search(sentence)
+            if not hit:
+                continue
+            if _NEGATED_RECOMMENDATION.search(sentence[: hit.end()]):
+                continue  # named in order to rule it out
+            return False, (
+                f"{rule} replacement recommends hoisting the relationship onto "
+                f"the generic, which is what the carve-out forbids: {sentence!r}"
+            )
+    for pat in patterns:
+        if pat.search(text):
+            return True, f"{rule} discloses {group} (matched {pat.pattern!r})"
+    return False, f"{rule} prose does not disclose {group}"
+
+
 def check_yagni_no_finding_on_file(
     findings: list[dict], substring: str
 ) -> tuple[bool, str]:
@@ -269,6 +363,7 @@ _CHECKS: dict[str, tuple[Any, list[str]]] = {
     "yagni-finding-ladder-step": (check_yagni_finding_ladder_step, ["str", "int"]),
     "yagni-finding-file": (check_yagni_finding_file, ["str", "str"]),
     "yagni-finding-file-excludes": (check_yagni_no_finding_on_file, ["str"]),
+    "yagni-finding-discloses": (check_yagni_finding_replacement_mentions, ["str", "str"]),
     "yagni-findings-sorted": (check_yagni_findings_sorted_by_ladder, []),
     "yagni-bootstrap-carveout": (check_yagni_finding_carves_out_bootstrap, []),
     "yagni-no-above-medium": (check_yagni_no_finding_above_medium, []),

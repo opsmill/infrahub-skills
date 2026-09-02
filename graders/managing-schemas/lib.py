@@ -1056,8 +1056,327 @@ def check_choice_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
     return True, f"All {seen} dropdown choice(s) are in canonical key order"
 
 
+
+# ---------------------------------------------------------------------------
+# Generic inheritance semantics
+#
+# All three verified against Infrahub's in-memory schema validator: order_by
+# on a generic resolves only against that generic's own declarations; an
+# inherited Dropdown override must restate kind + the full choice list, and a
+# mismatched list loads silently; an inherited relationship's peer is fixed.
+# ---------------------------------------------------------------------------
+
+
+# A trailing `__asc` / `__desc` is a direction suffix, not part of the path.
+# It is legal on every order_by form, node metadata included.
+_ORDER_BY_DIRECTIONS = {"asc", "desc"}
+
+
+def _strip_order_direction(entry: str) -> str:
+    """Drop a trailing ``__asc`` / ``__desc`` direction suffix from an entry."""
+    head, sep, tail = entry.rpartition("__")
+    if sep and head and tail in _ORDER_BY_DIRECTIONS:
+        return head
+    return entry
+
+
+def _entities(schema: dict) -> list[tuple[str, dict]]:
+    """Yield ``(section, entity)`` for every node and generic in the schema."""
+    out: list[tuple[str, dict]] = []
+    for section in ("generics", "nodes"):
+        for entity in schema.get(section) or []:
+            if isinstance(entity, dict):
+                out.append((section, entity))
+    return out
+
+
+def _generic_map(schema: dict) -> dict[str, dict]:
+    """Return generics keyed by full kind."""
+    return {
+        f"{g.get('namespace', '')}{g.get('name', '')}": g
+        for g in (schema.get("generics") or [])
+        if isinstance(g, dict)
+    }
+
+
+def _generics_by_kind(schema: dict) -> dict[str, dict]:
+    return {
+        f"{g.get('namespace', '')}{g.get('name', '')}": g
+        for g in (schema.get("generics") or [])
+        if isinstance(g, dict)
+    }
+
+
+def _all_parents_in_file(schema: dict, entity: dict) -> bool:
+    """True when every generic the entity inherits is declared in this file."""
+    declared = _generics_by_kind(schema)
+    return all(k in declared for k in (entity.get("inherit_from") or []))
+
+
+def _inherited_member_names(schema: dict, entity: dict) -> set[str]:
+    """Attribute and relationship names the entity gets from in-file generics."""
+    generics = _generics_by_kind(schema)
+    names: set[str] = set()
+    for parent_kind in entity.get("inherit_from") or []:
+        parent = generics.get(parent_kind)
+        if not parent:
+            continue
+        for group in ("attributes", "relationships"):
+            names |= {
+                member["name"]
+                for member in (parent.get(group) or [])
+                if isinstance(member, dict) and member.get("name")
+            }
+    return names
+
+
+def check_order_by_resolves_locally(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Every order_by entry must resolve against the schema that declares it.
+
+    A generic is the source of inheritance, so it has no inherited fields to
+    resolve against. Naming an attribute only the implementers declare is
+    rejected at load with "attribute '<name>' not defined on this schema".
+    """
+    problems: list[str] = []
+    seen = 0
+    for section, entity in _entities(schema):
+        entries = entity.get("order_by") or []
+        if not entries:
+            continue
+        seen += 1
+        own_attrs = {
+            a["name"] for a in (entity.get("attributes") or [])
+            if isinstance(a, dict) and a.get("name")
+        }
+        own_rels = {
+            r["name"] for r in (entity.get("relationships") or [])
+            if isinstance(r, dict) and r.get("name")
+        }
+        targets: dict[str, str] = {}
+        for entry in entries:
+            if not isinstance(entry, str):
+                continue
+            # "Each target at most once, even with opposite directions" is a
+            # load-time rejection, so the duplicate has to fail here too.
+            target = _strip_order_direction(entry)
+            if target in targets:
+                problems.append(
+                    f"{entity.get('name')}.order_by names {target!r} twice "
+                    f"({targets[target]!r} and {entry!r}); each target may "
+                    "appear at most once, even with opposite directions"
+                )
+            targets[target] = entry
+            if entry.startswith("node_metadata__"):
+                field = _strip_order_direction(entry).split("__", 1)[1]
+                if field not in {"created_at", "updated_at"}:
+                    problems.append(
+                        f"{entity.get('name')}.order_by {entry!r}: unknown metadata field"
+                    )
+                continue
+            head = entry.split("__")[0]
+            if head in own_attrs or head in own_rels:
+                continue
+            if section == "generics":
+                # A generic is the source of inheritance, so it has nothing
+                # to inherit the field from.
+                problems.append(
+                    f"{entity.get('name')}.order_by {entry!r}: "
+                    f"{head!r} is not declared on this generic"
+                )
+                continue
+            # On a node the field may be inherited, so resolve the parents
+            # declared in this file before calling it undeclared. Only a
+            # field that exists nowhere is a defect.
+            if head in _inherited_member_names(schema, entity):
+                continue
+            if entity.get("inherit_from") and not _all_parents_in_file(schema, entity):
+                continue  # inherited from a generic declared elsewhere
+            problems.append(
+                f"{entity.get('name')}.order_by {entry!r}: "
+                f"{head!r} is declared neither here nor on any generic it inherits"
+            )
+    if problems:
+        return False, "; ".join(problems)
+    if seen == 0:
+        return False, "no order_by declared anywhere"
+    return True, "order_by entries resolve against their declaring schema"
+
+
+def check_dropdown_override_complete(schema: dict, **_: Any) -> tuple[bool, str]:
+    """A Dropdown override must restate `kind` and the generic's full choice list.
+
+    Omitting choices is rejected at load; a shorter or longer list loads
+    silently and fails later at object-write time, so an exact match is the
+    only safe shape.
+    """
+    generic_dropdowns: dict[str, dict[str, list]] = {}
+    for kind, generic in _generic_map(schema).items():
+        for attr in generic.get("attributes") or []:
+            if isinstance(attr, dict) and attr.get("kind") == "Dropdown":
+                generic_dropdowns.setdefault(kind, {})[attr["name"]] = [
+                    c.get("name") for c in (attr.get("choices") or [])
+                    if isinstance(c, dict)
+                ]
+
+    if not generic_dropdowns:
+        return False, "no Dropdown declared on any generic"
+
+    problems: list[str] = []
+    overrides = 0
+    for node in schema.get("nodes") or []:
+        if not isinstance(node, dict):
+            continue
+        inherited: dict[str, list] = {}
+        for parent_kind in node.get("inherit_from") or []:
+            inherited.update(generic_dropdowns.get(parent_kind, {}))
+        for attr in node.get("attributes") or []:
+            if not isinstance(attr, dict) or attr.get("name") not in inherited:
+                continue
+            overrides += 1
+            name = attr["name"]
+            expected = inherited[name]
+            if attr.get("kind") != "Dropdown":
+                problems.append(
+                    f"{node.get('name')}.{name} override kind="
+                    f"{attr.get('kind')!r}, must restate Dropdown"
+                )
+                continue
+            actual = [
+                c.get("name") for c in (attr.get("choices") or [])
+                if isinstance(c, dict)
+            ]
+            if not actual:
+                problems.append(
+                    f"{node.get('name')}.{name} override omits choices "
+                    "(rejected at load)"
+                )
+            elif sorted(actual) != sorted(expected):
+                problems.append(
+                    f"{node.get('name')}.{name} choices {actual} != generic's "
+                    f"{expected} (loads silently, fails at write time)"
+                )
+    if problems:
+        return False, "; ".join(problems)
+    if overrides == 0:
+        return False, "no inherited Dropdown was overridden"
+    return True, f"{overrides} Dropdown override(s) restate kind and the full choice list"
+
+
+def check_inherited_peer_unchanged(schema: dict, **_: Any) -> tuple[bool, str]:
+    """No kind may redeclare an inherited relationship with a different peer.
+
+    Rejected at `infrahubctl schema check` from either side. Hierarchy
+    relationships are exempt, so they are skipped here too.
+    """
+    generic_rels: dict[str, dict[str, dict]] = {
+        kind: {
+            r["name"]: r for r in (generic.get("relationships") or [])
+            if isinstance(r, dict) and r.get("name")
+        }
+        for kind, generic in _generic_map(schema).items()
+    }
+
+    problems: list[str] = []
+    inheritors = 0
+    for node in schema.get("nodes") or []:
+        if not isinstance(node, dict):
+            continue
+        inherited: dict[str, dict] = {}
+        for parent_kind in node.get("inherit_from") or []:
+            inherited.update(generic_rels.get(parent_kind, {}))
+        if inherited:
+            inheritors += 1
+        for rel in node.get("relationships") or []:
+            if not isinstance(rel, dict):
+                continue
+            parent_rel = inherited.get(rel.get("name"))
+            if parent_rel is None:
+                continue
+            if "Hierarchy" in (rel.get("kind", ""), parent_rel.get("kind", "")):
+                continue  # exempt
+            if rel.get("peer") != parent_rel.get("peer"):
+                problems.append(
+                    f"{node.get('name')}.{rel['name']} peer={rel.get('peer')!r} "
+                    f"but inherited peer is {parent_rel.get('peer')!r}"
+                )
+    if problems:
+        return False, "inherited peer narrowed: " + "; ".join(problems)
+    # Floor guard: a schema with no inherited relationship at all satisfies
+    # "nothing is narrowed" without exercising the rule. Declaring the
+    # relationship on the concrete kinds instead of the generic sidesteps the
+    # constraint the task is about, so that shape must not score.
+    if inheritors == 0:
+        return False, "no node inherits a relationship, so nothing exercises the rule"
+    return True, "no inherited relationship peer is narrowed"
+
+
+# The pairing requirement cannot be expressed in the schema, so the only place
+# the answer can carry it is prose. Accept any wording that (a) says the
+# schema cannot express it and (b) names the place it has to live instead.
+_PAIRING_NOT_EXPRESSIBLE_PATTERNS = [
+    re.compile(r"\b(?:not|cannot|can't|isn't|is not|un)\s*\w*\s*express\w*", re.IGNORECASE),
+    re.compile(r"\bschema\s+cannot\b", re.IGNORECASE),
+    re.compile(r"\b(?:same|identical|fixed|frozen)\s+peer\b", re.IGNORECASE),
+    re.compile(r"\bpeer\b[^.\n]{0,60}\b(?:cannot|can't|may not)\b[^.\n]{0,30}\b(?:narrow|change|override)", re.IGNORECASE),
+    # The substance is "the schema will not carry this rule", however it is
+    # worded. Requiring the token "express" graded vocabulary: "Infrahub
+    # rejects a narrowed peer on an inherited relationship, so the rule has
+    # to live in a check" was scored as not stating the limit.
+    re.compile(
+        r"\b(?:reject|refus|forbid|disallow|prevent|block)\w*\b[^.\n]{0,80}"
+        r"\b(?:narrow\w*|override|overriding|changing|different)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:narrow\w*|override|overrid\w+)\b[^.\n]{0,60}"
+        r"\b(?:inherited|generic)\b[^.\n]{0,60}"
+        r"\b(?:reject|refus|not allowed|not permitted|fails?|error)\w*",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bhas to live\b[^.\n]{0,60}\b(?:in|as)\s+a\s+(?:python\s+)?check",
+        re.IGNORECASE,
+    ),
+]
+
+# The enforcement home has to be a check or the proposed-change pipeline.
+# A bare "check" matches an `infrahubctl schema check` comment, so the word
+# needs a qualifier that makes it the artifact rather than the verb.
+_PAIRING_ENFORCEMENT_HOME_PATTERNS = [
+    re.compile(r"\bcheck[_-]?definitions?\b", re.IGNORECASE),
+    re.compile(r"\b(?:python|custom|a|the)\s+check\b(?!\s*(?:that\s+)?the\s+schema)", re.IGNORECASE),
+    re.compile(r"\bchecks?\b[^.\n]{0,40}\bproposed[-\s]?change\b", re.IGNORECASE),
+    re.compile(r"\bproposed[-\s]?change\b", re.IGNORECASE),
+    re.compile(r"\bInfrahubCheck\b"),
+]
+
+
+def check_pairing_note_present(schema: dict, *, raw_text: str = "", **_: Any) -> tuple[bool, str]:
+    """The answer must say the kind-to-kind pairing is not expressible in schema.
+
+    Naming a Python check (or the proposed-change pipeline) as the place the
+    rule has to live instead is part of the requirement: "you cannot do it"
+    without "here is where it goes" leaves the user stuck.
+    """
+    said_inexpressible = next(
+        (p for p in _PAIRING_NOT_EXPRESSIBLE_PATTERNS if p.search(raw_text)), None
+    )
+    if said_inexpressible is None:
+        return False, "does not state that the kind-to-kind pairing is inexpressible in the schema"
+    named_home = next(
+        (p for p in _PAIRING_ENFORCEMENT_HOME_PATTERNS if p.search(raw_text)), None
+    )
+    if named_home is None:
+        return False, "states the limit but never names a check as where the pairing must live"
+    return True, f"pairing note present (matched {said_inexpressible.pattern!r} and {named_home.pattern!r})"
+
+
 CHECKS: dict[str, Any] = {
     "attr-min-length": check_attr_min_length,
+    "order-by-resolves-locally": check_order_by_resolves_locally,
+    "dropdown-override-complete": check_dropdown_override_complete,
+    "inherited-peer-unchanged": check_inherited_peer_unchanged,
+    "pairing-note-present": check_pairing_note_present,
     "dropdown-for-status": check_dropdown_for_status,
     "no-deprecated-string": check_no_deprecated_string,
     "full-kind-references": check_full_kind_references,

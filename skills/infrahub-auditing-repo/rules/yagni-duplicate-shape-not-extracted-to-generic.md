@@ -42,10 +42,49 @@ SDK type generation also collapse to one definition instead of N.
    identifiers, cardinality) — the relationship belongs on a shared
    generic.
 
+## What the finding must disclose
+
+Extracting a generic is cheap and usually right, but it
+is not free, and two of the costs are invisible until
+after the hierarchy is written. A finding that only says
+"extract a generic" hands the reader a surprise. Name
+these alongside the recommendation:
+
+1. **A relationship moved onto a generic has its peer
+   frozen there.** No inheriting kind can narrow or widen
+   it, from either side. So if the sibling nodes have
+   relationships that ought to pair up precisely
+   (`OpticalPort` only ever attaches to `OpticalDevice`),
+   extracting the relationship to the generic makes that
+   pairing **inexpressible in the schema** — it has to
+   move to a Python check or go unenforced. Hierarchy
+   relationships are exempt. See
+   [../../infrahub-managing-schemas/rules/relationship-peer-kind.md](../../infrahub-managing-schemas/rules/relationship-peer-kind.md).
+2. **The generic's implementer set becomes a published
+   interface.** Every query rooted on the generic, every
+   uniqueness constraint declared on it, and every
+   consumer that sums or filters over it now answers
+   differently, and adding the next implementer changes
+   those answers again with no migration and no
+   validation to flag it.
+3. **A Dropdown moved onto a generic can drift.** A
+   concrete kind that overrides it to add a default must
+   restate the whole choice list, and a stale or invented
+   list loads silently.
+
+None of this makes the finding wrong. It means the
+suggested replacement should say *which* attributes and
+relationships to hoist, and should leave a precisely
+paired relationship on the concrete kinds rather than
+sweeping it up with the rest.
+
 ## What NOT to flag
 
 - Two nodes sharing one or two trivial attributes (`name`,
   `description`). The cost of a generic exceeds the duplication.
+- A relationship whose peer differs meaningfully per sibling, where
+  the pairing is the point. Hoisting it to a generic would erase a
+  constraint the schema is currently enforcing.
 - Nodes that share attribute *names* but differ in kind or
   constraints (one's `id` is `Text`, another's is `Number`). They
   aren't the same shape.
