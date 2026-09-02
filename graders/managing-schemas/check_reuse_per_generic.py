@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Grader for the reuse-kind-availability eval."""
+"""Grader for the reuse-per-generic eval.
+
+Grades whether a published file was judged per generic rather than as a unit:
+the cheap generic is adopted, and the provenance comment records what was
+taken and why the rest was excluded.
+"""
 
 from __future__ import annotations
 
@@ -14,8 +19,7 @@ CHECKS = [
     "schema-version",
     "external-kinds-core-or-sourced",
     "records-marketplace-provenance",
-    "corrects-builtin-core-premise",
-    "names-kind-verification-command",
+    "records-subset-rationale",
     "full-kind-references",
 ]
 

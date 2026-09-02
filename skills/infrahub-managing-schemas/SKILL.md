@@ -117,10 +117,10 @@ already covers it:
 
 | Signal | Cheaper layer | See rule |
 | ------ | ------------- | -------- |
-| Building any domain from scratch (the marketplace publishes far more than DCIM / location / org — routing, security, compute, and many more) | Search the whole marketplace and reuse a published schema: `infrahubctl marketplace get <ns>/<name>` then `inherit_from` | [yagni-reuse-existing-marketplace-schema](../infrahub-auditing-repo/rules/yagni-reuse-existing-marketplace-schema.md) |
+| Building any domain from scratch (the marketplace publishes far more than DCIM / location / org — routing, security, compute, and many more) | Search the whole marketplace and reuse a published schema: `infrahubctl marketplace get <ns>/<name>` then `inherit_from`. Adoption is a dependency, not a freebie: confirm the kind's tier and record provenance | [yagni-reuse-existing-marketplace-schema](../infrahub-auditing-repo/rules/yagni-reuse-existing-marketplace-schema.md), [reuse-verify-kind-availability](./rules/reuse-verify-kind-availability.md), [reuse-evaluate-per-generic](./rules/reuse-evaluate-per-generic.md) |
 | Copying a value onto a node that's reachable by traversing a relationship (`region_code` when `device.location.region.code` exists) | An indirect relationship traversal; let consumers follow the link | [yagni-denormalized-vs-indirect-relationship](../infrahub-auditing-repo/rules/yagni-denormalized-vs-indirect-relationship.md) |
 | Several sibling nodes repeating the same attributes and relationships | Extract a generic and `inherit_from` it | [yagni-duplicate-shape-not-extracted-to-generic](../infrahub-auditing-repo/rules/yagni-duplicate-shape-not-extracted-to-generic.md) |
-| Defining custom IP address / prefix / VLAN nodes | `inherit_from` the built-in primitive (`BuiltinIPAddress`, `BuiltinIPPrefix`, `IpamVLAN`) | [yagni-custom-domain-primitives-instead-of-builtin](../infrahub-auditing-repo/rules/yagni-custom-domain-primitives-instead-of-builtin.md) |
+| Defining custom IP address / prefix nodes | `inherit_from` the built-in primitive (`BuiltinIPAddress`, `BuiltinIPPrefix`). A VLAN primitive is marketplace-published, not core, so confirm it before peering it | [yagni-custom-domain-primitives-instead-of-builtin](../infrahub-auditing-repo/rules/yagni-custom-domain-primitives-instead-of-builtin.md), [reuse-verify-kind-availability](./rules/reuse-verify-kind-availability.md) |
 | An `Attribute` + `cardinality: one` relationship with no inverse on the peer | Declare the matching inverse so consumers filter in the query, not in Python | [yagni-missing-inverse-forces-python-filter](../infrahub-auditing-repo/rules/yagni-missing-inverse-forces-python-filter.md) |
 | A Profile carrying a single value that never varies across objects | An attribute `default_value` — a Profile only earns its cost when values vary or are re-tuned centrally | [yagni-profile-over-default](../infrahub-auditing-repo/rules/yagni-profile-over-default.md) |
 | Reaching for an Object Template to share live values, or a Profile to clone a node's child components | Match the tool to intent: a Profile shares live values, an Object Template clones structure | [yagni-template-profile-confusion](../infrahub-auditing-repo/rules/yagni-template-profile-confusion.md) |
@@ -148,6 +148,15 @@ Follow these steps when creating or modifying a schema:
    Discovery, collections (`-c`), the airgap fallback,
    and the required SDK version live in
    [../infrahub-common/marketplace-reference.md](../infrahub-common/marketplace-reference.md).
+   Judge the published file **per generic**, not as a
+   unit, and record provenance for whatever you take
+   ([rules/reuse-evaluate-per-generic.md](./rules/reuse-evaluate-per-generic.md)).
+   Confirm every kind you inherit or peer actually exists
+   on a clean instance before depending on it. A
+   `Core`/`Builtin` prefix is a convention, not a
+   guarantee, and there is no location kind in the
+   platform core
+   ([rules/reuse-verify-kind-availability.md](./rules/reuse-verify-kind-availability.md)).
 3. **Read relevant rules** — Read
    [rules/naming-conventions.md](./rules/naming-conventions.md)
    for naming constraints,
@@ -158,7 +167,13 @@ Follow these steps when creating or modifying a schema:
 4. **Build the schema YAML** — Start with the `$schema`
    comment and `version: "1.0"`. Define generics first
    (if any), then nodes. Apply naming, display, and
-   relationship rules from step 3.
+   relationship rules from step 3. If a node joins a
+   generic that already has implementers, treat that
+   `inherit_from` line as a change to a published
+   interface: it passes `schema check`, produces no
+   migration, and still changes what every query,
+   constraint, and consumer over the generic answers. See
+   [rules/generic-membership-is-a-published-interface.md](./rules/generic-membership-is-a-published-interface.md).
 5. **Audit downstream consumers** — Walk the table in
    "Designing for Downstream Consumers" above. If any
    node will become an artifact or generator target, add

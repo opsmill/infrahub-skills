@@ -43,7 +43,7 @@ For each generic or node in the file, separately:
 
    | Class | Cost |
    | ----- | ---- |
-   | Platform core (`Core*`, `Builtin*`, `Ipam*`) | none |
+   | A kind Infrahub itself ships | none |
    | Already present in your repository | none |
    | A new transitive dependency | the whole set it drags in, recursively |
 
@@ -53,7 +53,9 @@ For each generic or node in the file, separately:
    peers is **not** a reason to reject a cheap candidate
    in the same file.
 
-Confirm the tier of every peer with
+A `Core`/`Builtin`/`Ipam` prefix does not put a peer in
+the first row. Confirm the tier of every peer with
+`infrahubctl schema show <Kind>` and
 [reuse-verify-kind-availability.md](reuse-verify-kind-availability.md)
 before calling it free.
 

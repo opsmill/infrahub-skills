@@ -464,25 +464,95 @@
     },
     {
       "id": 14,
-      "prompt": "I need a `NetEndpoint` node. Each endpoint is tagged, and each\none sits at a site.\n\nFor the site, I want to reuse the location generic everyone uses\nrather than modelling locations myself. A colleague told me it is\nbuilt into Infrahub, so I can just peer it.\n\nA teammate also looked at the published location file and rejected\nreusing any of it, because one of the generics in that file drags in\na whole second device hierarchy we do not want.\n\nWrite the schema. Tell me in YAML comments whether the location\ngeneric really is built in, and what reusing it commits this\nrepository to.",
-      "expected_output": "A schema peering BuiltinTag (which is genuinely core) and a marketplace-published location generic, with comments correcting the \"built into Infrahub\" premise: the Builtin namespace ships only BuiltinIPAddress, BuiltinIPNamespace, BuiltinIPPrefix and BuiltinTag, and there is no location kind in the platform core. The file must record `infrahubctl marketplace get <namespace>/<name>` provenance with a version, state that the fetched files are committed and loaded first, and note that the teammate's blanket rejection was wrong because a published file is evaluated per generic, not as a unit.",
+      "prompt": "I need a `NetEndpoint` node. Each endpoint is tagged, and each\none sits at a site.\n\nFor the site, I want to reuse the location generic everyone uses\nrather than modelling locations myself. A colleague told me it is\nbuilt into Infrahub, so I can just peer it.\n\nWrite the schema. Tell me in YAML comments whether the location\ngeneric really is built in, what reusing it commits this repository\nto, and how I confirm on a clean instance that a kind exists before\nI depend on it.",
+      "expected_output": "A schema peering BuiltinTag (which is genuinely core) and a marketplace-published location generic, with comments correcting the \"built into Infrahub\" premise: the Builtin namespace ships only BuiltinIPAddress, BuiltinIPNamespace, BuiltinIPPrefix and BuiltinTag, and there is no location kind in the platform core. The file records `infrahubctl marketplace get <namespace>/<name>` provenance naming the reused kind and a version, states that the fetched files are committed and loaded before this schema, and names `infrahubctl schema show <Kind>` as the confirmation command (`schema list` prints node kinds only, so it cannot confirm a generic).",
       "files": [],
       "expectations": [
         "States that the location generic is NOT platform core, and that the Builtin namespace ships only four kinds",
         "Records `infrahubctl marketplace get` provenance including a version",
         "States that reusing it makes it a dependency the repository must carry, committed and loaded before this schema",
-        "Corrects the teammate: a published file is evaluated per generic, so an expensive sibling is not a reason to reject a cheap candidate",
-        "Names a command to confirm a kind exists, such as `infrahubctl schema list`",
         "BuiltinTag is used correctly as a genuinely core kind"
       ],
       "assertions": [
         {
           "name": "external-kinds-core-or-sourced",
-          "check": "Every kind referenced but not defined is either genuinely platform core or carries marketplace provenance; no invented Builtin* kind"
+          "check": "Every kind referenced but not defined is a kind the platform actually ships, or is named by a marketplace provenance comment; no invented Builtin*/Core* kind"
         },
         {
           "name": "records-marketplace-provenance",
-          "check": "Provenance records the marketplace identifier and a version"
+          "check": "A provenance comment records the `<namespace>/<name>` marketplace identifier and a version"
+        },
+        {
+          "name": "corrects-builtin-core-premise",
+          "check": "Comments name all four Builtin kinds and state the reused kind is not platform core"
+        },
+        {
+          "name": "names-kind-verification-command",
+          "check": "Comments name `infrahubctl schema show <Kind>`, which resolves generics, rather than only `schema list`"
+        },
+        {
+          "name": "schema-version",
+          "check": "File declares version \"1.0\""
+        },
+        {
+          "name": "full-kind-references",
+          "check": "Relationship peers use full Namespace+Name kinds"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "I need a `NetOpticalEndpoint` node, and each endpoint is\ntagged.\n\nA teammate looked at the published `infrahub/optical-transport`\nschema file and rejected reusing any of it. That file defines two\ngenerics: `NetOpticalEndpoint`, which peers one built-in kind, and\n`NetTransportDevice`, whose `chassis` and `linecard` peers pull in a\nsecond device and interface hierarchy competing with the DcimDevice\ntree we already have. His reason was the second generic.\n\nWrite the schema. In YAML comments, tell me whether his rejection\nholds, and record whatever the next reader needs to know about where\nthe reused shape came from.",
+      "expected_output": "A schema that adopts the cheap generic and rejects the blanket rejection: a published file is evaluated per generic, so an expensive sibling is not a reason to reinvent a cheap candidate. The provenance comment records the `infrahubctl marketplace get infrahub/optical-transport` identifier and version, names the generic taken, and says the transport-device generic was excluded and why.",
+      "files": [],
+      "expectations": [
+        "Corrects the teammate: cost is the transitive peer set of the candidate, not the file",
+        "Records provenance with the marketplace identifier and a version",
+        "Names which generic was taken and which was excluded, with the reason",
+        "Notes that a vendored subset is no longer refreshed by `marketplace get`"
+      ],
+      "assertions": [
+        {
+          "name": "external-kinds-core-or-sourced",
+          "check": "Every kind referenced but not defined is a kind the platform actually ships, or is named by a marketplace provenance comment"
+        },
+        {
+          "name": "records-marketplace-provenance",
+          "check": "A provenance comment records the `<namespace>/<name>` marketplace identifier and a version"
+        },
+        {
+          "name": "records-subset-rationale",
+          "check": "Provenance records what was taken and what was excluded, so the per-generic decision survives in the file"
+        },
+        {
+          "name": "schema-version",
+          "check": "File declares version \"1.0\""
+        },
+        {
+          "name": "full-kind-references",
+          "check": "Relationship peers use full Namespace+Name kinds"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "We already have a `NetEndpoint` generic with two implementers,\n`NetOpticalEndpoint` and `NetEthernetEndpoint`. I need a third kind,\n`NetCoherentEndpoint`, and it has to inherit `NetEndpoint` because a\nrelationship on `NetCircuit` peers that generic. A capacity report\nalso sums over `NetEndpoint`, and the generic carries a\n`uniqueness_constraints` entry.\n\nWrite the schema for all three implementers plus the generic and\n`NetCircuit`, with YAML comments recording what the new implementer\nchanges for whatever reads that generic.\n\n`infrahubctl schema check` passes either way, so also give me a test\nthat would have caught this in CI without a running Infrahub.\n\nProduce two files:\n- the schema, saved to: output.yml\n- the test, saved to: output.py",
+      "expected_output": "A schema where NetCoherentEndpoint inherits NetEndpoint, with comments naming what the addition changes: queries rooted on the generic, the uniqueness constraint the new kind must now satisfy, and the capacity report that now counts it. Plus a test that pins the implementer set by reading `inherit_from` out of the schema YAML, with a failure message listing what was added and removed. The test must not need a running instance.",
+      "files": [],
+      "expectations": [
+        "NetCoherentEndpoint inherits NetEndpoint and the relationship on NetCircuit peers the generic",
+        "Comments name the consumers the addition changes: queries, the uniqueness constraint, and the report that sums the generic",
+        "The test pins the implementer set against the schema YAML, not a loaded graph, so it runs in CI without Infrahub",
+        "The failure message lists the added and removed kinds so the fix is mechanical"
+      ],
+      "assertions": [
+        {
+          "name": "generic-membership-consumers-noted",
+          "check": "Comments name at least two classes of consumer the new implementer changes"
+        },
+        {
+          "name": "generic-implementer-set-pinned",
+          "check": "The test pins the expected implementer set offline from `inherit_from` and reports added/removed on failure"
         },
         {
           "name": "schema-version",

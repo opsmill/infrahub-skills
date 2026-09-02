@@ -73,7 +73,16 @@
     published shape or ships a schema that loads on a
     developer machine and fails on a clean one.
 
-12. **Validation (validation-)** — HIGH for
+12. **Generic Membership (generic-)** — HIGH. A generic's
+    set of implementers is an interface its consumers
+    already depend on. Adding a kind to it is invisible to
+    `infrahubctl schema check` and produces no migration,
+    yet it changes what every query, constraint, and
+    consumer over that generic answers. Covers enumerating
+    those consumers and pinning the set in a fast offline
+    test.
+
+13. **Validation (validation-)** — HIGH for
     string-length caps (load-time `string_too_long`
     on `description` / `label` / `identifier` /
     `deprecation`), otherwise LOW. Pre-validation

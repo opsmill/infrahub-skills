@@ -33,9 +33,15 @@ time.
 
 | Tier | Available on a clean instance | Cost |
 | ---- | ---------------------------- | ---- |
-| **Platform core** (`Core*`, `Builtin*`, `Ipam*`) | Yes | none |
+| **Platform core** (a kind Infrahub itself ships) | Yes | none |
 | **Marketplace-published** | **No.** Must be fetched and loaded | becomes a dependency your repository carries |
 | **Locally defined** | Only if your files define it | yours to maintain |
+
+A `Core`, `Builtin`, or `Ipam` prefix is a naming
+convention, not a guarantee. `CoreLocation` reads exactly
+like a platform kind and does not exist. The tier is
+decided by whether Infrahub ships the kind, so confirm it
+rather than reading the prefix.
 
 The `Builtin` namespace is small. On a bare instance it
 is exactly four kinds:
@@ -58,12 +64,22 @@ every example schema uses one.
 Ask the instance rather than assuming:
 
 ```bash
-# every kind the instance currently knows
-infrahubctl schema list
-
-# one kind's full definition, including whether it exists at all
+# does this kind exist? works for nodes and generics alike
 infrahubctl schema show <Kind>
 ```
+
+`schema show` is the check that answers the question,
+because it resolves generics. Reuse candidates usually
+*are* generics: three of the four `Builtin` kinds above
+are, and so is the location generic people reach for.
+
+`infrahubctl schema list` is for browsing, not for
+confirming. It prints node kinds only, so a generic that
+exists is absent from the table and a generic that does
+not exist looks identical. `infrahubctl marketplace show
+<namespace>/<name>` tells you what a published schema
+contains before you fetch it, which is the other half of
+the question.
 
 Do this on the **cleanest** instance the schema has to
 work on, not on the machine where you have been
@@ -86,9 +102,18 @@ That is fine, and often the right answer. It is a
    clean deploy loads them before your own schema.
 3. Load them **before** the schema that inherits from
    them. Order matters: the peer has to exist first.
-4. Record the identifier and version, so the next reader
-   can tell whether the local copy has drifted. See
+4. Record the identifier, the version, **and the kinds
+   you took**, in one comment next to the shape that uses
+   them. A provenance note that names the command but not
+   the kinds vouches for nothing in particular. See
    [reuse-evaluate-per-generic.md](reuse-evaluate-per-generic.md).
+
+```yaml
+# Sourced from the marketplace:
+#   infrahubctl marketplace get infrahub/location -v 1.4.0
+# Provides: LocationGeneric, LocationSite.
+# Committed under schemas/vendor/ and loaded before this file.
+```
 
 See
 [../../infrahub-common/marketplace-reference.md](../../infrahub-common/marketplace-reference.md)
@@ -107,6 +132,12 @@ depend on, check its tier first.
 
 - Treating a kind as core because every example uses it.
   Popularity is not availability.
+- Reading the namespace prefix as the tier. `Core`,
+  `Builtin`, and `Ipam` are conventions a made-up kind can
+  spell just as well.
+- Confirming with `infrahubctl schema list`, which prints
+  node kinds only and so cannot see the generic you are
+  about to inherit.
 - Verifying on a developer instance that already has the
   marketplace schema loaded, which proves nothing about a
   clean one.
