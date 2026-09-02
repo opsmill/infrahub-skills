@@ -854,8 +854,29 @@ def _save_opts_out(call: ast.Call) -> bool:
     return isinstance(value, ast.Constant) and value.value is False
 
 
+def _target_names(target: ast.expr) -> list[str]:
+    """Every name a binding target introduces, `self.x` and tuples included.
+
+    Holding a shared object on `self` is the natural way to reach it from a
+    helper method, so an `Attribute` target is the likely shape, not a
+    corner case. Recognising only a plain `Name` made those saves invisible.
+    """
+    if isinstance(target, ast.Name):
+        return [target.id]
+    if isinstance(target, ast.Attribute):
+        return [ast.unparse(target)]
+    if isinstance(target, (ast.Tuple, ast.List)):
+        return [n for elt in target.elts for n in _target_names(elt)]
+    return []
+
+
 def _vars_bound_to_kind(tree: ast.Module, kind: str) -> set[str]:
-    """Names assigned from a create/get of ``kind`` (``await`` unwrapped)."""
+    """Names assigned from a create/get of ``kind`` (``await`` unwrapped).
+
+    Also collects names bound by a `for` loop over a collection that holds
+    such a name, so `for obj in (trunk, leg): await obj.save(...)` is seen
+    as saving both.
+    """
     names: set[str] = set()
     for stmt in ast.walk(tree):
         if isinstance(stmt, ast.Assign):
@@ -874,8 +895,28 @@ def _vars_bound_to_kind(tree: ast.Module, kind: str) -> set[str]:
         if _kind_of_call(value) != kind:
             continue
         for tgt in targets:
-            if isinstance(tgt, ast.Name):
-                names.add(tgt.id)
+            names.update(_target_names(tgt))
+
+    # A loop whose iterable mentions one of those names binds the loop
+    # variable to it as far as this check is concerned.
+    for _ in range(3):  # settle transitive `for a in (b,)` chains
+        grew = False
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.For, ast.AsyncFor)):
+                continue
+            mentioned = {
+                ast.unparse(n)
+                for n in ast.walk(node.iter)
+                if isinstance(n, (ast.Name, ast.Attribute))
+            }
+            if not (mentioned & names):
+                continue
+            for name in _target_names(node.target):
+                if name not in names:
+                    names.add(name)
+                    grew = True
+        if not grew:
+            break
     return names
 
 
@@ -925,6 +966,9 @@ def check_traversal_uses_relationship_filter(
                 "whitelist is kind_filter"
             )
 
+    # Every traversal call has to be constrained. Returning on the first
+    # conforming call let an unconstrained walk pass as long as some other
+    # call spelled the keyword.
     reasons: list[str] = []
     for call in calls:
         rel = get_kwarg(call, "relationship_filter")
@@ -934,18 +978,42 @@ def check_traversal_uses_relationship_filter(
                 "kind filtering does not stop the walk crossing a shared node"
             )
             continue
+        if isinstance(rel, (ast.List, ast.Tuple, ast.Set)) and not rel.elts:
+            reasons.append(
+                "relationship_filter is empty, which constrains nothing"
+            )
+            continue
         # A relationship identifier contains `__`; a per-side name does not.
         resolved, values = _resolve_str_list(rel, tree)
-        if resolved and not any("__" in v for v in values):
+        if not resolved:
+            reasons.append(
+                f"relationship_filter is {ast.unparse(rel)!r}, which cannot be "
+                "resolved to a list of schema identifiers here; pass the list "
+                "literally or bind it to a module-level constant"
+            )
+            continue
+        if not any("__" in v for v in values):
             reasons.append(
                 f"relationship_filter holds relationship names "
                 f"({', '.join(values)}); it takes schema identifiers such as "
                 "`device__interface`"
             )
             continue
-        return True, "traversal constrained by relationship_filter"
 
-    return False, "; ".join(reasons)
+    if reasons:
+        return False, "; ".join(sorted(set(reasons)))
+
+    missing_depth = [c for c in calls if get_kwarg(c, "max_depth") is None]
+    if missing_depth:
+        return False, (
+            f"{len(missing_depth)} traversal call(s) pass no max_depth; the "
+            "default of 5 silently drops longer routes, so the bound has to "
+            "be a decision rather than a default"
+        )
+    return True, (
+        f"all {len(calls)} traversal call(s) constrained by relationship_filter "
+        "and bounded by max_depth"
+    )
 
 
 def check_traversal_enumerates_and_checks_truncation(
@@ -971,21 +1039,158 @@ def check_traversal_enumerates_and_checks_truncation(
             )
         return False, "no traverse_paths call found"
 
-    if not _iterates_attribute(tree, "paths"):
+    results = _names_bound_to_traversal(tree)
+    if not results:
         return False, (
-            "never iterates the returned .paths, so no leg is created per "
-            "discovered path"
+            "the traverse_paths result is not bound to a name, so nothing "
+            "can be shown to read .paths or .truncated_at_depth from it"
         )
 
-    if not any(
-        isinstance(n, ast.Attribute) and n.attr == "truncated_at_depth"
-        for n in ast.walk(tree)
-    ):
+    if not _reads_attribute_of(tree, results, "paths", iterated=True):
         return False, (
-            "does not check truncated_at_depth, so a search that ran out of "
-            "budget is treated as a complete answer"
+            f"never iterates {sorted(results)[0]}.paths, so no leg is created "
+            "per discovered path"
         )
-    return True, "enumerates .paths and checks truncated_at_depth"
+
+    if not _tests_attribute_of(tree, results, "truncated_at_depth"):
+        return False, (
+            "does not branch on the traversal result's truncated_at_depth, so "
+            "a search that ran out of budget is treated as a complete answer. "
+            "Reading the attribute without acting on it is not a check"
+        )
+    return True, "enumerates the result's .paths and branches on truncated_at_depth"
+
+
+def _names_bound_to_traversal(tree: ast.Module) -> set[str]:
+    """Names assigned from a ``traverse_paths`` call."""
+    names: set[str] = set()
+    for stmt in ast.walk(tree):
+        if isinstance(stmt, ast.Assign):
+            targets, value = stmt.targets, stmt.value
+        elif isinstance(stmt, ast.AnnAssign):
+            targets, value = [stmt.target], stmt.value
+        else:
+            continue
+        if isinstance(value, ast.Await):
+            value = value.value
+        if not (
+            isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Attribute)
+            and value.func.attr == "traverse_paths"
+        ):
+            continue
+        for tgt in targets:
+            names.update(_target_names(tgt))
+    return names
+
+
+def _attribute_of(node: ast.AST, names: set[str], attr: str) -> bool:
+    """True when ``node`` reads ``<one of names>.<attr>``."""
+    for sub in ast.walk(node):
+        if (
+            isinstance(sub, ast.Attribute)
+            and sub.attr == attr
+            and isinstance(sub.value, (ast.Name, ast.Attribute))
+            and ast.unparse(sub.value) in names
+        ):
+            return True
+    return False
+
+
+def _reads_attribute_of(
+    tree: ast.Module, names: set[str], attr: str, *, iterated: bool = False
+) -> bool:
+    """True when the attribute is read off one of ``names``.
+
+    With ``iterated``, it has to be the iterable of a loop or comprehension:
+    the requirement is one leg per discovered path, which means walking
+    them.
+    """
+    for node in ast.walk(tree):
+        if iterated:
+            if isinstance(node, (ast.For, ast.AsyncFor)) and _attribute_of(
+                node.iter, names, attr
+            ):
+                return True
+            if isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp,
+                                 ast.DictComp)) and any(
+                _attribute_of(gen.iter, names, attr) for gen in node.generators
+            ):
+                return True
+        elif _attribute_of(node, names, attr):
+            return True
+    return False
+
+
+def _tests_attribute_of(tree: ast.Module, names: set[str], attr: str) -> bool:
+    """True when the attribute is used as a condition, not merely read.
+
+    `_ = result.truncated_at_depth` reads it and acts on nothing.
+    """
+    for node in ast.walk(tree):
+        test = None
+        if isinstance(node, (ast.If, ast.IfExp, ast.While, ast.Assert)):
+            test = node.test
+        elif isinstance(node, ast.BoolOp):
+            test = node
+        elif isinstance(node, ast.Call) and node.args:
+            # e.g. log a warning whose message interpolates the flag, guarded
+            # or not, still counts as acting on it only if it is a condition;
+            # a bare call does not.
+            continue
+        if test is not None and _attribute_of(test, names, attr):
+            return True
+    return False
+
+
+# Attributes a PathHop does not carry. The label lives on the hop's node,
+# and reaching for it on the hop itself is the bug this rule was written
+# after: it raises AttributeError at run time, not at review time.
+_HOP_NON_ATTRIBUTES = {"display_label", "name", "hfid", "id", "kind"}
+
+
+def check_path_hop_shape(output: dict, **_: Any) -> tuple[bool, str]:
+    """A hop carries ``node`` and ``relationship``; the label is on the node.
+
+    Anything a path's hops are iterated into is a PathHop, so reading a
+    node attribute straight off it is wrong however the loop is spelled.
+    """
+    tree = _answer_tree(output)
+    if tree is None:
+        return False, "no parseable Python block found"
+
+    hop_names: set[str] = set()
+    for node in ast.walk(tree):
+        iters = []
+        if isinstance(node, (ast.For, ast.AsyncFor)):
+            iters = [(node.iter, node.target)]
+        elif isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp,
+                               ast.DictComp)):
+            iters = [(gen.iter, gen.target) for gen in node.generators]
+        for iterable, target in iters:
+            if any(
+                isinstance(n, ast.Attribute) and n.attr == "hops"
+                for n in ast.walk(iterable)
+            ):
+                hop_names.update(_target_names(target))
+
+    if not hop_names:
+        return True, "the answer iterates no path hops, so nothing to check"
+
+    bad = sorted({
+        f"{ast.unparse(n.value)}.{n.attr}"
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Attribute)
+        and n.attr in _HOP_NON_ATTRIBUTES
+        and isinstance(n.value, (ast.Name, ast.Attribute))
+        and ast.unparse(n.value) in hop_names
+    })
+    if bad:
+        return False, (
+            f"reads {bad} off a path hop; a hop carries `node` and "
+            "`relationship` only, so the label is `hop.node.display_label`"
+        )
+    return True, "path hops are read through .node / .relationship"
 
 
 def check_shared_save_opts_out_of_tracking(
@@ -1026,10 +1231,27 @@ def check_shared_save_opts_out_of_tracking(
     shared_saves = [
         c for c in saves
         if isinstance(c.func, ast.Attribute)
-        and isinstance(c.func.value, ast.Name)
-        and c.func.value.id in shared_vars
+        and isinstance(c.func.value, (ast.Name, ast.Attribute))
+        and ast.unparse(c.func.value) in shared_vars
     ]
     if not shared_saves:
+        # Every save whose receiver could not be resolved is a save that
+        # might be the shared object's, so it cannot be waved through: the
+        # old message claimed the object "is never saved" without having
+        # looked at the receivers it could not parse.
+        unresolved = [
+            ast.unparse(c.func.value)
+            for c in saves
+            if isinstance(c.func, ast.Attribute)
+            and ast.unparse(c.func.value) not in shared_vars
+        ]
+        if unresolved:
+            return False, (
+                f"the generator creates the shared {_SHARED_KIND}, and the "
+                f"save receiver(s) {sorted(set(unresolved))} cannot be tied "
+                "back to it. Save the shared object explicitly, with "
+                "update_group_context=False, so the opt-out is visible"
+            )
         return True, (
             f"the shared {_SHARED_KIND} is referenced but never saved, so the "
             "run does not claim it"
@@ -1044,6 +1266,43 @@ def check_shared_save_opts_out_of_tracking(
     return True, f"the shared {_SHARED_KIND} is saved with update_group_context=False"
 
 
+# Labels an answer uses to mark the half it is arguing against. The rules
+# in this repository use all three spellings, so the grader has to know all
+# three rather than guess which one it is looking at.
+_NEGATIVE_LABEL = re.compile(
+    r"(?:#|//|<!--)?\s*\**\s*(?:WRONG|INCORRECT|BAD|AVOID|DO NOT|DON'T|"
+    r"NEVER|BROKEN|FAILS?|DOES NOT RESOLVE|ANTI-?PATTERN)\b",
+    re.IGNORECASE,
+)
+_POSITIVE_LABEL = re.compile(
+    r"(?:#|//|<!--)?\s*\**\s*(?:RIGHT|CORRECT|GOOD|INSTEAD|USE THIS|WORKS|DO THIS)\b",
+    re.IGNORECASE,
+)
+
+
+def _strip_negative_examples(text: str) -> str:
+    """``text`` with the blocks it labels as the wrong form removed.
+
+    A negative label applies until the next positive label or the next
+    blank line, which is how these rules lay a contrast pair out.
+    """
+    kept: list[str] = []
+    skipping = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if _NEGATIVE_LABEL.match(stripped):
+            skipping = True
+            continue
+        if _POSITIVE_LABEL.match(stripped) or not stripped:
+            skipping = False
+            if not stripped:
+                kept.append(line)
+            continue
+        if not skipping:
+            kept.append(line)
+    return "\n".join(kept)
+
+
 def check_group_membership_from_member_side(
     output: dict, **_: Any
 ) -> tuple[bool, str]:
@@ -1055,13 +1314,19 @@ def check_group_membership_from_member_side(
     Read from the YAML fence only. Scanning the whole answer would let the
     prose that explains `member_of_groups` pass an object-data snippet that
     actually uses the group-side form.
+
+    Lines the answer marks as the negative half of a contrast are skipped.
+    The rules teach a WRONG/RIGHT presentation, so failing an answer for
+    showing the wrong form under a `# WRONG` label would penalise it for
+    following them.
     """
-    yaml_block = output.get("yaml", "")
+    yaml_block = output.get("yaml_all") or output.get("yaml", "")
     if not yaml_block.strip():
         return False, "no ```yaml object-data block found"
 
-    group_side = re.search(r"^\s*-?\s*members\s*:", yaml_block, re.M)
-    member_side = re.search(r"^\s*-?\s*member_of_groups\s*:", yaml_block, re.M)
+    recommended = _strip_negative_examples(yaml_block)
+    group_side = re.search(r"^\s*-?\s*members\s*:", recommended, re.M)
+    member_side = re.search(r"^\s*-?\s*member_of_groups\s*:", recommended, re.M)
 
     if group_side:
         return False, (
@@ -1079,6 +1344,7 @@ CHECKS: dict[str, Any] = {
     "traversal-enumerates-and-checks-truncation": check_traversal_enumerates_and_checks_truncation,
     "shared-save-opts-out-of-tracking": check_shared_save_opts_out_of_tracking,
     "group-membership-from-member-side": check_group_membership_from_member_side,
+    "path-hop-shape": check_path_hop_shape,
     # AST / relationship family (output.py)
     "relationship-hfid-form-correct": check_relationship_hfid_form_correct,
     "no-bare-string-relationship": check_no_bare_string_relationship,

@@ -95,13 +95,30 @@ looks like idempotent housekeeping. It is a claim of
 ownership.
 
 ```python
-# Target A's run and target B's run both do this.
-# Whichever runs last owns the container.
+# WRONG. Target A's run and target B's run both do this,
+# and whichever runs last owns the container. When A
+# stops producing it, A's cleanup deletes it out from
+# under B.
 container = await self.client.create(
     kind="NetContainer", data={"name": "shared-trunk"},
 )
 await container.save(allow_upsert=True)   # claims it
 ```
+
+```python
+# RIGHT. The same write, opted out of the run's tracking
+# group, so neither run claims the container and neither
+# run's cleanup can remove it.
+container = await self.client.create(
+    kind="NetContainer", data={"name": "shared-trunk"},
+)
+await container.save(allow_upsert=True, update_group_context=False)
+```
+
+The trade is in the second comment: nothing cleans it up
+either. [Two ways to honour it](#two-ways-to-honour-it)
+below covers the other option, which is to create the
+shared object outside the generator entirely.
 
 ### The failure is a refusal, not a changed output set
 
@@ -132,12 +149,13 @@ wrong. That is the quieter of the two possible failures.
 > can both reach an object, the object belongs to
 > neither.
 
-Two ways to honour it:
+### Two ways to honour it
 
 1. **Create the shared object outside the generator** —
    in an object data file, or a separate one-off
    generator with its own single target.
-2. **Opt out of tracking for that save:**
+2. **Opt out of tracking for that save**, as in the
+   RIGHT block above:
 
    ```python
    await container.save(allow_upsert=True, update_group_context=False)

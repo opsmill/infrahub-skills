@@ -1389,6 +1389,10 @@ tasks:
           The shared NetContainer's own save sets update_group_context=False
           (or it is created outside the generator), and not every save
           carries the flag
+      - name: path-hop-shape
+        check: >-
+          Path hops are read through `.node` / `.relationship`; the label
+          is on the hop's node, not the hop
       - name: group-membership-from-member-side
         check: >-
           The YAML object data assigns membership via member_of_groups, not

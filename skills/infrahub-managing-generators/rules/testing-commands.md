@@ -27,7 +27,9 @@ like it ran cleanly while doing nothing.
 
 ### Prerequisites
 
-All commands below require a running Infrahub server.
+All commands below require a running Infrahub server,
+with one exception: `infrahubctl generator --list` reads
+the local `.infrahub.yml` and never contacts the server.
 Verify connectivity first:
 
 ```bash
@@ -40,7 +42,10 @@ for troubleshooting.
 ### Commands
 
 ```bash
-# List available generators
+# List the generators declared in .infrahub.yml.
+# Local only: this never contacts the server, so it says
+# nothing about whether the config loaded or the target
+# group resolved.
 infrahubctl generator --list
 
 # Run a generator locally

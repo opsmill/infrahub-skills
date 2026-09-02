@@ -25,6 +25,8 @@ load_output_py = _mod.load_output_py
 
 import ast
 
+import pytest
+
 
 def _parse(src: str) -> ast.Module:
     return ast.parse(src)
@@ -638,3 +640,202 @@ def test_missing_membership_in_yaml_fails(tmp_path):
     output = _answer(tmp_path, yaml="- kind: NetTopology\n  data:\n    - name: dc1")
     ok, _ = _check("group-membership-from-member-side", output)
     assert not ok
+
+
+# ---------------------------------------------------------------------------
+# Traversal, ownership and hop shape
+#
+# Every case here is a shape the checks previously got wrong in one
+# direction or the other.
+# ---------------------------------------------------------------------------
+
+
+def _run(name: str, python: str = "", yaml_text: str = ""):
+    return _mod.CHECKS[name]({"python_all": python, "yaml": yaml_text})
+
+
+OWNERSHIP_VIOLATIONS = [
+    pytest.param(
+        '''
+class G:
+    async def generate(self, data):
+        self.trunk = await self.client.create(kind="NetContainer", name="trunk")
+        await self.trunk.save(allow_upsert=True)
+''',
+        id="held-on-self",
+    ),
+    pytest.param(
+        '''
+class G:
+    async def generate(self, data):
+        trunk = await self.client.create(kind="NetContainer", name="t")
+        leg = await self.client.create(kind="NetLeg", name="l")
+        for obj in (trunk, leg):
+            await obj.save(allow_upsert=True)
+''',
+        id="saved-in-a-loop",
+    ),
+]
+
+
+@pytest.mark.parametrize("python", OWNERSHIP_VIOLATIONS)
+def test_the_shared_object_claim_is_caught_however_it_is_held(python):
+    ok, msg = _run("shared-save-opts-out-of-tracking", python)
+    assert not ok, msg
+
+
+def test_the_opt_out_on_a_self_held_object_passes():
+    ok, msg = _run(
+        "shared-save-opts-out-of-tracking",
+        '''
+class G:
+    async def generate(self, data):
+        self.trunk = await self.client.create(kind="NetContainer", name="trunk")
+        await self.trunk.save(allow_upsert=True, update_group_context=False)
+        leg = await self.client.create(kind="NetLeg", name="l")
+        await leg.save()
+''',
+    )
+    assert ok, msg
+
+
+def test_a_wrong_right_yaml_contrast_is_not_failed_for_showing_the_wrong_form():
+    ok, msg = _run(
+        "group-membership-from-member-side",
+        yaml_text="# WRONG\nmembers: [t1]\n# RIGHT\nmember_of_groups: [topologies_dc]",
+    )
+    assert ok, msg
+
+
+def test_an_unlabelled_group_side_assignment_still_fails():
+    ok, _ = _run("group-membership-from-member-side", yaml_text="members: [t1]")
+    assert not ok
+
+
+TRAVERSAL_VIOLATIONS = [
+    pytest.param(
+        '''
+class G:
+    async def generate(self, data):
+        a = await self.client.traverse_paths(
+            start_id="x", relationship_filter=["device__interface"], max_depth=8)
+        b = await self.client.traverse_paths(start_id="y", max_depth=8)
+''',
+        id="one-call-unconstrained",
+    ),
+    pytest.param(
+        '''
+class G:
+    async def generate(self, data):
+        a = await self.client.traverse_paths(
+            start_id="x", relationship_filter=[], max_depth=8)
+''',
+        id="empty-filter",
+    ),
+    pytest.param(
+        '''
+RELS = build_rels()
+
+
+class G:
+    async def generate(self, data):
+        a = await self.client.traverse_paths(
+            start_id="x", relationship_filter=RELS, max_depth=8)
+''',
+        id="unresolvable-filter",
+    ),
+    pytest.param(
+        '''
+class G:
+    async def generate(self, data):
+        a = await self.client.traverse_paths(
+            start_id="x", relationship_filter=["device__interface"])
+''',
+        id="no-max-depth",
+    ),
+]
+
+
+@pytest.mark.parametrize("python", TRAVERSAL_VIOLATIONS)
+def test_an_unconstrained_traversal_fails(python):
+    ok, msg = _run("traversal-uses-relationship-filter", python)
+    assert not ok, msg
+
+
+def test_a_constrained_bounded_traversal_passes():
+    ok, msg = _run(
+        "traversal-uses-relationship-filter",
+        '''
+RELS = ["device__interface", "interface__circuit"]
+
+
+class G:
+    async def generate(self, data):
+        a = await self.client.traverse_paths(
+            start_id="x", relationship_filter=RELS, max_depth=8)
+''',
+    )
+    assert ok, msg
+
+
+def test_truncation_has_to_be_read_off_the_traversal_result():
+    ok, _ = _run(
+        "traversal-enumerates-and-checks-truncation",
+        '''
+class G:
+    async def generate(self, data):
+        for p in self.cache.paths:
+            pass
+        _ = self.meta.truncated_at_depth
+        result = await self.client.traverse_paths(start_id="x")
+''',
+    )
+    assert not ok
+
+
+def test_reading_truncation_without_acting_on_it_is_not_a_check():
+    ok, _ = _run(
+        "traversal-enumerates-and-checks-truncation",
+        '''
+class G:
+    async def generate(self, data):
+        result = await self.client.traverse_paths(start_id="x")
+        for path in result.paths:
+            pass
+        result.truncated_at_depth
+''',
+    )
+    assert not ok
+
+
+def test_enumerating_and_branching_on_truncation_passes():
+    ok, msg = _run(
+        "traversal-enumerates-and-checks-truncation",
+        '''
+class G:
+    async def generate(self, data):
+        result = await self.client.traverse_paths(start_id="x")
+        for path in result.paths:
+            pass
+        if result.truncated_at_depth:
+            self.logger.warning("truncated")
+''',
+    )
+    assert ok, msg
+
+
+def test_a_label_read_off_the_hop_itself_fails():
+    """The AttributeError this rule was written after."""
+    ok, msg = _run(
+        "path-hop-shape",
+        "labels = [h.display_label for p in result.paths for h in p.hops]",
+    )
+    assert not ok and "hop.node.display_label" in msg
+
+
+def test_a_label_read_through_the_hops_node_passes():
+    ok, msg = _run(
+        "path-hop-shape",
+        "labels = [h.node.display_label for p in result.paths for h in p.hops]",
+    )
+    assert ok, msg
