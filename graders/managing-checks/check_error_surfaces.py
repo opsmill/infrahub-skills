@@ -14,6 +14,7 @@ CHECKS = [
     "uses-sdk-execute-graphql",
     "no-status-code-branch",
     "catches-graphql-error",
+    "separate-local-bounds-branch",
 ]
 
 if __name__ == "__main__":

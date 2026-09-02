@@ -134,6 +134,7 @@ checks/transforms/generators) and a `file_path` to the
 | `file_path` | Yes | Path to Python file |
 | `class_name` | No | Python class name |
 | `convert_query_response` | No | Convert to SDK objects |
+| `watch` | No | Extra files this transform depends on |
 
 ### `jinja2_transforms`
 
@@ -143,6 +144,7 @@ checks/transforms/generators) and a `file_path` to the
 | `query` | Yes | GraphQL query name |
 | `template_path` | Yes | Path to Jinja2 template |
 | `description` | No | Documentation text |
+| `watch` | No | Extra files this transform depends on |
 
 ### `artifact_definitions`
 
@@ -168,6 +170,40 @@ checks/transforms/generators) and a `file_path` to the
 | `convert_query_response` | No | Convert to SDK objects |
 | `execute_in_proposed_change` | No | Run during proposed changes |
 | `execute_after_merge` | No | Run after branch merge |
+| `watch` | No | Extra files this generator depends on |
+
+## The `watch` Field
+
+Infrahub already detects the files a transform or
+generator reads directly. `watch` declares the ones it
+cannot see: templates pulled in dynamically, helper
+modules imported at runtime, or a package installed into
+the worker image. When a watched file changes, the
+artifacts regenerate.
+
+```yaml
+python_transforms:
+  - name: render_vlan_plan
+    file_path: "transforms/render_vlan_plan.py"
+    class_name: RenderVlanPlan
+    watch:
+      files:
+        - src/netdomain        # a directory watches everything beneath it
+        - templates/shared.j2
+```
+
+| Field | Required | Description |
+| ----- | -------- | ----------- |
+| `files` | No | Paths relative to the repository root. Defaults to empty |
+
+`watch: {}` is valid on its own: an empty `files` list
+records that the author checked and nothing beyond what
+Infrahub detects needs watching.
+
+Available on `python_transforms`, `jinja2_transforms` and
+`generator_definitions`. **Not** on `check_definitions`,
+which is `extra="forbid"` and refuses to load a config
+that carries it.
 
 ## The `parameters` Field
 

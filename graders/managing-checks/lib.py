@@ -13,8 +13,6 @@ from __future__ import annotations
 import ast
 import re
 import textwrap
-import ast
-import re
 from pathlib import Path
 from typing import Any
 
@@ -86,30 +84,117 @@ def load_output_py(path: Path) -> tuple[ast.Module | None, str]:
 # the fix is to use it. Verified against Infrahub 1.11.0 / SDK 1.23.1.
 # ---------------------------------------------------------------------------
 
-_RAW_HTTP_MARKERS = ("httpx.", "requests.", "urllib.request", "aiohttp.")
+_RAW_HTTP_MODULES = frozenset({"httpx", "requests", "aiohttp", "urllib"})
+
+
+def _raw_http_modules_used(tree: ast.Module) -> list[str]:
+    """Names of raw HTTP clients actually imported or called, ignoring prose.
+
+    AST-only on purpose: a compliant check that *names* the antipattern in a
+    comment or docstring, which both the rule and the eval prompt invite, must
+    not be failed for describing it.
+    """
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found.update(a.name.split(".")[0] for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            found.add(node.module.split(".")[0])
+        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            found.add(node.value.id)
+    return sorted(found & _RAW_HTTP_MODULES)
+
+
+def _calls_execute_graphql(tree: ast.Module) -> bool:
+    """True when `execute_graphql` is called somewhere in the code itself."""
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+        if name == "execute_graphql":
+            return True
+    return False
+
+
+def _references_status_code(node: ast.AST) -> bool:
+    """True when an expression reads a `status_code` attribute or name."""
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Attribute) and sub.attr == "status_code":
+            return True
+        if isinstance(sub, ast.Name) and sub.id == "status_code":
+            return True
+    return False
+
+
+def _branches_on_status_code(tree: ast.Module) -> bool:
+    """True when control flow or a comparison turns on an HTTP status code."""
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.If, ast.IfExp, ast.While)) and _references_status_code(node.test):
+            return True
+        if isinstance(node, ast.Assert) and _references_status_code(node.test):
+            return True
+        if isinstance(node, ast.Compare) and _references_status_code(node):
+            return True
+    return False
+
+
+def _call_name(call: ast.Call) -> str:
+    """The bare callee name of a call, whether plain or attribute access."""
+    func = call.func
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return getattr(func, "id", "")
+
+
+def _handler_names(handler: ast.ExceptHandler) -> list[str]:
+    """Exception names an `except` clause catches; `bare except` when untyped."""
+    node = handler.type
+    if isinstance(node, ast.Name):
+        return [node.id]
+    if isinstance(node, ast.Attribute):
+        return [node.attr]
+    if isinstance(node, ast.Tuple):
+        return [
+            e.id if isinstance(e, ast.Name) else getattr(e, "attr", "?") for e in node.elts
+        ]
+    if node is None:
+        return ["bare except"]
+    return []
+
+
+def _calls_log_error(node: ast.AST) -> bool:
+    """True when `log_error` is called anywhere beneath this node."""
+    return any(
+        isinstance(sub, ast.Call) and _call_name(sub) == "log_error" for sub in ast.walk(node)
+    )
 
 
 def check_uses_sdk_execute_graphql(
-    _config: dict | None = None, *, py_raw: str = "", **_: Any
+    _config: dict | None = None, *, tree: ast.Module | None = None, py_raw: str = "", **_: Any
 ) -> tuple[bool, str]:
     """Follow-up calls must go through the SDK client, which raises on errors."""
     if not py_raw:
         return False, "no Python source found"
-    if "execute_graphql" not in py_raw:
+    if tree is None:
+        return False, "check file has a syntax error"
+    if not _calls_execute_graphql(tree):
         return False, "does not call self.client.execute_graphql"
-    raw_http = [m for m in _RAW_HTTP_MARKERS if m in py_raw]
+    raw_http = _raw_http_modules_used(tree)
     if raw_http:
-        return False, f"uses raw HTTP ({sorted(raw_http)}) instead of the SDK client"
+        return False, f"uses raw HTTP ({raw_http}) instead of the SDK client"
     return True, "uses self.client.execute_graphql"
 
 
 def check_no_status_code_branch(
-    _config: dict | None = None, *, py_raw: str = "", **_: Any
+    _config: dict | None = None, *, tree: ast.Module | None = None, py_raw: str = "", **_: Any
 ) -> tuple[bool, str]:
     """Branching on an HTTP status code to detect a rejection fails open."""
     if not py_raw:
         return False, "no Python source found"
-    if re.search(r"status_code", py_raw):
+    if tree is None:
+        return False, "check file has a syntax error"
+    if _branches_on_status_code(tree):
         return False, (
             "branches on status_code; every executed GraphQL request returns "
             "200 even when the body carries errors"
@@ -128,30 +213,171 @@ def check_catches_graphql_error(
         return False, "no except handler; a rejection raises GraphQLError"
 
     names: list[str] = []
+    graphql_handlers: list[ast.ExceptHandler] = []
     for handler in handlers:
-        node = handler.type
-        if isinstance(node, ast.Name):
-            names.append(node.id)
-        elif isinstance(node, ast.Attribute):
-            names.append(node.attr)
-        elif isinstance(node, ast.Tuple):
-            names.extend(
-                e.id if isinstance(e, ast.Name) else getattr(e, "attr", "?")
-                for e in node.elts
-            )
-        elif node is None:
-            names.append("bare except")
+        caught = _handler_names(handler)
+        names.extend(caught)
+        if "GraphQLError" in caught:
+            graphql_handlers.append(handler)
 
-    if "GraphQLError" not in names:
+    if not graphql_handlers:
         return False, f"catches {names} but not GraphQLError"
     if "Exception" in names or "bare except" in names:
         return False, (
             f"catches {names}; a broad handler around execute_graphql "
             "reintroduces fail-open"
         )
-    if "log_error" not in py_raw:
+    if not any(_calls_log_error(h) for h in graphql_handlers):
         return False, "catches GraphQLError but never calls log_error, so the check still passes"
     return True, "catches GraphQLError and logs an error"
+
+
+def check_separate_local_bounds_branch(
+    _config: dict | None = None, *, tree: ast.Module | None = None, py_raw: str = "", **_: Any
+) -> tuple[bool, str]:
+    """A locally-detectable bad value needs its own branch: only a rejection raises.
+
+    Passing requires a `log_error` reached without an exception handler, so the
+    out-of-range case is reported by the check's own logic rather than being
+    left to a server round trip that never raises for it.
+    """
+    if not py_raw:
+        return False, "no Python source found"
+    if tree is None:
+        return False, "check file has a syntax error"
+
+    handler_calls = {
+        id(call)
+        for handler in ast.walk(tree)
+        if isinstance(handler, ast.ExceptHandler)
+        for call in ast.walk(handler)
+        if isinstance(call, ast.Call)
+    }
+    local_logs = [
+        call
+        for call in ast.walk(tree)
+        if isinstance(call, ast.Call)
+        and _call_name(call) == "log_error"
+        and id(call) not in handler_calls
+    ]
+    if not local_logs:
+        return False, (
+            "every log_error sits inside an except handler; the "
+            "locally-detectable out-of-range value needs its own branch"
+        )
+    return True, "reports the locally-detectable value outside the exception path"
+
+
+# ---------------------------------------------------------------------------
+# Shared-module checks
+#
+# A module used by more than one artifact type cannot be reached with a
+# relative import, so it has to be installed into the worker image. The two
+# flags that decide whether that image works are UV_PROJECT_ENVIRONMENT (the
+# base image's virtualenv) and --inexact (without it `uv sync` removes the
+# Infrahub install). Verified against Infrahub 1.11.0 / SDK 1.23.1.
+# ---------------------------------------------------------------------------
+
+_WATCHABLE_SECTIONS = ("python_transforms", "generator_definitions")
+
+
+def check_shared_module_absolute_import(
+    _config: dict | None = None, *, tree: ast.Module | None = None, py_raw: str = "", **_: Any
+) -> tuple[bool, str]:
+    """The shared module is imported absolutely, never relatively or via sys.path."""
+    if not py_raw:
+        return False, "no Python source found"
+    if tree is None:
+        return False, "check file has a syntax error"
+
+    relative = [
+        f"{'.' * node.level}{node.module or ''}"
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.level > 0
+    ]
+    if relative:
+        return False, (
+            f"imports {relative} relatively; a relative import cannot reach a "
+            "module outside this artifact's own directory"
+        )
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr == "path":
+            if isinstance(node.value, ast.Name) and node.value.id == "sys":
+                return False, "edits sys.path; the worker runs from a different directory"
+
+    absolute = {
+        node.module.split(".")[0]
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module
+    }
+    absolute |= {
+        alias.name.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.Import)
+        for alias in node.names
+    }
+    shared = absolute - {"infrahub_sdk", "typing", "__future__"}
+    if not shared:
+        return False, "no absolute import of a shared package"
+    return True, f"imports {sorted(shared)} absolutely"
+
+
+def check_dockerfile_targets_base_venv(
+    _config: dict | None = None, *, dockerfile_raw: str = "", **_: Any
+) -> tuple[bool, str]:
+    """The install must target the base image's virtualenv, not a fresh one."""
+    if not dockerfile_raw:
+        return False, "no Dockerfile found"
+    if not re.search(r"UV_PROJECT_ENVIRONMENT\s*=?\s*[\"']?/\.venv", dockerfile_raw):
+        return False, (
+            "does not set UV_PROJECT_ENVIRONMENT=/.venv; uv would build its own "
+            "virtualenv and the workers would not see the package"
+        )
+    return True, "installs into the base image's /.venv"
+
+
+def check_dockerfile_uv_sync_inexact(
+    _config: dict | None = None, *, dockerfile_raw: str = "", **_: Any
+) -> tuple[bool, str]:
+    """`uv sync` without `--inexact` removes the Infrahub install from the image."""
+    if not dockerfile_raw:
+        return False, "no Dockerfile found"
+    syncs = re.findall(r"uv\s+sync[^\n]*", dockerfile_raw)
+    if not syncs:
+        return False, "no `uv sync` line installing the package"
+    bare = [line for line in syncs if "--inexact" not in line]
+    if bare:
+        return False, f"`uv sync` without --inexact ({bare[0].strip()}) wipes the base environment"
+    return True, "uv sync carries --inexact"
+
+
+def check_watch_declares_shared_package(config: dict, **_: Any) -> tuple[bool, str]:
+    """Artifacts importing the installed package declare it under `watch:`.
+
+    An installed package is invisible to Infrahub's dependency detection, so
+    without this the artifact does not regenerate when the shared logic changes.
+    """
+    present = [
+        (section, entry)
+        for section in _WATCHABLE_SECTIONS
+        for entry in (config.get(section) or [])
+        if isinstance(entry, dict)
+    ]
+    if not present:
+        return False, f"no {' or '.join(_WATCHABLE_SECTIONS)} entries to declare a dependency on"
+
+    missing = [f"{section}:{entry.get('name', '?')}" for section, entry in present if "watch" not in entry]
+    if missing:
+        return False, f"no `watch:` on {missing}; the artifact will not regenerate"
+
+    malformed = [
+        f"{section}:{entry.get('name', '?')}"
+        for section, entry in present
+        if not isinstance(entry["watch"], dict)
+        or set(entry["watch"]) - {"files"}
+    ]
+    if malformed:
+        return False, f"`watch:` on {malformed} is not a mapping with only a `files` key"
+    return True, f"all {len(present)} watchable entries declare `watch:`"
 
 
 def check_check_definitions_present(config: dict, **_: Any) -> tuple[bool, str]:
@@ -270,6 +496,11 @@ CHECKS: dict[str, Any] = {
     "uses-sdk-execute-graphql": check_uses_sdk_execute_graphql,
     "no-status-code-branch": check_no_status_code_branch,
     "catches-graphql-error": check_catches_graphql_error,
+    "separate-local-bounds-branch": check_separate_local_bounds_branch,
+    "shared-module-absolute-import": check_shared_module_absolute_import,
+    "dockerfile-targets-base-venv": check_dockerfile_targets_base_venv,
+    "dockerfile-uv-sync-inexact": check_dockerfile_uv_sync_inexact,
+    "watch-declares-shared-package": check_watch_declares_shared_package,
     "check-definitions-present": check_check_definitions_present,
     "no-query-field-in-check-def": check_no_query_field_in_check_def,
     "only-allowed-fields-in-check-def": check_only_allowed_fields_in_check_def,
@@ -288,21 +519,30 @@ def run_checks(
     check_names: list[str],
     output_path: Path,
     py_path: Path | None = None,
+    dockerfile_path: Path | None = None,
 ) -> dict:
     """Run named checks against an .infrahub.yml output and return skillgrade JSON.
 
-    ``py_path`` is optional: error-surface checks inspect a Python check file
-    rather than the config, and receive it as ``tree`` / ``py_raw``.
+    ``py_path`` and ``dockerfile_path`` are optional: error-surface checks
+    inspect a Python check file, received as ``tree`` / ``py_raw``, and
+    shared-module checks also inspect a Dockerfile, received as
+    ``dockerfile_raw``.
     """
     config, _ = load_output(output_path)
     tree, py_raw = load_output_py(py_path) if py_path else (None, "")
+    dockerfile_raw = ""
+    if dockerfile_path:
+        try:
+            dockerfile_raw = Path(dockerfile_path).read_text(encoding="utf-8")
+        except (FileNotFoundError, OSError):
+            dockerfile_raw = ""
 
     entries: list[dict] = []
     passed_count = 0
     for name in check_names:
         fn = CHECKS[name]
         try:
-            ok, msg = fn(config, tree=tree, py_raw=py_raw)
+            ok, msg = fn(config, tree=tree, py_raw=py_raw, dockerfile_raw=dockerfile_raw)
         except Exception as exc:  # pragma: no cover
             ok, msg = False, f"Error running check: {exc}"
         if ok:
@@ -462,10 +702,10 @@ def text_flags_unresolvable_parent(gql: str, py: str) -> tuple[bool, str]:
     return True, "Flags an unresolvable related node instead of skipping it"
 
 
+# Text checks take `(gql, py)` positionally. The error-surface and
+# shared-module checks take keyword-only sources and belong in CHECKS, which
+# `run_checks` drives. They are deliberately absent here.
 TEXT_CHECKS: dict[str, Any] = {
-    "uses-sdk-execute-graphql": check_uses_sdk_execute_graphql,
-    "no-status-code-branch": check_no_status_code_branch,
-    "catches-graphql-error": check_catches_graphql_error,
     "child-status-filter": text_child_status_filter,
     "traverses-related-node": text_traverses_related_node,
     "fetches-related-attribute-value": text_fetches_related_attribute_value,

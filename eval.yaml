@@ -1129,8 +1129,7 @@ tasks:
       For case 2 the check needs to attempt the write and observe whether
       the server accepted it.
 
-      My first attempt did this and it passed on everything, including
-      values I know are rejected:
+      My first attempt handled case 2 like this:
 
       ```python
       resp = httpx.post(f"{url}/graphql/{branch}", json={"query": mutation})
@@ -1140,7 +1139,7 @@ tasks:
           self.log_error(message="rejected")
       ```
 
-      Tell me why that passes, and write the correct check.
+      Review that approach, then write the check you would ship.
 
       Save the check to: output.py
       Save the `.infrahub.yml` registration to: output.yml
@@ -1184,6 +1183,83 @@ tasks:
         check: >-
           Catches GraphQLError specifically (not Exception or a bare
           except) and calls log_error in the handler
+      - name: separate-local-bounds-branch
+        check: >-
+          The out-of-range value is reported by its own branch, outside
+          the exception path, since only a server rejection raises
+
+  - name: check-shared-module
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-checks/SKILL.md and
+      follow its workflow and rules.
+
+      Task: One piece of logic in our repository, a VLAN allocation planner,
+      is now needed by three artifacts: a check, a generator and a transform.
+      Today it is copied into all three directories and the copies have
+      drifted.
+
+      Give me the layout that lets all three call one implementation, and
+      the pieces needed to make it run in the workers.
+
+      The base image is registry.opsmill.io/opsmill/infrahub:1.11.0 and the
+      shared package should be called `netdomain`.
+
+      Produce three files:
+      - the check that uses the shared logic, saved to: output.py
+      - the image that makes it available to the workers, saved to:
+        output.dockerfile
+      - the `.infrahub.yml` registering the check, the generator
+        (`plan_vlans`, targets `vlan_pools`, query `vlan_pool_state`) and
+        the Python transform (`render_vlan_plan`, class
+        `RenderVlanPlan`), saved to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-checks/check_shared_module.py
+        weight: 1.0
+    expected_output: >-
+      A `src/` layout package installed into the worker image and imported
+      absolutely from every artifact directory, because a relative import
+      cannot span artifact directories. The Dockerfile derives from the
+      Infrahub image, sets `UV_PROJECT_ENVIRONMENT=/.venv` so the install
+      lands in the virtualenv the workers already run, and calls
+      `uv sync --inexact --no-dev --frozen` so the sync does not remove the
+      Infrahub install. The `.infrahub.yml` declares the package under
+      `watch:` on the generator and Python transform entries, since an
+      installed package is invisible to Infrahub's dependency detection.
+    expectations:
+      - >-
+        Explains that a relative import only reaches within one artifact
+        directory, so the shared logic has to be installed as a package
+      - >-
+        The check imports the package absolutely, with no relative import
+        and no sys.path manipulation
+      - >-
+        Sets UV_PROJECT_ENVIRONMENT to the base image's /.venv rather than
+        letting uv create its own
+      - >-
+        Uses `uv sync --inexact` and says that without --inexact the sync
+        removes the Infrahub install from the image
+      - >-
+        Declares the shared package under `watch:` on the generator and
+        Python transform entries, and notes that check_definitions has no
+        such field
+      - >-
+        Says the package is worth it on the second consumer of the logic,
+        not in anticipation of one
+    assertions:
+      - name: shared-module-absolute-import
+        check: >-
+          The check imports the shared package absolutely, with no
+          relative import and no sys.path edit
+      - name: dockerfile-targets-base-venv
+        check: The Dockerfile sets UV_PROJECT_ENVIRONMENT to /.venv
+      - name: dockerfile-uv-sync-inexact
+        check: Every `uv sync` line carries --inexact
+      - name: watch-declares-shared-package
+        check: >-
+          Every python_transforms and generator_definitions entry declares
+          a `watch:` mapping
 
   # --- Generators: relationship reference encoding --- #
   - name: generator-relationship-hfid-encoding

@@ -149,12 +149,37 @@ An installed package is invisible to Infrahub's
 dependency detection, so a transform or generator that
 imports it will not regenerate when it changes. Declare
 it under `watch:` on every `python_transforms` and
-`generator_definitions` entry that imports it. See
-[../../infrahub-common/infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md).
+`generator_definitions` entry that imports it. Paths are
+relative to the repository root, so point at the package
+source:
+
+```yaml
+generator_definitions:
+  - name: plan_vlans
+    file_path: generators/plan_vlans.py
+    query: vlan_pool_state
+    targets: vlan_pools
+    watch:
+      files:
+        - src/netdomain
+
+python_transforms:
+  - name: render_vlan_plan
+    file_path: transforms/render_vlan_plan.py
+    class_name: RenderVlanPlan
+    watch:
+      files:
+        - src/netdomain
+```
+
+`watch: {}` is a valid answer on its own: an empty
+`files` list records that you checked and nothing beyond
+what Infrahub detects needs watching.
 
 Note that `check_definitions` accepts no such field, so a
 check's dependency on the shared package cannot be
-declared today.
+declared today. See
+[../../infrahub-common/infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md).
 
 ### When not to do this
 
