@@ -25,6 +25,8 @@ load_output_py = _mod.load_output_py
 
 import ast
 
+import pytest
+
 
 def _parse(src: str) -> ast.Module:
     return ast.parse(src)
@@ -397,3 +399,443 @@ def test_preflight_or_upsert_fails_on_unsafe():
     tree = ast.parse(SRC_UNSAFE)
     ok, _ = _mod.CHECKS["preflight-or-upsert"](tree)
     assert not ok
+
+
+# ---------------------------------------------------------------------------
+# Path traversal, shared-object ownership, group membership (output.md family)
+# ---------------------------------------------------------------------------
+
+GEN_GOOD = """
+class RouteBuilder(InfrahubGenerator):
+    async def generate(self, data: dict) -> None:
+        service = data["NetService"]["edges"][0]["node"]
+        result = await self.client.traverse_paths(
+            source=service["endpoint_a"]["node"]["id"],
+            destination=service["endpoint_z"]["node"]["id"],
+            relationship_filter=["netendpoint__netsegment"],
+            max_depth=6,
+            shortest_paths_only=False,
+        )
+        if result.truncated_at_depth is not None:
+            raise ValueError("truncated")
+        container = await self.client.create(kind="NetContainer", data={"name": "shared-trunk"})
+        await container.save(allow_upsert=True, update_group_context=False)
+        for path in result.paths:
+            leg = await self.client.create(kind="NetLeg", data={"container": container})
+            await leg.save(allow_upsert=True)
+"""
+
+YAML_MEMBER_SIDE = """
+- kind: NetTopology
+  data:
+    - name: dc1-fabric
+      member_of_groups:
+        - topologies_dc
+"""
+
+YAML_GROUP_SIDE = """
+- kind: CoreGeneratorGroup
+  data:
+    - name: topologies_dc
+      members:
+        - dc1-fabric
+"""
+
+
+def _answer(tmp_path, *, python=GEN_GOOD, yaml=YAML_MEMBER_SIDE, extra_python=None, prose=""):
+    """Build an output.md and return the parsed load_output dict."""
+    parts = []
+    if prose:
+        parts.append(prose)
+    parts.append("```python\n" + python.strip() + "\n```")
+    if extra_python:
+        parts.append("```python\n" + extra_python.strip() + "\n```")
+    parts.append("```yaml\n" + yaml.strip() + "\n```")
+    path = tmp_path / "output.md"
+    path.write_text("\n\n".join(parts), encoding="utf-8")
+    return _mod.load_output(path)
+
+
+def _check(name, output):
+    return _mod.CHECKS[name](output)
+
+
+# --- traversal-uses-relationship-filter ---
+
+def test_relationship_filter_passes_on_schema_identifiers(tmp_path):
+    ok, _ = _check("traversal-uses-relationship-filter", _answer(tmp_path))
+    assert ok
+
+
+def test_relationship_filter_resolves_through_a_variable(tmp_path):
+    """`relationship_filter=RELS` must be judged on what RELS holds."""
+    src = 'RELS = ["interfaces"]\n' + GEN_GOOD.replace(
+        'relationship_filter=["netendpoint__netsegment"]', "relationship_filter=RELS"
+    )
+    ok, msg = _check("traversal-uses-relationship-filter", _answer(tmp_path, python=src))
+    assert not ok
+    assert "relationship names" in msg
+
+
+def test_relationship_filter_accepts_variable_holding_identifiers(tmp_path):
+    src = 'RELS = ["netendpoint__netsegment"]\n' + GEN_GOOD.replace(
+        'relationship_filter=["netendpoint__netsegment"]', "relationship_filter=RELS"
+    )
+    ok, _ = _check("traversal-uses-relationship-filter", _answer(tmp_path, python=src))
+    assert ok
+
+
+def test_included_kinds_in_a_comment_does_not_fail(tmp_path):
+    """The check reads the parsed call, so prose about included_kinds is not a use."""
+    src = GEN_GOOD.replace("max_depth=6,", "max_depth=6,  # included_kinds is not a whitelist")
+    ok, _ = _check("traversal-uses-relationship-filter", _answer(tmp_path, python=src))
+    assert ok
+
+
+def test_included_kinds_passed_to_the_call_fails(tmp_path):
+    src = GEN_GOOD.replace("max_depth=6,", 'max_depth=6, included_kinds=["NetSegmentType"],')
+    ok, msg = _check("traversal-uses-relationship-filter", _answer(tmp_path, python=src))
+    assert not ok
+    assert "included_kinds" in msg
+
+
+def test_all_python_fences_are_graded_not_just_the_first(tmp_path):
+    """A WRONG/RIGHT contrast pair must not be graded on the WRONG half."""
+    output = _answer(
+        tmp_path,
+        python='relationship_filter = ["interfaces"]  # WRONG: a relationship name',
+        extra_python=GEN_GOOD,
+    )
+    ok, _ = _check("traversal-uses-relationship-filter", output)
+    assert ok
+
+
+def test_kind_filter_alone_fails(tmp_path):
+    src = GEN_GOOD.replace(
+        'relationship_filter=["netendpoint__netsegment"],', 'kind_filter=["NetSegment"],'
+    )
+    ok, _ = _check("traversal-uses-relationship-filter", _answer(tmp_path, python=src))
+    assert not ok
+
+
+# --- traversal-enumerates-and-checks-truncation ---
+
+def test_traversal_enumerates_and_checks_truncation_passes(tmp_path):
+    ok, _ = _check("traversal-enumerates-and-checks-truncation", _answer(tmp_path))
+    assert ok
+
+
+def test_path_exists_alone_cannot_enumerate_paths(tmp_path):
+    """path_exists returns a bool, so it cannot produce one leg per path."""
+    src = """
+class RouteBuilder(InfrahubGenerator):
+    async def generate(self, data: dict) -> None:
+        if not await self.client.path_exists(
+            source=a, destination=z,
+            relationship_filter=["netendpoint__netsegment"], max_depth=6,
+        ):
+            return
+        leg = await self.client.create(kind="NetLeg", data={})
+        await leg.save(allow_upsert=True)
+"""
+    ok, msg = _check("traversal-enumerates-and-checks-truncation", _answer(tmp_path, python=src))
+    assert not ok
+    assert "path_exists" in msg
+
+
+def test_traversal_without_iterating_paths_fails(tmp_path):
+    src = GEN_GOOD.replace("for path in result.paths:", "for path in [1]:")
+    ok, _ = _check("traversal-enumerates-and-checks-truncation", _answer(tmp_path, python=src))
+    assert not ok
+
+
+def test_traversal_without_truncation_check_fails(tmp_path):
+    src = GEN_GOOD.replace(
+        'if result.truncated_at_depth is not None:\n            raise ValueError("truncated")',
+        "pass",
+    )
+    ok, _ = _check("traversal-enumerates-and-checks-truncation", _answer(tmp_path, python=src))
+    assert not ok
+
+
+# --- shared-save-opts-out-of-tracking ---
+
+def test_shared_save_opt_out_passes_when_bound_to_the_shared_object(tmp_path):
+    ok, _ = _check("shared-save-opts-out-of-tracking", _answer(tmp_path))
+    assert ok
+
+
+def test_blanket_opt_out_on_every_save_fails(tmp_path):
+    """Opting every save out disables the per-target cleanup."""
+    src = GEN_GOOD.replace(
+        "await leg.save(allow_upsert=True)",
+        "await leg.save(allow_upsert=True, update_group_context=False)",
+    )
+    ok, msg = _check("shared-save-opts-out-of-tracking", _answer(tmp_path, python=src))
+    assert not ok
+    assert "every save()" in msg
+
+
+def test_shared_object_created_outside_the_generator_passes(tmp_path):
+    """Creating the shared object elsewhere is the other accepted answer."""
+    src = """
+class RouteBuilder(InfrahubGenerator):
+    async def generate(self, data: dict) -> None:
+        result = await self.client.traverse_paths(
+            source=a, destination=z,
+            relationship_filter=["netendpoint__netsegment"], max_depth=6,
+        )
+        if result.truncated_at_depth is not None:
+            raise ValueError("truncated")
+        for path in result.paths:
+            leg = await self.client.create(kind="NetLeg", data={})
+            await leg.save(allow_upsert=True)
+"""
+    ok, _ = _check("shared-save-opts-out-of-tracking", _answer(tmp_path, python=src))
+    assert ok
+
+
+def test_shared_object_saved_without_opt_out_fails(tmp_path):
+    src = GEN_GOOD.replace(
+        "await container.save(allow_upsert=True, update_group_context=False)",
+        "await container.save(allow_upsert=True)",
+    )
+    ok, _ = _check("shared-save-opts-out-of-tracking", _answer(tmp_path, python=src))
+    assert not ok
+
+
+def test_opt_out_on_the_wrong_save_fails(tmp_path):
+    """The flag on a per-target leg does not protect the shared object."""
+    src = GEN_GOOD.replace(
+        "await container.save(allow_upsert=True, update_group_context=False)",
+        "await container.save(allow_upsert=True)",
+    ).replace(
+        "await leg.save(allow_upsert=True)",
+        "await leg.save(allow_upsert=True, update_group_context=False)",
+    )
+    ok, _ = _check("shared-save-opts-out-of-tracking", _answer(tmp_path, python=src))
+    assert not ok
+
+
+# --- group-membership-from-member-side ---
+
+def test_group_membership_member_side_passes(tmp_path):
+    ok, _ = _check("group-membership-from-member-side", _answer(tmp_path))
+    assert ok
+
+
+def test_group_side_yaml_fails_even_when_prose_mentions_member_of_groups(tmp_path):
+    """The check reads the YAML fence, not the explanation around it."""
+    output = _answer(
+        tmp_path,
+        yaml=YAML_GROUP_SIDE,
+        prose="Membership must be written from the member side with member_of_groups.",
+    )
+    ok, msg = _check("group-membership-from-member-side", output)
+    assert not ok
+    assert "group side" in msg
+
+
+def test_missing_membership_in_yaml_fails(tmp_path):
+    output = _answer(tmp_path, yaml="- kind: NetTopology\n  data:\n    - name: dc1")
+    ok, _ = _check("group-membership-from-member-side", output)
+    assert not ok
+
+
+# ---------------------------------------------------------------------------
+# Traversal, ownership and hop shape
+#
+# Every case here is a shape the checks previously got wrong in one
+# direction or the other.
+# ---------------------------------------------------------------------------
+
+
+def _run(name: str, python: str = "", yaml_text: str = ""):
+    return _mod.CHECKS[name]({"python_all": python, "yaml": yaml_text})
+
+
+OWNERSHIP_VIOLATIONS = [
+    pytest.param(
+        '''
+class G:
+    async def generate(self, data):
+        self.trunk = await self.client.create(kind="NetContainer", name="trunk")
+        await self.trunk.save(allow_upsert=True)
+''',
+        id="held-on-self",
+    ),
+    pytest.param(
+        '''
+class G:
+    async def generate(self, data):
+        trunk = await self.client.create(kind="NetContainer", name="t")
+        leg = await self.client.create(kind="NetLeg", name="l")
+        for obj in (trunk, leg):
+            await obj.save(allow_upsert=True)
+''',
+        id="saved-in-a-loop",
+    ),
+]
+
+
+@pytest.mark.parametrize("python", OWNERSHIP_VIOLATIONS)
+def test_the_shared_object_claim_is_caught_however_it_is_held(python):
+    ok, msg = _run("shared-save-opts-out-of-tracking", python)
+    assert not ok, msg
+
+
+def test_the_opt_out_on_a_self_held_object_passes():
+    ok, msg = _run(
+        "shared-save-opts-out-of-tracking",
+        '''
+class G:
+    async def generate(self, data):
+        self.trunk = await self.client.create(kind="NetContainer", name="trunk")
+        await self.trunk.save(allow_upsert=True, update_group_context=False)
+        leg = await self.client.create(kind="NetLeg", name="l")
+        await leg.save()
+''',
+    )
+    assert ok, msg
+
+
+def test_a_wrong_right_yaml_contrast_is_not_failed_for_showing_the_wrong_form():
+    ok, msg = _run(
+        "group-membership-from-member-side",
+        yaml_text="# WRONG\nmembers: [t1]\n# RIGHT\nmember_of_groups: [topologies_dc]",
+    )
+    assert ok, msg
+
+
+def test_an_unlabelled_group_side_assignment_still_fails():
+    ok, _ = _run("group-membership-from-member-side", yaml_text="members: [t1]")
+    assert not ok
+
+
+TRAVERSAL_VIOLATIONS = [
+    pytest.param(
+        '''
+class G:
+    async def generate(self, data):
+        a = await self.client.traverse_paths(
+            start_id="x", relationship_filter=["device__interface"], max_depth=8)
+        b = await self.client.traverse_paths(start_id="y", max_depth=8)
+''',
+        id="one-call-unconstrained",
+    ),
+    pytest.param(
+        '''
+class G:
+    async def generate(self, data):
+        a = await self.client.traverse_paths(
+            start_id="x", relationship_filter=[], max_depth=8)
+''',
+        id="empty-filter",
+    ),
+    pytest.param(
+        '''
+RELS = build_rels()
+
+
+class G:
+    async def generate(self, data):
+        a = await self.client.traverse_paths(
+            start_id="x", relationship_filter=RELS, max_depth=8)
+''',
+        id="unresolvable-filter",
+    ),
+    pytest.param(
+        '''
+class G:
+    async def generate(self, data):
+        a = await self.client.traverse_paths(
+            start_id="x", relationship_filter=["device__interface"])
+''',
+        id="no-max-depth",
+    ),
+]
+
+
+@pytest.mark.parametrize("python", TRAVERSAL_VIOLATIONS)
+def test_an_unconstrained_traversal_fails(python):
+    ok, msg = _run("traversal-uses-relationship-filter", python)
+    assert not ok, msg
+
+
+def test_a_constrained_bounded_traversal_passes():
+    ok, msg = _run(
+        "traversal-uses-relationship-filter",
+        '''
+RELS = ["device__interface", "interface__circuit"]
+
+
+class G:
+    async def generate(self, data):
+        a = await self.client.traverse_paths(
+            start_id="x", relationship_filter=RELS, max_depth=8)
+''',
+    )
+    assert ok, msg
+
+
+def test_truncation_has_to_be_read_off_the_traversal_result():
+    ok, _ = _run(
+        "traversal-enumerates-and-checks-truncation",
+        '''
+class G:
+    async def generate(self, data):
+        for p in self.cache.paths:
+            pass
+        _ = self.meta.truncated_at_depth
+        result = await self.client.traverse_paths(start_id="x")
+''',
+    )
+    assert not ok
+
+
+def test_reading_truncation_without_acting_on_it_is_not_a_check():
+    ok, _ = _run(
+        "traversal-enumerates-and-checks-truncation",
+        '''
+class G:
+    async def generate(self, data):
+        result = await self.client.traverse_paths(start_id="x")
+        for path in result.paths:
+            pass
+        result.truncated_at_depth
+''',
+    )
+    assert not ok
+
+
+def test_enumerating_and_branching_on_truncation_passes():
+    ok, msg = _run(
+        "traversal-enumerates-and-checks-truncation",
+        '''
+class G:
+    async def generate(self, data):
+        result = await self.client.traverse_paths(start_id="x")
+        for path in result.paths:
+            pass
+        if result.truncated_at_depth:
+            self.logger.warning("truncated")
+''',
+    )
+    assert ok, msg
+
+
+def test_a_label_read_off_the_hop_itself_fails():
+    """The AttributeError this rule was written after."""
+    ok, msg = _run(
+        "path-hop-shape",
+        "labels = [h.display_label for p in result.paths for h in p.hops]",
+    )
+    assert not ok and "hop.node.display_label" in msg
+
+
+def test_a_label_read_through_the_hops_node_passes():
+    ok, msg = _run(
+        "path-hop-shape",
+        "labels = [h.node.display_label for p in result.paths for h in p.hops]",
+    )
+    assert ok, msg
