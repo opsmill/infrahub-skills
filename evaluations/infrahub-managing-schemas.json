@@ -488,6 +488,10 @@
           "check": "No inherited relationship peer is narrowed on any kind"
         },
         {
+          "name": "pairing-note-present",
+          "check": "A comment states the kind-to-kind pairing is not expressible in the schema and names a check as where it must live"
+        },
+        {
           "name": "schema-version",
           "check": "File declares version \"1.0\""
         },

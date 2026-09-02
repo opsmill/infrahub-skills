@@ -1067,6 +1067,19 @@ def check_choice_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
 # ---------------------------------------------------------------------------
 
 
+# A trailing `__asc` / `__desc` is a direction suffix, not part of the path.
+# It is legal on every order_by form, node metadata included.
+_ORDER_BY_DIRECTIONS = {"asc", "desc"}
+
+
+def _strip_order_direction(entry: str) -> str:
+    """Drop a trailing ``__asc`` / ``__desc`` direction suffix from an entry."""
+    head, sep, tail = entry.rpartition("__")
+    if sep and head and tail in _ORDER_BY_DIRECTIONS:
+        return head
+    return entry
+
+
 def _entities(schema: dict) -> list[tuple[str, dict]]:
     """Yield ``(section, entity)`` for every node and generic in the schema."""
     out: list[tuple[str, dict]] = []
@@ -1112,7 +1125,7 @@ def check_order_by_resolves_locally(schema: dict, **_: Any) -> tuple[bool, str]:
             if not isinstance(entry, str):
                 continue
             if entry.startswith("node_metadata__"):
-                field = entry.split("__", 1)[1]
+                field = _strip_order_direction(entry).split("__", 1)[1]
                 if field not in {"created_at", "updated_at"}:
                     problems.append(
                         f"{entity.get('name')}.order_by {entry!r}: unknown metadata field"
@@ -1209,12 +1222,15 @@ def check_inherited_peer_unchanged(schema: dict, **_: Any) -> tuple[bool, str]:
     }
 
     problems: list[str] = []
+    inheritors = 0
     for node in schema.get("nodes") or []:
         if not isinstance(node, dict):
             continue
         inherited: dict[str, dict] = {}
         for parent_kind in node.get("inherit_from") or []:
             inherited.update(generic_rels.get(parent_kind, {}))
+        if inherited:
+            inheritors += 1
         for rel in node.get("relationships") or []:
             if not isinstance(rel, dict):
                 continue
@@ -1230,7 +1246,49 @@ def check_inherited_peer_unchanged(schema: dict, **_: Any) -> tuple[bool, str]:
                 )
     if problems:
         return False, "inherited peer narrowed: " + "; ".join(problems)
+    # Floor guard: a schema with no inherited relationship at all satisfies
+    # "nothing is narrowed" without exercising the rule. Declaring the
+    # relationship on the concrete kinds instead of the generic sidesteps the
+    # constraint the task is about, so that shape must not score.
+    if inheritors == 0:
+        return False, "no node inherits a relationship, so nothing exercises the rule"
     return True, "no inherited relationship peer is narrowed"
+
+
+# The pairing requirement cannot be expressed in the schema, so the only place
+# the answer can carry it is prose. Accept any wording that (a) says the
+# schema cannot express it and (b) names the place it has to live instead.
+_PAIRING_NOT_EXPRESSIBLE_PATTERNS = [
+    re.compile(r"\b(?:not|cannot|can't|isn't|is not|un)\s*\w*\s*express\w*", re.IGNORECASE),
+    re.compile(r"\bschema\s+cannot\b", re.IGNORECASE),
+    re.compile(r"\b(?:same|identical|fixed|frozen)\s+peer\b", re.IGNORECASE),
+    re.compile(r"\bpeer\b[^.\n]{0,60}\b(?:cannot|can't|may not)\b[^.\n]{0,30}\b(?:narrow|change|override)", re.IGNORECASE),
+]
+
+_PAIRING_ENFORCEMENT_HOME_PATTERNS = [
+    re.compile(r"\bcheck(?:s|_definition|-definition)?\b", re.IGNORECASE),
+    re.compile(r"\bproposed[-\s]?change\b", re.IGNORECASE),
+]
+
+
+def check_pairing_note_present(schema: dict, *, raw_text: str = "", **_: Any) -> tuple[bool, str]:
+    """The answer must say the kind-to-kind pairing is not expressible in schema.
+
+    Naming a Python check (or the proposed-change pipeline) as the place the
+    rule has to live instead is part of the requirement: "you cannot do it"
+    without "here is where it goes" leaves the user stuck.
+    """
+    said_inexpressible = next(
+        (p for p in _PAIRING_NOT_EXPRESSIBLE_PATTERNS if p.search(raw_text)), None
+    )
+    if said_inexpressible is None:
+        return False, "does not state that the kind-to-kind pairing is inexpressible in the schema"
+    named_home = next(
+        (p for p in _PAIRING_ENFORCEMENT_HOME_PATTERNS if p.search(raw_text)), None
+    )
+    if named_home is None:
+        return False, "states the limit but never names a check as where the pairing must live"
+    return True, f"pairing note present (matched {said_inexpressible.pattern!r} and {named_home.pattern!r})"
 
 
 CHECKS: dict[str, Any] = {
@@ -1238,6 +1296,7 @@ CHECKS: dict[str, Any] = {
     "order-by-resolves-locally": check_order_by_resolves_locally,
     "dropdown-override-complete": check_dropdown_override_complete,
     "inherited-peer-unchanged": check_inherited_peer_unchanged,
+    "pairing-note-present": check_pairing_note_present,
     "dropdown-for-status": check_dropdown_for_status,
     "no-deprecated-string": check_no_deprecated_string,
     "full-kind-references": check_full_kind_references,

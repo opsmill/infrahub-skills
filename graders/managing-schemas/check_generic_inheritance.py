@@ -15,6 +15,7 @@ CHECKS = [
     "order-by-resolves-locally",
     "dropdown-override-complete",
     "inherited-peer-unchanged",
+    "pairing-note-present",
     "full-kind-references",
 ]
 

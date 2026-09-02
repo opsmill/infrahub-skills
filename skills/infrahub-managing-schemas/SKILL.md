@@ -53,7 +53,7 @@ use the first argument as the namespace and remaining arguments as node names.
 | CRITICAL | Relationships | `relationship-` | IDs, peers, component/parent, on_delete |
 | HIGH | Attributes | `attribute-` | Defaults, dropdowns, computed Jinja2, branch-agnostic, deprecated |
 | HIGH | Hierarchy | `hierarchy-` | Hierarchical generics, parent/children |
-| HIGH | Display | `display-` | human_friendly_id, order_weight, menu placement |
+| HIGH | Display | `display-` | human_friendly_id, order_weight, order_by, menu placement |
 | MEDIUM | Extensions | `extension-` | Cross-file via extensions block, artifact targets |
 | MEDIUM | Uniqueness | `uniqueness-` | Constraint format, __value suffix |
 | MEDIUM | Migration | `migration-` | Add/remove attributes, state: absent |
@@ -170,6 +170,10 @@ Follow these steps when creating or modifying a schema:
    `order_weight` per
    [rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md)
    and [rules/display-order-weight.md](./rules/display-order-weight.md).
+   If a kind needs a default listing order, set `order_by`
+   per [rules/display-order-by-scope.md](./rules/display-order-by-scope.md)
+   — on a generic it resolves only against fields that
+   generic declares itself.
 7. **Format the file** — Put the keys in the canonical
    order before committing so diffs stay small. Run
    `infrahubctl schema format` when your `infrahubctl`

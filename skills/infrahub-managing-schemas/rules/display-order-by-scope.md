@@ -48,7 +48,14 @@ nodes:
     namespace: Net
     inherit_from: [NetEndpoint]
     attributes:
-      - name: name              # the implementers all have it
+      - name: name              # this implementer declares it
+        kind: Text
+
+  - name: Console
+    namespace: Net
+    inherit_from: [NetEndpoint]
+    attributes:
+      - name: port_id           # this one has no `name`
         kind: Text
 ```
 
@@ -57,13 +64,16 @@ NetEndpoint.order_by: attribute 'name' not defined on this schema (entry: 'name_
 ```
 
 **The message may name an implementer instead of the
-generic.** Because the generic's `order_by` is copied
-down to every implementer that declares none of its own,
-whichever schema is validated first is the one named. So
-the same mistake can report as:
+generic.** The generic's `order_by` is copied down to
+every implementer that declares none of its own, and each
+copy is validated against the schema it landed on.
+`NetOptical` declares `name`, so its copy resolves.
+`NetConsole` does not, so its copy fails too, and
+whichever failing schema is validated first is the one
+named:
 
 ```text
-NetOptical.order_by: attribute 'name' not defined on this schema (entry: 'name__value').
+NetConsole.order_by: attribute 'name' not defined on this schema (entry: 'name__value').
 ```
 
 on a kind whose file does not mention `order_by` at all.

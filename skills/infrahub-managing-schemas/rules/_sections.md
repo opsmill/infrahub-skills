@@ -32,7 +32,9 @@
    parent-child taxonomy.
 
 6. **Display (display-)** — HIGH. human_friendly_id,
-   display_label, order_weight, and menu placement
+   display_label, order_weight, `order_by` (the default
+   listing order, and it resolves only against the schema
+   that declares it), and menu placement
    (`include_in_menu: false`, `menu_placement:`).
    Controls how objects are identified, ordered, and
    surfaced in the UI sidebar.

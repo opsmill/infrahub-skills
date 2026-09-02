@@ -627,18 +627,21 @@ and give up per-kind defaults.
 ### 3. Where `order_by` resolves
 
 `order_by` on a generic resolves against that generic's
-**own** declarations only. `DcimDevice` above cannot
-order by `name__value`, because `name` lives on the
-implementers:
+**own** declarations only. That is why `DcimDevice` above
+orders by metadata: it declares no `name`, so
+`order_by: [name__value]` on it would be rejected. Swap
+the metadata entry for `name__value` and the load fails:
 
 ```text
 DcimSwitch.order_by: attribute 'name' not defined on this schema (entry: 'name__value').
 ```
 
 Note the message names `DcimSwitch`, whose file contains
-no `order_by` at all, because the generic's value was
-copied down to it. When the named kind has no
-`order_by`, look at its generics.
+no `order_by` at all. The generic's value was copied down
+to it, and `DcimSwitch` declares no `name` either. When
+the named kind has no `order_by`, look at its generics.
+`DcimPort` gets away with `name__value` only because it
+declares `name` itself.
 
 ## Component Pattern (Modules/Slots)
 
