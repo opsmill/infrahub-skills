@@ -173,6 +173,42 @@
     },
     {
       "id": 5,
+      "prompt": "Create an Infrahub schema in the 'Virtualization' namespace with a Cluster node\n(name) and a VirtualMachine node with a numeric 'vmid'. A VM records which cluster it\ncurrently runs on \u2014 VMs migrate between clusters, so the cluster is a plain reference\nrather than an owning parent. Every VM always belongs to exactly one cluster. The vmid\nmust be unique within each cluster, but the same vmid can be reused on a different\ncluster.",
+      "expected_output": "A schema whose VirtualMachine node scopes uniqueness with uniqueness_constraints combining the bare relationship name and the vmid attribute with its __value suffix, where the cluster relationship is declared cardinality: one and optional: false so the constraint passes server-side validation.",
+      "files": [],
+      "expectations": [
+        "uniqueness_constraints on VirtualMachine combines the bare relationship name (cluster) with vmid__value",
+        "The cluster relationship has optional: false and cardinality: one, which the server requires for any relationship a uniqueness constraint reaches",
+        "No uniqueness_constraints entry uses a peer-attribute path such as cluster__name__value",
+        "Any relationship reached by a human_friendly_id path is likewise mandatory and cardinality: one",
+        "human_friendly_id is defined on each node",
+        "Schema starts with version: \"1.0\""
+      ],
+      "assertions": [
+        {
+          "name": "schema-version",
+          "check": "Schema starts with version: '1.0'"
+        },
+        {
+          "name": "uniqueness-rel-mandatory",
+          "check": "Every relationship reached by uniqueness_constraints or human_friendly_id has optional: false and cardinality: one, and constraints use bare relationship names"
+        },
+        {
+          "name": "matching-identifiers",
+          "check": "Relationship identifier pairs match on both sides"
+        },
+        {
+          "name": "full-kind-references",
+          "check": "All peer references use full Namespace+Name kind"
+        },
+        {
+          "name": "human-friendly-id",
+          "check": "human_friendly_id defined on each node"
+        }
+      ]
+    },
+    {
+      "id": 6,
       "prompt": "A schema is already loaded into a running Infrahub instance. The DcimDevice node\ndeclares a forward relationship to its interfaces, and that relationship was first loaded\nWITHOUT an explicit identifier, so Infrahub auto-generated one: dcimdevice__dciminterface.\nThe DcimInterface node currently has NO relationship back to its device, so consumers that\nhold an interface cannot traverse to its device.\n\nExisting schema (do not change the DcimDevice side):\n\n  version: \"1.0\"\n  nodes:\n    - name: Device\n      namespace: Dcim\n      human_friendly_id: [\"name__value\"]\n      attributes:\n        - name: name\n          kind: Text\n      relationships:\n        - name: interfaces\n          peer: DcimInterface\n          kind: Attribute\n          cardinality: many\n          identifier: \"dcimdevice__dciminterface\"\n    - name: Interface\n      namespace: Dcim\n      human_friendly_id: [\"name__value\"]\n      attributes:\n        - name: name\n          kind: Text\n\nAdd the missing inverse `device` relationship on DcimInterface (peer DcimDevice,\ncardinality one) so the link is traversable from both sides.",
       "expected_output": "A schema where the new DcimInterface.device relationship reuses the forward side's existing identifier 'dcimdevice__dciminterface' verbatim, rather than inventing a new one (e.g. 'device__interfaces') and renaming the forward side \u2014 which would fail with not_supported because the identifier is immutable once loaded.",
       "files": [],
@@ -202,7 +238,7 @@
       ]
     },
     {
-      "id": 6,
+      "id": 7,
       "prompt": "Create an Infrahub schema for a BGP autonomous-system catalog. An AutonomousSystem\nnode has an asn (number) and a description. The display name should NOT be entered by\nthe user \u2014 it must be auto-derived from the ASN as 'AS<asn>' (e.g., 'AS65000') using a\nJinja2 computed attribute. The derived name is used as the display label and as part\nof human_friendly_id, so it must always be populated. Use namespace 'Routing'.",
       "expected_output": "A schema where the name attribute uses computed_attribute with kind: Jinja2 and a non-empty jinja2_template, paired with read_only: true (always required) and optional: false (because the value is load-bearing \u2014 used as display_label and in human_friendly_id).",
       "files": [],
@@ -234,7 +270,7 @@
       ]
     },
     {
-      "id": 7,
+      "id": 8,
       "prompt": "Create an Infrahub schema for a load-balancer VIP service. A VIPService has a\nname (Text) and references a frontend IP (IpamIPAddress). The VIPService owns a list\nof HealthCheck objects \u2014 health checks have no meaning on their own and should be\ndeleted when their VIPService is deleted. The frontend IP, however, is shared\ninfrastructure: deleting a VIPService must NOT delete its IP. Use namespace 'ServiceLB'.",
       "expected_output": "A schema where the VIPService \u2192 HealthCheck Component relationship sets on_delete: cascade explicitly (so health checks are removed when the parent VIP is deleted), and the VIPService \u2192 IP relationship either omits on_delete or sets on_delete: no-action (so the shared IP is preserved). Any kind: Parent relationship has optional: false.",
       "files": [],
@@ -275,7 +311,7 @@
       ]
     },
     {
-      "id": 8,
+      "id": 9,
       "prompt": "Create an Infrahub schema for a network-device inventory. Define a generic\nGenericDevice (with shared attributes like hostname and role) and a concrete Device\nnode that inherits from it. The concrete Device should:\n\n  - Be eligible for rendered configuration artifacts (so artifact definitions in\n    .infrahub.yml can attach to it).\n  - Be cloneable from the UI as a starter for new devices (one template per role \u2014\n    leaf, spine, edge \u2014 speeds onboarding).\n\nThe two capabilities are independent features and should be applied to the concrete\nDevice, not to the generic. Use namespace 'Dcim'.",
       "expected_output": "A schema with the GenericDevice generic carrying the shared attributes, and a concrete Device node that both inherits from CoreArtifactTarget AND sets generate_template: true. Neither flag appears on the generic.",
       "files": [],
@@ -309,7 +345,7 @@
       ]
     },
     {
-      "id": 9,
+      "id": 10,
       "prompt": "Add a DcimNetworkDiagram node to my Infrahub schema. Each diagram is a Visio\nfile attached to a LocationSite. Track a title, the author, and the date it was\nlast reviewed. The Visio file itself must be stored inside Infrahub, not as a URL.\nUse namespace 'Dcim'. The LocationSite node already exists \u2014 extend it via the\nschema's relationships rather than redefining it.",
       "expected_output": "A schema in which DcimNetworkDiagram inherits from CoreFileObject (so the Visio file lives in Infrahub object storage with auto file metadata and a GraphQL upload mutation), carries domain attributes (title, author, last_reviewed) but does NOT redeclare the reserved file_name/file_size/file_type/checksum/storage_id attributes, and links back to LocationSite via a cardinality:one relationship.",
       "files": [],
@@ -349,7 +385,7 @@
       ]
     },
     {
-      "id": 10,
+      "id": 11,
       "prompt": "Model a network-device inventory where many devices share the\nsame operational defaults (MTU, status, timezone) that operators want\nto manage in one place and change centrally. Define a generic\nGenericDevice (hostname, role) and a concrete Device node that inherits\nfrom it. Enable the mechanism that lets operators define reusable\ndefault-value sets and assign them to devices. Use namespace 'Dcim'.",
       "expected_output": "A schema whose concrete Device node sets generate_profile: true (never on the GenericDevice generic), inherits from DcimGenericDevice by full kind, and defines human_friendly_id. The shared attributes (mtu, status, timezone) are optional so Profile-supplied values apply.",
       "files": [],
@@ -374,7 +410,7 @@
       ]
     },
     {
-      "id": 11,
+      "id": 12,
       "prompt": "Create an Infrahub schema for a service-handoff intent model. Namespace: 'Service'.\n\nDefine a single node, HandoffIntent, with:\n\n  - intent_id: a Number, the unique identifier for the handoff intent.\n  - state: a Dropdown \u2014 one of draft, active, decommissioned.\n\nPlus two relationships on HandoffIntent:\n\n  - source_device: peer DcimDevice. Constraint: must point to a customer-edge\n    router where the provider hands traffic off. Non-edge devices are rejected at\n    submit by the generator's _validate() step.\n  - handoff_port: peer DcimInterface. The specific port on source_device where\n    the handover happens. The picker walks DcimDevice \u2192 DcimInterface via the\n    peer's human_friendly_id; only ports on the chosen source_device are valid.\n\nThese descriptions are operator-facing \u2014 they are the only docs operators see in the UI\ntooltip. Make sure the schema actually loads (`infrahubctl schema load`) without errors\nin addition to passing `infrahubctl schema check`.",
       "expected_output": "A schema where every string field (`description`, `label`, `identifier`, `deprecation`) stays within Infrahub's server-enforced Pydantic `max_length` caps so the schema loads cleanly. Limits are resolved live per the validation-string-limits rule (public JSON Schema primary, `/api/openapi.json` fallback); this eval does not pin specific numbers. Longer operator-facing context belongs in YAML comments next to the field, not in `description:` itself.",
       "files": [],
@@ -409,7 +445,7 @@
       ]
     },
     {
-      "id": 12,
+      "id": 13,
       "prompt": "Production incident \u2014 we need a new `maintenance_window` optional Dropdown\nattribute on DcimDevice live on our shared, team-wide Infrahub instance in the next 10\nminutes so on-call can start tagging devices. It's just one optional dropdown, totally\nadditive, zero risk. Give me the exact command to apply it to the server right now \u2014 we\ndon't have time to mess with branches and proposed changes.\n\nSave your full plan (the commands plus a brief rationale) to: output.md",
       "expected_output": "Despite the time pressure and the \"additive / zero risk\" framing, the answer should hold the line rather than hand over a bare `schema load` that targets the default branch. It creates or selects a dedicated branch (e.g. `infrahubctl branch create schema-maint-window`) and runs `infrahubctl schema check --branch <branch>` then `infrahubctl schema load --branch <branch>` on that branch, rather than loading directly into the default branch (`main` by convention, but it can be renamed). The rationale should explain that a schema load runs migrations against loaded data immediately, so applying on the default branch gives no preview and no per-step undo, whereas a branch can be previewed, merged via a proposed change after review, or discarded \u2014 and that the branch costs ~60 seconds, which is exactly what an incident needs.",
       "files": [],
@@ -431,7 +467,7 @@
       ]
     },
     {
-      "id": 13,
+      "id": 14,
       "prompt": "Our schema reviews are drowning in noise \u2014 every edit reshuffles keys and the\nreal change gets lost, so CI now rejects any schema file that isn't in our canonical\nkey order. Add a new file for patch-panel inventory: a `DcimPatchPanel` node with a\nunique name, a `rack_unit` position (number), a `status` dropdown (active, spare,\nfaulty), a free-text description, and a relationship to the rack it sits in\n(`LocationRack`, one per panel, mandatory). It has to land already formatted so the\nfirst review diff is clean.",
       "expected_output": "A schema file whose keys are already in the canonical order the skill documents, so a subsequent `infrahubctl schema format` would be a no-op. Top-level keys run `version` then `nodes`. `DcimPatchPanel` leads with `name` then `namespace`, carries `human_friendly_id` and `display_label`, and ends with `attributes` then `relationships` \u2014 no scalar keys trailing after those lists. Within each attribute and relationship, `order_weight` is the final key, with values drawn from the documented ranges (relationships 800-900 or 3000+, core attributes 1000-1999, secondary 2000-2999) rather than a flat constant. The status dropdown's choices are ordered `name`, `label`, then `color`.",
       "files": [],

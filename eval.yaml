@@ -389,6 +389,60 @@ tasks:
       - name: human-friendly-id
         check: human_friendly_id defined on each node
 
+  - name: uniqueness-scoped-by-relationship
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Create an Infrahub schema in the 'Virtualization' namespace with a Cluster node
+      (name) and a VirtualMachine node with a numeric 'vmid'. A VM records which cluster it
+      currently runs on — VMs migrate between clusters, so the cluster is a plain reference
+      rather than an owning parent. Every VM always belongs to exactly one cluster. The vmid
+      must be unique within each cluster, but the same vmid can be reused on a different
+      cluster.
+
+      Save ONLY the final schema YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_uniqueness_constraints.py
+        weight: 1.0
+    expected_output: >-
+      A schema whose VirtualMachine node scopes uniqueness with
+      uniqueness_constraints combining the bare relationship name and the
+      vmid attribute with its __value suffix, where the cluster
+      relationship is declared cardinality: one and optional: false so the
+      constraint passes server-side validation.
+    expectations:
+      - >-
+        uniqueness_constraints on VirtualMachine combines the bare
+        relationship name (cluster) with vmid__value
+      - >-
+        The cluster relationship has optional: false and cardinality: one,
+        which the server requires for any relationship a uniqueness
+        constraint reaches
+      - >-
+        No uniqueness_constraints entry uses a peer-attribute path such as
+        cluster__name__value
+      - >-
+        Any relationship reached by a human_friendly_id path is likewise
+        mandatory and cardinality: one
+      - "human_friendly_id is defined on each node"
+      - 'Schema starts with version: "1.0"'
+    assertions:
+      - name: schema-version
+        check: "Schema starts with version: '1.0'"
+      - name: uniqueness-rel-mandatory
+        check: >-
+          Every relationship reached by uniqueness_constraints or
+          human_friendly_id has optional: false and cardinality: one, and
+          constraints use bare relationship names
+      - name: matching-identifiers
+        check: Relationship identifier pairs match on both sides
+      - name: full-kind-references
+        check: All peer references use full Namespace+Name kind
+      - name: human-friendly-id
+        check: human_friendly_id defined on each node
+
   - name: inverse-identifier-reuse
     trials: 3
     instruction: |
