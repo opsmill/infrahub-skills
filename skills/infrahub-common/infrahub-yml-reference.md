@@ -188,13 +188,19 @@ python_transforms:
     class_name: RenderVlanPlan
     watch:
       files:
-        - src/netdomain        # a directory watches everything beneath it
+        - src/mydomain        # a directory watches everything beneath it
         - templates/shared.j2
 ```
 
 | Field | Required | Description |
 | ----- | -------- | ----------- |
 | `files` | No | Paths relative to the repository root. Defaults to empty |
+
+**Requires SDK 1.23.0 or later.** The config models use
+`extra="forbid"`, so on 1.22.x a file carrying `watch:`
+does not load at all: it fails with an `extra_forbidden`
+validation error naming the field, rather than ignoring
+it.
 
 `watch: {}` is valid on its own: an empty `files` list
 records that the author checked and nothing beyond what

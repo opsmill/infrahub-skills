@@ -98,10 +98,16 @@ artifact type, a relative import **cannot** span
 directories: the module has to be installed into the
 worker image as a package.
 
-The full pattern, including the three `uv` flags whose
-absence each fails differently, is documented once in
+The full pattern is documented once in
 [../../infrahub-managing-checks/rules/patterns-shared-module.md](../../infrahub-managing-checks/rules/patterns-shared-module.md).
-Read it there rather than re-deriving it.
+Read it there rather than re-deriving it. It covers the
+three `uv` flags whose absence each fails differently,
+**and the `watch:` declaration this section needs**: an
+installed package is invisible to Infrahub's dependency
+detection, so without `watch:` the artifact does not
+regenerate when the shared logic changes. `watch:` is
+accepted on this section and on `python_transforms`
+only, and requires SDK 1.23.0 or later.
 
 Reach for it on the **second** consumer of the logic,
 not in anticipation of one.

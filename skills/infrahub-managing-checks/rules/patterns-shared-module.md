@@ -16,21 +16,22 @@ means a package plus a custom worker image.
 ### Why it matters
 
 [patterns-common.md](patterns-common.md) shows
-`from .common import get_data` — correct, and it only
-works within `checks/`. Nothing in these skills covers
-one piece of domain logic called from a check, a
-generator and a transform, which is the case where
-keeping the three from drifting actually matters.
+`from .common import get_data`, which is correct and
+reaches only within `checks/`. The moment a generator or
+a transform needs the same logic, that import stops
+working: a relative import cannot span directories, and
+the worker runs from a different working directory than
+your shell, so `..` and `sys.path` edits work locally
+and fail in production.
 
-The relative-import pattern does not span directories,
-so it does not address the case at all. Discovering that
-is cheap; discovering what to do instead is not. The
-answer needs a package layout, a build backend, a
-Dockerfile, and three flags whose absence each produces
-a differently confusing failure. It is worth carrying as
-a documented pattern because every downstream artifact
-depends on the answer, so nothing else can be built
-until it is settled.
+Getting it wrong is not a loud failure. The three `uv`
+flags below each produce a different confusing symptom:
+without `UV_PROJECT_ENVIRONMENT=/.venv` the workers
+never see the package; without `--inexact`, `uv sync`
+removes the Infrahub install from the image; without
+`--no-dev` a second SDK resolves alongside the first.
+None of them says "your shared module is not
+installed".
 
 ### The pattern
 
@@ -124,6 +125,9 @@ from infrahub_sdk.checks import InfrahubCheck
 class SharedModuleCheck(InfrahubCheck):
     """Fails loudly when the shared package is missing from the worker image."""
 
+    # Any cheap query works, but the name has to exist under top-level
+    # `queries:` in .infrahub.yml: the class attribute resolves by exact
+    # name and a mismatch fails at sync.
     query = "any_cheap_query"
 
     def validate(self, data: dict) -> None:
@@ -151,7 +155,13 @@ imports it will not regenerate when it changes. Declare
 it under `watch:` on every `python_transforms` and
 `generator_definitions` entry that imports it. Paths are
 relative to the repository root, so point at the package
-source:
+source.
+
+**`watch:` requires SDK 1.23.0 or later.** The config
+models use `extra="forbid"`, so on 1.22.x the same file
+does not load at all: it fails with an
+`extra_forbidden` validation error naming `watch`, not
+with the field being ignored.
 
 ```yaml
 generator_definitions:
@@ -161,7 +171,7 @@ generator_definitions:
     targets: vlan_pools
     watch:
       files:
-        - src/netdomain
+        - src/mydomain
 
 python_transforms:
   - name: render_vlan_plan
@@ -169,17 +179,16 @@ python_transforms:
     class_name: RenderVlanPlan
     watch:
       files:
-        - src/netdomain
+        - src/mydomain
 ```
 
-`watch: {}` is a valid answer on its own: an empty
-`files` list records that you checked and nothing beyond
-what Infrahub detects needs watching.
-
-Note that `check_definitions` accepts no such field, so a
-check's dependency on the shared package cannot be
-declared today. See
-[../../infrahub-common/infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md).
+`check_definitions` accepts no such field, so a check's
+dependency on the shared package cannot be declared
+today; only the two sections above can.
+[../../infrahub-common/infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md)
+is the authority on the `watch:` field itself: which
+sections take it, what an empty `files` list means, and
+the minimum SDK version. Read it before writing one.
 
 ### When not to do this
 
@@ -202,9 +211,6 @@ consumer, not in anticipation of one.
 - Shipping dev dependencies and resolving a second SDK.
 - Assuming an unchanged shared module means unchanged
   artifacts, without a `watch:` declaration.
-
-Cross-referenced from the generators and transforms
-skills, which share this problem exactly.
 
 Reference:
 [patterns-common.md](patterns-common.md),

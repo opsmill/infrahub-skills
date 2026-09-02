@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import re
+import sys
 import textwrap
 from pathlib import Path
 from typing import Any
@@ -178,12 +179,26 @@ def check_uses_sdk_execute_graphql(
         return False, "no Python source found"
     if tree is None:
         return False, "check file has a syntax error"
-    if not _calls_execute_graphql(tree):
-        return False, "does not call self.client.execute_graphql"
-    raw_http = _raw_http_modules_used(tree)
-    if raw_http:
-        return False, f"uses raw HTTP ({raw_http}) instead of the SDK client"
-    return True, "uses self.client.execute_graphql"
+    if _calls_execute_graphql(tree):
+        raw_http = _raw_http_modules_used(tree)
+        if raw_http and _raw_http_requests_made(tree):
+            return False, (
+                f"calls execute_graphql but also sends raw HTTP ({raw_http}); "
+                "the raw path does not raise on a GraphQL error"
+            )
+        return True, "uses self.client.execute_graphql"
+    # api-error-surfaces.md sanctions a raw-HTTP fallback, provided it
+    # inspects the response body for `errors` rather than the status code.
+    # Rejecting it outright made the grader forbid what the rule allows.
+    if _inspects_graphql_errors_payload(tree):
+        return True, (
+            "uses raw HTTP but inspects the response body for `errors`, which "
+            "is the fail-closed fallback the rule permits"
+        )
+    return False, (
+        "does not call self.client.execute_graphql, and does not inspect the "
+        "response body for an `errors` key either, so a rejection is invisible"
+    )
 
 
 def check_no_status_code_branch(
@@ -202,6 +217,70 @@ def check_no_status_code_branch(
     return True, "does not branch on a status code"
 
 
+# HTTP verbs, as method or function names. `import urllib.parse` to build a
+# URL is not a raw request; `urllib.request.urlopen(...)` is.
+_HTTP_REQUEST_CALLS = {
+    "get", "post", "put", "patch", "delete", "head", "options", "request",
+    "urlopen", "send", "stream",
+}
+
+
+def _raw_http_requests_made(tree: ast.Module) -> list[str]:
+    """Calls that actually send a request through a raw HTTP client."""
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr not in _HTTP_REQUEST_CALLS:
+            continue
+        receiver = node.func.value
+        while isinstance(receiver, ast.Attribute):
+            receiver = receiver.value
+        if isinstance(receiver, ast.Name) and receiver.id in _RAW_HTTP_MODULES:
+            found.add(ast.unparse(node.func))
+    return sorted(found)
+
+
+def _inspects_graphql_errors_payload(tree: ast.Module) -> bool:
+    """True when the code reads an `errors` key out of a response body.
+
+    api-error-surfaces.md sanctions a raw-HTTP fallback on exactly this
+    condition: the status code is always 200, so the body's `errors` key is
+    what a rejection looks like.
+    """
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and node.value == "errors":
+            return True
+        if isinstance(node, ast.Attribute) and node.attr == "errors":
+            return True
+    return False
+
+
+def _logs_error_on_payload_errors(tree: ast.Module) -> bool:
+    """True when a branch testing for `errors` in the body calls log_error."""
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.If):
+            continue
+        if not _inspects_graphql_errors_payload(node.test):
+            continue
+        for call in ast.walk(node):
+            if isinstance(call, ast.Call) and _call_name(call) == "log_error":
+                return True
+    return False
+
+
+def _try_blocks_calling_execute_graphql(tree: ast.Module) -> list[ast.Try]:
+    """`try` statements whose body reaches `execute_graphql`."""
+    out = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Try) and any(
+            _calls_execute_graphql(ast.Module(body=[stmt], type_ignores=[]))
+            for stmt in node.body
+        ):
+            out.append(node)
+    return out
+
+
 def check_catches_graphql_error(
     _config: dict | None = None, *, tree: ast.Module | None = None, py_raw: str = "", **_: Any
 ) -> tuple[bool, str]:
@@ -210,6 +289,19 @@ def check_catches_graphql_error(
         return False, "check file missing or has a syntax error"
     handlers = [n for n in ast.walk(tree) if isinstance(n, ast.ExceptHandler)]
     if not handlers:
+        # The SDK client raises, so an SDK-based check needs a handler. A
+        # raw-HTTP check has nothing to catch: for it, the fail-closed shape
+        # api-error-surfaces.md sanctions is testing the body for `errors`.
+        if not _calls_execute_graphql(tree) and _inspects_graphql_errors_payload(tree):
+            if _logs_error_on_payload_errors(tree):
+                return True, (
+                    "raw-HTTP path: detects a rejection from the response body's "
+                    "`errors` key and logs an error"
+                )
+            return False, (
+                "reads the response body's `errors` key but never calls "
+                "log_error on it, so the check still passes"
+            )
         return False, "no except handler; a rejection raises GraphQLError"
 
     names: list[str] = []
@@ -222,10 +314,23 @@ def check_catches_graphql_error(
 
     if not graphql_handlers:
         return False, f"catches {names} but not GraphQLError"
-    if "Exception" in names or "bare except" in names:
+    # Only a broad handler that actually wraps the GraphQL call reintroduces
+    # fail-open. Scanning the whole module failed a correct check for an
+    # unrelated `try: json.loads(...) / except Exception:`.
+    graphql_tries = _try_blocks_calling_execute_graphql(tree)
+    # If nothing identifiably wraps the GraphQL call, fall back to the whole
+    # module: a broad handler somewhere is still the likely cause.
+    scoped = [h for t in graphql_tries for h in t.handlers] or handlers
+    broad_over_graphql = [
+        caught
+        for handler in scoped
+        for caught in [_handler_names(handler)]
+        if "Exception" in caught or "bare except" in caught
+    ]
+    if broad_over_graphql:
         return False, (
-            f"catches {names}; a broad handler around execute_graphql "
-            "reintroduces fail-open"
+            f"catches {broad_over_graphql} around execute_graphql; a broad "
+            "handler there reintroduces fail-open"
         )
     if not any(_calls_log_error(h) for h in graphql_handlers):
         return False, "catches GraphQLError but never calls log_error, so the check still passes"
@@ -253,19 +358,35 @@ def check_separate_local_bounds_branch(
         for call in ast.walk(handler)
         if isinstance(call, ast.Call)
     }
-    local_logs = [
-        call
-        for call in ast.walk(tree)
-        if isinstance(call, ast.Call)
-        and _call_name(call) == "log_error"
-        and id(call) not in handler_calls
-    ]
-    if not local_logs:
+    # The log_error has to sit on a comparison the check made itself, not
+    # merely outside an except handler. Without that, the prompt's own
+    # `if resp.status_code == 200: ... else: log_error(...)` antipattern
+    # scored this, the task's most distinctive assertion.
+    guarded: list[str] = []
+    for branch in ast.walk(tree):
+        if not isinstance(branch, ast.If):
+            continue
+        test = branch.test
+        comparisons = [n for n in ast.walk(test) if isinstance(n, ast.Compare)]
+        if not comparisons:
+            continue
+        if _branches_on_status_code(branch):
+            continue  # a status code is not a locally-detectable bad value
+        for call in ast.walk(branch):
+            if (
+                isinstance(call, ast.Call)
+                and _call_name(call) == "log_error"
+                and id(call) not in handler_calls
+            ):
+                guarded.append(ast.unparse(test)[:60])
+                break
+    if not guarded:
         return False, (
-            "every log_error sits inside an except handler; the "
-            "locally-detectable out-of-range value needs its own branch"
+            "no log_error sits on a comparison the check made itself; the "
+            "locally-detectable out-of-range value needs its own branch, "
+            "not an except handler and not a status-code test"
         )
-    return True, "reports the locally-detectable value outside the exception path"
+    return True, f"reports the locally-detectable value on its own test: {guarded[:2]}"
 
 
 # ---------------------------------------------------------------------------
@@ -280,11 +401,72 @@ def check_separate_local_bounds_branch(
 
 _WATCHABLE_SECTIONS = ("python_transforms", "generator_definitions")
 
+# Imports that are not the shared package under any circumstances. The old
+# exclusion list held three names, so `import os` satisfied "an absolute
+# import of the shared package".
+_STDLIB_AND_SDK = frozenset(sys.stdlib_module_names) | {
+    "infrahub_sdk", "__future__", "httpx", "requests", "yaml", "pydantic",
+}
+
+
+def _dockerfile_instructions(raw: str) -> str:
+    """A Dockerfile with its `#` comment lines removed, continuations joined.
+
+    patterns-shared-module.md teaches the reader to annotate the wrong form
+    with a `# WRONG: ...` comment, so matching raw text failed the correct
+    answer on its own documentation and passed a pip-installing image whose
+    only mention of `--inexact` was in a comment.
+    """
+    lines = [
+        line for line in raw.splitlines()
+        if not line.lstrip().startswith("#")
+    ]
+    joined: list[str] = []
+    for line in lines:
+        stripped = line.rstrip()
+        if joined and joined[-1].endswith("\\"):
+            joined[-1] = joined[-1][:-1].rstrip() + " " + stripped.lstrip()
+        else:
+            joined.append(stripped)
+    return "\n".join(joined)
+
+
+def _declared_package(config: dict, dockerfile_raw: str, py_raw: str) -> str | None:
+    """The shared package name, from the `watch:` paths the config declares.
+
+    Everything in this pattern has to name the same package: the check
+    imports it, the image installs it, and `watch:` points at its source.
+    Without a shared anchor each check passes independently on unrelated
+    inputs -- `import json`, a pip Dockerfile, and `watch: {files: []}`
+    scored 4/4.
+    """
+    for section in _WATCHABLE_SECTIONS:
+        for entry in config.get(section) or []:
+            if not isinstance(entry, dict):
+                continue
+            watch = entry.get("watch")
+            if not isinstance(watch, dict):
+                continue
+            for path in watch.get("files") or []:
+                name = str(path).rstrip("/").rsplit("/", 1)[-1]
+                if name and not name.startswith("."):
+                    return name.removesuffix(".py")
+    return None
+
 
 def check_shared_module_absolute_import(
-    _config: dict | None = None, *, tree: ast.Module | None = None, py_raw: str = "", **_: Any
+    _config: dict | None = None,
+    *,
+    tree: ast.Module | None = None,
+    py_raw: str = "",
+    dockerfile_raw: str = "",
+    **_: Any,
 ) -> tuple[bool, str]:
-    """The shared module is imported absolutely, never relatively or via sys.path."""
+    """The shared module is imported absolutely, never relatively or via sys.path.
+
+    The imported name has to be the package the rest of the layout declares,
+    not any absolute import at all: `import json` alone was satisfying this.
+    """
     if not py_raw:
         return False, "no Python source found"
     if tree is None:
@@ -315,9 +497,19 @@ def check_shared_module_absolute_import(
         alias.name.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.Import)
         for alias in node.names
     }
-    shared = absolute - {"infrahub_sdk", "typing", "__future__"}
+    shared = absolute - _STDLIB_AND_SDK
     if not shared:
-        return False, "no absolute import of a shared package"
+        return False, (
+            "no absolute import of a shared package; only the SDK and the "
+            "standard library are imported"
+        )
+    package = _declared_package(_config or {}, dockerfile_raw, py_raw)
+    if package and package not in shared:
+        return False, (
+            f"imports {sorted(shared)}, but the layout declares the shared "
+            f"package as {package!r} under `watch:`; the check has to import "
+            "the package the image installs"
+        )
     return True, f"imports {sorted(shared)} absolutely"
 
 
@@ -327,7 +519,8 @@ def check_dockerfile_targets_base_venv(
     """The install must target the base image's virtualenv, not a fresh one."""
     if not dockerfile_raw:
         return False, "no Dockerfile found"
-    if not re.search(r"UV_PROJECT_ENVIRONMENT\s*=?\s*[\"']?/\.venv", dockerfile_raw):
+    instructions = _dockerfile_instructions(dockerfile_raw)
+    if not re.search(r"UV_PROJECT_ENVIRONMENT\s*=?\s*[\"']?/\.venv", instructions):
         return False, (
             "does not set UV_PROJECT_ENVIRONMENT=/.venv; uv would build its own "
             "virtualenv and the workers would not see the package"
@@ -341,7 +534,7 @@ def check_dockerfile_uv_sync_inexact(
     """`uv sync` without `--inexact` removes the Infrahub install from the image."""
     if not dockerfile_raw:
         return False, "no Dockerfile found"
-    syncs = re.findall(r"uv\s+sync[^\n]*", dockerfile_raw)
+    syncs = re.findall(r"uv\s+sync[^\n]*", _dockerfile_instructions(dockerfile_raw))
     if not syncs:
         return False, "no `uv sync` line installing the package"
     bare = [line for line in syncs if "--inexact" not in line]

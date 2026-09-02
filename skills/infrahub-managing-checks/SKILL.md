@@ -55,9 +55,9 @@ Existing queries:
 | -------- | -------- | ------ | ----------- |
 | CRITICAL | Architecture | `architecture-` | Three components, global vs targeted, execution flow |
 | CRITICAL | Python Class | `python-` | InfrahubCheck base class, validate(), log_error/log_info |
-| HIGH | API Reference | `api-` | Class attributes, instance properties, methods, lifecycle |
+| HIGH | API Reference | `api-` | Class attributes, instance properties, methods, lifecycle, and which API surfaces a rejection (a GraphQL error is a 200) |
 | HIGH | Registration | `registration-` | .infrahub.yml config, query name matching, parameters |
-| MEDIUM | Patterns | `patterns-` | Error collection, shared utilities, scoped validation, relationship-traversal validation |
+| HIGH | Patterns | `patterns-` | Error collection, shared utilities, scoped validation, relationship-traversal validation, sharing a module across artifact types |
 | HIGH | Testing | `testing-` | Resources Testing Framework (YAML-driven tests), infrahubctl check commands |
 
 <!-- markdownlint-enable MD013 -->
@@ -165,7 +165,15 @@ Follow these steps when creating a check:
    [rules/python-validate.md](./rules/python-validate.md)
    for the class pattern and
    [rules/api-reference.md](./rules/api-reference.md)
-   for available methods.
+   for available methods. If the check calls back into
+   Infrahub, read
+   [rules/api-error-surfaces.md](./rules/api-error-surfaces.md)
+   too: a rejected GraphQL request still returns HTTP
+   200, so branching on a status code makes the check
+   pass on the failure it exists to catch. If the logic
+   is shared with a generator or a transform, read
+   [rules/patterns-shared-module.md](./rules/patterns-shared-module.md)
+   before reaching for a relative import.
 4. **Register in .infrahub.yml** — Add the check under
    `check_definitions`. The query name must match the
    Python class `query` attribute. See
