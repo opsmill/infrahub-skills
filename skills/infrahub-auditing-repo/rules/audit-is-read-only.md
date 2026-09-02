@@ -47,10 +47,14 @@ auditor that modifying the tree was worth mentioning.
 
 ## Checks
 
-Both command lists below are canonical. `SKILL.md`,
-`audit-procedure.md` and the graders point at them
-instead of restating them, so an edit here is the only
-edit needed.
+Both command lists below are canonical. `SKILL.md`
+and `audit-procedure.md` point at them instead of
+restating them. The graders cannot import prose, so
+`graders/auditing-repo/lib.py` mirrors both lists in
+`_DESTRUCTIVE_GIT_VERBS` and `_READ_ONLY_GIT_VERBS`;
+adding a verb here means adding it there too, and
+`tests/graders/test_auditing_repo_conduct.py` is where
+the new verb earns a case.
 
 1. **Never write to the tree or the index.** No file
    creation, edit, move, or delete. The single
@@ -64,16 +68,34 @@ edit needed.
    tree being audited**, *including to undo your own
    side effect*:
 
+   Overwrites or deletes working-tree content:
+
    ```text
-   git checkout      git restore     git stash
-   git clean         git reset       git rm
-   git switch        git mv          git add
-   git commit
+   git checkout      git restore     git switch
+   git stash         git clean       git rm
+   git mv            git apply       git am
+   git revert        git merge       git rebase
+   git cherry-pick
    ```
 
-   The first six rewrite or delete tree content. The
-   last four move content into the index or history,
-   which is still a write the user did not ask for.
+   Writes the index, a ref, or history without
+   touching the tree, which is still a write the user
+   did not ask for:
+
+   ```text
+   git add           git commit      git branch -D
+   git update-ref    git update-index
+   git worktree add  git push
+   ```
+
+   `git switch` overwrites files exactly as
+   `git checkout` does, and `git mv` renames them on
+   disk; both belong in the first group whatever their
+   name suggests. Read-only forms of a listed verb are
+   fine: `git stash list`, `git stash show`,
+   `git worktree list` and a bare `git branch` inspect
+   without writing.
+
    The "including to undo your own side effect" clause
    is the load-bearing half. A revert run in the belief
    that it is tidying up is still a delete.
@@ -90,7 +112,10 @@ edit needed.
    This is how you compare committed content against
    a dirty tree without stashing anything.
    `git status --porcelain` and `git log` are read-only
-   too; they just do not reach file content.
+   too; they just do not reach file content. Git's
+   global options sit before the verb, so
+   `git -C /path/to/repo show HEAD:objects/racks.yml`
+   is the same read-only command aimed elsewhere.
 4. **Before running any repository script for its
    output, establish whether it writes.** Read the
    script. A flag named `--check`, `--dry-run`, or

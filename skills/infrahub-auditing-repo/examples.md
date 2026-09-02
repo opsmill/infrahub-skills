@@ -20,14 +20,19 @@ The wrong shape, and the one that has already
 destroyed work:
 
 ```bash
-# WRONG. The pop deletes whatever else landed in objects/
-# while the generator was running, including another
-# agent's or the user's uncommitted files.
+# WRONG. Line 4 is what destroys work: it deletes every
+# uncommitted file under objects/, not only the ones the
+# generator wrote, including another agent's or the
+# user's. The stash around it is what makes the sequence
+# look tidy enough to run.
 git stash push generators/build_racks.py
 python generators/build_racks.py --check     # this flag writes
 git stash pop
 git checkout -- objects/                     # the destructive step
 ```
+
+Dropping the stash does not make this safe. The
+`git checkout --` is the delete, and it is still there.
 
 The right shape:
 
@@ -48,6 +53,38 @@ performed here. Report it as not performed, say why,
 and point at a clean clone or CI. An honest gap in the
 report costs the reader a minute; a silent revert costs
 them their work.
+
+## Reporting a tree you have already dirtied
+
+Rule check 5 applies after the fact: if the audit has
+already written, say so and leave it. That header and
+finding look like this.
+
+```markdown
+**Working tree at audit time**: 2 uncommitted files
+**Tree modified by this audit**: yes, listing paths
+```
+
+```markdown
+### CRITICAL: Audit modified the working tree
+
+**Category**: Conduct
+**File**: `objects/racks-generated.yml`
+**Finding**: This audit ran
+`python generators/build_racks.py --check` before
+establishing that the flag writes. The run overwrote
+`objects/racks-generated.yml`, which held uncommitted
+work. The file has been left exactly as the run left
+it, and nothing was reverted.
+**Fix**: Recover the previous content from the other
+writer, or from a commit's parent if it was ever
+committed. Do not run `git checkout -- objects/`: that
+would delete the rest of the directory's uncommitted
+files as well.
+```
+
+A visible mess is recoverable. The revert that hides
+it is not.
 
 ## Example Report Output
 
@@ -78,6 +115,7 @@ Below is a sample `AUDIT_REPORT.md` showing the expected format and types of fin
 | Category | Status |
 | ---------- | -------- |
 | Project Structure | PASS |
+| Conduct | PASS |
 | Schema Validation | FAIL (2 critical) |
 | Object Data | PASS |
 | Python Components | FAIL (1 critical) |

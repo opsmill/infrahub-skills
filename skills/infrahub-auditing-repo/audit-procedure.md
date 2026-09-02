@@ -11,30 +11,17 @@ Read
 before Phase 1. It is not a phase you walk; it is the
 constraint every phase runs under.
 
-The rule holds the canonical command lists, forbidden
-and permitted. They are not restated here, so prose and
-graders stay on one source of truth.
+In one line: **do not write to the working tree or the
+index, and do not run a git command that would.** The
+report file (`AUDIT_REPORT.md`) is the only file this
+audit creates.
 
-The short form:
-
-- Do not write to the working tree or the index. The
-  report file (`AUDIT_REPORT.md`) is the only file the
-  audit creates.
-- Do not run any git command from the rule's forbidden
-  list against the tree, **including to undo your own
-  side effect**.
-- To read another revision, use one of the read-only
-  commands the rule lists. None of them touch the tree.
-- Before running a repository script for its output,
-  read it and establish whether it writes. A flag
-  named `--check` is not a guarantee. If you cannot
-  establish it, skip the check and record why.
-- If you have already dirtied the tree, name the paths
-  in the report and leave them alone.
-
-Record the tree's condition in the report either way,
-because uncommitted changes bound what the findings
-are worth.
+That line is not enough to act on. Which git verbs are
+forbidden, which read another revision without touching
+the tree, what to do about a script whose `--check`
+flag may write, and how to report a tree you have
+already dirtied are all in the rule, and none of them
+are restated here. Open it.
 
 ## Phase 1: Project Structure (CRITICAL)
 

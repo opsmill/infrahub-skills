@@ -199,8 +199,8 @@ The auditor checks rules from all skills:
 ## Rules and Procedure
 
 - [audit-procedure.md](./audit-procedure.md) — the
-  nine-phase walkthrough that drives every audit
-  run
+  Phase 0 constraint and nine-phase walkthrough
+  that drive every audit run
 - [rules/](./rules/) — detailed audit rule
   definitions referenced from the phases
 - [examples.md](./examples.md) — sample audit
