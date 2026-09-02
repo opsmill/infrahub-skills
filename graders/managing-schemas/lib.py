@@ -1077,9 +1077,14 @@ def check_uniqueness_rel_mandatory(schema: dict, **_: Any) -> tuple[bool, str]:
     mandatory and single-valued.
 
     Server-validated: a relationship named in a constraint must have
-    `optional: false` and `cardinality: one`, and must be referenced by its bare
-    name rather than a peer-attribute path. A human_friendly_id is converted into
-    a uniqueness constraint, so the same requirement reaches its relationships.
+    `optional: false` and `cardinality: one`. A human_friendly_id is converted
+    into a uniqueness constraint, so the same two requirements reach its
+    relationships.
+
+    The path shape is inverted between the two fields: `uniqueness_constraints`
+    takes the bare relationship name and rejects a peer-attribute path, while
+    `human_friendly_id` requires the peer-attribute path and rejects the bare
+    name. Both directions are asserted here.
     """
     all_items = _all_nodes(schema) + _all_generics(schema)
     bad: list[str] = []
@@ -1110,6 +1115,16 @@ def check_uniqueness_rel_mandatory(schema: dict, **_: Any) -> tuple[bool, str]:
                 continue
             head = token.split("__", 1)[0]
             if _resolve_rel(schema, node, head) is not None:
+                # Path shape is inverted from uniqueness_constraints: an HFID
+                # must traverse to a peer attribute, never name the bare
+                # relationship.
+                if "__" not in token:
+                    bad.append(
+                        f"{ref}.human_friendly_id uses bare relationship name "
+                        f"{token!r}; use a peer-attribute path such as "
+                        f"{token}__<attr>__value"
+                    )
+                    continue
                 targets.append(("human_friendly_id", head))
 
         for source, rel_name in targets:

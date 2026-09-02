@@ -397,8 +397,9 @@ tasks:
       Task: Create an Infrahub schema in the 'Virtualization' namespace with a Cluster node
       (name) and a VirtualMachine node with a numeric 'vmid'. A VM records which cluster it
       currently runs on — VMs migrate between clusters, so the cluster is a plain reference
-      rather than an owning parent. The vmid must be unique within each cluster, but the same
-      vmid can be reused on a different cluster.
+      rather than an owning parent. Every VM always belongs to exactly one cluster. The vmid
+      must be unique within each cluster, but the same vmid can be reused on a different
+      cluster.
 
       Save ONLY the final schema YAML to: output.yml
     graders:

@@ -173,7 +173,7 @@
     },
     {
       "id": 5,
-      "prompt": "Create an Infrahub schema in the 'Virtualization' namespace with a Cluster node\n(name) and a VirtualMachine node with a numeric 'vmid'. A VM records which cluster it\ncurrently runs on \u2014 VMs migrate between clusters, so the cluster is a plain reference\nrather than an owning parent. The vmid must be unique within each cluster, but the same\nvmid can be reused on a different cluster.",
+      "prompt": "Create an Infrahub schema in the 'Virtualization' namespace with a Cluster node\n(name) and a VirtualMachine node with a numeric 'vmid'. A VM records which cluster it\ncurrently runs on \u2014 VMs migrate between clusters, so the cluster is a plain reference\nrather than an owning parent. Every VM always belongs to exactly one cluster. The vmid\nmust be unique within each cluster, but the same vmid can be reused on a different\ncluster.",
       "expected_output": "A schema whose VirtualMachine node scopes uniqueness with uniqueness_constraints combining the bare relationship name and the vmid attribute with its __value suffix, where the cluster relationship is declared cardinality: one and optional: false so the constraint passes server-side validation.",
       "files": [],
       "expectations": [

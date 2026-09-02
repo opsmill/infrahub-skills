@@ -60,7 +60,12 @@ below are checked at schema load.
 | ----------- | ------------------- | ----------------- |
 | Mandatory | `optional: false` | `cannot use <name> relationship, relationship must be mandatory` |
 | Single-valued | `cardinality: one` | `cannot use <name> relationship, relationship must be of cardinality one` |
-| Bare name only | no peer-attribute path | `cannot use attributes of related node, only the relationship` |
+| Bare name only (constraints only — see below) | no peer-attribute path | `cannot use attributes of related node, only the relationship` |
+
+Only the first failing condition is reported. An
+optional relationship written as a peer-attribute path
+reports the mandatory error; fix that and the path
+error surfaces on the next load.
 
 The mandatory requirement is the one that surprises
 people: a constraint scoped by a relationship can only
@@ -137,8 +142,18 @@ nodes:
 
 A `human_friendly_id` is also converted into a
 uniqueness constraint behind the scenes, so a
-relationship used in an HFID must meet the same
-preconditions. The confusing part is the error: it is
+relationship reached by an HFID path must be
+`optional: false` and `cardinality: one` too.
+
+**The path shape is inverted between the two**, so do
+not carry the bare-name habit across:
+
+| Field | Relationship written as | Rejects |
+| ----- | ----------------------- | ------- |
+| `uniqueness_constraints` | bare name (`rack`) | a peer-attribute path, with `cannot use attributes of related node, only the relationship` |
+| `human_friendly_id` | peer-attribute path (`rack__name__value`) | a bare name, with `Must use attributes of related node.` |
+
+The confusing part is the mandatory error: it is
 reported against `uniqueness_constraints` even when
 you never wrote one.
 

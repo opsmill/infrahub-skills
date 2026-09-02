@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 """Grader for the uniqueness-constraints eval task.
 
-Verifies the constraint format (``__value`` on attributes, bare names on
-relationships) and the preconditions the server enforces on any relationship a
-constraint reaches: ``optional: false`` and ``cardinality: one``.
+Verifies the preconditions the server enforces on any relationship a
+uniqueness constraint reaches — ``optional: false`` and ``cardinality: one`` —
+and the relationship path shape, which is inverted between the two fields:
+``uniqueness_constraints`` takes the bare name, ``human_friendly_id`` takes a
+peer-attribute path.
+
+Does NOT verify the ``__value`` suffix on plain attribute entries; a bare
+attribute name in a constraint is a separate server error
+(``invalid attribute, it must end with one of the following properties: value``)
+and is not asserted here.
 """
 
 from __future__ import annotations

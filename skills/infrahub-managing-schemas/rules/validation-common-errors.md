@@ -13,9 +13,10 @@ messages to the rule files that explain how to fix
 them.
 
 > **Note on `MUST`/`must` in this file and in
-> [relationship-defaults.md](./relationship-defaults.md)
+> [relationship-defaults.md](./relationship-defaults.md),
+> [relationship-component-parent.md](./relationship-component-parent.md)
 > and
-> [relationship-component-parent.md](./relationship-component-parent.md):**
+> [uniqueness-constraints.md](./uniqueness-constraints.md):**
 > any `must` appearing inside a quoted string or
 > backticks is a verbatim Infrahub server error
 > message — kept literal so users can grep their
@@ -122,8 +123,19 @@ the relationship from the constraint. See
 A `uniqueness_constraints` entry used a peer-attribute
 path such as `rack__name__value`. Constraints take the
 bare relationship name (`rack`). Peer-attribute paths
-are valid in `human_friendly_id`, not here. See
+are not merely allowed in `human_friendly_id` — they
+are required there. See
 [uniqueness-constraints](./uniqueness-constraints.md).
+
+### "Must use attributes of related node"
+
+The mirror of the error above, and the one you hit by
+carrying the bare-name habit from constraints into an
+HFID. A `human_friendly_id` entry named a relationship
+directly (`rack`) instead of traversing to one of its
+attributes (`rack__name__value`). See
+[uniqueness-constraints](./uniqueness-constraints.md)
+for the two path shapes side by side.
 
 ### "Unable to load the schema:" with empty body
 
