@@ -34,17 +34,66 @@ Before opening a PR that touches any `.gql` file under
 `queries/**/`, run each affected query against a live
 Infrahub schema.
 
+**Which command depends on how the transform is
+registered.** `render` serves `jinja2_transforms`
+only, and `transform` serves `python_transforms`
+only. They are not interchangeable and there is no
+command that serves both.
+
+Reaching for the wrong one prints
+
+```text
+Error: Unable to find 'spine_config' in 'jinja2_transforms'
+```
+
+The quoted section name is the whole diagnosis: it says
+where the CLI looked, not that the transform is
+missing. If the entry is under `python_transforms` in
+`.infrahub.yml`, the command was wrong, not the
+registration. Read the section name in the error before
+concluding the dry-run is unavailable and skipping the
+gate.
+
 ```bash
-# Per-query dry-run: rendering executes the transform's query
-# against the branch and surfaces any GraphQL/schema mismatch
-infrahubctl render <transform_name> --branch <branch>
+# Python transform, registered under python_transforms
+infrahubctl transform <name> <param>=<value> --branch <branch>
+
+# Jinja2 transform, registered under jinja2_transforms
+infrahubctl render <name> <param>=<value> --branch <branch>
 
 # For a check or generator, the equivalent is to run the
 # check/generator itself locally — it will fetch via the .gql
-# and surface any GraphQL error on the spot
-infrahubctl check run <check_name>
-infrahubctl generator run <generator_name> <target_id>
+# and surface any GraphQL error on the spot. Both take the
+# name as a positional argument; there is no `run` subcommand.
+infrahubctl check <check_name> --branch <branch>
+infrahubctl generator <generator_name> <param>=<target_id> --branch <branch>
 ```
+
+Three details that each cost a round trip:
+
+- **A required query variable has to be supplied by
+  hand locally.** In the pipeline the artifact
+  definition binds it from an attribute on the target,
+  so a local invocation is the only place a human ever
+  types it. Omitting it fails inside the query rather
+  than at the CLI, which looks like a query bug.
+- **A generator target is a query variable, not a
+  bare id.** Everything after the generator name is
+  parsed as `key=value`, and a token with no `=` is
+  dropped silently. The result is not a quiet no-op:
+  with no variables left, `infrahubctl generator` falls
+  back to its group path and runs the generator **over
+  every member of the definition's target group**. So
+  `infrahubctl generator create_dc dc-01-uuid --branch b`
+  does not fail on the missing variable, it writes
+  objects for the whole group. Unintended writes on a
+  shared server are CRITICAL under
+  [workflow-branch-for-crud](./workflow-branch-for-crud.md).
+  Verified against SDK 1.23.1
+  (`ctl/utils.py` `parse_cli_vars`, `ctl/generator.py`).
+- **Neither transform command reaches a check or a
+  generator.** Those are dry-run by running the check
+  or the generator itself, as above.
 
 If your local Infrahub doesn't have data matching the query,
 spin up a fresh instance with the bootstrap dataset
@@ -75,10 +124,13 @@ a fragment, or a relationship traversal does.
 
 ### CI integration
 
-Where practical, wire `infrahubctl render --branch <ci-branch>` into CI
-as a pre-merge gate on `queries/**/*.gql` changes. The check
-takes <1s per query against a warmed Infrahub and prevents
-the silent-sync-failure class of bug from reaching main.
+Where practical, wire the dry-run into CI as a
+pre-merge gate on `queries/**/*.gql` changes, using
+`infrahubctl transform` for each `python_transforms`
+entry and `infrahubctl render` for each
+`jinja2_transforms` entry. The check takes <1s per
+query against a warmed Infrahub and prevents the
+silent-sync-failure class of bug from reaching main.
 
 Reference:
 [Infrahub schema docs](https://docs.infrahub.app)

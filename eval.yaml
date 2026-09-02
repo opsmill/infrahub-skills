@@ -1290,24 +1290,28 @@ tasks:
              similar).
           2. The file contains either a Python triple-quoted string
              named TEST_PLAN, or a block of # comments, that explains
-             how to test the generator end-to-end. Mentions
-             "infrahubctl generator run" (or equivalent live-instance
-             command). At least one full sentence of guidance — not
-             just a stub.
+             how to test the generator end-to-end. Names a concrete
+             live-instance command; if it names infrahubctl, the form
+             is `infrahubctl generator <name> <param>=<target_id>`,
+             because the generator takes its target as a positional
+             key=value argument and there is no `run` subcommand. At
+             least one full sentence of guidance — not just a stub.
           3. The guidance explicitly notes that unit tests on the
              input dict do not cover SDK call shape (or equivalent
              warning that runtime SDK shape errors slip past
              type/unit checks).
     expected_output: >-
       A Python generator plus end-to-end test guidance. The guidance should
-      mention infrahubctl generator run against a live instance and note
-      that input-dict unit tests don't cover SDK call shape.
+      name a live-instance run of the generator — `infrahubctl generator
+      <name> <param>=<target_id>`, not a `run` subcommand — and note that
+      input-dict unit tests don't cover SDK call shape.
     expectations:
       - "Generator class is present and creates DcimDevice instances"
       - "TEST_PLAN string or block comment exists at the bottom of the file"
       - >-
-        The guidance mentions infrahubctl generator run against a real
-        Infrahub instance
+        The guidance names a live run of the generator against a real
+        Infrahub instance, in the form `infrahubctl generator <name>
+        <param>=<target_id>`
       - >-
         The guidance notes that unit tests on the input dict do not cover
         SDK call shape
@@ -1423,8 +1427,9 @@ tasks:
     expectations:
       - >-
         Recommends executing the query live as a dry-run via a concrete
-        command (`infrahubctl render`, or `infrahubctl check run` /
-        `infrahubctl generator run`), not just `schema check`
+        command (`infrahubctl render <name>` or `infrahubctl transform
+        <name>`, or the owning `infrahubctl check <name>` /
+        `infrahubctl generator <name>`), not just `schema check`
       - >-
         Frames the dry-run as a pre-merge gate (before opening / merging
         the PR)
@@ -1434,8 +1439,9 @@ tasks:
     assertions:
       - name: dry-run-executes-query
         check: >-
-          Plan dry-runs the query live (infrahubctl render / check run /
-          generator run), not only static schema check
+          Plan dry-runs the query live (infrahubctl render/transform/
+          check/generator, each taking its target as a positional
+          argument), not only static schema check
       - name: dry-run-before-merge
         check: Plan frames the dry-run as a pre-merge / pre-PR step
 
@@ -1583,6 +1589,224 @@ tasks:
     assertions:
       - name: docs-fallback
         check: Output cites a docs.infrahub.app page and flags the gap
+
+  # --- Common: infrahubctl command truth --- #
+  - name: common-dry-run-python-transform
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-common/SKILL.md and follow
+      its rules.
+
+      Task: I changed `queries/spine.gql`. It is the query behind a
+      transform named `spine_config`, which my `.infrahub.yml` registers
+      like this:
+
+      ```yaml
+      python_transforms:
+        - name: spine_config
+          file_path: "transforms/spine_config.py"
+          class_name: SpineConfig
+      ```
+
+      A `.gql` change passes every static check and only fails when the
+      repository syncs, so I want to dry-run the query before I open the
+      PR. Give me the exact command, and tell me what else I need to
+      supply for it to run locally.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/common/check_dry_run_command.py
+        weight: 0.7
+      # The deterministic check only reads fenced blocks and code spans, so
+      # an invented command written as bare prose slips past it. This is the
+      # compensating control its docstring assumes.
+      - type: llm_rubric
+        provider: anthropic
+        weight: 0.3
+        rubric: |
+          Read output.md. Score each criterion 0.0 or 1.0; return the
+          average.
+
+          1. Every `infrahubctl` command the answer names, in prose or in
+             a code block, is a real command. Score 0.0 if any of check,
+             transform, render or generator is given a generic verb
+             (run, list, get, create, delete, execute) where its target
+             belongs: each takes its target as a positional argument, and
+             listing is a flag. Score 0.0 if `schema` is given any
+             subcommand other than check, export, format, list, load or
+             show.
+          2. The answer aims `infrahubctl transform` at `spine_config`
+             and does not recommend `infrahubctl render` for it.
+    expected_output: >-
+      An answer giving `infrahubctl transform spine_config <param>=<value>
+      --branch <branch>`, because the transform is registered under
+      python_transforms. It should note that `infrahubctl render` serves
+      jinja2_transforms only, and that a required query variable has to be
+      supplied by hand locally because the artifact definition binds it
+      from the target in the pipeline.
+    expectations:
+      - >-
+        Recommends `infrahubctl transform spine_config`, not
+        `infrahubctl render spine_config`
+      - >-
+        Explains that render serves jinja2_transforms and transform serves
+        python_transforms
+      - >-
+        Notes that a required query variable must be passed by hand on a
+        local run
+      - Every infrahubctl command named in the answer actually exists
+    assertions:
+      - name: python-transform-dry-run:spine_config
+        check: >-
+          Uses `infrahubctl transform` for the python_transforms entry and
+          does not aim `infrahubctl render` at it
+      - name: cli-commands-exist
+        check: >-
+          No invented subcommand (schema validate, check run,
+          generator list, import load) appears in the answer
+
+  - name: common-preflight-before-write
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-common/SKILL.md and follow
+      its rules.
+
+      Task: I am about to run `infrahubctl branch create` and then
+      `infrahubctl object load` against a local instance. My project keeps
+      its settings in a `.env` file that docker compose reads. I ran
+      `infrahubctl info` and it printed a green Connection Status with a
+      full version readout, so I assume I am good to go.
+
+      Am I? Tell me what to check before I run the writes.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/common/check_preflight_write.py
+        weight: 0.7
+      # As above: the deterministic half cannot see a command written as
+      # bare prose.
+      - type: llm_rubric
+        provider: anthropic
+        weight: 0.3
+        rubric: |
+          Read output.md. Score each criterion 0.0 or 1.0; return the
+          average.
+
+          1. Every `infrahubctl` command the answer names, in prose or in
+             a code block, is a real command. Score 0.0 if any of check,
+             transform, render or generator is given a generic verb
+             (run, list, get, create, delete, execute) where its target
+             belongs, or if `schema` is given any subcommand other than
+             check, export, format, list, load or show.
+          2. The answer does not print the value of `INFRAHUB_API_TOKEN`
+             (for example with `echo $INFRAHUB_API_TOKEN`). Testing
+             whether it is set is fine; echoing it puts the token in the
+             shell history and any CI log.
+    expected_output: >-
+      An answer explaining that a green `infrahubctl info` does not prove
+      write authorisation: reads are served anonymously, and with no token
+      configured the user lookup is skipped entirely so the status is green
+      regardless. It should tell the user to confirm INFRAHUB_API_TOKEN is
+      exported in their shell (a value in `.env` reaches docker compose,
+      not necessarily infrahubctl), and to probe a write by creating and
+      deleting a throwaway branch.
+    expectations:
+      - >-
+        States that a green info result does not prove write access,
+        because reads are anonymous
+      - >-
+        Explains the absent-versus-invalid asymmetry: an absent token
+        still reports green, only the User line is missing
+      - >-
+        Says to confirm INFRAHUB_API_TOKEN is exported, and that a value
+        in `.env` is not necessarily in the shell
+      - >-
+        Recommends a write probe such as creating and deleting a
+        throwaway branch, not merely listing branches
+      - Every infrahubctl command named in the answer actually exists
+    assertions:
+      - name: preflight-write-probe
+        check: >-
+          Checks the token or probes a write rather than treating a green
+          `infrahubctl info` as clearance
+      - name: cli-commands-exist
+        check: No invented infrahubctl subcommand appears in the answer
+
+  - name: common-dry-run-generator
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-common/SKILL.md and follow
+      its rules.
+
+      Task: I changed `queries/dc_topology.gql`. It feeds a generator
+      registered in `.infrahub.yml` like this:
+
+      ```yaml
+      generator_definitions:
+        - name: create_dc
+          file_path: "generators/create_dc.py"
+          class_name: CreateDc
+          targets: dc_sites
+          query: dc_topology
+          parameters:
+            site_id: "id"
+      ```
+
+      I want to dry-run the query against my local instance before I open
+      the PR, for the one site whose id is
+      `1809d0bc-4f21-4a3e-9b2c-7e5a1d3c8f60`. Give me the exact command,
+      and tell me what goes wrong if I get the argument shape wrong.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/common/check_generator_dry_run.py
+        weight: 0.7
+      - type: llm_rubric
+        provider: anthropic
+        weight: 0.3
+        rubric: |
+          Read output.md. Score each criterion 0.0 or 1.0; return the
+          average.
+
+          1. The answer says that a token without an `=` is dropped, and
+             that the run then falls back to the definition's target
+             group and runs over every member of it. Saying it "runs with
+             no variables", "fails", "errors" or "looks like a query bug"
+             scores 0.0: the consequence is a mass write, and framing it
+             as a failure is what stops the reader looking for the
+             writes.
+          2. Every `infrahubctl` command the answer names, in prose or in
+             a code block, is a real command. Score 0.0 if `generator` is
+             given a generic verb (run, list, create, execute) where its
+             target belongs: the generator name is positional and
+             listing is a flag.
+    expected_output: >-
+      An answer giving `infrahubctl generator create_dc
+      site_id=1809d0bc-4f21-4a3e-9b2c-7e5a1d3c8f60 --branch <branch>`. The
+      target is passed as the `key=value` query variable the generator's
+      parameters declare, never as a bare id, and the run names a branch
+      because it writes. It should say that a bare id is dropped silently
+      and the generator then runs over every member of the `dc_sites`
+      group.
+    expectations:
+      - >-
+        The target is passed as `site_id=<uuid>`, a key=value query
+        variable, not as a bare id
+      - The run names a branch, because running a generator writes
+      - >-
+        Explains that a token with no `=` is dropped and the generator
+        then runs over the whole target group, which is a mass write
+      - Every infrahubctl command named in the answer actually exists
+    assertions:
+      - name: generator-target-is-key-value
+        check: >-
+          The generator target is a `key=value` query variable on a named
+          branch, not a bare id
+      - name: cli-commands-exist
+        check: No invented infrahubctl subcommand appears in the answer
 
   # --- Issue Reporter --- #
   - name: bug-sanitization

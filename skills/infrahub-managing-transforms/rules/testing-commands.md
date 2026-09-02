@@ -72,7 +72,7 @@ Be explicit about which lifecycle you're testing:
 
 | Lifecycle | What loads | How |
 | --------- | ---------- | --- |
-| **Local render** | The single transform file you point at | `infrahubctl transform <name>` / `infrahubctl render <name>` reads the file off disk and renders against live server data |
+| **Local render** | The single transform file you point at | `infrahubctl transform <name>` for a `python_transforms` entry, `infrahubctl render <name>` for a `jinja2_transforms` entry. They are not interchangeable: each resolves the name against its own section only. Either one reads the file off disk and renders against live server data |
 | **Artifact pipeline** | Everything in the registered repo: `queries:`, `jinja2_transforms:`, `python_transforms:`, `artifact_definitions:` | Requires the repo to be registered as a `CoreReadOnlyRepository` (or `CoreRepository`) and synced |
 
 The trap: `infrahubctl object load .` ingests

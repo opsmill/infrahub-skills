@@ -101,10 +101,15 @@ This failure is invisible to ``infrahubctl schema check`` and
 YAML validation — it only surfaces when ``CoreRepository``
 executes the query during schema-sync. So before opening a PR
 that changes a ``.gql`` file, dry-run the query against a live
-schema (``infrahubctl render <transform> --branch <branch>``,
-or run the check/generator that owns the query). See the shared
-rule
+schema.
+
+The commands live in the shared rule
 [../../infrahub-common/rules/deployment-gql-dry-run.md](../../infrahub-common/rules/deployment-gql-dry-run.md).
+Read them there rather than from a copy here: which
+command applies depends on whether the transform is
+registered under ``python_transforms`` or
+``jinja2_transforms``, and a restated copy is what let
+the two drift apart in the first place.
 
 Reference:
 [Infrahub schema docs](https://docs.infrahub.app)

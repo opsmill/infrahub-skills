@@ -48,11 +48,15 @@ the constraints are correct, and untangling them by
 hand is fragile. The repeatable fix:
 
 1. **Fix the underlying file.** Run
-   `infrahubctl schema check <dir>` and
-   `infrahubctl render <transform>` locally
-   against the committed file set until everything
-   loads cleanly outside of the repo pipeline. If
-   you skip this step, every retry below will leave
+   `infrahubctl schema check <dir>` and dry-run every
+   transform locally against the committed file set
+   until everything loads cleanly outside of the repo
+   pipeline. Use `infrahubctl transform <name>` for a
+   `python_transforms` entry and
+   `infrahubctl render <name>` for a
+   `jinja2_transforms` entry; see
+   [deployment-gql-dry-run.md](deployment-gql-dry-run.md).
+   If you skip this step, every retry below will leave
    the new repo in the same sticky state.
 
 2. **Serve the repository under a new path or
@@ -85,11 +89,13 @@ failing on a new repo:
 - Run `infrahubctl schema check schemas/` locally
   before committing any schema change. The check
   catches the malformations that trip the worker.
-- Run `infrahubctl render` and
-  `infrahubctl transform` against every transform
-  before registering the repo. The pipeline runs
-  the same code path; local success means import
-  success.
+- Dry-run every transform before registering the
+  repo: `infrahubctl transform <name>` for each
+  `python_transforms` entry,
+  `infrahubctl render <name>` for each
+  `jinja2_transforms` entry. Each command serves only
+  its own section. The pipeline runs the same code
+  path; local success means import success.
 - Stage repo changes on a fork or branch before
   pointing the production repo at a new commit.
   See

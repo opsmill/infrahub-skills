@@ -203,6 +203,8 @@ each task reads).
 | infrahub-collecting-diagnostics | 3 |
 | infrahub-analyzing-diagnostics | 10 |
 | infrahub-importing-data | 25 |
+| infrahub-common | 3 |
+| infrahub-reporting-skill-gaps | 13 |
 
 `infrahub-analyzing-data` has no eval tasks yet —
 adding them is a good contribution. It has rules but

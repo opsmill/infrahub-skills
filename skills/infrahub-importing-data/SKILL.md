@@ -4,7 +4,7 @@ description: >-
   Converts CSV/TSV inputs into Infrahub object YAML and loads them onto a fresh branch.
   Handles a single file, a folder of files, an explicit list of paths, and one-big-denormalized-sheet exports.
   TRIGGER when: importing CSV, loading CSV/TSV into Infrahub, ingesting spreadsheet data, converting CSV to Infrahub objects, splitting a denormalized CSV across multiple kinds.
-  DO NOT TRIGGER when: running `infrahubctl import load` against an LDJSON dump (different format and tool), designing or modifying schemas (this skill is read-only against the schema and fails closed on unmapped columns), exporting data from Infrahub (use `infrahubctl object get -o csv` for single-kind export), or ingesting JSON/XLSX (v1 is CSV+TSV only).
+  DO NOT TRIGGER when: running `infrahubctl load` against an LDJSON dump (different format and tool), designing or modifying schemas (this skill is read-only against the schema and fails closed on unmapped columns), exporting data from Infrahub (use `infrahubctl object get -o csv` for single-kind export), or ingesting JSON/XLSX (v1 is CSV+TSV only).
 allowed-tools:
   - Read
   - Write
@@ -77,10 +77,11 @@ remaining arguments as additional paths to include.
 ## When NOT to Use
 
 - The input is an LDJSON dump from `infrahubctl
-  export dump`. Use `infrahubctl import load`; it
-  reads a different format and is the wrong tool
-  for CSV. The skills disambiguate so you don't
-  conflate them.
+  dump`. Use `infrahubctl load`; it reads a
+  different format and is the wrong tool for CSV.
+  Both are top-level commands; there is no
+  `import` or `export` command group. The skills
+  disambiguate so you don't conflate them.
 - The user needs schema changes. This skill is
   read-only against the schema. Hand off to
   `infrahub-managing-schemas`.

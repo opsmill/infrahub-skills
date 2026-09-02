@@ -23,9 +23,13 @@ a clean `ConnectionRefusedError`, sometimes with a
 a hang. Each surfaces deep inside the command's
 output, after partial work may have already been
 attempted. A 2-second `infrahubctl info` up front
-gives a clean diagnosis (SDK loaded, address set,
-token valid) before any state-changing command runs,
+gives a clean diagnosis (SDK loaded, address
+reachable) before any state-changing command runs,
 which keeps recovery cheap.
+
+**It does not confirm a token is present.** See
+"What `info` does not tell you" below before treating
+a green tick as clearance to write.
 
 ### Symptoms
 
@@ -95,15 +99,94 @@ Infrahub server: http://localhost:8000
 Server version: x.y.z
 ```
 
-#### Step 2: Check environment variables
+#### What `info` does not tell you
+
+`info` fetches server information anonymously, then
+looks up the user **only if a token or username is
+configured**. With neither set, the lookup is skipped
+and the status is reported green regardless. So the
+three outcomes are not symmetric:
+
+| Token | `Connection Status` | `User:` line |
+| ----- | ------------------- | ------------ |
+| Valid | Green tick | Present |
+| Invalid | Red cross, `Invalid token` | Absent |
+| **Absent** | **Green tick**, full version readout | **Absent** |
+
+The absent case is the dangerous one, because the
+pre-flight passes on exactly the misconfiguration it
+exists to catch. The only signal is that the `User:`
+line is missing, and a missing line is not a warning.
+
+Reads are served anonymously, so **a green result does
+not prove write authorisation.** Every read succeeds
+and every write fails, which reads as an intermittent
+server problem rather than a configuration problem.
+
+#### Step 2: Probe a write before you write
+
+Listing branches is a read, so it proves nothing about
+write access. Create and delete a throwaway branch
+instead:
+
+```bash
+infrahubctl branch create preflight-probe-a1 --description "write probe" \
+  && infrahubctl branch delete preflight-probe-a1
+```
+
+Two things about the name. It has to be **fixed within
+the run**, not `$$` or any other per-shell value: the
+delete has to name the branch the create made, and each
+command may run in its own shell. And it has to be
+**different between runs**: pick a fresh suffix each
+time you write the pair. A name reused across runs
+fails the create on branch-already-exists if an earlier
+run died between the create and the delete, and two
+agents or two CI jobs probing at once will delete each
+other's branch.
+
+Chain the two with `&&` so a failed create does not
+leave a delete swinging at a branch that was never
+created.
+
+If the create fails on authentication, stop there and
+fix credentials. If it fails on the branch already
+existing, that is a leftover probe, not a credentials
+problem: delete it by name and rerun with a new
+suffix.
+
+#### The failure often surfaces one command later
+
+An unauthenticated write fails, and the *next* command
+fails on the consequence. Documentation that says to
+run a branch create followed by an object load
+produces this pair:
+
+```text
+Authentication failure: Authentication is required to perform this operation
+infrahub_sdk.exceptions.BranchNotFoundError: The requested branch was not found on the server
+```
+
+The branch error is true and is a consequence, not a
+cause. A reader who scans to the bottom of the output
+goes looking at branches. When a command fails, read
+the *first* error in the run, not the last.
+
+#### Step 3: Check environment variables
 
 ```bash
 # Server address (defaults to localhost:8000)
-echo $INFRAHUB_ADDRESS
+echo "$INFRAHUB_ADDRESS"
 
-# API token for authentication
-echo $INFRAHUB_API_TOKEN
+# API token: report whether it is set, never what it is
+echo "INFRAHUB_API_TOKEN ${INFRAHUB_API_TOKEN:+is set}${INFRAHUB_API_TOKEN:-is NOT set}"
 ```
+
+Never `echo` the token itself. Its value lands in the
+terminal, the shell history and, when this check gets
+automated, the CI job log, which is retained. `${VAR:+…}`
+answers the only question you have, which is whether the
+variable is exported.
 
 Set them if missing:
 
@@ -112,7 +195,7 @@ export INFRAHUB_ADDRESS="http://localhost:8000"
 export INFRAHUB_API_TOKEN="your-api-token"
 ```
 
-#### Step 3: Troubleshoot connection failures
+#### Step 4: Troubleshoot connection failures
 
 1. **Is the server running?** Check with `docker ps`
    or the relevant process manager
@@ -128,7 +211,11 @@ export INFRAHUB_API_TOKEN="your-api-token"
 - Run `infrahubctl info` as the first step of any
   server-dependent workflow — it's the cheapest
   signal that the rest of the run has a chance of
-  succeeding
+  succeeding. It is not the last step: a green `info`
+  with no token set is indistinguishable from a green
+  `info` with a valid one, so before anything that
+  writes, run the branch create/delete probe from
+  Step 2 as well
 - For offline work (no server available), limit to
   local validation:
   - YAML linting and structure checks
@@ -138,8 +225,30 @@ export INFRAHUB_API_TOKEN="your-api-token"
   - Schema YAML format checks (correct keys, naming
     conventions)
 - Set `INFRAHUB_ADDRESS` and `INFRAHUB_API_TOKEN` in
-  your shell profile or `.env` file for consistent
-  config
+  your shell profile for consistent config, and
+  confirm both are actually exported before a write:
+
+  ```bash
+  : "${INFRAHUB_ADDRESS:?not set}" "${INFRAHUB_API_TOKEN:?not set}"
+  ```
+
+  `:` is the no-op command, so the `:?` expansions abort
+  with a named error if either variable is unset and
+  print nothing if both are set. Do not `echo` that same
+  line: it would put the token in the log of every run.
+
+  The SDK reads both from the environment by the same
+  mechanism, and reads neither from a `.env` file on
+  its own. A `.env` file only reaches `infrahubctl` if
+  something loads it (docker compose, direnv, a task
+  runner), so a value sitting in `.env` is not
+  necessarily a value in your shell. This is the usual
+  reason a project has a working address and a missing
+  token: the compose stack reads the file, your shell
+  does not.
+- Wrap state-changing commands in a task runner that
+  supplies credentials explicitly rather than relying
+  on ambient configuration.
 
 Reference:
 [Infrahub CLI Docs](https://docs.infrahub.app)
