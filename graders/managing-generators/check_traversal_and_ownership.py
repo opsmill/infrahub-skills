@@ -15,6 +15,7 @@ CHECKS = [
     "traversal-enumerates-and-checks-truncation",
     "shared-save-opts-out-of-tracking",
     "group-membership-from-member-side",
+    "path-hop-shape",
 ]
 
 if __name__ == "__main__":

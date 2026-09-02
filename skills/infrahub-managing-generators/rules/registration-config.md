@@ -20,8 +20,13 @@ field — the opposite of `check_definitions`, which
 embeds the query under the check itself. Copying the
 check shape into a generator block is the most
 common setup mistake; Infrahub rejects the config at
-load time and the generator never appears in
-`infrahubctl generator --list`. `targets:` resolves
+load time, so the repository never finishes syncing and
+no run is ever enqueued. Read the sync status on the
+repository object, or `infrahubctl task list
+--include-logs`, to see it. **Not `infrahubctl generator
+--list`**: that reads the local `.infrahub.yml` and
+never contacts the server, so it lists the malformed
+entry happily. `targets:` resolves
 strictly against `CoreGeneratorGroup`; pointing it
 at a `CoreStandardGroup` of the same name parses
 fine but the dispatcher never enqueues runs, so the

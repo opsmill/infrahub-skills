@@ -39,7 +39,7 @@ part worth memorising:
 | Parameter | What it actually does |
 | --------- | --------------------- |
 | `kind_filter` | **Whitelist.** Only traverse through nodes of these kinds |
-| `included_kinds` | **Not a whitelist.** Re-includes kinds that are excluded *by default*. No effect on anything you passed in `excluded_kinds` in the same request |
+| `included_kinds` | **Not a whitelist.** Re-includes kinds excluded *by default*. It is applied after `excluded_kinds`, so a kind you excluded yourself and re-included here ends up included; if you want it excluded, do not name it in both |
 | `excluded_kinds` | Unioned with the defaults (`BuiltinIPNamespace` and its implementers) |
 | `excluded_namespaces` | Unioned with the defaults `Core, Internal, Builtin, Lineage, Profile, Template`. **The defaults cannot be opted out of** |
 | `relationship_filter` | Only follow these **schema relationship identifiers** |
@@ -55,7 +55,7 @@ Constrain by relationship identifier and bound the
 depth:
 
 ```python
-from infrahub_sdk.exceptions import VersionNotSupportedError
+from infrahub_sdk.generator import InfrahubGenerator
 
 
 class RouteBuilder(InfrahubGenerator):
@@ -73,7 +73,7 @@ class RouteBuilder(InfrahubGenerator):
             ],
             max_depth=6,
             shortest_paths_only=False,
-            branch=self.branch_name,
+            branch=self.branch,
         )
 
         if result.truncated_at_depth is not None:
@@ -125,9 +125,11 @@ accept the cost.
   depths below that value, and deeper paths may exist.
   **Check this before acting on the result.** It is the
   one shape-level signal that the answer is incomplete.
-- **`excluded_kinds`** — what was actually excluded, the
-  defaults plus your additions minus your re-inclusions.
-  Read it when a path you expected is missing.
+- **`excluded_kinds`** — what was actually excluded:
+  the defaults plus your additions, minus anything
+  `included_kinds` put back. Read it when a path you
+  expected is missing; it is the authoritative answer to
+  "why is my kind still excluded", and to the reverse.
 
 ### Just asking whether a path exists
 
@@ -140,7 +142,7 @@ if not await self.client.path_exists(
     source=a_id, destination=z_id,
     relationship_filter=["netendpoint__netsegment"], max_depth=6,
 ):
-    self.log.warning("no route between the endpoints; skipping")
+    self.logger.warning("no route between the endpoints; skipping")
     return
 ```
 
