@@ -154,7 +154,11 @@ Follow these steps when creating or modifying a schema:
    [rules/attribute-defaults-and-types.md](./rules/attribute-defaults-and-types.md)
    for attribute kinds and defaults, and
    [rules/relationship-identifiers.md](./rules/relationship-identifiers.md)
-   for bidirectional relationship setup.
+   for bidirectional relationship setup. Every
+   `cardinality: one` you are about to write is a
+   write-time data constraint, not only a shape, so read
+   [rules/relationship-cardinality-consequences.md](./rules/relationship-cardinality-consequences.md)
+   while choosing them rather than after a load fails.
 4. **Build the schema YAML** — Start with the `$schema`
    comment and `version: "1.0"`. Define generics first
    (if any), then nodes. Apply naming, display, and

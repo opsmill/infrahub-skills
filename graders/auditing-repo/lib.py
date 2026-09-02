@@ -43,6 +43,7 @@ Usage (in a per-task grader script)::
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -217,6 +218,85 @@ def check_yagni_finding_carves_out_bootstrap(
     return True, "bootstrap/seed/demo carve-out respected"
 
 
+# `\s` rather than `\W` so the value may sit on the next line of a YAML
+# snippet, which is where a model that answers in YAML puts it.
+# The character class holds no word characters, so a generous bound cannot
+# bridge "cardinality" to an unrelated "one" -- only to a value separated
+# from it by whitespace and punctuation, such as a wrapped YAML line.
+_CARDINALITY_RE = re.compile(
+    r"""cardinality[\s:=\-'"`]{0,40}(one|many)\b""", re.IGNORECASE
+)
+
+# Fields that carry the recommended fix. A cardinality quoted anywhere else
+# in the finding -- typically in evidence, restating the *existing*
+# declaration the prompt handed over -- is not a recommendation.
+_RECOMMENDATION_FIELDS = (
+    "replacement", "recommendation", "fix", "suggestion", "remediation",
+    "proposed", "action",
+)
+
+
+def _flatten_strings(value: Any) -> list[str]:
+    """Every string reachable inside a finding value, at any depth."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [s for v in value.values() for s in _flatten_strings(v)]
+    if isinstance(value, (list, tuple)):
+        return [s for v in value for s in _flatten_strings(v)]
+    return []
+
+
+def _finding_text(finding: dict) -> str:
+    """Flatten every string in a finding into one searchable blob.
+
+    Recurses into nested dicts and lists: a model answering in YAML puts
+    the fix under `replacement: {yaml: "..."}`, and dropping dict values
+    silently failed those findings.
+    """
+    return " ".join(_flatten_strings(finding))
+
+
+def _recommendation_text(finding: dict) -> str:
+    """The finding's recommended fix, or its whole text if it names no field."""
+    parts = [
+        s
+        for field in _RECOMMENDATION_FIELDS
+        for s in _flatten_strings(finding.get(field))
+    ]
+    return " ".join(parts)
+
+
+def check_yagni_finding_names_cardinality(
+    findings: list[dict], rule: str
+) -> tuple[bool, str]:
+    """Assert the finding's recommended fix names a cardinality.
+
+    Adding an inverse relationship is not shape-neutral. The value chosen
+    decides whether an inbound cap exists and fixes the GraphQL selection
+    shape, so a finding that recommends an inverse without naming a
+    cardinality hands the reader an unflagged decision with write-time
+    consequences.
+    """
+    f = _find(findings, rule)
+    if f is None:
+        return False, f"{rule} missing — cannot check cardinality"
+    recommendation = _recommendation_text(f)
+    if not recommendation.strip():
+        return False, (
+            f"{rule} carries no recommendation field "
+            f"({', '.join(_RECOMMENDATION_FIELDS)}), so it recommends nothing"
+        )
+    match = _CARDINALITY_RE.search(recommendation)
+    if match:
+        return True, f"{rule} recommendation names cardinality {match.group(1).lower()}"
+    return False, (
+        f"{rule} recommendation does not name a cardinality for the inverse; "
+        "a cardinality quoted elsewhere in the finding restates the existing "
+        "declaration rather than choosing one"
+    )
+
+
 def check_yagni_finding_file(
     findings: list[dict], rule: str, substring: str
 ) -> tuple[bool, str]:
@@ -267,6 +347,7 @@ _CHECKS: dict[str, tuple[Any, list[str]]] = {
     "yagni-finding-present": (check_yagni_finding_present, ["str"]),
     "yagni-finding-severity": (check_yagni_finding_severity, ["str", "str"]),
     "yagni-finding-ladder-step": (check_yagni_finding_ladder_step, ["str", "int"]),
+    "yagni-finding-names-cardinality": (check_yagni_finding_names_cardinality, ["str"]),
     "yagni-finding-file": (check_yagni_finding_file, ["str", "str"]),
     "yagni-finding-file-excludes": (check_yagni_no_finding_on_file, ["str"]),
     "yagni-findings-sorted": (check_yagni_findings_sorted_by_ladder, []),

@@ -1056,8 +1056,101 @@ def check_choice_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
     return True, f"All {seen} dropdown choice(s) are in canonical key order"
 
 
+
+# ---------------------------------------------------------------------------
+# Cardinality consequences
+#
+# Verified against the validator: `cardinality: one` forces max_count 1, so
+# the inbound cap on a peer comes from that PEER's declaration on the same
+# identifier. Widening only your own side loads cleanly and does not lift the
+# cap. Renaming while widening trips the identifier-uniqueness check.
+#
+# The checks here are schema-shape checks that hold for any schema. Whether a
+# given one-to-one pair is correct or is a cap somebody wanted lifted depends
+# on the fixture's intent, so that assertion lives in the task's grader.
+# ---------------------------------------------------------------------------
+
+
+def implicit_identifier(kind: str, peer: str) -> str:
+    """Reproduce the identifier Infrahub derives when none is declared.
+
+    A relationship without an explicit ``identifier`` still gets one, built
+    from its kind and peer sorted and lowercased. Deriving it here means the
+    identifier-keyed checks see the same graph whether the schema spells the
+    identifier out or relies on the default.
+    """
+    return "__".join(sorted([kind, peer])).lower()
+
+
+def rels_by_identifier(schema: dict) -> dict[str, list[tuple[str, dict]]]:
+    """Map identifier -> [(owning kind, relationship), ...] across the file."""
+    out: dict[str, list[tuple[str, dict]]] = {}
+    for section in ("generics", "nodes"):
+        for entity in schema.get(section) or []:
+            if not isinstance(entity, dict):
+                continue
+            kind = f"{entity.get('namespace', '')}{entity.get('name', '')}"
+            for rel in entity.get("relationships") or []:
+                if not isinstance(rel, dict):
+                    continue
+                identifier = rel.get("identifier") or implicit_identifier(
+                    kind, str(rel.get("peer", ""))
+                )
+                out.setdefault(identifier, []).append((kind, rel))
+    return out
+
+
+def check_identifier_unique_per_direction(schema: dict, **_: Any) -> tuple[bool, str]:
+    """One relationship per identifier per direction on any given kind.
+
+    A kind may declare two relationships on one identifier only when one is
+    `inbound` and the other `outbound` — the self-referential pattern. Any
+    other pair is rejected at load; the usual cause is widening a cardinality
+    and renaming to a plural in the same change, leaving both declarations
+    behind.
+    """
+    by_identifier = rels_by_identifier(schema)
+    if not by_identifier:
+        return False, "no relationship declares an identifier, so nothing was checked"
+    problems: list[str] = []
+    for identifier, entries in by_identifier.items():
+        per_kind: dict[str, list[tuple[str, str]]] = {}
+        for kind, rel in entries:
+            direction = str(rel.get("direction") or "bidirectional")
+            per_kind.setdefault(kind, []).append((str(rel.get("name", "?")), direction))
+        for kind, decls in per_kind.items():
+            if len(decls) == 1:
+                continue
+            if sorted(d for _name, d in decls) == ["inbound", "outbound"]:
+                continue
+            problems.append(f"{kind} declares {decls} on identifier {identifier!r}")
+    if problems:
+        return False, "; ".join(problems)
+    return True, "each kind declares at most one relationship per identifier and direction"
+
+
+def check_many_max_count_valid(schema: dict, **_: Any) -> tuple[bool, str]:
+    """`max_count: 1` on a cardinality-many relationship is rejected at load."""
+    by_identifier = rels_by_identifier(schema)
+    if not by_identifier:
+        return False, "no relationship declares an identifier, so nothing was checked"
+    problems: list[str] = []
+    for _identifier, entries in by_identifier.items():
+        for kind, rel in entries:
+            if rel.get("cardinality") == "many" and rel.get("max_count") == 1:
+                problems.append(
+                    f"{kind}.{rel.get('name')} is cardinality many with max_count 1; "
+                    "use cardinality one for a genuine cap of one"
+                )
+    if problems:
+        return False, "; ".join(problems)
+    return True, "no cardinality-many relationship carries max_count 1"
+
+
 CHECKS: dict[str, Any] = {
     "attr-min-length": check_attr_min_length,
+    "identifier-unique-per-direction": check_identifier_unique_per_direction,
+    "many-max-count-valid": check_many_max_count_valid,
     "dropdown-for-status": check_dropdown_for_status,
     "no-deprecated-string": check_no_deprecated_string,
     "full-kind-references": check_full_kind_references,
@@ -1101,7 +1194,7 @@ CHECKS: dict[str, Any] = {
 
 
 def run_checks(
-    check_names: list[str],
+    check_names: list[str | tuple[str, Any]],
     output_path: Path,
     raw_text: str | None = None,
 ) -> dict:
@@ -1110,7 +1203,11 @@ def run_checks(
     Parameters
     ----------
     check_names:
-        List of assertion names from the ``CHECKS`` registry.
+        List of assertion names from the ``CHECKS`` registry, or
+        ``(name, function)`` pairs for checks that are specific to one eval
+        task. Task-local checks stay in the task's grader script instead of
+        the shared registry, so a check that encodes one fixture's intent
+        cannot be picked up by another task where it would be wrong.
     output_path:
         Path to the schema YAML file produced by the model.
     raw_text:
@@ -1127,7 +1224,7 @@ def run_checks(
     Raises
     ------
     KeyError
-        If any name in ``check_names`` is not in ``CHECKS``.
+        If any bare name in ``check_names`` is not in ``CHECKS``.
     """
     schema, file_raw = load_output(output_path)
     if raw_text is None:
@@ -1136,8 +1233,12 @@ def run_checks(
     entries: list[dict] = []
     passed_count = 0
 
-    for name in check_names:
-        fn = CHECKS[name]  # raises KeyError for unknown names
+    for entry in check_names:
+        if isinstance(entry, tuple):
+            name, fn = entry
+        else:
+            name = entry
+            fn = CHECKS[name]  # raises KeyError for unknown names
         try:
             ok, msg = fn(schema, raw_text=raw_text)
         except Exception as exc:  # pragma: no cover — defensive

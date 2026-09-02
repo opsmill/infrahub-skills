@@ -249,13 +249,14 @@
     },
     {
       "id": 9,
-      "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this schema (schemas/dcim.yml). The forward\n`Interface.device` rel is `kind: Attribute, cardinality: one` but\n`Device` declares no inverse \u2014 consumers with an interface in hand\nhave no way to traverse back to its device without filtering.\n\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: Device\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n    # no `interfaces` relationship declared\n  - name: Interface\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n    relationships:\n      - name: device\n        peer: DcimDevice\n        kind: Attribute\n        cardinality: one\n        identifier: device__interfaces\n```\n\nSave ONLY the JSON findings to: output.json",
-      "expected_output": "JSON listing one yagni-missing-inverse-forces-python-filter finding with severity MEDIUM and ladder_step 3.",
+      "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this schema (schemas/dcim.yml). The forward\n`Interface.device` rel is `kind: Attribute, cardinality: one` but\n`Device` declares no inverse \u2014 consumers with an interface in hand\nhave no way to traverse back to its device without filtering.\n\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: Device\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n    # no `interfaces` relationship declared\n  - name: Interface\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n    relationships:\n      - name: device\n        peer: DcimDevice\n        kind: Attribute\n        cardinality: one\n        identifier: device__interfaces\n```\n\nEach finding carries `rule`, `severity`, `ladder_step`, `file` and\n`replacement`.\n\nSave ONLY the JSON findings to: output.json",
+      "expected_output": "JSON listing one yagni-missing-inverse-forces-python-filter finding with severity MEDIUM and ladder_step 3, whose replacement names the cardinality for the recommended inverse and says why that value was chosen.",
       "files": [],
       "expectations": [
         "Output is JSON with a findings array (or an object with a findings key)",
         "Contains a yagni-missing-inverse-forces-python-filter finding",
         "That finding has severity MEDIUM and ladder_step 3",
+        "The recommended inverse names a cardinality and justifies it, because cardinality one on the inverse caps inbound references at write time",
         "No yagni finding exceeds MEDIUM severity"
       ],
       "assertions": [
@@ -270,6 +271,10 @@
         {
           "name": "correct-ladder-step",
           "check": "The yagni-missing-inverse-forces-python-filter finding has ladder_step 3"
+        },
+        {
+          "name": "names-cardinality",
+          "check": "The recommended inverse names a cardinality (one or many)"
         },
         {
           "name": "severity-cap",

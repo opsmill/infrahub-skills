@@ -4,6 +4,17 @@ GraphQL queries are the data layer for checks, transforms,
 and generators. They fetch data from Infrahub's API and pass
 it to your Python code.
 
+## Contents
+
+- [File Format](#file-format)
+- [Query Structure](#query-structure)
+- [Infrahub GraphQL Conventions](#infrahub-graphql-conventions)
+  - [Cardinality Decides the Shape](#cardinality-decides-the-shape)
+  - [Inline Fragments (Generics/Polymorphism)](#inline-fragments-genericspolymorphism)
+- [Response Data Structure](#response-data-structure)
+- [File Organization](#file-organization)
+- [Best Practices](#best-practices)
+
 ## File Format
 
 Queries are stored as `.gql` files and registered in
@@ -235,6 +246,61 @@ tags {
   }
 }
 ```
+
+### Cardinality Decides the Shape
+
+**Which of the two shapes above a relationship takes is
+decided by its `cardinality`.** Nothing else selects
+between them:
+
+| Cardinality | GraphQL type | Selection |
+| ----------- | ------------ | --------- |
+| `one` | `NestedEdged<Kind>` | `rel { node { … } }` |
+| `many` | `NestedPaginated<Kind>` | `rel { edges { node { … } } }`, plus `count` |
+
+`count` exists only on the `many` shape.
+
+On a hierarchical kind the generated fields do not follow
+what you declared: `parent` is always node-shaped, while
+`children`, `ancestors` and `descendants` are always
+edges-shaped.
+
+#### Changing a cardinality changes the shape
+
+Because cardinality selects the shape, **changing a
+relationship's cardinality invalidates every stored query
+that selects it.** The failure is a server error, not a
+validation message, and it names an internal wrapper type
+rather than the relationship:
+
+```text
+Cannot query field 'edges' on type 'NestedEdged<Kind>'
+```
+
+The reverse migration gives the mirror:
+
+```text
+Cannot query field 'node' on type 'NestedPaginated<Kind>'
+```
+
+`NestedEdged<Kind>` and `NestedPaginated<Kind>` appear
+nowhere in your schema, your `.gql` files, or the
+documentation, which is why the error is hard to connect
+to the schema change that caused it.
+
+A `.gql` file cannot be unit tested, so a query that has
+stopped executing is invisible to an offline suite.
+Dry-run every migrated query instead: see
+[rules/deployment-gql-dry-run.md](rules/deployment-gql-dry-run.md)
+for the command per transform type.
+
+**Planning or making the schema change is not this
+file's subject.** Which command fails, when, and how to
+find every affected query all belong to the schema
+change, and live in
+[../infrahub-managing-schemas/rules/relationship-cardinality-consequences.md](../infrahub-managing-schemas/rules/relationship-cardinality-consequences.md),
+which owns removing and retyping a field as well as
+widening a cardinality.
 
 ### Inline Fragments (Generics/Polymorphism)
 

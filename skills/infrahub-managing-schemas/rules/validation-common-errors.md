@@ -126,6 +126,59 @@ A schema-load-time Pydantic error on
 the verified per-field caps and a Python preflight
 walker.
 
+### "has N peers for <identifier>, maximum of 1 allowed"
+
+**Not a schema error.** A write-time data constraint,
+so `infrahubctl schema check` reports the schema valid
+and always will. It fires when a second object tries to
+point at a peer whose own relationship on that
+identifier is `cardinality: one`.
+
+```text
+Node <id> has 2 peers for service__wavelength, maximum of 1 allowed
+```
+
+The cap lives on the **peer's** side, not yours, so
+widening your own relationship does not lift it. The
+`min_count` mirror on delete reads
+`no fewer than N allowed`. See
+[relationship-cardinality-consequences](./relationship-cardinality-consequences.md).
+
+### "Identifier of relationships must be unique for a given direction"
+
+Two relationships on the same kind share one
+`identifier` in the same direction. The usual cause is
+renaming a relationship while keeping the old
+declaration, or widening `cardinality` and giving the
+widened relationship a new plural name in the same
+change. The message lists both names:
+
+```text
+NetService: Identifier of relationships must be unique for a given direction >
+'service__wavelength' : [('wavelength', 'bidirectional'), ('wavelengths', 'bidirectional')]
+```
+
+Keep one declaration per identifier per direction. A
+widened relationship keeps its original name **in that
+change**. Renaming is still possible, just not in the
+same step: drop the old declaration with `state:
+absent`, load, then re-add it under the new name. See
+[relationship-cardinality-consequences.md](./relationship-cardinality-consequences.md).
+
+### "Cannot query field 'edges' on type 'NestedEdged<Kind>'"
+
+**Not a schema error either.** A stored GraphQL query
+selecting the wrong shape for a relationship's
+cardinality, surfacing as a server error at execution or
+as `Query is not valid, …` at repository import. Caused
+by changing a cardinality without migrating the queries
+that select it. Removing or retyping any field a stored
+query selects does the same thing.
+[relationship-cardinality-consequences.md](./relationship-cardinality-consequences.md)
+has the procedure for finding every affected query;
+[../../infrahub-common/graphql-queries.md](../../infrahub-common/graphql-queries.md)
+has the two selection shapes.
+
 ### Pre-Validation Checklist
 
 Before running `infrahubctl schema check`, verify:

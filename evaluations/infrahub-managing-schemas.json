@@ -461,6 +461,49 @@
           "check": "Dropdown choice keys follow name -> label -> description -> color"
         }
       ]
+    },
+    {
+      "id": 14,
+      "prompt": "I have this working schema. Today each service gets its own\nwavelength:\n\n```yaml\nnodes:\n  - name: Wavelength\n    namespace: Net\n    attributes:\n      - name: name\n        kind: Text\n    relationships:\n      - name: service\n        peer: NetService\n        cardinality: one\n        optional: true\n        identifier: service__wavelength\n  - name: Service\n    namespace: Net\n    attributes:\n      - name: name\n        kind: Text\n    relationships:\n      - name: wavelength\n        peer: NetWavelength\n        cardinality: one\n        optional: true\n        identifier: service__wavelength\n```\n\nA new requirement says several services must be able to share one\nwavelength. The first service provisions fine and the second one\nfails at write time.\n\nGive me the corrected schema. Also tell me, in YAML comments, what\nelse in the repository this change breaks, because I have `.gql`\nfiles that select `wavelength`.",
+      "expected_output": "A schema where the WAVELENGTH side is widened to cardinality many, because the inbound cap comes from the peer's own declaration on that identifier; widening only the Service side loads cleanly and does not lift the cap. The widened relationship must keep its singular name, since renaming to a plural in the same change leaves two declarations on one identifier and is rejected at load. Comments should note that cardinality selects the GraphQL shape, so every stored query selecting the relationship must migrate between `{ node { \u2026 } }` and `{ edges { node { \u2026 } } }`.",
+      "files": [],
+      "expectations": [
+        "The Wavelength side is widened to cardinality many, not only the Service side -- and the Service side is left at cardinality one, because widening both lifts the cap but also turns Service.wavelength into a list for nothing",
+        "Explains that the inbound cap comes from the peer's own declaration on that identifier",
+        "The widened relationship keeps its singular name, with a comment explaining why",
+        "States that changing cardinality breaks every stored query selecting the relationship, and names the two selection shapes",
+        "Notes the cap is enforced at write time and that schema check reports the schema valid either way"
+      ],
+      "assertions": [
+        {
+          "name": "shared-side-widened",
+          "check": "The Wavelength side of the identifier is cardinality many, so several services can point at one wavelength, and the Service side is still cardinality one, so widening did not turn Service.wavelength into a list as well"
+        },
+        {
+          "name": "relationship-names-unchanged",
+          "check": "Both relationships keep the singular names the input schema gave them"
+        },
+        {
+          "name": "comments-cover-query-migration",
+          "check": "YAML comments contrast the one-side `node { ... }` and many-side `edges { node { ... } }` selection shapes, name the stored-query impact, and name the failure it produces"
+        },
+        {
+          "name": "identifier-unique-per-direction",
+          "check": "No kind declares two relationships on the same identifier in the same direction"
+        },
+        {
+          "name": "many-max-count-valid",
+          "check": "No cardinality-many relationship carries max_count 1"
+        },
+        {
+          "name": "schema-version",
+          "check": "File declares version \"1.0\""
+        },
+        {
+          "name": "matching-identifiers",
+          "check": "Both sides of the relationship share one identifier"
+        }
+      ]
     }
   ]
 }
