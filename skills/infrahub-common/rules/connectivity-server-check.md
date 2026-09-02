@@ -130,9 +130,15 @@ write access. Create and delete a throwaway branch
 instead:
 
 ```bash
-infrahubctl branch create preflight-$$ --description "write probe"
-infrahubctl branch delete preflight-$$
+infrahubctl branch create preflight-write-probe --description "write probe" \
+  && infrahubctl branch delete preflight-write-probe
 ```
+
+Use a fixed name, not `$$` or any other per-shell
+value: the delete has to name the branch the create
+made, and each command may run in its own shell. Chain
+the two with `&&` so a failed create does not leave a
+delete swinging at a branch that was never created.
 
 If the first command fails on authentication, stop
 there and fix credentials.

@@ -55,7 +55,7 @@ infrahubctl render <name> <param>=<value> --branch <branch>
 # and surface any GraphQL error on the spot. Both take the
 # name as a positional argument; there is no `run` subcommand.
 infrahubctl check <check_name> --branch <branch>
-infrahubctl generator <generator_name> <target_id> --branch <branch>
+infrahubctl generator <generator_name> <param>=<target_id> --branch <branch>
 ```
 
 Two details that each cost a round trip:
@@ -66,6 +66,11 @@ Two details that each cost a round trip:
   so a local invocation is the only place a human ever
   types it. Omitting it fails inside the query rather
   than at the CLI, which looks like a query bug.
+- **A generator target is a query variable, not a
+  bare id.** Everything after the generator name is
+  parsed as `key=value`; a token with no `=` is dropped
+  without a warning, so the generator runs with no
+  variables and the failure looks like a query bug.
 - **Neither transform command reaches a check or a
   generator.** Those are dry-run by running the check
   or the generator itself, as above.

@@ -30,9 +30,14 @@ After the generator is implemented and unit-tested:
    definition registered. ``--list`` is a flag; there is no
    ``generator list`` subcommand, and a bare word there is read
    as the name of a generator to run.
-2. ``infrahubctl generator <name> <target-id>`` — execute the
-   generator against a real branch. The name is a positional
-   argument, not a ``run`` subcommand.
+2. ``infrahubctl generator <name> <param>=<target-id>`` —
+   execute the generator against a real branch. The name is a
+   positional argument, not a ``run`` subcommand. Everything
+   after the name is a query variable in ``key=value`` form:
+   the target is passed as a variable the generator's ``.gql``
+   declares, never as a bare id. A token with no ``=`` is
+   dropped without a warning, so the generator runs with no
+   variables and looks like a query bug.
 3. Verify the created objects exist via the UI or a GraphQL
    query. Confirm relationships resolve.
 4. If anything fails, fix and re-run before moving on.

@@ -25,6 +25,10 @@ skills_all: &skills_all
   - "graders/**"
   - "eval.yaml"
 
+cli_invocations_all:
+  - "skills/**/*.md"
+  - "scripts/check-cli-invocations.py"
+
 documentation_all:
   - *doc_files
   - *markdown_all

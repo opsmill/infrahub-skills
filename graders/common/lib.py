@@ -66,9 +66,14 @@ def check_docs_fallback(text: str) -> tuple[bool, str]:
 # The tree is duplicated from scripts/check-cli-invocations.py rather than
 # imported, per dev/guides/adding-a-rule.md: graders stay standalone. That
 # script checks what the *skills* print; these checks what the *model*
-# prints, which is the outcome the rules exist to change. Read from
-# infrahub-sdk 1.23.1.
+# prints, which is the outcome the rules exist to change.
+#
+# Keep _CLI_SDK_VERSION, the tree below, and the same three constants in
+# scripts/check-cli-invocations.py in step. When the CLI changes, both copies
+# move together and the commit says which SDK version they were read from.
 # ---------------------------------------------------------------------------
+
+_CLI_SDK_VERSION = "1.23.1"
 
 _CLI_GROUPS: dict[str, set[str]] = {
     "branch": {"create", "delete", "list", "merge", "rebase", "report", "validate"},
@@ -97,6 +102,28 @@ _CLI_SUSPICIOUS: set[str] = {
 
 _CLI_INVOCATION = re.compile(r"infrahubctl\s+([a-z][a-z0-9_-]*)(?:\s+([a-z][a-z0-9_-]*))?")
 
+# Words that follow `infrahubctl` in a heading or a table cell without being
+# a command. Same list as the script's PROSE_ALLOWLIST.
+_CLI_PROSE_ALLOWLIST: set[str] = {"available", "commands", "first"}
+
+_CLI_FENCE = re.compile(r"```[^\n]*\n(.*?)```", re.DOTALL)
+_CLI_SPAN = re.compile(r"`([^`\n]+)`")
+
+
+def _cli_code_regions(text: str) -> str:
+    """Return only the parts of an answer that read as code.
+
+    A model answer is mostly prose, and prose that happens to follow the
+    word `infrahubctl` ("infrahubctl reads the token from the environment")
+    is not an invocation. Scanning fenced blocks and inline code spans keeps
+    the check on what a reader would paste into a shell, so a correct answer
+    is not failed for an ordinary sentence. An invented command written as
+    bare prose is missed; the LLM assertion on the same task covers that.
+    """
+    regions = _CLI_FENCE.findall(text)
+    regions.extend(_CLI_SPAN.findall(_CLI_FENCE.sub("\n", text)))
+    return "\n".join(regions)
+
 
 def check_cli_commands_exist(text: str) -> tuple[bool, str]:
     """Every `infrahubctl ...` command in the answer must be a real command.
@@ -106,7 +133,9 @@ def check_cli_commands_exist(text: str) -> tuple[bool, str]:
     fail on first use.
     """
     bad: list[str] = []
-    for first, second in _CLI_INVOCATION.findall(text):
+    for first, second in _CLI_INVOCATION.findall(_cli_code_regions(text)):
+        if first in _CLI_PROSE_ALLOWLIST:
+            continue
         shown = f"infrahubctl {first}" + (f" {second}" if second else "")
         if first in _CLI_GROUPS:
             if second and second not in _CLI_GROUPS[first]:
@@ -128,23 +157,42 @@ def check_python_transform_dry_run(text: str) -> tuple[bool, str]:
     at a `python_transforms` entry prints "Unable to find <name>", which
     reads as an unregistered transform rather than the wrong command. The
     reader concludes the gate is unavailable and skips it.
+
+    Both tests name the transform, so a bare mention of `infrahubctl
+    transform` in a contrast sentence no longer clears the check while the
+    answer aims `render` at the same transform. The fixture name comes from
+    the `common-dry-run-python-transform` task in eval.yaml; a new task
+    reusing this check has to use the same one.
     """
     lower = text.lower()
-    if "infrahubctl transform" not in lower:
-        return False, "does not recommend `infrahubctl transform` for the Python transform"
+    # Accept either separator: a model may write spine-config for spine_config.
+    named = r"spine[_-]config"
+    if not re.search(rf"infrahubctl\s+transform\s+{named}", lower):
+        return False, "does not aim `infrahubctl transform` at the named Python transform"
     # `render` may legitimately appear to draw the contrast; what must not
     # appear is render aimed at the named python transform.
-    misuse = re.search(r"infrahubctl\s+render\s+spine_config", lower)
-    if misuse:
+    if re.search(rf"infrahubctl\s+render\s+{named}", lower):
         return False, "recommends `infrahubctl render` for a python_transforms entry"
-    return True, "uses `infrahubctl transform` for the Python transform"
+    return True, "uses `infrahubctl transform` for the named Python transform"
 
 
-_WRITE_PROBE_MARKERS = [
-    "branch create",
-    "throwaway branch",
-    "write probe",
-    "infrahub_api_token",
+# The probe is the create/delete *pair*. `branch create` on its own is
+# handed to the model by the task prompt ("I am about to run `infrahubctl
+# branch create` ..."), so an answer that restates the user's plan would
+# score on it. `branch delete` appears nowhere in the prompt.
+_WRITE_PROBE_CREATE = re.compile(r"branch\s+create\b")
+_WRITE_PROBE_DELETE = re.compile(r"branch\s+delete\b")
+
+# The answer must also say, in words, that a green connectivity result is
+# not clearance to write. Any one of these forms counts.
+_NOT_PROOF_PATTERNS = [
+    r"(does not|doesn't|do not|don't|never)[^.\n]{0,70}"
+    r"(prove|proof|confirm|guarantee|establish|mean you have)"
+    r"[^.\n]{0,70}(write|token|auth|permission)",
+    r"(not|no)\s+proof[^.\n]{0,70}(write|token|auth|permission)",
+    r"green[^.\n]{0,90}(not enough|insufficient|not sufficient|not clearance|proves nothing)",
+    r"reads?\s+(are|is)\s+(served\s+)?anonymous",
+    r"anonymous(ly)?[^.\n]{0,70}read",
 ]
 
 
@@ -153,20 +201,23 @@ def check_preflight_write_probe(text: str) -> tuple[bool, str]:
 
     With no token set, `info` skips the user lookup entirely and reports a
     green status, so it passes on exactly the misconfiguration it exists to
-    catch. The answer has to check the token or probe a write.
+    catch. Two things must be present, and neither is available by echoing
+    the prompt: the create *and* delete pair that probes a write, and an
+    explicit statement that a green result is not write authorisation. An
+    answer that says "your green `info` means you are good to go" fails on
+    both.
     """
     lower = text.lower()
-    if not any(m in lower for m in _WRITE_PROBE_MARKERS):
-        return False, (
-            "no token check or write probe; expected one of "
-            f"{_WRITE_PROBE_MARKERS}"
-        )
+    if not (_WRITE_PROBE_CREATE.search(lower) and _WRITE_PROBE_DELETE.search(lower)):
+        return False, "no write probe: expected a throwaway `branch create` and `branch delete` pair"
+    if not any(re.search(p, lower) for p in _NOT_PROOF_PATTERNS):
+        return False, "does not state that a green `infrahubctl info` is not proof of write access"
     claims_token_valid = re.search(
         r"info[^.\n]{0,80}(token is valid|validates the token|confirms the token)", lower
     )
     if claims_token_valid:
         return False, "claims `infrahubctl info` confirms the token is valid"
-    return True, "checks the token or probes a write rather than trusting `info`"
+    return True, "probes a write and states that a green `info` is not write authorisation"
 
 
 # ---------------------------------------------------------------------------
