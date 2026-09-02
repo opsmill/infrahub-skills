@@ -10,6 +10,7 @@ allowed-tools:
   - Bash
   - Grep
   - Glob
+  - Write
 argument-hint: "[focus-area]"
 metadata:
   version: 1.2.8
@@ -25,6 +26,22 @@ all rules and best practices from the infrahub-skills
 plugin. Produces a structured report covering schemas,
 objects, checks, generators, transforms, menus,
 `.infrahub.yml` configuration, and deployment readiness.
+
+**The audit is read-only.** The one file it writes is
+its own report, `AUDIT_REPORT.md`. Nothing else in the
+working tree or the index is touched, and no
+destructive git command is run against them, including
+to undo the audit's own side effect. An audit is most
+useful on a tree that holds uncommitted work, which is
+exactly the tree where a write cannot be undone.
+
+[rules/audit-is-read-only.md](./rules/audit-is-read-only.md)
+holds the canonical lists: which git commands are
+forbidden and which read another revision without
+touching the tree. Read it, and Phase 0 of the
+procedure, before Phase 1. The `Bash` tool is granted
+for read-only inspection, not for changing state;
+`Write` is granted for the report file only.
 
 ## Project Context
 
@@ -59,17 +76,19 @@ When invoked, the auditor:
 
 The phased procedure that ties these steps together
 lives in [audit-procedure.md](./audit-procedure.md) —
-read that file when running an audit. It defines the
-nine phases (project structure → schema → objects →
-Python components → cross-references → registration →
-best practices → deployment → YAGNI / cost-to-fix)
-and the per-finding severity levels used in the final
-report.
+read that file when running an audit. It opens with
+Phase 0, the read-only constraint every other phase
+runs under, then defines the nine phases (project
+structure → schema → objects → Python components →
+cross-references → registration → best practices →
+deployment → YAGNI / cost-to-fix) and the per-finding
+severity levels used in the final report.
 
 ## Audit Categories
 
 | Priority | Category | What It Checks |
 | -------- | -------- | -------------- |
+| CRITICAL | Conduct | The audit writes nothing but its report; constrains the auditor, not the repo |
 | CRITICAL | Project Structure | `.infrahub.yml` exists, paths valid |
 | CRITICAL | Schema Validation | Naming, relationships, deprecated fields |
 | CRITICAL | Object Validation | YAML structure, value types, refs |
@@ -102,6 +121,9 @@ The report is written to `AUDIT_REPORT.md` in the project root with this structu
 
 - Total findings: N
 - Critical: N | High: N | Medium: N | Low: N | Info: N
+- Working tree at audit time: clean | N uncommitted files
+- Tree modified by this audit: no | yes, listing paths
+  (the report file itself does not count)
 
 ## Project Structure
 
@@ -177,8 +199,8 @@ The auditor checks rules from all skills:
 ## Rules and Procedure
 
 - [audit-procedure.md](./audit-procedure.md) — the
-  nine-phase walkthrough that drives every audit
-  run
+  Phase 0 constraint and nine-phase walkthrough
+  that drive every audit run
 - [rules/](./rules/) — detailed audit rule
   definitions referenced from the phases
 - [examples.md](./examples.md) — sample audit
