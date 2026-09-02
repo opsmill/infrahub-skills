@@ -16,7 +16,10 @@
 3. **Relationships (relationship-)** — CRITICAL.
    Bidirectional identifier matching, peer references,
    Component/Parent pairing, cardinality and optional
-   defaults, `on_delete` cascade vs no-action.
+   defaults, `on_delete` cascade vs no-action, and the
+   peer of an inherited relationship, which is fixed by
+   the generic and cannot be narrowed by any kind that
+   inherits it (`relationship-peer-kind.md`).
    Incorrect relationships cause silent data model
    bugs and orphaned objects on delete.
 
@@ -24,7 +27,11 @@
    Mandatory-by-default behavior, Dropdown choices
    format, computed Jinja2 attributes (`read_only`
    plus `optional: false` combo), branch-agnostic
-   identity fields, deprecated field names.
+   identity fields, deprecated field names, and what an
+   implementer may and may not change about an
+   attribute it inherits: the kind is fixed, and a
+   Dropdown's choices are replaced wholesale rather
+   than added to (`attribute-defaults-and-types.md`).
 
 5. **Hierarchy (hierarchy-)** — HIGH. Setting up
    hierarchical generics and nodes with parent/children

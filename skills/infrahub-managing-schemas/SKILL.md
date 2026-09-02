@@ -154,7 +154,13 @@ Follow these steps when creating or modifying a schema:
    [rules/attribute-defaults-and-types.md](./rules/attribute-defaults-and-types.md)
    for attribute kinds and defaults, and
    [rules/relationship-identifiers.md](./rules/relationship-identifiers.md)
-   for bidirectional relationship setup.
+   for bidirectional relationship setup. If any node
+   inherits from a generic, read
+   [rules/relationship-peer-kind.md](./rules/relationship-peer-kind.md)
+   too: a relationship's peer is fixed by the generic
+   that declares it and no implementer can narrow it, so
+   deciding which relationships live on the generic is a
+   one-way choice made here rather than later.
 4. **Build the schema YAML** — Start with the `$schema`
    comment and `version: "1.0"`. Define generics first
    (if any), then nodes. Apply naming, display, and

@@ -141,7 +141,7 @@ you omitted `kind` somewhere.
 **Declaring a different `kind`** is a separate failure:
 
 ```text
-NetOptical.media inherited from NetEndpoint must be the same kind ["Dropdown", "Text"]
+NetOpticalEndpoint.media inherited from NetEndpoint must be the same kind ["Dropdown", "Text"]
 ```
 
 #### The dangerous half: a wrong list loads silently
@@ -179,7 +179,7 @@ deliberately:
    The server then rejects any override outright:
 
    ```text
-   NetOptical's attribute media inherited from NetEndpoint cannot be overriden
+   NetOpticalEndpoint's attribute media inherited from NetEndpoint cannot be overriden
    ```
 
    This makes drift impossible, at the cost of the

@@ -516,9 +516,14 @@ nodes:
 
 ## What a Generic Fixes for Its Implementers
 
-Three things a generic decides once and no inheriting
-kind can change back. Each was verified against
-Infrahub 1.11.0; each is worth knowing before the type
+Three things a generic decides for every kind that
+inherits it. Only the first is truly one-way: an
+inherited relationship's peer cannot be narrowed at
+all. The other two *can* be changed per kind, but only
+in a specific form, and getting the form wrong fails
+quietly in one case and loudly in the other. Each was
+verified against Infrahub `1.10.8+19`, the 1.11.0
+development line; each is worth knowing before the type
 hierarchy is written rather than after.
 
 ### 1. An inherited relationship's peer
@@ -538,6 +543,12 @@ generics:
     attributes:
       - name: label
         kind: Text
+    relationships:
+      - name: ports
+        peer: DcimPort       # the matching side of device__ports
+        cardinality: many
+        optional: true
+        identifier: device__ports
 
   - name: Port
     namespace: Dcim
@@ -636,10 +647,14 @@ the metadata entry for `name__value` and the load fails:
 DcimSwitch.order_by: attribute 'name' not defined on this schema (entry: 'name__value').
 ```
 
-Note the message names `DcimSwitch`, whose file contains
-no `order_by` at all. The generic's value was copied down
-to it, and `DcimSwitch` declares no `name` either. When
-the named kind has no `order_by`, look at its generics.
+Note the message names an implementer, `DcimSwitch`
+here, whose file contains no `order_by` at all. The
+generic's value was copied down to it, and `DcimSwitch`
+declares no `name` either. Which implementer gets named
+is not fixed: whichever failing schema is validated
+first is the one in the message, so on your load it may
+be a sibling kind. When the named kind has no
+`order_by`, look at its generics.
 `DcimPort` gets away with `name__value` only because it
 declares `name` itself.
 

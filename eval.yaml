@@ -948,6 +948,10 @@ tasks:
          `copper`. Optical ports are always fibre, so I want that to be
          the default on `DcimOpticalPort` and not repeated in every
          object file.
+
+      1b. Every port attaches to exactly one device, and that is true of
+         all ports, so the port-to-device relationship belongs on the
+         `DcimPort` generic. Give it a matching side on `DcimDevice`.
       2. Ports list in name order by default. Devices have no natural
          sort key, but I still want a stable order for them.
       3. An optical port should only ever attach to a switch. Express

@@ -1099,6 +1099,37 @@ def _generic_map(schema: dict) -> dict[str, dict]:
     }
 
 
+def _generics_by_kind(schema: dict) -> dict[str, dict]:
+    return {
+        f"{g.get('namespace', '')}{g.get('name', '')}": g
+        for g in (schema.get("generics") or [])
+        if isinstance(g, dict)
+    }
+
+
+def _all_parents_in_file(schema: dict, entity: dict) -> bool:
+    """True when every generic the entity inherits is declared in this file."""
+    declared = _generics_by_kind(schema)
+    return all(k in declared for k in (entity.get("inherit_from") or []))
+
+
+def _inherited_member_names(schema: dict, entity: dict) -> set[str]:
+    """Attribute and relationship names the entity gets from in-file generics."""
+    generics = _generics_by_kind(schema)
+    names: set[str] = set()
+    for parent_kind in entity.get("inherit_from") or []:
+        parent = generics.get(parent_kind)
+        if not parent:
+            continue
+        for group in ("attributes", "relationships"):
+            names |= {
+                member["name"]
+                for member in (parent.get(group) or [])
+                if isinstance(member, dict) and member.get("name")
+            }
+    return names
+
+
 def check_order_by_resolves_locally(schema: dict, **_: Any) -> tuple[bool, str]:
     """Every order_by entry must resolve against the schema that declares it.
 
@@ -1121,9 +1152,20 @@ def check_order_by_resolves_locally(schema: dict, **_: Any) -> tuple[bool, str]:
             r["name"] for r in (entity.get("relationships") or [])
             if isinstance(r, dict) and r.get("name")
         }
+        targets: dict[str, str] = {}
         for entry in entries:
             if not isinstance(entry, str):
                 continue
+            # "Each target at most once, even with opposite directions" is a
+            # load-time rejection, so the duplicate has to fail here too.
+            target = _strip_order_direction(entry)
+            if target in targets:
+                problems.append(
+                    f"{entity.get('name')}.order_by names {target!r} twice "
+                    f"({targets[target]!r} and {entry!r}); each target may "
+                    "appear at most once, even with opposite directions"
+                )
+            targets[target] = entry
             if entry.startswith("node_metadata__"):
                 field = _strip_order_direction(entry).split("__", 1)[1]
                 if field not in {"created_at", "updated_at"}:
@@ -1134,12 +1176,25 @@ def check_order_by_resolves_locally(schema: dict, **_: Any) -> tuple[bool, str]:
             head = entry.split("__")[0]
             if head in own_attrs or head in own_rels:
                 continue
-            # On a node an inherited field is legitimate; on a generic it is not.
             if section == "generics":
+                # A generic is the source of inheritance, so it has nothing
+                # to inherit the field from.
                 problems.append(
                     f"{entity.get('name')}.order_by {entry!r}: "
                     f"{head!r} is not declared on this generic"
                 )
+                continue
+            # On a node the field may be inherited, so resolve the parents
+            # declared in this file before calling it undeclared. Only a
+            # field that exists nowhere is a defect.
+            if head in _inherited_member_names(schema, entity):
+                continue
+            if entity.get("inherit_from") and not _all_parents_in_file(schema, entity):
+                continue  # inherited from a generic declared elsewhere
+            problems.append(
+                f"{entity.get('name')}.order_by {entry!r}: "
+                f"{head!r} is declared neither here nor on any generic it inherits"
+            )
     if problems:
         return False, "; ".join(problems)
     if seen == 0:
@@ -1263,11 +1318,36 @@ _PAIRING_NOT_EXPRESSIBLE_PATTERNS = [
     re.compile(r"\bschema\s+cannot\b", re.IGNORECASE),
     re.compile(r"\b(?:same|identical|fixed|frozen)\s+peer\b", re.IGNORECASE),
     re.compile(r"\bpeer\b[^.\n]{0,60}\b(?:cannot|can't|may not)\b[^.\n]{0,30}\b(?:narrow|change|override)", re.IGNORECASE),
+    # The substance is "the schema will not carry this rule", however it is
+    # worded. Requiring the token "express" graded vocabulary: "Infrahub
+    # rejects a narrowed peer on an inherited relationship, so the rule has
+    # to live in a check" was scored as not stating the limit.
+    re.compile(
+        r"\b(?:reject|refus|forbid|disallow|prevent|block)\w*\b[^.\n]{0,80}"
+        r"\b(?:narrow\w*|override|overriding|changing|different)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:narrow\w*|override|overrid\w+)\b[^.\n]{0,60}"
+        r"\b(?:inherited|generic)\b[^.\n]{0,60}"
+        r"\b(?:reject|refus|not allowed|not permitted|fails?|error)\w*",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bhas to live\b[^.\n]{0,60}\b(?:in|as)\s+a\s+(?:python\s+)?check",
+        re.IGNORECASE,
+    ),
 ]
 
+# The enforcement home has to be a check or the proposed-change pipeline.
+# A bare "check" matches an `infrahubctl schema check` comment, so the word
+# needs a qualifier that makes it the artifact rather than the verb.
 _PAIRING_ENFORCEMENT_HOME_PATTERNS = [
-    re.compile(r"\bcheck(?:s|_definition|-definition)?\b", re.IGNORECASE),
+    re.compile(r"\bcheck[_-]?definitions?\b", re.IGNORECASE),
+    re.compile(r"\b(?:python|custom|a|the)\s+check\b(?!\s*(?:that\s+)?the\s+schema)", re.IGNORECASE),
+    re.compile(r"\bchecks?\b[^.\n]{0,40}\bproposed[-\s]?change\b", re.IGNORECASE),
     re.compile(r"\bproposed[-\s]?change\b", re.IGNORECASE),
+    re.compile(r"\bInfrahubCheck\b"),
 ]
 
 
