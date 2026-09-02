@@ -1109,8 +1109,11 @@ def check_identifier_unique_per_direction(schema: dict, **_: Any) -> tuple[bool,
     and renaming to a plural in the same change, leaving both declarations
     behind.
     """
+    by_identifier = rels_by_identifier(schema)
+    if not by_identifier:
+        return False, "no relationship declares an identifier, so nothing was checked"
     problems: list[str] = []
-    for identifier, entries in rels_by_identifier(schema).items():
+    for identifier, entries in by_identifier.items():
         per_kind: dict[str, list[tuple[str, str]]] = {}
         for kind, rel in entries:
             direction = str(rel.get("direction") or "bidirectional")
@@ -1128,8 +1131,11 @@ def check_identifier_unique_per_direction(schema: dict, **_: Any) -> tuple[bool,
 
 def check_many_max_count_valid(schema: dict, **_: Any) -> tuple[bool, str]:
     """`max_count: 1` on a cardinality-many relationship is rejected at load."""
+    by_identifier = rels_by_identifier(schema)
+    if not by_identifier:
+        return False, "no relationship declares an identifier, so nothing was checked"
     problems: list[str] = []
-    for _identifier, entries in rels_by_identifier(schema).items():
+    for _identifier, entries in by_identifier.items():
         for kind, rel in entries:
             if rel.get("cardinality") == "many" and rel.get("max_count") == 1:
                 problems.append(

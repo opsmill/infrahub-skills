@@ -159,7 +159,11 @@ NetService: Identifier of relationships must be unique for a given direction >
 ```
 
 Keep one declaration per identifier per direction. A
-widened relationship keeps its original name.
+widened relationship keeps its original name **in that
+change**. Renaming is still possible, just not in the
+same step: drop the old declaration with `state:
+absent`, load, then re-add it under the new name. See
+[relationship-cardinality-consequences.md](./relationship-cardinality-consequences.md).
 
 ### "Cannot query field 'edges' on type 'NestedEdged<Kind>'"
 
@@ -168,8 +172,12 @@ selecting the wrong shape for a relationship's
 cardinality, surfacing as a server error at execution or
 as `Query is not valid, …` at repository import. Caused
 by changing a cardinality without migrating the queries
-that select it. See
-[../../infrahub-common/graphql-queries.md](../../infrahub-common/graphql-queries.md).
+that select it. Removing or retyping any field a stored
+query selects does the same thing.
+[relationship-cardinality-consequences.md](./relationship-cardinality-consequences.md)
+has the procedure for finding every affected query;
+[../../infrahub-common/graphql-queries.md](../../infrahub-common/graphql-queries.md)
+has the two selection shapes.
 
 ### Pre-Validation Checklist
 

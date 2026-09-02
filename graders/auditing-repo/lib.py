@@ -218,22 +218,52 @@ def check_yagni_finding_carves_out_bootstrap(
     return True, "bootstrap/seed/demo carve-out respected"
 
 
-_CARDINALITY_RE = re.compile(r"cardinality\W{0,4}(one|many)\b", re.IGNORECASE)
+# `\s` rather than `\W` so the value may sit on the next line of a YAML
+# snippet, which is where a model that answers in YAML puts it.
+# The character class holds no word characters, so a generous bound cannot
+# bridge "cardinality" to an unrelated "one" -- only to a value separated
+# from it by whitespace and punctuation, such as a wrapped YAML line.
+_CARDINALITY_RE = re.compile(
+    r"""cardinality[\s:=\-'"`]{0,40}(one|many)\b""", re.IGNORECASE
+)
+
+# Fields that carry the recommended fix. A cardinality quoted anywhere else
+# in the finding -- typically in evidence, restating the *existing*
+# declaration the prompt handed over -- is not a recommendation.
+_RECOMMENDATION_FIELDS = (
+    "replacement", "recommendation", "fix", "suggestion", "remediation",
+    "proposed", "action",
+)
+
+
+def _flatten_strings(value: Any) -> list[str]:
+    """Every string reachable inside a finding value, at any depth."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [s for v in value.values() for s in _flatten_strings(v)]
+    if isinstance(value, (list, tuple)):
+        return [s for v in value for s in _flatten_strings(v)]
+    return []
 
 
 def _finding_text(finding: dict) -> str:
-    """Flatten every string value in a finding into one searchable blob.
+    """Flatten every string in a finding into one searchable blob.
 
-    Findings carry their prose under whichever of `replacement`,
-    `description` or `recommendation` the model reached for, so match on the
-    whole record rather than pinning one field name.
+    Recurses into nested dicts and lists: a model answering in YAML puts
+    the fix under `replacement: {yaml: "..."}`, and dropping dict values
+    silently failed those findings.
     """
-    parts: list[str] = []
-    for value in finding.values():
-        if isinstance(value, str):
-            parts.append(value)
-        elif isinstance(value, (list, tuple)):
-            parts.extend(v for v in value if isinstance(v, str))
+    return " ".join(_flatten_strings(finding))
+
+
+def _recommendation_text(finding: dict) -> str:
+    """The finding's recommended fix, or its whole text if it names no field."""
+    parts = [
+        s
+        for field in _RECOMMENDATION_FIELDS
+        for s in _flatten_strings(finding.get(field))
+    ]
     return " ".join(parts)
 
 
@@ -251,10 +281,20 @@ def check_yagni_finding_names_cardinality(
     f = _find(findings, rule)
     if f is None:
         return False, f"{rule} missing — cannot check cardinality"
-    match = _CARDINALITY_RE.search(_finding_text(f))
+    recommendation = _recommendation_text(f)
+    if not recommendation.strip():
+        return False, (
+            f"{rule} carries no recommendation field "
+            f"({', '.join(_RECOMMENDATION_FIELDS)}), so it recommends nothing"
+        )
+    match = _CARDINALITY_RE.search(recommendation)
     if match:
         return True, f"{rule} recommendation names cardinality {match.group(1).lower()}"
-    return False, f"{rule} recommendation does not name a cardinality for the inverse"
+    return False, (
+        f"{rule} recommendation does not name a cardinality for the inverse; "
+        "a cardinality quoted elsewhere in the finding restates the existing "
+        "declaration rather than choosing one"
+    )
 
 
 def check_yagni_finding_file(

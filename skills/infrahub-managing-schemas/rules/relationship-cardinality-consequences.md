@@ -138,12 +138,36 @@ NetService: Relationship 'wavelengths' max_count must be 0 or greater than 1 whe
 Use `cardinality: one` for a genuine cap of one; `many`
 with `max_count: 0` means unbounded.
 
-### It also breaks every existing query
+### Any stored query that selects the field is part of the change
 
-Cardinality selects the GraphQL selection shape, so
+This section owns three cases, not one: **widening a
+cardinality, removing a field, and retyping a field.**
+Every stored query that selects the field is invalidated
+by all three, and nothing in the schema tooling says so.
+
+Cardinality is the least obvious of the three, because
+cardinality selects the GraphQL selection shape, so
 widening one is a **query migration as well as a schema
-migration**. The same applies to removing or retyping any
-field a stored query selects.
+migration**.
+
+#### Nothing fails at the step you made the change in
+
+`schema check` passes. `schema load` passes. The break
+appears one command later, in a subsystem that does not
+mention the field. Which failure you get depends only on
+whether the `.gql` file itself changed:
+
+| The `.gql` file | Where it fails |
+| --------------- | -------------- |
+| unchanged | the stored query stays in place and fails **at execution**, whenever something next runs it |
+| changed, or the repository re-imported from scratch | **at repository import**, because creating the query object validates the text against the live schema: `Query is not valid, …` |
+
+The import-time failure names **the query**, not the
+schema change that invalidated it, so a
+destroy-and-reload cycle can fail twice before the cause
+is found.
+
+#### Find every affected query first
 
 Run this before loading the change, not after:
 
@@ -162,7 +186,9 @@ Run this before loading the change, not after:
    for the command per transform type.
 
 [../../infrahub-common/graphql-queries.md](../../infrahub-common/graphql-queries.md)
-carries the two shapes and the error strings.
+carries the two selection shapes and the
+`NestedEdged<Kind>` / `NestedPaginated<Kind>` error
+strings the server prints.
 
 ### Common mistakes
 
@@ -173,7 +199,8 @@ carries the two shapes and the error strings.
 - Widening the wrong side and concluding the cap is not
   cardinality-related.
 - Renaming to a plural in the same change as the
-  widening.
+  widening. Rename in a separate step instead: `state:
+  absent` on the old declaration, load, then re-add.
 - Loading the schema change without migrating the queries
   that select the relationship.
 

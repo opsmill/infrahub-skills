@@ -995,7 +995,9 @@ tasks:
     expectations:
       - >-
         The Wavelength side is widened to cardinality many, not only the
-        Service side
+        Service side -- and the Service side is left at cardinality one,
+        because widening both lifts the cap but also turns
+        Service.wavelength into a list for nothing
       - >-
         Explains that the inbound cap comes from the peer's own
         declaration on that identifier
@@ -1012,15 +1014,18 @@ tasks:
       - name: shared-side-widened
         check: >-
           The Wavelength side of the identifier is cardinality many, so
-          several services can point at one wavelength
+          several services can point at one wavelength, and the Service
+          side is still cardinality one, so widening did not turn
+          Service.wavelength into a list as well
       - name: relationship-names-unchanged
         check: >-
           Both relationships keep the singular names the input schema
           gave them
       - name: comments-cover-query-migration
         check: >-
-          YAML comments name both selection shapes and the stored-query
-          impact
+          YAML comments contrast the one-side `node { ... }` and many-side
+          `edges { node { ... } }` selection shapes, name the stored-query
+          impact, and name the failure it produces
       - name: identifier-unique-per-direction
         check: >-
           No kind declares two relationships on the same identifier in

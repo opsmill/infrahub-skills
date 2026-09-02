@@ -33,22 +33,46 @@ def _entries(schema: dict) -> list[tuple[str, dict]]:
 
 
 def check_shared_side_widened(schema: dict, **_: Any) -> tuple[bool, str]:
-    """The Wavelength side must be `many`, not only the Service side.
+    """Exactly the Wavelength side must be `many`; the Service side stays `one`.
 
     The cap on how many Services may point at one Wavelength is the
     Wavelength's own declaration on this identifier. Widening
     `Service.wavelength` alone loads cleanly and leaves the cap in place, so
     an answer that only touches the Service side has to fail here.
+
+    Widening *both* sides also lifts the cap, and is the blunt fix: it turns
+    `Service.wavelength` into a list as well, changing that field's query
+    shape for no reason the task asked for. Asserting only the shared side
+    scored the blunt answer identically to the correct one, which made the
+    rule's central point -- which side actually caps -- the one thing the
+    eval could not see.
     """
     owned = [rel for kind, rel in _entries(schema) if kind == SHARED_KIND]
     if not owned:
         return False, f"{SHARED_KIND} declares nothing on identifier {IDENTIFIER!r}"
-    cardinalities = [str(rel.get("cardinality", "<unset>")) for rel in owned]
-    if "many" in cardinalities:
-        return True, f"{SHARED_KIND} side is cardinality many, so the peer can be shared"
-    return False, (
-        f"{SHARED_KIND} side is cardinality {cardinalities}; the inbound cap lives "
-        f"here, so widening only {HOLDER_KIND} does not lift it"
+    shared_cardinalities = [str(rel.get("cardinality", "<unset>")) for rel in owned]
+    if "many" not in shared_cardinalities:
+        return False, (
+            f"{SHARED_KIND} side is cardinality {shared_cardinalities}; the inbound "
+            f"cap lives here, so widening only {HOLDER_KIND} does not lift it"
+        )
+
+    held = [rel for kind, rel in _entries(schema) if kind == HOLDER_KIND]
+    if not held:
+        return False, f"{HOLDER_KIND} declares nothing on identifier {IDENTIFIER!r}"
+    holder_cardinalities = [str(rel.get("cardinality", "<unset>")) for rel in held]
+    # `cardinality` defaults to `many` when unset, so an omitted key on the
+    # holder side is a widening too.
+    if any(c in ("many", "<unset>") for c in holder_cardinalities):
+        return False, (
+            f"{HOLDER_KIND} side is cardinality {holder_cardinalities}; a service "
+            "still has one wavelength, so widening this side too turns "
+            f"{HOLDER_KIND}.wavelength into a list and changes that field's query "
+            "shape for nothing the task asked for"
+        )
+    return True, (
+        f"{SHARED_KIND} side is many and {HOLDER_KIND} side is still one, so the "
+        "cap is lifted on exactly the side that held it"
     )
 
 
@@ -86,15 +110,27 @@ def check_comments_cover_query_migration(
     if not comments.strip():
         return False, "output carries no YAML comments"
     missing = []
-    if "edges" not in comments:
-        missing.append("the many-side selection shape (edges)")
-    if "node" not in comments:
-        missing.append("the one-side selection shape (node)")
+    # The two shapes have to be contrasted, not merely mentioned: a bare
+    # "# node edges query" was passing this check.
+    if not re.search(r"edges\b[^\n]{0,80}\bnode\b|\bnode\b[^\n]{0,80}edges\b", comments):
+        missing.append(
+            "the selection-shape change, as the contrast between the one-side "
+            "`node { ... }` and the many-side `edges { node { ... } }`"
+        )
     if not any(term in comments for term in ("quer", ".gql", "graphql")):
         missing.append("the stored-query impact")
+    # And the failure a reader will actually see, which is the point of
+    # writing the migration down before making it.
+    if not re.search(
+        r"nested\s*edged|nested\s*paginated|not valid|import[- ]?time|error", comments
+    ):
+        missing.append(
+            "the failure it produces (the NestedEdged / NestedPaginated field "
+            "error, or the import-time `Query is not valid` failure)"
+        )
     if missing:
-        return False, "comments do not mention " + ", ".join(missing)
-    return True, "comments name both selection shapes and the stored-query impact"
+        return False, "comments do not mention " + "; ".join(missing)
+    return True, "comments contrast both selection shapes and name the failure"
 
 
 CHECKS = [

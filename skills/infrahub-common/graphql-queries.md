@@ -9,6 +9,8 @@ it to your Python code.
 - [File Format](#file-format)
 - [Query Structure](#query-structure)
 - [Infrahub GraphQL Conventions](#infrahub-graphql-conventions)
+  - [Cardinality Decides the Shape](#cardinality-decides-the-shape)
+  - [Inline Fragments (Generics/Polymorphism)](#inline-fragments-genericspolymorphism)
 - [Response Data Structure](#response-data-structure)
 - [File Organization](#file-organization)
 - [Best Practices](#best-practices)
@@ -263,15 +265,13 @@ what you declared: `parent` is always node-shaped, while
 `children`, `ancestors` and `descendants` are always
 edges-shaped.
 
-#### Changing a cardinality is a query migration
+#### Changing a cardinality changes the shape
 
 Because cardinality selects the shape, **changing a
-relationship's cardinality breaks every existing query
-that selects it.** A repository may have a dozen across
-checks, transforms and generators. The failure is a
-server error, not a validation message, and it names an
-internal wrapper type rather than the relationship or the
-schema change:
+relationship's cardinality invalidates every stored query
+that selects it.** The failure is a server error, not a
+validation message, and it names an internal wrapper type
+rather than the relationship:
 
 ```text
 Cannot query field 'edges' on type 'NestedEdged<Kind>'
@@ -285,46 +285,22 @@ Cannot query field 'node' on type 'NestedPaginated<Kind>'
 
 `NestedEdged<Kind>` and `NestedPaginated<Kind>` appear
 nowhere in your schema, your `.gql` files, or the
-documentation, so a reader who has just widened a
-cardinality has no reason to connect the two. That is the
-whole reason this is worth writing down.
+documentation, which is why the error is hard to connect
+to the schema change that caused it.
 
 A `.gql` file cannot be unit tested, so a query that has
-stopped executing is invisible to an offline suite. Dry-run
-every migrated query instead: see
+stopped executing is invisible to an offline suite.
+Dry-run every migrated query instead: see
 [rules/deployment-gql-dry-run.md](rules/deployment-gql-dry-run.md)
 for the command per transform type.
 
-The procedure for finding and migrating the affected
-queries belongs to the schema change, and lives in
-[../infrahub-managing-schemas/rules/relationship-cardinality-consequences.md](../infrahub-managing-schemas/rules/relationship-cardinality-consequences.md).
-
-### Stored Queries Are Part of a Schema Change's Blast Radius
-
-Cardinality is one trigger. The general statement:
-**every stored query that selects a field is invalidated
-when that field changes or goes away.** Removing an
-attribute or a relationship does it too.
-
-Which failure you get depends only on whether the `.gql`
-file itself changed:
-
-| The `.gql` file | Where it fails |
-| --------------- | -------------- |
-| unchanged | the stored query stays in place and fails **at execution**, whenever something next runs it |
-| changed, or the repository re-imported from scratch | **at repository import**, because creating the query object validates the text against the live schema: `Query is not valid, …` |
-
-The import-time failure names **the query**, not the
-schema change that invalidated it, so a destroy-and-reload
-cycle can fail twice before the cause is found. Nothing
-fails at the step you made the change in: `schema check`
-passes, `schema load` passes, and the break appears one
-command later in a subsystem that does not mention
-attributes.
-
-So removing or retyping a field has a query-side
-precondition. The schema skill owns it:
-[../infrahub-managing-schemas/rules/relationship-cardinality-consequences.md](../infrahub-managing-schemas/rules/relationship-cardinality-consequences.md).
+**Planning or making the schema change is not this
+file's subject.** Which command fails, when, and how to
+find every affected query all belong to the schema
+change, and live in
+[../infrahub-managing-schemas/rules/relationship-cardinality-consequences.md](../infrahub-managing-schemas/rules/relationship-cardinality-consequences.md),
+which owns removing and retyping a field as well as
+widening a cardinality.
 
 ### Inline Fragments (Generics/Polymorphism)
 
