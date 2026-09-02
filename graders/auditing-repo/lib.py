@@ -43,6 +43,7 @@ Usage (in a per-task grader script)::
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -217,6 +218,45 @@ def check_yagni_finding_carves_out_bootstrap(
     return True, "bootstrap/seed/demo carve-out respected"
 
 
+_CARDINALITY_RE = re.compile(r"cardinality\W{0,4}(one|many)\b", re.IGNORECASE)
+
+
+def _finding_text(finding: dict) -> str:
+    """Flatten every string value in a finding into one searchable blob.
+
+    Findings carry their prose under whichever of `replacement`,
+    `description` or `recommendation` the model reached for, so match on the
+    whole record rather than pinning one field name.
+    """
+    parts: list[str] = []
+    for value in finding.values():
+        if isinstance(value, str):
+            parts.append(value)
+        elif isinstance(value, (list, tuple)):
+            parts.extend(v for v in value if isinstance(v, str))
+    return " ".join(parts)
+
+
+def check_yagni_finding_names_cardinality(
+    findings: list[dict], rule: str
+) -> tuple[bool, str]:
+    """Assert the finding's recommended fix names a cardinality.
+
+    Adding an inverse relationship is not shape-neutral. The value chosen
+    decides whether an inbound cap exists and fixes the GraphQL selection
+    shape, so a finding that recommends an inverse without naming a
+    cardinality hands the reader an unflagged decision with write-time
+    consequences.
+    """
+    f = _find(findings, rule)
+    if f is None:
+        return False, f"{rule} missing — cannot check cardinality"
+    match = _CARDINALITY_RE.search(_finding_text(f))
+    if match:
+        return True, f"{rule} recommendation names cardinality {match.group(1).lower()}"
+    return False, f"{rule} recommendation does not name a cardinality for the inverse"
+
+
 def check_yagni_finding_file(
     findings: list[dict], rule: str, substring: str
 ) -> tuple[bool, str]:
@@ -267,6 +307,7 @@ _CHECKS: dict[str, tuple[Any, list[str]]] = {
     "yagni-finding-present": (check_yagni_finding_present, ["str"]),
     "yagni-finding-severity": (check_yagni_finding_severity, ["str", "str"]),
     "yagni-finding-ladder-step": (check_yagni_finding_ladder_step, ["str", "int"]),
+    "yagni-finding-names-cardinality": (check_yagni_finding_names_cardinality, ["str"]),
     "yagni-finding-file": (check_yagni_finding_file, ["str", "str"]),
     "yagni-finding-file-excludes": (check_yagni_no_finding_on_file, ["str"]),
     "yagni-findings-sorted": (check_yagni_findings_sorted_by_ladder, []),

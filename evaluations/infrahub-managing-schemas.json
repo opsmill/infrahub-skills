@@ -476,12 +476,20 @@
       ],
       "assertions": [
         {
-          "name": "shared-peer-widened-on-peer-side",
-          "check": "Not both sides of the identifier are cardinality one, so the peer can be shared"
+          "name": "shared-side-widened",
+          "check": "The Wavelength side of the identifier is cardinality many, so several services can point at one wavelength"
+        },
+        {
+          "name": "relationship-names-unchanged",
+          "check": "Both relationships keep the singular names the input schema gave them"
+        },
+        {
+          "name": "comments-cover-query-migration",
+          "check": "YAML comments name both selection shapes and the stored-query impact"
         },
         {
           "name": "identifier-unique-per-direction",
-          "check": "No kind declares two relationships on the same identifier"
+          "check": "No kind declares two relationships on the same identifier in the same direction"
         },
         {
           "name": "many-max-count-valid",

@@ -4,6 +4,15 @@ GraphQL queries are the data layer for checks, transforms,
 and generators. They fetch data from Infrahub's API and pass
 it to your Python code.
 
+## Contents
+
+- [File Format](#file-format)
+- [Query Structure](#query-structure)
+- [Infrahub GraphQL Conventions](#infrahub-graphql-conventions)
+- [Response Data Structure](#response-data-structure)
+- [File Organization](#file-organization)
+- [Best Practices](#best-practices)
+
 ## File Format
 
 Queries are stored as `.gql` files and registered in
@@ -280,22 +289,15 @@ documentation, so a reader who has just widened a
 cardinality has no reason to connect the two. That is the
 whole reason this is worth writing down.
 
-The procedure:
-
-```bash
-# 1. Before loading the schema change, find every query that selects it
-grep -rn "<relationship_name>" queries/
-
-# 2. Migrate each hit between the two shapes above
-# 3. Dry-run every hit afterwards — see
-#    rules/deployment-gql-dry-run.md for which command per transform type
-```
-
 A `.gql` file cannot be unit tested, so a query that has
-stopped executing is invisible to an offline suite. In
-the reported case a transform was returning nothing at
-all and it was found only because a later task happened
-to dry-run it.
+stopped executing is invisible to an offline suite. Dry-run
+every migrated query instead: see
+[rules/deployment-gql-dry-run.md](rules/deployment-gql-dry-run.md)
+for the command per transform type.
+
+The procedure for finding and migrating the affected
+queries belongs to the schema change, and lives in
+[../infrahub-managing-schemas/rules/relationship-cardinality-consequences.md](../infrahub-managing-schemas/rules/relationship-cardinality-consequences.md).
 
 ### Stored Queries Are Part of a Schema Change's Blast Radius
 
@@ -320,9 +322,9 @@ passes, `schema load` passes, and the break appears one
 command later in a subsystem that does not mention
 attributes.
 
-So before removing or retyping any field, grep `queries/`
-for it. Treat that as an explicit precondition step, not
-as something to remember.
+So removing or retyping a field has a query-side
+precondition. The schema skill owns it:
+[../infrahub-managing-schemas/rules/relationship-cardinality-consequences.md](../infrahub-managing-schemas/rules/relationship-cardinality-consequences.md).
 
 ### Inline Fragments (Generics/Polymorphism)
 

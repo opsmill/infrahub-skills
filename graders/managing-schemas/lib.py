@@ -1064,10 +1064,25 @@ def check_choice_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
 # the inbound cap on a peer comes from that PEER's declaration on the same
 # identifier. Widening only your own side loads cleanly and does not lift the
 # cap. Renaming while widening trips the identifier-uniqueness check.
+#
+# The checks here are schema-shape checks that hold for any schema. Whether a
+# given one-to-one pair is correct or is a cap somebody wanted lifted depends
+# on the fixture's intent, so that assertion lives in the task's grader.
 # ---------------------------------------------------------------------------
 
 
-def _rels_by_identifier(schema: dict) -> dict[str, list[tuple[str, dict]]]:
+def implicit_identifier(kind: str, peer: str) -> str:
+    """Reproduce the identifier Infrahub derives when none is declared.
+
+    A relationship without an explicit ``identifier`` still gets one, built
+    from its kind and peer sorted and lowercased. Deriving it here means the
+    identifier-keyed checks see the same graph whether the schema spells the
+    identifier out or relies on the default.
+    """
+    return "__".join(sorted([kind, peer])).lower()
+
+
+def rels_by_identifier(schema: dict) -> dict[str, list[tuple[str, dict]]]:
     """Map identifier -> [(owning kind, relationship), ...] across the file."""
     out: dict[str, list[tuple[str, dict]]] = {}
     for section in ("generics", "nodes"):
@@ -1076,65 +1091,45 @@ def _rels_by_identifier(schema: dict) -> dict[str, list[tuple[str, dict]]]:
                 continue
             kind = f"{entity.get('namespace', '')}{entity.get('name', '')}"
             for rel in entity.get("relationships") or []:
-                if isinstance(rel, dict) and rel.get("identifier"):
-                    out.setdefault(rel["identifier"], []).append((kind, rel))
+                if not isinstance(rel, dict):
+                    continue
+                identifier = rel.get("identifier") or implicit_identifier(
+                    kind, str(rel.get("peer", ""))
+                )
+                out.setdefault(identifier, []).append((kind, rel))
     return out
 
 
 def check_identifier_unique_per_direction(schema: dict, **_: Any) -> tuple[bool, str]:
-    """One relationship per identifier per kind.
+    """One relationship per identifier per direction on any given kind.
 
-    Two declarations sharing an identifier on the same kind are rejected at
-    load. The usual cause is widening a cardinality and renaming to a plural
-    in the same change, leaving both declarations behind.
+    A kind may declare two relationships on one identifier only when one is
+    `inbound` and the other `outbound` — the self-referential pattern. Any
+    other pair is rejected at load; the usual cause is widening a cardinality
+    and renaming to a plural in the same change, leaving both declarations
+    behind.
     """
     problems: list[str] = []
-    for identifier, entries in _rels_by_identifier(schema).items():
-        per_kind: dict[str, list[str]] = {}
+    for identifier, entries in rels_by_identifier(schema).items():
+        per_kind: dict[str, list[tuple[str, str]]] = {}
         for kind, rel in entries:
-            per_kind.setdefault(kind, []).append(rel.get("name", "?"))
-        for kind, names in per_kind.items():
-            if len(names) > 1:
-                problems.append(f"{kind} declares {names} on identifier {identifier!r}")
+            direction = str(rel.get("direction") or "bidirectional")
+            per_kind.setdefault(kind, []).append((str(rel.get("name", "?")), direction))
+        for kind, decls in per_kind.items():
+            if len(decls) == 1:
+                continue
+            if sorted(d for _name, d in decls) == ["inbound", "outbound"]:
+                continue
+            problems.append(f"{kind} declares {decls} on identifier {identifier!r}")
     if problems:
         return False, "; ".join(problems)
-    return True, "each kind declares at most one relationship per identifier"
-
-
-def check_shared_peer_widened_on_peer_side(schema: dict, **_: Any) -> tuple[bool, str]:
-    """A peer meant to be shared must not be capped by its own side.
-
-    If both ends of an identifier are `cardinality: one`, only one object can
-    ever hold that peer, enforced at write time. To let several objects share
-    it, the PEER's side has to be `many`.
-    """
-    problems: list[str] = []
-    checked = 0
-    for identifier, entries in _rels_by_identifier(schema).items():
-        if len(entries) < 2:
-            continue
-        checked += 1
-        ones = [
-            f"{kind}.{rel.get('name')}"
-            for kind, rel in entries
-            if rel.get("cardinality") == "one"
-        ]
-        if len(ones) == len(entries):
-            problems.append(
-                f"identifier {identifier!r}: both sides are cardinality one "
-                f"({ones}), so at most one object can hold that peer"
-            )
-    if problems:
-        return False, "; ".join(problems)
-    if checked == 0:
-        return False, "no identifier has both sides declared, so no cap is expressible"
-    return True, f"{checked} reciprocal identifier(s) not capped on both sides"
+    return True, "each kind declares at most one relationship per identifier and direction"
 
 
 def check_many_max_count_valid(schema: dict, **_: Any) -> tuple[bool, str]:
     """`max_count: 1` on a cardinality-many relationship is rejected at load."""
     problems: list[str] = []
-    for _identifier, entries in _rels_by_identifier(schema).items():
+    for _identifier, entries in rels_by_identifier(schema).items():
         for kind, rel in entries:
             if rel.get("cardinality") == "many" and rel.get("max_count") == 1:
                 problems.append(
@@ -1149,7 +1144,6 @@ def check_many_max_count_valid(schema: dict, **_: Any) -> tuple[bool, str]:
 CHECKS: dict[str, Any] = {
     "attr-min-length": check_attr_min_length,
     "identifier-unique-per-direction": check_identifier_unique_per_direction,
-    "shared-peer-widened-on-peer-side": check_shared_peer_widened_on_peer_side,
     "many-max-count-valid": check_many_max_count_valid,
     "dropdown-for-status": check_dropdown_for_status,
     "no-deprecated-string": check_no_deprecated_string,
@@ -1194,7 +1188,7 @@ CHECKS: dict[str, Any] = {
 
 
 def run_checks(
-    check_names: list[str],
+    check_names: list[str | tuple[str, Any]],
     output_path: Path,
     raw_text: str | None = None,
 ) -> dict:
@@ -1203,7 +1197,11 @@ def run_checks(
     Parameters
     ----------
     check_names:
-        List of assertion names from the ``CHECKS`` registry.
+        List of assertion names from the ``CHECKS`` registry, or
+        ``(name, function)`` pairs for checks that are specific to one eval
+        task. Task-local checks stay in the task's grader script instead of
+        the shared registry, so a check that encodes one fixture's intent
+        cannot be picked up by another task where it would be wrong.
     output_path:
         Path to the schema YAML file produced by the model.
     raw_text:
@@ -1220,7 +1218,7 @@ def run_checks(
     Raises
     ------
     KeyError
-        If any name in ``check_names`` is not in ``CHECKS``.
+        If any bare name in ``check_names`` is not in ``CHECKS``.
     """
     schema, file_raw = load_output(output_path)
     if raw_text is None:
@@ -1229,8 +1227,12 @@ def run_checks(
     entries: list[dict] = []
     passed_count = 0
 
-    for name in check_names:
-        fn = CHECKS[name]  # raises KeyError for unknown names
+    for entry in check_names:
+        if isinstance(entry, tuple):
+            name, fn = entry
+        else:
+            name = entry
+            fn = CHECKS[name]  # raises KeyError for unknown names
         try:
             ok, msg = fn(schema, raw_text=raw_text)
         except Exception as exc:  # pragma: no cover — defensive

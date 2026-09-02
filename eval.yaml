@@ -1009,13 +1009,22 @@ tasks:
         Notes the cap is enforced at write time and that schema check
         reports the schema valid either way
     assertions:
-      - name: shared-peer-widened-on-peer-side
+      - name: shared-side-widened
         check: >-
-          Not both sides of the identifier are cardinality one, so the
-          peer can be shared
+          The Wavelength side of the identifier is cardinality many, so
+          several services can point at one wavelength
+      - name: relationship-names-unchanged
+        check: >-
+          Both relationships keep the singular names the input schema
+          gave them
+      - name: comments-cover-query-migration
+        check: >-
+          YAML comments name both selection shapes and the stored-query
+          impact
       - name: identifier-unique-per-direction
         check: >-
-          No kind declares two relationships on the same identifier
+          No kind declares two relationships on the same identifier in
+          the same direction
       - name: many-max-count-valid
         check: No cardinality-many relationship carries max_count 1
       - name: schema-version
@@ -4106,18 +4115,27 @@ tasks:
               identifier: device__interfaces
       ```
 
+      Each finding carries `rule`, `severity`, `ladder_step`, `file` and
+      `replacement`.
+
       Save ONLY the JSON findings to: output.json
     graders:
       - type: deterministic
-        run: python graders/auditing-repo/check_yagni_rule.py yagni-missing-inverse-forces-python-filter MEDIUM 3
+        run: python graders/auditing-repo/check_yagni_missing_inverse.py
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-missing-inverse-forces-python-filter
-      finding with severity MEDIUM and ladder_step 3.
+      finding with severity MEDIUM and ladder_step 3, whose replacement
+      names the cardinality for the recommended inverse and says why
+      that value was chosen.
     expectations:
       - Output is JSON with a findings array (or an object with a findings key)
       - Contains a yagni-missing-inverse-forces-python-filter finding
       - That finding has severity MEDIUM and ladder_step 3
+      - >-
+        The recommended inverse names a cardinality and justifies it,
+        because cardinality one on the inverse caps inbound references at
+        write time
       - No yagni finding exceeds MEDIUM severity
     assertions:
       - name: finding-present
@@ -4126,6 +4144,9 @@ tasks:
         check: The yagni-missing-inverse-forces-python-filter finding has severity MEDIUM
       - name: correct-ladder-step
         check: The yagni-missing-inverse-forces-python-filter finding has ladder_step 3
+      - name: names-cardinality
+        check: >-
+          The recommended inverse names a cardinality (one or many)
       - name: severity-cap
         check: No yagni finding exceeds MEDIUM severity
 
