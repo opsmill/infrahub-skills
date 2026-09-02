@@ -1133,25 +1133,47 @@ def check_uniqueness_attr_value_suffix(schema: dict, **_: Any) -> tuple[bool, st
 
     A bare attribute name is rejected at load with "invalid attribute, it
     must end with one of the following properties: value".
+
+    Heads that resolve to neither an attribute nor a relationship are
+    skipped, not failed: a schema file may legitimately constrain a field
+    it inherits from a generic defined in another file, and this grader
+    only ever sees one file.
     """
     problems: list[str] = []
+    skipped: list[str] = []
     for _section, entity in _entities(schema):
         attr_names, rels = _resolved_members(schema, entity)
         for field in _constraint_fields(entity):
             head = field.split("__")[0]
             if head in attr_names and not field.endswith("__value"):
                 problems.append(f"{entity.get('name')}.{field} (attribute needs __value)")
-            if head in rels and "__" in field:
+            elif head in rels and "__" in field:
                 problems.append(
                     f"{entity.get('name')}.{field} (relationship must be bare)"
                 )
-            if head not in attr_names and head not in rels:
-                problems.append(
-                    f"{entity.get('name')}.{field} names no known attribute or relationship"
-                )
+            elif head not in attr_names and head not in rels:
+                skipped.append(f"{entity.get('name')}.{field}")
     if problems:
         return False, "malformed constraint field(s): " + "; ".join(problems)
+    if skipped:
+        return True, (
+            "constraint fields use __value for attributes and bare "
+            f"relationships; unresolved in this file (skipped): {skipped}"
+        )
     return True, "constraint fields use __value for attributes and bare relationships"
+
+
+def _is_ip_namespace_carveout(entity: dict, field: str) -> bool:
+    """True for the one optional relationship Infrahub exempts.
+
+    ``ip_namespace`` on an IP address or IP prefix node may be optional and
+    still appear in a constraint. Every other optional relationship is a
+    load-time rejection.
+    """
+    if field != "ip_namespace":
+        return False
+    inherits = " ".join(str(k) for k in (entity.get("inherit_from") or []))
+    return "IPAddress" in inherits or "IPPrefix" in inherits
 
 
 def check_uniqueness_rel_mandatory(schema: dict, **_: Any) -> tuple[bool, str]:
@@ -1167,13 +1189,13 @@ def check_uniqueness_rel_mandatory(schema: dict, **_: Any) -> tuple[bool, str]:
         for field in _constraint_fields(entity):
             rel = rels.get(field)
             if rel is None:
-                continue  # an attribute path, not a relationship
+                continue  # an attribute path, or inherited from another file
             if rel.get("cardinality") != "one":
                 problems.append(
                     f"{entity.get('name')}.{field} cardinality="
                     f"{rel.get('cardinality')!r}, must be one"
                 )
-            if rel.get("optional") is not False:
+            if rel.get("optional") is not False and not _is_ip_namespace_carveout(entity, field):
                 problems.append(
                     f"{entity.get('name')}.{field} optional="
                     f"{rel.get('optional')!r}, must be false"
@@ -1183,31 +1205,88 @@ def check_uniqueness_rel_mandatory(schema: dict, **_: Any) -> tuple[bool, str]:
     return True, "constrained relationships are cardinality one and mandatory"
 
 
+def _generic_scoped_uniqueness(generic: dict) -> list[str]:
+    """Every key on a generic that produces a generic-scoped constraint.
+
+    ``uniqueness_constraints`` is the obvious one. ``human_friendly_id``
+    and an attribute with ``unique: true`` are compiled into
+    ``uniqueness_constraints`` on the declaring entity at schema load, so
+    they carry exactly the same cross-implementer scope.
+    """
+    reasons: list[str] = []
+    if generic.get("uniqueness_constraints"):
+        reasons.append("uniqueness_constraints")
+    if generic.get("human_friendly_id"):
+        reasons.append("human_friendly_id")
+    unique_attrs = [
+        a.get("name")
+        for a in (generic.get("attributes") or [])
+        if isinstance(a, dict) and a.get("unique") is True
+    ]
+    if unique_attrs:
+        reasons.append(f"unique: true on {unique_attrs}")
+    return reasons
+
+
 def check_uniqueness_not_on_generic(schema: dict, **_: Any) -> tuple[bool, str]:
-    """No generic declares uniqueness_constraints; each concrete kind does.
+    """Every implementer declares its own constraint; the generic declares none.
 
     For a split where the new kinds are allowed to reuse each other's
     values, the constraint has to sit on the concrete kinds. On the generic
     it spans every implementer, and a concrete kind cannot narrow it back.
+
+    Only generics that are actually inherited within this file are
+    inspected, because estate-wide uniqueness on a standalone generic is a
+    legitimate choice. For each such generic, every kind that inherits it
+    must declare its own ``uniqueness_constraints``. One implementer
+    constrained and its sibling left open is the wrong answer, not a
+    partial one.
     """
-    offenders = [
-        entity.get("name")
+    generics_by_kind = {
+        _full_kind(entity): entity
         for section, entity in _entities(schema)
-        if section == "generics" and entity.get("uniqueness_constraints")
-    ]
+        if section == "generics"
+    }
+    nodes = [entity for section, entity in _entities(schema) if section == "nodes"]
+
+    implementers: dict[str, list[dict]] = {}
+    for node in nodes:
+        for parent_kind in node.get("inherit_from") or []:
+            if parent_kind in generics_by_kind:
+                implementers.setdefault(parent_kind, []).append(node)
+
+    if not implementers:
+        return False, "no node in this file inherits from a generic declared here"
+
+    offenders: list[str] = []
+    for parent_kind in implementers:
+        reasons = _generic_scoped_uniqueness(generics_by_kind[parent_kind])
+        if reasons:
+            offenders.append(f"{parent_kind} ({', '.join(reasons)})")
     if offenders:
         return False, (
-            f"generic(s) declare uniqueness_constraints: {offenders}. "
-            "A constraint on a generic spans every implementer"
+            f"generic(s) carry estate-wide uniqueness: {'; '.join(offenders)}. "
+            "Each of these is enforced across every implementer; "
+            "human_friendly_id and unique: true compile into "
+            "uniqueness_constraints on the layer that declares them"
         )
-    concrete = [
-        entity.get("name")
-        for section, entity in _entities(schema)
-        if section == "nodes" and entity.get("uniqueness_constraints")
-    ]
-    if not concrete:
-        return False, "no uniqueness_constraints declared on any concrete kind"
-    return True, f"constraint scoped to concrete kind(s): {concrete}"
+
+    missing: list[str] = []
+    constrained: list[str] = []
+    for parent_kind, kids in implementers.items():
+        for node in kids:
+            label = f"{_full_kind(node)} (inherits {parent_kind})"
+            if node.get("uniqueness_constraints"):
+                constrained.append(_full_kind(node))
+            else:
+                missing.append(label)
+    if missing:
+        return False, (
+            "implementer(s) declare no uniqueness_constraints of their own: "
+            f"{'; '.join(missing)}. Moving the constraint down means every "
+            "implementer gets one"
+        )
+    return True, f"constraint scoped to each concrete kind: {sorted(set(constrained))}"
 
 
 CHECKS: dict[str, Any] = {

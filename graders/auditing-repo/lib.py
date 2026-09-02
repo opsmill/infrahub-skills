@@ -104,6 +104,54 @@ def check_yagni_finding_present(findings: list[dict], rule: str) -> tuple[bool, 
     return False, f"{rule} missing. Saw: {rules_seen}"
 
 
+def check_yagni_finding_absent(findings: list[dict], rule: str) -> tuple[bool, str]:
+    """Assert the named yagni-* rule is NOT emitted.
+
+    The inverse of ``check_yagni_finding_present``, for the carve-outs a
+    rule's "What NOT to flag" list names. Presence-only graders cannot
+    fail an audit that over-reports, so a rule whose scope was narrowed in
+    prose has no test until the negative case is asserted here.
+    """
+    f = _find(findings, rule)
+    if f is None:
+        return True, f"{rule} correctly not emitted"
+    return False, f"{rule} emitted on a carved-out artifact: file={f.get('file')!r}"
+
+
+def check_yagni_replacement_mentions(
+    findings: list[dict], rule: str, substring: str
+) -> tuple[bool, str]:
+    """Assert the named rule's suggested replacement names ``substring``.
+
+    A uniqueness finding has to say which kind the constraint goes on: the
+    layer changes the semantics, so a replacement that names the shared
+    generic is a different (and wider) change than the check performed.
+    """
+    f = _find(findings, rule)
+    if f is None:
+        return False, f"{rule} missing, cannot check replacement"
+    text = str(f.get("replacement", ""))
+    if substring.lower() in text.lower():
+        return True, f"{rule} replacement names {substring!r}"
+    return False, f"{rule} replacement does not name {substring!r}: {text!r}"
+
+
+def check_yagni_replacement_excludes(
+    findings: list[dict], rule: str, substring: str
+) -> tuple[bool, str]:
+    """Assert the named rule's suggested replacement does NOT name ``substring``."""
+    f = _find(findings, rule)
+    if f is None:
+        return False, f"{rule} missing, cannot check replacement"
+    text = str(f.get("replacement", ""))
+    if substring.lower() in text.lower():
+        return False, (
+            f"{rule} replacement names {substring!r}, which would put the "
+            f"constraint on the wrong layer: {text!r}"
+        )
+    return True, f"{rule} replacement avoids {substring!r}"
+
+
 def check_yagni_finding_severity(
     findings: list[dict], rule: str, expected: str
 ) -> tuple[bool, str]:
@@ -265,6 +313,9 @@ def check_yagni_no_finding_on_file(
 
 _CHECKS: dict[str, tuple[Any, list[str]]] = {
     "yagni-finding-present": (check_yagni_finding_present, ["str"]),
+    "yagni-finding-absent": (check_yagni_finding_absent, ["str"]),
+    "yagni-replacement-mentions": (check_yagni_replacement_mentions, ["str", "str"]),
+    "yagni-replacement-excludes": (check_yagni_replacement_excludes, ["str", "str"]),
     "yagni-finding-severity": (check_yagni_finding_severity, ["str", "str"]),
     "yagni-finding-ladder-step": (check_yagni_finding_ladder_step, ["str", "int"]),
     "yagni-finding-file": (check_yagni_finding_file, ["str", "str"]),

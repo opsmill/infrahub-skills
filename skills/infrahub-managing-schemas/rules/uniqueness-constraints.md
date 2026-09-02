@@ -163,7 +163,8 @@ So the effect of declaring your own is:
 
 If one implementer genuinely needs a looser rule, the
 constraint is on the wrong layer: move it down onto
-each concrete kind that wants it.
+each concrete kind that wants it. Check the generic for
+the two keys below before concluding it declares none.
 
 ### What this means for a migration
 
@@ -184,13 +185,35 @@ determines the load order. When both can work, putting
 the constraint on the concrete kinds buys a reversible
 migration.
 
-### `human_friendly_id` has the same scope, and a worse error
+### Two other keys compile into `uniqueness_constraints`
 
-A `human_friendly_id` declared on a generic also
-resolves across every implementer, so an upsert of one
-kind can match an existing object of a sibling kind. It
-is a separate mechanism from `uniqueness_constraints`
-and it fails differently. See
+`uniqueness_constraints` is not the only way to declare
+one. Both of these are folded into the entity's
+`uniqueness_constraints` at schema load, **on the layer
+they are declared on**:
+
+| Key | Becomes |
+| --- | ------- |
+| `human_friendly_id: [parent__name__value, name__value]` | the group `["parent", "name__value"]` (relationship paths collapse to the bare relationship) |
+| an attribute with `unique: true` | the single-field group `["<attr>__value"]` |
+
+So a generic that carries either one has generic-scoped
+uniqueness even with no `uniqueness_constraints:` key in
+the file, and the resulting load error is reported
+against a constraint nobody wrote:
+
+```text
+<Kind>.uniqueness_constraints: cannot use <rel> relationship, relationship must be mandatory.
+```
+
+**Moving a constraint down onto the concrete kinds means
+moving the `human_friendly_id` and any `unique: true`
+down with it.** Leaving either on the generic reinstates
+the cross-kind check you just moved.
+
+`human_friendly_id` on a generic fails with a different
+message than a plain constraint does, and the message is
+misleading. See
 [display-human-friendly-id.md](display-human-friendly-id.md).
 
 ### Example: unique name per rack

@@ -962,16 +962,23 @@ tasks:
         weight: 1.0
     expected_output: >-
       A schema where `uniqueness_constraints: [["parent", "name__value"]]`
-      is declared on EACH concrete kind and NOT on the shared generic,
+      is declared on BOTH concrete kinds and NOT on the shared generic,
       because a constraint on a generic is enforced across every kind that
-      inherits it and a concrete kind cannot narrow it back. The rack
-      relationship must be `cardinality: one` with `optional: false`, since
-      a relationship used in a constraint has to be mandatory. The
-      attribute is referenced as `name__value` and the relationship bare.
+      inherits it and a concrete kind cannot narrow it back. The generic
+      must also carry no `human_friendly_id` and no attribute with
+      `unique: true`: both compile into `uniqueness_constraints` on the
+      layer that declares them, so either one on the generic reinstates
+      the cross-kind check. The rack relationship must be
+      `cardinality: one` with `optional: false`, since a relationship used
+      in a constraint has to be mandatory. The attribute is referenced as
+      `name__value` and the relationship bare.
     expectations:
       - >-
-        The uniqueness constraint is on each concrete kind, not on the
+        The uniqueness constraint is on both concrete kinds, not on the
         shared generic
+      - >-
+        The generic carries no human_friendly_id and no unique: true
+        attribute, since both compile into a generic-scoped constraint
       - >-
         Explains that a constraint on a generic spans every implementer, so
         the two kinds would collide
@@ -983,8 +990,9 @@ tasks:
     assertions:
       - name: uniqueness-not-on-generic
         check: >-
-          No generic declares uniqueness_constraints; each concrete kind
-          declares its own
+          The inherited generic declares no uniqueness_constraints, no
+          human_friendly_id and no unique: true attribute, and every kind
+          inheriting it declares its own uniqueness_constraints
       - name: uniqueness-rel-mandatory
         check: >-
           Every relationship named in a constraint is cardinality one and
@@ -3642,6 +3650,137 @@ tasks:
         check: The yagni-python-validator-vs-schema-constraint finding has severity MEDIUM
       - name: correct-ladder-step
         check: The yagni-python-validator-vs-schema-constraint finding has ladder_step 3
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
+
+  - name: yagni-python-validator-uniqueness-scope
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9 of the audit procedure (YAGNI / Cost-to-Fix). For this
+      evaluation, emit findings as JSON to output.json (not the usual
+      AUDIT_REPORT.md). Shape:
+
+      {"findings": [{"rule": "...", "severity": "MEDIUM|LOW",
+                     "ladder_step": <int>, "file": "...",
+                     "line": "...", "replacement": "..."}]}
+
+      Audit these two artifacts.
+
+      checks/check_switch_name_unique.py:
+      ```python
+      from infrahub_sdk.checks import InfrahubCheck
+
+      class SwitchNameUniqueCheck(InfrahubCheck):
+          query = "switch_query"
+
+          async def validate(self, data):
+              seen = set()
+              for sw in data["DcimSwitch"]["edges"]:
+                  key = (sw["node"]["site"]["node"]["id"],
+                         sw["node"]["name"]["value"])
+                  if key in seen:
+                      self.log_error(message=f"duplicate switch name {key}")
+                  seen.add(key)
+      ```
+
+      checks/check_pdu_rack_unique.py:
+      ```python
+      from infrahub_sdk.checks import InfrahubCheck
+
+      class PduRackUniqueCheck(InfrahubCheck):
+          query = "pdu_query"
+
+          async def validate(self, data):
+              seen = set()
+              for pdu in data["DcimPdu"]["edges"]:
+                  rack = pdu["node"]["rack"]["node"]
+                  if rack is None:
+                      continue
+                  key = (rack["id"], pdu["node"]["name"]["value"])
+                  if key in seen:
+                      self.log_error(message=f"duplicate pdu {key}")
+                  seen.add(key)
+      ```
+
+      The schema (schemas/dcim.yml):
+      ```yaml
+      generics:
+        - name: GenericDevice
+          namespace: Dcim
+          attributes:
+            - name: name
+              kind: Text
+          relationships:
+            - name: site
+              peer: LocSite
+              cardinality: one
+              optional: false
+
+      nodes:
+        - name: Switch
+          namespace: Dcim
+          inherit_from:
+            - DcimGenericDevice
+
+        - name: Router
+          namespace: Dcim
+          inherit_from:
+            - DcimGenericDevice
+
+        - name: Pdu
+          namespace: Dcim
+          attributes:
+            - name: name
+              kind: Text
+          relationships:
+            - name: rack
+              peer: DcimRack
+              cardinality: one
+              optional: true
+      ```
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_uniqueness_scope.py
+        weight: 1.0
+    expected_output: >-
+      JSON with exactly one yagni-python-validator-vs-schema-constraint
+      finding, on checks/check_switch_name_unique.py, severity MEDIUM,
+      ladder_step 3. Its replacement puts
+      `uniqueness_constraints: [["site", "name__value"]]` on the concrete
+      kind DcimSwitch, not on the shared DcimGenericDevice generic: on the
+      generic it would also bar a DcimRouter from reusing a switch name,
+      which the Python check never did. No finding on
+      checks/check_pdu_rack_unique.py, because `rack` is optional and a
+      uniqueness constraint over an optional relationship is rejected at
+      schema load, so there is no cheaper layer to move it to.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - >-
+        The switch check is flagged with severity MEDIUM and ladder_step 3
+      - >-
+        The replacement names the concrete kind DcimSwitch, not the shared
+        DcimGenericDevice generic
+      - >-
+        The PDU check is not flagged, because its rack relationship is
+        optional and the schema rejects that in a constraint
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-python-validator-vs-schema-constraint finding is emitted
+      - name: correct-severity
+        check: The yagni-python-validator-vs-schema-constraint finding has severity MEDIUM
+      - name: correct-ladder-step
+        check: The yagni-python-validator-vs-schema-constraint finding has ladder_step 3
+      - name: flagged-on-switch-check
+        check: The finding is attributed to checks/check_switch_name_unique.py
+      - name: replacement-names-concrete-kind
+        check: The suggested replacement names DcimSwitch
+      - name: replacement-avoids-generic
+        check: The suggested replacement does not put the constraint on DcimGenericDevice
+      - name: optional-rel-carveout
+        check: No finding is emitted on checks/check_pdu_rack_unique.py
       - name: severity-cap
         check: No yagni finding exceeds MEDIUM severity
 

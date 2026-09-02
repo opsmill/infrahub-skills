@@ -78,11 +78,17 @@ human_friendly_id:
 
 ### Scope on a generic: it resolves across every implementer
 
-A `human_friendly_id` declared on a generic resolves
-across **every kind that inherits it**, exactly like
-`uniqueness_constraints`. So an upsert of one kind can
-match an existing object of a *sibling* kind that
-happens to share the same identifying values.
+At schema load the `human_friendly_id` is compiled into
+a `uniqueness_constraints` group on the entity that
+declares it: attribute paths carry over as-is, and a
+relationship path such as `parent__name__value`
+collapses to the bare relationship `parent`.
+
+So a `human_friendly_id` on a generic **is** a
+generic-scoped uniqueness constraint, and it resolves
+across **every kind that inherits it**. An upsert of one
+kind can match an existing object of a *sibling* kind
+that happens to share the same identifying values.
 
 The error does not say so. On a non-default branch it
 reads:
@@ -106,10 +112,12 @@ If two implementers of a generic legitimately share
 identifying values, the `human_friendly_id` belongs on
 each concrete kind rather than on the generic.
 
-Keep it distinct from `uniqueness_constraints`: they are
-two mechanisms with the same scope and different
-failures, and telling them apart from the error text
-alone is hard. See
+That also means moving a `uniqueness_constraints` entry
+off a generic and onto its concrete kinds is only half
+the job: an HFID left behind on the generic puts the
+same cross-kind check straight back, and the load error
+then names a `uniqueness_constraints` entry that does
+not appear in the file. Move both together. See
 [uniqueness-constraints.md](uniqueness-constraints.md).
 
 Pair with `display_label` for UI rendering (supports Jinja2):

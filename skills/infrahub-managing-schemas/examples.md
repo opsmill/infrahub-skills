@@ -337,14 +337,21 @@ generics:
     label: Device
     icon: mdi:server
     include_in_menu: false
+    # Everything below is declared on the GENERIC, so all three are
+    # enforced across every device kind that inherits it, not per kind.
+    # That is deliberate here: one rack slot holds one device, and a
+    # device name is unique across the estate.
     human_friendly_id:
       - name__value
     uniqueness_constraints:
+      # rack_u_position is optional, and an unset value compares as the
+      # literal "NULL", so only one un-racked device may exist. Give
+      # every device a position, or drop it from the constraint.
       - ["rack", "rack_u_position__value"]
     attributes:
       - name: name
         kind: Text
-        unique: true
+        unique: true          # compiles into ["name__value"] on the generic
         order_weight: 1000
       - name: serial
         kind: Text
@@ -605,22 +612,49 @@ are checked *in addition to* the generic's.
 ### On each concrete kind: scoped per kind
 
 Move the constraint down when the implementers are
-allowed to overlap:
+allowed to overlap. `human_friendly_id` moves with it:
+an HFID left on the generic compiles back into a
+generic-scoped constraint and undoes the fix.
 
 ```yaml
+---
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+version: "1.0"
+
 generics:
   - name: Endpoint
     namespace: Net
-    # no uniqueness_constraints here
+    # No uniqueness_constraints, no human_friendly_id, and no
+    # attribute with `unique: true`. All three land on the generic.
+    attributes:
+      - name: name
+        kind: Text
+      - name: media
+        kind: Text
+    relationships:
+      - name: parent
+        peer: LocRack
+        kind: Parent
+        cardinality: one
+        optional: false
+        identifier: rack__endpoints
+
+nodes:
+  - name: Rack
+    namespace: Loc
+    human_friendly_id:
+      - name__value
     attributes:
       - name: name
         kind: Text
 
-nodes:
   - name: OpticalEndpoint
     namespace: Net
     inherit_from:
       - NetEndpoint
+    human_friendly_id:
+      - parent__name__value
+      - name__value
     uniqueness_constraints:
       - ["parent", "name__value"]
 
@@ -628,6 +662,9 @@ nodes:
     namespace: Net
     inherit_from:
       - NetEndpoint
+    human_friendly_id:
+      - parent__name__value
+      - name__value
     uniqueness_constraints:
       - ["parent", "name__value"]
 ```
@@ -648,14 +685,18 @@ concrete kinds buys a reversible migration.
 
 ### The same trap through `human_friendly_id`
 
-The generic above deliberately puts a third attribute
-(`media`) in its `human_friendly_id`, so the two objects
-have *different* human-friendly IDs while sharing the
-constrained pair. Without that separation the two
-mechanisms are easy to confuse, because a generic's
-`human_friendly_id` also resolves across every
-implementer, and it fails with a message about
-rebasing:
+A `human_friendly_id` is compiled into a
+`uniqueness_constraints` group on whatever declares it,
+with relationship paths collapsed to the bare
+relationship. The first generic above therefore carries
+two generic-scoped groups: the one it declares, plus
+`["parent", "name__value", "media__value"]` from its
+HFID. Adding `media` is what keeps them apart, so the
+two objects have *different* human-friendly IDs while
+still colliding on the constrained pair.
+
+Without that separation the HFID fires first, and it
+fails with a message about rebasing:
 
 ```text
 Node <id> / NetOpticalEndpoint uses this human-friendly ID, but does not
