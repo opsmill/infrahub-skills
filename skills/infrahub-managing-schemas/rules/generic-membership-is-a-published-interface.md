@@ -88,8 +88,18 @@ Only the second is a claim a contributor can break, and
 only the second runs in under a second. Neither replaces
 the other, but if you have one, have the offline one.
 
+The test is self-contained: it reads the schema files
+off disk, so it needs no fixture, no plugin and no
+server.
+
 ```python
 # tests/test_generic_membership.py
+from pathlib import Path
+
+import yaml
+
+SCHEMA_DIR = Path(__file__).resolve().parent.parent / "schemas"
+
 EXPECTED_NET_ENDPOINT_IMPLEMENTERS = {
     "NetOpticalEndpoint",
     "NetEthernetEndpoint",
@@ -98,10 +108,17 @@ EXPECTED_NET_ENDPOINT_IMPLEMENTERS = {
 }
 
 
-def test_endpoint_implementers_are_pinned(schema_files):
+def _declared_nodes():
+    """Every node declared across the repository's schema files."""
+    for path in sorted(SCHEMA_DIR.rglob("*.yml")):
+        document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        yield from document.get("nodes") or []
+
+
+def test_endpoint_implementers_are_pinned():
     actual = {
         f"{node['namespace']}{node['name']}"
-        for node in schema_files.nodes
+        for node in _declared_nodes()
         if "NetEndpoint" in (node.get("inherit_from") or [])
     }
     added = actual - EXPECTED_NET_ENDPOINT_IMPLEMENTERS

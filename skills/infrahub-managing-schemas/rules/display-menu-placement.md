@@ -107,7 +107,11 @@ nodes:
     menu_placement: DcimGenericPatchPanelInterface
 ```
 
-Common menu-placement targets in production:
+Common menu-placement targets in production. **None of
+these is a platform kind**: each comes from a
+marketplace-published schema, so confirm the parent
+exists on your instance before naming it, per
+[reuse-verify-kind-availability.md](./reuse-verify-kind-availability.md).
 
 | Parent kind | Typical children |
 | ----------- | ---------------- |

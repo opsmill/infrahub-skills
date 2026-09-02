@@ -54,10 +54,17 @@ BuiltinTag          (node)
 ```
 
 **There is no location kind in the platform core.** The
-commonly referenced location generic is published on the
-marketplace, not shipped by the platform. It is the most
-likely kind to be mistaken for core, because almost
-every example schema uses one.
+commonly referenced location generic, `LocationGeneric`,
+is published on the marketplace, not shipped by the
+platform. It is the most likely kind to be mistaken for
+core, because almost every example schema uses one --
+including [hierarchy-setup.md](./hierarchy-setup.md) and
+[display-menu-placement.md](./display-menu-placement.md)
+in this skill, both of which now say so at the point of
+use. `IpamVLAN` and `IpamPrefix` are the same story: the
+Builtin IPAM primitives are `BuiltinIPAddress`,
+`BuiltinIPNamespace` and `BuiltinIPPrefix`, and nothing
+else.
 
 ### Check before you depend on it
 
@@ -102,22 +109,37 @@ That is fine, and often the right answer. It is a
    clean deploy loads them before your own schema.
 3. Load them **before** the schema that inherits from
    them. Order matters: the peer has to exist first.
-4. Record the identifier, the version, **and the kinds
-   you took**, in one comment next to the shape that uses
-   them. A provenance note that names the command but not
-   the kinds vouches for nothing in particular. See
-   [reuse-evaluate-per-generic.md](reuse-evaluate-per-generic.md).
+4. Record the provenance in one comment next to the
+   shape that uses it, in the format
+   [reuse-evaluate-per-generic.md](reuse-evaluate-per-generic.md)
+   defines. That file owns the format; this rule does not
+   define a shorter one. A note that names the command
+   but not the kinds vouches for nothing in particular.
+
+   The command above takes the latest published version,
+   so if you did not pass `-v`, record the date instead
+   of inventing a version number:
 
 ```yaml
 # Sourced from the marketplace:
 #   infrahubctl marketplace get infrahub/location -v 1.4.0
 # Provides: LocationGeneric, LocationSite.
+# Excluded: nothing, the whole file was taken.
 # Committed under schemas/vendor/ and loaded before this file.
 ```
 
 See
 [../../infrahub-common/marketplace-reference.md](../../infrahub-common/marketplace-reference.md)
 for discovery and fetching.
+
+### Where the provenance template lives
+
+[reuse-evaluate-per-generic.md](./reuse-evaluate-per-generic.md)
+owns the provenance comment format, including the
+exclusion rationale a partial adoption needs. This rule
+requires the same header; it does not define a second,
+shorter one. If you took only part of a file, write the
+full form there.
 
 ### Reading examples correctly
 

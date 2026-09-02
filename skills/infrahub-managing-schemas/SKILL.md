@@ -59,6 +59,8 @@ use the first argument as the namespace and remaining arguments as node names.
 | MEDIUM | Migration | `migration-` | Add/remove attributes, state: absent |
 | MEDIUM | File Formatting | `format-` | Canonical key order; `infrahubctl schema format` (offline) |
 | HIGH | Validation | `validation-` | Load-time string-length caps (description / label / identifier), common error messages, pre-check checklist |
+| HIGH | Reuse | `reuse-` | Check the marketplace before modelling; verify a kind exists before referencing it; adopt per generic, not per file |
+| HIGH | Generic Membership | `generic-` | A generic's implementer set is an interface: joining one changes every query, constraint and consumer over it |
 
 ## Schema File Basics
 

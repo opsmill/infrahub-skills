@@ -46,6 +46,13 @@ generics:
 
 ### Step 2: Nodes with parent and children
 
+> `LocationGeneric` is not a platform kind. It is
+> defined by the schema-library location schema,
+> published on the marketplace. Verify it exists on
+> your instance before referencing it, per
+> [reuse-verify-kind-availability.md](./reuse-verify-kind-availability.md),
+> or define your own generic instead.
+
 ```yaml
 nodes:
   - name: Region

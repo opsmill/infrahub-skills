@@ -128,5 +128,11 @@ worth re-opening; one based on a failed load is not.
 - Taking a subset when the whole file would have been
   nearly free, losing the update path for nothing.
 
+This is the one provenance format. [reuse-verify-kind-availability.md](./reuse-verify-kind-availability.md)
+points here rather than defining a shorter one, so a
+whole-file adoption and a partial adoption record the
+same fields; a whole-file adoption simply has nothing to
+put under "excluded".
+
 Reference:
 [../../infrahub-common/marketplace-reference.md](../../infrahub-common/marketplace-reference.md)

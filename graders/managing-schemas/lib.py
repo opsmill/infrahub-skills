@@ -18,7 +18,10 @@ Usage (in a per-task grader script)::
 
 from __future__ import annotations
 
+import ast
+import io
 import re
+import tokenize
 from pathlib import Path
 from typing import Any
 
@@ -1128,8 +1131,17 @@ _PLATFORM_NAMESPACES = ("Builtin", "Core", "Internal", "Ipam", "Lineage")
 # concrete kind, so they are real exactly when that kind is.
 _DERIVED_PREFIXES = ("Profile", "Template")
 
+# A version pin, a commit pin, or -- for the documented default
+# invocation, which fetches "latest published" -- the word "latest" next to
+# a date, which is what a reader actually needs in order to tell later
+# whether the local copy has drifted.
 _PROVENANCE_VERSION_RE = re.compile(
-    r"(?:-v|--version)\s+v?\d+\.\d+|version[\s:=]+v?\d+\.\d+", re.IGNORECASE
+    r"(?:-v|--version)\s+v?\d+\.\d+"
+    r"|version[\s:=]+v?\d+\.\d+"
+    r"|\b(?:commit|sha|rev)[\s:=]+[0-9a-f]{7,40}\b"
+    r"|\blatest\b[^\n]{0,40}\d{4}-\d{2}-\d{2}"
+    r"|\d{4}-\d{2}-\d{2}[^\n]{0,40}\blatest\b",
+    re.IGNORECASE,
 )
 
 
@@ -1156,11 +1168,18 @@ def _referenced_external_kinds(schema: dict) -> set[str]:
 
 
 def _comment_runs(raw_text: str) -> list[str]:
-    """Maximal runs of consecutive comment lines, each joined into one string."""
+    """Maximal runs of consecutive comment lines, each joined into one string.
+
+    A `#`-only line ends a run. Without that, a file header separated into
+    paragraphs by bare `#` lines is one block, and per-block provenance
+    scoping is per-file scoping again: one `marketplace get` line vouches
+    for every kind named anywhere in the header.
+    """
     runs: list[str] = []
     current: list[str] = []
     for line in raw_text.splitlines():
-        if line.lstrip().startswith("#"):
+        stripped = line.strip()
+        if stripped.startswith("#") and stripped.lstrip("#").strip():
             current.append(line)
         elif current:
             runs.append("\n".join(current))
@@ -1240,8 +1259,10 @@ def check_records_marketplace_provenance(
         return False, "provenance records no `<namespace>/<name>` marketplace identifier"
     if not any(_PROVENANCE_VERSION_RE.search(block) for block in blocks):
         return False, (
-            "provenance names no version; record `-v <version>` or the fetched "
-            "version in the same comment"
+            "provenance names no version; record `-v <version>`, a commit pin, "
+            "or -- if you took the default `marketplace get <ns>/<name>`, which "
+            "fetches the latest published version -- `latest at <YYYY-MM-DD>` "
+            "in the same comment"
         )
     return True, "provenance records the marketplace identifier and a version"
 
@@ -1259,21 +1280,47 @@ def check_corrects_builtin_core_premise(
     if not comments:
         return False, "file records no comments, so it corrects nothing"
 
-    missing = sorted(k for k in _BUILTIN_KINDS if k not in comments)
-    if missing:
-        return False, (
-            f"comments do not name the full Builtin namespace; missing {missing}"
-        )
-    denial = re.search(
-        r"\bnot\b[^\n]{0,80}\b(core|built[\s-]?in|platform|shipped)\b"
-        r"|\bno\b[^\n]{0,80}\blocation\b[^\n]{0,40}\b(kind|core|generic)\b",
+    # What Builtin holds, stated either by naming the kinds or by describing
+    # the set. Requiring all four literal names graded transcription: "the
+    # Builtin namespace ships only the tag kind and the three IPAM
+    # primitives" is correct and complete and was failing, while a list of
+    # the four names plus a false claim was passing.
+    named = [k for k in _BUILTIN_KINDS if k in comments]
+    described = re.search(
+        r"\bbuiltin\b[^\n]{0,120}\b(?:tag|ipam|ip address|ip prefix|ip namespace)\b",
         comments,
         re.IGNORECASE,
     )
-    if not denial:
+    if len(named) < len(_BUILTIN_KINDS) and not described:
         return False, (
-            "comments name the Builtin kinds but never say the reused kind is "
-            "not platform core"
+            "comments do not say what the Builtin namespace holds; name the "
+            f"kinds ({sorted(_BUILTIN_KINDS)}) or describe the set"
+        )
+
+    # And the claim under test: the *reused* kind is not one of them. A
+    # denial whose subject is a Builtin kind is the opposite claim --
+    # "BuiltinTag is not core" is false, and asserting it should not earn
+    # the check the way a token list did.
+    denial_re = re.compile(
+        r"\bnot\b[^\n]{0,80}\b(?:core|built[\s-]?in|platform|shipped)\b"
+        r"|\b(?:no|not a)\b[^\n]{0,80}\blocation\b[^\n]{0,40}\b(?:kind|core|generic)\b"
+        r"|\bships no\b[^\n]{0,60}\blocation\b",
+        re.IGNORECASE,
+    )
+    denial = None
+    for sentence in re.split(r"(?<=[.;])\s+|\n", comments):
+        hit = denial_re.search(sentence)
+        if not hit:
+            continue
+        if any(kind in sentence for kind in _BUILTIN_KINDS):
+            continue  # a Builtin kind *is* core; this denies the wrong thing
+        denial = hit
+        break
+    if denial is None:
+        return False, (
+            "comments say what Builtin holds but never say the reused kind is "
+            "not platform core (a denial naming a Builtin kind does not count: "
+            "those are core)"
         )
     return True, "comments state what Builtin ships and that the reused kind is not core"
 
@@ -1323,6 +1370,66 @@ def check_records_subset_rationale(
     return True, "provenance records what was taken and what was excluded"
 
 
+def _python_code_only(src: str) -> str:
+    """``src`` with comments and docstrings removed.
+
+    Keyword matching over raw source counts a `# TODO: read inherit_from
+    properly; report added / removed kinds` comment as an implementation of
+    exactly what it says is missing. Other string literals are kept, because
+    `n.get("inherit_from")` is how the test does the reading.
+    """
+    try:
+        tokens = [
+            t for t in tokenize.generate_tokens(io.StringIO(src).readline)
+            if t.type != tokenize.COMMENT
+        ]
+        without_comments = tokenize.untokenize(tokens)
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        without_comments = re.sub(r"#[^\n]*", "", src)
+    try:
+        tree = ast.parse(without_comments)
+    except SyntaxError:
+        return without_comments
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if not isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
+                                 ast.AsyncFunctionDef)) or not body:
+            continue
+        first = body[0]
+        if (isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant)
+                and isinstance(first.value.value, str)):
+            first.value.value = ""
+    return ast.unparse(tree)
+
+
+def _pinned_kind_sets(src: str) -> list[tuple[str, set[str]]]:
+    """Assigned literal collections of kind-looking strings, by target name."""
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return []
+    out: list[tuple[str, set[str]]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        value = node.value
+        if isinstance(value, ast.Call) and value.args:
+            value = value.args[0]  # set([...]) / frozenset([...])
+        if not isinstance(value, (ast.Set, ast.List, ast.Tuple)):
+            continue
+        items = {
+            e.value for e in value.elts
+            if isinstance(e, ast.Constant) and isinstance(e.value, str)
+        }
+        if not items or not all(re.fullmatch(r"[A-Z][A-Za-z0-9]+", i) for i in items):
+            continue
+        targets = [node.target] if isinstance(node, ast.AnnAssign) else node.targets
+        for target in targets:
+            if isinstance(target, ast.Name):
+                out.append((target.id, items))
+    return out
+
+
 def check_generic_implementer_set_pinned(
     schema: dict, *, sources: dict[str, str] | None = None, **_: Any
 ) -> tuple[bool, str]:
@@ -1331,27 +1438,67 @@ def check_generic_implementer_set_pinned(
     An assertion against a loaded graph proves what the platform returns; an
     assertion over the schema YAML proves what the schema declares, and only
     that one runs fast enough to block a pull request.
+
+    The pinned set is compared against the implementers the schema actually
+    declares. Without that link the check was keyword matching: a stub whose
+    only mention of `inherit_from`, `added` and `removed` was inside a
+    `# TODO` comment scored full marks.
     """
     test_src = (sources or {}).get("py", "")
-    if not test_src:
+    if not test_src.strip():
         return False, "no Python test produced"
-    if re.search(r"InfrahubClient|infrahub_sdk|\.execute_graphql\(|await client", test_src):
+    code = _python_code_only(test_src)
+    if re.search(r"InfrahubClient|infrahub_sdk|\.execute_graphql\(|await client", code):
         return False, (
             "the test reaches a live instance; pin the set over the schema YAML "
             "so the gate runs offline"
         )
-    if not re.search(r"inherit_from", test_src):
+    if not re.search(r"inherit_from", code):
         return False, "the test never reads `inherit_from`, so it pins nothing"
-    if not re.search(r"^[A-Z_]*(EXPECTED|IMPLEMENTERS)[A-Z_]*\s*[:=]", test_src, re.M):
-        return False, "the test declares no pinned expected implementer set"
-    if not re.search(r"assert\b", test_src):
+    if not re.search(r"\bassert\b", code):
         return False, "the test asserts nothing"
-    if not (re.search(r"\badded\b", test_src, re.I) and re.search(r"\bremoved\b", test_src, re.I)):
+    if not (re.search(r"\badded\b", code, re.I) and re.search(r"\bremoved\b", code, re.I)):
         return False, (
             "the failure path does not report what was added and removed, so the "
             "fix is not mechanical"
         )
-    return True, "the test pins the implementer set offline and reports added/removed"
+
+    declared = _implementers_by_generic(schema)
+    if not declared:
+        return False, "the schema declares no generic with implementers to pin"
+    pinned = _pinned_kind_sets(test_src)
+    if not pinned:
+        return False, "the test declares no pinned expected implementer set"
+    for _name, items in pinned:
+        for generic, kinds in declared.items():
+            if items == kinds:
+                return True, (
+                    f"the test pins {sorted(kinds)} for {generic}, matching the "
+                    "schema, offline, and reports added/removed"
+                )
+    return False, (
+        f"the pinned set(s) {[sorted(i) for _n, i in pinned]} match no generic's "
+        f"implementers in the schema {({g: sorted(k) for g, k in declared.items()})}; "
+        "the pin has to be of what the schema declares"
+    )
+
+
+def _implementers_by_generic(schema: dict) -> dict[str, set[str]]:
+    """Generics declared in this file, mapped to the kinds that inherit them."""
+    generics = {
+        f"{g.get('namespace', '')}{g.get('name', '')}"
+        for _s, g in _entities(schema)
+        if _s == "generics"
+    }
+    out: dict[str, set[str]] = {}
+    for section, entity in _entities(schema):
+        if section != "nodes":
+            continue
+        kind = f"{entity.get('namespace', '')}{entity.get('name', '')}"
+        for parent in entity.get("inherit_from") or []:
+            if parent in generics:
+                out.setdefault(parent, set()).add(kind)
+    return out
 
 
 def check_generic_membership_consumers_noted(
@@ -1365,17 +1512,35 @@ def check_generic_membership_consumers_noted(
     comments = "\n".join(_comment_runs(raw_text))
     if not comments:
         return False, "file records no comments about the membership change"
+    # The prompt hands the model "`infrahubctl schema check` passes either
+    # way", so the words in it cannot be what earns the check.
+    prompt_echo = re.compile(
+        r"infrahubctl\s+schema\s+check|schema\s+check\s+passes", re.IGNORECASE
+    )
+    scored = prompt_echo.sub(" ", comments)
     hits = sorted(
         {
             term
             for term, pattern in (
-                ("queries", r"quer(y|ies)"),
+                ("queries", r"\bquer(?:y|ies)\b"),
                 ("constraints", r"uniqueness_constraints|human_friendly_id|constraint"),
-                ("consumers", r"consumer|generator|transform|check\b|iterat|sum(s|med|ming)?\b"),
+                (
+                    "consumers",
+                    r"\bconsumer|\bgenerator|\btransform|check[_\s-]?definition"
+                    r"|\biterat|\bsums?\b|\bsummed\b|\bsumming\b|\breport\b",
+                ),
             )
-            if re.search(pattern, comments, re.IGNORECASE)
+            if re.search(pattern, scored, re.IGNORECASE)
         }
     )
+    # And the comments have to be about the generic that gained the
+    # implementer, not consumer nouns floating anywhere in the file.
+    declared = _implementers_by_generic(schema)
+    if declared and not any(generic in scored for generic in declared):
+        return False, (
+            "comments never name the generic that gained an implementer "
+            f"({sorted(declared)}), so they record no decision about it"
+        )
     if len(hits) < 2:
         return False, (
             "comments name fewer than two consumer classes affected by the new "
