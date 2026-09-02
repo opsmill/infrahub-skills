@@ -432,11 +432,33 @@ def test_dry_run_executes_query_fails_without_live_command():
     assert not ok
 
 
-def test_dry_run_executes_query_accepts_check_run():
+def test_dry_run_executes_query_accepts_a_check_by_name():
     ok, _ = _mod.CHECKS["dry-run-executes-query"](
-        md_text="Run `infrahubctl check run rack_collision` before merging."
+        md_text="Run `infrahubctl check rack_collision` before merging."
     )
     assert ok
+
+
+def test_dry_run_executes_query_accepts_a_python_transform():
+    ok, _ = _mod.CHECKS["dry-run-executes-query"](
+        md_text="Run `infrahubctl transform spine_config device=spine1` first."
+    )
+    assert ok
+
+
+def test_dry_run_executes_query_accepts_a_generator():
+    ok, _ = _mod.CHECKS["dry-run-executes-query"](
+        md_text="Run `infrahubctl generator create_dc site=hq` before merging."
+    )
+    assert ok
+
+
+def test_dry_run_executes_query_rejects_the_invented_run_subcommand():
+    """The invented `run` subcommand: rewarding it undoes the rule."""
+    ok, _ = _mod.CHECKS["dry-run-executes-query"](
+        md_text="Run `infrahubctl check run` before merging."  # cli-check: ignore
+    )
+    assert not ok
 
 
 def test_dry_run_before_merge_passes_on_good():

@@ -123,25 +123,37 @@ not prove write authorisation.** Every read succeeds
 and every write fails, which reads as an intermittent
 server problem rather than a configuration problem.
 
-#### Probe writes before you write
+#### Step 2: Probe a write before you write
 
 Listing branches is a read, so it proves nothing about
 write access. Create and delete a throwaway branch
 instead:
 
 ```bash
-infrahubctl branch create preflight-write-probe --description "write probe" \
-  && infrahubctl branch delete preflight-write-probe
+infrahubctl branch create preflight-probe-a1 --description "write probe" \
+  && infrahubctl branch delete preflight-probe-a1
 ```
 
-Use a fixed name, not `$$` or any other per-shell
-value: the delete has to name the branch the create
-made, and each command may run in its own shell. Chain
-the two with `&&` so a failed create does not leave a
-delete swinging at a branch that was never created.
+Two things about the name. It has to be **fixed within
+the run**, not `$$` or any other per-shell value: the
+delete has to name the branch the create made, and each
+command may run in its own shell. And it has to be
+**different between runs**: pick a fresh suffix each
+time you write the pair. A name reused across runs
+fails the create on branch-already-exists if an earlier
+run died between the create and the delete, and two
+agents or two CI jobs probing at once will delete each
+other's branch.
 
-If the first command fails on authentication, stop
-there and fix credentials.
+Chain the two with `&&` so a failed create does not
+leave a delete swinging at a branch that was never
+created.
+
+If the create fails on authentication, stop there and
+fix credentials. If it fails on the branch already
+existing, that is a leftover probe, not a credentials
+problem: delete it by name and rerun with a new
+suffix.
 
 #### The failure often surfaces one command later
 
@@ -160,15 +172,21 @@ cause. A reader who scans to the bottom of the output
 goes looking at branches. When a command fails, read
 the *first* error in the run, not the last.
 
-#### Step 2: Check environment variables
+#### Step 3: Check environment variables
 
 ```bash
 # Server address (defaults to localhost:8000)
-echo $INFRAHUB_ADDRESS
+echo "$INFRAHUB_ADDRESS"
 
-# API token for authentication
-echo $INFRAHUB_API_TOKEN
+# API token: report whether it is set, never what it is
+echo "INFRAHUB_API_TOKEN ${INFRAHUB_API_TOKEN:+is set}${INFRAHUB_API_TOKEN:-is NOT set}"
 ```
+
+Never `echo` the token itself. Its value lands in the
+terminal, the shell history and, when this check gets
+automated, the CI job log, which is retained. `${VAR:+…}`
+answers the only question you have, which is whether the
+variable is exported.
 
 Set them if missing:
 
@@ -177,7 +195,7 @@ export INFRAHUB_ADDRESS="http://localhost:8000"
 export INFRAHUB_API_TOKEN="your-api-token"
 ```
 
-#### Step 3: Troubleshoot connection failures
+#### Step 4: Troubleshoot connection failures
 
 1. **Is the server running?** Check with `docker ps`
    or the relevant process manager
@@ -193,7 +211,11 @@ export INFRAHUB_API_TOKEN="your-api-token"
 - Run `infrahubctl info` as the first step of any
   server-dependent workflow — it's the cheapest
   signal that the rest of the run has a chance of
-  succeeding
+  succeeding. It is not the last step: a green `info`
+  with no token set is indistinguishable from a green
+  `info` with a valid one, so before anything that
+  writes, run the branch create/delete probe from
+  Step 2 as well
 - For offline work (no server available), limit to
   local validation:
   - YAML linting and structure checks
@@ -207,8 +229,13 @@ export INFRAHUB_API_TOKEN="your-api-token"
   confirm both are actually exported before a write:
 
   ```bash
-  echo "${INFRAHUB_ADDRESS:?not set}" "${INFRAHUB_API_TOKEN:?not set}"
+  : "${INFRAHUB_ADDRESS:?not set}" "${INFRAHUB_API_TOKEN:?not set}"
   ```
+
+  `:` is the no-op command, so the `:?` expansions abort
+  with a named error if either variable is unset and
+  print nothing if both are set. Do not `echo` that same
+  line: it would put the token in the log of every run.
 
   The SDK reads both from the environment by the same
   mechanism, and reads neither from a `.env` file on

@@ -46,10 +46,13 @@ absence never blocks a report.
 Friction shows up in a transcript as:
 
 - a verifier that failed and later passed on the same
-  target: `schema format --check` (offline), `schema check`
-  or `schema load` (needs a server), `object validate` or
-  `object load`, `check <name>`, `transform <name>`, or a
-  `pytest` run of a check's or transform's tests
+  target. The list is
+  [rules/evidence-detection-ladder.md](./rules/evidence-detection-ladder.md)
+  Probe A, not restated here: `infrahubctl schema format
+  --check`, `schema check`, `schema load`, `object
+  validate`, `object load`, `check <name>`, `transform
+  <name>`, `render <name>`, `generator <name>
+  <param>=<id>`, or a `pytest` run
 - `tool_result` blocks carrying `is_error`, two or more
   on the same tool and target
 - three or more edits to one artifact inside a single

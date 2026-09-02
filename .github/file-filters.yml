@@ -27,7 +27,19 @@ skills_all: &skills_all
 
 cli_invocations_all:
   - "skills/**/*.md"
+  - "graders/**"
+  - "tests/**"
+  - "dev/guides/**"
+  - "dev/knowledges/**"
+  - "dev/commands/**"
+  - "eval.yaml"
   - "scripts/check-cli-invocations.py"
+
+pytest_all: &pytest_all
+  - "graders/**"
+  - "tests/**"
+  - "pyproject.toml"
+  - "uv.lock"
 
 documentation_all:
   - *doc_files

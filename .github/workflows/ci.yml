@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       markdown: ${{ steps.changes.outputs.markdown_all }}
+      pytest: ${{ steps.changes.outputs.pytest_all }}
       yaml: ${{ steps.changes.outputs.yaml_all }}
       skills: ${{ steps.changes.outputs.skills_all }}
       cli: ${{ steps.changes.outputs.cli_invocations_all }}
@@ -53,7 +54,19 @@ jobs:
       - run: yamllint -c .yamllint.yml .
 
   # ---------------------------------------------------------------------------
-  # Verify every infrahubctl command printed in skills/ exists
+  # Run the grader unit tests
+  # ---------------------------------------------------------------------------
+  pytest:
+    needs: files-changed
+    if: needs.files-changed.outputs.pytest == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run pytest tests -q
+
+  # ---------------------------------------------------------------------------
+  # Verify every infrahubctl command printed in the repo exists
   # ---------------------------------------------------------------------------
   cli-invocations:
     needs: files-changed

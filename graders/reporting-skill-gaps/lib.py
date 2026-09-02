@@ -752,12 +752,20 @@ def check_no_docs_gap_when_unsettled(text: str, **_: object) -> CheckResult:
 # `infrahubctl` invocations because a redacted report often paraphrases the
 # command rather than pasting it, and paraphrasing is what
 # evidence-no-customer-data.md asks for.
+# The forms mirror rules/evidence-detection-ladder.md's Probe A list. A
+# check, transform, generator or render takes its target as a positional
+# argument; there is no `run` subcommand, and matching one here rewarded the
+# invented form that skills/infrahub-common/rules/deployment-gql-dry-run.md
+# exists to remove.
 _VERIFIER_CMD_RE = re.compile(
-    r"infrahubctl\s+(?:schema\s+(?:load|validate|check)|object\s+load"
-    r"|check\s+run|transform\s+run|generator\s+run)"
+    r"infrahubctl\s+(?:schema\s+(?:load|check|format)|object\s+(?:load|validate)"
+    r"|(?:check|transform|render|generator)\s+"
+    r"(?!(?:run|list|get|create|delete|load|dump|check|validate|execute"
+    r"|show|new|add|export|import)\b)[a-z0-9][\w.-]*)"
     r"|\bpytest\b"
-    r"|\bschema\s+(?:load|validate)\b"
-    r"|\bobject\s+load\b",
+    r"|\bschema\s+(?:load|check|format)\b"
+    r"|\bobject\s+(?:load|validate)\b"
+    r"|\b(?:check|transform|render|generator)\s+<name>",
     re.IGNORECASE,
 )
 

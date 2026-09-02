@@ -19,8 +19,10 @@ Look for a red-to-green transition on the same target:
 `infrahubctl schema format --check` (offline),
 `infrahubctl schema check` or `infrahubctl schema load` (needs a server),
 `infrahubctl object validate` or `infrahubctl object load`,
-`infrahubctl check <name>`, `infrahubctl transform <name>`, or a `pytest`
-run of a check's or transform's tests. Something that failed and later passed is the
+`infrahubctl check <name>`, `infrahubctl transform <name>` (a
+`python_transforms` entry), `infrahubctl render <name>` (a
+`jinja2_transforms` entry), `infrahubctl generator <name> <param>=<id>`,
+or a `pytest` run of a check's or transform's tests. Something that failed and later passed is the
 strongest evidence available, because no self-assessment produced it. The
 failing output names the topic; the passing version names the fix.
 

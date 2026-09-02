@@ -330,11 +330,24 @@ def check_polls_coreartifact_after_post(
 # ---------------------------------------------------------------------------
 
 # The plan must dry-run the changed query by *executing* it against a live
-# schema — `infrahubctl render` for a transform, or running the check /
-# generator that owns the query — not rely on static `schema check` alone.
+# schema, not rely on static `schema check` alone. Which command depends on
+# what owns the query: `render` for a jinja2_transforms entry, `transform`
+# for a python_transforms entry, or the check / generator itself. All three
+# take their target as a positional argument. There is no `run` subcommand,
+# and matching one here rewarded exactly the invented form
+# skills/infrahub-common/rules/deployment-gql-dry-run.md exists to remove.
+# A generic verb where the positional target belongs is an invented
+# subcommand, not a name, so it does not count as a live dry-run.
+_INVENTED_SUBCOMMAND = (
+    r"(?!(?:run|list|get|create|delete|load|dump|check|validate|execute|"
+    r"show|new|add|export|import)\b)"
+)
 _DRY_RUN_CMD_PATTERNS = [
-    re.compile(r"infrahubctl\s+render\b", re.IGNORECASE),
-    re.compile(r"infrahubctl\s+(?:check|generator)\s+run\b", re.IGNORECASE),
+    re.compile(
+        rf"infrahubctl\s+(?:render|transform|check|generator)\s+"
+        rf"{_INVENTED_SUBCOMMAND}[a-z0-9][\w.-]*",
+        re.IGNORECASE,
+    ),
 ]
 
 # The dry-run must be framed as a pre-merge gate (before opening / merging
@@ -354,16 +367,21 @@ _PRE_MERGE_PATTERNS = [
 
 
 def check_dry_run_executes_query(md_text: str = "", **_: Any) -> tuple[bool, str]:
-    """Plan must dry-run the query live (render / check run / generator run),
-    not rely on static ``schema check`` alone."""
+    """Plan must dry-run the query live, not rely on static ``schema check``.
+
+    Live means executing the query: ``infrahubctl render <name>`` or
+    ``transform <name>`` for the transform that owns it, or ``check <name>``
+    / ``generator <name>`` for a check or generator. Each takes its target
+    as a positional argument.
+    """
     if not md_text:
         return False, "No plan text to inspect"
     for pat in _DRY_RUN_CMD_PATTERNS:
         if pat.search(md_text):
             return True, f"Dry-runs the query live (matched {pat.pattern!r})"
     return False, (
-        "No live dry-run command (infrahubctl render / check run / "
-        "generator run) — static schema check alone misses GQL mismatches"
+        "No live dry-run command (infrahubctl render/transform/check/"
+        "generator <name>) — static schema check alone misses GQL mismatches"
     )
 
 
