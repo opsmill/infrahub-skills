@@ -55,7 +55,7 @@ use the first argument as the namespace and remaining arguments as node names.
 | HIGH | Hierarchy | `hierarchy-` | Hierarchical generics, parent/children |
 | HIGH | Display | `display-` | human_friendly_id, order_weight, menu placement |
 | MEDIUM | Extensions | `extension-` | Cross-file via extensions block, artifact targets |
-| MEDIUM | Uniqueness | `uniqueness-` | Constraint format, __value suffix |
+| HIGH | Uniqueness | `uniqueness-` | Constraint format and scope; generic vs concrete kind |
 | MEDIUM | Migration | `migration-` | Add/remove attributes, state: absent |
 | MEDIUM | File Formatting | `format-` | Canonical key order; `infrahubctl schema format` (offline) |
 | HIGH | Validation | `validation-` | Load-time string-length caps (description / label / identifier), common error messages, pre-check checklist |
