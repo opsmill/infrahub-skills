@@ -1454,14 +1454,16 @@ tasks:
       and follow its workflow and rules.
 
       Task: I want an artifact that delivers a generated **rack elevation
-      diagram** — an SVG drawing, one per rack. I looked at the transform
-      examples and they all produce plain text or CSV, so I assumed
-      artifacts can only carry text and that I would have to serve the
-      diagram some other way.
+      drawing** — a scale picture of the rack front, one per rack, that a
+      field engineer opens in a browser and that stays sharp when they
+      zoom in. I looked at the transform examples and they all produce
+      plain text or CSV, so I assumed artifacts can only carry text and
+      that I would have to serve the picture some other way.
 
-      Can an artifact deliver a diagram? If it can, build it: the
-      transform and the registration. Each rack has a `height` in rack
-      units and `devices` with a `position` and a `device_type.height`.
+      Can an artifact deliver a drawing like that? If it can, build it:
+      pick the content type, then write the transform and the
+      registration. Each rack has a `height` in rack units and `devices`
+      with a `position` and a `device_type.height`.
 
       I already compute the geometry as a dict (`{"width": 220,
       "height": 900, "slots": [{"y": 40, "h": 40, "label": "leaf-01"}]}`),
@@ -1485,12 +1487,13 @@ tasks:
       repr with no error.
     expectations:
       - >-
-        Confirms an artifact can carry a diagram; image/svg+xml is one of
-        the eight supported content types
+        Confirms an artifact can carry a drawing, and picks image/svg+xml
+        as the content type without being told to: it is one of the eight
+        supported values and the only vector one
       - The artifact definition declares content_type image/svg+xml
       - >-
         Refuses to return the geometry dict and renders it into an SVG
-        string instead, annotated -> str
+        string instead
       - >-
         States that only application/json and application/yaml serialise
         a dict, and that other types go through str()

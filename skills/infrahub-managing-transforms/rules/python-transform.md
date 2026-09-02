@@ -10,8 +10,8 @@ Impact: CRITICAL
 
 A Python transform is a subclass of `InfrahubTransform`
 with a `query` class attribute and a `transform()`
-method whose return type drives the artifact's
-`content_type`.
+method whose return value must match the
+`content_type` the artifact declares.
 
 ### Why it matters
 
@@ -19,8 +19,11 @@ The SDK wires three things together by convention: the
 `query` attribute points at a named query in
 `.infrahub.yml`, the `transform()` method receives that
 query's GraphQL response as `data`, and the return
-value's Python type decides whether downstream
-artifacts are served as JSON or plain text. A mismatch
+declared `content_type` decides how that return value
+is serialised: only `application/json` and
+`application/yaml` turn a dict into structured output,
+and every other value is passed through `str()`. See
+[artifacts-definitions.md](./artifacts-definitions.md). A mismatch
 on any of the three breaks the pipeline differently —
 a wrong `query` name surfaces as a missing-query error
 at sync, but a `dict` return paired with a
@@ -80,8 +83,14 @@ python_transforms:
   against `.infrahub.yml`; a mismatch fails at sync
 - `transform()` can be sync or async -- the SDK
   handles both
-- Return type determines artifact format -- `dict`
-  yields JSON, `str` yields text
+- The artifact's `content_type` selects the serialiser,
+  and the return value has to match it. Only
+  `application/json` and `application/yaml` accept a
+  `dict`; the other six pass the payload through
+  `str()`, so a `dict` under `text/csv` or
+  `image/svg+xml` is stored as its Python repr with no
+  error. See
+  [artifacts-definitions.md](./artifacts-definitions.md)
 - `self.root_directory` is the repository root, used
   for loading templates and sibling files
 

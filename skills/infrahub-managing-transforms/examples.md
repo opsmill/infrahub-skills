@@ -618,7 +618,7 @@ topology:
 Every other example here uses `text/plain` or
 `text/csv`. This one exists because `image/svg+xml` is
 the content type most often assumed unsupported: it is
-the only one of the eight that is not text, so scanning
+the only one of the eight whose output is a picture, so scanning
 examples gives the wrong answer. It is supported, and an
 artifact can deliver a generated diagram.
 

@@ -67,9 +67,12 @@ All eight values are supported, whether or not a
 worked example happens to use them, so read this table
 instead of pattern-matching the examples.
 `image/svg+xml` is the one most often assumed
-unsupported, because it is the only value that is not
-text. It is supported; for a diagram artifact end to
-end, see [../examples.md](../examples.md).
+unsupported, because it is the only value whose output
+is a picture. It is supported, and it is the one whose
+payload readers most often assume must be a dict of
+geometry. It must not be: like the other five string
+types it is serialised with `str()`. For a diagram
+artifact end to end, see [../examples.md](../examples.md).
 
 > **Use `application/yaml`, not `text/yaml`.** The
 > server validates `content_type` against the
