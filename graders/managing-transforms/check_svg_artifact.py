@@ -13,7 +13,7 @@ from lib import run_checks  # noqa: E402
 CHECKS = [
     "artifact-content-type-declared",
     "svg-transform-returns-str",
-    "no-yaml-dict-confusion",
+    "svg-markup-in-output",
 ]
 
 if __name__ == "__main__":

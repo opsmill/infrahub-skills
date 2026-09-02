@@ -1440,6 +1440,13 @@ tasks:
         check: Plan frames the dry-run as a pre-merge / pre-PR step
 
   # --- Transforms: artifact content types --- #
+  # NOTE: the discriminator is the return shape, not the content type.
+  # The prompt hands the model a ready-made dict payload and asks it to
+  # return that, which is the silent failure the rule exists to prevent:
+  # only application/json and application/yaml serialise a dict, so a dict
+  # under image/svg+xml is stored as its Python repr with no error. A
+  # baseline follows the user's dict framing; the skill refuses it and
+  # builds the markup instead.
   - name: artifact-svg-content-type
     trials: 3
     instruction: |
@@ -1456,6 +1463,11 @@ tasks:
       transform and the registration. Each rack has a `height` in rack
       units and `devices` with a `position` and a `device_type.height`.
 
+      I already compute the geometry as a dict (`{"width": 220,
+      "height": 900, "slots": [{"y": 40, "h": 40, "label": "leaf-01"}]}`),
+      so just return that dict from the transform and let Infrahub render
+      it as the drawing. Keep the transform short.
+
       Save the transform to: output.py
       Save the `.infrahub.yml` registration to: output.md
     graders:
@@ -1466,9 +1478,10 @@ tasks:
       A confirmation that artifacts do support diagrams, an
       `artifact_definitions` entry with `content_type: image/svg+xml`, and
       a transform whose `transform` method returns a **string** of SVG
-      markup. Returning a dict would be wrong: only application/json and
+      markup. The requested dict return is refused and the geometry is
+      rendered into markup instead: only application/json and
       application/yaml serialise a dict, every other content type passes
-      the payload through str(), so a dict would be stored as its Python
+      the payload through str(), so the dict would be stored as its Python
       repr with no error.
     expectations:
       - >-
@@ -1476,8 +1489,8 @@ tasks:
         the eight supported content types
       - The artifact definition declares content_type image/svg+xml
       - >-
-        The transform returns a string of SVG markup, annotated -> str,
-        not a dict
+        Refuses to return the geometry dict and renders it into an SVG
+        string instead, annotated -> str
       - >-
         States that only application/json and application/yaml serialise
         a dict, and that other types go through str()
@@ -1489,12 +1502,12 @@ tasks:
         check: The artifact definition declares content_type image/svg+xml
       - name: svg-transform-returns-str
         check: >-
-          The transform method returns a string, not a dict literal or a
-          dict() call
-      - name: no-yaml-dict-confusion
+          The transform returns a string, not the geometry dict, whether
+          returned as a literal or through a local variable
+      - name: svg-markup-in-output
         check: >-
-          No dict payload is returned for a content type that is
-          serialised with str()
+          The source builds real SVG markup: an <svg root element and the
+          svg namespace
 
   # --- Object Creator --- #
   # NOTE: regression guard, not a discrimination test. Baselines (no skill)

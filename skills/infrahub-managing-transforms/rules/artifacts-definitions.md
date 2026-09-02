@@ -62,17 +62,15 @@ on the schema attribute):
 | `application/hcl`  | Terraform / HCL config               |
 | `image/svg+xml`    | Generated diagrams (topology, racks) |
 
-> **This table is the authority, not the examples.**
-> All eight values are supported. Worked examples
-> across these skills use only `text/plain` and
-> `text/csv`, so a capability documented here can look
-> undocumented if you pattern-match the examples
-> instead of reading this table. `image/svg+xml` in
-> particular is the one most often assumed
-> unsupported, because it is the only value that is
-> not text. It is supported; see the worked example in
-> [../examples.md](../examples.md).
->
+**This table is the authority, not the examples.**
+All eight values are supported, whether or not a
+worked example happens to use them, so read this table
+instead of pattern-matching the examples.
+`image/svg+xml` is the one most often assumed
+unsupported, because it is the only value that is not
+text. It is supported; for a diagram artifact end to
+end, see [../examples.md](../examples.md).
+
 > **Use `application/yaml`, not `text/yaml`.** The
 > server validates `content_type` against the
 > enum above and rejects anything outside it at
@@ -114,8 +112,9 @@ string.** Build the markup or the text yourself and
 return it.
 
 Related:
-[../reference.md](../reference.md) carries the
-return-type matrix per transform class.
+[../reference.md](../reference.md) summarises which
+content types suit each return type; this rule is the
+authority on how the payload is serialised.
 
 ### Target Requirements
 
