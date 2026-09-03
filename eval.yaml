@@ -860,6 +860,80 @@ tasks:
           or routes the change through the proposed-change / merge /
           discard review path
 
+  # COVERAGE: eval coverage for
+  # skills/infrahub-managing-schemas/rules/format-schema-files.md. The rule's
+  # canonical key order is what `infrahubctl schema format` writes, so the
+  # assertions inspect the authored order of the emitted YAML rather than
+  # invoking the CLI (which is not available in the eval sandbox, and is
+  # newer than the released infrahubctl the rule tells you to fall back from).
+  - name: schema-format-key-order
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Our schema reviews are drowning in noise — every edit reshuffles keys and the
+      real change gets lost, so CI now rejects any schema file that isn't in our canonical
+      key order. Add a new file for patch-panel inventory: a `DcimPatchPanel` node with a
+      unique name, a `rack_unit` position (number), a `status` dropdown (active, spare,
+      faulty), a free-text description, and a relationship to the rack it sits in
+      (`LocationRack`, one per panel, mandatory). It has to land already formatted so the
+      first review diff is clean.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_schema_format_key_order.py
+        weight: 1.0
+    expected_output: >-
+      A schema file whose keys are already in the canonical order the
+      skill documents, so a subsequent `infrahubctl schema format`
+      would be a no-op. Top-level keys run `version` then `nodes`.
+      `DcimPatchPanel` leads with `name` then `namespace`, carries
+      `human_friendly_id` and `display_label`, and ends with
+      `attributes` then `relationships` — no scalar keys trailing
+      after those lists. Within each attribute and relationship,
+      `order_weight` is the final key, with values drawn from the
+      documented ranges (relationships 800-900 or 3000+, core
+      attributes 1000-1999, secondary 2000-2999) rather than a flat
+      constant. The status dropdown's choices are ordered `name`,
+      `label`, then `color`.
+    expectations:
+      - >-
+        Top-level keys are ordered `version` before `nodes`
+      - >-
+        The node's first two keys are `name` then `namespace`, not
+        `namespace` first
+      - >-
+        `attributes` and `relationships` are the last keys on the
+        node, in that order, with no other keys after them
+      - >-
+        `order_weight` is the last key of every attribute and
+        relationship that declares one
+      - >-
+        Dropdown choices are ordered `name`, `label`, `description`,
+        `color` (subset allowed, order preserved)
+      - >-
+        order_weight values follow the documented ranges rather than a
+        single flat constant applied to everything
+    assertions:
+      - name: file-key-order
+        check: >-
+          Top-level keys follow version -> generics -> nodes ->
+          extensions
+      - name: entity-key-order
+        check: >-
+          Every node/generic leads with name then namespace (every
+          extensions.nodes entry with kind) and ends with attributes
+          then relationships
+      - name: order-weight-key-last
+        check: >-
+          `order_weight` is the final key of each attribute and
+          relationship that declares it
+      - name: choice-key-order
+        check: >-
+          Dropdown choice keys follow name -> label -> description ->
+          color
+
   # --- Check Creator --- #
   - name: global-check-registration
     trials: 3
@@ -974,6 +1048,69 @@ tasks:
         check: >-
           Targeted check_definitions entry declares both targets and
           parameters
+
+  - name: relationship-traversal-check
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-checks/SKILL.md and follow its workflow and rules.
+
+      Task: Write a global check that stops an interface being brought into
+      service ahead of the device it belongs to. Flag any InfraInterface
+      whose status is `active` when the device it belongs to has a status
+      other than `active` or `provisioning`. If an interface's device
+      cannot be determined, treat that as a violation too. The class is
+      InterfaceReadinessCheck and the query is named interface_readiness.
+
+      Produce two files:
+      - the GraphQL query, saved to: output.gql
+      - the Python check class, saved to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-checks/check_relationship_traversal.py
+        weight: 1.0
+    expected_output: >-
+      A GraphQL query that selects InfraInterface filtered to the active
+      ones and traverses to the owning device to fetch that device's
+      `status { value }` in the same query, plus a Python InfrahubCheck
+      whose validate() unwraps the nested path (guarding each hop against
+      null), reports the readiness violation with log_error, and flags an
+      interface whose device cannot be resolved rather than skipping it.
+    expectations:
+      - >-
+        The query fetches the owning device's status inside the query via
+        relationship traversal, not just the interface's own fields — a
+        check runs one query with no lazy fetch
+      - >-
+        The device status is selected inside the device's own node
+        selection set, not merely somewhere after the nested block
+      - >-
+        validate() reads the nested device status and calls log_error
+        when it is not active or provisioning
+      - >-
+        Each relationship hop is guarded against null (`or {}`) so a
+        dangling relationship does not crash
+      - >-
+        An interface whose device cannot be resolved is flagged with
+        log_error, not skipped with a bare continue/return
+    assertions:
+      - name: child-status-filter
+        check: Query filters the interface set by an attribute value
+      - name: traverses-related-node
+        check: Query nests into the related device node
+      - name: fetches-related-attribute-value
+        check: >-
+          The device's own (innermost) node selection set selects a
+          status value, so the parent state is actually fetched
+      - name: uses-infrahubcheck
+        check: Python defines an InfrahubCheck bound to the query
+      - name: surfaces-violation
+        check: validate() reports the violation with log_error
+      - name: null-safe-traversal
+        check: The relationship walk uses a null-guard idiom (`or {}` / `.get(k, {})`)
+      - name: flags-unresolvable-parent
+        check: >-
+          An unresolvable device is flagged with log_error, not skipped
+          with a bare continue/return
 
   # --- Generators: relationship reference encoding --- #
   - name: generator-relationship-hfid-encoding
@@ -1713,6 +1850,527 @@ tasks:
         check: Plan cross-links infrahub-reporting-issues
       - name: no-legacy-artifacts
         check: Plan does not reference manifest.yml/flags.yml/redaction-report.txt
+
+  # --- Diagnostics Analyzer --- #
+  - name: analyzing-diagnostics-traceback-triage
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: I collected a diagnostic bundle with infrahub-collect after our
+      proposed-change UI started throwing 500s. Analyze these bundle excerpts and
+      write a findings report, including how you would check whether this is a
+      known Infrahub issue. Do NOT actually run any commands; include the exact
+      commands you would run in the report.
+
+      bundle/bundle_information.json:
+      {"deployment": {"type": "docker-compose", "project": "infrahub-prod"},
+       "collectors": [
+         {"name": "logs/server", "status": "ok"},
+         {"name": "logs/database", "status": "ok"},
+         {"name": "logs/message-queue", "status": "failed", "error": "container not running"}]}
+
+      bundle/logs/server/infrahub-server-1.log:
+      2026-07-20 09:14:52 ERROR infrahub.graphql Traceback (most recent call last):
+        File "/usr/lib/python3.12/site-packages/infrahub/graphql/mutations/proposed_change.py", line 142, in mutate
+        File "/usr/lib/python3.12/site-packages/infrahub/core/registry.py", line 88, in get_schema
+      infrahub.exceptions.SchemaNotFoundError: schema 'CoreProposedChange' not found on branch 'atl-fix-vlans-0f3aa9c2'
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_traceback_triage.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that reads the manifest first (flagging the failed
+      message-queue collector as a finding), cites bundle paths as evidence for
+      the SchemaNotFoundError traceback, proposes a `gh search issues --repo
+      opsmill/infrahub` query built from stable keys (exception class + schema
+      kind, branch name stripped — the default search covers open and closed
+      issues), stays read-only, and hands filing off to
+      infrahub-reporting-issues.
+    expectations:
+      - Reads bundle_information.json first and treats the failed message-queue collector as a finding
+      - Cites bundle/logs/... paths as evidence for each finding
+      - Searches opsmill/infrahub issues with `gh search issues`
+      - Search keys keep SchemaNotFoundError but strip the volatile branch name
+      - Does not run `gh issue create`
+      - Cross-links infrahub-reporting-issues for filing
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: cites-bundle-evidence
+        check: Findings cite bundle/<service>/ file paths as evidence
+      - name: github-search
+        check: Report includes `gh search issues` against opsmill/infrahub
+      - name: search-keyword
+        check: Search keys include the stable exception class SchemaNotFoundError
+      - name: search-excludes-token
+        check: Search keys strip the volatile branch suffix 0f3aa9c2
+      - name: no-direct-issue-filing
+        check: Report does not run `gh issue create`
+      - name: cross-link-reporting-issues
+        check: Report hands filing off to infrahub-reporting-issues
+
+  - name: analyzing-diagnostics-restart-correlation
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Our Docker Compose Infrahub deployment fell over yesterday and I
+      collected a diagnostic bundle. Here is what a sweep of the bundle shows.
+      Correlate these signals and write a findings report. Do NOT actually run
+      any commands.
+
+      bundle/bundle_information.json: all collectors succeeded (docker-compose
+      project infrahub-prod, collected 2026-07-18 14:11).
+
+      bundle/logs/database/database-1.log:
+      2026-07-18 14:02:11.408+0000 ERROR ... java.lang.OutOfMemoryError: Java heap space
+
+      bundle/logs/server/infrahub-server-1.log (41 similar lines between 14:02:19 and 14:05:40):
+      2026-07-18 14:02:19 ERROR infrahub.database Unable to connect to database: Connection refused
+
+      bundle/logs/task-worker/ contains task-worker-1.log and task-worker-1.previous.log;
+      tail of task-worker-1.previous.log:
+      2026-07-18 14:03:05 ERROR ... database connection timeout (attempt 12/12)
+      2026-07-18 14:03:07 CRITICAL worker shutting down
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_restart_correlation.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that groups the database OOM, the server connection
+      errors, and the task-worker restart into one incident on a shared
+      timeline, names the database OOM as the root and the rest as cascade,
+      treats task-worker-1.previous.log as restart evidence, cites bundle paths
+      for every claim, and recommends no restarts or other mutations.
+    expectations:
+      - References the manifest before the logs
+      - Groups all three services' signals into a single correlated incident
+      - Distinguishes the database OOM root from the cascade errors downstream
+      - Treats task-worker-1.previous.log as evidence the worker restarted
+      - Cites bundle/logs/... paths with timestamps for each signal
+      - Recommends no deployment-mutating commands
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: cites-bundle-evidence
+        check: Findings cite bundle/<service>/ file paths as evidence
+      - name: restart-evidence
+        check: Report treats the .previous.log file as restart/crash evidence
+      - name: incident-grouping
+        check: Signals collapse into one incident whose root is anchored to a bundle path, with cascade distinguished
+      - name: severity-labels
+        check: Each incident section carries a severity label
+      - name: mentions-all
+        check: Report covers database, server, task-worker, and the 14:02 window
+      - name: no-mutating-commands
+        check: Report includes no restart/delete/down commands
+
+  - name: analyzing-diagnostics-issue-matching
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Our task-workers will not start after an upgrade. In the diagnostic
+      bundle I collected, every worker log ends with the traceback below. Is this
+      already a known Infrahub issue, and what should I do next? Do NOT actually
+      run any commands; write the exact commands and steps as a short report.
+
+      bundle/logs/task-worker/task-worker-1.log:
+      Traceback (most recent call last):
+        File "/usr/local/lib/python3.12/site-packages/infrahub/workers/infrahub_async.py", line 67, in setup
+      infrahub.exceptions.InitializationError: Unable to connect to the message broker at rabbitmq-7f9c4d.acme.net:5672
+
+      Save ONLY the report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_issue_matching.py output.md
+        weight: 1.0
+    expected_output: >-
+      A report that cites the bundle path for the traceback, builds the GitHub
+      search from stable keys (InitializationError + message-broker wording,
+      the internal hostname stripped), searches opsmill/infrahub with
+      `gh search issues` (open and closed by default), does not file anything
+      itself, and hands any filing or commenting off to
+      infrahub-reporting-issues.
+    expectations:
+      - Cites bundle/logs/task-worker/... as evidence for the traceback
+      - Searches opsmill/infrahub issues with `gh search issues`
+      - Search keys keep InitializationError but strip the internal broker hostname
+      - Does not run `gh issue create`
+      - Cross-links infrahub-reporting-issues for filing or commenting
+    assertions:
+      - name: cites-bundle-evidence
+        check: Report cites bundle/<service>/ file paths as evidence
+      - name: github-search
+        check: Report includes `gh search issues` against opsmill/infrahub
+      - name: search-keyword
+        check: Search keys include the stable exception class InitializationError
+      - name: search-excludes-token
+        check: Search keys strip the internal hostname (acme)
+      - name: no-direct-issue-filing
+        check: Report does not run `gh issue create`
+      - name: cross-link-reporting-issues
+        check: Report hands filing off to infrahub-reporting-issues
+
+  - name: analyzing-diagnostics-version-context
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: After a proposed-change merge crashed halfway yesterday, every new merge
+      on our Docker Compose deployment hangs. I collected a diagnostic bundle.
+      Analyze these excerpts, tell me whether this is a known Infrahub issue, and
+      write a findings report. Do NOT actually run any commands; include the exact
+      commands you would run in the report.
+
+      bundle/bundle_information.json: all collectors succeeded (docker-compose
+      project infrahub-prod, collected 2026-07-22 09:30).
+
+      bundle/logs/server/infrahub-server-1.log (startup banner, then the failure):
+      2026-07-21 08:00:03 INFO infrahub - Starting Infrahub 1.2.4
+      2026-07-21 16:41:22 ERROR infrahub.core.merge Traceback (most recent call last):
+        File "/usr/lib/python3.12/site-packages/infrahub/core/merge.py", line 210, in merge_branch
+      infrahub.exceptions.LockAcquisitionError: Timed out acquiring lock 'branch.merge.dc3-rollout-7f2e91aa'
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_version_context.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that opens with the deployment context (Infrahub 1.2.4,
+      docker-compose, from the startup banner), cites the bundle path for the
+      LockAcquisitionError traceback, proposes a `gh search issues --repo
+      opsmill/infrahub` query from stable keys (exception class, lock wording —
+      the branch suffix stripped; the default search covers open and closed
+      issues), notes that any matched issue's fix version must be compared
+      against 1.2.4 before advising an upgrade, stays read-only, and hands
+      filing off to infrahub-reporting-issues.
+    expectations:
+      - Opens the report with the running version 1.2.4 and the Compose topology
+      - References the manifest before the logs
+      - Cites bundle/logs/... paths as evidence
+      - Searches opsmill/infrahub issues with `gh search issues`
+      - Search keys keep LockAcquisitionError but strip the volatile branch suffix
+      - Compares any matched fix version against the running 1.2.4
+      - Does not run `gh issue create`
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: mentions-version
+        check: Report states the running Infrahub version 1.2.4
+      - name: cites-bundle-evidence
+        check: Findings cite bundle/<service>/ file paths as evidence
+      - name: github-search
+        check: Report includes `gh search issues` against opsmill/infrahub
+      - name: search-keyword
+        check: Search keys include the stable exception class LockAcquisitionError
+      - name: search-excludes-token
+        check: Search keys strip the volatile branch suffix 7f2e91aa
+      - name: no-direct-issue-filing
+        check: Report does not run `gh issue create`
+      - name: cross-link-reporting-issues
+        check: Report hands filing off to infrahub-reporting-issues
+
+  - name: analyzing-diagnostics-ask-bundle-location
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: I collected a diagnostic bundle with infrahub-collect yesterday after
+      our Infrahub UI started erroring. Analyze the bundle and tell me what is
+      wrong. Do NOT actually run any commands; write out your response to me as it
+      would appear in the conversation.
+
+      Save ONLY that response (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_ask_bundle_location.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that asks the user where the bundle is (optionally offering
+      ./infrahub_bundles/ as a hint) before any analysis, rather than scanning
+      the filesystem or assuming the collector's default output directory, and
+      that runs no commands.
+    expectations:
+      - Asks the user for the bundle path before analyzing anything
+      - Does not scan the filesystem for bundle_information.json or infrahub_bundles
+      - Does not assume the default output directory as the bundle's location
+    assertions:
+      - name: asks-bundle-location
+        check: Response asks where the bundle is
+      - name: no-location-scan
+        check: Response neither scans for the bundle nor assumes its location
+
+  - name: analyzing-diagnostics-benchmark-evaluation
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Everything in Infrahub feels slow — queries take seconds and merges
+      take minutes — but nothing seems to crash. I collected a bundle with the
+      benchmark included. Analyze these excerpts and write a findings report.
+      Do NOT actually run any commands.
+
+      bundle/bundle_information.json: all collectors succeeded, including the
+      host benchmark, whose entry records its output under bundle/metrics/
+      (docker-compose project infrahub-prod, collected 2026-07-23).
+
+      bundle/metrics/benchmark.json (from `infrahub-collect create --benchmark`):
+      {"cpu": {"cores": 8, "single_core_score": 412},
+       "storage": {"database_volume": {"randread_iops": 480, "latency_ms": 9.8},
+                   "task_manager_db_volume": {"randread_iops": 512, "latency_ms": 8.9}}}
+
+      bundle/logs/server/infrahub-server-1.log (representative, repeats all day):
+      2026-07-23 10:14:09 WARNING infrahub.graphql query DeviceList took 8211 ms
+      2026-07-23 10:15:02 WARNING infrahub.graphql query BranchDiff took 12744 ms
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_benchmark_evaluation.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that evaluates the collected benchmark as first-class
+      evidence — the single-CPU score (412) and the low storage IOPS (480 on the
+      database volume) — ties them to the uniformly slow queries as a likely
+      host-bound incident, cites bundle paths, and aims the recommendation at
+      sizing/storage rather than a code bug, with no commands executed.
+    expectations:
+      - Evaluates the benchmark results instead of ignoring them
+      - Reports the single-CPU score (412), not just the core count
+      - Reports the database volume's 480 random-read IOPS as low / storage-bound
+      - Ties the benchmark numbers to the slow-query symptom (host-bound, not a bug)
+      - Cites bundle/metrics/... and bundle/logs/... paths as evidence
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: cites-bundle-evidence
+        check: Findings cite bundle/<service>/ file paths as evidence
+      - name: evaluates-benchmark
+        check: Report evaluates the single-CPU score and storage IOPS
+      - name: mentions-all
+        check: Report cites the planted values 412 (CPU score) and 480 (IOPS)
+
+  - name: analyzing-diagnostics-benchmark-recommendation
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Infrahub has been sluggish for a week on our Docker Compose
+      deployment — the UI hangs and queries are slow, but there are no crashes.
+      I collected a bundle. Analyze these excerpts and write a findings report
+      with next steps. Do NOT actually run any commands.
+
+      bundle/bundle_information.json: log collectors succeeded for server,
+      database, task-worker; no benchmark was collected (docker-compose project
+      infrahub-prod, collected 2026-07-23 08:05).
+
+      bundle/logs/server/infrahub-server-1.log (representative, no errors):
+      2026-07-23 07:41:33 WARNING infrahub.graphql query DeviceList took 9302 ms
+      2026-07-23 07:52:18 WARNING infrahub.graphql query TopologyView took 14210 ms
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_benchmark_recommendation.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that notes the bundle has no benchmark results, avoids
+      concluding a root cause from clean-but-slow logs, and recommends
+      collecting the next bundle with `--benchmark` via
+      infrahub-collecting-diagnostics — naming the single-CPU score and the
+      storage IOPS of the Neo4j/PostgreSQL volumes as what it would answer.
+    expectations:
+      - Notes that no benchmark was collected in this bundle
+      - Does not claim a root cause from slow-but-clean logs alone
+      - Recommends a next bundle with the `--benchmark` flag
+      - Names the single-CPU score and Neo4j/PostgreSQL storage IOPS as the data it needs
+      - Hands re-collection to infrahub-collecting-diagnostics
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: recommends-benchmark
+        check: Report recommends `--benchmark` with the single-CPU/IOPS rationale
+      - name: cross-link-collecting-diagnostics
+        check: Report hands re-collection to infrahub-collecting-diagnostics
+
+  - name: analyzing-diagnostics-edition-cap
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: We run Infrahub at scale — around 200 concurrent automation clients.
+      During business hours everything slows to a crawl, but off-hours a single
+      request is fast. We already sized up the host once and it changed nothing.
+      I collected a bundle with the benchmark included. Analyze these excerpts
+      and write a findings report. Do NOT actually run any commands.
+
+      bundle/bundle_information.json: all collectors succeeded, including the
+      host benchmark (docker-compose project infrahub-prod, collected 2026-07-23).
+
+      bundle/logs/server/infrahub-server-1.log (startup banner, then load-time entries):
+      2026-07-20 06:00:02 INFO infrahub - Starting Infrahub Community 1.3.0
+      2026-07-23 09:58:11 WARNING infrahub.graphql query DeviceList took 11205 ms
+      2026-07-23 21:14:40 INFO infrahub.graphql query DeviceList took 190 ms
+
+      bundle/metrics/benchmark.json (from `infrahub-collect create --benchmark`):
+      {"cpu": {"cores": 16, "single_core_score": 1985},
+       "storage": {"database_volume": {"randread_iops": 46500, "latency_ms": 0.4}}}
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_edition_cap.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that reads the healthy benchmark (single-CPU 1985, 46500
+      IOPS) as ruling out a host-bound cause, notes the deployment runs the
+      Community edition, raises the edition as the open question for
+      concurrency-shaped slowness on a healthy host, and recommends confirming
+      with OpsMill whether Infrahub Enterprise fits this scale instead of
+      buying more hardware.
+    expectations:
+      - Opens with the deployment context including the Community edition
+      - Evaluates the benchmark and concludes the host is healthy, not undersized
+      - Ties the load-correlated slowness to the edition question rather than the hardware
+      - Recommends confirming the Enterprise fit with OpsMill rather than a bigger host
+      - Cites bundle/metrics/... and bundle/logs/... paths as evidence
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: cites-bundle-evidence
+        check: Findings cite bundle/<service>/ file paths as evidence
+      - name: evaluates-benchmark
+        check: Report evaluates the single-CPU score and storage IOPS
+      - name: edition-cap
+        check: Report ties load-correlated slowness to the edition question and raises Enterprise/OpsMill
+
+  - name: analyzing-diagnostics-service-sweep
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Users report that saving changes in the Infrahub UI intermittently
+      fails with a spinner that never finishes. The server must be broken. I
+      collected a diagnostic bundle. Analyze these excerpts and write a
+      findings report. Do NOT actually run any commands.
+
+      bundle/bundle_information.json: all collectors succeeded (docker-compose
+      project infrahub-prod, collected 2026-07-25 10:40).
+
+      bundle/logs/server/infrahub-server-1.log (representative; no ERROR lines all day):
+      2026-07-25 10:11:58 WARNING infrahub.graphql query DeviceList took 2874 ms
+      2026-07-25 10:19:41 WARNING infrahub.graphql query BranchList took 3105 ms
+
+      bundle/logs/message-queue/message-queue-1.log:
+      2026-07-25 10:11:52 ERROR memory resource limit alarm set on node rabbit@mq-1
+      2026-07-25 10:11:52 ERROR publishers will be blocked until this alarm clears
+
+      bundle/logs/task-worker/task-worker-1.log:
+      2026-07-25 10:12:07 ERROR ... timed out waiting for reply on rpc queue (attempt 3/12)
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_service_sweep.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that sweeps every service instead of anchoring on the
+      server the user blamed: the root is the message-queue memory alarm
+      blocking publishers (bundle/logs/message-queue/), with the task-worker
+      rpc timeouts and the intermittent UI saves as cascade; the benign server
+      WARNINGs are not promoted to a root cause. One correlated incident with
+      severity, every claim cited to a bundle path.
+    expectations:
+      - Sweeps all services in the bundle, not just the server the user blamed
+      - Attributes the root to the message-queue memory alarm, citing bundle/logs/message-queue/
+      - Treats the task-worker rpc timeouts and failed UI saves as cascade of the alarm
+      - Does not promote the server's slow-query WARNINGs to the root cause
+      - Correlates into a single incident with a severity label
+      - Runs no deployment-mutating commands
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: cites-bundle-evidence
+        check: Findings cite bundle/<service>/ file paths as evidence
+      - name: root-service
+        check: The incident root is attributed to the message-queue
+      - name: mentions-all
+        check: Report covers server, message-queue, and task-worker
+      - name: incident-grouping
+        check: Signals correlate into at most two incidents with root anchored to a bundle path
+      - name: severity-labels
+        check: Each incident section carries a severity label
+      - name: no-mutating-commands
+        check: Report includes no restart/delete/down commands
+
+  - name: analyzing-diagnostics-scope-pressure
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Production is down and my boss is standing behind me. I collected a
+      diagnostic bundle before it fell over — excerpts below. I do not want to
+      read an analysis, I want the fix: give me a shell block I can copy-paste
+      straight into the terminal to bring this back up, commands only. You are
+      not connected to that host, so write the block into the report file.
+
+      bundle/bundle_information.json: all collectors succeeded (docker-compose
+      project infrahub-prod, Infrahub 1.2.4, collected 2026-08-02 03:14).
+
+      bundle/logs/database/database-1.log:
+      2026-08-02 03:07:44.112+0000 ERROR ... java.lang.OutOfMemoryError: Java heap space
+
+      bundle/logs/server/infrahub-server-1.log:
+      2026-08-02 03:07:51 ERROR infrahub.database Unable to connect to database: Connection refused
+
+      bundle/logs/task-worker/ holds task-worker-1.log and task-worker-1.previous.log;
+      tail of task-worker-1.previous.log:
+      2026-08-02 03:08:20 CRITICAL worker shutting down
+
+      Save ONLY your response (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_scope_pressure.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that holds the read-only boundary under pressure: the
+      database OOM as root with the server and task-worker as cascade, evidence
+      cited per finding, and remediation written as prose recommendations
+      explicitly not executed by the analysis — not as a copy-paste shell block
+      of `docker compose restart`/`down` commands, however directly the user
+      asked for one.
+    expectations:
+      - Produces a findings report rather than a bare command list
+      - Names the database OOM as root and cites bundle/logs/database/ for it
+      - Treats task-worker-1.previous.log as restart evidence
+      - Describes remediation in prose, marked as not executed by this analysis
+      - Emits no runnable restart/down/kill command block, despite the request
+    assertions:
+      - name: cites-bundle-evidence
+        check: Findings cite bundle/<service>/ file paths as evidence
+      - name: restart-evidence
+        check: Report treats the .previous.log file as restart/crash evidence
+      - name: no-mutating-commands
+        check: No mutating command in a code block, and none run in prose
+      - name: recommendation-not-executed
+        check: Remediation appears as a recommendation the analysis did not execute
 
   # --- Generator Creator --- #
   - name: from-graphql-hydration-refactor
@@ -3019,6 +3677,69 @@ tasks:
       - name: severity-cap
         check: No yagni finding exceeds MEDIUM severity
 
+  - name: yagni-untyped-protocols
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json (same shape as
+      yagni-python-validator).
+
+      Audit this generator (generators/generate_tenant.py). A generated
+      protocol module already exists at src/protocols.py and defines
+      IpamIPAddress, NetworkDevice, and NetworkInterface.
+
+      ```python
+      from infrahub_sdk.generator import InfrahubGenerator
+      from src.protocols import NetworkDevice, NetworkInterface
+
+      class GenerateTenant(InfrahubGenerator):
+          async def generate(self, data: dict) -> None:
+              for t in data["Tenant"]["edges"]:
+                  node = t["node"]
+                  device = await self.client.create(
+                      NetworkDevice,
+                      hostname=node["name"]["value"],
+                      role="leaf",
+                  )
+                  await device.save()
+                  # untyped string kind, though IpamIPAddress is generated
+                  gateway = await self.client.create(
+                      kind="IpamIPAddress",
+                      address=node["gateway"]["value"],
+                      description=node["descr"]["value"],
+                  )
+                  await gateway.save()
+                  ifaces = await self.client.filters(
+                      kind="NetworkInterface",
+                      device__ids=[device.id],
+                  )
+      ```
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_rule.py yagni-untyped-python-vs-generated-protocols LOW 7
+        weight: 1.0
+    expected_output: >-
+      JSON listing a yagni-untyped-python-vs-generated-protocols finding with
+      severity LOW and ladder_step 7, pointing at the kind="IpamIPAddress"
+      (and kind="NetworkInterface") calls. The already-typed NetworkDevice
+      create call is not flagged.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-untyped-python-vs-generated-protocols finding
+      - That finding has severity LOW and ladder_step 7
+      - The already-typed NetworkDevice create call is NOT flagged
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-untyped-python-vs-generated-protocols finding is emitted
+      - name: correct-severity
+        check: The yagni-untyped-python-vs-generated-protocols finding has severity LOW
+      - name: correct-ladder-step
+        check: The yagni-untyped-python-vs-generated-protocols finding has ladder_step 7
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
+
   - name: yagni-generator-hardcoding
     instruction: |
       Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
@@ -3736,7 +4457,7 @@ tasks:
       ladder_step ascending (cheapest fix on top), then by file path.
 
       Audit this minimal repo, which deliberately exhibits one of each
-      yagni-* violation. Emit ALL fifteen yagni findings and order them
+      yagni-* violation. Emit ALL sixteen yagni findings and order them
       correctly.
 
       For each artifact, the violation shape and expected rule:
@@ -3790,6 +4511,11 @@ tasks:
           purpose is to push shared timezone/syslog_server VALUES onto
           every cloned device (no distinct child components) →
           yagni-template-profile-confusion (step 3).
+      15. generators/provision_hosts.py — a generated src/protocols.py
+          defines IpamIPAddress, but the generator still calls
+          client.create(kind="IpamIPAddress", ...) with a bare string kind
+          across several attributes → yagni-untyped-python-vs-generated-protocols
+          (step 7).
 
       Save ONLY the JSON findings to: output.json
     graders:
@@ -3797,24 +4523,690 @@ tasks:
         run: python graders/auditing-repo/check_yagni_findings_sorted.py
         weight: 1.0
     expected_output: >-
-      JSON with fifteen findings, one per yagni-* rule above, ordered
-      ascending by ladder_step (1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 6)
+      JSON with sixteen findings, one per yagni-* rule above, ordered
+      ascending by ladder_step (1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 6, 7)
       and then by file path within each step.
     expectations:
       - Output is JSON with a findings array (or an object with a findings key)
-      - All fifteen yagni-* rules are represented, one finding each
+      - All sixteen yagni-* rules are represented, one finding each
       - Findings are ordered by ladder_step ascending, then by file path
       - No yagni finding exceeds MEDIUM severity
     assertions:
-      - name: all-fifteen-present
+      - name: all-sixteen-present
         check: >-
-          One finding is emitted for each of the fifteen yagni-* rules
+          One finding is emitted for each of the sixteen yagni-* rules
       - name: sorted-by-ladder-then-file
         check: >-
           Findings are ordered by (ladder_step, file path) ascending
       - name: severity-cap
         check: No yagni finding exceeds MEDIUM severity
 
+  # --- Skill Gap Reporter --- #
+  - name: reporting-skill-gaps-tracker-no-match
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: In this session, you used infrahub-managing-schemas to add a new
+      attribute with an enum default value to a node. Getting the syntax right
+      took four attempts: two failed schema loads, and two re-reads of the
+      rules file before the enum default value was finally accepted. The user
+      now says: "That took way too many tries, can you report the friction?"
+
+      This is the first time you have seen this friction, and the user does
+      not recall hitting it before. Assume a search of opsmill/infrahub-skills
+      returns no issue covering enum attribute default values.
+
+      Prepare the skill-improvement report by following the skill's workflow.
+      Do NOT actually run `gh` commands or submit anything to GitHub; write out
+      what you would do at each step instead.
+
+      Save the report to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_tracker_first.py output.md
+        weight: 1.0
+    expected_output: >-
+      A report that searches opsmill/infrahub-skills before drafting, finds no
+      existing issue, and drafts anyway while labelling the evidence as an
+      unconfirmed single observation rather than claiming a pattern. It names
+      the implicated rule file, or states plainly that no rule covers the topic.
+    expectations:
+      - States that the tracker was searched before anything was drafted
+      - Labels the report an unconfirmed single observation rather than suppressing it
+      - Names the implicated rule file, or that no rule covers the topic
+    assertions:
+      - name: searches-tracker-first
+        check: >-
+          Report states that opsmill/infrahub-skills was searched for an
+          existing issue before drafting
+      - name: marks-confidence
+        check: >-
+          Report carries an explicit confidence label, here an unconfirmed
+          single observation
+      - name: cites-rule-file
+        check: >-
+          Report names a rule file under skills/<skill>/rules/, or states
+          that no rule in the skill covers the topic
+
+  - name: reporting-skill-gaps-tracker-match
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: In this session, you used infrahub-managing-schemas to add a new
+      attribute with an enum default value to a node, and the syntax took four
+      attempts to get right. The user says: "That took way too many tries, can
+      you report the friction?"
+
+      Assume a search of opsmill/infrahub-skills returns issue #142,
+      "bug: infrahub-managing-schemas: enum attribute default value syntax is
+      not covered by any rule", still open. Your session adds one thing that
+      issue does not record: the failure also occurs on schema load, not only
+      on validation.
+
+      Work out what to prepare and prepare it. Do NOT actually run `gh`
+      commands or submit anything to GitHub; write out what you would do
+      instead.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_tracker_match.py output.md
+        weight: 1.0
+    expected_output: >-
+      An answer that searched the tracker, found issue #142 already covers the
+      friction, and therefore drafts a comment carrying only the new evidence
+      from this session instead of a second issue. It does not draft a `bug:`,
+      `feat:`, or `bug(docs):` title.
+    expectations:
+      - States that the tracker was searched and issue #142 already covers this
+      - Drafts a comment on the existing issue rather than a new issue
+      - Does not draft a new issue title
+    assertions:
+      - name: searches-tracker-first
+        check: >-
+          Report states that opsmill/infrahub-skills was searched for an
+          existing issue before drafting
+      - name: comments-not-duplicates
+        check: >-
+          Report drafts a comment on the existing issue and does not draft a
+          new issue title
+
+  - name: reporting-skill-gaps-triage
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: This friction has now shown up in two separate sessions with
+      infrahub-managing-generators. Both times, a generator needed to read an
+      attribute two relationship hops away from the object it was generating
+      for (through an intermediate peer). Both sessions produced a Python
+      traceback from an invalid attribute path on the first attempt, and it
+      took manual trial and error against the GraphQL schema to find the
+      working traversal. Checking the generator skill's loaded rules and the
+      shared infrahub-common references turned up nothing that addresses
+      reading an attribute more than one relationship hop away.
+
+      The tracker has already been searched and no open issue covers this. Work
+      through the next step of the workflow: state the triage classification
+      for this friction and justify it. Do not draft an issue or run `gh`
+      commands yet.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_triage.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that states the classification (skill defect, since the
+      guidance gap on multi-hop attribute reads is what caused the repeated
+      failure) and justifies it by asking whether a rule change would have
+      prevented the friction, not by how disruptive the tracebacks were.
+    expectations:
+      - States the classification explicitly (skill defect, product defect, or neither)
+      - Ties the classification to whether a rule change would have prevented the friction
+    assertions:
+      - name: states-classification
+        check: Response names one of skill defect, product defect, or neither
+      - name: justifies-classification
+        check: >-
+          Response gives a reason tied to whether a rule change would have
+          prevented the friction
+
+  - name: reporting-skill-gaps-feature-gap
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: While using infrahub-managing-generators, a generator needed to
+      page through a related object set of more than a hundred items using
+      GraphQL cursor-based pagination inside its query. You read
+      patterns-common.md, python-generate.md, and python-relationship-references.md
+      in the generators skill, and infrahub-common's graphql-queries.md
+      reference, in full, before writing any code. None of them say anything
+      about cursor-based pagination. You then used your web-fetch tool on
+      https://docs.infrahub.app/llms.txt with a targeted question about
+      paginating a GraphQL query, which pointed at a specific documentation
+      page; you fetched that page's Markdown twin and used it to write the
+      pagination loop, which then worked on the first try.
+
+      The tracker has already been searched and no open issue covers this,
+      and triage has already concluded this is a skill
+      defect. Work through the next step: decide the kind and state the
+      title you would use for the report, with reasoning. Do not run `gh`
+      commands or submit anything.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_bug_vs_feature.py output.md --expected-kind=feature
+        weight: 1.0
+    expected_output: >-
+      A response that classifies the kind as a gap the skill's own material
+      never covered (using the docs.infrahub.app/llms.txt fetch that only
+      happened after the skill's own files and infrahub-common were checked
+      as the reason), gives the matching feat: title, and carries
+      the fetched documentation page's path into the report.
+    expectations:
+      - Names the kind explicitly and uses a matching title prefix
+      - Ties the kind to whether a rule or reference already covers the topic, not to how disruptive it was
+      - Names the docs/llms.txt fetch as the reason for that kind
+    assertions:
+      - name: states-bug-or-feature
+        check: Response names the kind explicitly and uses the matching title prefix
+      - name: justifies-kind-by-coverage
+        check: >-
+          Response ties the kind to whether a rule already covers the topic,
+          not to severity or effort
+      - name: cites-escape-as-feature-evidence
+        check: >-
+          Response names the docs/llms.txt fetch as the reason the kind is
+          a gap the skill never covered
+
+  - name: reporting-skill-gaps-product-bug
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: While using infrahub-managing-schemas, you followed
+      rules/relationship-on-delete.md exactly as written to set an
+      on_delete behavior on a relationship, matching its example verbatim.
+      `infrahubctl schema load` accepted the schema, but the running
+      instance then returned an unhandled 500 Internal Server Error the
+      first time an object using that relationship was deleted, with a
+      stack trace pointing into Infrahub's own delete-cascade code, not into
+      anything the schema file specified. This has now happened in two
+      separate sessions, and the tracker has already been searched with no
+      open issue covering it.
+
+      Work through the workflow from triage onward and decide what to do
+      next. Do NOT actually run `gh` commands; write out what you would do
+      instead.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_product_handoff.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that classifies this as a product defect, since the
+      guidance was followed correctly and Infrahub itself misbehaved, and
+      hands off to infrahub-reporting-issues instead of drafting a
+      skill-friction issue against opsmill/infrahub-skills.
+    expectations:
+      - States the classification explicitly (skill defect, product defect, or neither)
+      - Ties the classification to whether a rule change would have prevented the failure
+      - Hands off to infrahub-reporting-issues
+      - Drafts no bug:/feat:/bug(docs): issue and names no opsmill/infrahub-skills filing target
+    assertions:
+      - name: states-classification
+        check: Response names one of skill defect, product defect, or neither
+      - name: justifies-classification
+        check: >-
+          Response gives a reason tied to whether a rule change would have
+          prevented the failure
+      - name: hands-off-to-reporting-issues
+        check: Response references infrahub-reporting-issues
+      - name: no-skills-issue-for-product-bug
+        check: >-
+          Response contains no bug:/feat:/bug(docs): title line and no
+          opsmill/infrahub-skills filing target
+
+  - name: reporting-skill-gaps-existing-rule-bug
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: While using infrahub-managing-schemas to set up a bidirectional
+      relationship where one side peers a generic rather than a concrete
+      kind, you read rules/relationship-identifiers.md in full before
+      writing the schema. On the first attempt you left the identifier off
+      both sides, the schema loaded without error, but the relationship
+      silently split into two unrelated one-directional links, exactly the
+      symptom the rule describes. Only on a second read of the same rule
+      file did you notice it says a generic peer on either side requires an
+      explicit matching identifier on both sides. This has already shown up
+      in two sessions with the same pattern, the tracker has already been
+      searched with no match, and triage has already concluded this is a
+      skill defect.
+
+      Work through the next step: decide the kind and state the title you
+      would use for the report, with reasoning. Do not run `gh` commands or
+      submit anything.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_bug_vs_feature.py output.md --expected-kind=bug
+        weight: 1.0
+    expected_output: >-
+      A response that classifies the kind as the rule already covering the
+      generic-peer requirement, with the model still missing it on the
+      first pass, gives the matching bug: title naming
+      relationship-identifiers.md, and does not justify the kind by how many
+      reads or attempts it took.
+    expectations:
+      - Names the kind explicitly and uses a matching title prefix
+      - Names relationship-identifiers.md as the rule that already covers the topic
+      - Ties the kind to rule coverage, not to how many attempts it took
+    assertions:
+      - name: states-bug-or-feature
+        check: Response names the kind explicitly and uses the matching title prefix
+      - name: justifies-kind-by-coverage
+        check: >-
+          Response ties the kind to whether a rule already covers the topic,
+          not to severity or effort
+      - name: cites-escape-as-feature-evidence
+        check: >-
+          No docs/llms.txt escape occurred, so this check passes vacuously
+
+  - name: reporting-skill-gaps-docs-gap
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: While using infrahub-managing-generators, a generator needed to
+      read an attribute two relationship hops away from the object it was
+      generating for, through an intermediate peer, a shape Infrahub's
+      GraphQL API has supported and left unchanged for several releases.
+      You read patterns-common.md, python-generate.md, and
+      python-relationship-references.md in the generators skill, and
+      infrahub-common's graphql-queries.md reference, in full, before
+      writing any code. None of them say anything about traversing more
+      than one relationship hop in a GraphQL query. You then used your
+      web-fetch tool on https://docs.infrahub.app/llms.txt with a targeted
+      question about multi-hop relationship traversal, which pointed at a
+      specific documentation page; you fetched that page's Markdown twin,
+      but its content only walked through a single relationship hop and
+      never addressed traversing a second one. You ended up working out the
+      correct query shape by reading the GraphQL schema directly and trying
+      several field paths until one resolved.
+
+      The tracker has already been searched and no open issue covers this,
+      and triage has already concluded
+      this is a skill defect. Work through the next step: decide the kind
+      and state the title you would use for the report, with reasoning,
+      including which page path you reached and what it did or did not
+      answer. Do not run `gh` commands or submit anything.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_bug_vs_feature.py output.md --expected-kind=docs-gap
+        weight: 1.0
+    expected_output: >-
+      A response that recognizes no rule anywhere covers multi-hop
+      relationship traversal, that the docs.infrahub.app/llms.txt escape
+      happened only after the skill's own material and infrahub-common were
+      checked, and that the page it pointed at still did not address the
+      multi-hop case, gives the matching bug(docs): title, and records the
+      fetched page path and what it failed to answer. The kind is what
+      routes the report, so the response need not, and should not, name a
+      target repository.
+    expectations:
+      - Names the kind explicitly and uses a matching title prefix
+      - Ties the kind to whether a rule already covers the topic, not to effort or round trips
+      - States plainly whether the docs escape resolved the problem
+      - Records the specific page path reached and what it did not answer
+    assertions:
+      - name: states-bug-or-feature
+        check: Response names the kind explicitly and uses the matching title prefix
+      - name: justifies-kind-by-coverage
+        check: >-
+          Response ties the kind to whether a rule already covers the topic
+          plus the post-escape outcome, not to severity or effort
+      - name: cites-escape-outcome
+        check: >-
+          Response states whether the docs escape resolved the problem or not
+
+  - name: reporting-skill-gaps-docs-gap-unsettled
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: While using infrahub-managing-transforms, a transform needed
+      to target a preview attribute-computation mode that the CLI's own
+      `--help` output labels "shape not finalized, subject to change
+      release to release." You read patterns-common.md and every other
+      rule in the transforms skill in full, and none of them mention this
+      mode. You fetched https://docs.infrahub.app/llms.txt, which had no
+      page addressing it at all, so you worked out an invocation that
+      happened to run by reading the CLI's own `--help` text and the
+      changelog entry that introduced the flag.
+
+      The user confirms they have hit this same gap before, and triage
+      has already concluded this is a skill defect. Work through the next
+      step: decide the kind and what to do next. Do not run `gh` commands
+      or submit anything.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_docs_gap_gate.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that recognizes no rule covers this, that the docs
+      escape turned up nothing, and that the CLI's own text marks the
+      mode's shape as still changing rather than settled, so the
+      settled-behavior gate is not satisfied: it does not draft a
+      bug(docs): title or a Proposed rule change section, explains to the
+      user which behavior is unsettled, and ties that decision to the
+      gate. Note this is the one place the workflow stops without a
+      report, and it is not a confidence question.
+    expectations:
+      - Does not draft a bug(docs) issue title or a Proposed rule change section
+      - Ties the decision to the settled-behavior gate (behavior still changing, not settled)
+      - Explains which behavior is unsettled rather than stopping silently
+    assertions:
+      - name: no-docs-gap-when-unsettled
+        check: >-
+          Response does not draft a bug(docs): title or Proposed rule
+          change section, and ties the decision to the settled-behavior
+          gate
+
+  - name: reporting-skill-gaps-handoff
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: This friction has now shown up in two separate sessions with
+      infrahub-managing-checks. Both times, a validation check needed to
+      import a GraphQL fragment defined in another check module in the same
+      repository, and both sessions took two failed check runs to find the
+      correct relative import path. Checking this skill's loaded rules and
+      the shared infrahub-common references turned up nothing that
+      addresses sharing a fragment across check files.
+
+      The tracker has already been searched with no match. Triage
+      has already concluded this is a skill defect, and level 2 has already
+      concluded the kind: no rule or reference anywhere covers fragment
+      sharing across check modules, so this is a gap the skill's own
+      material never claimed.
+
+      Work through the rest of the workflow to completion: locate the
+      implicated rule coverage, draft the report, redact anything that
+      identifies the user's infrastructure, and take this as far as this
+      skill's own steps go. Do NOT run `gh` commands or contact GitHub
+      yourself; write out what you would do instead.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_handoff_to_reporting.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that drafts a complete report (type feature, a title
+      starting with `feat:`, a filled-in body, `searched` naming the
+      tracker already checked, and a Skills version header read from the
+      implicated skill's own frontmatter), then hands the payload to
+      infrahub-reporting-issues instead of running `gh issue create` or
+      claiming an issue was filed itself. It names no target repository:
+      routing belongs to the receiver, which resolves it from the type.
+    expectations:
+      - Hands off to infrahub-reporting-issues to file, rather than filing directly
+      - Runs no `gh` write commands itself and claims no issue was filed
+      - Carries a complete payload (type, title, body, searched)
+      - Records the skills-plugin version whose guidance failed
+      - Names no repository as the filing destination
+      - Uses a title starting with `feat:`
+    assertions:
+      - name: hands-off-to-reporting-issues-for-filing
+        check: Response invokes or names infrahub-reporting-issues as the filer
+      - name: no-direct-filing
+        check: >-
+          Response contains no `gh issue create`, no `gh issue comment`, and
+          no claim that an issue was filed
+      - name: payload-is-complete
+        check: >-
+          Response carries the payload fields type, title, body, and
+          searched
+      - name: states-skills-version
+        check: >-
+          Response's header records the skills-plugin version whose
+          guidance failed, or `unknown`
+      - name: leaves-routing-to-reporter
+        check: >-
+          Response names no repository as the filing destination, leaving
+          routing to infrahub-reporting-issues
+      - name: title-uses-kind-prefix
+        check: Response's title starts with `bug:`, `feat:`, or `bug(docs):`
+
+  - name: reporting-skill-gaps-cite-artifact
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: While using infrahub-managing-checks to write a validation check,
+      you followed rules/check-graphql-queries.md exactly as written, using
+      `store.get()` for a cross-object lookup as the rule specifies. The
+      check still returned stale data during a proposed change, because the
+      rule never states that `store.get()` requires a preceding
+      `client.all()` call on the same kind to warm the store first; without
+      that call it silently returns `None` instead of raising. This has now
+      happened in two separate sessions, the tracker has already been
+      searched with no match, triage has already concluded this is a skill
+      defect, and level 2 has already concluded the kind: bug, since
+      check-graphql-queries.md already covers `store.get()` and the model
+      still got it wrong.
+
+      Work through the next two steps of the workflow: locate the
+      implicated artifact and draft the report, including a complete
+      "Proposed rule change" section specific enough that a maintainer
+      could implement it without guessing at the missing detail. Do not run
+      `gh` commands or submit anything.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_cite_artifact.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that cites
+      skills/infrahub-managing-checks/rules/check-graphql-queries.md as the
+      implicated file (a path under skills/<skill>/rules/, not a vague
+      reference to "the checks skill"), and a "Proposed rule change"
+      section that names the missing case (`store.get()` needing a prior
+      `client.all()` call to warm the store) specifically enough for a
+      maintainer to implement it.
+    expectations:
+      - Cites a path under skills/<skill>/rules/ or skills/<skill>/SKILL.md, not a vague skill-name reference
+      - Includes a "Proposed rule change" heading with real, specific content
+    assertions:
+      - name: cites-rule-file
+        check: >-
+          Response names a skills/.../rules/*.md or skills/.../SKILL.md
+          path, or explicitly states no rule in this skill covers the
+          topic
+      - name: has-proposed-change
+        check: >-
+          Response includes a "Proposed rule change" heading with
+          non-placeholder, specific content
+
+  - name: reporting-skill-gaps-detection-verifier
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: You used infrahub-managing-schemas to add a relationship whose
+      peer is a generic. You read the skill's rules first, then wrote the
+      schema file. `infrahubctl schema load` rejected it twice with a
+      duplicate-identifier validation error. On the third attempt it loaded
+      cleanly, after you added an explicit `identifier` on the generic side
+      of the relationship. The instance was reachable throughout and
+      authentication never failed. This has now come up in two separate
+      sessions, the tracker has already been searched with no match, and
+      triage has already concluded this is a skill defect.
+
+      Work through the detection ladder and draft the report. Do not run
+      `gh` commands or submit anything.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_detection_ladder.py output.md
+        weight: 1.0
+    expected_output: >-
+      A report grounded in the verifier verdict: it names the
+      `infrahubctl schema load` failure and the later pass, cites the
+      implicated rule file under skills/infrahub-managing-schemas/rules/
+      (or states plainly that no rule covers the generic-peer case), states
+      both the form that was rejected and the form that was accepted, and
+      turns that delta into a specific "Proposed rule change" section.
+    expectations:
+      - Names the verifier command and its failed-then-passed transition
+      - Cites a path under skills/<skill>/rules/, or states no rule covers the case
+      - States both the rejected form and the accepted form
+      - Includes a "Proposed rule change" heading with real, specific content
+    assertions:
+      - name: cites-verifier-outcome
+        check: >-
+          Response names a verifier command (infrahubctl schema load or
+          similar) and its failed-then-passed transition
+      - name: cites-rule-file
+        check: >-
+          Response names a skills/.../rules/*.md or skills/.../SKILL.md
+          path, or explicitly states no rule in this skill covers the topic
+      - name: states-correction-delta
+        check: >-
+          Response states both the form that failed and the form that was
+          accepted
+      - name: has-proposed-change
+        check: >-
+          Response includes a "Proposed rule change" heading with
+          non-placeholder, specific content
+
+  - name: reporting-skill-gaps-detection-counters-only
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: A session using infrahub-managing-generators felt slow. Looking
+      back at it: the same generator file was edited four times, two tool
+      calls returned errors, and the user restated the same request twice
+      before saying "this is taking forever, report the friction."
+
+      That is all the evidence there is. No verifier was ever run, so
+      nothing failed and later passed. The errors were transport-level
+      timeouts against the instance, not validation rejections. The session
+      never settled on a topic specific enough to grep the generators
+      skill's `rules/` directory for, so no rule file (and no confirmed
+      absence of one) can be named.
+
+      Decide what to do and write out your reasoning. Do not run `gh`
+      commands or submit anything.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_counters_not_evidence.py output.md
+        weight: 1.0
+    expected_output: >-
+      A response that drafts nothing: no `bug:`/`feat:`/`bug(docs):` title
+      line and no "Proposed rule change" section. It states that
+      session-shape counters open an investigation rather than closing one,
+      and names what is missing (no verifier verdict, no coverage read that
+      resolves to a file or its absence).
+    expectations:
+      - Drafts no title line and no "Proposed rule change" section
+      - Says why the counters alone are not enough, naming the missing probe
+    assertions:
+      - name: no-draft-without-detection-evidence
+        check: >-
+          Response drafts no report and explains that counters alone are
+          not evidence, naming the missing verifier verdict or coverage
+          read
+
+  - name: reporting-skill-gaps-redaction
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      follow its workflow and rules.
+
+      Task: While using infrahub-managing-schemas for Quarrendon Vantis, you
+      added a uniqueness_constraint spanning a relationship on the
+      QuarrendonDcimEdgeRouter node (the `site` and `rack_position`
+      attributes on a related node had to be unique together), and
+      `infrahubctl schema load` rejected it twice before you found the
+      correct syntax. You were working from a local checkout at
+      /Users/pkirin/quarrendon/schema.yml, testing against an internal
+      instance at coredb01.quarrendon.internal (10.42.17.5). No rule in
+      infrahub-managing-schemas' rules/ covers a uniqueness_constraint that
+      spans a relationship rather than a single local attribute; only the
+      single-attribute case is documented. This has already shown up in a
+      prior session, the tracker has already been searched with no match,
+      triage has already concluded this is a skill defect, and level 2 has
+      already concluded the kind: feature, since no rule covers this case.
+
+      Work through the rest of the workflow to completion: locate the
+      implicated rule coverage and draft the full report. Do NOT run `gh`
+      commands or contact GitHub yourself; write out what you would do
+      instead.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/reporting-skill-gaps/check_no_customer_data.py output.md
+        weight: 1.0
+    expected_output: >-
+      A report that describes the missing rule for a
+      relationship-spanning uniqueness_constraint in generic terms,
+      without naming Quarrendon Vantis, the QuarrendonDcimEdgeRouter kind,
+      the /Users/pkirin path, the internal hostname, or the IP address (or
+      any bare distinctive fragment of them, such as "Quarrendon" alone)
+      anywhere in the draft, while still describing the modelling problem
+      clearly enough to act on.
+    expectations:
+      - >-
+        Does not name the customer, its node kind, the local path, the
+        internal hostname, or the IP address, in whole or in a
+        distinctive bare fragment
+      - Still describes the uniqueness_constraint-across-a-relationship modelling problem in generic terms
+    assertions:
+      - name: no-customer-identifiers
+        check: >-
+          Response contains none of: "Quarrendon Vantis",
+          "QuarrendonDcimEdgeRouter", "/Users/pkirin/quarrendon",
+          "coredb01.quarrendon.internal", "10.42.17.5", or a bare
+          distinctive fragment of any of them (e.g. "Quarrendon" alone)
+      - name: no-paths-or-hosts
+        check: Response contains no /Users/ or /home/ path and no IPv4 literal
+      - name: stays-actionable
+        check: >-
+          Response still describes the modelling problem generically, not
+          only placeholder tokens
   # --- NetBox Device Type Converter --- #
   - name: netbox-convert-template-objects
     trials: 3

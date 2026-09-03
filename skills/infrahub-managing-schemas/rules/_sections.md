@@ -57,7 +57,14 @@
    state: absent. Strategies for non-breaking schema
    changes.
 
-10. **Validation (validation-)** — HIGH for
+10. **File Formatting (format-)** — MEDIUM. Canonical key
+    ordering inside schema files, and the offline
+    `infrahubctl schema format` command that applies it.
+    Unformatted files reshuffle keys on every edit, so
+    diffs bury the substantive change. Cosmetic only — it
+    never changes what the schema means.
+
+11. **Validation (validation-)** — HIGH for
     string-length caps (load-time `string_too_long`
     on `description` / `label` / `identifier` /
     `deprecation`), otherwise LOW. Pre-validation

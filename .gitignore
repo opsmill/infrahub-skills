@@ -55,6 +55,10 @@ htmlcov/
 .env.local
 *.local
 
+# Direnv files (https://direnv.net/)
+.direnv/
+.envrc
+
 # OS
 .DS_Store
 Thumbs.db
@@ -73,3 +77,6 @@ docs/build/
 credentials.json
 secrets.yaml
 .claude/
+
+# Superpowers workspaces (never commit)
+.superpowers/

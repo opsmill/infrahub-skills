@@ -1,0 +1,298 @@
+# Reference — analyzing a diagnostic bundle
+
+Signal patterns, per-service log notes, manifest
+fields, and GitHub search recipes. The workflow in
+[SKILL.md](SKILL.md) links here for the exact
+commands at each step.
+
+## Bundle layout
+
+The layout is produced by `infrahub-collect create`
+and documented authoritatively in
+[../infrahub-collecting-diagnostics/reference.md](../infrahub-collecting-diagnostics/reference.md)
+— read it there rather than relying on a copy here.
+What analysis needs: `bundle_information.json` sits
+at the bundle root; per-service logs live under
+`bundle/logs/<service>/` (one file per replica,
+`*.previous.log` present after restarts); per-service
+state directories (`server/`, `database/`,
+`message-queue/`, `cache/`, `task-worker/`,
+`task-manager/`, `metrics/`) sit alongside `logs/`.
+
+Analysis order: `bundle_information.json` →
+`logs/*/` (including every `*.previous.log`) → the
+per-service state directories as findings demand.
+
+## Manifest
+
+`bundle_information.json` records the deployment
+that was collected and the outcome per collector.
+Read it for:
+
+- **Deployment/topology info** — Compose project or
+  K8s namespace; anchors which services to expect.
+- **Collector outcomes** — anything that failed is a
+  finding (see
+  [rules/workflow-manifest-first.md](rules/workflow-manifest-first.md)).
+- **Collection timestamp** — bounds the timeline;
+  errors near the end of a log may continue past the
+  bundle's horizon.
+
+## Deployment context
+
+Anchor these three facts before triage and put them
+in the report's first lines (see
+[rules/workflow-deployment-context.md](rules/workflow-deployment-context.md)):
+
+- **Version and edition** — from `bundle/server/`
+  state or the server log's startup banner. The
+  version drives the known-issue conclusion: fix
+  version newer than the running version → upgrade;
+  running version already at/past the fix →
+  unconfirmed match / possible regression. The
+  edition (Community vs Enterprise) matters for
+  scale-related findings — see the edition question
+  under Benchmark results.
+- **Topology** — Compose project or K8s namespace,
+  from the manifest. Several known failure patterns
+  (below) are Kubernetes-specific.
+- **Size** — replica counts from the per-replica
+  files under `bundle/logs/<service>/`. Multi-replica
+  API servers have their own failure pattern (shared
+  object storage).
+
+## Signal sweep — grep patterns
+
+Run across **all** of `bundle/logs/` (`-r`), never a
+single service. Case-insensitive where formats vary:
+
+```bash
+# Python tracebacks (server, task-worker, task-manager)
+grep -rn "Traceback (most recent call last)" bundle/logs/
+
+# Severity markers (all services)
+grep -rniE "\b(error|critical|fatal|panic)\b" bundle/logs/
+
+# Resource kills / OOM (database is Java; container runtime may log OOMKilled)
+grep -rniE "outofmemory|oomkilled|out of memory|killed" bundle/logs/
+
+# Connection failures and retry storms
+grep -rniE "connection (refused|reset|closed)|timed? ?out|retry" bundle/logs/
+
+# Restart evidence
+find bundle/logs -name "*.previous.log"
+```
+
+For each hit, keep: bundle path, timestamp, and 2-3
+surrounding lines (`grep -B2 -A6` around tracebacks
+to capture the exception line below the frames).
+
+## Per-service log notes
+
+| Service | Runtime | What its errors look like |
+| ------- | ------- | ------------------------- |
+| server | Python (FastAPI/GraphQL) | Python tracebacks; structured lines with levels; GraphQL errors may embed the operation name |
+| task-worker / task-manager | Python (Prefect-based) | Python tracebacks; task/flow retry messages; killed workers often only visible in `*.previous.log` |
+| database | Neo4j (Java) | `java.lang.*` exceptions, `OutOfMemoryError: Java heap space`, GC/stop-the-world warnings |
+| message-queue | RabbitMQ / NATS | connection churn, channel errors, memory watermarks |
+| cache | Redis / Valkey | `WARNING`/`# ...` lines, persistence and memory warnings |
+
+The task-manager is a Prefect server with its own
+dependency tail — a PostgreSQL database and Redis —
+so task-manager errors frequently originate there
+rather than in Infrahub code; read its log with that
+in mind. Task and worker logs are also viewable in
+the Infrahub UI's task history (internal system
+tasks excepted) — a useful fallback when the
+bundle's log window is truncated, and a way for the
+user to check state newer than the bundle.
+
+A Python traceback's most useful parts for matching:
+the **exception class** (last line), the **message**
+after the colon, and the **innermost frame whose
+path contains `infrahub`** (frames in site-packages
+below it belong to libraries).
+
+## Benchmark results
+
+The manifest is what tells you a benchmark ran and
+where its output went — read the benchmark collector's
+entry rather than assuming a path. Results commonly
+land under `bundle/metrics/`, but the directory and
+file names vary by collector version, so enumerate
+before concluding a benchmark is absent: an empty or
+missing `bundle/metrics/` is not evidence that
+`--benchmark` wasn't used.
+
+Evaluate the results as evidence, not an afterthought
+(see
+[rules/triage-benchmark-results.md](rules/triage-benchmark-results.md)
+for the full reasoning):
+
+- **Single-CPU score** — graph traversals in Neo4j
+  are largely single-core-bound; a low score caps
+  query latency regardless of core count. Report the
+  score, not the core count.
+- **Storage IOPS / latency** for the volumes backing
+  Neo4j *and* the task-manager's PostgreSQL — both
+  are random-I/O-sensitive. A few hundred IOPS with
+  high latency is the signature of network-attached
+  or burstable cloud storage and corroborates slow
+  writes, lock timeouts, and hanging merges.
+
+Which way the numbers point (the rule above carries
+the reasoning for each):
+
+| Benchmark | Symptom | Where the recommendation aims |
+| --------- | ------- | ----------------------------- |
+| Low score / low IOPS | Performance-shaped | Host sizing or storage — not a GitHub search |
+| Absent | Performance-shaped | A next bundle with `--benchmark` |
+| Healthy | Slowness tracking concurrent load, Community edition | The edition question, not more hardware |
+
+## Correlation heuristics
+
+- Dependency order (lower = more upstream):
+  database / message-queue / cache → server →
+  task-manager → task-worker. Cascades flow
+  downstream; root candidates sit upstream and fail
+  earliest.
+- Connection errors name their peer — `Connection
+  refused` to the database points the incident at
+  the database, not at the erroring service.
+- A restart timestamp (from `*.previous.log` tails)
+  anchors the incident window.
+- Log clocks are the container's own; small skews
+  between services are normal. Cluster on windows,
+  not exact equality.
+- The task-manager (Prefect) adds a side-branch to
+  the dependency order: it depends on its own
+  PostgreSQL and Redis. Worker symptoms (tasks not
+  starting, flows stuck) can root in that branch
+  without the main database or message-queue showing
+  anything — check task-manager logs for
+  Postgres/Redis connection errors before concluding
+  the workers themselves are at fault.
+
+## Known failure patterns
+
+Field-proven symptom-to-cause mappings. Check these
+before searching GitHub — when one fits, the search
+gets targeted (or becomes unnecessary) and the
+report can point at configuration instead of code.
+Each still needs bundle evidence before it goes in
+the report as more than a hypothesis.
+
+| Symptom | Likely cause | Where to look in the bundle |
+| ------- | ------------ | --------------------------- |
+| Triggers or computed attributes not firing (K8s) | Prefect background services not running — commonly disabled by hand-edited Helm values; the chart's env-var *list* is overridden wholesale by Helm, not merged | Manifest collector outcomes and `bundle/logs/task-manager/`: missing/empty background-service activity; no trigger-execution lines around the symptom window |
+| Merge or proposed-change crashes midway, later merges hang | Long-lived lock left behind (deadlock); the periodic cleanup task should clear it and may itself be stuck | `bundle/cache/` state for old locks; `bundle/logs/task-manager/` for the cleanup task's runs around the window |
+| Tasks stuck in RUNNING long after activity stopped | Stale task entries surviving a worker crash/restart | `*.previous.log` restart evidence for the workers; task-manager log around the worker's death. Remediation to *recommend* (never run from analysis): clean the stale RUNNING entries via the task-manager — the exact procedure depends on the deployment, so confirm it with OpsMill support |
+| Data or repositories gone after a pod restart (K8s) | Storage persistence disabled in the deployment values | Restart evidence plus post-restart logs showing empty/initialized state where data existed before |
+| Artifact/storage errors only on multi-replica API servers | No shared object storage (S3-compatible) configured — replicas can't see each other's artifacts | Replica count under `bundle/logs/server/`; storage-backend errors appearing on some replicas but not others |
+| Uniformly slow queries/UI with clean logs | Undersized host: low single-CPU score, or low-IOPS storage backing Neo4j/PostgreSQL (network-attached or burstable volumes) | Benchmark results when collected (`--benchmark`); if absent, the next bundle needs that flag before concluding anything |
+| Slowness that tracks concurrent load at scale, benchmark healthy (Community edition) | Edition-level scaling difference (the Neo4j edition underneath differs between Infrahub Community and Enterprise) — more hardware is unlikely to change it | Edition + version in the deployment context; healthy benchmark numbers; slowness correlating with user/automation concurrency. Recommendation: raise the edition question and confirm the Enterprise fit with OpsMill |
+
+When a pattern fits but its confirming evidence sits
+outside the bundle (Helm values, live pod listing,
+Redis lock listing), report the hypothesis with what
+the bundle *does* show and name the missing check as
+an open question for the user or the expert.
+
+## GitHub issue search
+
+```bash
+# Primary — stable keywords only; no --state (see
+# rules/match-stable-search-keys.md for why)
+gh search issues --repo opsmill/infrahub "<ExceptionClass> <stable message words>"
+
+# Second pass — synonyms / alternate fragment
+gh search issues --repo opsmill/infrahub "<module or symptom keywords>"
+```
+
+Key construction (see
+[rules/match-stable-search-keys.md](rules/match-stable-search-keys.md)):
+keep the exception class and constant message words;
+strip UUIDs, branch names, hostnames, IPs, file
+paths, timestamps, and object names unique to the
+deployment.
+
+### Reading a match for its fix version
+
+`gh search issues` returns title, state, and URL —
+never the version a fix shipped in. The
+version-comparison conclusion
+([rules/workflow-deployment-context.md](rules/workflow-deployment-context.md))
+therefore needs a second call on each promising
+match:
+
+```bash
+gh issue view <number> --repo opsmill/infrahub \
+  --json title,state,closedAt,milestone,labels,body
+```
+
+Where a fix version usually appears, in order of
+reliability: the **milestone** on a closed issue, the
+**closing comment** or linked PR, and a release-note
+mention in the body. A close date is *not* a fix
+version — the release that carried the fix may be
+later.
+
+When the issue names no version anywhere, that is the
+finding: report the match with "fix version
+undetermined" and keep the upgrade question open.
+Recommending an upgrade to an unknown version is the
+failure this step exists to prevent.
+
+Fallback when `gh` is unavailable — this skill's
+`allowed-tools` allows `WebFetch`, so read the issue
+from its URL directly; otherwise hand the user the
+search URL:
+
+```text
+https://github.com/opsmill/infrahub/issues?q=is%3Aissue+<keywords>
+```
+
+Nearly all platform symptoms belong in
+`opsmill/infrahub`. Only search a sub-repo when the
+traceback is unambiguous about it (e.g.
+`infrahub_sdk/` frames → `opsmill/infrahub-sdk-python`)
+— and repo *routing* for filing purposes stays with
+`infrahub-reporting-issues`.
+
+## Findings report shape
+
+Open the report with the deployment line, then one
+section per incident:
+
+```markdown
+# Findings — <project/namespace> bundle (collected <ts>)
+
+Deployment: Infrahub <version> (<edition>),
+<topology>, <replica counts>. Manifest:
+<collectors ok/failed>.
+
+## Incident <n>: <one-line summary> (<severity>)
+
+- Window: <first signal> → <last signal>
+- Root: <error> — <bundle path>
+  > <quoted excerpt, 1-3 lines>
+- Cascade: <downstream effects with paths>
+- Known issue: <matched issue URL + state; when it
+  names a fix version, the comparison against the
+  running version — or "no match (queries: ...)">
+- Open questions: <what this bundle cannot answer;
+  whether the symptom reproduces on demand and when
+  it last did; which `infrahub-collect create` flags
+  a next bundle would need>
+- Recommendation: <next step — not executed here>
+```
+
+Severity scale: CRITICAL (service down / data at
+risk), HIGH (feature broken, crash loop), MEDIUM
+(degraded, recovering), LOW (noise worth noting).
+
+## Docs
+
+- [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+- [Infrahub architecture](https://docs.infrahub.app/overview/architecture)
+- [opsmill/infrahub issues](https://github.com/opsmill/infrahub/issues)

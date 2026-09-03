@@ -53,6 +53,76 @@ hasn't expressed an intent to file an issue. Filing
 is the action that distinguishes this skill from
 general troubleshooting.
 
+Do not trigger directly when the friction is with an
+Infrahub *skill's* own guidance (a rule that's wrong,
+missing, or confusing) rather than the Infrahub
+product itself. That belongs to
+[infrahub-reporting-skill-gaps](../infrahub-reporting-skill-gaps/SKILL.md),
+which checks the tracker for an existing report and
+decides bug vs. feature before handing a payload to
+this skill.
+
+## Skill-gap intake
+
+This skill may also be invoked directly by
+`infrahub-reporting-skill-gaps` with a prepared payload:
+`{type, title, body, searched, issue?}`. For that caller,
+`type` is `bug`, `feature`, or `docs gap`, already decided
+by that skill's two-level triage.
+
+**The payload carries no `repo`, and routing is yours.**
+That caller deliberately names no destination, so this
+table is the only place the mapping lives:
+
+| `type` | Repo |
+| ------ | ---- |
+| `bug` | `opsmill/infrahub-skills` |
+| `feature` | `opsmill/infrahub-skills` |
+| `docs gap` | `opsmill/infrahub` |
+
+A bug or a feature is about a rule file, which lives in
+the skills repo. A docs gap is about Infrahub's own
+documentation, which lives in the main repo, and the
+skills maintainers have no power to write it. Resolve the
+repo from this table before step 4, then continue as
+though step 3 had run.
+
+Titles use `bug(docs):` for the docs-gap case, without a
+`[skill]` segment, since the originating skill means
+nothing to `opsmill/infrahub`'s maintainers; see
+[reference.md](reference.md) for that repo's own title
+notes and the `bug:`/`feat:` convention this pairs with.
+
+`searched` names the repo the caller already searched
+at its own step 2, and `issue` is optional. When
+`issue` is present, the caller matched an existing
+issue: treat it as the target, render `body` as a
+comment, and post with `gh issue comment` at step 8
+rather than `gh issue create`.
+
+**Step 4 depends on `searched`.** Skip it when `searched`
+equals the repo you just resolved: the caller has already
+run that exact search, and repeating it risks a second
+answer that contradicts the one already written into
+`body`. Run it as normal when they differ, which is the
+docs-gap case: the caller searches
+`opsmill/infrahub-skills` before it knows the kind, but a
+docs gap routes to `opsmill/infrahub`, so that tracker has
+not been checked by anyone yet.
+
+When invoked this way, classification (step 2) is already
+decided, skip it. Step 3's detection logic does not apply
+either; the table above replaces it, and there is nothing
+to confirm with the user since the kind was already
+established from the session's own evidence. Skip
+environment info gathering (step 5) too; it collects
+Infrahub server, SDK, and OS versions, which apply to
+neither a report about a skill's own guidance nor a
+report about missing documentation. Use the caller's
+title and body as the render for step 6 instead of a
+generic template. Continue through steps 7-9 as normal:
+review gate, submission method, confirm.
+
 ## Workflow
 
 Follow these steps in order. Stop at every user-gate
@@ -144,10 +214,21 @@ Show the user the top 3-5 matches with title, state
 > "Is your issue covered by any of these? If yes,
 > we'll add a comment instead of opening a new one."
 
-If a match exists, switch to **comment mode**:
-prepare a comment that adds the user's new
-information (their version, reproduction, etc.) to
-the existing issue. Otherwise, proceed.
+If a match exists, switch to **comment mode** and
+choose one of two paths. State which one to the user:
+
+1. **Complement**: this occurrence adds information
+   the existing issue lacks, such as a different
+   trigger, a second affected skill or component, or a
+   new failure shape. Comment with the new information
+   only; do not restate what the issue already says.
+2. **Plus one**: this occurrence adds nothing new.
+   Post a short comment recording another hit, so
+   maintainers can gauge frequency, without repeating
+   the existing description.
+
+Either way, give the user the issue URL. Otherwise,
+proceed to draft a new issue.
 
 ### 5. Gather environment info (bugs only)
 
@@ -238,18 +319,19 @@ until they explicitly approve the content.
 ### 8. Pick a submission method
 
 Once content is approved, ask the user how they want
-to submit:
+to submit. The commands differ for a new issue and a
+comment; pick the column that matches what step 7
+showed:
 
-1. **`gh issue create`** — direct via the CLI. Use
-   `gh issue create --repo <owner/repo> --title
-   "..." --body "..."`. Show the resulting URL.
-2. **MCP GitHub server** — if the user has a GitHub
-   MCP server, use it. Confirm the tool name with
-   the user before invoking.
-3. **Manual** — print the title and body as
-   copy-paste-ready markdown, plus the "New issue"
-   URL for the target repo:
-   `https://github.com/<owner>/<repo>/issues/new`.
+| Method | New issue | Comment on an existing issue |
+| ------ | --------- | ---------------------------- |
+| **CLI** | `gh issue create --repo <owner/repo> --title "..." --body "..."` | `gh issue comment <number> --repo <owner/repo> --body "..."` |
+| **MCP GitHub server** | Use it if the user has one. Confirm the tool name before invoking. | Same, using the server's comment tool. |
+| **Manual** | Print title and body as copy-paste-ready markdown, plus `https://github.com/<owner>/<repo>/issues/new`. | Print the body as copy-paste-ready markdown, plus `https://github.com/<owner>/<repo>/issues/<number>`. |
+
+A comment carries no title. If the render still has
+one, step 6 built the wrong artifact; go back rather
+than pasting a title into a comment body.
 
 Never assume a default — always ask. After the user
 picks a method, execute it.
@@ -258,8 +340,9 @@ picks a method, execute it.
 
 After submission, give the user:
 
-- The new issue URL (for gh/MCP submissions)
-- A one-line summary of what was filed
+- The issue URL, or the comment's permalink when the
+  submission was a comment (for gh/MCP submissions)
+- A one-line summary of what was filed or commented
 - A reminder that they can subscribe to the issue
   for updates
 

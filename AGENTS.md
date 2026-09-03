@@ -10,26 +10,28 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 
 ## Project Structure
 
-@dev/knowledges/architecture.md
+Read [dev/knowledges/architecture.md](dev/knowledges/architecture.md) for the component architecture, the progressive-disclosure model, the rule/eval systems, and the design decisions behind them.
 
 ## Getting Started
 
-@dev/guides/getting-started.md
+Read [dev/guides/getting-started.md](dev/guides/getting-started.md) for installation options, the typical workflow, and verification steps.
 
 ## Development Guides
 
-@dev/guides/adding-a-skill.md
-@dev/guides/adding-a-rule.md
-@dev/guides/running-evals.md
+Read the guide that matches the task before starting work:
+
+- [dev/guides/adding-a-skill.md](dev/guides/adding-a-skill.md) — creating a new skill (anatomy, SKILL.md, rules, evals, registration)
+- [dev/guides/adding-a-rule.md](dev/guides/adding-a-rule.md) — adding or tightening a rule; required reading for the Rule = Test workflow below
+- [dev/guides/running-evals.md](dev/guides/running-evals.md) — running skillgrade evals, writing graders and eval prompts
 
 ## Domain Knowledge
 
-@dev/knowledges/skill-writing-guide.md
-@dev/knowledges/infrahub-concepts.md
+- [dev/knowledges/skill-writing-guide.md](dev/knowledges/skill-writing-guide.md) — how to write effective skills: descriptions, rule structure, examples, common pitfalls
+- [dev/knowledges/infrahub-concepts.md](dev/knowledges/infrahub-concepts.md) — Infrahub concepts skill authors need: schema, relationships, metadata, proposed changes
 
 ## Custom Commands
 
-@dev/commands/
+AI command definitions live in [dev/commands/](dev/commands/).
 
 ## Quick Reference
 
@@ -46,21 +48,11 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 | `infrahub-analyzing-data` | `skills/infrahub-analyzing-data/` | Live data analysis via MCP server |
 | `infrahub-auditing-repo` | `skills/infrahub-auditing-repo/` | Audit repository against best practices (incl. YAGNI / cost-to-fix rules) |
 | `infrahub-reporting-issues` | `skills/infrahub-reporting-issues/` | Route and prepare bug/feature reports for any opsmill/infrahub-* repo |
+| `infrahub-reporting-skill-gaps` | `skills/infrahub-reporting-skill-gaps/` | Turn friction with an Infrahub skill into a bug or feature issue, filed via `infrahub-reporting-issues` |
 | `infrahub-collecting-diagnostics` | `skills/infrahub-collecting-diagnostics/` | Collect a redacted local diagnostic bundle via the infrahub-collect tool (logs, config, version, state) for OpsMill expert hand-off |
+| `infrahub-analyzing-diagnostics` | `skills/infrahub-analyzing-diagnostics/` | Analyze a collected diagnostic bundle: triage tracebacks/failures, correlate into incidents, match against existing GitHub issues |
 | `infrahub-importing-data` | `skills/infrahub-importing-data/` | Convert CSV/TSV inputs into Infrahub object YAML and load onto a fresh branch |
 | `infrahub-converting-netbox-device-types` | `skills/infrahub-converting-netbox-device-types/` | Convert NetBox device-type definitions into Infrahub object templates via a bundled, mapping-profile-driven Python converter |
-
-### Key Directories
-
-- `skills/` — Skill definitions with rules, examples, and references
-- `eval.yaml` — skillgrade eval config (all skills)
-- `evaluations/` — Auto-generated JSON eval files (regenerate with `python scripts/sync-evals.py` after editing `eval.yaml`)
-- `graders/` — Deterministic grader scripts per skill
-- `skills/infrahub-common/` — Shared references and cross-cutting rules
-- `hooks/` — Hook definitions for Infrahub project detection
-- `scripts/` — Utility scripts (`sync-versions.sh`, `sync-evals.py`)
-- `dev/` — Development guides, domain knowledge, and AI commands
-- `.claude-plugin/` — Plugin manifest
 
 ### Rule = Test (Required)
 

@@ -1,8 +1,8 @@
 ---
 name: infrahub-managing-schemas
 description: >-
-  Creates, validates, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions. Also checks the Infrahub Marketplace for an existing published schema to reuse before modelling a domain from scratch.
-  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations, looking for an existing/off-the-shelf schema or checking the marketplace for a domain (DCIM, location, routing, etc.), modeling file objects / attachments / uploads (storing PDFs, diagrams, images, certificates, documents as Infrahub objects).
+  Creates, validates, formats, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions. Also checks the Infrahub Marketplace for an existing published schema to reuse before modelling a domain from scratch.
+  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations, looking for an existing/off-the-shelf schema or checking the marketplace for a domain (DCIM, location, routing, etc.), modeling file objects / attachments / uploads (storing PDFs, diagrams, images, certificates, documents as Infrahub objects), formatting or tidying schema files, normalising / canonicalising schema key order, cleaning up noisy schema diffs where every edit reshuffles keys, or running `infrahubctl schema format` (including as a CI gate).
   DO NOT TRIGGER when: populating data objects, writing checks/generators/transforms, querying live data.
 allowed-tools:
   - Read
@@ -57,6 +57,7 @@ use the first argument as the namespace and remaining arguments as node names.
 | MEDIUM | Extensions | `extension-` | Cross-file via extensions block, artifact targets |
 | MEDIUM | Uniqueness | `uniqueness-` | Constraint format, __value suffix |
 | MEDIUM | Migration | `migration-` | Add/remove attributes, state: absent |
+| MEDIUM | File Formatting | `format-` | Canonical key order; `infrahubctl schema format` (offline) |
 | HIGH | Validation | `validation-` | Load-time string-length caps (description / label / identifier), common error messages, pre-check checklist |
 
 ## Schema File Basics
@@ -169,7 +170,13 @@ Follow these steps when creating or modifying a schema:
    `order_weight` per
    [rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md)
    and [rules/display-order-weight.md](./rules/display-order-weight.md).
-7. **Validate and roll out on a branch** — Run
+7. **Format the file** — Put the keys in the canonical
+   order before committing so diffs stay small. Run
+   `infrahubctl schema format` when your `infrahubctl`
+   provides it (offline, no server); otherwise author the
+   order by hand. See
+   [rules/format-schema-files.md](./rules/format-schema-files.md).
+8. **Validate and roll out on a branch** — Run
    `infrahubctl schema check` to fix errors per
    [validation.md](./validation.md) and
    [rules/validation-common-errors.md](./rules/validation-common-errors.md).

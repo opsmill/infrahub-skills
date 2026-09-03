@@ -7,8 +7,10 @@ description: >-
   debugging, wants to collect logs/diagnostics, prepares a hand-off for OpsMill
   support, or reports a crash/timeout/connection issue (upgrade failure, stuck
   branch, container CrashLoopBackOff, 500s, OOM).
-  DO NOT TRIGGER when: filing a public GitHub issue (use infrahub-reporting-issues),
-  or running operational queries (use infrahub-analyzing-data).
+  DO NOT TRIGGER when: a bundle has already been collected and the user wants
+  it analyzed (use infrahub-analyzing-diagnostics), filing a public GitHub
+  issue (use infrahub-reporting-issues), or running operational queries
+  (use infrahub-analyzing-data).
 allowed-tools:
   - Read
   - Bash
@@ -140,6 +142,11 @@ email). If the user also wants to file a public
 GitHub issue, hand off to `infrahub-reporting-issues`
 — see
 [rules/cross-link-reporting-issues.md](rules/cross-link-reporting-issues.md).
+If the user wants a local first-pass analysis of the
+bundle (tracebacks, failures, known-issue matching)
+before or instead of the expert hand-off, continue
+with `infrahub-analyzing-diagnostics` — this skill
+only collects; the analyzer owns triage.
 
 ## Rule Categories
 
