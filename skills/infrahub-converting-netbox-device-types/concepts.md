@@ -90,15 +90,21 @@ templatable.** This is the single most common wrong
 conclusion, and it is worth stating plainly because it
 looks so much like a blocker:
 
-> `DeviceGenericModule.serial_number` is `unique: true`
-> and is the generic's `human_friendly_id`, so a module
-> cannot be templated.
+> `DcimGenericModule.computed_name` is `unique: true`
+> and is how a module is identified, so a module cannot
+> be templated.
 
-That is **false**. `TemplateDeviceLinecard` simply has
-no `serial_number` attribute, is keyed on
-`template_name`, and is created without one. The serial
-is supplied on each module instantiated from it —
-exactly as a device's `name` is.
+That is **false**. `TemplateDcimModule` simply has no
+`computed_name` attribute, is keyed on `template_name`,
+and is created without one. The identity is supplied on
+each module instantiated from it — exactly as a
+device's `name` is.
+
+The same holds for **mandatory relationships**:
+`DcimGenericModule.module_bay` is `optional: false`, yet
+a module template is created without being installed in
+a bay. Infrahub relaxes those on generated templates the
+way it omits unique attributes.
 
 The real question is never "is this attribute unique?"
 but "does this node have a `Component` relationship

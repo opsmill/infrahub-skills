@@ -2,7 +2,7 @@
 
 NetBox module types declare the ports a module provides, with a ``{module}``
 token that NetBox substitutes with the bay position when the module is
-installed. Those declarations import into Infrahub as ``DeviceModulePort``
+installed. Those declarations import into Infrahub as ``DcimModulePort``
 objects parented by the module (schema-library ``extensions/module_port``).
 They are declarations only: the token is still literal, and they are not
 ``DcimInterface`` objects, so they cannot be cabled, addressed, or queried as
@@ -25,7 +25,8 @@ known once the module is installed, and a template is not bound to a bay.
 
 What it does, per device
 ------------------------
-For each installed module (``device.modules``), resolve the bay position, then
+For each installed module (``device.module_bays[].installed_module``), resolve
+the bay position, then
 for each of the module's ports substitute the token and create the device-side
 object routed by ``port.category``:
 
@@ -48,7 +49,7 @@ skip rather than a failed run.
 
 Where ``port_type`` goes: nowhere, by default
 ---------------------------------------------
-``DeviceModulePort.port_type`` holds a NetBox slug (``1000base-t``, ``rj-45``,
+``DcimModulePort.port_type`` holds a NetBox slug (``1000base-t``, ``rj-45``,
 ``iec-60320-c14``). Stock ``InterfacePhysical`` has **no media-type
 attribute** -- its own attribute list is empty, and the ``DcimInterface``
 generic it inherits declares only ``name``, ``description``, ``mtu``,
@@ -145,7 +146,7 @@ POSITION_TOKEN = "{module}"
 PROVENANCE_PREFIX = "[module-port]"
 
 #: Category used when a port declares none. Mirrors the schema default on
-#: ``DeviceModulePort.category``.
+#: ``DcimModulePort.category``.
 DEFAULT_CATEGORY = "interface"
 
 #: Kind created for a network interface port.
@@ -253,7 +254,11 @@ def peers(wrapper: Any) -> list[dict]:
     edges = wrapper.get("edges")
     if not isinstance(edges, list):
         return []
-    return [edge["node"] for edge in edges if isinstance(edge, dict) and isinstance(edge.get("node"), dict)]
+    return [
+        edge["node"]
+        for edge in edges
+        if isinstance(edge, dict) and isinstance(edge.get("node"), dict)
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -342,22 +347,49 @@ def provenance(module_serial: str, position: str | None) -> str:
     return text
 
 
-def resolve_position(module: dict) -> tuple[str | None, str]:
+def installed_modules(device: dict) -> list[tuple[dict | None, dict]]:
+    """Return ``(bay, module)`` pairs for every populated bay on a device.
+
+    schema-library v2 has no ``DcimPhysicalDevice.modules``: a device owns
+    ``module_bays``, and each bay may carry an ``installed_module``. Walking
+    bays is therefore the only route to a device's modules, and it hands the
+    position over directly — the bay owns it.
+
+    Args:
+        device: The device node from the GraphQL response.
+
+    Returns:
+        One pair per bay that has a module installed. Empty bays are skipped;
+        they have no ports to materialise.
+    """
+    pairs: list[tuple[dict | None, dict]] = []
+    for bay in peers(device.get("module_bays")):
+        module = peer(bay.get("installed_module"))
+        if module is not None:
+            pairs.append((bay, module))
+    return pairs
+
+
+def resolve_position(module: dict, bay: dict | None = None) -> tuple[str | None, str]:
     """Resolve the bay position of an installed module.
 
-    Prefers ``module_bay.position``, the canonical free-form position. Falls
-    back to a concrete-kind ``slot`` value when the query enables that inline
+    Prefers the bay's ``position``, the canonical free-form value. Falls back
+    to a concrete-kind ``slot`` value when the query enables that inline
     fragment and the bay gives nothing usable.
 
     Args:
         module: A module node from the GraphQL response.
+        bay: The bay the module is installed in, when known. Passing it
+            explicitly is what lets this work on schema-library v2, where the
+            traversal runs device -> bay -> module rather than the reverse.
 
     Returns:
         ``(position, source)``. ``position`` is ``None`` when nothing usable
         was found; ``source`` always explains which branch was taken, so the
         caller can report *why* a position is missing.
     """
-    bay = peer(module.get("module_bay"))
+    if bay is None:
+        bay = peer(module.get("module_bay"))
 
     if bay is not None:
         position = scalar(bay.get("position"))
@@ -439,9 +471,9 @@ def plan_device(
     existing = existing_interfaces(device)
     claimed: dict[str, str] = {}
 
-    for module in peers(device.get("modules")):
+    for bay, module in installed_modules(device):
         module_serial = str(scalar(module.get("serial_number")) or "<no serial>")
-        position, position_source = resolve_position(module)
+        position, position_source = resolve_position(module, bay)
 
         for port in peers(module.get("ports")):
             outcome = _decide_port(
@@ -551,7 +583,9 @@ def _decide_port(
         name=resolved,
         device_id=plan.device_id,
         device_name=plan.device_name,
-        description=provenance(module_serial, position if POSITION_TOKEN in declared_name else None),
+        description=provenance(
+            module_serial, position if POSITION_TOKEN in declared_name else None
+        ),
         role=role,
         port_type=str(port_type) if port_type and target_attribute else None,
         port_type_attribute=target_attribute,

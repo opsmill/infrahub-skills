@@ -101,7 +101,7 @@ Module port names carry NetBox's `{module}` token, which
 no conversion can resolve — the bay position is only
 known once the module is installed. Once the
 schema-library module extensions are loaded so the ports
-import as `DeviceModulePort` declarations, the bundled
+import as `DcimModulePort` declarations, the bundled
 generator resolves the token per installed module and
 creates the real device interfaces. See
 [generators-module-ports.md](./generators-module-ports.md).
@@ -140,10 +140,14 @@ Full index: [rules/_sections.md](./rules/_sections.md).
 ### 1. Confirm the schema generates templates
 
 `Template*` kinds exist only where a node declares
-`generate_template: true`. In the OpsMill
-schema-library that line ships **commented out** in
-`base/dcim.yml`, so this is the most common reason a
-conversion loads nothing.
+`generate_template: true`. Check the target schema
+rather than assuming either way — this is the most
+common reason a conversion loads nothing.
+
+In the OpsMill schema-library the answer depends on
+the version: **v2 and later enable it** on `DcimDevice`
+in `base/dcim.yml`, while pre-v2 shipped the line
+commented out. Custom schemas usually have to add it.
 
 Read
 [rules/workflow-schema-prerequisites.md](./rules/workflow-schema-prerequisites.md).
@@ -261,12 +265,15 @@ Read
 
 Two cases worth flagging by name when they apply:
 
-- **Modular chassis convert to an empty template** —
-  their ports live in module bays, 13.5% of the
-  published library. The schema-library modules
-  extension does not close this the way it looks like it
-  should; see
-  [extending-your-schema.md](./extending-your-schema.md#module-bays-what-the-modules-extension-does-and-does-not-give-you).
+- **Modular chassis** — their ports live in module
+  bays, so 13.5% of the published library converts to a
+  template with no interfaces. On schema-library **v2**
+  the bays themselves convert (`TemplateDcimModuleBay`),
+  which turns an empty template into a useful one; the
+  `schema-library-modules.yml` profile maps them. On
+  pre-v2, or a schema with no bay node, they are still
+  reported as skipped. See
+  [extending-your-schema.md](./extending-your-schema.md#module-bays).
 - **Console ports are usually a profile change, not a
   schema change** — if the schema models them as a node
   inheriting the interface generic, they already ride

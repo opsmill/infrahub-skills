@@ -55,6 +55,7 @@ REASON_UNNAMED = _mod.REASON_UNNAMED
 POSITION_BAY_WITHOUT_POSITION = _mod.POSITION_BAY_WITHOUT_POSITION
 POSITION_FROM_BAY = _mod.POSITION_FROM_BAY
 POSITION_FROM_SLOT = _mod.POSITION_FROM_SLOT
+installed_modules = _mod.installed_modules
 POSITION_NO_BAY = _mod.POSITION_NO_BAY
 is_ours = _mod.is_ours
 peer = _mod.peer
@@ -109,7 +110,7 @@ def module(
     slot=None,
     typename="DeviceLinecard",
 ):
-    """Build one installed DeviceGenericModule node.
+    """Build one installed DcimGenericModule node.
 
     Args:
         serial: The module's ``serial_number``.
@@ -147,12 +148,33 @@ def interface(name, description=""):
 
 
 def device(name="dcs-7508n-01", modules=(), interfaces=(), device_id="device-uuid-1"):
-    """Build one DcimDevice node."""
+    """Build one DcimDevice node.
+
+    schema-library v2 has no ``DcimPhysicalDevice.modules``: a device owns
+    ``module_bays``, and each bay carries an ``installed_module``. The
+    ``modules`` argument is kept for readability — each one is wrapped in the
+    bay its own ``module_bay`` describes.
+
+    A module built with ``bay=False`` has no bay to be found through, which v2
+    forbids (``DcimGenericModule.module_bay`` is mandatory). It is wrapped in a
+    bay with a null position instead — the reachable analogue.
+    """
+    bays = []
+    for index, mod in enumerate(modules):
+        own_bay = mod.get("module_bay")
+        bay_node = own_bay.get("node") if isinstance(own_bay, dict) else None
+        if bay_node is None:
+            bay_node = {
+                "id": f"bay-null-{index}",
+                "name": attr(f"Bay {index}"),
+                "position": attr(None),
+            }
+        bays.append({**bay_node, "installed_module": one(mod)})
     return {
         "id": device_id,
         "name": attr(name),
         "interfaces": many(list(interfaces)),
-        "modules": many(list(modules)),
+        "module_bays": many(bays),
     }
 
 
@@ -174,8 +196,7 @@ SUP2_PORTS = [
 
 #: module-types/Arista/DCS-7500R-36CQ.yaml
 CQ36_PORTS = [
-    port(f"Ethernet{{module}}/{index}/1", port_type="100gbase-x-qsfp28")
-    for index in range(1, 37)
+    port(f"Ethernet{{module}}/{index}/1", port_type="100gbase-x-qsfp28") for index in range(1, 37)
 ]
 
 #: module-types/Juniper/EX-PWR-320-AC.yml
@@ -404,7 +425,7 @@ def test_module_with_no_bay_skips_its_tokenised_ports_with_the_reason():
 
     assert plan.creates == []
     assert reasons(plan) == [REASON_POSITION_UNRESOLVED] * 3
-    assert {skip.detail for skip in plan.skips} == {POSITION_NO_BAY}
+    assert {skip.detail for skip in plan.skips} == {POSITION_BAY_WITHOUT_POSITION}
 
 
 def test_bay_with_null_position_skips_with_the_more_precise_reason():
@@ -763,7 +784,8 @@ def test_generate_creates_nothing_when_the_response_is_empty():
 
 def test_generate_handles_every_device_in_the_response():
     generator = build_generator({"InterfacePhysical": ["name"]})
-    run_generate(generator, 
+    run_generate(
+        generator,
         response(
             device(name="chassis-a", modules=[module("A", [port("Ethernet{module}/1")], "1")]),
             device(
@@ -771,7 +793,7 @@ def test_generate_handles_every_device_in_the_response():
                 modules=[module("B", [port("Ethernet{module}/1")], "2")],
                 device_id="device-uuid-2",
             ),
-        )
+        ),
     )
 
     created = {node.data["name"]: node.data["device"] for node in generator.client.created}
@@ -779,3 +801,63 @@ def test_generate_handles_every_device_in_the_response():
         "Ethernet1/1": {"id": "device-uuid-1"},
         "Ethernet2/1": {"id": "device-uuid-2"},
     }
+
+
+# ---------------------------------------------------------------------------
+# schema-library v2 traversal: device -> module_bays -> installed_module
+# ---------------------------------------------------------------------------
+
+
+def test_modules_are_reached_through_bays_not_a_device_modules_relationship():
+    """v2 has no DcimPhysicalDevice.modules; selecting it fails the query."""
+    dev = device(modules=[module("S1", [port("Ethernet{module}/1")])])
+
+    assert "modules" not in dev
+    assert "module_bays" in dev
+    assert [scalar(m.get("serial_number")) for _, m in installed_modules(dev)] == ["S1"]
+
+
+def test_an_empty_bay_contributes_no_module():
+    dev = device(modules=[module("S1", [port("Ethernet{module}/1")])])
+    dev["module_bays"]["edges"].append(
+        {
+            "node": {
+                "id": "bay-empty",
+                "name": attr("Slot 9"),
+                "position": attr("9"),
+                "installed_module": {"node": None},
+            }
+        }
+    )
+
+    assert len(installed_modules(dev)) == 1
+
+
+def test_position_comes_from_the_bay_being_walked():
+    dev = device(modules=[module("S1", [port("Ethernet{module}/1")], position="F3")])
+    bay, mod = installed_modules(dev)[0]
+
+    assert resolve_position(mod, bay) == ("F3", POSITION_FROM_BAY)
+
+
+def test_free_form_bay_positions_survive_the_traversal():
+    """#76 retypes position to Text; F1 / PSU-1 / 0 all have to work."""
+    for position in ("F1", "PSU-8", "0", "10"):
+        dev = device(modules=[module("S1", [port("Ethernet{module}/1")], position=position)])
+        bay, mod = installed_modules(dev)[0]
+        assert resolve_position(mod, bay) == (position, POSITION_FROM_BAY)
+
+
+def test_a_bay_with_a_null_position_is_reported_not_guessed():
+    dev = device(modules=[module("S1", [port("Ethernet{module}/1")], position=None)])
+    bay, mod = installed_modules(dev)[0]
+
+    assert resolve_position(mod, bay) == (None, POSITION_BAY_WITHOUT_POSITION)
+
+
+def test_resolve_position_still_falls_back_to_the_back_reference():
+    """Defensive path for a schema where the bay is not the entry point."""
+    mod = module("S1", [], position="7")
+
+    assert resolve_position(mod) == ("7", POSITION_FROM_BAY)
+    assert resolve_position(module("S1", [], bay=False)) == (None, POSITION_NO_BAY)

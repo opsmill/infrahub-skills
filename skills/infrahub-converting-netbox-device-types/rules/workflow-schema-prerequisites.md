@@ -26,9 +26,12 @@ never heard of — every file fails to load with
 "schema kind not found", and the failure appears at
 load time, far from the conversion that caused it.
 
-This bites people using the OpsMill schema-library in
-particular: `base/dcim.yml` ships that line
-**commented out**.
+Which side of this a schema-library project falls on
+depends on its version, so check rather than assume:
+**v2 and later enable it** on `DcimDevice`, while
+pre-v2 shipped `base/dcim.yml` with the line
+**commented out**. A schema pinned to the older
+library, or any custom schema, still needs it added.
 
 > Docs:
 > [Object Templates overview](https://docs.infrahub.app/object-templates/overview)
@@ -53,7 +56,7 @@ particular: `base/dcim.yml` ships that line
 nodes:
   - name: Device
     namespace: Dcim
-    # generate_template: true    # commented out — no Template* kinds
+    # generate_template: true    # pre-v2 schema-library — no Template* kinds
 ```
 
 **Template-generating:**

@@ -32,14 +32,15 @@ interfaces:
 
 ### Schema prerequisite
 
-`generate_template` ships commented out in
-schema-library. Uncomment it and load the schema
-before converting:
+`DcimDevice` needs `generate_template: true`.
+schema-library **v2 and later already set it**; on a
+pre-v2 pin it ships commented out and has to be
+uncommented and the schema reloaded:
 
 ```yaml
   - name: Device
     namespace: Dcim
-    generate_template: true    # was commented out
+    generate_template: true    # set on v2; uncomment on pre-v2
     inherit_from:
       - CoreArtifactTarget
       - DcimGenericDevice
@@ -86,7 +87,7 @@ spec:
     part_number: C9300-48P
     height: 1
     full_depth: true
-    weight: 7.59
+    weight: 8
     manufacturer: Cisco
 ```
 
@@ -179,7 +180,7 @@ device-types/Juniper/EX4300-48T-copy.yaml; template names must be unique
 Weight conversion shows up in the report:
 
 ```markdown
-- Coerced weight: weight 16.1 lb converted to 7.303 kg
+- Coerced weight: weight 16.1 lb converted to 7 kg
 ```
 
 ## 3. Closing a coverage gap

@@ -106,9 +106,13 @@ what it cannot.
 
 `console-ports`, `console-server-ports`,
 `power-ports`, `power-outlets`, `front-ports`,
-`rear-ports`, `module-bays`, `device-bays`,
-`inventory-items` — schema-library models no
-equivalent node.
+`rear-ports`, `device-bays`, `inventory-items` —
+schema-library models no equivalent node.
+
+`module-bays` are the exception on schema-library **v2**:
+`DcimModuleBay` exists and `schema-library-modules.yml`
+maps them. They remain skipped under the plain
+`schema-library.yml` profile, and on pre-v2 schemas.
 
 ### Not mapped — reported as dropped
 

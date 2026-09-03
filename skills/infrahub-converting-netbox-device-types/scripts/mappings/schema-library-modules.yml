@@ -1,36 +1,39 @@
 ---
-# Mapping profile for the OpsMill schema-library DCIM schema *with* the
-# modules extension, covering NetBox device types AND module types.
+# Mapping profile for the OpsMill schema-library **v2** DCIM schema, covering
+# NetBox device types AND module types.
 #
-# Prerequisites beyond the plain schema-library profile:
+# Schema prerequisites (all on schema-library main since v2, #75):
 #
-# 1. Load `extensions/modules/modules.yml`. It defines the generics
-#    DeviceGenericModule and DeviceGenericModuleType, plus the
-#    DcimPhysicalDevice.modules Component relationship.
-# 2. Define a CONCRETE node inheriting DeviceGenericModuleType — the
-#    extension ships generics only, and a generic cannot be instantiated.
-#    `experimental/modules_linecards/linecard.yml` has a worked example
-#    (DeviceLinecardType / DeviceLinecard); set `module_type.kind` below to
-#    whichever concrete kind you settle on.
+#   base/dcim.yml                              DcimDevice already carries
+#                                              generate_template: true
+#   extensions/device_module/device_module.yml DcimModuleBay, DcimModule,
+#                                              DcimModuleType (concrete nodes —
+#                                              v2 no longer ships generics only)
+#   extensions/module_port/module_port.yml     DcimModulePort  [schema-library #76]
 #
-# What converts, and what does not:
+# Requires schema-library #76 for three things. Against v2 main today, drop
+# the `label` line from module-bays and the `weight` line from module_type;
+# everything else converts.
 #
-# NetBox module types are mostly their component list — the ports the
-# module provides. Neither DeviceGenericModuleType nor DeviceGenericModule
-# has ANY component relationship, so those lists are reported as skipped,
-# not converted. This profile therefore emits module type *records* (model,
-# part number, manufacturer) and no module templates.
+#   DcimModuleBay.position   v2 types it Number with min_value: 1, rejecting
+#                            the free-form positions NetBox actually uses
+#                            (`F1`, `PSU-1`, `'0'` — 15 of the DCS-7508N's 24
+#                            bays). #76 retypes it to Text. The attribute
+#                            exists either way, so this fails at load, not at
+#                            conversion.
+#   DcimModuleBay.bay_label  added by #76
+#   DcimGenericModuleType.weight_grams  added by #76
 #
-# What is NOT the obstacle: DeviceGenericModule.serial_number being unique
-# and the generic's human_friendly_id. Module templates work — Infrahub
-# omits unique attributes from a generated template entirely and re-keys it
-# on template_name, so a TemplateDeviceLinecard has no serial_number and is
-# created without one. The missing piece is somewhere to put the ports.
+# What converts:
 #
-# To convert the components too: put `generate_template: true` on your
-# concrete module node, give it a Component relationship to an
-# interface-like node, then uncomment the `template:` and `components:`
-# blocks under `module_type:` below. See ../../extending-your-schema.md.
+#   device types  -> DcimDeviceType + TemplateDcimDevice (+ interfaces, bays)
+#   module types  -> DcimModuleType records
+#
+# Module ports are NOT converted here. A module's ports carry NetBox's
+# {module} bay-position token, which cannot be resolved at conversion time;
+# extensions/module_port gives them a home and the bundled
+# materialize_module_ports.py generator resolves the token once a module is
+# installed in a bay. See ../../generators-module-ports.md.
 version: 1
 name: schema-library-modules
 
@@ -88,10 +91,30 @@ components:
     defaults:
       status: active
 
+  # Module bays convert as of schema-library v2: DcimPhysicalDevice.module_bays
+  # is a Component relationship to DcimModuleBay, so Infrahub generates
+  # TemplateDcimModuleBay. This is what turns a modular chassis from an empty
+  # template into a useful one — a DCS-7508N carries 24 bays and no interfaces.
+  #
+  # Needs schema-library #76: bay `position` must be Text (see the header).
+  module-bays:
+    kind: TemplateDcimModuleBay
+    relationship: module_bays
+    template_name: "{template_name}__bay__{name}"
+    fields:
+      name: name
+      position: position
+      # NetBox's `label` goes to `bay_label`, never an attribute named
+      # `label`: Infrahub auto-populates a `label` attribute from `name` and
+      # title-cases it, so "NetBox supplied no label" would be
+      # indistinguishable from "label equals name".
+      label: bay_label
+
 module_type:
-  # Set this to YOUR concrete node inheriting DeviceGenericModuleType.
-  # DeviceGenericModuleType itself is a generic and cannot be instantiated.
-  kind: DeviceLinecardType
+  # v2 ships this concrete node (inherits DcimGenericModuleType) — no need to
+  # define one yourself any more. DeviceLinecardType from
+  # experimental/modules_linecards/ is an alternative if you have loaded it.
+  kind: DcimModuleType
   manufacturer_relationship: manufacturer
   # Module types carry no slug; `model` is unique across all published
   # module types, so it is the identity.
@@ -102,22 +125,14 @@ module_type:
     description:
       target: description
       fallback: comments
+    # weight_grams [schema-library #76] is grams-denominated, so module
+    # weights keep full resolution — unlike DcimDeviceType.weight, which is
+    # kilograms and rounds sub-500g hardware to 0.
+    weight:
+      target: weight_grams
+      transform: weight_g
 
-  # Uncomment once your concrete module node carries `generate_template:
-  # true` AND a Component relationship that can hold the module's ports.
-  # Until then the component lists are reported as skipped, which is the
-  # honest outcome.
-  #
-  # position_placeholder: "1"   # substitutes NetBox's {module} bay token
-  #
-  # template:
-  #   kind: TemplateDeviceLinecard
-  #   template_name: "module__{model}"
-  #   module_type_relationship: linecard_type
-  # components:
-  #   interfaces:
-  #     kind: TemplateInterfacePhysical
-  #     relationship: interfaces
-  #     template_name: "module__{template_name}__{name}"
-  #     fields:
-  #       name: name
+  # Module ports: see the header. Enabling a module template here would need a
+  # concrete module node carrying `generate_template: true`; v2's DcimModule
+  # does not, so TemplateDcimModule is not generated and the ports are
+  # reported as skipped. That is the honest outcome until the generator runs.

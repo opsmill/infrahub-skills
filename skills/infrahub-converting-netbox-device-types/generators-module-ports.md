@@ -25,7 +25,7 @@ interfaces.
 
 ## Why a generator and not a template
 
-A `DeviceModulePort` is a **declaration**: it records
+A `DcimModulePort` is a **declaration**: it records
 the port a module type provides, parented by the
 module, with `{module}` still literal. It is
 deliberately not a `DcimInterface`.
@@ -50,8 +50,8 @@ for one reason: the bay position is only known once the
 module is installed.
 
 Schema prerequisites, in load order: `base/dcim.yml` →
-`extensions/modules/modules.yml` →
-`extensions/module_bay/module_bay.yml` →
+`extensions/device_module/device_module.yml` →
+`extensions/device_module/device_module.yml` →
 `extensions/module_port/module_port.yml`.
 
 ## What it creates, and what it refuses to
@@ -80,7 +80,7 @@ with no code change.
 
 ### Where `port_type` goes: nowhere, by default
 
-`DeviceModulePort.port_type` holds a NetBox slug
+`DcimModulePort.port_type` holds a NetBox slug
 (`1000base-t`, `rj-45`, `iec-60320-c14`). Stock
 `InterfacePhysical` has **no media-type attribute** —
 its own attribute list is empty and the `DcimInterface`
@@ -181,7 +181,7 @@ collision check), its installed modules, each module's
 ### Unions and inline fragments
 
 `device.modules` peers the **generic**
-`DeviceGenericModule`, so the node type is a GraphQL
+`DcimGenericModule`, so the node type is a GraphQL
 interface. Everything the generator needs is declared
 on that generic — `serial_number` and `description` on
 the generic itself, `ports` and `module_bay` extended
@@ -193,7 +193,7 @@ an inline fragment. Selecting one on the interface
 fails the whole query:
 
 ```text
-Cannot query field 'slot' on type 'DeviceGenericModule'.
+Cannot query field 'slot' on type 'DcimGenericModule'.
 ```
 
 The rule is
@@ -368,12 +368,12 @@ and re-loading does **not** backfill the ports. The
 modules have to be deleted and recreated.
 
 **The module→device link has to be set from the device
-side.** `DeviceGenericModule.device` peers
+side.** `DcimGenericModule.device` peers
 `DcimPhysicalDevice`, a generic with no `name` and so no
 `human_friendly_id` — there is nothing for a name in an
 object file to resolve against. Set it from
 `DcimDevice.modules` instead, whose peer
-`DeviceGenericModule` *is* keyed on `serial_number__value`.
+`DcimGenericModule` *is* keyed on `serial_number__value`.
 That document has to restate the device's mandatory
 `status` and `location`:
 

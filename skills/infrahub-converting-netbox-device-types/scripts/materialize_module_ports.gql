@@ -8,15 +8,25 @@
 #
 # Inline fragments and unions
 # ---------------------------
-# `modules` peers the GENERIC DeviceGenericModule, so the node type is a
-# GraphQL interface. Everything selected below is declared on that generic —
-# serial_number and description on the generic itself, `ports` and `module_bay`
-# extended onto it by extensions/module_port/module_port.yml and
-# extensions/module_bay/module_bay.yml — which is why they select directly.
+# A device reaches its modules THROUGH ITS BAYS. schema-library v2 puts
+# `module_bays` (Component -> DcimModuleBay) on DcimPhysicalDevice, and the bay
+# carries `installed_module` (-> DcimGenericModule). There is no
+# `DcimPhysicalDevice.modules`; the pre-v2 modules extension had one, and
+# selecting it against v2 fails the whole query with
+# "Cannot query field 'modules' on type 'DcimDevice'".
+#
+# Traversing bays is also what makes the position reliable: the bay owns
+# `position`, so it is read straight off the node being walked rather than
+# back-referenced from the module.
+#
+# `installed_module` peers the GENERIC DcimGenericModule, so its node type is a
+# GraphQL interface. serial_number and description are declared on that generic;
+# `ports` is extended onto it by extensions/module_port/module_port.yml — which
+# is why they select directly.
 #
 # Fields that live only on a CONCRETE module kind require an inline fragment;
 # selecting them on the interface fails the whole query with
-# "Cannot query field 'X' on type 'DeviceGenericModule'". See
+# "Cannot query field 'X' on type 'DcimGenericModule'". See
 # skills/infrahub-managing-transforms/rules/queries-union-fragments.md.
 #
 # The one such field the generator can use is DeviceLinecard.slot, a fallback
@@ -56,52 +66,52 @@ query ModulePortsForDevice($name: String!) {
             }
           }
         }
-        modules {
+        module_bays {
           edges {
             node {
               id
-              __typename
-              serial_number {
+              name {
                 value
               }
-              module_bay {
+              position {
+                value
+              }
+              installed_module {
                 node {
                   id
-                  name {
+                  __typename
+                  serial_number {
                     value
                   }
-                  position {
-                    value
-                  }
-                }
-              }
-              ports {
-                edges {
-                  node {
-                    name {
-                      value
-                    }
-                    category {
-                      value
-                    }
-                    port_type {
-                      value
-                    }
-                    mgmt_only {
-                      value
-                    }
-                    maximum_draw {
-                      value
+                  ports {
+                    edges {
+                      node {
+                        name {
+                          value
+                        }
+                        category {
+                          value
+                        }
+                        port_type {
+                          value
+                        }
+                        mgmt_only {
+                          value
+                        }
+                        maximum_draw {
+                          value
+                        }
+                      }
                     }
                   }
+                  # Concrete-kind fallback position — see the header note.
+                  # ... on DeviceLinecard {
+                  #   slot {
+                  #     value
+                  #   }
+                  # }
                 }
               }
-              # Concrete-kind fallback position — see the header note.
-              # ... on DeviceLinecard {
-              #   slot {
-              #     value
-              #   }
-              # }
             }
           }
         }

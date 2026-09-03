@@ -39,8 +39,8 @@ ls schema-library/extensions/
 | NetBox list | Existing coverage | Notes |
 | ----------- | ----------------- | ----- |
 | `console-ports` | `DcimConsoleInterface` in infrahub-demo-dc's `extensions/console/` | Inherits `DcimInterface`, so no new relationship — see [below](#console-ports-usually-need-no-schema-change) |
-| `module-bays` | Partial — `extensions/modules/` in schema-library | Models modules and module *types*, not bays — see [below](#module-bays-what-the-modules-extension-does-and-does-not-give-you) |
-| `inventory-items` | Partial — `extensions/modules/` | `DeviceGenericModuleType` covers part numbers |
+| `module-bays` | **`DcimModuleBay`** in schema-library v2 `extensions/device_module/` | Converts with a profile entry — see [below](#module-bays) |
+| `inventory-items` | Partial — `extensions/device_module/` | `DcimModuleType` covers part numbers |
 | `front-ports` / `rear-ports` | `extensions/patch_panel/` | Patch-panel oriented |
 | `interfaces` (optics) | `extensions/sfp/` | Transceivers, not interface media type |
 
@@ -91,84 +91,92 @@ see [Gap 2](#gap-2-a-field-is-dropped).
 If your schema has no console node at all, that is
 [Gap 1](#gap-1-a-whole-component-list-is-skipped).
 
-## Module bays: what the modules extension does and does not give you
+## Module bays
 
-Modular chassis convert to an empty template — a
-DCS-7508N has 24 module bays and zero interfaces,
-because every port lives on a line card. This is the
-largest single gap in the library and the honest answer
-has three parts.
+Modular chassis used to convert to an empty template —
+a DCS-7508N has 24 module bays and zero interfaces,
+because every port lives on a line card. **schema-library
+v2 closes this**, and it is worth checking which side of
+that line your schema sits on before modelling anything.
 
-**What schema-library's `extensions/modules/` provides:**
+### With schema-library v2 (or later)
 
-| Kind | Represents | Templatable? |
-| ---- | ---------- | ------------ |
-| `DeviceGenericModule` | An *installed* module, keyed by a unique `serial_number` | **Yes** — see below |
-| `DeviceGenericModuleType` | The module model (name, part number, manufacturer) | Not a device component |
-| `DcimPhysicalDevice.modules` | `Component` relationship to installed modules | Yes, generates `TemplateDeviceGenericModule` |
-
-Both are **generics**, so you also need a concrete node
-inheriting them — and that node needs
-`generate_template: true` — before anything can be
-instantiated or templated.
-
-> **The unique serial number is not a blocker.** It is
-> tempting to conclude that a module cannot be templated
-> because `serial_number` is `unique: true` and is the
-> generic's `human_friendly_id`. It can. Infrahub omits
-> unique attributes from a generated template entirely
-> and re-keys it on `template_name`, so
-> `TemplateDeviceLinecard` has no `serial_number` and is
-> created without one — the serial is supplied per
-> installed module. See
-> [concepts.md](./concepts.md#unique-attributes-do-not-exist-on-a-template).
-
-**What genuinely is missing** is a component
-relationship: `DeviceGenericModule` has none, so a
-module template has nowhere to put the module's ports
-until you add one ([Gap 1](#gap-1-a-whole-component-list-is-skipped)).
-
-**Why none of this maps to NetBox module bays.** A
-NetBox module bay is a *slot* — `name`, `label`,
-`position`:
+`extensions/device_module/device_module.yml` puts a
+`module_bays` **Component** relationship on
+`DcimPhysicalDevice`, peering `DcimModuleBay`. Infrahub
+therefore generates `TemplateDcimModuleBay`, and bays
+convert with nothing more than a profile entry:
 
 ```yaml
-module-bays:
-  - name: Slot 1
-    label: Supervisor
-    position: '1'
+components:
+  module-bays:
+    kind: TemplateDcimModuleBay
+    relationship: module_bays
+    template_name: "{template_name}__bay__{name}"
+    fields:
+      name: name
+      position: position
+      label: bay_label
 ```
 
-The extension models what is *installed*, not the slot
-that holds it. A device type declares that a chassis
-*has* eight line-card slots; it says nothing about which
-line cards are in them, which is what
-`DeviceGenericModule` records. Mapping bays onto modules
-would assert an inventory the input does not contain.
+Two details that are easy to get wrong:
 
-**What does map.** NetBox publishes module types as a
-**separate input directory**, `module-types/`, and those
-line up with `DeviceGenericModuleType` cleanly. The
-converter reads them — see
-[Converting module types](#converting-module-types).
+- **`position` must be `Text`.** NetBox bay positions are
+  free-form — a DCS-7508N alone uses `F1`–`F6` and
+  `PSU-1`–`PSU-8` beside `1`–`10`, and `A9K-AC-PEM-V3`
+  starts at `'0'`. v2 types it as `Number` with
+  `min_value: 1`, which rejects 15 of that chassis's 24
+  bays. [schema-library #76](https://github.com/opsmill/schema-library/pull/76)
+  retypes it and adds `bay_label`; until it merges, drop
+  `position` and `label` from the mapping.
+- **NetBox's `label` maps to `bay_label`, never `label`.**
+  Infrahub auto-populates an attribute named `label` from
+  `name` and title-cases it, so "NetBox supplied no
+  label" becomes indistinguishable from "label equals
+  name".
 
-**Recommendation.** If chassis matter to you:
+### What the extension models, and what it does not
 
-1. Load `extensions/modules/modules.yml` and define a
-   concrete node inheriting `DeviceGenericModuleType`
-   (`experimental/modules_linecards/linecard.yml` has a
-   worked `DeviceLinecardType` / `DeviceLinecard` pair).
-2. Convert `module-types/` with the
-   `schema-library-modules.yml` profile.
-3. Model bays only if you need slot-level accounting —
-   that is a new node (`name`, `position`, plus a
-   Component relationship), following
-   [Gap 1](#gap-1-a-whole-component-list-is-skipped).
+| Kind | Represents | Ships in v2? |
+| ---- | ---------- | ------------ |
+| `DcimModuleBay` | The **slot** — name, position, label | Yes, concrete |
+| `DcimGenericModule` / `DcimModule` | An **installed** module | Yes, generic + concrete |
+| `DcimGenericModuleType` / `DcimModuleType` | The module **model** | Yes, generic + concrete |
+| `DcimModulePort` | A port the module provides | [#76](https://github.com/opsmill/schema-library/pull/76) |
 
-If chassis are not in scope, leaving them reported as
-skipped is the right answer. Say so rather than
-producing an empty template that looks like a working
-one.
+`DcimGenericModuleType.weight_grams` also arrives with
+[#76](https://github.com/opsmill/schema-library/pull/76). It is grams, not
+kilograms, precisely because modules are the light hardware that integer
+kilograms round to zero — map it with the `weight_g` transform.
+
+v2 ships **concrete** nodes, so you no longer have to
+define one yourself — earlier versions shipped generics
+only. `experimental/modules_linecards/` remains an option
+if you want a richer line-card model.
+
+A device type says a chassis *has* eight line-card slots;
+it says nothing about which line cards are in them. So
+bays convert from `device-types/`, module models convert
+from `module-types/`, and **which module is installed
+where is not in either input** — that is inventory, and
+asserting it would be inventing data.
+
+### Ports on a module
+
+`DcimModulePort` ([#76](https://github.com/opsmill/schema-library/pull/76))
+gives a module's ports a home, and #76 extends
+`DcimGenericModule` with a `ports` Component
+relationship. Those ports carry NetBox's `{module}`
+token, which no conversion can resolve — the bay
+position is only known once the module is installed.
+The bundled generator closes that gap at runtime; see
+[generators-module-ports.md](./generators-module-ports.md).
+
+Note that v2's `DcimModule` does **not** set
+`generate_template: true`, so `TemplateDcimModule` is not
+generated and the converter reports a module's own
+component lists as skipped. Add the flag to your concrete
+module node if you want module templates.
 
 ## Converting module types
 
@@ -211,8 +219,8 @@ module_type:
 That is all the stock schema supports, and it is worth
 being blunt about why: a NetBox module type is mostly
 its component list — the ports the module provides —
-and neither `DeviceGenericModuleType` nor
-`DeviceGenericModule` has **any component
+and neither `DcimGenericModuleType` nor
+`DcimGenericModule` has **any component
 relationship**. Every `interfaces`, `power-ports`, and
 `front-ports` entry is reported as skipped. You get a
 catalogue of module models, not their ports.
@@ -238,7 +246,7 @@ nodes:
     namespace: Device
     generate_template: true          # generates TemplateDeviceLinecard
     inherit_from:
-      - DeviceGenericModule
+      - DcimGenericModule
     relationships:
       - name: interfaces
         peer: DcimInterface
@@ -445,7 +453,7 @@ Three of these carry a wrinkle:
 - **`module-bays`** are how modular chassis carry their
   ports, and the schema-library modules extension does
   not cover them the way you would expect — see
-  [the module-bay section](#module-bays-what-the-modules-extension-does-and-does-not-give-you)
+  [the module-bay section](#module-bays)
   before modelling anything.
 
 Before adding any of them, re-read
