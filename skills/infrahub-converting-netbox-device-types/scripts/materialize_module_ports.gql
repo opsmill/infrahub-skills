@@ -1,0 +1,121 @@
+# Query feeding materialize_module_ports.py.
+#
+# Root kind: DcimDevice. `modules` and `module_bays` are extended onto the
+# DcimPhysicalDevice generic, while `name` and `interfaces` live on the
+# DcimGenericDevice generic; DcimDevice inherits both, so rooting here selects
+# all three without fragments. A schema whose physical device kind is named
+# something else needs that kind substituted here.
+#
+# Inline fragments and unions
+# ---------------------------
+# A device reaches its modules THROUGH ITS BAYS. schema-library v2 puts
+# `module_bays` (Component -> DcimModuleBay) on DcimPhysicalDevice, and the bay
+# carries `installed_module` (-> DcimGenericModule). There is no
+# `DcimPhysicalDevice.modules`; the pre-v2 modules extension had one, and
+# selecting it against v2 fails the whole query with
+# "Cannot query field 'modules' on type 'DcimDevice'".
+#
+# Traversing bays is also what makes the position reliable: the bay owns
+# `position`, so it is read straight off the node being walked rather than
+# back-referenced from the module.
+#
+# `installed_module` peers the GENERIC DcimGenericModule, so its node type is a
+# GraphQL interface. serial_number and description are declared on that generic;
+# `ports` is extended onto it by extensions/module_port/module_port.yml — which
+# is why they select directly.
+#
+# Fields that live only on a CONCRETE module kind require an inline fragment;
+# selecting them on the interface fails the whole query with
+# "Cannot query field 'X' on type 'DcimGenericModule'". See
+# skills/infrahub-managing-transforms/rules/queries-union-fragments.md.
+#
+# The one such field the generator can use is DeviceLinecard.slot, a fallback
+# bay position for a linecard installed with no module_bay set. It ships
+# commented out on purpose: a fragment on a type absent from the loaded schema
+# fails the query with "Unknown type 'DeviceLinecard'", and that kind lives in
+# schema-library's *experimental* tree. Uncomment it only once DeviceLinecard is
+# loaded — the generator already reads `slot` defensively, so no code changes.
+#
+# `interfaces` peers the generic DcimInterface, but name and description are
+# declared on that generic (InterfacePhysical adds no attributes of its own),
+# so they select directly too.
+# The variable is `$name`, not `$device_name`, and the name is load-bearing.
+# `infrahubctl generator` derives the query variable from the FIRST KEY of the
+# generator's `parameters` block, and that same key has to be a real attribute
+# on the target node (it does `getattr(member, key)`). `name` satisfies both;
+# `device_name` satisfies neither. See generators-module-ports.md → Registration.
+query ModulePortsForDevice($name: String!) {
+  DcimDevice(name__value: $name) {
+    edges {
+      node {
+        id
+        name {
+          value
+        }
+        interfaces {
+          edges {
+            node {
+              id
+              __typename
+              name {
+                value
+              }
+              description {
+                value
+              }
+            }
+          }
+        }
+        module_bays {
+          edges {
+            node {
+              id
+              name {
+                value
+              }
+              position {
+                value
+              }
+              installed_module {
+                node {
+                  id
+                  __typename
+                  serial_number {
+                    value
+                  }
+                  ports {
+                    edges {
+                      node {
+                        name {
+                          value
+                        }
+                        category {
+                          value
+                        }
+                        port_type {
+                          value
+                        }
+                        mgmt_only {
+                          value
+                        }
+                        maximum_draw {
+                          value
+                        }
+                      }
+                    }
+                  }
+                  # Concrete-kind fallback position — see the header note.
+                  # ... on DeviceLinecard {
+                  #   slot {
+                  #     value
+                  #   }
+                  # }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

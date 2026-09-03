@@ -20,7 +20,10 @@
     "analysis",
     "correlation",
     "mcp",
-    "issue-reporting"
+    "issue-reporting",
+    "netbox",
+    "device-types",
+    "object-templates"
   ],
   "repository": "https://github.com/opsmill/infrahub-skills"
 }
