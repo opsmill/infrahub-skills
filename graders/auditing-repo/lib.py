@@ -261,14 +261,28 @@ _REPLACEMENT_KEYWORD_GROUPS: dict[str, list[re.Pattern[str]]] = {
     ],
 }
 
-# Words that turn a following recommendation into a warning. "Do not hoist
-# the device relationship" and "hoisting it would freeze the peer" both
-# name the antipattern in order to rule it out.
-_NEGATED_RECOMMENDATION = re.compile(
-    r"\b(?:do not|don't|never|not|avoid|resist|instead of|rather than|"
+# Words that turn a recommendation into a warning: "do not hoist the device
+# relationship", "hoisting it would freeze the peer". A direct negator
+# governs the rest of its sentence, so it still applies across a comma.
+_DIRECT_NEGATION = re.compile(
+    r"\b(?:do not|don't|never|not|avoid|resist|"
     r"would|could|cannot|can't|must not|should not|shouldn't|if you)\b",
     re.IGNORECASE,
 )
+
+# Cues that name an alternative rather than negate. "Instead of X, do Y"
+# negates X and *recommends* Y, so unlike a direct negator this one governs
+# only its own clause. Treating it as sentence-wide let
+# "Instead of duplicating the fields, move the relationship onto the
+# generic" read as a warning against the move it was urging.
+_ALTERNATIVE_CUE = re.compile(r"\b(?:instead of|rather than)\b", re.IGNORECASE)
+
+# The destination is "the generic", and a finding routinely names it: "onto
+# the DcimPort generic", "onto the new shared generic". Matching only the
+# bare word missed every recommendation that named the kind it proposed.
+# The window is two words so it cannot reach across a contrast —
+# "on the concrete kinds, not the generic" stays out.
+_GENERIC_DESTINATION = r"(?:(?:the|a|an)\s+)?(?:[\w-]+\s+){0,2}generics?\b"
 
 # A positive match is not enough on its own. A finding can disclose the
 # frozen-peer cost in one sentence and still recommend hoisting the
@@ -277,8 +291,8 @@ _REPLACEMENT_DISQUALIFIERS: dict[str, list[re.Pattern[str]]] = {
     "paired-relationship-stays-put": [
         re.compile(
             r"\b(?:hoist|move|lift|extract|pull|put|place|keep|leave)\b"
-            r"[^.\n]{0,60}\brelationships?\b[^.\n]{0,60}"
-            r"\b(?:on|onto|to|into|up to)\s+(?:the\s+)?generic\b",
+            r"[^.\n]{0,60}\brelationships?\b[^.\n]{0,40}"
+            r"\b(?:on|onto|to|into|up to)\s+" + _GENERIC_DESTINATION,
             re.IGNORECASE,
         ),
         re.compile(
@@ -290,8 +304,54 @@ _REPLACEMENT_DISQUALIFIERS: dict[str, list[re.Pattern[str]]] = {
             r"\brelationships?\b[^.\n]{0,40}\b(?:there|on it)\b[^.\n]{0,20}\btoo\b",
             re.IGNORECASE,
         ),
+        # The trailing appositive: "pull the shared shape up to a generic,
+        # relationships included". Its own clause carries no destination, so
+        # it needs a pattern that does not depend on being near `generic`.
+        re.compile(
+            r"\brelationships?\b[^.\n]{0,20}\bincluded\b",
+            re.IGNORECASE,
+        ),
     ],
 }
+
+
+# A disqualifier has to match inside one clause. Spanning a comma or a
+# subordinator paired the verb of a correct recommendation with a `generic`
+# mentioned in the explanation after it: "Leave the relationship on each
+# concrete kind, because a relationship hoisted onto a generic has its peer
+# frozen there" is the right answer, not a hoist.
+_CLAUSE_BOUNDARY = re.compile(
+    r",\s*|\s+(?:because|since|as|so|whereas|while|which|that)\s+"
+)
+
+
+def _clauses(sentence: str) -> list[tuple[int, str]]:
+    """Each clause of a sentence with its offset in that sentence."""
+    out: list[tuple[int, str]] = []
+    start = 0
+    for boundary in _CLAUSE_BOUNDARY.finditer(sentence):
+        out.append((start, sentence[start:boundary.start()]))
+        start = boundary.end()
+    out.append((start, sentence[start:]))
+    return out
+
+
+def _recommends(sentence: str, hit_end: int) -> bool:
+    """True when the hoist matched in this sentence is urged, not ruled out.
+
+    The cue has to govern the hoist. A direct negator does, wherever it sits
+    in the sentence: "do not, under any circumstances, move it onto the
+    generic". An alternative cue governs only its own clause, because its
+    object is the thing being rejected and what follows the comma is the
+    recommendation: "instead of duplicating the fields, move it onto the
+    generic" recommends the move.
+    """
+    before = sentence[:hit_end]
+    clause_start = before.rfind(",")
+    own_clause = before[clause_start + 1:]
+    if _DIRECT_NEGATION.search(own_clause) or _ALTERNATIVE_CUE.search(own_clause):
+        return False
+    return not _DIRECT_NEGATION.search(before[: clause_start + 1])
 
 
 def check_yagni_finding_replacement_mentions(
@@ -313,16 +373,20 @@ def check_yagni_finding_replacement_mentions(
         str(f.get(field, "")) for field in ("replacement", "description", "message", "detail", "recommendation")
     )
     for sentence in re.split(r"(?<=[.;:])\s+|\n", text):
-        for bad in _REPLACEMENT_DISQUALIFIERS.get(group, []):
-            hit = bad.search(sentence)
-            if not hit:
-                continue
-            if _NEGATED_RECOMMENDATION.search(sentence[: hit.end()]):
-                continue  # named in order to rule it out
-            return False, (
-                f"{rule} replacement recommends hoisting the relationship onto "
-                f"the generic, which is what the carve-out forbids: {sentence!r}"
-            )
+        for offset, clause in _clauses(sentence):
+            for bad in _REPLACEMENT_DISQUALIFIERS.get(group, []):
+                hit = bad.search(clause)
+                if not hit:
+                    continue
+                # Negation is read over the whole sentence: a direct
+                # negator before the clause still governs the hoist.
+                if not _recommends(sentence, offset + hit.end()):
+                    continue  # named in order to rule it out
+                return False, (
+                    f"{rule} replacement recommends hoisting the relationship "
+                    "onto the generic, which is what the carve-out forbids: "
+                    f"{sentence!r}"
+                )
     for pat in patterns:
         if pat.search(text):
             return True, f"{rule} discloses {group} (matched {pat.pattern!r})"

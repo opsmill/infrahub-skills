@@ -37,16 +37,40 @@ def _disclose(replacement: str):
 HOISTS_THE_RELATIONSHIP = [
     pytest.param(
         "Extract a `DcimPort` generic with the six attributes and keep the "
-        "device relationships there too.",
+        "device relationships there too. The peer is frozen either way.",
         id="keep-there-too",
     ),
     pytest.param(
-        "Move the six attributes and the device relationship onto the generic.",
+        "Move the six attributes and the device relationship onto the "
+        "generic. The peer is frozen for every implementer.",
         id="move-onto-the-generic",
     ),
+    # Each of these carries the disclosure sentence as well, so it can only
+    # fail on the recommendation. Without it a fixture passes vacuously on a
+    # missing disclosure and stops testing the disqualifier at all.
     pytest.param(
-        "Pull the shared shape up to a generic, relationships included.",
+        "Pull the shared shape up to a generic, relationships included. "
+        "The peer is frozen for every implementer.",
         id="relationships-included",
+    ),
+    # The destination is routinely named. Recognising only the bare word
+    # `generic` let every recommendation that named the kind through.
+    pytest.param(
+        "The peer is frozen; put the device relationship on the DcimPort "
+        "generic.",
+        id="destination-names-the-kind",
+    ),
+    pytest.param(
+        "The peer is frozen, so move the relationship up to the new shared "
+        "generic.",
+        id="destination-carries-adjectives",
+    ),
+    # "Instead of X, do Y" recommends Y. Reading the cue as sentence-wide
+    # negation turned the recommendation into a warning against itself.
+    pytest.param(
+        "Instead of duplicating the fields, move the device relationship "
+        "onto the generic. The peer is frozen.",
+        id="alternative-cue-governs-only-its-own-clause",
     ),
 ]
 
@@ -74,6 +98,25 @@ DISCLOSES_THE_COST = [
         "The kind-to-kind pairing is inexpressible in the schema once hoisted, "
         "so it has to live in a check.",
         id="pairing-inexpressible",
+    ),
+    # A direct negator governs the whole sentence, so it still applies to a
+    # hoist named after a comma.
+    pytest.param(
+        "Do not, under any circumstances, move the device relationship onto "
+        "the DcimPort generic - the peer is fixed there for every implementer.",
+        id="direct-negation-reaches-across-a-comma",
+    ),
+    # The alternative cue's own object is what is being rejected.
+    pytest.param(
+        "Instead of moving the device relationship onto the generic, leave it "
+        "on each port kind: a hoisted relationship has one frozen peer.",
+        id="alternative-cue-rejects-its-own-object",
+    ),
+    # The contrast form: the destination window must not reach past "not".
+    pytest.param(
+        "Keep the device relationship on the concrete kinds, not the generic, "
+        "because the peer is locked once it is on a generic.",
+        id="contrast-with-the-generic",
     ),
 ]
 
