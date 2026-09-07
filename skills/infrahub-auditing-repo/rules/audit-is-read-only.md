@@ -123,6 +123,11 @@ the new verb earns a case.
    guarantee. If you cannot establish it from the
    source, do not run it: report the check as not
    performed and say why.
+   `python -m generators.build_interfaces` runs the
+   same file as
+   `python generators/build_interfaces.py`, so the
+   module form is the same run and needs the same
+   check.
 5. **If you have already dirtied the tree, say so in
    the report and leave it.** Name the paths you
    touched. A visible mess is recoverable; a silent

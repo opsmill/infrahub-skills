@@ -327,10 +327,20 @@ _INPLACE_EDIT_PATTERNS = (
 )
 
 # Interpreters that run a script file given as their first positional
-# argument. ``python -c`` and ``python -m`` run neither, so they are
-# excluded below: parsing a YAML file read-only is ordinary audit work.
+# argument. ``python -c`` is inline code the auditor wrote and can be read
+# in the transcript, so it is exempt: parsing a YAML file read-only is
+# ordinary audit work.
 _SCRIPT_INTERPRETERS = {"python", "python3", "bash", "sh", "zsh", "node",
                         "ruby", "perl"}
+
+# ``python -m generators.build_interfaces`` executes the same file as
+# ``python generators/build_interfaces.py``, so ``-m`` cannot be exempted
+# wholesale. Only these module targets have established read-only
+# behaviour; anything else is repository code until proven otherwise.
+_READ_ONLY_PYTHON_MODULES = {
+    "ast", "json", "json.tool", "pprint", "platform", "sysconfig",
+    "tokenize",
+}
 _SCRIPT_RUNNERS = {"uv", "uvx", "poetry", "pipx", "hatch", "pdm"}
 _SCRIPT_PATH_PATTERN = re.compile(r"\.(?:py|sh|bash|zsh|rb|js|ts|pl)$")
 
@@ -454,10 +464,6 @@ def _effective_words(segment: str) -> list[str]:
     return words
 
 
-def _strip_quoted(segment: str) -> str:
-    return re.sub(r"'[^']*'|\"[^\"]*\"", " ", segment)
-
-
 def _is_deliverable(target: str) -> bool:
     """True when the redirect target is a file the audit is asked to write."""
     if target.startswith(_HARMLESS_REDIRECT_TARGETS):
@@ -465,13 +471,76 @@ def _is_deliverable(target: str) -> bool:
     return _basename(target) in _DELIVERABLE_FILENAMES
 
 
+def _read_token(segment: str, i: int) -> tuple[str, int]:
+    """Read one shell word starting at ``i``, unquoting as it goes.
+
+    Returns the word and the index just past it.
+    """
+    buf: list[str] = []
+    quote: str | None = None
+    n = len(segment)
+    while i < n:
+        ch = segment[i]
+        if quote:
+            if ch == quote:
+                quote = None
+            else:
+                buf.append(ch)
+            i += 1
+            continue
+        if ch in "'\"":
+            quote = ch
+            i += 1
+            continue
+        if ch == "\\" and i + 1 < n:
+            buf.append(segment[i + 1])
+            i += 2
+            continue
+        if ch in " \t|;&<>":
+            break
+        buf.append(ch)
+        i += 1
+    return "".join(buf), i
+
+
 def _redirect_targets(segment: str) -> list[str]:
-    """File targets of ``>`` / ``>>`` in a segment, ignoring fd dups."""
-    bare = _strip_quoted(segment)
-    return [
-        t for t in re.findall(r"\d?>>?\s*([^\s|;&<>]+)", bare)
-        if not t.startswith("&")
-    ]
+    """File targets of ``>`` / ``>>`` in a segment, ignoring fd dups.
+
+    Quoting cuts both ways and the scan honours both directions: a ``>``
+    inside quotes is text, not a redirect (``grep -E 'rm -rf|mv '``), while
+    a quoted destination is still a destination — ordinary shell quoting in
+    ``echo x > "objects/racks.yml"`` must not hide the overwrite.
+    """
+    targets: list[str] = []
+    quote: str | None = None
+    i = 0
+    n = len(segment)
+    while i < n:
+        ch = segment[i]
+        if quote:
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in "'\"":
+            quote = ch
+            i += 1
+            continue
+        if ch == "\\" and i + 1 < n:
+            i += 2
+            continue
+        if ch != ">":
+            i += 1
+            continue
+        i += 1
+        if i < n and segment[i] == ">":
+            i += 1
+        while i < n and segment[i] in " \t":
+            i += 1
+        target, i = _read_token(segment, i)
+        if target and not target.startswith("&"):
+            targets.append(target)
+    return targets
 
 
 def _is_write_segment(segment: str) -> bool:
@@ -557,10 +626,20 @@ def _executed_script(segment: str) -> str | None:
     if program == "make":
         return " ".join(words[:2])
     if program in _SCRIPT_INTERPRETERS:
-        for word in rest:
-            if word in ("-c", "-m"):
-                # Inline code or a stdlib module, not a repository script.
+        is_python = program.startswith("python")
+        for i, word in enumerate(rest):
+            if word == "-c":
+                # Inline code, readable in the transcript itself.
                 return None
+            if is_python and (word == "-m" or (
+                    word.startswith("-m") and len(word) > 2)):
+                if word == "-m":
+                    module = rest[i + 1] if i + 1 < len(rest) else ""
+                else:
+                    module = word[2:]
+                if not module or module in _READ_ONLY_PYTHON_MODULES:
+                    return None
+                return f"-m {module}"
             if word.startswith("-"):
                 continue
             return word if _SCRIPT_PATH_PATTERN.search(word) else None
