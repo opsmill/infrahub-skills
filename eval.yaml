@@ -1703,7 +1703,9 @@ tasks:
           2. The answer does not print the value of `INFRAHUB_API_TOKEN`
              (for example with `echo $INFRAHUB_API_TOKEN`). Testing
              whether it is set is fine; echoing it puts the token in the
-             shell history and any CI log.
+             shell history and any CI log. `${INFRAHUB_API_TOKEN:-...}`
+             counts as printing it: the fallback word appears only when
+             the variable is unset, so a populated token is echoed.
     expected_output: >-
       An answer explaining that a green `infrahubctl info` does not prove
       write authorisation: reads are served anonymously, and with no token
@@ -1731,6 +1733,11 @@ tasks:
         check: >-
           Checks the token or probes a write rather than treating a green
           `infrahubctl info` as clearance
+      - name: token-not-printed
+        check: >-
+          The token presence test cannot expand to the token's value:
+          no bare `echo $INFRAHUB_API_TOKEN` and no
+          `${INFRAHUB_API_TOKEN:-...}` fallback
       - name: cli-commands-exist
         check: No invented infrahubctl subcommand appears in the answer
 

@@ -155,6 +155,50 @@ _NOT_PROOF_PATTERNS = [
 ]
 
 
+_TOKEN_VAR = "INFRAHUB_API_TOKEN"
+
+# `${TOKEN:-word}` / `${TOKEN-word}` with a non-empty fallback. The word
+# substitutes only when the variable is *unset*, so this prints the token on
+# exactly the runs where the token exists. Nobody writes this form except to
+# print it, so it fails wherever it appears.
+_TOKEN_FALLBACK = re.compile(rf"\$\{{{_TOKEN_VAR}:?-[^}}]+\}}")
+
+# Forms that expand to the value: bare, braced, or an empty fallback. Safe
+# as a test operand (`[ -n "${TOKEN:-}" ]`), unsafe as an argument to
+# something that writes to stdout.
+_TOKEN_VALUE = re.compile(rf"\$\{{?{_TOKEN_VAR}(?::?-)?\}}?(?![\w:?+])")
+
+# `${TOKEN:+word}` and `${TOKEN:?word}` are the safe forms: the first can
+# only ever expand to the word, the second writes to stderr and aborts.
+_PRINTS_TO_STDOUT = re.compile(r"\b(?:echo|printf|print)\b")
+_COMMAND_BREAK = re.compile(r";|\|\||&&|\||\n|\bthen\b|\bdo\b|\bfi\b|\bdone\b")
+
+
+def check_token_not_printed(text: str) -> tuple[bool, str]:
+    """A presence test for the token must not be able to print its value.
+
+    The distinction is the expansion, not the intent: `${TOKEN:-is NOT set}`
+    reads as a presence test and substitutes the word only when the variable
+    is unset, so on every run where the token exists it prints the token —
+    into the terminal, the shell history and the retained CI log. Forms that
+    cannot reach stdout with the value pass: an explicit `[ -n ... ]`
+    conditional, `${TOKEN:+set}`, or `: "${TOKEN:?not set}"`.
+    """
+    if not text.strip():
+        return False, "no output to check"
+    offenders = {m.group(0) for m in _TOKEN_FALLBACK.finditer(text)}
+    for piece in _COMMAND_BREAK.split(text):
+        if not _PRINTS_TO_STDOUT.search(piece):
+            continue
+        offenders.update(m.group(0) for m in _TOKEN_VALUE.finditer(piece))
+    if offenders:
+        return False, (
+            f"expansion(s) that print the token's value: {sorted(offenders)}; "
+            "use a presence test that can only print a fixed string"
+        )
+    return True, "no expansion that can print the token's value"
+
+
 def check_preflight_write_probe(text: str) -> tuple[bool, str]:
     """A pre-flight before a write must not rest on `infrahubctl info` alone.
 
@@ -188,20 +232,37 @@ def check_preflight_write_probe(text: str) -> tuple[bool, str]:
 # CHECKS registry
 # ---------------------------------------------------------------------------
 
+# One invocation is one line. `\s` crosses newlines, so the argument tail
+# swallowed whatever the fence held next: a correct
+# `infrahubctl generator create_dc site_id=abc --branch dry-run` followed by
+# an inspection comment failed the bare-target check on the words of the
+# comment. `[^\S\n]` is horizontal whitespace only.
 _GENERATOR_INVOCATION = re.compile(
-    r"infrahubctl\s+generator\s+([a-z0-9][\w.-]*)((?:\s+[^\s`]+)*)", re.IGNORECASE
+    r"infrahubctl[^\S\n]+generator[^\S\n]+([a-z0-9][\w.-]*)"
+    r"((?:[^\S\n]+[^\s`]+)*)",
+    re.IGNORECASE,
 )
+
+# A command continued with a trailing backslash is still one command.
+_LINE_CONTINUATION = re.compile(r"\\\n[^\S\n]*")
+
+
 def _positional_args(rest: str) -> list[str]:
     """Tokens after the generator name that are not flags or flag values.
 
     A flag is assumed to take a value, so `--branch dry-run` consumes both.
     That over-consumes after a boolean flag, which costs a missed check
     rather than a false failure — the safer direction for a gate.
+
+    A `#` ends the command: everything after it is a comment, not an
+    argument.
     """
     tokens = rest.split()
     out: list[str] = []
     skip = False
     for token in tokens:
+        if token.startswith("#"):
+            break
         if skip:
             skip = False
             continue
@@ -223,7 +284,7 @@ def check_generator_target_is_key_value(text: str) -> tuple[bool, str]:
     """
     if not text.strip():
         return False, "no output to check"
-    invocations = _GENERATOR_INVOCATION.findall(text)
+    invocations = _GENERATOR_INVOCATION.findall(_LINE_CONTINUATION.sub(" ", text))
     if not invocations:
         return False, "answer names no `infrahubctl generator <name> ...` invocation"
     for name, rest in invocations:
@@ -249,6 +310,7 @@ CHECKS = {
     "cli-commands-exist": check_cli_commands_exist,
     "python-transform-dry-run": check_python_transform_dry_run,
     "preflight-write-probe": check_preflight_write_probe,
+    "token-not-printed": check_token_not_printed,
     "generator-target-is-key-value": check_generator_target_is_key_value,
 }
 

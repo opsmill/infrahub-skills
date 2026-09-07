@@ -41,6 +41,10 @@
           "check": "Checks the token or probes a write rather than treating a green `infrahubctl info` as clearance"
         },
         {
+          "name": "token-not-printed",
+          "check": "The token presence test cannot expand to the token's value: no bare `echo $INFRAHUB_API_TOKEN` and no `${INFRAHUB_API_TOKEN:-...}` fallback"
+        },
+        {
           "name": "cli-commands-exist",
           "check": "No invented infrahubctl subcommand appears in the answer"
         }

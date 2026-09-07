@@ -61,6 +61,15 @@ SUSPICIOUS_VERBS: set[str] = {
 # a command.
 PROSE_ALLOWLIST: set[str] = {"available", "commands", "first"}
 
+# Words that read as a command: every subcommand registered anywhere in the
+# tree, every top-level command, and the generic verbs above. Used only by
+# the bare `group sub` scan, where nothing else says the span is a command.
+COMMAND_WORDS: set[str] = (
+    SUSPICIOUS_VERBS
+    | LEAVES
+    | {sub for subs in GROUPS.values() for sub in subs}
+)
+
 # `_` belongs in the token class: transform and generator names are snake
 # case, and without it `infrahubctl generator create_dc` truncates to the
 # verb `create` and trips the suspicious-verb rule.
@@ -78,11 +87,17 @@ INVOCATION = re.compile(rf"infrahubctl[ \t]+({TOKEN})(?:[ \t]+({TOKEN}))?")
 # Bare `infrahubctl`-less `group sub` inside a code span, for prose that
 # drops the binary name: "`infrahubctl schema load`, then `schema validate`".  # cli-check: ignore
 #
-# The span has to be exactly `group sub`, optionally with arguments after it.
-# Matching a group name plus any following word anywhere in a span turns
-# ordinary Infrahub nouns into build failures — "the `schema files` in the  # cli-check: ignore
-# repository", "the `object kinds` you model", "a `branch strategy`" — and a  # cli-check: ignore
-# gate that blocks merges on normal prose gets disabled rather than fixed.
+# The span has to open with `group sub`, and — with no `infrahubctl` here to
+# say the span is a command at all — the second token has to read as one.
+# Anchoring alone does not separate an invocation from an ordinary Infrahub
+# noun phrase, because those open with the group word too: "the `schema      # cli-check: ignore
+# files` in the repository", "the `object kinds` you model", "a `branch      # cli-check: ignore
+# strategy`" all start at position zero, and a gate that blocks merges on
+# normal prose gets disabled rather than fixed. Requiring a command word in
+# the subcommand slot keeps the case this exists for — `validate` is one,
+# `files` and `kinds` and `strategy` are not — at the cost of missing a
+# wrong subcommand that happens to be a noun, which is the direction the
+# rest of this module already errs in.
 BARE_GROUP = re.compile(
     r"^(" + "|".join(sorted(GROUPS)) + rf")[ \t]+({TOKEN})(?:[ \t]|$)"
 )
@@ -144,7 +159,7 @@ def invalid_invocations_in_region(region: str, *, spans_only: bool = True) -> li
             bad.append(shown)
     if spans_only:
         for group, sub in BARE_GROUP.findall(region.strip()):
-            if sub not in GROUPS[group]:
+            if sub in COMMAND_WORDS and sub not in GROUPS[group]:
                 bad.append(f"{group} {sub}")
     return bad
 

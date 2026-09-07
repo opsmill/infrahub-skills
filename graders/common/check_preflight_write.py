@@ -12,6 +12,7 @@ from lib import run_checks  # noqa: E402
 
 CHECKS = [
     "preflight-write-probe",
+    "token-not-printed",
     "cli-commands-exist",
 ]
 

@@ -151,9 +151,14 @@ created.
 
 If the create fails on authentication, stop there and
 fix credentials. If it fails on the branch already
-existing, that is a leftover probe, not a credentials
-problem: delete it by name and rerun with a new
-suffix.
+existing, that is a name collision, not a credentials
+problem: pick a fresh suffix and retry. Do **not**
+delete the branch that is in the way. You cannot tell a
+leftover from another agent's live probe by looking at
+it, and deleting the live one takes that run's write
+probe out from under it — the same mistake this rule
+warns about two paragraphs up. Delete only a branch this
+run's own create succeeded on.
 
 #### The failure often surfaces one command later
 
@@ -179,14 +184,22 @@ the *first* error in the run, not the last.
 echo "$INFRAHUB_ADDRESS"
 
 # API token: report whether it is set, never what it is
-echo "INFRAHUB_API_TOKEN ${INFRAHUB_API_TOKEN:+is set}${INFRAHUB_API_TOKEN:-is NOT set}"
+if [ -n "${INFRAHUB_API_TOKEN:-}" ]; then
+  echo "INFRAHUB_API_TOKEN is set"
+else
+  echo "INFRAHUB_API_TOKEN is NOT set"
+fi
 ```
 
-Never `echo` the token itself. Its value lands in the
-terminal, the shell history and, when this check gets
-automated, the CI job log, which is retained. `${VAR:+…}`
-answers the only question you have, which is whether the
-variable is exported.
+Never `echo` the token itself, and check the expansion
+you reach for actually holds to that. `${VAR:-fallback}`
+prints the *value* whenever the variable is populated,
+so pairing it with `${VAR:+…}` prints the token on
+exactly the runs where the token exists. Both branches
+above print a fixed string and neither can expand to the
+value. The value otherwise lands in the terminal, the
+shell history and, when this check gets automated, the
+CI job log, which is retained.
 
 Set them if missing:
 

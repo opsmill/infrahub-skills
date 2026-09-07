@@ -24,6 +24,105 @@ check_cli_commands_exist = _mod.check_cli_commands_exist
 check_python_transform_dry_run = _mod.check_python_transform_dry_run
 check_preflight_write_probe = _mod.check_preflight_write_probe
 check_generator_target_is_key_value = _mod.check_generator_target_is_key_value
+check_token_not_printed = _mod.check_token_not_printed
+invalid_invocations = _mod.invalid_invocations
+
+
+# --- token-not-printed ----------------------------------------------------
+
+TOKEN_LEAKS = [
+    pytest.param("Run `echo $INFRAHUB_API_TOKEN` to check.", id="bare-echo"),
+    pytest.param('Run `echo "${INFRAHUB_API_TOKEN}"`.', id="braced-echo"),
+    # The shape that reads as a presence test and is not one: the fallback
+    # word substitutes only when the variable is unset, so a populated token
+    # is what gets printed.
+    pytest.param(
+        'Run `echo "INFRAHUB_API_TOKEN ${INFRAHUB_API_TOKEN:+is set}'
+        '${INFRAHUB_API_TOKEN:-is NOT set}"`.',
+        id="colon-dash-fallback-prints-the-value",
+    ),
+    pytest.param(
+        'Run `echo "${INFRAHUB_API_TOKEN-unset}"`.', id="plain-dash-fallback"
+    ),
+]
+
+
+@pytest.mark.parametrize("text", TOKEN_LEAKS)
+def test_expansions_that_print_the_token_fail(text):
+    assert not check_token_not_printed(text)[0]
+
+
+TOKEN_SAFE = [
+    pytest.param(
+        'Run `if [ -n "${INFRAHUB_API_TOKEN:-}" ]; then echo "set"; fi`.',
+        id="explicit-conditional",
+    ),
+    pytest.param(
+        'Run `echo "INFRAHUB_API_TOKEN ${INFRAHUB_API_TOKEN:+is set}"`.',
+        id="colon-plus-can-only-print-the-word",
+    ),
+    pytest.param(
+        'Run `: "${INFRAHUB_API_TOKEN:?not set}"` — it prints nothing.',
+        id="colon-question-aborts-to-stderr",
+    ),
+    pytest.param("Confirm INFRAHUB_API_TOKEN is exported.", id="named-in-prose-only"),
+]
+
+
+@pytest.mark.parametrize("text", TOKEN_SAFE)
+def test_presence_tests_that_cannot_leak_pass(text):
+    ok, msg = check_token_not_printed(text)
+    assert ok, msg
+
+
+def test_empty_answer_is_not_a_free_pass_on_the_token_check():
+    assert not check_token_not_printed("")[0]
+
+
+def test_the_rule_itself_prints_no_token():
+    """The rule taught the leak it warns against. Hold it to its own check."""
+    rule = (
+        _REPO_ROOT
+        / "skills"
+        / "infrahub-common"
+        / "rules"
+        / "connectivity-server-check.md"
+    ).read_text(encoding="utf-8")
+    ok, msg = check_token_not_printed(rule)
+    assert ok, msg
+
+
+# --- the bare `group sub` form -------------------------------------------
+#
+# Exercised through `invalid_invocations` rather than the grader, because
+# these are the strings the CI guard reads out of ordinary documentation
+# prose, where no `infrahubctl` appears at all.
+
+BARE_FORM_IS_PROSE = [
+    pytest.param("The `schema files` in the repository.", id="schema-files-is-a-noun"),
+    pytest.param("The `object kinds` you model.", id="object-kinds-is-a-noun"),
+    pytest.param("Document a `branch strategy` up front.", id="branch-strategy"),
+    pytest.param("A `task list` for the migration.", id="valid-form-is-fine-too"),
+]
+
+
+@pytest.mark.parametrize("text", BARE_FORM_IS_PROSE)
+def test_ordinary_noun_phrases_do_not_break_the_gate(text):
+    """A group name plus a noun is documentation wording, not a command.
+
+    Anchoring the pattern does not separate the two, because a noun phrase
+    opens with the group word as readily as an invocation does. A gate that
+    fails CI on normal prose gets disabled rather than fixed.
+    """
+    assert invalid_invocations(text) == []
+
+
+def test_bare_group_with_a_command_word_is_still_caught():
+    """The reason the bare form is scanned at all must survive the fix."""
+    assert invalid_invocations(
+        "Run `infrahubctl schema load`, then `schema validate`."  # cli-check: ignore
+    ) == ["schema validate"]
+
 
 
 # --- cli-commands-exist --------------------------------------------------
@@ -61,6 +160,13 @@ CLI_REJECTED = [
     pytest.param("```\ninfrahubctl check run my_check\n```", id="invented-run"),  # cli-check: ignore
     pytest.param("Run `infrahubctl schema validate schemas/`.", id="invented-group-sub"),  # cli-check: ignore
     pytest.param("Run `infrahubctl generator list`.", id="invented-list"),  # cli-check: ignore
+    # The binary name may be dropped once prose has established it, so the
+    # bare form still has to be caught when the second token reads as a
+    # command word.
+    pytest.param(
+        "Run `infrahubctl schema load`, then `schema validate`.",  # cli-check: ignore
+        id="bare-group-with-invented-sub",
+    ),
 ]
 
 
@@ -155,6 +261,54 @@ def test_bare_id_target_fails():
 def test_missing_branch_fails():
     ok, _ = check_generator_target_is_key_value(
         "Run `infrahubctl generator create_dc site_id=1809d0bc`."
+    )
+    assert not ok
+
+
+def test_a_following_line_is_not_an_argument():
+    """One invocation is one line.
+
+    The argument tail used to cross newlines, so a correct invocation
+    followed by anything else in the same fence failed on the next line's
+    words. That capped a perfect answer at 0.65.
+    """
+    ok, msg = check_generator_target_is_key_value(
+        "```bash\n"
+        "infrahubctl generator create_dc site_id=1809d0bc --branch dry-run\n"
+        "# then inspect what it produced\n"
+        "infrahubctl branch list\n"
+        "```"
+    )
+    assert ok, msg
+
+
+def test_a_continued_line_is_still_one_invocation():
+    ok, msg = check_generator_target_is_key_value(
+        "```bash\n"
+        "infrahubctl generator create_dc \\\n"
+        "  site_id=1809d0bc --branch dry-run\n"
+        "```"
+    )
+    assert ok, msg
+
+
+def test_a_trailing_comment_is_not_a_target():
+    ok, msg = check_generator_target_is_key_value(
+        "```bash\n"
+        "infrahubctl generator create_dc site_id=1809d0bc --branch dry-run  "
+        "# writes to the branch\n"
+        "```"
+    )
+    assert ok, msg
+
+
+def test_a_bare_target_on_the_first_line_still_fails():
+    """The line-scoping must not cost the check its catch."""
+    ok, _ = check_generator_target_is_key_value(
+        "```bash\n"
+        "infrahubctl generator create_dc 1809d0bc --branch dry-run\n"
+        "infrahubctl branch list\n"
+        "```"
     )
     assert not ok
 
