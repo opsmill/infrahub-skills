@@ -83,16 +83,35 @@ def test_explicit_constraint_on_both_kinds_is_full_marks():
     assert _score(_schema(optical_body=EXPLICIT, ethernet_body=EXPLICIT)) == 1.0
 
 
-def test_hfid_and_unique_true_express_the_same_move():
-    """rules/uniqueness-constraints.md tells the author to move these down.
+def test_hfid_and_the_explicit_key_express_the_same_move():
+    """rules/uniqueness-constraints.md sanctions both forms.
 
-    Two schemas that load to the same constraints must not score 0 and 1.
+    A human_friendly_id compiles into the same uniqueness_constraints on the
+    layer that declares it, so two schemas that load to the same constraints
+    must not score 0 and 1.
+    """
+    assert _score(_schema(optical_body=HFID, ethernet_body=EXPLICIT)) == 1.0
+    assert _score(_schema(optical_body=HFID, ethernet_body=HFID)) == 1.0
+
+
+def test_unique_true_cannot_express_this_rule():
+    """`unique: true` is a form of uniqueness, not a form of *this* rule.
+
+    It compiles to `[["serial__value"]]` on the declaring kind — one
+    attribute, estate-wide, no relationship. It satisfies
+    `uniqueness-not-on-generic`, whose question is only whether the
+    implementer declares uniqueness of its own, and must not satisfy the
+    scope check, whose question is whether the name is scoped by the rack.
     """
     unique_attr = (
         "    attributes:\n      - name: serial\n        kind: Text\n"
         "        unique: true"
     )
-    assert _score(_schema(optical_body=HFID, ethernet_body=unique_attr)) == 1.0
+    schema = _schema(optical_body=HFID, ethernet_body=unique_attr)
+    assert _mod.CHECKS["uniqueness-not-on-generic"](schema=schema)[0]
+    ok, msg = _mod.CHECKS["uniqueness-scopes-by-relationship"](schema=schema)
+    assert not ok and "NetEthernetEndpoint" in msg
+    assert _score(schema) < 1.0
 
 
 def test_constraint_left_on_the_generic_fails():
@@ -128,8 +147,58 @@ def test_estate_wide_constraint_with_an_optional_parent_fails():
         optical_body=ESTATE_WIDE, ethernet_body=ESTATE_WIDE, optional="true"
     )
     ok, msg = _mod.CHECKS["uniqueness-scopes-by-relationship"](schema=schema)
-    assert not ok and "names no" in msg
+    assert not ok and "pairs no relationship with the endpoint name" in msg
     assert _score(schema) < 1.0
+
+
+WRONG_PAIR = '    uniqueness_constraints:\n      - ["rack", "serial__value"]'
+
+
+def test_a_relationship_paired_with_the_wrong_attribute_fails():
+    """A mixed pair is not the rule; the requested pair is.
+
+    `[rack, serial__value]` on both kinds names a relationship and an
+    attribute, so an any-relationship-plus-any-attribute assertion passes it
+    while neither kind enforces name uniqueness within the rack.
+    """
+    schema = _schema(optical_body=WRONG_PAIR, ethernet_body=WRONG_PAIR)
+    ok, msg = _mod.CHECKS["uniqueness-scopes-by-relationship"](schema=schema)
+    assert not ok
+    assert "NetOpticalEndpoint" in msg and "NetEthernetEndpoint" in msg
+
+
+def test_one_implementer_scoped_and_its_sibling_open_fails():
+    ok, msg = _mod.CHECKS["uniqueness-scopes-by-relationship"](
+        schema=_schema(optical_body=EXPLICIT)
+    )
+    assert not ok and "NetEthernetEndpoint" in msg
+
+
+def test_an_extra_constraint_alongside_the_requested_one_is_fine():
+    both = (
+        "    uniqueness_constraints:\n"
+        '      - ["serial__value"]\n'
+        '      - ["rack", "name__value"]'
+    )
+    ok, msg = _mod.CHECKS["uniqueness-scopes-by-relationship"](
+        schema=_schema(optical_body=both, ethernet_body=EXPLICIT)
+    )
+    assert ok, msg
+
+
+def test_the_rack_nodes_own_uniqueness_is_not_asked_to_scope():
+    """`LocRack` implements nothing and has no relationship to scope by.
+
+    Its own `[["name__value"]]` is the correct thing for a container to
+    declare, and reading it as a failed scoping made the right answer fail.
+    """
+    schema = _schema(optical_body=EXPLICIT, ethernet_body=EXPLICIT)
+    for node in schema["nodes"]:
+        if node["name"] == "Rack":
+            node["uniqueness_constraints"] = [["name__value"]]
+    ok, msg = _mod.CHECKS["uniqueness-scopes-by-relationship"](schema=schema)
+    assert ok, msg
+    assert _score(schema) == 1.0
 
 
 def test_optional_attribute_in_a_constraint_fails():

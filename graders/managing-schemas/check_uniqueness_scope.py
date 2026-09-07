@@ -16,7 +16,9 @@ CHECKS = [
     # Without this, `uniqueness_constraints: [["serial__value"]]` on both
     # concrete kinds scores full marks: it is a valid constraint that
     # expresses a different rule, and the relationship checks only inspect
-    # relationships a constraint already names.
+    # relationships a constraint already names. It asks for the requested
+    # pair on every implementer, not for any relationship plus any
+    # attribute, which `[["rack", "serial__value"]]` also satisfies.
     "uniqueness-scopes-by-relationship",
     "uniqueness-rel-mandatory",
     "uniqueness-no-optional-attr",

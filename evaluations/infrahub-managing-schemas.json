@@ -480,7 +480,7 @@
       "assertions": [
         {
           "name": "uniqueness-scopes-by-relationship",
-          "check": "Each concrete kind's constraint pairs a relationship with an attribute path, so it scopes the name within the rack"
+          "check": "Every kind inheriting the generic pairs the rack relationship with the endpoint name, so the name is scoped within the rack rather than across the estate. An extra unrelated constraint alongside it is fine, and the rack node's own uniqueness is not asked to scope by anything"
         },
         {
           "name": "uniqueness-no-optional-attr",

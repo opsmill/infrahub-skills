@@ -1255,7 +1255,7 @@ def check_uniqueness_rel_mandatory(schema: dict, **_: Any) -> tuple[bool, str]:
 def check_uniqueness_constraint_scopes_by_relationship(
     schema: dict, **_: Any
 ) -> tuple[bool, str]:
-    """A "unique within its parent" constraint has to name the parent.
+    """Every implementer scopes the *requested* attribute within its parent.
 
     ``uniqueness_constraints: [["serial__value"]]`` is a valid constraint
     and expresses estate-wide uniqueness of one attribute, which is a
@@ -1264,45 +1264,74 @@ def check_uniqueness_constraint_scopes_by_relationship(
     only inspect relationships that already appear in a constraint, so
     leaving the parent out and leaving it optional is unpunished.
 
-    Each concrete kind's constraint must pair at least one relationship
-    with at least one attribute path.
+    Asking only that *some* constraint pair *any* relationship with *any*
+    attribute is not enough, because that is satisfied by a pair the task
+    never asked for: ``[["rack", "serial__value"]]`` on both kinds scores
+    while neither enforces name-within-rack. So the requirement is
+    per-implementer and names the attribute: every concrete kind that
+    inherits a generic declared in this file must carry a constraint
+    pairing a relationship with the endpoint ``name``. Additional
+    constraints alongside it are fine, and a node that implements nothing
+    — the standalone rack, whose own ``[["name__value"]]`` is correct and
+    has no relationship to pair — is not asked for one.
+
+    ``name`` is accepted with or without the ``__value`` suffix:
+    ``uniqueness-attr-value-suffix`` owns the suffix, and one mistake
+    should cost one check.
     """
+    scoped_attr_names = {"name", "name__value"}
+
+    generics_by_kind = {
+        _full_kind(entity)
+        for section, entity in _entities(schema)
+        if section == "generics"
+    }
+    implementers = [
+        entity
+        for section, entity in _entities(schema)
+        if section == "nodes"
+        and any(p in generics_by_kind for p in (entity.get("inherit_from") or []))
+    ]
+    if not implementers:
+        return False, "no node in this file inherits from a generic declared here"
+
     problems: list[str] = []
-    checked: list[str] = []
-    for section, entity in _entities(schema):
-        if section != "nodes":
-            continue
-        constraints = list(entity.get("uniqueness_constraints") or [])
-        hfid = entity.get("human_friendly_id")
-        if hfid:
+    scoped: list[str] = []
+    for entity in implementers:
+        constraints = [
+            group
+            for group in list(entity.get("uniqueness_constraints") or [])
+            + ([entity.get("human_friendly_id")] if entity.get("human_friendly_id") else [])
             # A human_friendly_id compiles into a uniqueness constraint, so
             # it expresses the same scoping and has to be read as one.
-            constraints.append(hfid)
-        if not constraints:
-            continue
+            if isinstance(group, list)
+        ]
         _attrs, rels = _resolved_members(schema, entity)
         kind = _full_kind(entity)
-        for constraint in constraints:
-            if not isinstance(constraint, list):
-                continue
-            named_rels = [f for f in constraint if f in rels]
-            named_attrs = [f for f in constraint if f not in rels]
-            if named_rels and named_attrs:
-                checked.append(f"{kind} {constraint}")
-            else:
-                missing = "a relationship" if not named_rels else "an attribute path"
-                problems.append(f"{kind} {constraint} names no {missing}")
-    if not checked and not problems:
-        return False, (
-            "no node declares a uniqueness_constraints entry or a "
-            "human_friendly_id"
+        match = next(
+            (
+                group
+                for group in constraints
+                if any(f in rels for f in group)
+                and any(f in scoped_attr_names for f in group)
+            ),
+            None,
         )
+        if match is not None:
+            scoped.append(f"{kind} {match}")
+        elif not constraints:
+            problems.append(f"{kind} declares no constraint at all")
+        else:
+            problems.append(
+                f"{kind} {constraints} pairs no relationship with the "
+                "endpoint name"
+            )
     if problems:
         return False, (
-            "constraint(s) do not scope an attribute within a parent: "
+            "implementer(s) do not scope the name within a parent: "
             + "; ".join(problems)
         )
-    return True, f"constraint(s) scope an attribute within a relationship: {checked}"
+    return True, f"every implementer scopes the name within a relationship: {scoped}"
 
 
 def check_uniqueness_no_optional_attr(schema: dict, **_: Any) -> tuple[bool, str]:
