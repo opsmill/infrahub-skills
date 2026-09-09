@@ -82,60 +82,84 @@ skillgrade preview browser
 
 ## eval.yaml Format
 
-The root `eval.yaml` defines all tasks to run:
+A `defaults` block sets the agent, provider, trials,
+timeout, and threshold; `tasks` is a flat list of
+task blocks that override those per task. Each task
+names the skill to load in its own `instruction`,
+which is how tasks for different skills coexist in
+one file:
 
 ```yaml
-skill_name: infrahub-my-skill  # matches SKILL.md frontmatter name
-
 tasks:
-  - id: basic-scenario
-    prompt: >-
-      A realistic user request with specific names,
-      namespaces, and field types.
-    expected_output: >-
-      Human-readable description of what correct
-      output looks like.
-    grader: graders/my-skill/basic-scenario.sh  # path to deterministic grader
+  - name: my-rule-task
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/<skill>/SKILL.md
+      and follow its workflow and rules.
 
-  - id: advanced-scenario
-    prompt: >-
-      A more complex request with relationships
-      and cross-references.
+      Task: <realistic prompt that naturally requires
+      the rule to be applied>
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/<skill>/check_my_rule.py
+        weight: 1.0
     expected_output: >-
-      Expected output description.
-    grader: graders/my-skill/advanced-scenario.sh
+      <one-paragraph description of correct output>
+    expectations:
+      - <human-readable expectation 1>
+    assertions:
+      - name: <assertion-name-from-CHECKS>
+        check: <human-readable description>
 ```
+
+`graders` is what skillgrade scores, by weight.
+`expected_output`, `expectations`, and `assertions`
+document the task for whoever reads the results —
+keep them accurate, but don't expect them to fail a
+run on their own.
 
 ## Writing Grader Scripts
 
-Graders live in `graders/<skill-name>/` and
-are deterministic shell scripts that inspect the
-model's output and emit a JSON result.
+Graders live in `graders/<skill>/` and are
+deterministic Python scripts. A task grader reads the
+artifact the instruction told the AI to save (usually
+`output.yml` in the working directory), calls
+`run_checks` from its skill's `lib.py`, and prints
+the skillgrade JSON result to stdout:
 
-A grader receives the model output on stdin and must
-print a JSON object to stdout:
+```python
+#!/usr/bin/env python3
+"""Grader for the my-rule-task eval."""
 
-```bash
-#!/usr/bin/env bash
-# graders/my-skill/basic-scenario.sh
-output=$(cat)
+from __future__ import annotations
+import json
+import sys
+from pathlib import Path
 
-# Check for required patterns
-if echo "$output" | grep -q 'kind: Dropdown'; then
-  echo '{"pass": true, "reason": "Status uses Dropdown kind"}'
-else
-  echo '{"pass": false, "reason": "Status does not use Dropdown kind"}'
-fi
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lib import run_checks  # noqa: E402
+
+CHECKS = ["schema-version", "<assertion-name>"]
+
+if __name__ == "__main__":
+    print(json.dumps(run_checks(CHECKS, Path("output.yml"))))
 ```
 
-**Keep graders deterministic.** They should not call
-external services or depend on timing. Parse the
-output text and check for the presence or absence of
-specific patterns.
+The individual assertions live in
+`graders/<skill>/lib.py` under a `CHECKS` registry.
+Writing one — including how to parse rather than
+substring-match the answer, and the four fixtures
+that prove it works — is covered in
+[adding-a-rule.md](./adding-a-rule.md#2-add-a-grader-check-function).
 
-**Use descriptive file names.** The grader filename
-appears in results (`dropdown-for-status.sh` is more
-readable than `check1.sh`).
+**Keep graders deterministic.** No LLM grading, no
+network calls, no dependence on timing.
+
+**Name the script after what it asserts.** The
+filename appears in results, so
+`check_dropdown_for_status.py` beats `check1.py`.
 
 ## Writing Good Eval Prompts
 
@@ -160,21 +184,19 @@ field names, missing bidirectional identifiers), write
 eval prompts that would expose these mistakes without
 the skill's guidance.
 
-## Writing Good Assertions
+**Don't put the answer in the question.** A prompt
+that dictates the output schema, names the fields it
+wants back, or tells the AI to "follow the rule" is
+answerable without the skill. Keep the prompt at the
+abstraction level a real user would type and let the
+skill supply the shape.
 
-**Make them objectively verifiable.** "Output looks
-nice" is not an assertion. "Status uses kind: Dropdown
-with choice objects" is.
-
-**Use descriptive names.** The grader filename appears
-in results. Someone scanning results should understand
-what `dropdown-for-status.sh` checks without reading
-the full script.
-
-**Focus on what the skill uniquely provides.** If a
-model would get something right even without the
-skill, testing it isn't very informative. Test the
-things the skill's rules specifically address.
+**Prove the task discriminates.** Run it once with
+the skill unloaded. If the grader still scores 1.0,
+the task measures the model rather than the skill —
+that is a broken task, not a passing one. Make the
+prompt harder, or grade something only the skill's
+rules produce.
 
 ## Iteration Loop
 
@@ -186,24 +208,15 @@ things the skill's rules specifically address.
 ## Existing Evals
 
 All tasks live in the single root `eval.yaml`; graders
-live under `graders/<skill>/`. Counts below reflect the
-tasks currently defined (group by the `skills/<skill>/SKILL.md`
-each task reads).
+live under `graders/<skill>/`. Rather than restating
+the per-skill counts here, where they go stale
+silently, read them off the file:
 
-| Skill | Tasks |
-| ----- | ----- |
-| infrahub-managing-schemas | 13 |
-| infrahub-managing-menus | 3 |
-| infrahub-managing-checks | 3 |
-| infrahub-managing-generators | 6 |
-| infrahub-managing-transforms | 3 |
-| infrahub-managing-objects | 3 |
-| infrahub-reporting-issues | 3 |
-| infrahub-auditing-repo | 16 |
-| infrahub-collecting-diagnostics | 3 |
-| infrahub-analyzing-diagnostics | 10 |
-| infrahub-importing-data | 25 |
+```bash
+grep -oE '\.agents/skills/infrahub-[a-z-]+' eval.yaml |
+  sort | uniq -c | sort -rn
+```
 
-`infrahub-analyzing-data` has no eval tasks yet —
-adding them is a good contribution. It has rules but
-no grader directory.
+A skill absent from that output has rules but no
+eval coverage, which makes it the highest-value place
+to add a task.
