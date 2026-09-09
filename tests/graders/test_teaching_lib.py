@@ -355,3 +355,186 @@ def test_status_stays_introduced_concept_missing(tmp_path):
     ws = make_ws(tmp_path, progress=only_other)
     ok, msg = teaching_lib.CHECKS["status-stays-introduced"](ws)
     assert not ok
+
+
+SANDBOX_LESSON = """# Lesson: proposed changes
+
+## Probe
+1. Have you merged a git branch before?
+2. What do you expect a review to catch?
+
+## Explain
+A proposed change is Infrahub's review pipeline.
+See https://docs.infrahub.app/topics/proposed-change for details.
+
+## Exercise
+This exercise writes to your instance. Shall we create a scratch branch
+for it?
+
+**Your task:** After you confirm, run these steps yourself:
+
+1. `infrahubctl branch create learning-pc-demo`
+2. `infrahubctl object load sandbox/objects.yml --branch learning-pc-demo`
+3. Open a proposed change from learning-pc-demo in the UI and read the diff.
+4. Clean up: `infrahubctl branch delete learning-pc-demo`
+
+## Check
+1. Why did the diff show only your branch's edits?
+2. What would a check have blocked here?
+"""
+
+
+def test_sandbox_safety_pass(tmp_path):
+    ws = make_ws(tmp_path, lesson=SANDBOX_LESSON, concept="proposed-changes")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert ok, msg
+
+
+def test_sandbox_safety_merge_forbidden(tmp_path):
+    merged = SANDBOX_LESSON.replace(
+        "4. Clean up:", "4. `infrahubctl branch merge learning-pc-demo`\n5. Clean up:")
+    ws = make_ws(tmp_path, lesson=merged, concept="proposed-changes")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert not ok and "merge" in msg
+
+
+def test_sandbox_safety_write_outside_learning_branch(tmp_path):
+    stray = SANDBOX_LESSON.replace(
+        "`infrahubctl object load sandbox/objects.yml --branch learning-pc-demo`",
+        "`infrahubctl object load sandbox/objects.yml`")
+    ws = make_ws(tmp_path, lesson=stray, concept="proposed-changes")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert not ok
+
+
+def test_sandbox_safety_no_opt_in_question(tmp_path):
+    silent = SANDBOX_LESSON.replace(
+        "This exercise writes to your instance. Shall we create a scratch branch\nfor it?\n\n",
+        "")
+    ws = make_ws(tmp_path, lesson=silent, concept="proposed-changes")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert not ok and "opt-in" in msg
+
+
+def test_sandbox_safety_no_cleanup(tmp_path):
+    dirty = SANDBOX_LESSON.replace(
+        "4. Clean up: `infrahubctl branch delete learning-pc-demo`\n", "")
+    ws = make_ws(tmp_path, lesson=dirty, concept="proposed-changes")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert not ok and "delete" in msg
+
+
+def test_own_artifacts_pass(tmp_path):
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert ok, msg
+
+
+def test_own_artifacts_generic_example_instead(tmp_path):
+    generic = COMPLIANT_LESSON.replace("TestbedSensor", "MyNode").replace(
+        "TestbedZone", "OtherNode").replace("TestbedRack", "ThirdNode")
+    ws = make_ws(tmp_path, lesson=generic)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert not ok
+
+
+def test_graduation_pointer_pass(tmp_path):
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON)
+    ok, msg = teaching_lib.CHECKS["graduation-pointer"](ws)
+    assert ok, msg
+
+
+def test_graduation_pointer_missing(tmp_path):
+    no_pointer = COMPLIANT_LESSON.replace(
+        "Next step when you are ready: the infrahub-managing-schemas skill does\nthis work on real projects.\n",
+        "")
+    ws = make_ws(tmp_path, lesson=no_pointer)
+    ok, msg = teaching_lib.CHECKS["graduation-pointer"](ws)
+    assert not ok
+
+
+OFF_MAP_LESSON = COMPLIANT_LESSON.replace(
+    "# Lesson: schema relationships", "# Lesson: webhooks (off-map)"
+).replace(
+    "https://docs.infrahub.app/topics/schema",
+    "https://docs.infrahub.app/topics/webhooks",
+)
+
+
+def test_off_map_lesson_pass(tmp_path):
+    ws = make_ws(tmp_path, lesson=OFF_MAP_LESSON, concept="webhooks")
+    ok, msg = teaching_lib.CHECKS["off-map-lesson"](ws)
+    assert ok, msg
+
+
+def test_off_map_lesson_rejects_known_slug(tmp_path):
+    ws = make_ws(tmp_path, lesson=OFF_MAP_LESSON, concept="schema")
+    ok, msg = teaching_lib.CHECKS["off-map-lesson"](ws)
+    assert not ok and "slug" in msg
+
+
+def test_off_map_lesson_needs_docs_citation(tmp_path):
+    uncited = OFF_MAP_LESSON.replace(
+        "See https://docs.infrahub.app/topics/webhooks for the full model.", "")
+    ws = make_ws(tmp_path, lesson=uncited, concept="webhooks")
+    ok, msg = teaching_lib.CHECKS["off-map-lesson"](ws)
+    assert not ok
+
+
+def test_off_map_lesson_needs_structure(tmp_path):
+    unstructured = OFF_MAP_LESSON.replace("## Check", "## Recap")
+    ws = make_ws(tmp_path, lesson=unstructured, concept="webhooks")
+    ok, msg = teaching_lib.CHECKS["off-map-lesson"](ws)
+    assert not ok
+
+
+COMPARISON_LINE_SOURCED = (
+    "In NetBox, config contexts attach JSON data to devices by scope.\n"
+    "**Comparison source:** https://docs.netbox.dev/en/stable/features/context-data/\n"
+)
+COMPARISON_LINE_UNVERIFIED = (
+    "You described NetBox config contexts; I could not verify the NetBox\n"
+    "side against its docs from here, so I am unsure of that half.\n"
+    "**Comparison source:** unverified\n"
+)
+
+
+def _with_comparison(line: str) -> str:
+    return COMPLIANT_LESSON.replace("## Exercise", line + "\n## Exercise")
+
+
+def test_competitor_mapping_sourced_pass(tmp_path):
+    ws = make_ws(tmp_path, lesson=_with_comparison(COMPARISON_LINE_SOURCED))
+    ok, msg = teaching_lib.CHECKS["competitor-mapping"](ws)
+    assert ok, msg
+
+
+def test_competitor_mapping_unverified_pass(tmp_path):
+    ws = make_ws(tmp_path, lesson=_with_comparison(COMPARISON_LINE_UNVERIFIED))
+    ok, msg = teaching_lib.CHECKS["competitor-mapping"](ws)
+    assert ok, msg
+
+
+def test_competitor_mapping_missing_marker(tmp_path):
+    bare = COMPLIANT_LESSON.replace(
+        "## Exercise", "In NetBox this is a config context.\n\n## Exercise")
+    ws = make_ws(tmp_path, lesson=bare)
+    ok, msg = teaching_lib.CHECKS["competitor-mapping"](ws)
+    assert not ok and "Comparison source" in msg
+
+
+def test_competitor_mapping_blog_source_rejected(tmp_path):
+    blog = COMPARISON_LINE_SOURCED.replace(
+        "https://docs.netbox.dev/en/stable/features/context-data/",
+        "https://someblog.example.com/netbox-vs-infrahub")
+    ws = make_ws(tmp_path, lesson=_with_comparison(blog))
+    ok, msg = teaching_lib.CHECKS["competitor-mapping"](ws)
+    assert not ok and "official" in msg
+
+
+def test_competitor_mapping_infrahub_citation_still_required(tmp_path):
+    no_infrahub = _with_comparison(COMPARISON_LINE_SOURCED).replace(
+        "See https://docs.infrahub.app/topics/schema for the full model.", "")
+    ws = make_ws(tmp_path, lesson=no_infrahub)
+    ok, msg = teaching_lib.CHECKS["competitor-mapping"](ws)
+    assert not ok

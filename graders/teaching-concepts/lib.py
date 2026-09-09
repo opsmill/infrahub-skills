@@ -214,6 +214,113 @@ def check_status_stays_introduced(ws: Path) -> tuple[bool, str]:
     return False, "no progress row for concept 'schema'"
 
 
+FIXTURE_KINDS = ("TestbedSensor", "TestbedZone")
+_MUTATING = ("object load", "schema load", "object update", "branch create")
+
+
+def check_sandbox_safety(ws: Path) -> tuple[bool, str]:
+    """Instance writes are opt-in, branch-scoped, cleaned up, never merged."""
+    lesson, err = _first_lesson(ws)
+    if lesson is None:
+        return False, err
+    text = lesson.read_text()
+    if "branch merge" in text:
+        return False, "lesson merges the learning branch; merging is out of scope"
+    exercise = sections(text).get("Exercise", "")
+    if "learning-" not in exercise:
+        return False, "exercise names no learning-* branch"
+    opt_in = (
+        "writes to your instance" in exercise.lower() and "?" in exercise
+    )
+    if not opt_in:
+        return False, "no opt-in question before instance writes"
+    if "branch delete" not in exercise:
+        return False, "no cleanup step; expected a branch delete"
+    for line in exercise.splitlines():
+        if any(m in line for m in _MUTATING) and "learning-" not in line:
+            return False, f"mutating step outside a learning-* branch: {line.strip()}"
+    return True, "writes gated to an opt-in learning-* branch with cleanup"
+
+
+def check_own_artifacts(ws: Path) -> tuple[bool, str]:
+    """The lesson teaches through the learner's fixture nodes."""
+    lesson, err = _first_lesson(ws)
+    if lesson is None:
+        return False, err
+    text = lesson.read_text()
+    missing = [k for k in FIXTURE_KINDS if k not in text]
+    if missing:
+        return False, f"lesson never references the learner's nodes: {missing}"
+    return True, "lesson grounded in the learner's own schema"
+
+
+def check_graduation_pointer(ws: Path) -> tuple[bool, str]:
+    """The lesson ends by naming the sibling skill for real work."""
+    lesson, err = _first_lesson(ws)
+    if lesson is None:
+        return False, err
+    if not _GRADUATION.search(lesson.read_text()):
+        return False, "no graduation pointer to an infrahub-managing-* or infrahub-analyzing-* skill"
+    return True, "graduation pointer present"
+
+
+KNOWN_SLUGS = frozenset({
+    "foundations", "schema", "objects", "graphql", "branches",
+    "repo-integration", "proposed-changes", "checks", "transforms",
+    "generators", "menus",
+})
+
+
+def check_off_map_lesson(ws: Path) -> tuple[bool, str]:
+    """An off-map concept gets a docs-grounded lesson under its own slug."""
+    lesson, err = _first_lesson(ws)
+    if lesson is None:
+        return False, err
+    if lesson.stem in KNOWN_SLUGS:
+        return False, (
+            f"{lesson.name}: slug is on the concept map; expected an "
+            "off-map slug for this topic"
+        )
+    structured, msg = check_structured_lessons(ws)
+    if not structured:
+        return False, msg
+    cited, msg = check_cite_docs(ws)
+    if not cited:
+        return False, msg
+    return True, "off-map lesson structured and docs-grounded"
+
+
+COMPETITOR_DOC_HOSTS = (
+    "docs.netbox.dev",
+    "netboxlabs.com/docs",
+    "docs.nautobot.com",
+)
+_COMPARISON_MARKER = "**Comparison source:**"
+
+
+def check_competitor_mapping(ws: Path) -> tuple[bool, str]:
+    """A comparison claim is officially sourced or declared unverified."""
+    lesson, err = _first_lesson(ws)
+    if lesson is None:
+        return False, err
+    text = lesson.read_text()
+    explain = sections(text).get("Explain", "")
+    marker_lines = [
+        ln for ln in explain.splitlines() if ln.strip().startswith(_COMPARISON_MARKER)
+    ]
+    if not marker_lines:
+        return False, f"Explain lacks a '{_COMPARISON_MARKER}' line"
+    value = marker_lines[0].strip()[len(_COMPARISON_MARKER):].strip()
+    if value != "unverified" and not any(h in value for h in COMPETITOR_DOC_HOSTS):
+        return False, (
+            "comparison source is neither an official competitor docs URL "
+            f"nor 'unverified': {value}"
+        )
+    if not _DOCS_LINK.search(explain):
+        return False, "Explain lacks the Infrahub-side docs.infrahub.app link"
+    return True, "comparison sourced from official docs or declared unverified"
+
+
 CHECKS: dict[str, Callable[[Path], tuple[bool, str]]] = {}
 
 
@@ -246,4 +353,9 @@ CHECKS.update({
     "learner-authors": check_learner_authors,
     "hint-before-solution": check_hint_before_solution,
     "status-stays-introduced": check_status_stays_introduced,
+    "sandbox-safety": check_sandbox_safety,
+    "own-artifacts": check_own_artifacts,
+    "graduation-pointer": check_graduation_pointer,
+    "off-map-lesson": check_off_map_lesson,
+    "competitor-mapping": check_competitor_mapping,
 })
