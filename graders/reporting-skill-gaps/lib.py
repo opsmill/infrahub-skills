@@ -1006,6 +1006,88 @@ def check_states_skills_version(text: str, **_: object) -> CheckResult:
     )
 
 
+# The infrahub-sdk version the session ran against. Matched as its own
+# header line, and `sdk` is required, so neither the `**Skills version**`
+# line above nor the `**Infrahub version**` line below can satisfy this
+# check, and prose that happens to mention a version cannot either. A
+# trailing suffix is allowed because prereleases exist (`1.14.0b1`,
+# `1.14.0rc1`). `unknown` is accepted: no SDK may be installed at all,
+# and saying so beats a guess.
+_SDK_VERSION_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?\*{0,2}(?:infrahub[ \-]?)?sdk\s+version\*{0,2}\s*[:\-]\s*"
+    r"[`\'\"]?(v?\d+\.\d+(?:\.\d+)?[0-9a-z.\-]*|unknown)",
+    re.IGNORECASE | re.MULTILINE,
+)
+# The Infrahub version the session talked to, which `infrahubctl info`
+# reports as `Infrahub Version` alongside `SDK Version`. `infrahub` has to
+# be followed directly by `version` (or by `server version`), so the
+# adjacent `**Infrahub SDK version**` line cannot satisfy this check.
+# `n/a` is accepted next to `unknown` because that is the literal value
+# `infrahubctl info` prints when no server is reachable, and a model
+# copying it through is being accurate rather than guessing.
+_INFRAHUB_VERSION_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?\*{0,2}infrahub(?:\s+server)?\s+version\*{0,2}\s*[:\-]\s*"
+    r"[`\'\"]?(v?\d+\.\d+(?:\.\d+)?[0-9a-z.\-]*|unknown|n/a)",
+    re.IGNORECASE | re.MULTILINE,
+)
+_UNFILLED_INFRAHUB_VERSION_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?\*{0,2}infrahub(?:\s+server)?\s+version\*{0,2}\s*[:\-]\s*\[",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def check_states_infrahub_version(text: str, **_: object) -> CheckResult:
+    """Output's header records the Infrahub version the session talked to.
+
+    Rules split by target. One naming a CLI flag or a client method is
+    aimed at an SDK version; one about schema loading, branch behavior, or
+    a check pipeline is aimed at a server version. A report that carries
+    only the SDK version leaves the second kind unanchored.
+
+    Accepts `unknown` and `n/a`. Work done against files alone never
+    reaches a server, and `infrahubctl info` prints `N/A` when none is
+    reachable, so both are honest readings rather than guesses.
+    """
+    if _UNFILLED_INFRAHUB_VERSION_RE.search(text):
+        return False, "Infrahub-version line is still an unfilled template placeholder"
+    match = _INFRAHUB_VERSION_RE.search(text)
+    if match:
+        return True, f"records the Infrahub version ({match.group(1)!r})"
+    return False, (
+        "no Infrahub-version header line found; a maintainer cannot tell "
+        "which server behavior the cited rule was aimed at"
+    )
+# The template's own unfilled placeholder, the same trap
+# `_UNFILLED_VERSION_RE` guards for on the skills-version line.
+_UNFILLED_SDK_VERSION_RE = re.compile(
+    r"sdk\s+version\*{0,2}\s*[:\-]\s*\[", re.IGNORECASE
+)
+
+
+def check_states_sdk_version(text: str, **_: object) -> CheckResult:
+    """Output's header records the infrahub-sdk version the session ran against.
+
+    Skill rules encode SDK behavior: a CLI flag, a client method, a
+    generated protocol. Without the SDK version a maintainer cannot tell
+    whether the cited rule is wrong or merely older than the SDK that ran,
+    which is the difference between rewriting the guidance and adding a
+    version note to it.
+
+    Accepts `unknown` as a value. The read can genuinely fail, and no SDK
+    may be installed in the session at all; an explicit `unknown` is
+    honest, while a plausible-looking guess is worse than nothing.
+    """
+    if _UNFILLED_SDK_VERSION_RE.search(text):
+        return False, "SDK-version line is still an unfilled template placeholder"
+    match = _SDK_VERSION_RE.search(text)
+    if match:
+        return True, f"records the SDK version ({match.group(1)!r})"
+    return False, (
+        "no SDK-version header line found; a maintainer cannot tell whether "
+        "the cited rule is wrong or older than the SDK that ran"
+    )
+
+
 def check_hands_off_to_reporting_issues(text: str, **_: object) -> CheckResult:
     """Output references infrahub-reporting-issues for the product-defect handoff."""
     if "infrahub-reporting-issues" in text:
@@ -1599,6 +1681,8 @@ CHECKS: dict[str, CheckFn] = {
     "no-direct-filing": check_no_direct_filing,
     "payload-is-complete": check_payload_is_complete,
     "states-skills-version": check_states_skills_version,
+    "states-sdk-version": check_states_sdk_version,
+    "states-infrahub-version": check_states_infrahub_version,
     "leaves-routing-to-reporter": check_leaves_routing_to_reporter,
     "title-uses-kind-prefix": check_title_uses_kind_prefix,
     "cites-rule-file": check_cites_rule_file,
