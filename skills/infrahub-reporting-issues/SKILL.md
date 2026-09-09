@@ -255,8 +255,8 @@ Where to find versions:
 
 | Component | Command |
 | --------- | ------- |
-| Infrahub server | `infrahubctl --version`, or check `image:` tag in compose file |
-| Python SDK | `pip show infrahub-sdk` |
+| Infrahub server | `infrahubctl info` (`Infrahub Version` line), or check `image:` tag in compose file |
+| Python SDK | `infrahubctl info` (`SDK Version` line), or `pip show infrahub-sdk` |
 | Ansible collection | `ansible-galaxy collection list opsmill.infrahub` |
 | Nornir plugin | `pip show nornir-infrahub` |
 | Helm chart | `helm list -n <namespace>` |

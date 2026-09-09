@@ -87,13 +87,22 @@ below the same way (e.g.,
 infrahubctl info
 ```
 
-Expected output includes the server address and
-version:
+Expected output includes the address, the connection
+status, and both versions:
 
 ```text
-Infrahub server: http://localhost:8000
-Server version: x.y.z
+ Address:            http://localhost:8000
+ Connection Status:  ✅
+ Python Version:     3.12.x
+ SDK Version:        x.y.z
+ Infrahub Version:   x.y.z
+ Deployment ID:      <id>
 ```
+
+`Connection Status` is the signal to read: when it
+fails, `Infrahub Version` and `Deployment ID` come back
+`N/A` while `SDK Version` still reports, since that one
+needs no server.
 
 #### Step 2: Check environment variables
 
