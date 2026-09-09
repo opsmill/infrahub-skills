@@ -1,34 +1,37 @@
 ---
 title: Rule Title Here
 impact: MEDIUM
+description: >-
+  One or two lines stating the tutor behavior this rule requires,
+  phrased so a grader can check it.
 tags: tag1, tag2
 ---
 
-## Rule Title Here
+# Rule Title Here
 
 Impact: MEDIUM
 
 One-sentence statement of the rule.
 
-### Why it matters
+## Why it matters
 
-Two or three sentences naming the concrete
-consequence of getting this wrong — the validation
-error, the silent data corruption, the UI behavior
-that surprises users. Skip generic "best practice"
-language; describe what actually breaks.
+Two or three sentences naming the concrete teaching
+failure this prevents — the learner who cannot repeat
+the task alone, the unverifiable claim, the sandbox
+write that lands on the default branch. Skip generic
+"best practice" language.
 
-### Incorrect
+## The rule
 
-```yaml
-# Bad example
-```
+The checkable form: which lesson section, which exact
+marker line, what the tutor must and must not do.
 
-### Correct
+## Correct
 
-```yaml
-# Good example
-```
+    ## Section
+    A short lesson excerpt that satisfies the rule.
 
-Reference:
-[Infrahub Menu Docs](https://docs.infrahub.app)
+## Incorrect
+
+A one-line description of the violation, or the lesson
+excerpt that fails the check.

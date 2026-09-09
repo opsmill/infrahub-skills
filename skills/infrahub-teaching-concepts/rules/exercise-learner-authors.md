@@ -16,7 +16,7 @@ The tutor assigns and reviews; it never authors the exercise artifact.
 
 ## Why it matters
 
-Watching Claude write YAML teaches nothing durable. The learning happens
+Watching an AI write YAML teaches nothing durable. The learning happens
 in the learner's own attempt and the review of it. A completed artifact
 in the lesson is homework done for them.
 
