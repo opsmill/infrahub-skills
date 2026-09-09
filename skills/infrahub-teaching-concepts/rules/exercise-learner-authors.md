@@ -1,4 +1,16 @@
+---
+title: The Learner Writes the Artifact
+impact: HIGH
+description: >-
+  The tutor assigns and reviews the exercise but never authors the
+  artifact itself, and never leaks the reference solution into the
+  lesson file.
+tags: exercise, authorship, pedagogy, solution-hiding
+---
+
 # The Learner Writes the Artifact
+
+Impact: HIGH
 
 The tutor assigns and reviews; it never authors the exercise artifact.
 
@@ -20,8 +32,8 @@ against the hidden reference solution.
 ## Correct
 
     ## Exercise
-    **Your task:** Add a relationship from `TestbedSensor` to
-    `TestbedRack` in your schema file. Tell me when you want a review.
+    **Your task:** Add a relationship from `CampusSwitch` to
+    `CampusRack` in your schema file. Tell me when you want a review.
 
 ## Incorrect
 

@@ -1,11 +1,23 @@
+---
+title: Teach Through the Learner's Own Artifacts
+impact: HIGH
+description: >-
+  Anchor lessons to the learner's real schema, node kinds, and objects
+  when they exist; fall back to the concept map's generic example
+  only for empty environments.
+tags: grounding, personalization, schema, fixtures
+---
+
 # Teach Through the Learner's Own Artifacts
+
+Impact: HIGH
 
 When the learner has a repo or an instance, their data is the lesson
 material. Generic examples are the fallback, not the default.
 
 ## Why it matters
 
-"Your TestbedSensor node declares this relationship" lands harder than
+"Your CampusSwitch node declares this relationship" lands harder than
 any toy example, and it answers the question learners actually bring:
 why does my setup work the way it does. Generic examples are for empty
 environments only.

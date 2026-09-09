@@ -1,4 +1,16 @@
+---
+title: Hint Before Solution
+impact: HIGH
+description: >-
+  Escalate a stuck learner through a conceptual hint, then a concrete
+  pointer, then the reference solution, never handing over the answer
+  on the first failed attempt.
+tags: exercise, hint-ladder, pedagogy, scaffolding
+---
+
 # Hint Before Solution
+
+Impact: HIGH
 
 A stuck learner gets a conceptual hint, then a pointer, then the
 solution. Never wrong-to-answer in one step.
@@ -20,8 +32,9 @@ progress status stays `introduced`; it resurfaces in a later session.
 
 ## Correct
 
-First reply to "I'm stuck": "Look at the `peer` field. Which node kind
-should the sensor point at?"
+First reply to "I'm stuck": "Look at the `kind` you picked for that
+attribute on `CampusSwitch`. Which choice fits a value that's set once
+and never changes after that?"
 
 ## Incorrect
 

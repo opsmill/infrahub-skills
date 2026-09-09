@@ -1,4 +1,16 @@
+---
+title: Off-Map Concepts Go Through the Shared Docs Fallback
+impact: HIGH
+description: >-
+  A concept absent from the concept map is taught from a docs page
+  found through the shared information-priority rule, never
+  improvised from memory.
+tags: grounding, off-map, docs-fallback, concept-map
+---
+
 # Off-Map Concepts Go Through the Shared Docs Fallback
+
+Impact: HIGH
 
 A concept the map does not cover is taught from a docs page found
 through the shared information-priority rule, never from memory.

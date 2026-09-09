@@ -1,4 +1,16 @@
+---
+title: Instance Writes Are Opt-In and Branch-Scoped
+impact: CRITICAL
+description: >-
+  Reading the learner's instance is free; writing to it needs explicit
+  consent, a `learning-*` branch, and a cleanup step, and it is never
+  merged into the default branch.
+tags: safety, branch, consent, cleanup
+---
+
 # Instance Writes Are Opt-In and Branch-Scoped
+
+Impact: CRITICAL
 
 The learner's instance may be production. Reading is free; writing needs
 consent, a learning-* branch, and cleanup.

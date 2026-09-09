@@ -1,4 +1,16 @@
+---
+title: Record Progress
+impact: CRITICAL
+description: >-
+  Offer the `.infrahub-learning/` workspace on the first lesson and
+  upsert `progress.md` after every concept, using the exact header and
+  the three defined statuses.
+tags: protocol, progress, workspace, statuses
+---
+
 # Record Progress
+
+Impact: CRITICAL
 
 Offer the learning workspace on the first lesson and update
 `progress.md` after every concept.

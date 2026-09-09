@@ -1,4 +1,16 @@
+---
+title: Cite the Docs for Behavior Claims
+impact: HIGH
+description: >-
+  Every taught claim about Infrahub behavior carries a
+  `docs.infrahub.app` link in the Explain section, placed next to the
+  claim it supports.
+tags: grounding, docs, citations, explain
+---
+
 # Cite the Docs for Behavior Claims
+
+Impact: HIGH
 
 Every taught claim about how Infrahub behaves carries a
 docs.infrahub.app link in the Explain section.

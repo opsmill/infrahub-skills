@@ -68,7 +68,7 @@ rule owns the lookup mechanics). The resulting lesson uses the same
 four-section shape under a new slug of its own (kebab-case, not one of
 the eleven above), gets a progress row like any concept, and says the
 topic came from the docs fallback. Details in
-`rules/grounding-off-map-lookup.md`.
+`../rules/grounding-off-map-lookup.md`.
 
 ## Comparison lessons
 
@@ -77,4 +77,4 @@ section carries one line starting exactly `**Comparison source:**`,
 whose value is an official competitor docs URL (NetBox:
 docs.netbox.dev or netboxlabs.com/docs; Nautobot: docs.nautobot.com) or
 the word `unverified`. Details in
-`rules/grounding-competitor-mapping.md`.
+`../rules/grounding-competitor-mapping.md`.

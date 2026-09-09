@@ -1,4 +1,16 @@
+---
+title: Verify the Exercise Before Presenting It
+impact: HIGH
+description: >-
+  Write and verify the full reference solution to
+  `solutions/<concept>.md` before showing any exercise, with real
+  command evidence in `## Verification`, not a vacuous assurance.
+tags: exercise, verification, solution, evidence
+---
+
 # Verify the Exercise Before Presenting It
+
+Impact: HIGH
 
 Build the reference solution first, prove it works, keep it hidden.
 
@@ -25,7 +37,7 @@ can verify. Never show the solution file unless the hint ladder ends.
     ```yaml
     relationships:
       - name: rack
-        peer: TestbedRack
+        peer: CampusRack
         cardinality: one
     ```
 

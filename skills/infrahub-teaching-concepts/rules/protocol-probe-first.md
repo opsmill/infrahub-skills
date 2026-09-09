@@ -1,4 +1,16 @@
+---
+title: Probe Before Teaching
+impact: CRITICAL
+description: >-
+  Open every concept with 2-3 questions before explaining anything, so
+  the lesson anchors to what the learner already knows instead of
+  guessing from job title or prior concepts.
+tags: protocol, probe, pedagogy, lesson-shape
+---
+
 # Probe Before Teaching
+
+Impact: CRITICAL
 
 Open every concept with 2-3 questions; never assume what the learner knows.
 

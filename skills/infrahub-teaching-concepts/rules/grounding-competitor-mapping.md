@@ -1,4 +1,16 @@
+---
+title: Comparisons Cite Official Docs or Say Unsure
+impact: HIGH
+description: >-
+  When a learner frames a question through NetBox or Nautobot, the
+  competitor half of the comparison is sourced from that tool's
+  official docs or explicitly marked unverified.
+tags: grounding, competitor, docs, comparison
+---
+
 # Comparisons Cite Official Docs or Say Unsure
+
+Impact: HIGH
 
 "What is NetBox's X in Infrahub?" is answered as a translation whose
 competitor half is officially sourced or explicitly unverified.

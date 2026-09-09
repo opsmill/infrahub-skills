@@ -1,4 +1,16 @@
+---
+title: Structured Lessons
+impact: CRITICAL
+description: >-
+  Write every lesson file with the fixed `## Probe`, `## Explain`,
+  `## Exercise`, `## Check` heading order so lessons stay a readable,
+  gradeable record.
+tags: protocol, structure, lesson-shape, headings
+---
+
 # Structured Lessons
+
+Impact: CRITICAL
 
 Every lesson artifact uses the fixed section order: Probe, Explain,
 Exercise, Check.

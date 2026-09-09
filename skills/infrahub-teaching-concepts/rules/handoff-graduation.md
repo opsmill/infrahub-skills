@@ -1,4 +1,16 @@
+---
+title: End With a Graduation Pointer
+impact: MEDIUM
+description: >-
+  Every concept closes by naming the sibling skill that does the real
+  work, or the next concept on the map when the concept has no
+  graduation skill.
+tags: handoff, graduation, sibling-skills
+---
+
 # End With a Graduation Pointer
+
+Impact: MEDIUM
 
 Every concept closes by naming the sibling skill that does this work on
 real projects.
@@ -16,7 +28,10 @@ point to infrahub-managing-schemas, objects to infrahub-managing-objects,
 GraphQL to infrahub-analyzing-data, checks to infrahub-managing-checks,
 transforms to infrahub-managing-transforms, generators to
 infrahub-managing-generators, menus to infrahub-managing-menus. The
-concept map carries the mapping.
+concept map carries the mapping. A concept whose map row has no
+graduation skill (foundations, branches, repo-integration,
+proposed-changes) closes by pointing to the next concept on the map
+instead.
 
 ## Correct
 
