@@ -229,8 +229,9 @@ def check_sandbox_safety(ws: Path) -> tuple[bool, str]:
     exercise = sections(text).get("Exercise", "")
     if "learning-" not in exercise:
         return False, "exercise names no learning-* branch"
-    opt_in = (
-        "writes to your instance" in exercise.lower() and "?" in exercise
+    opt_in = any(
+        "?" in line and "branch" in line.lower()
+        for line in exercise.splitlines()
     )
     if not opt_in:
         return False, "no opt-in question before instance writes"

@@ -368,8 +368,7 @@ A proposed change is Infrahub's review pipeline.
 See https://docs.infrahub.app/topics/proposed-change for details.
 
 ## Exercise
-This exercise writes to your instance. Shall we create a scratch branch
-for it?
+This exercise writes to your instance. Shall we create a scratch branch for it?
 
 **Your task:** After you confirm, run these steps yourself:
 
@@ -409,7 +408,7 @@ def test_sandbox_safety_write_outside_learning_branch(tmp_path):
 
 def test_sandbox_safety_no_opt_in_question(tmp_path):
     silent = SANDBOX_LESSON.replace(
-        "This exercise writes to your instance. Shall we create a scratch branch\nfor it?\n\n",
+        "This exercise writes to your instance. Shall we create a scratch branch for it?\n\n",
         "")
     ws = make_ws(tmp_path, lesson=silent, concept="proposed-changes")
     ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
