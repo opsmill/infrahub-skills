@@ -1,0 +1,70 @@
+---
+title: Concept Tutor
+sidebar_position: 13
+---
+
+The Concept Tutor teaches Infrahub concepts starting from wherever the learner is, using their own repo files and live instance as lesson material instead of generic examples. It probes what the learner already knows, explains each concept anchored to their own schema and data, sets a hands-on exercise verified solvable before it's shown, and records progress so a later session resumes instead of restarting.
+
+## When to use
+
+- Learning how a concept works: "teach me how relationships work," "explain how branches work in my instance"
+- New to Infrahub and wanting a guided tour rather than a task done for you
+- Coming from NetBox or Nautobot and wanting the Infrahub equivalent of a concept you already know
+- Understanding why your instance behaves a certain way, when the goal is learning rather than an operational answer
+- Resuming a learning session: "where were we?"
+
+## What it produces
+
+- `.infrahub-learning/progress.md`: one row per concept taught, tracking status (`not-seen`, `introduced`, `practiced`) and when it was last seen
+- `.infrahub-learning/lessons/<concept>.md`: a lesson artifact per concept, structured as Probe, Explain, Exercise, Check
+- `.infrahub-learning/solutions/<concept>.md`: a verified reference solution and the verification evidence, written before the exercise is shown to the learner
+- A closing pointer to the sibling skill that does that concept's work on real projects
+
+The curriculum is dependency-ordered and enters wherever the probe says the learner already is:
+
+| # | Concept | Graduates to |
+| --- | --- | --- |
+| 1 | Foundations | (none) |
+| 2 | Schema | Schema Manager |
+| 3 | Objects | Object Manager |
+| 4 | GraphQL | Data Analyzer |
+| 5 | Branches | (none) |
+| 6 | Repo integration | (none) |
+| 7 | Proposed changes | (none) |
+| 8 | Checks | Check Manager |
+| 9 | Transforms | Transform Manager |
+| 10 | Generators | Generator Manager |
+| 11 | Menus | Menu Manager |
+
+A concept outside this list isn't refused. It's taught as an off-map lesson, grounded in a docs page found through the same lookup path other skills use, and flagged to the learner as coming from that fallback rather than the curriculum.
+
+## Example prompts
+
+- "Teach me how relationships work"
+- "I'm new to Infrahub, give me a guided tour"
+- "What's the NetBox equivalent of a proposed change in Infrahub?"
+- "Explain why my instance behaves this way" (asked to understand, not to get an operational answer)
+- "Where were we?"
+
+## Key rules enforced
+
+- **Probe before teaching**: every lesson opens with 2-3 questions that place the learner before any explanation starts
+- **Teach through the learner's own artifacts**: schema, objects, and a reachable live instance take priority over generic examples; a small two-node fallback example is used only when the learner has neither
+- **Verified exercises**: the reference solution is built and verified before the exercise is shown, so the learner is never handed an assignment that can't be solved
+- **Hint ladder**: a struggling learner gets a conceptual hint first, then a concrete pointer, then the full solution on a third attempt or on request, never the answer up front
+- **Instance writes are opt-in and branch-scoped**: reading the instance needs no consent; writing happens only after an explicit yes, targets a `learning-*` branch, is cleaned up afterward, and is never merged into the default branch
+- **Progress recording**: every lesson updates `.infrahub-learning/progress.md` so a later session resumes instead of restarting
+- **Comparisons are sourced**: a NetBox or Nautobot comparison cites that tool's official docs or is explicitly marked unverified, never asserted from memory
+- **Graduation**: each concept closes by naming the sibling skill that does that work on real projects
+
+## Concept Tutor vs. Managing skills vs. Data Analyzer
+
+| Use Concept Tutor when... | Use a Managing skill when... | Use Data Analyzer when... |
+| -------------------------- | ------------------------------ | --------------------------- |
+| The learner wants to understand a concept | The learner wants the artifact built for them | The learner wants a live operational answer |
+| Progress and exercises matter | Correctness and load-readiness matter | Speed and accuracy on current data matter |
+| Output is a lesson and a verified exercise | Output is a schema, object, check, transform, generator, or menu file | Output is an answer, not a file |
+
+:::tip
+Instance access is read-only by default. The tutor only writes to your instance for lessons on branches or proposed changes, and only after asking first. See the safety rules above.
+:::
