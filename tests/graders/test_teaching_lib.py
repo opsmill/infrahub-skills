@@ -36,6 +36,52 @@ def make_ws(tmp_path, lesson=None, solution=None, progress=None,
     return tmp_path
 
 
+COMPLIANT_LESSON = """# Lesson: schema relationships
+
+## Probe
+1. What does a relationship in Infrahub connect?
+2. Have you used foreign keys in a database before?
+
+## Explain
+A relationship connects two schema nodes. Your `TestbedSensor` node points
+to `TestbedZone`. Cardinality controls how many peers one object can have.
+See https://docs.infrahub.app/topics/schema for the full model.
+
+## Exercise
+**Your task:** Add a new relationship from `TestbedSensor` to a
+`TestbedRack` node in your schema file and pick the right cardinality.
+
+## Check
+1. What happens if you omit cardinality?
+2. Which side of the relationship owns the data?
+
+Next step when you are ready: the infrahub-managing-schemas skill does
+this work on real projects.
+"""
+
+COMPLIANT_SOLUTION = """# Solution: schema relationships
+
+## Solution
+```yaml
+relationships:
+  - name: rack
+    peer: TestbedRack
+    cardinality: one
+    kind: Attribute
+```
+
+## Verification
+Ran `python scripts/validate_schema.py sandbox/schema.yml` (in-memory
+Infrahub validator): schema loads cleanly, relationship resolves.
+"""
+
+COMPLIANT_PROGRESS = """| concept | status | last-seen | notes |
+|---|---|---|---|
+| schema | introduced | 2026-09-09 | solution revealed on exercise |
+| foundations | practiced | 2026-09-08 | |
+"""
+
+
 def test_sections_splits_on_h2():
     text = "# Title\n## Probe\nq1?\nq2?\n## Explain\nbody\n"
     parts = teaching_lib.sections(text)
@@ -82,3 +128,123 @@ def test_run_checks_survives_crashing_check(tmp_path, monkeypatch):
     result = teaching_lib.run_checks(["crasher"], tmp_path)
     assert result["score"] == 0.0
     assert "crash" in result["checks"][0]["message"]
+
+
+def test_structured_lessons_pass(tmp_path):
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON)
+    ok, msg = teaching_lib.CHECKS["structured-lessons"](ws)
+    assert ok, msg
+
+
+def test_structured_lessons_missing_section(tmp_path):
+    broken = COMPLIANT_LESSON.replace("## Check", "## Recap")
+    ws = make_ws(tmp_path, lesson=broken)
+    ok, msg = teaching_lib.CHECKS["structured-lessons"](ws)
+    assert not ok and "Check" in msg
+
+
+def test_structured_lessons_wrong_order(tmp_path):
+    reordered = (
+        "## Explain\nbody https://docs.infrahub.app/topics/schema\n"
+        "## Probe\n1. q?\n2. q?\n## Exercise\n**Your task:** do it.\n"
+        "## Check\nq?\n"
+    )
+    ws = make_ws(tmp_path, lesson=reordered)
+    ok, msg = teaching_lib.CHECKS["structured-lessons"](ws)
+    assert not ok and "order" in msg
+
+
+def test_structured_lessons_no_lesson(tmp_path):
+    ok, msg = teaching_lib.CHECKS["structured-lessons"](tmp_path)
+    assert not ok
+
+
+def test_probe_first_pass(tmp_path):
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON)
+    ok, msg = teaching_lib.CHECKS["probe-first"](ws)
+    assert ok, msg
+
+
+def test_probe_first_too_few_questions(tmp_path):
+    one_q = COMPLIANT_LESSON.replace(
+        "2. Have you used foreign keys in a database before?", "")
+    ws = make_ws(tmp_path, lesson=one_q)
+    ok, msg = teaching_lib.CHECKS["probe-first"](ws)
+    assert not ok and "question" in msg
+
+
+def test_probe_first_too_many_questions(tmp_path):
+    four_q = COMPLIANT_LESSON.replace(
+        "## Explain",
+        "3. Another question?\n4. Yet another?\n\n## Explain")
+    ws = make_ws(tmp_path, lesson=four_q)
+    ok, msg = teaching_lib.CHECKS["probe-first"](ws)
+    assert not ok
+
+
+def test_probe_first_probe_after_explain(tmp_path):
+    swapped = (
+        "## Explain\nbody\n## Probe\n1. q?\n2. q?\n"
+        "## Exercise\n**Your task:** x\n## Check\nq?\n"
+    )
+    ws = make_ws(tmp_path, lesson=swapped)
+    ok, msg = teaching_lib.CHECKS["probe-first"](ws)
+    assert not ok
+
+
+def test_cite_docs_pass(tmp_path):
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON)
+    ok, msg = teaching_lib.CHECKS["cite-docs"](ws)
+    assert ok, msg
+
+
+def test_cite_docs_missing_link(tmp_path):
+    no_link = COMPLIANT_LESSON.replace(
+        "See https://docs.infrahub.app/topics/schema for the full model.", "")
+    ws = make_ws(tmp_path, lesson=no_link)
+    ok, msg = teaching_lib.CHECKS["cite-docs"](ws)
+    assert not ok
+
+
+def test_cite_docs_link_outside_explain_does_not_count(tmp_path):
+    moved = no_link = COMPLIANT_LESSON.replace(
+        "See https://docs.infrahub.app/topics/schema for the full model.", "")
+    moved = moved.replace(
+        "## Check", "## Check\nhttps://docs.infrahub.app/topics/schema\n")
+    ws = make_ws(tmp_path, lesson=moved)
+    ok, msg = teaching_lib.CHECKS["cite-docs"](ws)
+    assert not ok
+
+
+def test_record_progress_pass(tmp_path):
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON,
+                 progress=COMPLIANT_PROGRESS)
+    ok, msg = teaching_lib.CHECKS["record-progress"](ws)
+    assert ok, msg
+
+
+def test_record_progress_missing_file(tmp_path):
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON)
+    ok, msg = teaching_lib.CHECKS["record-progress"](ws)
+    assert not ok
+
+
+def test_record_progress_wrong_header(tmp_path):
+    bad = COMPLIANT_PROGRESS.replace("last-seen", "date")
+    ws = make_ws(tmp_path, progress=bad)
+    ok, msg = teaching_lib.CHECKS["record-progress"](ws)
+    assert not ok and "header" in msg
+
+
+def test_record_progress_invalid_status(tmp_path):
+    bad = COMPLIANT_PROGRESS.replace("introduced", "mastered")
+    ws = make_ws(tmp_path, progress=bad)
+    ok, msg = teaching_lib.CHECKS["record-progress"](ws)
+    assert not ok and "mastered" in msg
+
+
+def test_record_progress_no_rows(tmp_path):
+    header_only = "| concept | status | last-seen | notes |\n|---|---|---|---|\n"
+    ws = make_ws(tmp_path, progress=header_only)
+    ok, msg = teaching_lib.CHECKS["record-progress"](ws)
+    assert not ok

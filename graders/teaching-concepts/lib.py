@@ -75,6 +75,76 @@ def _first_lesson(ws: Path) -> tuple[Path | None, str]:
     return found[0], ""
 
 
+def check_structured_lessons(ws: Path) -> tuple[bool, str]:
+    """Every lesson has Probe, Explain, Exercise, Check headings in order."""
+    found = lessons(ws)
+    if not found:
+        return False, f"no lesson file under {LEARNING_DIR}/lessons/"
+    for lesson in found:
+        heads = headings(lesson.read_text())
+        positions = []
+        for name in SECTION_ORDER:
+            if name not in heads:
+                return False, f"{lesson.name}: missing '## {name}' section"
+            positions.append(heads.index(name))
+        if positions != sorted(positions):
+            return False, f"{lesson.name}: sections out of order: {heads}"
+    return True, "all lessons follow Probe/Explain/Exercise/Check"
+
+
+def check_probe_first(ws: Path) -> tuple[bool, str]:
+    """Probe precedes Explain and holds 2-3 questions."""
+    lesson, err = _first_lesson(ws)
+    if lesson is None:
+        return False, err
+    text = lesson.read_text()
+    heads = headings(text)
+    if "Probe" not in heads or "Explain" not in heads:
+        return False, f"{lesson.name}: needs both Probe and Explain sections"
+    if heads.index("Probe") > heads.index("Explain"):
+        return False, f"{lesson.name}: Probe appears after Explain"
+    probe = sections(text).get("Probe", "")
+    questions = [ln for ln in probe.splitlines() if ln.strip().endswith("?")]
+    if not 2 <= len(questions) <= 3:
+        return False, (
+            f"{lesson.name}: Probe has {len(questions)} question lines, "
+            "expected 2-3"
+        )
+    return True, "probe precedes explanation with 2-3 questions"
+
+
+def check_cite_docs(ws: Path) -> tuple[bool, str]:
+    """The Explain section links to docs.infrahub.app."""
+    lesson, err = _first_lesson(ws)
+    if lesson is None:
+        return False, err
+    explain = sections(lesson.read_text()).get("Explain", "")
+    if not _DOCS_LINK.search(explain):
+        return False, f"{lesson.name}: Explain has no docs.infrahub.app link"
+    return True, "explanation carries a docs anchor"
+
+
+def check_record_progress(ws: Path) -> tuple[bool, str]:
+    """progress.md exists with the exact header and valid statuses."""
+    path = _learning(ws) / "progress.md"
+    if not path.is_file():
+        return False, f"no {LEARNING_DIR}/progress.md"
+    rows = [r for r in path.read_text().splitlines() if r.strip().startswith("|")]
+    if not rows:
+        return False, "progress.md holds no table"
+    header = [c.strip().lower() for c in rows[0].strip().strip("|").split("|")]
+    if header != PROGRESS_HEADER:
+        return False, f"header is {header}, expected {PROGRESS_HEADER}"
+    data_rows = [r for r in rows[2:] if r.replace("|", "").replace("-", "").strip()]
+    if not data_rows:
+        return False, "progress.md has no concept rows"
+    for row in data_rows:
+        cells = [c.strip() for c in row.strip().strip("|").split("|")]
+        if len(cells) >= 2 and cells[1] not in VALID_STATUSES:
+            return False, f"invalid status '{cells[1]}'"
+    return True, "progress.md well formed"
+
+
 CHECKS: dict[str, Callable[[Path], tuple[bool, str]]] = {}
 
 
@@ -96,3 +166,11 @@ def run_checks(names: list[str], workspace: Path) -> dict:
         "details": failures or "all checks passed",
         "checks": results,
     }
+
+
+CHECKS.update({
+    "structured-lessons": check_structured_lessons,
+    "probe-first": check_probe_first,
+    "cite-docs": check_cite_docs,
+    "record-progress": check_record_progress,
+})
