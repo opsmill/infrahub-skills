@@ -207,7 +207,7 @@ def test_cite_docs_missing_link(tmp_path):
 
 
 def test_cite_docs_link_outside_explain_does_not_count(tmp_path):
-    moved = no_link = COMPLIANT_LESSON.replace(
+    moved = COMPLIANT_LESSON.replace(
         "See https://docs.infrahub.app/topics/schema for the full model.", "")
     moved = moved.replace(
         "## Check", "## Check\nhttps://docs.infrahub.app/topics/schema\n")
@@ -273,6 +273,15 @@ def test_verified_solution_no_verification_section(tmp_path):
 def test_verified_solution_empty_solution_section(tmp_path):
     empty = "## Solution\n\n## Verification\nran the validator, clean.\n"
     ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, solution=empty)
+    ok, msg = teaching_lib.CHECKS["verified-solution"](ws)
+    assert not ok
+
+
+def test_verified_solution_vacuous_assurance_rejected(tmp_path):
+    vacuous = COMPLIANT_SOLUTION.split("## Verification")[0] + (
+        "## Verification\nThis should work.\n"
+    )
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, solution=vacuous)
     ok, msg = teaching_lib.CHECKS["verified-solution"](ws)
     assert not ok
 
@@ -421,6 +430,39 @@ def test_sandbox_safety_no_cleanup(tmp_path):
     ws = make_ws(tmp_path, lesson=dirty, concept="proposed-changes")
     ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
     assert not ok and "delete" in msg
+
+
+def test_sandbox_safety_warning_phrasing_pass(tmp_path):
+    warned = SANDBOX_LESSON.replace(
+        "## Check",
+        "Never run `infrahubctl branch merge learning-pc-demo`; the "
+        "learning branch is never merged.\n\n## Check",
+    )
+    ws = make_ws(tmp_path, lesson=warned, concept="proposed-changes")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert ok, msg
+
+
+def test_sandbox_safety_ui_merge_imperative_step_fails(tmp_path):
+    ui_merge = SANDBOX_LESSON.replace(
+        "4. Clean up:",
+        "4. Merge the proposed change in the UI to apply it to main.\n"
+        "5. Clean up:",
+    )
+    ws = make_ws(tmp_path, lesson=ui_merge, concept="proposed-changes")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert not ok and "merge" in msg
+
+
+def test_sandbox_safety_mutating_command_in_explain_fails(tmp_path):
+    stray_explain = SANDBOX_LESSON.replace(
+        "See https://docs.infrahub.app/topics/proposed-change for details.",
+        "See https://docs.infrahub.app/topics/proposed-change for details.\n"
+        "For example: `infrahubctl object load sandbox/objects.yml`.",
+    )
+    ws = make_ws(tmp_path, lesson=stray_explain, concept="proposed-changes")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert not ok and "mutating" in msg
 
 
 def test_own_artifacts_pass(tmp_path):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Grader for eval task: teach-competitor.
+"""Grader for eval task: teach-competitor-mapping.
 
 Checks assertion names: competitor-mapping, structured-lessons.
 Usage: python check_competitor.py <workspace_dir>

@@ -156,8 +156,14 @@ def check_verified_solution(ws: Path) -> tuple[bool, str]:
     parts = sections(sol.read_text())
     if "Solution" not in parts or not code_blocks(parts["Solution"]):
         return False, "solution file needs a '## Solution' with a code block"
-    if not parts.get("Verification", "").strip():
+    verification = parts.get("Verification", "").strip()
+    if not verification:
         return False, "solution file needs a non-empty '## Verification'"
+    lowered = verification.lower()
+    if "should work" in lowered or "looks correct" in lowered:
+        return False, "Verification is a vacuous assurance, not evidence"
+    if "`" not in verification:
+        return False, "Verification names no command; nothing was actually run"
     return True, "reference solution present with verification evidence"
 
 
@@ -216,6 +222,25 @@ def check_status_stays_introduced(ws: Path) -> tuple[bool, str]:
 
 FIXTURE_KINDS = ("TestbedSensor", "TestbedZone")
 _MUTATING = ("object load", "schema load", "object update", "branch create")
+_MERGE_NEGATIONS = ("never", "not", "don't", "do not")
+_LIST_MARKER = re.compile(r"^(?:\d+\.|[-*])\s")
+
+
+def _is_merge_violation(line: str) -> bool:
+    """An imperative step that merges the learning branch or a proposed
+    change, as opposed to a warning against doing so."""
+    stripped = line.strip()
+    lower = stripped.lower()
+    if "merge" not in lower:
+        return False
+    if not _LIST_MARKER.match(stripped):
+        return False
+    if any(neg in lower for neg in _MERGE_NEGATIONS):
+        return False
+    references_target = "learning-" in lower or (
+        "proposed change" in lower and ("appl" in lower or "main" in lower)
+    )
+    return references_target
 
 
 def check_sandbox_safety(ws: Path) -> tuple[bool, str]:
@@ -224,8 +249,9 @@ def check_sandbox_safety(ws: Path) -> tuple[bool, str]:
     if lesson is None:
         return False, err
     text = lesson.read_text()
-    if "branch merge" in text:
-        return False, "lesson merges the learning branch; merging is out of scope"
+    for line in text.splitlines():
+        if _is_merge_violation(line):
+            return False, f"lesson merges the learning branch or change: {line.strip()}"
     exercise = sections(text).get("Exercise", "")
     if "learning-" not in exercise:
         return False, "exercise names no learning-* branch"
@@ -237,7 +263,7 @@ def check_sandbox_safety(ws: Path) -> tuple[bool, str]:
         return False, "no opt-in question before instance writes"
     if "branch delete" not in exercise:
         return False, "no cleanup step; expected a branch delete"
-    for line in exercise.splitlines():
+    for line in text.splitlines():
         if any(m in line for m in _MUTATING) and "learning-" not in line:
             return False, f"mutating step outside a learning-* branch: {line.strip()}"
     return True, "writes gated to an opt-in learning-* branch with cleanup"
