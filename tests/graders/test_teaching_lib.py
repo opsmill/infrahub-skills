@@ -465,6 +465,40 @@ def test_sandbox_safety_mutating_command_in_explain_fails(tmp_path):
     assert not ok and "mutating" in msg
 
 
+def test_is_merge_violation_not_substring_in_note_still_flagged():
+    # "not" is a substring of "note": a plain substring negation guard used
+    # to silence this line entirely, hiding a real merge-into-main step.
+    line = "3. Merge the proposed change into main - note the diff disappears."
+    assert teaching_lib._is_merge_violation(line)
+
+
+def test_is_merge_violation_negation_substring_in_another_or_nothing_still_flagged():
+    assert teaching_lib._is_merge_violation(
+        "5. Merge learning-pc-demo into another branch, nothing else needed."
+    )
+
+
+def test_sandbox_safety_merge_with_note_word_fails(tmp_path):
+    merged = SANDBOX_LESSON.replace(
+        "3. Open a proposed change from learning-pc-demo in the UI and read the diff.",
+        "3. Merge the proposed change into main - note the diff disappears.",
+    )
+    ws = make_ws(tmp_path, lesson=merged, concept="proposed-changes")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert not ok and "merge" in msg
+
+
+def test_sandbox_safety_another_nothing_words_still_flagged(tmp_path):
+    merged = SANDBOX_LESSON.replace(
+        "4. Clean up:",
+        "4. Merge learning-pc-demo into another branch; nothing else needed.\n"
+        "5. Clean up:",
+    )
+    ws = make_ws(tmp_path, lesson=merged, concept="proposed-changes")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert not ok and "merge" in msg
+
+
 def test_own_artifacts_pass(tmp_path):
     ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON)
     ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)

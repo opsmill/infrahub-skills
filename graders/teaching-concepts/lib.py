@@ -222,7 +222,10 @@ def check_status_stays_introduced(ws: Path) -> tuple[bool, str]:
 
 FIXTURE_KINDS = ("TestbedSensor", "TestbedZone")
 _MUTATING = ("object load", "schema load", "object update", "branch create")
-_MERGE_NEGATIONS = ("never", "not", "don't", "do not")
+# Word-bounded so "not" does not match inside "note", "another", "nothing",
+# or "annotate": a substring check silenced genuine violations sitting next
+# to those words.
+_NEGATION_RE = re.compile(r"\b(?:never|not|don't|do not)\b", re.IGNORECASE)
 _LIST_MARKER = re.compile(r"^(?:\d+\.|[-*])\s")
 
 
@@ -235,7 +238,7 @@ def _is_merge_violation(line: str) -> bool:
         return False
     if not _LIST_MARKER.match(stripped):
         return False
-    if any(neg in lower for neg in _MERGE_NEGATIONS):
+    if _NEGATION_RE.search(stripped):
         return False
     references_target = "learning-" in lower or (
         "proposed change" in lower and ("appl" in lower or "main" in lower)
