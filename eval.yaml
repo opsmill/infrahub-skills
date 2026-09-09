@@ -5219,3 +5219,438 @@ tasks:
         check: >-
           Response still describes the modelling problem generically, not
           only placeholder tokens
+
+  # --- Concept Tutor --- #
+  - name: teach-probe-first
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+
+      Task: I'm brand new to Infrahub and honestly not sure where to start.
+      Can you teach me what it actually is and how it thinks about data?
+
+      There is no live Infrahub instance reachable from this environment.
+      Deliver the lesson as files: create the learning workspace
+      ./.infrahub-learning/ as the skill's workflow describes and write every
+      artifact the workflow produces there.
+    graders:
+      - type: deterministic
+        run: python graders/teaching-concepts/check_probe_first.py
+        weight: 1.0
+    expected_output: >-
+      A lesson file for the foundations concept whose Probe section opens
+      with 2-3 questions (including a background question) before any
+      explanation appears, in the standard four-section shape.
+    expectations:
+      - The lesson opens with questions rather than an explanation
+      - The Probe section holds two or three questions
+      - The four lesson sections appear in the standard order
+    assertions:
+      - name: probe-first
+        check: Probe precedes Explain and holds 2-3 question lines
+      - name: structured-lessons
+        check: Probe/Explain/Exercise/Check sections present in order
+
+  - name: teach-structured-lesson
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+
+      Task: Teach me how branches work in Infrahub. I know git well, so feel
+      free to build on that.
+
+      There is no live Infrahub instance reachable from this environment.
+      Deliver the lesson as files: create the learning workspace
+      ./.infrahub-learning/ as the skill's workflow describes and write every
+      artifact the workflow produces there.
+    graders:
+      - type: deterministic
+        run: python graders/teaching-concepts/check_structured_lesson.py
+        weight: 1.0
+    expected_output: >-
+      A branches lesson file using the fixed four-section shape.
+    expectations:
+      - The lesson lands in .infrahub-learning/lessons/
+      - Sections appear as Probe, Explain, Exercise, Check in order
+    assertions:
+      - name: structured-lessons
+        check: Probe/Explain/Exercise/Check sections present in order
+
+  - name: teach-record-progress
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+
+      Task: Teach me how GraphQL queries work in Infrahub. I'll be away next
+      week, so keep track of what we covered for when I'm back.
+
+      There is no live Infrahub instance reachable from this environment.
+      Deliver the lesson as files: create the learning workspace
+      ./.infrahub-learning/ as the skill's workflow describes and write every
+      artifact the workflow produces there.
+    graders:
+      - type: deterministic
+        run: python graders/teaching-concepts/check_record_progress.py
+        weight: 1.0
+    expected_output: >-
+      A graphql lesson plus a progress.md whose table uses the exact
+      header and only the three defined statuses.
+    expectations:
+      - progress.md exists in the workspace
+      - The table header matches the contract exactly
+      - Every status is not-seen, introduced, or practiced
+    assertions:
+      - name: record-progress
+        check: progress.md exists with exact header and valid statuses
+      - name: structured-lessons
+        check: lesson uses the four-section shape
+
+  - name: teach-sandbox-branch
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+
+      Task: We run Infrahub in production for my team. I want to properly
+      understand proposed changes by doing one for real on our instance, not
+      just reading about it. Walk me through it.
+
+      You cannot reach the instance from this environment, so write the
+      lesson with the exact steps I should run myself. Deliver the lesson as
+      files: create the learning workspace ./.infrahub-learning/ as the
+      skill's workflow describes and write every artifact the workflow
+      produces there.
+    graders:
+      - type: deterministic
+        run: python graders/teaching-concepts/check_sandbox_branch.py
+        weight: 1.0
+    expected_output: >-
+      A proposed-changes lesson whose exercise asks consent, scopes every
+      write to a learning-* branch, ends with branch deletion, and never
+      merges.
+    expectations:
+      - An explicit consent question precedes any instance write
+      - Every mutating step targets a learning-* branch
+      - A cleanup step deletes the branch
+      - The branch is never merged
+    assertions:
+      - name: sandbox-safety
+        check: opt-in question, learning-* scope, cleanup, no merge
+      - name: structured-lessons
+        check: lesson uses the four-section shape
+
+  - name: teach-verified-solution
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+
+      Task: My repo has this schema file at schemas/testbed.yml:
+
+          version: "1.0"
+          nodes:
+            - name: Sensor
+              namespace: Testbed
+              attributes:
+                - name: name
+                  kind: Text
+                  unique: true
+            - name: Zone
+              namespace: Testbed
+              attributes:
+                - name: name
+                  kind: Text
+                  unique: true
+
+      Teach me how relationships work between nodes like these. I learn best
+      by doing.
+
+      There is no live Infrahub instance reachable from this environment.
+      Deliver the lesson as files: create the learning workspace
+      ./.infrahub-learning/ as the skill's workflow describes and write every
+      artifact the workflow produces there.
+    graders:
+      - type: deterministic
+        run: python graders/teaching-concepts/check_verified_solution.py
+        weight: 1.0
+    expected_output: >-
+      A schema lesson plus a hidden reference solution file holding the
+      solved exercise and its verification evidence; the lesson itself
+      contains no solution.
+    expectations:
+      - A solutions/ file exists for the lesson concept
+      - It has Solution and Verification sections with content
+      - The exercise in the lesson does not contain the solution
+    assertions:
+      - name: verified-solution
+        check: solution file has Solution code block and Verification evidence
+      - name: structured-lessons
+        check: lesson uses the four-section shape
+
+  - name: teach-learner-authors
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+
+      Task: My repo has this schema file at schemas/testbed.yml:
+
+          version: "1.0"
+          nodes:
+            - name: Sensor
+              namespace: Testbed
+              attributes:
+                - name: name
+                  kind: Text
+                  unique: true
+                - name: model
+                  kind: Text
+
+      Teach me how object files work, and give me something to try myself so
+      it sticks.
+
+      There is no live Infrahub instance reachable from this environment.
+      Deliver the lesson as files: create the learning workspace
+      ./.infrahub-learning/ as the skill's workflow describes and write every
+      artifact the workflow produces there.
+    graders:
+      - type: deterministic
+        run: python graders/teaching-concepts/check_learner_authors.py
+        weight: 1.0
+    expected_output: >-
+      An objects lesson whose exercise assigns the authoring to the
+      learner, with a hidden verified solution that never appears in the
+      lesson.
+    expectations:
+      - The exercise carries the assignment marker
+      - No completed exercise artifact appears in the lesson
+      - The reference solution stays in solutions/
+    assertions:
+      - name: learner-authors
+        check: assignment marker present, no solution leak in the lesson
+      - name: verified-solution
+        check: hidden solution with verification evidence exists
+
+  - name: teach-hint-ladder
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+
+      Task: We are mid-lesson. The workspace ./.infrahub-learning/ already
+      exists with this lesson at lessons/schema.md:
+
+          # Lesson: schema relationships
+
+          ## Probe
+          1. What does a relationship connect?
+          2. Have you used foreign keys before?
+
+          ## Explain
+          A relationship connects two schema nodes. See
+          https://docs.infrahub.app/topics/schema for the model.
+
+          ## Exercise
+          **Your task:** Add a relationship from TestbedSensor to
+          TestbedZone in your schema file with the right cardinality.
+
+          ## Check
+          1. What happens if you omit cardinality?
+
+      and this reference solution at solutions/schema.md:
+
+          ## Solution
+          ```yaml
+          relationships:
+            - name: zone
+              peer: TestbedZone
+              cardinality: one
+              kind: Attribute
+          ```
+
+          ## Verification
+          Offline schema validation: loads cleanly.
+
+      Recreate those two files verbatim first. This is my first attempt and
+      it is not validating, I don't get why:
+
+          relationships:
+            - name: zone
+              peer: zone
+              cardinality: ones
+
+      I'm stuck. Write your reply to me in ./reply.md, and bring
+      ./.infrahub-learning/progress.md up to date for the schema concept.
+    graders:
+      - type: deterministic
+        run: python graders/teaching-concepts/check_hint_ladder.py
+        weight: 1.0
+    expected_output: >-
+      A reply.md that nudges (no multi-line code, no pasted solution) and
+      a progress.md keeping the schema concept at introduced.
+    expectations:
+      - The reply is a hint, not the solution
+      - No code block in the reply exceeds two lines
+      - progress.md records schema as introduced
+    assertions:
+      - name: hint-before-solution
+        check: first stuck reply contains a hint and no solution
+      - name: status-stays-introduced
+        check: schema concept remains at introduced in progress.md
+
+  - name: teach-own-artifacts
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+
+      Task: My repo has this schema file at schemas/testbed.yml:
+
+          version: "1.0"
+          nodes:
+            - name: Sensor
+              namespace: Testbed
+              attributes:
+                - name: name
+                  kind: Text
+                  unique: true
+                - name: reading_interval
+                  kind: Number
+            - name: Zone
+              namespace: Testbed
+              attributes:
+                - name: name
+                  kind: Text
+                  unique: true
+
+      I inherited this project and want to actually understand what
+      attributes are and what mine are doing. Teach me.
+
+      There is no live Infrahub instance reachable from this environment.
+      Deliver the lesson as files: create the learning workspace
+      ./.infrahub-learning/ as the skill's workflow describes and write every
+      artifact the workflow produces there.
+    graders:
+      - type: deterministic
+        run: python graders/teaching-concepts/check_own_artifacts.py
+        weight: 1.0
+    expected_output: >-
+      A schema lesson anchored to the learner's TestbedSensor and
+      TestbedZone nodes rather than invented examples.
+    expectations:
+      - The lesson references the learner's actual node kinds
+      - No invented generic example displaces the learner's schema
+    assertions:
+      - name: own-artifacts
+        check: lesson references TestbedSensor and TestbedZone
+      - name: structured-lessons
+        check: lesson uses the four-section shape
+
+  - name: teach-cite-docs
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+
+      Task: What are transforms in Infrahub? Teach me properly, I keep
+      hearing the term and nodding along.
+
+      There is no live Infrahub instance reachable from this environment.
+      Deliver the lesson as files: create the learning workspace
+      ./.infrahub-learning/ as the skill's workflow describes and write every
+      artifact the workflow produces there.
+    graders:
+      - type: deterministic
+        run: python graders/teaching-concepts/check_cite_docs.py
+        weight: 1.0
+    expected_output: >-
+      A transforms lesson whose explanation cites docs.infrahub.app
+      beside its behavior claims.
+    expectations:
+      - The Explain section carries at least one docs.infrahub.app link
+    assertions:
+      - name: cite-docs
+        check: Explain section links to docs.infrahub.app
+      - name: structured-lessons
+        check: lesson uses the four-section shape
+
+  - name: teach-graduation
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+
+      Task: Teach me what generators are in Infrahub and when I'd want one.
+
+      There is no live Infrahub instance reachable from this environment.
+      Deliver the lesson as files: create the learning workspace
+      ./.infrahub-learning/ as the skill's workflow describes and write every
+      artifact the workflow produces there.
+    graders:
+      - type: deterministic
+        run: python graders/teaching-concepts/check_graduation.py
+        weight: 1.0
+    expected_output: >-
+      A generators lesson that closes by naming the sibling skill that
+      builds real generators.
+    expectations:
+      - The lesson ends by pointing at the matching sibling skill
+    assertions:
+      - name: graduation-pointer
+        check: lesson names an infrahub-managing-* or infrahub-analyzing-* skill
+      - name: structured-lessons
+        check: lesson uses the four-section shape
+
+  - name: teach-off-map
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+
+      Task: Teach me how webhooks work in Infrahub. We want to notify an
+      external system when data changes.
+
+      There is no live Infrahub instance reachable from this environment.
+      Deliver the lesson as files: create the learning workspace
+      ./.infrahub-learning/ as the skill's workflow describes and write every
+      artifact the workflow produces there.
+    graders:
+      - type: deterministic
+        run: python graders/teaching-concepts/check_off_map.py
+        weight: 1.0
+    expected_output: >-
+      A webhooks lesson under its own slug (webhooks is not a curriculum
+      concept), in the four-section shape, grounded in a docs.infrahub.app
+      page found through the docs index.
+    expectations:
+      - The lesson file uses an off-map slug, not a curriculum slug
+      - The four lesson sections appear in order
+      - The Explain section cites the docs page the topic was found on
+    assertions:
+      - name: off-map-lesson
+        check: off-map slug, four-section shape, docs.infrahub.app citation
+
+  - name: teach-competitor-mapping
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+
+      Task: I'm coming from NetBox, where we lean heavily on config
+      contexts. What's the equivalent way of doing that in Infrahub? Teach
+      me so I stop thinking in NetBox terms.
+
+      There is no live Infrahub instance reachable from this environment,
+      and treat outbound web access as unavailable too. Deliver the lesson
+      as files: create the learning workspace ./.infrahub-learning/ as the
+      skill's workflow describes and write every artifact the workflow
+      produces there.
+    graders:
+      - type: deterministic
+        run: python graders/teaching-concepts/check_competitor.py
+        weight: 1.0
+    expected_output: >-
+      A lesson translating the NetBox concept into Infrahub terms, whose
+      Explain carries a Comparison source line that is an official NetBox
+      docs URL or the word unverified (with the prose saying the NetBox
+      side is unsure), plus the usual docs.infrahub.app citation.
+    expectations:
+      - The Explain section carries the comparison source marker line
+      - The marker's value is an official competitor docs URL or unverified
+      - The Infrahub side still cites docs.infrahub.app
+    assertions:
+      - name: competitor-mapping
+        check: comparison officially sourced or declared unverified
+      - name: structured-lessons
+        check: lesson uses the four-section shape
