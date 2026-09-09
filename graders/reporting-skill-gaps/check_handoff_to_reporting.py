@@ -14,6 +14,7 @@ CHECKS = [
     "payload-is-complete",
     "states-skills-version",
     "states-sdk-version",
+    "states-infrahub-version",
     "leaves-routing-to-reporter",
     "title-uses-kind-prefix",
 ]

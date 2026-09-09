@@ -69,13 +69,30 @@ rather than a checkout, read `version` from
 write `unknown` rather than guessing: a wrong version sends
 a maintainer to the wrong revision of the rule. -->
 **Infrahub SDK version**: [the infrahub-sdk version this session ran against]
-<!-- Run `pip show infrahub-sdk` (or `uv pip show infrahub-sdk`)
-and read the `Version` field. Skill rules encode SDK behavior:
-a CLI flag, a client method, a generated protocol. Without this
-line a maintainer cannot tell whether the rule is wrong or just
-older than the SDK that ran, which is the difference between
-rewriting guidance and adding a version note. Write `unknown`
-when no SDK is installed or the read fails; never guess. -->
+**Infrahub version**: [the version of the Infrahub the session talked to]
+<!-- Both come from one command, `infrahubctl info`, which prints
+`SDK Version` and `Infrahub Version` (the connected server's).
+Run it the way
+../infrahub-common/rules/connectivity-server-check.md
+prescribes: the runner prefix matters, so `uv run infrahubctl
+info` in a uv project. Fall back to `pip show infrahub-sdk` for
+the SDK line when infrahubctl is not installed.
+
+Copy the two version values and nothing else. That output also
+carries the server address and deployment ID, which are exactly
+what rules/evidence-no-customer-data.md forbids.
+
+Rules are aimed at one or the other: a rule naming a CLI flag or a
+client method targets an SDK version, while a rule about schema
+loading, branch behavior, or a check pipeline targets a server
+version. Without both a maintainer cannot tell whether the
+guidance is wrong or merely older than what ran, which is the
+difference between rewriting a rule and adding a version note
+to it.
+
+Write `unknown` for either when the read fails or `infrahubctl
+info` reports `N/A`; work done against files alone is a normal
+reason for the Infrahub line to be `unknown`. Never guess. -->
 **Tracker search**: [the query run against opsmill/infrahub-skills, and its result]
 
 ## What was being attempted
