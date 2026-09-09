@@ -1,7 +1,10 @@
 """Tests for graders/teaching-concepts/lib.py.
 
-Each check gets one compliant fixture and near-miss violating fixtures.
-A grader that passes a violating fixture is a silently broken assertion.
+Each check gets the four fixtures dev/guides/adding-a-rule.md requires:
+compliant, compliant phrased differently, violating, and a violating
+near-miss that satisfies the check's keyword. The two variants are the
+ones that find bugs — a false fail on re-worded but correct output, and
+laundering by a violation that mentions the right word.
 """
 from __future__ import annotations
 
@@ -613,3 +616,311 @@ def test_competitor_mapping_infrahub_citation_still_required(tmp_path):
     ws = make_ws(tmp_path, lesson=no_infrahub)
     ok, msg = teaching_lib.CHECKS["competitor-mapping"](ws)
     assert not ok
+
+
+# --- Compliant, phrased differently -------------------------------------
+#
+# The false-fail direction: correct output that does not copy the shape of
+# the rule's own example. A check that fails these grades wording.
+
+VARIANT_LESSON = """Lesson - how attributes behave
+=============================
+
+## Probe
+- Which of your two node kinds carries the most attributes?
+- Have you set a default value on one before?
+- What do you expect `unique: true` to reject?
+
+## Explain
+Attributes hold the values on a node. On `TestbedSensor` the `name`
+attribute is unique, so a second sensor cannot reuse it; `TestbedZone`
+declares its own. Read
+[the schema topic](https://docs.infrahub.app/topics/schema#attributes)
+for the full list of kinds.
+
+Once you are past the basics, `infrahub-analyzing-data` is the skill that
+queries these attributes on a live instance.
+
+## Exercise
+**Your task:**
+Give `TestbedZone` a second attribute of your choosing, then say when you
+want it reviewed.
+
+## Check
+- Why did the loader reject a duplicate name?
+- Which attribute would you make unique next?
+"""
+
+VARIANT_SOLUTION = """Reference solution
+==================
+
+## Solution
+```yaml
+attributes:
+  - name: floor
+    kind: Number
+    optional: true
+```
+
+## Verification
+Loaded with `infrahubctl schema check schemas/testbed.yml` against the
+in-memory validator: no errors, `TestbedZone.floor` resolves.
+"""
+
+VARIANT_PROGRESS = """|  Concept  |  Status  |  Last-Seen  |  Notes  |
+| :--- | :--- | :--- | :--- |
+|  menus  |  not-seen  |  2026-09-07  |  queued  |
+|  schema  |  introduced  |  2026-09-09  |  hint ladder ran to reveal  |
+"""
+
+
+def test_probe_first_pass_variant(tmp_path):
+    ws = make_ws(tmp_path, lesson=VARIANT_LESSON, concept="objects")
+    ok, msg = teaching_lib.CHECKS["probe-first"](ws)
+    assert ok, msg
+
+
+def test_structured_lessons_pass_variant(tmp_path):
+    ws = make_ws(tmp_path, lesson=VARIANT_LESSON, concept="objects")
+    ok, msg = teaching_lib.CHECKS["structured-lessons"](ws)
+    assert ok, msg
+
+
+def test_cite_docs_pass_variant_markdown_link(tmp_path):
+    ws = make_ws(tmp_path, lesson=VARIANT_LESSON, concept="objects")
+    ok, msg = teaching_lib.CHECKS["cite-docs"](ws)
+    assert ok, msg
+
+
+def test_own_artifacts_pass_variant(tmp_path):
+    ws = make_ws(tmp_path, lesson=VARIANT_LESSON, concept="objects")
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert ok, msg
+
+
+def test_graduation_pointer_pass_variant_analyzing_skill(tmp_path):
+    ws = make_ws(tmp_path, lesson=VARIANT_LESSON, concept="objects")
+    ok, msg = teaching_lib.CHECKS["graduation-pointer"](ws)
+    assert ok, msg
+
+
+def test_learner_authors_pass_variant(tmp_path):
+    ws = make_ws(tmp_path, lesson=VARIANT_LESSON, solution=VARIANT_SOLUTION,
+                 concept="objects")
+    ok, msg = teaching_lib.CHECKS["learner-authors"](ws)
+    assert ok, msg
+
+
+def test_verified_solution_pass_variant(tmp_path):
+    ws = make_ws(tmp_path, lesson=VARIANT_LESSON, solution=VARIANT_SOLUTION,
+                 concept="objects")
+    ok, msg = teaching_lib.CHECKS["verified-solution"](ws)
+    assert ok, msg
+
+
+def test_record_progress_pass_variant(tmp_path):
+    ws = make_ws(tmp_path, progress=VARIANT_PROGRESS)
+    ok, msg = teaching_lib.CHECKS["record-progress"](ws)
+    assert ok, msg
+
+
+def test_status_stays_introduced_pass_variant(tmp_path):
+    ws = make_ws(tmp_path, progress=VARIANT_PROGRESS)
+    ok, msg = teaching_lib.CHECKS["status-stays-introduced"](ws)
+    assert ok, msg
+
+
+def test_hint_before_solution_pass_variant_short_snippet(tmp_path):
+    hint = ("Compare the two lines below and re-read your `peer` value:\n"
+            "```yaml\npeer: <a node kind, not an attribute>\n```\n"
+            "Which of your kinds belongs there?")
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON,
+                 solution=COMPLIANT_SOLUTION, reply=hint)
+    ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
+    assert ok, msg
+
+
+def test_sandbox_safety_pass_variant(tmp_path):
+    variant = SANDBOX_LESSON.replace(
+        "This exercise writes to your instance. Shall we create a scratch branch for it?",
+        "Happy for me to scope this to a throwaway branch you delete after?",
+    ).replace(
+        "1. `infrahubctl branch create learning-pc-demo`",
+        "1. Create the sandbox first: `infrahubctl branch create learning-pc-demo`",
+    )
+    ws = make_ws(tmp_path, lesson=variant, concept="proposed-changes")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert ok, msg
+
+
+def test_off_map_lesson_pass_variant(tmp_path):
+    variant = VARIANT_LESSON.replace(
+        "https://docs.infrahub.app/topics/schema#attributes",
+        "https://docs.infrahub.app/topics/api-tokens",
+    )
+    ws = make_ws(tmp_path, lesson=variant, concept="api-tokens")
+    ok, msg = teaching_lib.CHECKS["off-map-lesson"](ws)
+    assert ok, msg
+
+
+# --- The concept map is the single home for the slug list ----------------
+
+
+def test_known_slugs_derives_from_the_concept_map():
+    assert teaching_lib.known_slugs() == frozenset(
+        {"foundations", "schema", "objects", "graphql", "branches",
+         "repo-integration", "proposed-changes", "checks", "transforms",
+         "generators", "menus"}
+    )
+
+
+def test_known_slugs_picks_up_a_new_map_row(tmp_path, monkeypatch):
+    # A row added to the map has to reach the check without a grader edit.
+    fake_map = tmp_path / "concept-map.md"
+    fake_map.write_text(
+        "| # | Concept | Prerequisites |\n| --- | --- | --- |\n"
+        "| 1 | schema | none |\n| 2 | webhooks | schema |\n"
+    )
+    monkeypatch.setattr(teaching_lib, "CONCEPT_MAP", fake_map)
+    assert teaching_lib.known_slugs() == frozenset({"schema", "webhooks"})
+    ws = make_ws(tmp_path, lesson=OFF_MAP_LESSON, concept="webhooks")
+    ok, msg = teaching_lib.CHECKS["off-map-lesson"](ws)
+    assert not ok and "slug" in msg
+
+
+def test_known_slugs_raises_when_map_is_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(teaching_lib, "CONCEPT_MAP", tmp_path / "gone.md")
+    try:
+        teaching_lib.known_slugs()
+    except FileNotFoundError as exc:
+        assert "concept map" in str(exc)
+    else:
+        raise AssertionError("expected FileNotFoundError")
+
+
+def test_known_slugs_raises_when_no_rows_parse(tmp_path, monkeypatch):
+    empty = tmp_path / "concept-map.md"
+    empty.write_text("# Concept Map\n\nprose only, no table rows\n")
+    monkeypatch.setattr(teaching_lib, "CONCEPT_MAP", empty)
+    try:
+        teaching_lib.known_slugs()
+    except ValueError as exc:
+        assert "no numbered concept rows" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+# --- A compliant first lesson must not launder a violating second --------
+#
+# "schema" sorts before "transforms", so the violation is always second.
+
+
+def _two_lessons(tmp_path, second):
+    make_ws(tmp_path, lesson=COMPLIANT_LESSON, solution=COMPLIANT_SOLUTION,
+            concept="schema")
+    return make_ws(tmp_path, lesson=second, solution=COMPLIANT_SOLUTION,
+                   concept="transforms")
+
+
+def test_probe_first_second_lesson_violation_fails(tmp_path):
+    ws = _two_lessons(tmp_path, COMPLIANT_LESSON.replace(
+        "2. Have you used foreign keys in a database before?", ""))
+    ok, msg = teaching_lib.CHECKS["probe-first"](ws)
+    assert not ok and "transforms.md" in msg
+
+
+def test_cite_docs_second_lesson_violation_fails(tmp_path):
+    ws = _two_lessons(tmp_path, COMPLIANT_LESSON.replace(
+        "See https://docs.infrahub.app/topics/schema for the full model.", ""))
+    ok, msg = teaching_lib.CHECKS["cite-docs"](ws)
+    assert not ok and "transforms.md" in msg
+
+
+def test_structured_lessons_second_lesson_violation_fails(tmp_path):
+    ws = _two_lessons(tmp_path, COMPLIANT_LESSON.replace(
+        "## Check", "## Recap"))
+    ok, msg = teaching_lib.CHECKS["structured-lessons"](ws)
+    assert not ok and "transforms.md" in msg
+
+
+def test_learner_authors_second_lesson_violation_fails(tmp_path):
+    ws = _two_lessons(tmp_path, COMPLIANT_LESSON.replace(
+        "**Your task:**", "Try this:"))
+    ok, msg = teaching_lib.CHECKS["learner-authors"](ws)
+    assert not ok and "transforms.md" in msg
+
+
+def test_own_artifacts_second_lesson_violation_fails(tmp_path):
+    ws = _two_lessons(tmp_path, COMPLIANT_LESSON.replace(
+        "TestbedSensor", "MyNode").replace("TestbedZone", "OtherNode"))
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert not ok and "transforms.md" in msg
+
+
+def test_graduation_pointer_second_lesson_violation_fails(tmp_path):
+    ws = _two_lessons(tmp_path, COMPLIANT_LESSON.replace(
+        "Next step when you are ready: the infrahub-managing-schemas skill does\nthis work on real projects.\n",
+        ""))
+    ok, msg = teaching_lib.CHECKS["graduation-pointer"](ws)
+    assert not ok and "transforms.md" in msg
+
+
+def test_verified_solution_second_lesson_unverified_fails(tmp_path):
+    make_ws(tmp_path, lesson=COMPLIANT_LESSON, solution=COMPLIANT_SOLUTION,
+            concept="schema")
+    vacuous = COMPLIANT_SOLUTION.split("## Verification")[0] + (
+        "## Verification\nThis should work.\n"
+    )
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, solution=vacuous,
+                 concept="transforms")
+    ok, msg = teaching_lib.CHECKS["verified-solution"](ws)
+    assert not ok and "transforms.md" in msg
+
+
+def test_verified_solution_second_lesson_missing_solution_fails(tmp_path):
+    make_ws(tmp_path, lesson=COMPLIANT_LESSON, solution=COMPLIANT_SOLUTION,
+            concept="schema")
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, concept="transforms")
+    ok, msg = teaching_lib.CHECKS["verified-solution"](ws)
+    assert not ok and "transforms.md" in msg
+
+
+def test_sandbox_safety_second_lesson_merge_fails(tmp_path):
+    make_ws(tmp_path, lesson=SANDBOX_LESSON, concept="proposed-changes")
+    merged = SANDBOX_LESSON.replace(
+        "4. Clean up:",
+        "4. `infrahubctl branch merge learning-pc-demo`\n5. Clean up:")
+    ws = make_ws(tmp_path, lesson=merged, concept="transforms")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert not ok and "transforms.md" in msg
+
+
+def test_competitor_mapping_second_comparison_unsourced_fails(tmp_path):
+    make_ws(tmp_path, lesson=_with_comparison(COMPARISON_LINE_SOURCED),
+            concept="schema")
+    bare = COMPLIANT_LESSON.replace(
+        "## Exercise", "In Nautobot this is a config context.\n\n## Exercise")
+    ws = make_ws(tmp_path, lesson=bare, concept="transforms")
+    ok, msg = teaching_lib.CHECKS["competitor-mapping"](ws)
+    assert not ok and "transforms.md" in msg
+
+
+def test_hint_before_solution_leaks_second_lesson_solution(tmp_path):
+    make_ws(tmp_path, lesson=COMPLIANT_LESSON, concept="schema")
+    other_solution = """# Solution: transforms
+
+## Solution
+```python
+def transform(data):
+    return {"hostname": data["TestbedSensor"]["name"]}
+```
+
+## Verification
+Ran `infrahubctl transform sensor_export`: rendered without error.
+"""
+    spoiler = ('Here you go:\n```python\ndef transform(data):\n'
+               '    return {"hostname": data["TestbedSensor"]["name"]}\n```\n')
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, solution=other_solution,
+                 reply=spoiler, concept="transforms")
+    ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
+    assert not ok and "transforms.md" in msg

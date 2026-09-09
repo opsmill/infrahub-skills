@@ -52,8 +52,15 @@ Detect once per session, in this order, and prefer the richest source:
    queries illustrate concepts with real data.
 3. Neither: use the generic examples in `references/concept-map.md`.
 
+Before writing the first Explain section, read
+[rules/grounding-own-artifacts.md](./rules/grounding-own-artifacts.md) —
+a generic example when the learner has their own file is a violation,
+not a fallback.
+
 Instance safety has three tiers; the full ladder is in
-`rules/safety-instance-writes.md`. The short form: read-only by default,
+[rules/safety-instance-writes.md](./rules/safety-instance-writes.md).
+Read it before any command that could write, which includes the steps
+you tell the learner to run. The short form: read-only by default,
 author in local files, and write to the instance only after explicit
 consent, only in a `learning-*` branch, never merged, always deleted.
 
@@ -66,19 +73,46 @@ consent, only in a `learning-*` branch, never merged, always deleted.
    by prerequisite and carries per-concept probe questions, exercise
    specs, verification methods, and doc anchors. A topic with no row is
    taught off-map through the shared docs fallback
-   (`rules/grounding-off-map-lookup.md`).
-3. Run the lesson: Probe, Explain, Exercise, Check, then record progress.
-   Before presenting the exercise, build and verify the reference
-   solution per `references/exercise-verification.md`.
-4. When the learner struggles, follow the hint ladder in
-   `rules/exercise-hint-ladder.md`.
-5. Close each concept by naming the sibling skill that does this work on
-   real projects.
+   ([rules/grounding-off-map-lookup.md](./rules/grounding-off-map-lookup.md)).
+3. Before writing any lesson file, read
+   [rules/protocol-structured-lessons.md](./rules/protocol-structured-lessons.md)
+   — the Probe/Explain/Exercise/Check shape and its order are fixed.
+4. Open with Probe, never with the explanation. Read
+   [rules/protocol-probe-first.md](./rules/protocol-probe-first.md) for
+   how many questions and what they have to establish.
+5. Write Explain against the learner's own artifacts, and cite the docs
+   page for every behavior claim:
+   [rules/grounding-cite-docs.md](./rules/grounding-cite-docs.md). For a
+   "what's the NetBox/Nautobot equivalent" lesson, the credibility gate
+   is in
+   [rules/grounding-competitor-mapping.md](./rules/grounding-competitor-mapping.md).
+6. Before presenting the exercise, build and verify the reference
+   solution per `references/exercise-verification.md` and
+   [rules/exercise-verify-solution.md](./rules/exercise-verify-solution.md)
+   — an exercise you have not solved yourself cannot ship. Assign the
+   work; do not do it:
+   [rules/exercise-learner-authors.md](./rules/exercise-learner-authors.md).
+7. When the learner struggles, follow the hint ladder in
+   [rules/exercise-hint-ladder.md](./rules/exercise-hint-ladder.md)
+   before revealing anything.
+8. Record progress at the end of every lesson, before you reply:
+   [rules/protocol-record-progress.md](./rules/protocol-record-progress.md).
+9. Close each concept by naming the sibling skill that does this work on
+   real projects:
+   [rules/handoff-graduation.md](./rules/handoff-graduation.md).
 
 ## Rule Categories
 
-See `rules/_sections.md`. Read the rules for the lesson phase you are in;
-they are short and binding.
+| Priority | Category | Prefix | Description |
+| -------- | -------- | ------ | ----------- |
+| CRITICAL | Protocol | `protocol-` | Probe before teaching, the fixed lesson shape, progress recording |
+| CRITICAL | Safety | `safety-` | Instance writes: opt-in, `learning-*` branch only, cleanup, never the default branch |
+| HIGH | Exercise | `exercise-` | Verified reference solutions, learner-authored artifacts, the hint ladder |
+| HIGH | Grounding | `grounding-` | Teach through the learner's own artifacts, cite docs for behavior claims, off-map lookup, sourced comparisons |
+| MEDIUM | Handoff | `handoff-` | Graduation pointers to the sibling skills |
+
+Full scope per prefix is in `rules/_sections.md`. Read the rules for the
+lesson phase you are in; they are short and binding.
 
 ## Supporting References
 

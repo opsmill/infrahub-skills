@@ -75,6 +75,18 @@ def _first_lesson(ws: Path) -> tuple[Path | None, str]:
     return found[0], ""
 
 
+def _all_lessons(ws: Path) -> tuple[list[Path], str]:
+    """Every lesson in the workspace, for checks that bind to all of them.
+
+    Grading only ``lessons()[0]`` lets a compliant first lesson launder a
+    violating second one.
+    """
+    found = lessons(ws)
+    if not found:
+        return [], f"no lesson file under {LEARNING_DIR}/lessons/"
+    return found, ""
+
+
 def check_structured_lessons(ws: Path) -> tuple[bool, str]:
     """Every lesson has Probe, Explain, Exercise, Check headings in order."""
     found = lessons(ws)
@@ -93,34 +105,36 @@ def check_structured_lessons(ws: Path) -> tuple[bool, str]:
 
 
 def check_probe_first(ws: Path) -> tuple[bool, str]:
-    """Probe precedes Explain and holds 2-3 questions."""
-    lesson, err = _first_lesson(ws)
-    if lesson is None:
+    """Probe precedes Explain and holds 2-3 questions, in every lesson."""
+    found, err = _all_lessons(ws)
+    if not found:
         return False, err
-    text = lesson.read_text()
-    heads = headings(text)
-    if "Probe" not in heads or "Explain" not in heads:
-        return False, f"{lesson.name}: needs both Probe and Explain sections"
-    if heads.index("Probe") > heads.index("Explain"):
-        return False, f"{lesson.name}: Probe appears after Explain"
-    probe = sections(text).get("Probe", "")
-    questions = [ln for ln in probe.splitlines() if ln.strip().endswith("?")]
-    if not 2 <= len(questions) <= 3:
-        return False, (
-            f"{lesson.name}: Probe has {len(questions)} question lines, "
-            "expected 2-3"
-        )
+    for lesson in found:
+        text = lesson.read_text()
+        heads = headings(text)
+        if "Probe" not in heads or "Explain" not in heads:
+            return False, f"{lesson.name}: needs both Probe and Explain sections"
+        if heads.index("Probe") > heads.index("Explain"):
+            return False, f"{lesson.name}: Probe appears after Explain"
+        probe = sections(text).get("Probe", "")
+        questions = [ln for ln in probe.splitlines() if ln.strip().endswith("?")]
+        if not 2 <= len(questions) <= 3:
+            return False, (
+                f"{lesson.name}: Probe has {len(questions)} question lines, "
+                "expected 2-3"
+            )
     return True, "probe precedes explanation with 2-3 questions"
 
 
 def check_cite_docs(ws: Path) -> tuple[bool, str]:
-    """The Explain section links to docs.infrahub.app."""
-    lesson, err = _first_lesson(ws)
-    if lesson is None:
+    """Every lesson's Explain section links to docs.infrahub.app."""
+    found, err = _all_lessons(ws)
+    if not found:
         return False, err
-    explain = sections(lesson.read_text()).get("Explain", "")
-    if not _DOCS_LINK.search(explain):
-        return False, f"{lesson.name}: Explain has no docs.infrahub.app link"
+    for lesson in found:
+        explain = sections(lesson.read_text()).get("Explain", "")
+        if not _DOCS_LINK.search(explain):
+            return False, f"{lesson.name}: Explain has no docs.infrahub.app link"
     return True, "explanation carries a docs anchor"
 
 
@@ -146,43 +160,61 @@ def check_record_progress(ws: Path) -> tuple[bool, str]:
 
 
 def check_verified_solution(ws: Path) -> tuple[bool, str]:
-    """A hidden reference solution with verification evidence exists."""
-    lesson, err = _first_lesson(ws)
-    if lesson is None:
+    """Every lesson has a hidden solution carrying verification evidence."""
+    found, err = _all_lessons(ws)
+    if not found:
         return False, err
-    sol = solution_for(ws, lesson)
-    if not sol.is_file():
-        return False, f"no reference solution at solutions/{lesson.name}"
-    parts = sections(sol.read_text())
-    if "Solution" not in parts or not code_blocks(parts["Solution"]):
-        return False, "solution file needs a '## Solution' with a code block"
-    verification = parts.get("Verification", "").strip()
-    if not verification:
-        return False, "solution file needs a non-empty '## Verification'"
-    lowered = verification.lower()
-    if "should work" in lowered or "looks correct" in lowered:
-        return False, "Verification is a vacuous assurance, not evidence"
-    if "`" not in verification:
-        return False, "Verification names no command; nothing was actually run"
+    for lesson in found:
+        sol = solution_for(ws, lesson)
+        if not sol.is_file():
+            return False, f"no reference solution at solutions/{lesson.name}"
+        parts = sections(sol.read_text())
+        if "Solution" not in parts or not code_blocks(parts["Solution"]):
+            return False, (
+                f"solutions/{lesson.name}: needs a '## Solution' with a "
+                "code block"
+            )
+        verification = parts.get("Verification", "").strip()
+        if not verification:
+            return False, (
+                f"solutions/{lesson.name}: needs a non-empty '## Verification'"
+            )
+        lowered = verification.lower()
+        if "should work" in lowered or "looks correct" in lowered:
+            return False, (
+                f"solutions/{lesson.name}: Verification is a vacuous "
+                "assurance, not evidence"
+            )
+        if "`" not in verification:
+            return False, (
+                f"solutions/{lesson.name}: Verification names no command; "
+                "nothing was actually run"
+            )
     return True, "reference solution present with verification evidence"
 
 
 def check_learner_authors(ws: Path) -> tuple[bool, str]:
-    """Exercise is assigned to the learner; the solution is not leaked."""
-    lesson, err = _first_lesson(ws)
-    if lesson is None:
+    """Every exercise is assigned to the learner and leaks no solution."""
+    found, err = _all_lessons(ws)
+    if not found:
         return False, err
-    text = lesson.read_text()
-    exercise = sections(text).get("Exercise", "")
-    if TASK_MARKER not in exercise:
-        return False, f"Exercise lacks the '{TASK_MARKER}' assignment marker"
-    sol = solution_for(ws, lesson)
-    if sol.is_file():
-        sol_blocks = code_blocks(sections(sol.read_text()).get("Solution", ""))
-        lesson_norm = _normalize(text)
-        for block in sol_blocks:
-            if _normalize(block) in lesson_norm:
-                return False, "lesson leaks a solution code block"
+    for lesson in found:
+        text = lesson.read_text()
+        exercise = sections(text).get("Exercise", "")
+        if TASK_MARKER not in exercise:
+            return False, (
+                f"{lesson.name}: Exercise lacks the '{TASK_MARKER}' "
+                "assignment marker"
+            )
+        sol = solution_for(ws, lesson)
+        if sol.is_file():
+            sol_blocks = code_blocks(
+                sections(sol.read_text()).get("Solution", "")
+            )
+            lesson_norm = _normalize(text)
+            for block in sol_blocks:
+                if _normalize(block) in lesson_norm:
+                    return False, f"{lesson.name}: leaks a solution code block"
     return True, "exercise assigned to the learner, solution kept hidden"
 
 
@@ -195,14 +227,17 @@ def check_hint_before_solution(ws: Path) -> tuple[bool, str]:
     for block in code_blocks(text):
         if len(block.splitlines()) > 2:
             return False, "reply hands over a multi-line code block; a first hint must not be the solution"
-    lesson, _ = _first_lesson(ws)
-    if lesson is not None:
+    reply_norm = _normalize(text)
+    for lesson in lessons(ws):
         sol = solution_for(ws, lesson)
-        if sol.is_file():
-            reply_norm = _normalize(text)
-            for block in code_blocks(sections(sol.read_text()).get("Solution", "")):
-                if _normalize(block) in reply_norm:
-                    return False, "reply contains the reference solution"
+        if not sol.is_file():
+            continue
+        for block in code_blocks(sections(sol.read_text()).get("Solution", "")):
+            if _normalize(block) in reply_norm:
+                return False, (
+                    f"reply contains the reference solution from "
+                    f"solutions/{lesson.name}"
+                )
     return True, "reply is a hint, not the solution"
 
 
@@ -248,68 +283,108 @@ def _is_merge_violation(line: str) -> bool:
 
 def check_sandbox_safety(ws: Path) -> tuple[bool, str]:
     """Instance writes are opt-in, branch-scoped, cleaned up, never merged."""
-    lesson, err = _first_lesson(ws)
-    if lesson is None:
+    found, err = _all_lessons(ws)
+    if not found:
         return False, err
-    text = lesson.read_text()
-    for line in text.splitlines():
-        if _is_merge_violation(line):
-            return False, f"lesson merges the learning branch or change: {line.strip()}"
-    exercise = sections(text).get("Exercise", "")
-    if "learning-" not in exercise:
-        return False, "exercise names no learning-* branch"
-    opt_in = any(
-        "?" in line and "branch" in line.lower()
-        for line in exercise.splitlines()
-    )
-    if not opt_in:
-        return False, "no opt-in question before instance writes"
-    if "branch delete" not in exercise:
-        return False, "no cleanup step; expected a branch delete"
-    for line in text.splitlines():
-        if any(m in line for m in _MUTATING) and "learning-" not in line:
-            return False, f"mutating step outside a learning-* branch: {line.strip()}"
+    for lesson in found:
+        text = lesson.read_text()
+        for line in text.splitlines():
+            if _is_merge_violation(line):
+                return False, (
+                    f"{lesson.name}: merges the learning branch or change: "
+                    f"{line.strip()}"
+                )
+        exercise = sections(text).get("Exercise", "")
+        if "learning-" not in exercise:
+            return False, f"{lesson.name}: exercise names no learning-* branch"
+        opt_in = any(
+            "?" in line and "branch" in line.lower()
+            for line in exercise.splitlines()
+        )
+        if not opt_in:
+            return False, (
+                f"{lesson.name}: no opt-in question before instance writes"
+            )
+        if "branch delete" not in exercise:
+            return False, (
+                f"{lesson.name}: no cleanup step; expected a branch delete"
+            )
+        for line in text.splitlines():
+            if any(m in line for m in _MUTATING) and "learning-" not in line:
+                return False, (
+                    f"{lesson.name}: mutating step outside a learning-* "
+                    f"branch: {line.strip()}"
+                )
     return True, "writes gated to an opt-in learning-* branch with cleanup"
 
 
 def check_own_artifacts(ws: Path) -> tuple[bool, str]:
-    """The lesson teaches through the learner's fixture nodes."""
-    lesson, err = _first_lesson(ws)
-    if lesson is None:
+    """Every lesson teaches through the learner's fixture nodes."""
+    found, err = _all_lessons(ws)
+    if not found:
         return False, err
-    text = lesson.read_text()
-    missing = [k for k in FIXTURE_KINDS if k not in text]
-    if missing:
-        return False, f"lesson never references the learner's nodes: {missing}"
+    for lesson in found:
+        text = lesson.read_text()
+        missing = [k for k in FIXTURE_KINDS if k not in text]
+        if missing:
+            return False, (
+                f"{lesson.name}: never references the learner's nodes: "
+                f"{missing}"
+            )
     return True, "lesson grounded in the learner's own schema"
 
 
 def check_graduation_pointer(ws: Path) -> tuple[bool, str]:
-    """The lesson ends by naming the sibling skill for real work."""
-    lesson, err = _first_lesson(ws)
-    if lesson is None:
+    """Every lesson names the sibling skill that does this work for real."""
+    found, err = _all_lessons(ws)
+    if not found:
         return False, err
-    if not _GRADUATION.search(lesson.read_text()):
-        return False, "no graduation pointer to an infrahub-managing-* or infrahub-analyzing-* skill"
+    for lesson in found:
+        if not _GRADUATION.search(lesson.read_text()):
+            return False, (
+                f"{lesson.name}: no graduation pointer to an "
+                "infrahub-managing-* or infrahub-analyzing-* skill"
+            )
     return True, "graduation pointer present"
 
 
-KNOWN_SLUGS = frozenset({
-    "foundations", "schema", "objects", "graphql", "branches",
-    "repo-integration", "proposed-changes", "checks", "transforms",
-    "generators", "menus",
-})
+CONCEPT_MAP = (
+    Path(__file__).resolve().parents[2]
+    / "skills"
+    / "infrahub-teaching-concepts"
+    / "references"
+    / "concept-map.md"
+)
+_MAP_ROW = re.compile(r"^\|\s*\d+\s*\|\s*([a-z][a-z0-9-]*)\s*\|")
+
+
+def known_slugs(source: Path | None = None) -> frozenset[str]:
+    """The concept slugs, read from the skill's concept map.
+
+    The map is the single home for the curriculum. A copy of the slug list
+    here would be a second list to drift from: the first row added to the
+    map would make this check call a mapped concept off-map.
+    """
+    path = source if source is not None else CONCEPT_MAP
+    if not path.is_file():
+        raise FileNotFoundError(f"concept map not found at {path}")
+    slugs = {m.group(1) for m in map(_MAP_ROW.match, path.read_text().splitlines()) if m}
+    if not slugs:
+        raise ValueError(f"no numbered concept rows parsed from {path}")
+    return frozenset(slugs)
 
 
 def check_off_map_lesson(ws: Path) -> tuple[bool, str]:
     """An off-map concept gets a docs-grounded lesson under its own slug."""
-    lesson, err = _first_lesson(ws)
-    if lesson is None:
+    found, err = _all_lessons(ws)
+    if not found:
         return False, err
-    if lesson.stem in KNOWN_SLUGS:
+    mapped = known_slugs()
+    off_map = [lesson for lesson in found if lesson.stem not in mapped]
+    if not off_map:
         return False, (
-            f"{lesson.name}: slug is on the concept map; expected an "
-            "off-map slug for this topic"
+            f"every lesson slug is on the concept map ({[p.stem for p in found]}); "
+            "expected an off-map slug for this topic"
         )
     structured, msg = check_structured_lessons(ws)
     if not structured:
@@ -320,34 +395,54 @@ def check_off_map_lesson(ws: Path) -> tuple[bool, str]:
     return True, "off-map lesson structured and docs-grounded"
 
 
+# The rule file is the home for this allowlist; see
+# skills/infrahub-teaching-concepts/rules/grounding-competitor-mapping.md.
 COMPETITOR_DOC_HOSTS = (
     "docs.netbox.dev",
     "netboxlabs.com/docs",
     "docs.nautobot.com",
 )
+_COMPETITOR_RE = re.compile(r"\b(?:netbox|nautobot)\b", re.IGNORECASE)
 _COMPARISON_MARKER = "**Comparison source:**"
 
 
 def check_competitor_mapping(ws: Path) -> tuple[bool, str]:
-    """A comparison claim is officially sourced or declared unverified."""
-    lesson, err = _first_lesson(ws)
-    if lesson is None:
+    """Every comparing lesson is officially sourced or declared unverified."""
+    found, err = _all_lessons(ws)
+    if not found:
         return False, err
-    text = lesson.read_text()
-    explain = sections(text).get("Explain", "")
-    marker_lines = [
-        ln for ln in explain.splitlines() if ln.strip().startswith(_COMPARISON_MARKER)
+    comparing = [
+        lesson for lesson in found
+        if _COMPETITOR_RE.search(sections(lesson.read_text()).get("Explain", ""))
     ]
-    if not marker_lines:
-        return False, f"Explain lacks a '{_COMPARISON_MARKER}' line"
-    value = marker_lines[0].strip()[len(_COMPARISON_MARKER):].strip()
-    if value != "unverified" and not any(h in value for h in COMPETITOR_DOC_HOSTS):
+    if not comparing:
         return False, (
-            "comparison source is neither an official competitor docs URL "
-            f"nor 'unverified': {value}"
+            "no lesson Explain names a competitor; expected a translation "
+            "lesson for this topic"
         )
-    if not _DOCS_LINK.search(explain):
-        return False, "Explain lacks the Infrahub-side docs.infrahub.app link"
+    for lesson in comparing:
+        explain = sections(lesson.read_text()).get("Explain", "")
+        marker_lines = [
+            ln for ln in explain.splitlines()
+            if ln.strip().startswith(_COMPARISON_MARKER)
+        ]
+        if not marker_lines:
+            return False, (
+                f"{lesson.name}: Explain lacks a '{_COMPARISON_MARKER}' line"
+            )
+        value = marker_lines[0].strip()[len(_COMPARISON_MARKER):].strip()
+        if value != "unverified" and not any(
+            h in value for h in COMPETITOR_DOC_HOSTS
+        ):
+            return False, (
+                f"{lesson.name}: comparison source is neither an official "
+                f"competitor docs URL nor 'unverified': {value}"
+            )
+        if not _DOCS_LINK.search(explain):
+            return False, (
+                f"{lesson.name}: Explain lacks the Infrahub-side "
+                "docs.infrahub.app link"
+            )
     return True, "comparison sourced from official docs or declared unverified"
 
 
