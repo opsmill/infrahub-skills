@@ -145,6 +145,75 @@ def check_record_progress(ws: Path) -> tuple[bool, str]:
     return True, "progress.md well formed"
 
 
+def check_verified_solution(ws: Path) -> tuple[bool, str]:
+    """A hidden reference solution with verification evidence exists."""
+    lesson, err = _first_lesson(ws)
+    if lesson is None:
+        return False, err
+    sol = solution_for(ws, lesson)
+    if not sol.is_file():
+        return False, f"no reference solution at solutions/{lesson.name}"
+    parts = sections(sol.read_text())
+    if "Solution" not in parts or not code_blocks(parts["Solution"]):
+        return False, "solution file needs a '## Solution' with a code block"
+    if not parts.get("Verification", "").strip():
+        return False, "solution file needs a non-empty '## Verification'"
+    return True, "reference solution present with verification evidence"
+
+
+def check_learner_authors(ws: Path) -> tuple[bool, str]:
+    """Exercise is assigned to the learner; the solution is not leaked."""
+    lesson, err = _first_lesson(ws)
+    if lesson is None:
+        return False, err
+    text = lesson.read_text()
+    exercise = sections(text).get("Exercise", "")
+    if TASK_MARKER not in exercise:
+        return False, f"Exercise lacks the '{TASK_MARKER}' assignment marker"
+    sol = solution_for(ws, lesson)
+    if sol.is_file():
+        sol_blocks = code_blocks(sections(sol.read_text()).get("Solution", ""))
+        lesson_norm = _normalize(text)
+        for block in sol_blocks:
+            if _normalize(block) in lesson_norm:
+                return False, "lesson leaks a solution code block"
+    return True, "exercise assigned to the learner, solution kept hidden"
+
+
+def check_hint_before_solution(ws: Path) -> tuple[bool, str]:
+    """A stuck-learner reply is a hint, not the answer."""
+    path = ws / "reply.md"
+    if not path.is_file():
+        return False, "no reply.md written for the stuck learner"
+    text = path.read_text()
+    for block in code_blocks(text):
+        if len(block.splitlines()) > 2:
+            return False, "reply hands over a multi-line code block; a first hint must not be the solution"
+    lesson, _ = _first_lesson(ws)
+    if lesson is not None:
+        sol = solution_for(ws, lesson)
+        if sol.is_file():
+            reply_norm = _normalize(text)
+            for block in code_blocks(sections(sol.read_text()).get("Solution", "")):
+                if _normalize(block) in reply_norm:
+                    return False, "reply contains the reference solution"
+    return True, "reply is a hint, not the solution"
+
+
+def check_status_stays_introduced(ws: Path) -> tuple[bool, str]:
+    """After a solution reveal, the concept stays at 'introduced'."""
+    path = _learning(ws) / "progress.md"
+    if not path.is_file():
+        return False, f"no {LEARNING_DIR}/progress.md"
+    for row in path.read_text().splitlines():
+        cells = [c.strip() for c in row.strip().strip("|").split("|")]
+        if len(cells) >= 2 and cells[0] == "schema":
+            if cells[1] == "introduced":
+                return True, "revealed concept stays at introduced"
+            return False, f"concept 'schema' is '{cells[1]}', expected 'introduced' after a solution reveal"
+    return False, "no progress row for concept 'schema'"
+
+
 CHECKS: dict[str, Callable[[Path], tuple[bool, str]]] = {}
 
 
@@ -173,4 +242,8 @@ CHECKS.update({
     "probe-first": check_probe_first,
     "cite-docs": check_cite_docs,
     "record-progress": check_record_progress,
+    "verified-solution": check_verified_solution,
+    "learner-authors": check_learner_authors,
+    "hint-before-solution": check_hint_before_solution,
+    "status-stays-introduced": check_status_stays_introduced,
 })

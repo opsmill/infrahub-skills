@@ -248,3 +248,110 @@ def test_record_progress_no_rows(tmp_path):
     ws = make_ws(tmp_path, progress=header_only)
     ok, msg = teaching_lib.CHECKS["record-progress"](ws)
     assert not ok
+
+
+def test_verified_solution_pass(tmp_path):
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON,
+                 solution=COMPLIANT_SOLUTION)
+    ok, msg = teaching_lib.CHECKS["verified-solution"](ws)
+    assert ok, msg
+
+
+def test_verified_solution_missing_file(tmp_path):
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON)
+    ok, msg = teaching_lib.CHECKS["verified-solution"](ws)
+    assert not ok and "solution" in msg
+
+
+def test_verified_solution_no_verification_section(tmp_path):
+    unverified = COMPLIANT_SOLUTION.split("## Verification")[0]
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, solution=unverified)
+    ok, msg = teaching_lib.CHECKS["verified-solution"](ws)
+    assert not ok and "Verification" in msg
+
+
+def test_verified_solution_empty_solution_section(tmp_path):
+    empty = "## Solution\n\n## Verification\nran the validator, clean.\n"
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, solution=empty)
+    ok, msg = teaching_lib.CHECKS["verified-solution"](ws)
+    assert not ok
+
+
+def test_learner_authors_pass(tmp_path):
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON,
+                 solution=COMPLIANT_SOLUTION)
+    ok, msg = teaching_lib.CHECKS["learner-authors"](ws)
+    assert ok, msg
+
+
+def test_learner_authors_missing_task_marker(tmp_path):
+    no_marker = COMPLIANT_LESSON.replace("**Your task:**", "Try this:")
+    ws = make_ws(tmp_path, lesson=no_marker, solution=COMPLIANT_SOLUTION)
+    ok, msg = teaching_lib.CHECKS["learner-authors"](ws)
+    assert not ok and "Your task" in msg
+
+
+def test_learner_authors_solution_leaked_into_lesson(tmp_path):
+    leaked = COMPLIANT_LESSON.replace(
+        "## Check",
+        "```yaml\nrelationships:\n  - name: rack\n    peer: TestbedRack\n"
+        "    cardinality: one\n    kind: Attribute\n```\n\n## Check",
+    )
+    ws = make_ws(tmp_path, lesson=leaked, solution=COMPLIANT_SOLUTION)
+    ok, msg = teaching_lib.CHECKS["learner-authors"](ws)
+    assert not ok and "solution" in msg.lower()
+
+
+def test_hint_before_solution_pass(tmp_path):
+    hint = ("Look again at the `peer` field. Which node kind should the "
+            "sensor point at? Check your zone definition first.")
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON,
+                 solution=COMPLIANT_SOLUTION, reply=hint)
+    ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
+    assert ok, msg
+
+
+def test_hint_before_solution_missing_reply(tmp_path):
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON)
+    ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
+    assert not ok
+
+
+def test_hint_before_solution_reply_is_the_solution(tmp_path):
+    spoiler = ("Here you go:\n```yaml\nrelationships:\n  - name: rack\n"
+               "    peer: TestbedRack\n    cardinality: one\n"
+               "    kind: Attribute\n```\n")
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON,
+                 solution=COMPLIANT_SOLUTION, reply=spoiler)
+    ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
+    assert not ok
+
+
+def test_hint_before_solution_rejects_any_long_code_block(tmp_path):
+    other_code = ("Try:\n```yaml\nnodes:\n  - name: Foo\n    namespace: Bar\n"
+                  "    label: Foo\n```\n")
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON,
+                 solution=COMPLIANT_SOLUTION, reply=other_code)
+    ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
+    assert not ok
+
+
+def test_status_stays_introduced_pass(tmp_path):
+    ws = make_ws(tmp_path, progress=COMPLIANT_PROGRESS)
+    ok, msg = teaching_lib.CHECKS["status-stays-introduced"](ws)
+    assert ok, msg
+
+
+def test_status_stays_introduced_promoted_anyway(tmp_path):
+    promoted = COMPLIANT_PROGRESS.replace(
+        "| schema | introduced |", "| schema | practiced |")
+    ws = make_ws(tmp_path, progress=promoted)
+    ok, msg = teaching_lib.CHECKS["status-stays-introduced"](ws)
+    assert not ok
+
+
+def test_status_stays_introduced_concept_missing(tmp_path):
+    only_other = "| concept | status | last-seen | notes |\n|---|---|---|---|\n| menus | practiced | 2026-09-09 | |\n"
+    ws = make_ws(tmp_path, progress=only_other)
+    ok, msg = teaching_lib.CHECKS["status-stays-introduced"](ws)
+    assert not ok
