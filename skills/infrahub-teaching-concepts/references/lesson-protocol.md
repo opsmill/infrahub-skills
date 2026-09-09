@@ -10,7 +10,7 @@ change here without a grader change breaks evals, deliberately.
 never created without consent.
 
 | Path | Role |
-|---|---|
+| --- | --- |
 | `progress.md` | State. Read on resume, updated after each concept. |
 | `lessons/<concept>.md` | One durable lesson artifact per concept. |
 | `solutions/<concept>.md` | Hidden reference solution plus verification evidence. Written before the exercise is shown. |

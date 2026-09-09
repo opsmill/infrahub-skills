@@ -20,9 +20,9 @@ A concept whose exercise needed the solution revealed stays `introduced`.
 
 ## Correct
 
-    | concept | status | last-seen | notes |
-    |---|---|---|---|
-    | schema | introduced | 2026-09-09 | solution revealed |
+| concept | status | last-seen | notes |
+| --- | --- | --- | --- |
+| schema | introduced | 2026-09-09 | solution revealed |
 
 ## Incorrect
 

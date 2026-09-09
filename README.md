@@ -112,6 +112,7 @@ A team already running Infrahub who needs to continue extending it — adding sc
 | **collecting-diagnostics** | When Infrahub is misbehaving, use the infrahub-collect tool to gather logs, config, and state into a bundle, review it, and hand it to OpsMill support |
 | **analyzing-diagnostics** | Analyze a collected diagnostic bundle: triage tracebacks and failures, correlate errors into incidents, and match findings against existing GitHub issues |
 | **importing-data** | Convert CSV/TSV inputs into Infrahub object YAML, validate, and load onto a fresh branch |
+| **teaching-concepts** | Tutor for Infrahub concepts: probes what you know, teaches through your own repo and instance, sets verified hands-on exercises, and tracks progress across sessions |
 
 Each skill lives in `skills/infrahub-<name>/` with a `SKILL.md` entry point, reference docs, examples, and modular rules. Shared references (GraphQL patterns, `.infrahub.yml` format, git integration) are in `skills/infrahub-common/`. Skills use gerund-form names following the [Agent Skills best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
 
@@ -219,7 +220,8 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 │   ├── infrahub-reporting-skill-gaps/ # Skill-friction issue drafting
 │   ├── infrahub-collecting-diagnostics/ # Diagnostic-bundle collection for support hand-off
 │   ├── infrahub-analyzing-diagnostics/ # Bundle triage, correlation, and known-issue matching
-│   └── infrahub-importing-data/    # CSV/TSV → Infrahub objects
+│   ├── infrahub-importing-data/    # CSV/TSV → Infrahub objects
+│   └── infrahub-teaching-concepts/ # Guided tutor for Infrahub concepts
 ├── CLAUDE.md
 ├── README.md
 └── LICENSE                      # Apache 2.0

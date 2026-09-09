@@ -7,7 +7,7 @@ the current environment, reshape the exercise into one that has a
 method.
 
 | Artifact | Method |
-|---|---|
+| --- | --- |
 | Schema YAML | Offline validation: load the schema with the Infrahub SDK's in-memory validator, or `infrahubctl schema check <file>` when a client environment is configured. Either yields the verbatim load errors a server would raise. |
 | Object YAML | Validate shape against the governing schema: confirm every referenced kind, attribute, and relationship exists in the schema files, then, when an instance and consent exist, `infrahubctl object load <file> --branch learning-<topic>`. Without an instance, the schema cross-check is the method. |
 | GraphQL query | With an instance: execute the query read-only and record the result shape. Without one: resolve every queried field against the schema files. |

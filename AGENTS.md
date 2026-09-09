@@ -52,6 +52,7 @@ AI command definitions live in [dev/commands/](dev/commands/).
 | `infrahub-collecting-diagnostics` | `skills/infrahub-collecting-diagnostics/` | Collect a redacted local diagnostic bundle via the infrahub-collect tool (logs, config, version, state) for OpsMill expert hand-off |
 | `infrahub-analyzing-diagnostics` | `skills/infrahub-analyzing-diagnostics/` | Analyze a collected diagnostic bundle: triage tracebacks/failures, correlate into incidents, match against existing GitHub issues |
 | `infrahub-importing-data` | `skills/infrahub-importing-data/` | Convert CSV/TSV inputs into Infrahub object YAML and load onto a fresh branch |
+| `infrahub-teaching-concepts` | `skills/infrahub-teaching-concepts/` | Tutor for Infrahub concepts: probes the learner, teaches through their own repo/instance, verified hands-on exercises, tracked progress |
 
 ### Rule = Test (Required)
 
