@@ -68,6 +68,14 @@ rather than a checkout, read `version` from
 .claude-plugin/plugin.json instead. If neither is readable,
 write `unknown` rather than guessing: a wrong version sends
 a maintainer to the wrong revision of the rule. -->
+**Infrahub SDK version**: [the infrahub-sdk version this session ran against]
+<!-- Run `pip show infrahub-sdk` (or `uv pip show infrahub-sdk`)
+and read the `Version` field. Skill rules encode SDK behavior:
+a CLI flag, a client method, a generated protocol. Without this
+line a maintainer cannot tell whether the rule is wrong or just
+older than the SDK that ran, which is the difference between
+rewriting guidance and adding a version note. Write `unknown`
+when no SDK is installed or the read fails; never guess. -->
 **Tracker search**: [the query run against opsmill/infrahub-skills, and its result]
 
 ## What was being attempted

@@ -153,12 +153,17 @@ infrastructure or organization per
 This is security-critical and applies before the draft
 ever leaves this skill.
 
-The header carries the skills-plugin version whose
-guidance failed, read from `metadata.version` in the
-implicated skill's own SKILL.md frontmatter. Without it a
-maintainer cannot tell whether the rule they are looking
-at is the one that failed. Write `unknown` if it cannot be
-read; never guess.
+The header carries two versions. The skills-plugin
+version whose guidance failed, read from
+`metadata.version` in the implicated skill's own SKILL.md
+frontmatter: without it a maintainer cannot tell whether
+the rule they are looking at is the one that failed. And
+the `infrahub-sdk` version the session ran against, read
+from `pip show infrahub-sdk`: skill rules encode SDK
+behavior, so without it a maintainer cannot tell whether
+the rule is wrong or merely older than the SDK in use.
+Write `unknown` for either if it cannot be read; never
+guess.
 
 This produces the three handoff fields `type`, `title`,
 and `body`. It does **not** produce a target repository:
