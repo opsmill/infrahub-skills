@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+"""Grader for the reuse-per-generic eval.
+
+Grades whether a published file was judged per generic rather than as a unit:
+the cheap generic is adopted, and the provenance comment records what was
+taken and why the rest was excluded.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lib import run_checks  # noqa: E402
+
+CHECKS = [
+    "schema-version",
+    "external-kinds-core-or-sourced",
+    "records-marketplace-provenance",
+    "records-subset-rationale",
+    "full-kind-references",
+]
+
+if __name__ == "__main__":
+    print(json.dumps(run_checks(CHECKS, Path("output.yml"))))

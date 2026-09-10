@@ -220,6 +220,11 @@ generics:
         cardinality: many
         order_weight: 3000
 
+# `LocationGeneric` below is the generic declared above in
+# this same file, not a platform kind -- Infrahub core ships
+# no location kind. To reuse the marketplace location schema
+# instead of declaring your own, confirm its tier and record
+# its provenance; see rules/reuse-verify-kind-availability.md.
 nodes:
   - name: Region
     namespace: Location
@@ -1108,7 +1113,12 @@ nodes:
         kind: Attribute
         order_weight: 1200
 
-# Extend EXISTING nodes from other schema files
+# Extend EXISTING nodes from other schema files.
+# `IpamPrefix` and `IpamVLAN` here are marketplace-published
+# kinds, not platform core -- the Builtin IPAM primitives are
+# BuiltinIPAddress, BuiltinIPNamespace and BuiltinIPPrefix.
+# Confirm the kind with `infrahubctl schema show <Kind>` before
+# extending it; see rules/reuse-verify-kind-availability.md.
 extensions:
   nodes:
     - kind: IpamPrefix             # Add VLAN relationship to Prefix
