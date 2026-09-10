@@ -1,0 +1,26 @@
+graders/managing-transforms/lib.py
+  s_fe99a41d5e7f9e::t_c9841282cbc266 614-619,621-629,631-634
+tests/graders/test_svg_artifact.py
+  s_fe99a41d5e7f9e::t_d2d9af5f54dd4b 158-189
+skills/infrahub-managing-transforms/rules/artifacts-definitions.md
+  s_fe99a41d5e7f9e::t_10fd4a94f28db7 149-153
+skills/infrahub-managing-transforms/reference.md
+  s_fe99a41d5e7f9e::t_6ccd3dee537153 13
+  s_fe99a41d5e7f9e::t_0b9583f0454147 102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "565eb1ccbbb57856a2b32bf2f40c273414fae51f",
+  "prompts": {},
+  "sessions": {
+    "s_fe99a41d5e7f9e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f610d975-3725-4fda-8281-a3570da3554a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
