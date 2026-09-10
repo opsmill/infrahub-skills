@@ -1213,6 +1213,91 @@ def check_watch_no_third_party_in_fix(findings: list[dict], rule: str) -> tuple[
 # colon parts, so ``_dispatch`` is fully data-driven — adding a check means
 # adding one registry line, not a new branch in a hand-written if-chain.
 
+
+# `\s` rather than `\W` so the value may sit on the next line of a YAML
+# snippet, which is where a model that answers in YAML puts it.
+# The character class holds no word characters, so a generous bound cannot
+# bridge "cardinality" to an unrelated "one" -- only to a value separated
+# from it by whitespace and punctuation, such as a wrapped YAML line.
+_CARDINALITY_RE = re.compile(
+    r"""cardinality[\s:=\-'"`]{0,40}(one|many)\b""", re.IGNORECASE
+)
+
+# Fields that carry the recommended fix. A cardinality quoted anywhere else
+# in the finding -- typically in evidence, restating the *existing*
+# declaration the prompt handed over -- is not a recommendation.
+_RECOMMENDATION_FIELDS = (
+    "replacement", "recommendation", "fix", "suggestion", "remediation",
+    "proposed", "action",
+)
+
+
+def _flatten_strings(value: Any) -> list[str]:
+    """Every string reachable inside a finding value, at any depth."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [s for v in value.values() for s in _flatten_strings(v)]
+    if isinstance(value, (list, tuple)):
+        return [s for v in value for s in _flatten_strings(v)]
+    return []
+
+
+def _finding_text(finding: dict) -> str:
+    """Flatten every string in a finding into one searchable blob.
+
+    Recurses into nested dicts and lists: a model answering in YAML puts
+    the fix under `replacement: {yaml: "..."}`, and dropping dict values
+    silently failed those findings.
+    """
+    return " ".join(_flatten_strings(finding))
+
+
+def _recommendation_text(finding: dict) -> str:
+    """The finding's recommended fix, empty when it names no such field.
+
+    Deliberately does *not* fall back to the whole finding: a cardinality
+    quoted in evidence restates the declaration the prompt handed over
+    rather than choosing one for the inverse.
+    """
+    parts = [
+        s
+        for field in _RECOMMENDATION_FIELDS
+        for s in _flatten_strings(finding.get(field))
+    ]
+    return " ".join(parts)
+
+
+def check_yagni_finding_names_cardinality(
+    findings: list[dict], rule: str
+) -> tuple[bool, str]:
+    """Assert the finding's recommended fix names a cardinality.
+
+    Adding an inverse relationship is not shape-neutral. The value chosen
+    decides whether an inbound cap exists and fixes the GraphQL selection
+    shape, so a finding that recommends an inverse without naming a
+    cardinality hands the reader an unflagged decision with write-time
+    consequences.
+    """
+    f = _find(findings, rule)
+    if f is None:
+        return False, f"{rule} missing — cannot check cardinality"
+    recommendation = _recommendation_text(f)
+    if not recommendation.strip():
+        return False, (
+            f"{rule} carries no recommendation field "
+            f"({', '.join(_RECOMMENDATION_FIELDS)}), so it recommends nothing"
+        )
+    match = _CARDINALITY_RE.search(recommendation)
+    if match:
+        return True, f"{rule} recommendation names cardinality {match.group(1).lower()}"
+    return False, (
+        f"{rule} recommendation does not name a cardinality for the inverse; "
+        "a cardinality quoted elsewhere in the finding restates the existing "
+        "declaration rather than choosing one"
+    )
+
+
 _CHECKS: dict[str, tuple[Any, list[str]]] = {
     "yagni-finding-present": (check_yagni_finding_present, ["str"]),
     "yagni-finding-absent": (check_yagni_finding_absent, ["str"]),
@@ -1232,6 +1317,7 @@ _CHECKS: dict[str, tuple[Any, list[str]]] = {
     "watch-does-not-flag-entry": (check_watch_does_not_flag_entry, ["str", "str"]),
     "watch-not-on-forbidden-section": (check_watch_not_on_forbidden_section, []),
     "watch-no-third-party-in-fix": (check_watch_no_third_party_in_fix, ["str"]),
+    "yagni-finding-names-cardinality": (check_yagni_finding_names_cardinality, ["str"]),
 }
 
 # Checks that inspect the raw emitted document rather than the findings list.

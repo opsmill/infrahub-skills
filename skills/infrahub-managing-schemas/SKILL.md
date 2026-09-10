@@ -171,7 +171,11 @@ Follow these steps when creating or modifying a schema:
    too: a relationship's peer is fixed by the generic
    that declares it and no implementer can narrow it, so
    deciding which relationships live on the generic is a
-   one-way choice made here rather than later.
+   one-way choice made here rather than later. Every
+   `cardinality: one` you are about to write is also a
+   write-time data constraint, not only a shape, so read
+   [rules/relationship-cardinality-consequences.md](./rules/relationship-cardinality-consequences.md)
+   while choosing them rather than after a load fails.
 4. **Build the schema YAML** — Start with the `$schema`
    comment and `version: "1.0"`. Define generics first
    (if any), then nodes. Apply naming, display, and

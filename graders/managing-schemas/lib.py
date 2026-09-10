@@ -2302,6 +2302,88 @@ def check_generic_membership_consumers_noted(
     return True, f"comments name affected consumers: {hits}"
 
 
+def implicit_identifier(kind: str, peer: str) -> str:
+    """Reproduce the identifier Infrahub derives when none is declared.
+
+    A relationship without an explicit ``identifier`` still gets one, built
+    from its kind and peer sorted and lowercased. Deriving it here means the
+    identifier-keyed checks see the same graph whether the schema spells the
+    identifier out or relies on the default.
+    """
+    return "__".join(sorted([kind, peer])).lower()
+
+
+def rels_by_identifier(schema: dict) -> dict[str, list[tuple[str, dict]]]:
+    """Map identifier -> [(owning kind, relationship), ...] across the file."""
+    out: dict[str, list[tuple[str, dict]]] = {}
+    for section in ("generics", "nodes"):
+        for entity in schema.get(section) or []:
+            if not isinstance(entity, dict):
+                continue
+            kind = f"{entity.get('namespace', '')}{entity.get('name', '')}"
+            for rel in entity.get("relationships") or []:
+                if not isinstance(rel, dict):
+                    continue
+                identifier = rel.get("identifier") or implicit_identifier(
+                    kind, str(rel.get("peer", ""))
+                )
+                out.setdefault(identifier, []).append((kind, rel))
+    return out
+
+
+def check_identifier_unique_per_direction(schema: dict, **_: Any) -> tuple[bool, str]:
+    """One relationship per identifier per direction on any given kind.
+
+    A kind may declare two relationships on one identifier only when one is
+    `inbound` and the other `outbound` — the self-referential pattern. Any
+    other pair is rejected at load; the usual cause is widening a cardinality
+    and renaming to a plural in the same change, leaving both declarations
+    behind.
+    """
+    by_identifier = rels_by_identifier(schema)
+    if not by_identifier:
+        return False, "no relationship declares an identifier, so nothing was checked"
+    problems: list[str] = []
+    for identifier, entries in by_identifier.items():
+        per_kind: dict[str, list[tuple[str, str]]] = {}
+        for kind, rel in entries:
+            direction = str(rel.get("direction") or "bidirectional")
+            per_kind.setdefault(kind, []).append((str(rel.get("name", "?")), direction))
+        for kind, decls in per_kind.items():
+            if len(decls) == 1:
+                continue
+            if sorted(d for _name, d in decls) == ["inbound", "outbound"]:
+                continue
+            problems.append(f"{kind} declares {decls} on identifier {identifier!r}")
+    if problems:
+        return False, "; ".join(problems)
+    return True, "each kind declares at most one relationship per identifier and direction"
+
+
+def check_many_max_count_valid(schema: dict, **_: Any) -> tuple[bool, str]:
+    """`max_count: 1` on a cardinality-many relationship is rejected at load.
+
+    ``cardinality`` defaults to ``many`` when unset, so an omitted key is a
+    ``many`` relationship here too — otherwise a schema Infrahub rejects
+    passes this check.
+    """
+    by_identifier = rels_by_identifier(schema)
+    if not by_identifier:
+        return False, "no relationship declares an identifier, so nothing was checked"
+    problems: list[str] = []
+    for _identifier, entries in by_identifier.items():
+        for kind, rel in entries:
+            cardinality = str(rel.get("cardinality") or "many")
+            if cardinality == "many" and rel.get("max_count") == 1:
+                problems.append(
+                    f"{kind}.{rel.get('name')} is cardinality many with max_count 1; "
+                    "use cardinality one for a genuine cap of one"
+                )
+    if problems:
+        return False, "; ".join(problems)
+    return True, "no cardinality-many relationship carries max_count 1"
+
+
 CHECKS: dict[str, Any] = {
     "uniqueness-scopes-by-relationship": check_uniqueness_constraint_scopes_by_relationship,
     "uniqueness-no-optional-attr": check_uniqueness_no_optional_attr,
@@ -2354,6 +2436,8 @@ CHECKS: dict[str, Any] = {
     "records-subset-rationale": check_records_subset_rationale,
     "generic-implementer-set-pinned": check_generic_implementer_set_pinned,
     "generic-membership-consumers-noted": check_generic_membership_consumers_noted,
+    "identifier-unique-per-direction": check_identifier_unique_per_direction,
+    "many-max-count-valid": check_many_max_count_valid,
 }
 
 
