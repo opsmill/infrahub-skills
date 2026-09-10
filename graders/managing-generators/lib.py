@@ -1090,13 +1090,20 @@ def _target_names(target: ast.expr) -> list[str]:
     return []
 
 
-def _vars_bound_to_kind(tree: ast.Module, kind: str) -> set[str]:
-    """Names assigned from a create/get of ``kind`` (``await`` unwrapped).
+def _vars_bound_to_kind(
+    tree: ast.Module, kind: str, methods: set[str] | None = None
+) -> set[str]:
+    """Names assigned from a ``methods`` call on ``kind`` (``await`` unwrapped).
+
+    ``methods`` defaults to create/get/upsert. Callers that care whether the
+    generator *owns* the object pass ``{"create", "upsert"}``: a ``get`` is a
+    read, and only a ``save`` claims a node for the run's group.
 
     Also collects names bound by a `for` loop over a collection that holds
     such a name, so `for obj in (trunk, leg): await obj.save(...)` is seen
     as saving both.
     """
+    methods = methods or {"create", "get", "upsert"}
     names: set[str] = set()
     for stmt in ast.walk(tree):
         if isinstance(stmt, ast.Assign):
@@ -1110,7 +1117,7 @@ def _vars_bound_to_kind(tree: ast.Module, kind: str) -> set[str]:
         if not isinstance(value, ast.Call):
             continue
         func = value.func
-        if not (isinstance(func, ast.Attribute) and func.attr in {"create", "get", "upsert"}):
+        if not (isinstance(func, ast.Attribute) and func.attr in methods):
             continue
         if _kind_of_call(value) != kind:
             continue
@@ -1304,14 +1311,52 @@ def _names_bound_to_traversal(tree: ast.Module) -> set[str]:
     return names
 
 
-def _attribute_of(node: ast.AST, names: set[str], attr: str) -> bool:
-    """True when ``node`` reads ``<one of names>.<attr>``."""
+def _aliases_of_attribute(tree: ast.Module, names: set[str], attr: str) -> set[str]:
+    """Names bound to ``<one of names>.<attr>``.
+
+    Hoisting a result attribute into a local is ordinary Python, so the
+    alias stands for the attribute for the rest of the module. This is the
+    same one level of indirection `_resolve_str_list` already follows for
+    `relationship_filter`.
+    """
+    aliases: set[str] = set()
+    for stmt in ast.walk(tree):
+        if isinstance(stmt, ast.Assign):
+            targets, value = stmt.targets, stmt.value
+        elif isinstance(stmt, ast.AnnAssign):
+            targets, value = [stmt.target], stmt.value
+        else:
+            continue
+        if isinstance(value, ast.Await):
+            value = value.value
+        if not (
+            isinstance(value, ast.Attribute)
+            and value.attr == attr
+            and isinstance(value.value, (ast.Name, ast.Attribute))
+            and ast.unparse(value.value) in names
+        ):
+            continue
+        for tgt in targets:
+            aliases.update(_target_names(tgt))
+    return aliases
+
+
+def _attribute_of(
+    node: ast.AST, names: set[str], attr: str, aliases: set[str] | None = None
+) -> bool:
+    """True when ``node`` reads ``<one of names>.<attr>``, or an alias of it."""
     for sub in ast.walk(node):
         if (
             isinstance(sub, ast.Attribute)
             and sub.attr == attr
             and isinstance(sub.value, (ast.Name, ast.Attribute))
             and ast.unparse(sub.value) in names
+        ):
+            return True
+        if (
+            aliases
+            and isinstance(sub, (ast.Name, ast.Attribute))
+            and ast.unparse(sub) in aliases
         ):
             return True
     return False
@@ -1324,20 +1369,22 @@ def _reads_attribute_of(
 
     With ``iterated``, it has to be the iterable of a loop or comprehension:
     the requirement is one leg per discovered path, which means walking
-    them.
+    them. A local bound to the attribute counts as the attribute.
     """
+    aliases = _aliases_of_attribute(tree, names, attr)
     for node in ast.walk(tree):
         if iterated:
             if isinstance(node, (ast.For, ast.AsyncFor)) and _attribute_of(
-                node.iter, names, attr
+                node.iter, names, attr, aliases
             ):
                 return True
             if isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp,
                                  ast.DictComp)) and any(
-                _attribute_of(gen.iter, names, attr) for gen in node.generators
+                _attribute_of(gen.iter, names, attr, aliases)
+                for gen in node.generators
             ):
                 return True
-        elif _attribute_of(node, names, attr):
+        elif _attribute_of(node, names, attr, aliases):
             return True
     return False
 
@@ -1345,8 +1392,11 @@ def _reads_attribute_of(
 def _tests_attribute_of(tree: ast.Module, names: set[str], attr: str) -> bool:
     """True when the attribute is used as a condition, not merely read.
 
-    `_ = result.truncated_at_depth` reads it and acts on nothing.
+    `_ = result.truncated_at_depth` reads it and acts on nothing, and
+    hoisting it into a local is still only a read until something branches
+    on that local.
     """
+    aliases = _aliases_of_attribute(tree, names, attr)
     for node in ast.walk(tree):
         test = None
         if isinstance(node, (ast.If, ast.IfExp, ast.While, ast.Assert)):
@@ -1358,7 +1408,7 @@ def _tests_attribute_of(tree: ast.Module, names: set[str], attr: str) -> bool:
             # or not, still counts as acting on it only if it is a condition;
             # a bare call does not.
             continue
-        if test is not None and _attribute_of(test, names, attr):
+        if test is not None and _attribute_of(test, names, attr, aliases):
             return True
     return False
 
@@ -1441,10 +1491,15 @@ def check_shared_save_opts_out_of_tracking(
             f"Only the shared {_SHARED_KIND} may opt out"
         )
 
-    shared_vars = _vars_bound_to_kind(tree, _SHARED_KIND)
+    # A `get` binds the object without claiming it, so the two are tracked
+    # apart: created names decide whether an unaccounted-for save is the
+    # generator's problem, while every bound name is a save receiver worth
+    # matching -- saving a fetched object claims it just the same.
+    created_vars = _vars_bound_to_kind(tree, _SHARED_KIND, {"create", "upsert"})
+    shared_vars = created_vars | _vars_bound_to_kind(tree, _SHARED_KIND, {"get"})
     if not shared_vars:
         return True, (
-            f"the generator never creates the shared {_SHARED_KIND}, so the "
+            f"the generator never touches the shared {_SHARED_KIND}, so the "
             "run cannot claim it (owned outside the generator)"
         )
 
@@ -1455,10 +1510,15 @@ def check_shared_save_opts_out_of_tracking(
         and ast.unparse(c.func.value) in shared_vars
     ]
     if not shared_saves:
-        # Every save whose receiver could not be resolved is a save that
-        # might be the shared object's, so it cannot be waved through: the
-        # old message claimed the object "is never saved" without having
-        # looked at the receivers it could not parse.
+        if not created_vars:
+            return True, (
+                f"the generator only reads the shared {_SHARED_KIND} and "
+                "never saves it, so the run does not claim it (owned outside "
+                "the generator)"
+            )
+        # The generator created it, so something has to have written it.
+        # Every save whose receiver cannot be resolved might be that one, so
+        # it cannot be waved through as "never saved".
         unresolved = [
             ast.unparse(c.func.value)
             for c in saves
@@ -1473,7 +1533,7 @@ def check_shared_save_opts_out_of_tracking(
                 "update_group_context=False, so the opt-out is visible"
             )
         return True, (
-            f"the shared {_SHARED_KIND} is referenced but never saved, so the "
+            f"the shared {_SHARED_KIND} is created but never saved, so the "
             "run does not claim it"
         )
 

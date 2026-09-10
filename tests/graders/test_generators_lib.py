@@ -838,3 +838,139 @@ def test_a_label_read_through_the_hops_node_passes():
         "labels = [h.node.display_label for p in result.paths for h in p.hops]",
     )
     assert ok, msg
+
+
+# --- round 3: a read is not a claim, and one level of indirection is ordinary ---
+
+def test_fetching_the_shared_object_and_saving_only_the_leg_passes():
+    """`tracking-idempotent.md` option 1: the container is owned outside the run.
+
+    A `get` is a read. Only a `save` claims the node for the run's group,
+    so a generator that looks the container up and saves nothing but its
+    own legs has not claimed it.
+    """
+    ok, msg = _run(
+        "shared-save-opts-out-of-tracking",
+        '''
+class G:
+    async def generate(self, data):
+        trunk = await self.client.get(kind="NetContainer", name__value="shared-trunk")
+        leg = await self.client.create(kind="NetLeg", data={"name": "l", "parent": trunk})
+        await leg.save(allow_upsert=True)
+''',
+    )
+    assert ok, msg
+
+
+def test_fetching_the_shared_object_and_saving_it_still_needs_the_opt_out():
+    """A save on a fetched object claims it exactly as a save on a created one."""
+    ok, _ = _run(
+        "shared-save-opts-out-of-tracking",
+        '''
+class G:
+    async def generate(self, data):
+        trunk = await self.client.get(kind="NetContainer", name__value="shared-trunk")
+        await trunk.save(allow_upsert=True)
+''',
+    )
+    assert not ok
+
+
+def test_creating_the_shared_object_with_an_untraceable_save_still_fails():
+    """The round-2 false pass stays closed: a created container must be accounted for."""
+    ok, msg = _run(
+        "shared-save-opts-out-of-tracking",
+        '''
+class G:
+    async def generate(self, data):
+        trunk = await self.client.create(kind="NetContainer", name="t")
+        for obj in self._pending():
+            await obj.save(allow_upsert=True)
+''',
+    )
+    assert not ok
+    assert "cannot be tied back" in msg
+
+
+def test_truncation_check_follows_the_flag_hoisted_into_a_local():
+    src = '''
+class G:
+    async def generate(self, data):
+        result = await self.client.traverse_paths(start_id="x")
+        truncated = result.truncated_at_depth
+        if truncated is not None:
+            raise ValueError("truncated")
+        for path in result.paths:
+            pass
+'''
+    ok, msg = _run("traversal-enumerates-and-checks-truncation", src)
+    assert ok, msg
+
+
+def test_truncation_check_follows_paths_hoisted_into_a_local():
+    src = '''
+class G:
+    async def generate(self, data):
+        result = await self.client.traverse_paths(start_id="x")
+        if result.truncated_at_depth is not None:
+            raise ValueError("truncated")
+        paths = result.paths
+        for path in paths:
+            pass
+'''
+    ok, msg = _run("traversal-enumerates-and-checks-truncation", src)
+    assert ok, msg
+
+
+def test_truncation_check_follows_both_hoisted_at_once():
+    src = '''
+class G:
+    async def generate(self, data):
+        result = await self.client.traverse_paths(
+            source="a", destination="z",
+            relationship_filter=["netendpoint__netsegment"],
+            max_depth=6, shortest_paths_only=False,
+        )
+        truncated = result.truncated_at_depth
+        if truncated is not None:
+            raise ValueError("truncated")
+        paths = result.paths
+        for path in paths:
+            pass
+'''
+    ok, msg = _run("traversal-enumerates-and-checks-truncation", src)
+    assert ok, msg
+
+
+def test_a_hoisted_flag_that_is_never_branched_on_still_fails():
+    """Following the alias must not turn a bare read into a check."""
+    ok, _ = _run(
+        "traversal-enumerates-and-checks-truncation",
+        '''
+class G:
+    async def generate(self, data):
+        result = await self.client.traverse_paths(start_id="x")
+        truncated = result.truncated_at_depth
+        for path in result.paths:
+            pass
+''',
+    )
+    assert not ok
+
+
+def test_a_local_named_paths_from_elsewhere_does_not_satisfy_enumeration():
+    """The alias has to come off the traversal result, not any object."""
+    ok, _ = _run(
+        "traversal-enumerates-and-checks-truncation",
+        '''
+class G:
+    async def generate(self, data):
+        result = await self.client.traverse_paths(start_id="x")
+        if result.truncated_at_depth is not None:
+            raise ValueError("truncated")
+        paths = self.cache.paths
+        for path in paths:
+            pass
+''',
+    )
+    assert not ok
