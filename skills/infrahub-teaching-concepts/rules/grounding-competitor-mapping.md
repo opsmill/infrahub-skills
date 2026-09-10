@@ -40,7 +40,7 @@ forums, and recollection never ground a taught comparison.
     In NetBox, config contexts attach JSON data to devices by scope.
     **Comparison source:** https://docs.netbox.dev/en/stable/features/context-data/
     In Infrahub the same need is met by transforms over your own data.
-    See https://docs.infrahub.app/topics/transformation for the model.
+    See https://docs.infrahub.app/transformations/overview for the model.
 
 ## Incorrect
 

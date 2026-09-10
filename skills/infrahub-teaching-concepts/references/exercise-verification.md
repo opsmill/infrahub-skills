@@ -12,7 +12,7 @@ method.
 | Object YAML | Validate shape against the governing schema: confirm every referenced kind, attribute, and relationship exists in the schema files, then, when an instance and consent exist, `infrahubctl object load <file> --branch learning-<topic>`. Without an instance, the schema cross-check is the method. |
 | GraphQL query | With an instance: execute the query read-only and record the result shape. Without one: resolve every queried field against the schema files. |
 | Check or transform code | Run it locally: `infrahubctl check <name>` or `infrahubctl transform <name>` against sample data in the repo. |
-| Conceptual (no artifact) | The answer must be derivable from a cited docs.infrahub.app page; the citation is the verification. |
+| Conceptual (no artifact) | The answer must be derivable from a cited docs.infrahub.app page; the citation is the verification. Record the URL itself in `## Verification`. |
 
 When the tooling itself is absent (no `infrahubctl`, no SDK), only
 local-file and conceptual exercises are available; say so rather than

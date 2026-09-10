@@ -25,9 +25,14 @@ SECTION_ORDER = ["Probe", "Explain", "Exercise", "Check"]
 VALID_STATUSES = {"not-seen", "introduced", "practiced"}
 PROGRESS_HEADER = ["concept", "status", "last-seen", "notes"]
 TASK_MARKER = "**Your task:**"
+# A one-line solution block is often a fragment the Explain section has
+# to be able to say out loud ("an attribute is declared like `kind:
+# Text`"). Only a multi-line block is the answer being handed over.
+LEAK_MIN_LINES = 2
 
-_H2 = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+_H2 = re.compile(r"^##\s+(.+?)\s*$")
 _FENCE = re.compile(r"```[a-zA-Z0-9]*\n(.*?)```", re.DOTALL)
+_FENCE_EDGE = re.compile(r"^\s*```")
 _DOCS_LINK = re.compile(r"https://docs\.infrahub\.app/[\w\-./#?=]+")
 _GRADUATION = re.compile(r"infrahub-(?:managing|analyzing)-[a-z-]+")
 
@@ -49,17 +54,33 @@ def hints_for(ws: Path, lesson: Path) -> Path:
     return _learning(ws) / "hints" / lesson.name
 
 
+def _heading_lines(text: str):
+    """Yield (heading_or_None, line), skipping headings inside code fences.
+
+    A lesson that shows the lesson format itself in a fenced block would
+    otherwise have its '## Explain' snippet read as a real heading, and
+    the rest of the section reassigned to a phantom one.
+    """
+    in_fence = False
+    for line in text.splitlines():
+        if _FENCE_EDGE.match(line):
+            in_fence = not in_fence
+            yield None, line
+            continue
+        match = None if in_fence else _H2.match(line)
+        yield (match.group(1) if match else None), line
+
+
 def headings(text: str) -> list[str]:
-    return _H2.findall(text)
+    return [h for h, _ in _heading_lines(text) if h is not None]
 
 
 def sections(text: str) -> dict[str, str]:
     parts: dict[str, str] = {}
     current: str | None = None
-    for line in text.splitlines():
-        match = re.match(r"^##\s+(.+?)\s*$", line)
-        if match:
-            current = match.group(1)
+    for heading, line in _heading_lines(text):
+        if heading is not None:
+            current = heading
             parts[current] = ""
         elif current is not None:
             parts[current] += line + "\n"
@@ -191,10 +212,15 @@ def check_verified_solution(ws: Path) -> tuple[bool, str]:
                 f"solutions/{lesson.name}: Verification is a vacuous "
                 "assurance, not evidence"
             )
-        if "`" not in verification:
+        # Two accepted forms of evidence, matching the two tiers in
+        # references/exercise-verification.md: a command that was run, or
+        # -- for a conceptual exercise, which has no artifact to run
+        # anything against -- the docs page the answer derives from.
+        if "`" not in verification and not _DOCS_LINK.search(verification):
             return False, (
-                f"solutions/{lesson.name}: Verification names no command; "
-                "nothing was actually run"
+                f"solutions/{lesson.name}: Verification names neither a "
+                "command that was run nor the docs page a conceptual "
+                "answer derives from"
             )
     return True, "reference solution present with verification evidence"
 
@@ -219,6 +245,8 @@ def check_learner_authors(ws: Path) -> tuple[bool, str]:
             )
             lesson_norm = _normalize(text)
             for block in sol_blocks:
+                if len(block.splitlines()) < LEAK_MIN_LINES:
+                    continue  # `kind: Text` is vocabulary, not the answer
                 if _normalize(block) in lesson_norm:
                     return False, f"{lesson.name}: leaks a solution code block"
     return True, "exercise assigned to the learner, solution kept hidden"
@@ -299,14 +327,21 @@ def check_hint_before_solution(ws: Path) -> tuple[bool, str]:
 def check_attempt_not_promoted(ws: Path) -> tuple[bool, str]:
     """A concept with an unfinished exercise is not promoted to 'practiced'.
 
-    The concepts come from the lesson files in the workspace, not a
-    hardcoded slug. A literal 'schema' here pins the check to one eval
-    prompt: reword the task to teach 'objects' and a fully compliant
-    workspace scores 0. Same discipline as known_slugs().
+    Scoped to the concepts with an open escalation log, not every lesson
+    in the workspace: a resumed workspace legitimately carries earlier
+    concepts at 'practiced', and failing those would mean any learner who
+    finishes a concept fails the next task. The slug comes from the lesson
+    files rather than a literal, so rewording the prompt to teach another
+    concept is not a false fail. Same discipline as known_slugs().
     """
-    concepts = [lesson.stem for lesson in lessons(ws)]
+    concepts = [
+        lesson.stem for lesson in lessons(ws) if hints_for(ws, lesson).is_file()
+    ]
     if not concepts:
-        return False, f"no lesson file under {LEARNING_DIR}/lessons/"
+        return False, (
+            f"no {LEARNING_DIR}/hints/<concept>.md, so no concept has an "
+            "unfinished attempt to grade"
+        )
     path = _learning(ws) / "progress.md"
     if not path.is_file():
         return False, f"no {LEARNING_DIR}/progress.md"
@@ -359,11 +394,35 @@ def _is_merge_violation(line: str) -> bool:
     return references_target
 
 
+def _is_write_step(line: str) -> bool:
+    """An imperative step that writes to the instance, as opposed to a
+    warning against doing so.
+
+    The negation guard is the same one _is_merge_violation uses: a lesson
+    that quotes safety-instance-writes.md's own "## Incorrect" block is
+    teaching the rule, not breaking it. Unlike the merge check there is no
+    list-marker requirement -- a write command quoted mid-prose is still a
+    write command the learner may run.
+    """
+    stripped = line.strip()
+    if not any(m in stripped for m in _MUTATING):
+        return False
+    return not _NEGATION_RE.search(stripped)
+
+
 def check_sandbox_safety(ws: Path) -> tuple[bool, str]:
-    """Instance writes are opt-in, branch-scoped, cleaned up, never merged."""
+    """Instance writes are opt-in, branch-scoped, cleaned up, never merged.
+
+    Read-only lessons are the skill's default, not a violation:
+    safety-instance-writes.md puts writes at tier 3 and the concept map
+    puts 8 of 11 concepts below it. The branch, consent and cleanup
+    requirements therefore apply to a lesson that actually writes; the
+    never-merge and never-outside-a-learning-branch bars apply to all.
+    """
     found, err = _all_lessons(ws)
     if not found:
         return False, err
+    writing = []
     for lesson in found:
         text = lesson.read_text()
         for line in text.splitlines():
@@ -371,6 +430,16 @@ def check_sandbox_safety(ws: Path) -> tuple[bool, str]:
                 return False, (
                     f"{lesson.name}: merges the learning branch or change: "
                     f"{line.strip()}"
+                )
+        write_steps = [ln for ln in text.splitlines() if _is_write_step(ln)]
+        if not write_steps:
+            continue
+        writing.append(lesson.name)
+        for line in write_steps:
+            if "learning-" not in line:
+                return False, (
+                    f"{lesson.name}: mutating step outside a learning-* "
+                    f"branch: {line.strip()}"
                 )
         exercise = sections(text).get("Exercise", "")
         if "learning-" not in exercise:
@@ -387,12 +456,8 @@ def check_sandbox_safety(ws: Path) -> tuple[bool, str]:
             return False, (
                 f"{lesson.name}: no cleanup step; expected a branch delete"
             )
-        for line in text.splitlines():
-            if any(m in line for m in _MUTATING) and "learning-" not in line:
-                return False, (
-                    f"{lesson.name}: mutating step outside a learning-* "
-                    f"branch: {line.strip()}"
-                )
+    if not writing:
+        return True, "no lesson writes to the instance; read-only is the default"
     return True, "writes gated to an opt-in learning-* branch with cleanup"
 
 
@@ -426,7 +491,13 @@ def learner_kinds(ws: Path) -> set[str]:
 
 
 def check_own_artifacts(ws: Path) -> tuple[bool, str]:
-    """Every lesson teaches through the kinds in the learner's schema."""
+    """Every lesson's Explain is anchored to a kind the learner owns.
+
+    The rule asks Explain to be anchored to the learner's kinds, not for
+    every lesson to name every kind: against a real repo with a dozen
+    kinds, an all-of-them bar is unpassable, and a generic lesson is
+    caught by naming none of them either way.
+    """
     found, err = _all_lessons(ws)
     if not found:
         return False, err
@@ -437,26 +508,47 @@ def check_own_artifacts(ws: Path) -> tuple[bool, str]:
             "graded without the artifacts it is supposed to ground in"
         )
     for lesson in found:
-        text = lesson.read_text()
-        missing = sorted(k for k in kinds if k not in text)
-        if missing:
+        explain = sections(lesson.read_text()).get("Explain", "")
+        if not any(k in explain for k in kinds):
             return False, (
-                f"{lesson.name}: never references the learner's nodes: "
-                f"{missing}"
+                f"{lesson.name}: Explain names none of the learner's kinds "
+                f"{sorted(kinds)}; it teaches through an invented example"
             )
-    return True, f"lesson grounded in the learner's own kinds: {sorted(kinds)}"
+    return True, f"every Explain anchored to the learner's own kinds: {sorted(kinds)}"
 
 
 def check_graduation_pointer(ws: Path) -> tuple[bool, str]:
-    """Every lesson names the sibling skill that does this work for real."""
+    """Every lesson closes by naming its sibling skill, or the next concept.
+
+    Four concepts (foundations, branches, repo-integration,
+    proposed-changes) have no graduation skill and close by naming the
+    next concept instead. That set is read off the map's Graduation
+    column rather than copied here, so a new row cannot silently fall
+    out of step with the rule.
+    """
     found, err = _all_lessons(ws)
     if not found:
         return False, err
+    rows = concept_rows()
     for lesson in found:
-        if not _GRADUATION.search(lesson.read_text()):
+        text = lesson.read_text()
+        if _GRADUATION.search(text):
+            continue
+        row = rows.get(lesson.stem)
+        if row is None or row["graduation"].lower() != "none":
             return False, (
                 f"{lesson.name}: no graduation pointer to an "
                 "infrahub-managing-* or infrahub-analyzing-* skill"
+            )
+        # No sibling skill exists for this concept, so the closing has to
+        # hand off to another concept on the map.
+        closing = sections(text).get("Check", "")
+        others = [slug for slug in rows if slug != lesson.stem]
+        if not any(re.search(rf"\b{re.escape(s)}\b", closing) for s in others):
+            return False, (
+                f"{lesson.name}: '{lesson.stem}' has no graduation skill on "
+                "the map, so the closing must name the next concept; it "
+                "names none"
             )
     return True, "graduation pointer present"
 
@@ -471,20 +563,38 @@ CONCEPT_MAP = (
 _MAP_ROW = re.compile(r"^\|\s*\d+\s*\|\s*([a-z][a-z0-9-]*)\s*\|")
 
 
-def known_slugs(source: Path | None = None) -> frozenset[str]:
-    """The concept slugs, read from the skill's concept map.
+MAP_COLUMNS = (
+    "number", "concept", "prerequisites", "probe", "exercise",
+    "verify", "tier", "doc_anchor", "graduation",
+)
 
-    The map is the single home for the curriculum. A copy of the slug list
-    here would be a second list to drift from: the first row added to the
-    map would make this check call a mapped concept off-map.
+
+def concept_rows(source: Path | None = None) -> dict[str, dict[str, str]]:
+    """Every numbered row of the concept map, keyed by slug.
+
+    The map is the single home for the curriculum. A copy of any of its
+    columns here would be a second list to drift from: the first row
+    added to the map would make a check call a mapped concept off-map,
+    or hold a concept to a graduation skill the map says it has none of.
     """
     path = source if source is not None else CONCEPT_MAP
     if not path.is_file():
         raise FileNotFoundError(f"concept map not found at {path}")
-    slugs = {m.group(1) for m in map(_MAP_ROW.match, path.read_text().splitlines()) if m}
-    if not slugs:
+    rows: dict[str, dict[str, str]] = {}
+    for line in path.read_text().splitlines():
+        if not _MAP_ROW.match(line):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        cells += [""] * (len(MAP_COLUMNS) - len(cells))
+        rows[cells[1]] = dict(zip(MAP_COLUMNS, cells))
+    if not rows:
         raise ValueError(f"no numbered concept rows parsed from {path}")
-    return frozenset(slugs)
+    return rows
+
+
+def known_slugs(source: Path | None = None) -> frozenset[str]:
+    """The concept slugs, read from the skill's concept map."""
+    return frozenset(concept_rows(source))
 
 
 def check_off_map_lesson(ws: Path) -> tuple[bool, str]:
@@ -517,6 +627,14 @@ COMPETITOR_DOC_HOSTS = (
 )
 _COMPETITOR_RE = re.compile(r"\b(?:netbox|nautobot)\b", re.IGNORECASE)
 _COMPARISON_MARKER = "**Comparison source:**"
+# The prose half of the rule's unverified branch: an admission of
+# uncertainty about the competitor side.
+_UNSURE_RE = re.compile(
+    r"(?:unsure|not sure|cannot confirm|can't confirm|unconfirmed|"
+    r"could not verify|couldn't verify|have not verified|haven't verified|"
+    r"going by your|from your description|as you describe)",
+    re.IGNORECASE,
+)
 
 
 def check_competitor_mapping(ws: Path) -> tuple[bool, str]:
@@ -550,6 +668,19 @@ def check_competitor_mapping(ws: Path) -> tuple[bool, str]:
             return False, (
                 f"{lesson.name}: comparison source is neither an official "
                 f"competitor docs URL nor 'unverified': {value}"
+            )
+        # The rule's unverified branch is two halves: the marker and prose
+        # saying you are unsure and going by the learner's description.
+        # Grading only the marker turns the branch into one literal string.
+        prose = "\n".join(
+            ln for ln in explain.splitlines()
+            if not ln.strip().startswith(_COMPARISON_MARKER)
+        )
+        if value == "unverified" and not _UNSURE_RE.search(prose):
+            return False, (
+                f"{lesson.name}: marked unverified but the prose never says "
+                "the competitor side is unconfirmed and taken from the "
+                "learner's description"
             )
         if not _DOCS_LINK.search(explain):
             return False, (

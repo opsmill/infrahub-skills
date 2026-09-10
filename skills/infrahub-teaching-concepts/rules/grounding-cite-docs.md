@@ -31,7 +31,7 @@ any claim that changed between Infrahub releases.
 ## Correct
 
     Cardinality controls how many peers one object can have. See
-    https://docs.infrahub.app/topics/schema for the full model.
+    https://docs.infrahub.app/schema/overview for the full model.
 
 ## Incorrect
 

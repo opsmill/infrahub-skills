@@ -7629,7 +7629,9 @@ tasks:
       - The branch is never merged
     assertions:
       - name: sandbox-safety
-        check: opt-in question, learning-* scope, cleanup, no merge
+        check: >-
+          writes are opt-in, learning-* scoped, cleaned up and never merged;
+          read-only lessons need none of that ceremony
       - name: structured-lessons
         check: lesson uses the four-section shape
 
@@ -7676,7 +7678,9 @@ tasks:
       - The exercise in the lesson does not contain the solution
     assertions:
       - name: verified-solution
-        check: solution file has Solution code block and Verification evidence
+        check: >-
+          solution file has a Solution code block and Verification naming a
+          command run or the docs page a conceptual answer derives from
       - name: structured-lessons
         check: lesson uses the four-section shape
 
@@ -7739,7 +7743,7 @@ tasks:
 
           ## Explain
           A relationship connects two schema nodes. See
-          https://docs.infrahub.app/topics/schema for the model.
+          https://docs.infrahub.app/schema/overview for the model.
 
           ## Exercise
           **Your task:** Add a relationship from TestbedSensor to
@@ -7832,11 +7836,13 @@ tasks:
       A schema lesson anchored to the learner's TestbedSensor and
       TestbedZone nodes rather than invented examples.
     expectations:
-      - The lesson references the learner's actual node kinds
+      - The Explain section names a kind from the learner's own schema
       - No invented generic example displaces the learner's schema
     assertions:
       - name: own-artifacts
-        check: lesson references TestbedSensor and TestbedZone
+        check: >-
+          Explain is anchored to at least one node kind from the learner's
+          own schema file
       - name: structured-lessons
         check: lesson uses the four-section shape
 
@@ -7889,7 +7895,9 @@ tasks:
       - The lesson ends by pointing at the matching sibling skill
     assertions:
       - name: graduation-pointer
-        check: lesson names an infrahub-managing-* or infrahub-analyzing-* skill
+        check: >-
+          lesson names its sibling infrahub-managing-*/analyzing-* skill, or
+          the next concept when the map gives it no graduation skill
       - name: structured-lessons
         check: lesson uses the four-section shape
 
@@ -7950,6 +7958,42 @@ tasks:
       - The Infrahub side still cites docs.infrahub.app
     assertions:
       - name: competitor-mapping
-        check: comparison officially sourced or declared unverified
+        check: comparison declared unverified with matching prose
+      - name: structured-lessons
+        check: lesson uses the four-section shape
+
+  - name: teach-competitor-mapping-sourced
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+
+      Task: I'm coming from NetBox. Here is the page our team works from
+      for config contexts:
+
+          https://docs.netbox.dev/en/stable/features/context-data/
+
+      It says config context data is JSON attached to objects by scope,
+      merged by weight, and rendered onto a device at request time.
+      What's the equivalent way of doing that in Infrahub? Teach me.
+
+      There is no live Infrahub instance reachable from this environment.
+      Deliver the lesson as files: create the learning workspace
+      ./.infrahub-learning/ as the skill's workflow describes and write
+      every artifact the workflow produces there.
+    graders:
+      - type: deterministic
+        run: python graders/teaching-concepts/check_competitor.py
+        weight: 1.0
+    expected_output: >-
+      A lesson whose Explain carries a Comparison source line pointing at
+      the official NetBox docs URL the learner supplied, not the word
+      unverified, plus the usual docs.infrahub.app citation.
+    expectations:
+      - The comparison source is the official docs URL, not "unverified"
+      - The NetBox claim taught matches what that page says
+      - The Infrahub side still cites docs.infrahub.app
+    assertions:
+      - name: competitor-mapping
+        check: comparison sourced from the official competitor docs URL
       - name: structured-lessons
         check: lesson uses the four-section shape

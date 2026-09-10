@@ -41,7 +41,7 @@ teach an ungrounded lesson.
 
     This one is not in my curriculum, so I looked it up in the Infrahub
     docs index. Lesson saved as lessons/webhooks.md, grounded in
-    https://docs.infrahub.app/topics/webhooks.
+    https://docs.infrahub.app/webhooks/overview.
 
 ## Incorrect
 

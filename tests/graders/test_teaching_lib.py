@@ -73,7 +73,7 @@ COMPLIANT_LESSON = """# Lesson: schema relationships
 ## Explain
 A relationship connects two schema nodes. Your `TestbedSensor` node points
 to `TestbedZone`. Cardinality controls how many peers one object can have.
-See https://docs.infrahub.app/topics/schema for the full model.
+See https://docs.infrahub.app/schema/overview for the full model.
 
 ## Exercise
 **Your task:** Add a new relationship from `TestbedSensor` to a
@@ -102,6 +102,8 @@ relationships:
 Ran `python scripts/validate_schema.py sandbox/schema.yml` (in-memory
 Infrahub validator): schema loads cleanly, relationship resolves.
 """
+
+OPEN_LADDER = "## Hint 1\nWhich of your kinds belongs in `peer`?\n"
 
 COMPLIANT_PROGRESS = """| concept | status | last-seen | notes |
 |---|---|---|---|
@@ -173,7 +175,7 @@ def test_structured_lessons_missing_section(tmp_path):
 
 def test_structured_lessons_wrong_order(tmp_path):
     reordered = (
-        "## Explain\nbody https://docs.infrahub.app/topics/schema\n"
+        "## Explain\nbody https://docs.infrahub.app/schema/overview\n"
         "## Probe\n1. q?\n2. q?\n## Exercise\n**Your task:** do it.\n"
         "## Check\nq?\n"
     )
@@ -228,7 +230,7 @@ def test_cite_docs_pass(tmp_path):
 
 def test_cite_docs_missing_link(tmp_path):
     no_link = COMPLIANT_LESSON.replace(
-        "See https://docs.infrahub.app/topics/schema for the full model.", "")
+        "See https://docs.infrahub.app/schema/overview for the full model.", "")
     ws = make_ws(tmp_path, lesson=no_link)
     ok, msg = teaching_lib.CHECKS["cite-docs"](ws)
     assert not ok
@@ -236,9 +238,9 @@ def test_cite_docs_missing_link(tmp_path):
 
 def test_cite_docs_link_outside_explain_does_not_count(tmp_path):
     moved = COMPLIANT_LESSON.replace(
-        "See https://docs.infrahub.app/topics/schema for the full model.", "")
+        "See https://docs.infrahub.app/schema/overview for the full model.", "")
     moved = moved.replace(
-        "## Check", "## Check\nhttps://docs.infrahub.app/topics/schema\n")
+        "## Check", "## Check\nhttps://docs.infrahub.app/schema/overview\n")
     ws = make_ws(tmp_path, lesson=moved)
     ok, msg = teaching_lib.CHECKS["cite-docs"](ws)
     assert not ok
@@ -396,7 +398,7 @@ def test_hint_before_solution_full_ladder_may_reveal_at_rung_three(tmp_path):
 
 
 def test_attempt_not_promoted_pass(tmp_path):
-    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON,
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, hints=OPEN_LADDER,
                  progress=COMPLIANT_PROGRESS)
     ok, msg = teaching_lib.CHECKS["attempt-not-promoted"](ws)
     assert ok, msg
@@ -405,14 +407,16 @@ def test_attempt_not_promoted_pass(tmp_path):
 def test_attempt_not_promoted_promoted_anyway(tmp_path):
     promoted = COMPLIANT_PROGRESS.replace(
         "| schema | introduced |", "| schema | practiced |")
-    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, progress=promoted)
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, hints=OPEN_LADDER,
+                 progress=promoted)
     ok, msg = teaching_lib.CHECKS["attempt-not-promoted"](ws)
     assert not ok
 
 
 def test_attempt_not_promoted_concept_missing(tmp_path):
     only_other = "| concept | status | last-seen | notes |\n|---|---|---|---|\n| menus | practiced | 2026-09-09 | |\n"
-    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, progress=only_other)
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, hints=OPEN_LADDER,
+                 progress=only_other)
     ok, msg = teaching_lib.CHECKS["attempt-not-promoted"](ws)
     assert not ok and "schema" in msg
 
@@ -422,7 +426,7 @@ def test_attempt_not_promoted_follows_the_lesson_not_a_fixed_slug(tmp_path):
     objects_only = ("| concept | status | last-seen | notes |\n|---|---|---|---|\n"
                     "| objects | introduced | 2026-09-10 | exercise in flight |\n")
     ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, progress=objects_only,
-                 concept="objects")
+                 hints=OPEN_LADDER, concept="objects")
     ok, msg = teaching_lib.CHECKS["attempt-not-promoted"](ws)
     assert ok, msg
 
@@ -435,7 +439,7 @@ SANDBOX_LESSON = """# Lesson: proposed changes
 
 ## Explain
 A proposed change is Infrahub's review pipeline.
-See https://docs.infrahub.app/topics/proposed-change for details.
+See https://docs.infrahub.app/proposed-changes/overview for details.
 
 ## Exercise
 This exercise writes to your instance. Shall we create a scratch branch for it?
@@ -529,8 +533,8 @@ def test_sandbox_safety_ui_merge_imperative_step_fails(tmp_path):
 
 def test_sandbox_safety_mutating_command_in_explain_fails(tmp_path):
     stray_explain = SANDBOX_LESSON.replace(
-        "See https://docs.infrahub.app/topics/proposed-change for details.",
-        "See https://docs.infrahub.app/topics/proposed-change for details.\n"
+        "See https://docs.infrahub.app/proposed-changes/overview for details.",
+        "See https://docs.infrahub.app/proposed-changes/overview for details.\n"
         "For example: `infrahubctl object load sandbox/objects.yml`.",
     )
     ws = make_ws(tmp_path, lesson=stray_explain, concept="proposed-changes")
@@ -641,8 +645,8 @@ def test_graduation_pointer_missing(tmp_path):
 OFF_MAP_LESSON = COMPLIANT_LESSON.replace(
     "# Lesson: schema relationships", "# Lesson: webhooks (off-map)"
 ).replace(
-    "https://docs.infrahub.app/topics/schema",
-    "https://docs.infrahub.app/topics/webhooks",
+    "https://docs.infrahub.app/schema/overview",
+    "https://docs.infrahub.app/webhooks/overview",
 )
 
 
@@ -660,7 +664,7 @@ def test_off_map_lesson_rejects_known_slug(tmp_path):
 
 def test_off_map_lesson_needs_docs_citation(tmp_path):
     uncited = OFF_MAP_LESSON.replace(
-        "See https://docs.infrahub.app/topics/webhooks for the full model.", "")
+        "See https://docs.infrahub.app/webhooks/overview for the full model.", "")
     ws = make_ws(tmp_path, lesson=uncited, concept="webhooks")
     ok, msg = teaching_lib.CHECKS["off-map-lesson"](ws)
     assert not ok
@@ -719,7 +723,7 @@ def test_competitor_mapping_blog_source_rejected(tmp_path):
 
 def test_competitor_mapping_infrahub_citation_still_required(tmp_path):
     no_infrahub = _with_comparison(COMPARISON_LINE_SOURCED).replace(
-        "See https://docs.infrahub.app/topics/schema for the full model.", "")
+        "See https://docs.infrahub.app/schema/overview for the full model.", "")
     ws = make_ws(tmp_path, lesson=no_infrahub)
     ok, msg = teaching_lib.CHECKS["competitor-mapping"](ws)
     assert not ok
@@ -742,7 +746,7 @@ VARIANT_LESSON = """Lesson - how attributes behave
 Attributes hold the values on a node. On `TestbedSensor` the `name`
 attribute is unique, so a second sensor cannot reuse it; `TestbedZone`
 declares its own. Read
-[the schema topic](https://docs.infrahub.app/topics/schema#attributes)
+[the schema topic](https://docs.infrahub.app/schema/overview#attributes)
 for the full list of kinds.
 
 Once you are past the basics, `infrahub-analyzing-data` is the skill that
@@ -834,7 +838,7 @@ def test_record_progress_pass_variant(tmp_path):
 
 def test_attempt_not_promoted_pass_variant(tmp_path):
     ws = make_ws(tmp_path, lesson=VARIANT_LESSON, progress=VARIANT_PROGRESS,
-                 concept="objects")
+                 hints=OPEN_LADDER, concept="objects")
     ok, msg = teaching_lib.CHECKS["attempt-not-promoted"](ws)
     assert ok, msg
 
@@ -865,7 +869,7 @@ def test_sandbox_safety_pass_variant(tmp_path):
 
 def test_off_map_lesson_pass_variant(tmp_path):
     variant = VARIANT_LESSON.replace(
-        "https://docs.infrahub.app/topics/schema#attributes",
+        "https://docs.infrahub.app/schema/overview#attributes",
         "https://docs.infrahub.app/topics/api-tokens",
     )
     ws = make_ws(tmp_path, lesson=variant, concept="api-tokens")
@@ -941,7 +945,7 @@ def test_probe_first_second_lesson_violation_fails(tmp_path):
 
 def test_cite_docs_second_lesson_violation_fails(tmp_path):
     ws = _two_lessons(tmp_path, COMPLIANT_LESSON.replace(
-        "See https://docs.infrahub.app/topics/schema for the full model.", ""))
+        "See https://docs.infrahub.app/schema/overview for the full model.", ""))
     ok, msg = teaching_lib.CHECKS["cite-docs"](ws)
     assert not ok and "transforms.md" in msg
 
@@ -1034,3 +1038,215 @@ Ran `infrahubctl transform sensor_export`: rendered without error.
                  hints=spoiler, concept="transforms")
     ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
     assert not ok and "transforms.md" in msg
+
+
+# --- Verification evidence has two accepted forms -------------------------
+# references/exercise-verification.md defines a conceptual tier whose
+# evidence is the cited docs page, which never carries a backtick.
+
+def test_verified_solution_accepts_a_conceptual_citation(tmp_path):
+    conceptual = COMPLIANT_SOLUTION.split("## Verification")[0] + (
+        "## Verification\nThe answer derives from\n"
+        "https://docs.infrahub.app/branches/overview, which states a diff\n"
+        "shows only the edits made on that branch.\n"
+    )
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, solution=conceptual)
+    ok, msg = teaching_lib.CHECKS["verified-solution"](ws)
+    assert ok, msg
+
+
+def test_verified_solution_rejects_evidence_free_prose(tmp_path):
+    bare = COMPLIANT_SOLUTION.split("## Verification")[0] + (
+        "## Verification\nI worked through it and it comes out right.\n"
+    )
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, solution=bare)
+    ok, msg = teaching_lib.CHECKS["verified-solution"](ws)
+    assert not ok and "command" in msg
+
+
+# --- Read-only lessons are the default, not a safety violation ------------
+
+READ_ONLY_LESSON = """# Lesson: branches
+
+## Probe
+1. Have you worked with git branches before?
+2. What do you expect a diff between two branches to show?
+
+## Explain
+A branch isolates your edits until they are reviewed. Your
+`TestbedSensor` rows on main stay untouched while you work.
+See https://docs.infrahub.app/branches/overview for the model.
+
+## Exercise
+**Your task:** Diff two branches of your own data and tell me which
+rows differ and why.
+
+## Check
+1. Why did the diff show only one side's edits?
+
+Next on the map once this lands: the objects concept.
+"""
+
+
+def test_sandbox_safety_read_only_lesson_passes(tmp_path):
+    ws = make_ws(tmp_path, lesson=READ_ONLY_LESSON, concept="branches")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert ok, msg
+
+
+def test_sandbox_safety_quoted_warning_is_not_a_violation(tmp_path):
+    """A lesson teaching the rule quotes the rule's own Incorrect block."""
+    warned = READ_ONLY_LESSON.replace(
+        "## Check",
+        "Never run `infrahubctl object load data.yml` against the default\n"
+        "branch: it writes straight to production.\n\n## Check",
+    )
+    ws = make_ws(tmp_path, lesson=warned, concept="branches")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert ok, msg
+
+
+def test_sandbox_safety_unbranched_write_still_fails(tmp_path):
+    writing = READ_ONLY_LESSON.replace(
+        "## Check", "1. `infrahubctl object load data.yml`\n\n## Check")
+    ws = make_ws(tmp_path, lesson=writing, concept="branches")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert not ok and "mutating" in msg
+
+
+def test_sandbox_safety_branched_write_still_needs_consent_and_cleanup(tmp_path):
+    no_cleanup = SANDBOX_LESSON.replace(
+        "4. Clean up: `infrahubctl branch delete learning-pc-demo`\n", "")
+    ws = make_ws(tmp_path, lesson=no_cleanup, concept="proposed-changes")
+    ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+    assert not ok and "cleanup" in msg
+
+
+# --- Graduation: four concepts have no sibling skill ----------------------
+
+def test_graduation_pointer_next_concept_when_the_map_says_none(tmp_path):
+    ws = make_ws(tmp_path, lesson=READ_ONLY_LESSON, concept="branches")
+    ok, msg = teaching_lib.CHECKS["graduation-pointer"](ws)
+    assert ok, msg
+
+
+def test_graduation_pointer_dead_end_close_fails(tmp_path):
+    dead_end = READ_ONLY_LESSON.replace(
+        "\nNext on the map once this lands: the objects concept.\n", "")
+    ws = make_ws(tmp_path, lesson=dead_end, concept="branches")
+    ok, msg = teaching_lib.CHECKS["graduation-pointer"](ws)
+    assert not ok and "next concept" in msg
+
+
+def test_graduation_pointer_skill_still_required_where_one_exists(tmp_path):
+    """'schema' has a graduation skill on the map; a concept name is not it."""
+    ws = make_ws(tmp_path, lesson=READ_ONLY_LESSON, concept="schema")
+    ok, msg = teaching_lib.CHECKS["graduation-pointer"](ws)
+    assert not ok and "infrahub-managing" in msg
+
+
+def test_concept_rows_reads_the_graduation_column(tmp_path):
+    rows = teaching_lib.concept_rows()
+    assert rows["schema"]["graduation"] == "infrahub-managing-schemas"
+    assert {s for s, r in rows.items() if r["graduation"] == "none"} == {
+        "foundations", "branches", "repo-integration", "proposed-changes"}
+    assert all(r["doc_anchor"] for r in rows.values())
+
+
+# --- own-artifacts matches the rule's scope: Explain, at least one kind ---
+
+BIG_SCHEMA = """version: "1.0"
+nodes:
+  - name: Sensor
+    namespace: Testbed
+  - name: Zone
+    namespace: Testbed
+  - name: Rack
+    namespace: Testbed
+  - name: Site
+    namespace: Testbed
+"""
+
+
+def test_own_artifacts_one_anchored_kind_is_enough(tmp_path):
+    """A real repo has more kinds than any one lesson can name."""
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, schema=BIG_SCHEMA)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert ok, msg
+
+
+def test_own_artifacts_kind_outside_explain_does_not_anchor(tmp_path):
+    exercise_only = COMPLIANT_LESSON.replace(
+        "A relationship connects two schema nodes. Your `TestbedSensor` node points\n"
+        "to `TestbedZone`. Cardinality controls how many peers one object can have.",
+        "A relationship connects two nodes. Cardinality controls how many\n"
+        "peers one object can have.",
+    )
+    ws = make_ws(tmp_path, lesson=exercise_only)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert not ok and "Explain" in msg
+
+
+# --- unverified is two halves: the marker and the admission ---------------
+
+def test_competitor_mapping_bare_unverified_marker_fails(tmp_path):
+    bare = (
+        "In NetBox, config contexts attach JSON data to devices by scope.\n"
+        "**Comparison source:** unverified\n"
+    )
+    ws = make_ws(tmp_path, lesson=_with_comparison(bare))
+    ok, msg = teaching_lib.CHECKS["competitor-mapping"](ws)
+    assert not ok and "unverified" in msg
+
+
+# --- '##' inside a fence is not a heading ---------------------------------
+
+FENCED_FORMAT_LESSON = COMPLIANT_LESSON.replace(
+    "## Explain\n",
+    "## Explain\nEvery lesson I write has this shape:\n\n"
+    "```markdown\n## Probe\n## Explain\n## Exercise\n## Check\n```\n\n",
+)
+
+
+def test_headings_ignore_fenced_blocks():
+    assert teaching_lib.headings(FENCED_FORMAT_LESSON) == [
+        "Probe", "Explain", "Exercise", "Check"]
+
+
+def test_cite_docs_survives_a_fenced_format_snippet(tmp_path):
+    ws = make_ws(tmp_path, lesson=FENCED_FORMAT_LESSON)
+    ok, msg = teaching_lib.CHECKS["cite-docs"](ws)
+    assert ok, msg
+
+
+def test_structured_lessons_survives_a_fenced_format_snippet(tmp_path):
+    ws = make_ws(tmp_path, lesson=FENCED_FORMAT_LESSON)
+    ok, msg = teaching_lib.CHECKS["structured-lessons"](ws)
+    assert ok, msg
+
+
+# --- the leak guard needs a block big enough to be the answer -------------
+
+def test_learner_authors_short_fragment_is_not_a_leak(tmp_path):
+    short_solution = (
+        "# Solution: attributes\n\n## Solution\n```yaml\nkind: Text\n```\n\n"
+        "## Verification\nRan `infrahubctl schema check schemas/testbed.yml`: "
+        "loads cleanly.\n"
+    )
+    lesson = COMPLIANT_LESSON.replace(
+        "## Exercise",
+        "An attribute is declared like `kind: Text`.\n\n## Exercise")
+    ws = make_ws(tmp_path, lesson=lesson, solution=short_solution)
+    ok, msg = teaching_lib.CHECKS["learner-authors"](ws)
+    assert ok, msg
+
+
+def test_learner_authors_multiline_leak_still_caught(tmp_path):
+    leaked = COMPLIANT_LESSON.replace(
+        "## Check",
+        "```yaml\nrelationships:\n  - name: rack\n    peer: TestbedRack\n"
+        "    cardinality: one\n    kind: Attribute\n```\n\n## Check",
+    )
+    ws = make_ws(tmp_path, lesson=leaked, solution=COMPLIANT_SOLUTION)
+    ok, msg = teaching_lib.CHECKS["learner-authors"](ws)
+    assert not ok and "leaks" in msg

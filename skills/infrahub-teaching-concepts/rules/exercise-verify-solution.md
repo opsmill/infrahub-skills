@@ -42,7 +42,12 @@ can verify. Never show the solution file unless the hint ladder ends.
     ```
 
     ## Verification
-    Ran the offline schema validator: loads cleanly.
+    Ran `infrahubctl schema check schemas/campus.yml`: loads cleanly,
+    the relationship resolves.
+
+For a conceptual exercise there is no artifact to run anything against,
+so the cited docs page is the evidence: record the
+`https://docs.infrahub.app/...` URL the answer derives from.
 
 ## Incorrect
 
