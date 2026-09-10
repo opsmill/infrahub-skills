@@ -654,6 +654,45 @@ def _safe(name: str) -> str:
 # --------------------------------------------------------------------------
 
 
+def _only_in_use(objects: list[Any], *, is_module: bool) -> tuple[list[Any], int]:
+    """Keep the types that are actually used, and count the undecidable ones.
+
+    A record whose count is *absent* is kept rather than dropped. Treating a
+    missing field as zero would silently export nothing against any NetBox
+    that does not report the count, which is the same silent-empty-export
+    failure a wrong ``--url`` used to cause.
+
+    Args:
+        objects: Device or module types from NetBox.
+        is_module: Whether these are module types.
+
+    Returns:
+        ``(kept, undecidable)``.
+    """
+    counter = "module_count" if is_module else "device_count"
+    kept: list[Any] = []
+    undecidable = 0
+    for obj in objects:
+        count = field(obj, counter)
+        if count is None:
+            undecidable += 1
+            kept.append(obj)
+        elif count > 0:
+            kept.append(obj)
+    return kept, undecidable
+
+
+def _identity(obj: Any) -> tuple[str, str, str]:
+    """A stable sort key for one device or module type.
+
+    Sorts on the name a record competes for, then on its full identity, so
+    the ordering does not change when NetBox reorders its results.
+    """
+    manufacturer = str(unwrap(field(obj, "manufacturer")) or "")
+    stem = str(field(obj, "slug") or field(obj, "model") or "")
+    return (manufacturer, stem.replace("/", "-").replace(" ", "-"), stem)
+
+
 def _expected_stem(document: dict[str, Any]) -> str:
     """The file stem a document would get if nothing else had claimed it."""
     stem = str(document.get("slug") or document.get("model") or "unnamed")
@@ -729,13 +768,25 @@ def export(
         # device-type slug filter here would abort the whole export.
         applicable = {k: v for k, v in filters.items() if not (is_module and k == "slug")}
         objects = list(source.records(endpoint, **applicable))
-        if in_use and not is_module:
-            objects = [o for o in objects if (field(o, "device_count") or 0) > 0]
+        if in_use:
+            objects, unknown = _only_in_use(objects, is_module=is_module)
+            if unknown:
+                notes.append(
+                    f"{endpoint}: {unknown} record(s) kept because this NetBox did not "
+                    "report a usage count — --in-use could not judge them"
+                )
         if not objects:
             continue
 
         ids = [field(o, "id") for o in objects if field(o, "id") is not None]
         components = fetch_components(source, ids, is_module=is_module)
+
+        # Sort before writing so collision suffixes are deterministic. Two
+        # records whose names collide only after sanitising are assigned
+        # `-2` by arrival order otherwise, which swaps their contents between
+        # runs whenever NetBox returns them in a different order — a spurious
+        # diff, and unstable identities for anything built on the filenames.
+        objects.sort(key=_identity)
 
         for obj in objects:
             owned = components.get(field(obj, "id")) or {}
@@ -793,7 +844,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--in-use",
         action="store_true",
-        help="Only device types with at least one device, which is usually what you want.",
+        help="Only types that are in use — device types with at least one device, and "
+        "module types with at least one module. Usually what you want.",
     )
     parser.add_argument(
         "--module-types", action="store_true", help="Also export module types."

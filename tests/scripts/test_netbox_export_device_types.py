@@ -892,3 +892,72 @@ def test_the_configured_timeout_reaches_the_session():
         pass
     seen = captured[0] if captured else {}
     assert seen.get("timeout") == 7.5
+
+
+# ---------------------------------------------------------------------------
+# Findings from reviewing the previous round of fixes
+# ---------------------------------------------------------------------------
+
+
+def test_collision_suffixes_do_not_depend_on_arrival_order(tmp_path):
+    """Otherwise the two files swap contents whenever NetBox reorders."""
+    a = {"id": 1, "manufacturer": {"name": "J"}, "model": "EX9200 32XS", "part_number": "AAA"}
+    b = {"id": 2, "manufacturer": {"name": "J"}, "model": "EX9200-32XS", "part_number": "BBB"}
+
+    results = []
+    for order in ([a, b], [b, a]):
+        out = tmp_path / f"run{len(results)}"
+        export(
+            FakeSource({"dcim.module_types": order}),
+            out,
+            filters={},
+            in_use=False,
+            include_modules=True,
+        )
+        results.append(
+            {p.name: yaml.safe_load(p.read_text())["part_number"] for p in out.rglob("*.yaml")}
+        )
+
+    assert results[0] == results[1], "file identity must not depend on NetBox's ordering"
+
+
+def test_in_use_filters_module_types_too(tmp_path):
+    mods = [
+        {"id": 1, "manufacturer": {"name": "J"}, "model": "UNUSED", "module_count": 0},
+        {"id": 2, "manufacturer": {"name": "J"}, "model": "USED", "module_count": 4},
+    ]
+
+    written, _ = export(
+        FakeSource({"dcim.module_types": mods}),
+        tmp_path,
+        filters={},
+        in_use=True,
+        include_modules=True,
+    )
+
+    assert [p.stem for p in written] == ["USED"]
+
+
+def test_in_use_keeps_records_whose_count_is_absent(tmp_path):
+    """Treating a missing count as zero exported nothing, silently."""
+    dts = [
+        {
+            "id": 1,
+            "manufacturer": {"name": "A"},
+            "model": "M",
+            "slug": "m",
+            "u_height": 1,
+            "is_full_depth": True,
+        }
+    ]
+
+    written, notes = export(
+        FakeSource({"dcim.device_types": dts}),
+        tmp_path,
+        filters={},
+        in_use=True,
+        include_modules=False,
+    )
+
+    assert len(written) == 1
+    assert any("could not judge" in note for note in notes)
