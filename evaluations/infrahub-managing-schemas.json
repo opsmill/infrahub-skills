@@ -484,7 +484,7 @@
         },
         {
           "name": "corrects-builtin-core-premise",
-          "check": "Comments name all four Builtin kinds and state the reused kind is not platform core"
+          "check": "Comments say what the Builtin namespace holds -- naming the four kinds or describing the set -- and state the reused kind is not platform core"
         },
         {
           "name": "names-kind-verification-command",

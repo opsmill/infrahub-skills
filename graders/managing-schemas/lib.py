@@ -1358,7 +1358,15 @@ def check_records_subset_rationale(
     if not blocks:
         return False, "no `infrahubctl marketplace get` provenance comment recorded"
 
-    text = "\n".join(blocks)
+    # The rationale is read across the whole comment header, not just the run
+    # carrying the `marketplace get` line. The canonical header in
+    # reuse-evaluate-per-generic.md separates its paragraphs with bare `#`
+    # lines, which `_comment_runs` treats as run boundaries, so `Taken:` and
+    # `Excluded:` land in a different run from the command and per-run scoping
+    # failed the rule's own documented example. Per-run scoping stays where it
+    # is load-bearing: binding a kind to the command that vouches for it, in
+    # check_external_kinds_are_core_or_sourced.
+    text = "\n".join(_comment_runs(raw_text))
     taken = re.search(r"\b(taken|adopted|reused|kept|using only|only the)\b", text, re.I)
     excluded = re.search(
         r"\b(excluded|omitted|left out|not taken|dropped|skipped|rejected)\b", text, re.I

@@ -218,10 +218,11 @@ generics:
         cardinality: many
         order_weight: 3000
 
-# `LocationGeneric` below is the schema-library location
-# generic, published on the marketplace, not a platform kind.
-# Verify it or substitute your own; see
-# rules/reuse-verify-kind-availability.md.
+# `LocationGeneric` below is the generic declared above in
+# this same file, not a platform kind -- Infrahub core ships
+# no location kind. To reuse the marketplace location schema
+# instead of declaring your own, confirm its tier and record
+# its provenance; see rules/reuse-verify-kind-availability.md.
 nodes:
   - name: Region
     namespace: Location

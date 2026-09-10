@@ -118,13 +118,15 @@ That is fine, and often the right answer. It is a
 
    The command above takes the latest published version,
    so if you did not pass `-v`, record the date instead
-   of inventing a version number:
+   of inventing a version number. Same fields as the full
+   form, with the date standing in for the version, and
+   keep the two on one line so the pairing is unambiguous:
 
 ```yaml
-# Sourced from the marketplace:
-#   infrahubctl marketplace get infrahub/location -v 1.4.0
-# Provides: LocationGeneric, LocationSite.
-# Excluded: nothing, the whole file was taken.
+# Vendored from marketplace `infrahub/location`, latest as at 2026-08-31:
+#   infrahubctl marketplace get infrahub/location
+# Taken: the whole file -- LocationGeneric and LocationSite.
+# Excluded: nothing.
 # Committed under schemas/vendor/ and loaded before this file.
 ```
 

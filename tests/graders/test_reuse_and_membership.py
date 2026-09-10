@@ -192,3 +192,53 @@ def test_denying_that_a_builtin_kind_is_core_does_not_pass():
         "# BuiltinTag is not core."
     )
     assert not ok
+
+
+# --- the subset rationale, over the canonical provenance header -----------
+#
+# `records-subset-rationale` had no coverage, and per-run scoping made it
+# fail the very header reuse-evaluate-per-generic.md publishes as "the one
+# provenance format": the bare `#` separators split `Taken:`/`Excluded:`
+# away from the `marketplace get` line.
+
+
+def _rationale(text):
+    return _mod.CHECKS["records-subset-rationale"](schema={}, raw_text=text)
+
+
+CANONICAL_HEADER = (
+    "# Vendored from marketplace `infrahub/optical-transport`, version 1.4.0,\n"
+    "# fetched 2026-08-31 with:\n"
+    "#   infrahubctl marketplace get infrahub/optical-transport -v 1.4.0\n"
+    "#\n"
+    "# Taken: the OpticalEndpoint generic only.\n"
+    "# Excluded: the TransportDevice generic, whose `chassis` and `linecard`\n"
+    "#   peers pull in a second device/interface hierarchy that competes with\n"
+    "#   the DcimDevice tree this repository already has.\n"
+    "#\n"
+    "# Re-check on upgrade: if upstream changes OpticalEndpoint, reconcile by\n"
+    "# hand. This copy is no longer refreshed by `marketplace get`.\n"
+    'version: "1.0"\n'
+)
+
+
+def test_the_rules_own_canonical_header_passes():
+    ok, msg = _rationale(CANONICAL_HEADER)
+    assert ok, msg
+
+
+def test_provenance_without_an_exclusion_reason_fails():
+    ok, _ = _rationale(
+        "# Vendored from marketplace `infrahub/optical-transport`:\n"
+        "#   infrahubctl marketplace get infrahub/optical-transport -v 1.4.0\n"
+        "# Taken: the OpticalEndpoint generic.\n"
+    )
+    assert not ok
+
+
+def test_rationale_without_any_provenance_fails():
+    ok, _ = _rationale(
+        "# Taken: the OpticalEndpoint generic only.\n"
+        "# Excluded: the TransportDevice generic, too expensive.\n"
+    )
+    assert not ok
