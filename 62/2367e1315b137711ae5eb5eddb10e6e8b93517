@@ -1,0 +1,21 @@
+eval.yaml
+  s_3f195c84a32332::t_2cb394e581446b 1642-1643
+evaluations/infrahub-managing-generators.json
+  s_3f195c84a32332::t_f74dc4e049489e 113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "622367e1315b137711ae5eb5eddb10e6e8b93517",
+  "prompts": {},
+  "sessions": {
+    "s_3f195c84a32332": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2b71a8fc-a04f-434f-8c92-25e58441c494",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
