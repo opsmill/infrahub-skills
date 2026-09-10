@@ -1,0 +1,20 @@
+skills/infrahub-managing-generators/rules/patterns-path-traversal.md
+  s_fe99a41d5e7f9e::t_edbccec9f17157 129-134
+  s_fe99a41d5e7f9e::t_e6ff1971f5c0f9 42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "984844c6ec414e8ecd149b9c5f2670e166160e96",
+  "prompts": {},
+  "sessions": {
+    "s_fe99a41d5e7f9e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f610d975-3725-4fda-8281-a3570da3554a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
