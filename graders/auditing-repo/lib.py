@@ -289,14 +289,21 @@ _GENERIC_DESTINATION = r"(?:(?:the|a|an)\s+)?(?:[\w-]+\s+){0,2}generics?\b"
 # relationship in the next, which is the recommendation the rule forbids.
 _REPLACEMENT_DISQUALIFIERS: dict[str, list[re.Pattern[str]]] = {
     "paired-relationship-stays-put": [
+        # The verb stems are matched with a trailing `\w*`, not `\b`: bare
+        # stems let every inflected form of the same recommendation through.
+        # "Moving the device relationship onto the DcimPort generic" and
+        # "The audit moves it onto the generic" are the same antipattern as
+        # "Move it onto the generic".
         re.compile(
-            r"\b(?:hoist|move|lift|extract|pull|put|place|keep|leave)\b"
+            r"\b(?:hoist|mov|lift|extract|pull|put|plac|keep|leav)\w*"
             r"[^.\n]{0,60}\brelationships?\b[^.\n]{0,40}"
             r"\b(?:on|onto|to|into|up to)\s+" + _GENERIC_DESTINATION,
             re.IGNORECASE,
         ),
+        # The nominalised form names no verb at all: "a generic holding the
+        # six attributes plus the device relationship".
         re.compile(
-            r"\bgeneric\b[^.\n]{0,60}\b(?:with|including|and)\b[^.\n]{0,40}"
+            r"\bgeneric\b[^.\n]{0,60}\b(?:with|including|and|plus)\b[^.\n]{0,40}"
             r"\brelationships?\b",
             re.IGNORECASE,
         ),
@@ -313,6 +320,21 @@ _REPLACEMENT_DISQUALIFIERS: dict[str, list[re.Pattern[str]]] = {
         ),
     ],
 }
+
+
+# A clause that gives the relationship a concrete-kind home is the correct
+# recommendation, however the generic is named earlier in the same clause.
+# Without this, the eval's own expected replacement -- "Extract a `DcimPort`
+# generic with the six attributes and leave the `device` relationship on the
+# concrete kinds" -- was graded as the antipattern, because a disqualifier
+# bound `generic` to `relationship` through the coordinator and never looked
+# at where the relationship was actually being put.
+_CONCRETE_DESTINATION = re.compile(
+    r"\brelationships?\b[^.\n]{0,60}\b(?:on|onto|to|with)\b[^.\n]{0,30}"
+    r"\b(?:concrete|node|each|every|per-kind|implementer|individual|specific|"
+    r"sibling)\b",
+    re.IGNORECASE,
+)
 
 
 # A disqualifier has to match inside one clause. Spanning a comma or a
@@ -374,6 +396,8 @@ def check_yagni_finding_replacement_mentions(
     )
     for sentence in re.split(r"(?<=[.;:])\s+|\n", text):
         for offset, clause in _clauses(sentence):
+            if _CONCRETE_DESTINATION.search(clause):
+                continue  # this clause puts the relationship on the kinds
             for bad in _REPLACEMENT_DISQUALIFIERS.get(group, []):
                 hit = bad.search(clause)
                 if not hit:

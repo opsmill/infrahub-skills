@@ -72,6 +72,24 @@ HOISTS_THE_RELATIONSHIP = [
         "onto the generic. The peer is frozen.",
         id="alternative-cue-governs-only-its-own-clause",
     ),
+    # An inflected verb is the same recommendation. Matching bare stems with
+    # `\b` let every -ing / -s form of the antipattern score 1.0.
+    pytest.param(
+        "Moving the device relationship onto the DcimPort generic removes "
+        "the duplication. The peer is frozen for every implementer.",
+        id="gerund-verb",
+    ),
+    pytest.param(
+        "The audit moves the device relationship onto the DcimPort generic. "
+        "Its peer becomes frozen.",
+        id="third-person-verb",
+    ),
+    # No verb at all: the destination is a noun phrase.
+    pytest.param(
+        "Recommended replacement: a DcimPort generic holding the six "
+        "attributes plus the device relationship. The peer is frozen.",
+        id="nominalised-destination",
+    ),
 ]
 
 
@@ -117,6 +135,21 @@ DISCLOSES_THE_COST = [
         "Keep the device relationship on the concrete kinds, not the generic, "
         "because the peer is locked once it is on a generic.",
         id="contrast-with-the-generic",
+    ),
+    # eval.yaml's own expected replacement, in one clause. A disqualifier
+    # bound `generic` to `relationship` through the coordinator and read this
+    # as a hoist, so the answer the task asks for scored 0.8.
+    pytest.param(
+        "Extract a `DcimPort` generic with the six attributes and leave the "
+        "device relationship on the concrete kinds; a relationship hoisted "
+        "onto a generic has its peer frozen there.",
+        id="eval-expected-wording-one-clause",
+    ),
+    pytest.param(
+        "Extract a `DcimPort` generic with the six attributes and keep the "
+        "device relationship on each concrete kind. A hoisted relationship "
+        "has its peer frozen.",
+        id="eval-expected-wording-keep-variant",
     ),
 ]
 
