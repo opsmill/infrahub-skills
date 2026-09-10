@@ -114,6 +114,13 @@ So for the six string types — including
 string.** Build the markup or the text yourself and
 return it.
 
+`bytes` fails the same silent way a `dict` does: it is
+not special-cased either, so it lands in the body as
+`b'<svg ...'`. If you build the document with
+`xml.etree`, serialise it with
+`ET.tostring(root, encoding="unicode")` — without that
+argument `tostring` hands back `bytes`.
+
 Related:
 [../reference.md](../reference.md) summarises which
 content types suit each return type; this rule is the
