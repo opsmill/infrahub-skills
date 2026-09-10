@@ -1333,11 +1333,10 @@ tasks:
       Read the skill at .agents/skills/infrahub-managing-transforms/SKILL.md and
       follow its workflow and rules.
 
-      Task: Two things are wrong with our artifacts. Every artifact in the repo
-      re-renders on every commit, even for changes that have nothing to do with
-      it. And last week we edited src/my_package/formatting.py and the device
-      config artifact kept its old content until someone touched the transform
-      itself. Fix the transform registration in `.infrahub.yml`.
+      Task: I am not confident our transform registrations in
+      `.infrahub.yml` are right for artifact regeneration — I do not
+      think they reflect what these transforms actually depend on.
+      Review them against the code below and fix the registration.
 
       Repository layout:
 
