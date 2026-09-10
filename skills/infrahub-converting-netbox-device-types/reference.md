@@ -111,7 +111,7 @@ absent and false are different things.
 
 ### What it reports
 
-Two classes of note, on the same principle as the
+Four classes of note, on the same principle as the
 converter's coverage report:
 
 - **NetBox holds it, the library format has no field**
@@ -120,6 +120,13 @@ converter's coverage report:
   it** — a power port with no `type` is valid in NetBox
   and invalid in the library. The file is still
   written; the note says which entries and how many.
+- **The endpoint is absent from this NetBox** — component
+  endpoints come and go across versions, so the list is
+  skipped rather than the export failing.
+- **Two records collided on one file name** — sanitising
+  can collapse names NetBox considers distinct, so the
+  second is written alongside the first with a numeric
+  suffix rather than over it.
 
 ## Infrahub object templates
 
