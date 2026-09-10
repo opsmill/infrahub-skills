@@ -721,3 +721,44 @@ def test_body_ready_ignores_binding_from_another_function():
     ) + _helper(UNFILTERED, "len(artifacts) >= expected_count")
     ok, _ = _body_ready(src)
     assert not ok
+
+
+# -- check_watch_no_third_party --------------------------------------------
+
+check_watch_no_third_party = _mod.check_watch_no_third_party
+
+
+def _manifest(watch):
+    return {
+        "python_transforms": [
+            {
+                "name": "device_config",
+                "file_path": "transforms/device_config.py",
+                "watch": watch,
+            }
+        ]
+    }
+
+
+def test_watch_no_third_party_passes_on_first_party_paths():
+    ok, _ = check_watch_no_third_party(
+        yml_doc=_manifest({"files": ["transforms/device_config_query.py"]})
+    )
+    assert ok is True
+
+
+def test_watch_no_third_party_fails_on_installed_package():
+    ok, detail = check_watch_no_third_party(
+        yml_doc=_manifest(
+            {"files": ["transforms/device_config_query.py", "infrahub_sdk"]}
+        )
+    )
+    assert ok is False
+    assert "infrahub_sdk" in detail
+
+
+def test_watch_no_third_party_sees_through_the_bare_list_form():
+    # watch_files() returns None for the bare-list form Infrahub rejects at
+    # import, so a check reading it would let this through unexamined.
+    ok, _ = check_watch_no_third_party(yml_doc=_manifest(["infrahub_sdk"]))
+    assert ok is False
