@@ -227,10 +227,15 @@ python scripts/netbox_export_device_types.py \
 
 `--in-use` keeps only device types with at least one
 device, which on a real instance is a much smaller and
-more relevant set than the whole catalogue. It reports
-anything NetBox holds that the library format has no
-field for, and anything NetBox left unset that the
-library format requires.
+more relevant set than the whole catalogue.
+
+It reports anything that did not come across cleanly:
+fields NetBox holds that the library format cannot
+carry, fields NetBox left unset that the library format
+requires, endpoints absent from that NetBox version, and
+file names that collided after sanitising. Read that
+list before converting, the same way you read the
+conversion coverage report before loading.
 
 This is a one-way snapshot into files, not a sync.
 Continuous replication is
