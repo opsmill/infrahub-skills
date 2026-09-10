@@ -43,7 +43,7 @@ python_transforms:
     convert_query_response: true
     watch:                      # Always declare — see `watch` below
       files:
-        - shared/helpers.py     # [] if nothing outside the dir
+        - shared/helpers.py     # [] only if nothing is imported
 
 # Jinja2 transforms (template-based text rendering)
 jinja2_transforms:
@@ -79,7 +79,7 @@ generator_definitions:
     execute_after_merge: true
     watch:                      # Always declare — see `watch` below
       files:
-        - src/my_package/       # [] if nothing outside the dir
+        - src/my_package/       # [] only if nothing is imported
 ```
 
 ## Loading Order
@@ -338,10 +338,13 @@ generator_definitions:
     class_name: DCTopologyGenerator
     parameters:
       name: name__value
-    # Self-contained, but the key is still present: without it
-    # the generator re-runs on every commit.
+    # Imports .common and the generated .schema_protocols;
+    # both are first-party files, and imports are never
+    # followed, so both are declared.
     watch:
-      files: []
+      files:
+        - generators/common.py
+        - generators/schema_protocols.py
 
 queries:
   - name: topology_dc
