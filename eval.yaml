@@ -1639,8 +1639,8 @@ tasks:
 
       Save the generator, the object-data snippet, and your explanation to:
       output.md
-      Put the generator in a ```python fence and the object data in a
-      ```yaml fence.
+      Put the generator in a ```python fence and the object data
+      in a ```yaml fence.
     graders:
       - type: deterministic
         run: python graders/managing-generators/check_traversal_and_ownership.py
