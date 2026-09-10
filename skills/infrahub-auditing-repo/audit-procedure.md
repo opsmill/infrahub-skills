@@ -4,6 +4,25 @@ This document defines the step-by-step audit procedure.
 When running an audit, follow each phase in order and
 collect findings into a structured report.
 
+## Phase 0: The audit is read-only (CRITICAL)
+
+Read
+[rules/audit-is-read-only.md](./rules/audit-is-read-only.md)
+before Phase 1. It is not a phase you walk; it is the
+constraint every phase runs under.
+
+In one line: **do not write to the working tree or the
+index, and do not run a git command that would.** The
+report file (`AUDIT_REPORT.md`) is the only file this
+audit creates.
+
+That line is not enough to act on. Which git verbs are
+forbidden, which read another revision without touching
+the tree, what to do about a script whose `--check`
+flag may write, and how to report a tree you have
+already dirtied are all in the rule, and none of them
+are restated here. Open it.
+
 ## Phase 1: Project Structure (CRITICAL)
 
 ### 1.1 Check `.infrahub.yml` exists
@@ -333,6 +352,29 @@ convention).
 - `delete_unused_nodes=True` for generator cleanup
 - Shared utility functions in common.py when patterns
   repeat
+
+### 7.4 Dependency declarations (`watch`)
+
+- Every `python_transforms` and `generator_definitions`
+  entry carries a `watch` key — absent, the commit id is
+  folded into its fingerprint and it re-renders or re-runs
+  on every commit
+- `watch.files` names every first-party import and every
+  file read at runtime, siblings included (imports are
+  never followed)
+- Every entry resolves to a Git-tracked file
+  (`git ls-files -- <entry>`); one that does not still
+  counts as a declaration
+- `watch` never on `check_definitions` or
+  `artifact_definitions` — the models reject it and the
+  whole repository import fails
+- `jinja2_transforms` flagged only where a computed
+  include leaves the closure incomplete
+- Confirm the version under audit accepts the key before
+  proposing it, and say how
+
+See
+[rules/practices-watch-dependencies.md](./rules/practices-watch-dependencies.md).
 
 ---
 

@@ -1126,6 +1126,302 @@ def check_decomposition(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Process / conversation checks
+# ---------------------------------------------------------------------------
+#
+# These seven tasks answer in prose rather than object YAML, so each writes
+# its answer to ``output_dir/answer.md``. Grading prose is where a check most
+# easily degenerates into keyword matching, so every check below asserts
+# something structural instead:
+#
+#   - relative ORDER of items in a sequence (a wrong order fails even when
+#     every term is present),
+#   - a parsed command line and its flags (shlex, not string search),
+#   - the EXISTENCE of a referenced repo file (a hallucinated name fails),
+#   - the ABSENCE of emitted YAML where the rule is "do not write yet",
+#   - a parsed data structure for the profile task.
+#
+# Where a bare term does have to be found, it is a specific derived fact the
+# task cannot reach without doing the work (the source row number), not a
+# vocabulary word.
+
+
+def load_answer(output_dir: Path) -> str:
+    """Return the prose answer the task was told to save, lowercased.
+
+    Accepts ``answer.md`` or, failing that, any single ``.md`` in the
+    directory, so a model that named the file sensibly is not punished.
+    """
+    d = Path(output_dir)
+    candidate = d / "answer.md"
+    if candidate.is_file():
+        return candidate.read_text(encoding="utf-8", errors="replace").lower()
+    if d.is_dir():
+        mds = sorted(x for x in d.glob("*.md") if x.is_file())
+        if len(mds) == 1:
+            return mds[0].read_text(encoding="utf-8", errors="replace").lower()
+    return ""
+
+
+def _order_ok(text: str, sequence: list[list[str]]) -> tuple[bool, list]:
+    """Check that each stage's first occurrence precedes the next stage's.
+
+    ``sequence`` is a list of stages; a stage is a list of synonyms, any of
+    which identifies it. Returns ``(ok, positions)`` where a position is
+    ``None`` when the stage is absent.
+    """
+    positions = []
+    for synonyms in sequence:
+        hits = [text.find(s) for s in synonyms if text.find(s) != -1]
+        positions.append(min(hits) if hits else None)
+    if any(p is None for p in positions):
+        return False, positions
+    return all(a < b for a, b in zip(positions, positions[1:])), positions
+
+
+def _infrahubctl_commands(text: str) -> list[list[str]]:
+    """Return every ``infrahubctl ...`` invocation, tokenized with shlex.
+
+    Splitting on shlex rather than whitespace keeps a quoted branch name in
+    one token, so a flag's argument cannot be mistaken for the next flag.
+    """
+    import shlex
+
+    out = []
+    for raw in text.splitlines():
+        line = raw.strip().lstrip("$").strip().strip("`")
+        idx = line.find("infrahubctl")
+        if idx == -1:
+            continue
+        try:
+            out.append(shlex.split(line[idx:]))
+        except ValueError:
+            out.append(line[idx:].split())
+    return out
+
+
+def check_introspection_priority_order(
+    parsed_files: dict[Path, list[dict]], output_dir: Path = Path("output_dir"), **_: Any
+) -> tuple[bool, str]:
+    """The four schema sources must be given in fallback order.
+
+    Order is the substance of the rule: an answer naming all four in the
+    wrong sequence sends the reader to a stale local file before the live
+    server, so presence alone must not pass.
+    """
+    text = load_answer(output_dir)
+    if not text:
+        return False, "no answer.md found in the output directory"
+    ok, pos = _order_ok(
+        text,
+        [["mcp"], ["schema export", "schema-export"], ["/api/schema", "api/schema"],
+         ["schemas/", "local schema"]],
+    )
+    labels = ["MCP", "schema export", "/api/schema", "local schemas/"]
+    missing = [labels[i] for i, p in enumerate(pos) if p is None]
+    if missing:
+        return False, f"introspection chain omits: {', '.join(missing)}"
+    if not ok:
+        ranked = [labels[i] for i in sorted(range(4), key=lambda i: pos[i])]
+        return False, f"sources are not in fallback order; answer orders them {ranked}"
+    return True, "schema sources given in MCP -> export -> REST -> local order"
+
+
+def check_branch_before_validate_load(
+    parsed_files: dict[Path, list[dict]], output_dir: Path = Path("output_dir"), **_: Any
+) -> tuple[bool, str]:
+    """`branch create` must precede validate/load, and both must be branch-scoped.
+
+    Parses each invocation with shlex and compares positions, so an answer
+    that lists the right commands in the wrong order fails, as does one that
+    loads onto the default branch by omitting ``--branch``.
+    """
+    text = load_answer(output_dir)
+    if not text:
+        return False, "no answer.md found in the output directory"
+    cmds = _infrahubctl_commands(text)
+    if not cmds:
+        return False, "no infrahubctl commands found in the answer"
+
+    def first(pred):
+        for i, c in enumerate(cmds):
+            if pred(c):
+                return i
+        return None
+
+    create = first(lambda c: "branch" in c and "create" in c)
+    if create is None:
+        return False, "no `infrahubctl branch create` in the sequence"
+    targets = [
+        (i, c) for i, c in enumerate(cmds)
+        if "object" in c and ("validate" in c or "load" in c)
+    ]
+    if not targets:
+        return False, "no `infrahubctl object validate` or `object load` in the sequence"
+    early = [" ".join(c) for i, c in targets if i < create]
+    if early:
+        return False, f"validate/load run before the branch exists: {early}"
+    unscoped = [" ".join(c) for _, c in targets if "--branch" not in c]
+    if unscoped:
+        return False, f"validate/load not scoped to a branch (no --branch): {unscoped}"
+    return True, f"branch created before {len(targets)} branch-scoped validate/load call(s)"
+
+
+def check_error_traced_to_source_row(
+    parsed_files: dict[Path, list[dict]], output_dir: Path = Path("output_dir"), **_: Any
+) -> tuple[bool, str]:
+    """The validate error must be mapped back to the CSV cell, not the YAML.
+
+    ``row 12`` is the derived fact — the server reported row 7 of the emitted
+    file, and only a skill that kept the per-row mapping can name 12. The
+    answer must also steer the reader away from editing the emission.
+    """
+    text = load_answer(output_dir)
+    if not text:
+        return False, "no answer.md found in the output directory"
+    if "inventory.csv" not in text:
+        return False, "the answer never names inventory.csv as the file to fix"
+    if not re.search(r"row\s*1?2\b", text) or not re.search(r"\b12\b", text):
+        return False, "the answer does not trace the error to source row 12"
+    steers_away = re.search(
+        r"(do not|don't|never)[^.\n]{0,60}(edit|modify|change|hand-edit)[^.\n]{0,60}(yaml|yml|emitted|output)",
+        text,
+    )
+    if not steers_away:
+        return False, "the answer does not tell the reader to leave the emitted YAML alone"
+    return True, "error traced to inventory.csv row 12, with the YAML marked off-limits"
+
+
+def check_names_real_managing_objects_rules(
+    parsed_files: dict[Path, list[dict]], output_dir: Path = Path("output_dir"), **_: Any
+) -> tuple[bool, str]:
+    """Every managing-objects rule the answer cites must actually exist.
+
+    Verified against the repository tree rather than a hard-coded list, so
+    the check cannot drift from the skill, and a plausible-sounding rule
+    name that was invented fails.
+    """
+    text = load_answer(output_dir)
+    if not text:
+        return False, "no answer.md found in the output directory"
+    rules_dir = Path(__file__).resolve().parents[2] / "skills" / "infrahub-managing-objects" / "rules"
+    real = {p.name.lower() for p in rules_dir.glob("*.md")} if rules_dir.is_dir() else set()
+    if not real:
+        return False, f"could not read {rules_dir} to verify rule names"
+    cited = set(re.findall(r"[a-z0-9][a-z0-9-]*\.md", text))
+    cited = {c for c in cited if not c.startswith("_")}
+    if not cited:
+        return False, "the answer names no managing-objects rule file"
+    bogus = sorted(c for c in cited if c not in real)
+    if bogus:
+        return False, f"answer cites rule file(s) that do not exist: {bogus}"
+    return True, f"all {len(cited)} cited rule file(s) exist under managing-objects/rules/"
+
+
+def check_no_emission_before_confirmation(
+    parsed_files: dict[Path, list[dict]], output_dir: Path = Path("output_dir"), **_: Any
+) -> tuple[bool, str]:
+    """Nothing may be written until the batched questions are answered.
+
+    The rule is "surface every decision first, write nothing yet", so the
+    check is the absence of object YAML — a structural fact about the
+    directory, not a phrase in the answer. The unmapped column must also be
+    among the questions raised.
+    """
+    emitted = {
+        path.name: docs
+        for path, docs in (parsed_files or {}).items()
+        if any(isinstance(d, dict) and d.get("spec", {}).get("data") for d in docs)
+    }
+    if emitted:
+        return False, (
+            "object YAML was written before the questions were confirmed: "
+            f"{sorted(emitted)}"
+        )
+    text = load_answer(output_dir)
+    if not text:
+        return False, "no answer.md found in the output directory"
+    if "tier_label" not in text:
+        return False, "the unmapped tier_label column is not raised as a question"
+    return True, "no object YAML emitted; tier_label raised for decision"
+
+
+def check_profile_shape(
+    parsed_files: dict[Path, list[dict]], output_dir: Path = Path("output_dir"), **_: Any
+) -> tuple[bool, str]:
+    """The emitted profile must carry the facts the sample data determines.
+
+    Parsed from the profile file rather than matched in prose: every column
+    is present, the numeric column is typed numeric, the date column is
+    typed as a date, and the two low-cardinality columns report 2 distinct
+    values. Those follow from the four sample rows, so a profile that was
+    not actually computed gets them wrong.
+    """
+    d = Path(output_dir)
+    blob = ""
+    for name in ("profile.yml", "profile.yaml", "profile.json", "answer.md"):
+        f = d / name
+        if f.is_file():
+            blob = f.read_text(encoding="utf-8", errors="replace").lower()
+            break
+    if not blob and d.is_dir():
+        for f in sorted(d.iterdir()):
+            if f.is_file():
+                blob += f.read_text(encoding="utf-8", errors="replace").lower()
+    if not blob:
+        return False, "no profile output found in the output directory"
+
+    columns = ["name", "role", "status", "manufacturer_name", "port_count", "commissioned_at"]
+    missing = [c for c in columns if c not in blob]
+    if missing:
+        return False, f"profile omits column(s): {', '.join(missing)}"
+
+    def near(col: str, pattern: str, window: int = 400) -> bool:
+        i = blob.find(col)
+        while i != -1:
+            if re.search(pattern, blob[i : i + window]):
+                return True
+            i = blob.find(col, i + 1)
+        return False
+
+    if not near("port_count", r"(numeric|integer|\bint\b|number|100\s*%)"):
+        return False, "port_count is not reported as numeric"
+    if not near("commissioned_at", r"(date|yyyy-mm-dd|%y-%m-%d|timestamp)"):
+        return False, "commissioned_at is not reported as a date pattern"
+    for col in ("role", "status"):
+        if not near(col, r"\b2\b"):
+            return False, f"{col} does not report its 2 distinct values"
+    return True, "profile reports every column with numeric, date and cardinality facts"
+
+
+def check_input_shapes_normalized(
+    parsed_files: dict[Path, list[dict]], output_dir: Path = Path("output_dir"), **_: Any
+) -> tuple[bool, str]:
+    """All three input shapes must be covered, and non-CSV files accounted for.
+
+    The three shapes are the structure here: an answer that describes only
+    the single-file and directory cases has left the caller without an
+    answer for the list case.
+    """
+    text = load_answer(output_dir)
+    if not text:
+        return False, "no answer.md found in the output directory"
+    shapes = {
+        "single file": r"(single|one)\s+(csv\s+)?file",
+        "directory": r"(directory|folder)",
+        "explicit list": r"(list of (paths|files)|explicit list|multiple paths)",
+    }
+    absent = [k for k, pat in shapes.items() if not re.search(pat, text)]
+    if absent:
+        return False, f"input shape(s) not described: {', '.join(absent)}"
+    if ".tsv" not in text:
+        return False, "the answer does not say .tsv files are picked up alongside .csv"
+    if not re.search(r"(skip|ignore|exclud|not.{0,15}(csv|tsv)|non-csv|unsupported)", text):
+        return False, "the answer does not say what happens to non-CSV/TSV files"
+    return True, "all three input shapes described, with .tsv and non-CSV disposition"
+
+
 CHECKS: dict[str, Any] = {
     "envelope": check_envelope,
     "load-order-numbering": check_load_order_numbering,
@@ -1145,6 +1441,13 @@ CHECKS: dict[str, Any] = {
     "fail-closed": check_fail_closed,
     "folder-coverage": check_folder_coverage,
     "decomposition": check_decomposition,
+    "introspection-priority-order": check_introspection_priority_order,
+    "branch-before-validate-load": check_branch_before_validate_load,
+    "error-traced-to-source-row": check_error_traced_to_source_row,
+    "names-real-managing-objects-rules": check_names_real_managing_objects_rules,
+    "no-emission-before-confirmation": check_no_emission_before_confirmation,
+    "profile-shape": check_profile_shape,
+    "input-shapes-normalized": check_input_shapes_normalized,
 }
 
 

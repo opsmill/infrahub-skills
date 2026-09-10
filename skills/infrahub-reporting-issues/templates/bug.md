@@ -21,8 +21,8 @@ you observe? -->
 
 ## Environment
 
-- **Component version**: <!-- e.g., infrahub-sdk 1.5.2 -->
-- **Infrahub server version**: <!-- e.g., 1.4.0 (or "unknown") -->
+- **Component version**: <!-- e.g., infrahub-sdk 1.23.2 -->
+- **Infrahub server version**: <!-- e.g., 1.11.2 (or "unknown") -->
 - **OS / architecture**: <!-- e.g., macOS 14 arm64 -->
 - **Python version** (if applicable): <!-- e.g., 3.12 -->
 
