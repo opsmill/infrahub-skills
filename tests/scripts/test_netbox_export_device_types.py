@@ -961,3 +961,18 @@ def test_in_use_keeps_records_whose_count_is_absent(tmp_path):
 
     assert len(written) == 1
     assert any("could not judge" in note for note in notes)
+
+
+@pytest.mark.parametrize("manufacturer", ["..", ".", "  ..  ", "", "/"])
+def test_a_reserved_manufacturer_stays_inside_the_layout(tmp_path, manufacturer):
+    """NetBox names are free text; '..' landed the file in the output root."""
+    path = output_path({"manufacturer": manufacturer, "slug": "x"}, tmp_path, False)
+
+    assert (tmp_path / "device-types").resolve() in path.resolve().parents
+
+
+@pytest.mark.parametrize(("slug", "expected"), [("..", "unnamed.yaml"), ("", "unnamed.yaml")])
+def test_a_reserved_slug_becomes_a_real_file_name(tmp_path, slug, expected):
+    path = output_path({"manufacturer": "APC", "slug": slug}, tmp_path, False)
+
+    assert path.name == expected
