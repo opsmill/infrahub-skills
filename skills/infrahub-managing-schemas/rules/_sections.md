@@ -49,8 +49,11 @@
 
 8. **Uniqueness (uniqueness-)** — MEDIUM. Uniqueness
    constraint format with __value suffix for
-   attributes. Incorrect format causes validation
-   errors.
+   attributes and bare names for relationships, plus
+   the preconditions a referenced relationship must
+   meet (`optional: false`, `cardinality: one`).
+   Incorrect format or an optional relationship causes
+   validation errors.
 
 9. **Migration (migration-)** — MEDIUM. Adding,
    removing, and renaming attributes safely. Using
