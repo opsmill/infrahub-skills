@@ -739,3 +739,60 @@ def test_the_export_stays_within_one_call_per_endpoint(netbox_server, tmp_path):
     # 1 device-types call + 10 component endpoints + 5 extra interface pages
     # (300 rows over a 50-row cap). Anything materially above that is N+1.
     assert len(seen["paths"]) <= 20, seen["paths"]
+
+
+# ---------------------------------------------------------------------------
+# Filename collisions
+# ---------------------------------------------------------------------------
+#
+# NetBox enforces (manufacturer, slug) and (manufacturer, model) uniqueness,
+# but not after sanitising for the filesystem. Two legal records can want the
+# same file, and the loser used to vanish while still being counted as
+# written.
+
+
+def test_sanitising_collision_keeps_both_records(tmp_path):
+    """'EX9200 32XS' and 'EX9200-32XS' are both legal and both want one name."""
+    mods = [
+        {"id": 1, "manufacturer": {"name": "Juniper"}, "model": "EX9200 32XS"},
+        {"id": 2, "manufacturer": {"name": "Juniper"}, "model": "EX9200-32XS"},
+    ]
+    source = FakeSource({"dcim.module_types": mods})
+
+    written, notes = export(
+        source, tmp_path, filters={}, in_use=False, include_modules=True
+    )
+
+    on_disk = sorted(p.name for p in tmp_path.rglob("*.yaml"))
+    assert len(written) == 2
+    assert on_disk == ["EX9200-32XS-2.yaml", "EX9200-32XS.yaml"]
+    assert any("collided" in note for note in notes)
+
+
+def test_every_claimed_file_actually_exists(tmp_path):
+    """The count the script reports must match what is on disk."""
+    mods = [
+        {"id": n, "manufacturer": {"name": "J"}, "model": m}
+        for n, m in enumerate(["A B", "A-B", "A/B", "A  B"], start=1)
+    ]
+    source = FakeSource({"dcim.module_types": mods})
+
+    written, _ = export(source, tmp_path, filters={}, in_use=False, include_modules=True)
+
+    assert len(written) == len(mods)
+    assert all(p.exists() for p in written)
+    assert len(set(written)) == len(written)
+
+
+def test_output_path_without_a_taken_set_is_unchanged(tmp_path):
+    """The 3-argument form stays stable for callers that do not track paths."""
+    path = output_path({"manufacturer": "APC", "slug": "ap7901"}, tmp_path, False)
+
+    assert path == tmp_path / "device-types" / "APC" / "ap7901.yaml"
+
+
+def test_a_manufacturer_with_a_slash_stays_one_directory(tmp_path):
+    taken: set = set()
+    path = output_path({"manufacturer": "A/B", "slug": "x"}, tmp_path, False, taken)
+
+    assert path.parent == tmp_path / "device-types" / "A-B"
