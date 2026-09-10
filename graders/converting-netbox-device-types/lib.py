@@ -495,6 +495,51 @@ def check_coverage_report(
     return True, f"Coverage report names {len(mentioned)} component list(s) as lost"
 
 
+def check_bundled_script_output(
+    parsed: dict[Path, list[dict]], output_dir: Path | None = None, **_: Any
+) -> tuple[bool, str]:
+    """The output carries the guarantees only the bundled converter makes.
+
+    Deliberately checks properties, not provenance: what matters is not that
+    a particular command ran but that the output has the correctness a
+    hand-rolled conversion loses. Each assertion below is a trap that cost a
+    real bug to find.
+    """
+    docs = _object_docs(parsed)
+    if not docs:
+        return False, "No Infrahub object documents found"
+
+    # 1. Infrahub Number attributes are integer-backed; a float cannot load.
+    for doc in docs:
+        for row in _rows(doc):
+            floats = [k for k, v in row.items() if isinstance(v, float)]
+            if floats:
+                return False, (
+                    f"{doc['spec'].get('kind')} row {row.get('name') or row.get('template_name')!r} "
+                    f"has non-integer {floats}; Infrahub Number attributes hold integers, so this "
+                    "cannot load. The bundled converter rounds these."
+                )
+
+    # 2. Choice fields must be unwrapped, not written as their API wrapper.
+    for row in _template_rows(parsed):
+        for _, child in component_children(row):
+            wrapped = [k for k, v in child.items() if isinstance(v, dict) and "value" in v]
+            if wrapped:
+                return False, (
+                    f"component {child.get('template_name')!r} carries an unwrapped NetBox "
+                    f"choice object in {wrapped}; expected the bare value"
+                )
+
+    # 3. The coverage report is the mechanism for making loss visible.
+    text = _report_text(output_dir or Path("."))
+    if not text.strip():
+        return False, (
+            "No coverage report. The bundled converter always writes one; without it "
+            "any loss is unstated as well as unfixed."
+        )
+    return True, f"Output carries the bundled converter's guarantees across {len(docs)} document(s)"
+
+
 def check_shared_relationship_blocks(parsed: dict[Path, list[dict]], **_: Any) -> tuple[bool, str]:
     """Component lists sharing one relationship keep every child, in a loadable shape.
 
@@ -672,6 +717,7 @@ CHECKS: dict[str, Callable[..., tuple[bool, str]]] = {
     "load-order-numbering": check_load_order_numbering,
     "coverage-report": check_coverage_report,
     "shared-relationship-blocks": check_shared_relationship_blocks,
+    "bundled-script-output": check_bundled_script_output,
     "fallback-precedence": check_fallback_precedence,
     "generate-template-prerequisite": check_generate_template_prerequisite,
 }
