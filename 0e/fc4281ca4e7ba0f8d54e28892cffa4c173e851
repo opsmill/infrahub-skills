@@ -1,0 +1,25 @@
+skills/infrahub-managing-schemas/rules/validation-common-errors.md
+  s_fe99a41d5e7f9e::t_51c0db7d3b9773 168,175-179
+graders/managing-schemas/lib.py
+  s_fe99a41d5e7f9e::t_51c0db7d3b9773 1135-1140,1147-1148
+graders/auditing-repo/lib.py
+  s_fe99a41d5e7f9e::t_51c0db7d3b9773 261-266
+skills/infrahub-common/graphql-queries.md
+  s_fe99a41d5e7f9e::t_51c0db7d3b9773 274-278,281,284,287
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "0efc4281ca4e7ba0f8d54e28892cffa4c173e851",
+  "prompts": {},
+  "sessions": {
+    "s_fe99a41d5e7f9e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f610d975-3725-4fda-8281-a3570da3554a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
