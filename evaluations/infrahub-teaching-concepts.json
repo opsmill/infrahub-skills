@@ -1,0 +1,265 @@
+{
+  "skill_name": "infrahub-teaching-concepts",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm brand new to Infrahub and honestly not sure where to start.\nCan you teach me what it actually is and how it thinks about data?\n\nThere is no live Infrahub instance reachable from this environment.\nDeliver the lesson as files: create the learning workspace\n./.infrahub-learning/ as the skill's workflow describes and write every\nartifact the workflow produces there.",
+      "expected_output": "A lesson file for the foundations concept whose Probe section opens with 2-3 questions (including a background question) before any explanation appears, in the standard four-section shape.",
+      "files": [],
+      "expectations": [
+        "The lesson opens with questions rather than an explanation",
+        "The Probe section holds two or three questions",
+        "The four lesson sections appear in the standard order"
+      ],
+      "assertions": [
+        {
+          "name": "probe-first",
+          "check": "Probe precedes Explain and holds 2-3 question lines"
+        },
+        {
+          "name": "structured-lessons",
+          "check": "Probe/Explain/Exercise/Check sections present in order"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Teach me how branches work in Infrahub. I know git well, so feel\nfree to build on that.\n\nThere is no live Infrahub instance reachable from this environment.\nDeliver the lesson as files: create the learning workspace\n./.infrahub-learning/ as the skill's workflow describes and write every\nartifact the workflow produces there.",
+      "expected_output": "A branches lesson file using the fixed four-section shape.",
+      "files": [],
+      "expectations": [
+        "The lesson lands in .infrahub-learning/lessons/",
+        "Sections appear as Probe, Explain, Exercise, Check in order"
+      ],
+      "assertions": [
+        {
+          "name": "structured-lessons",
+          "check": "Probe/Explain/Exercise/Check sections present in order"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Teach me how GraphQL queries work in Infrahub. I'll be away next\nweek, so keep track of what we covered for when I'm back.\n\nThere is no live Infrahub instance reachable from this environment.\nDeliver the lesson as files: create the learning workspace\n./.infrahub-learning/ as the skill's workflow describes and write every\nartifact the workflow produces there.",
+      "expected_output": "A graphql lesson plus a progress.md whose table uses the exact header and only the three defined statuses.",
+      "files": [],
+      "expectations": [
+        "progress.md exists in the workspace",
+        "The table header matches the contract exactly",
+        "Every status is not-seen, introduced, or practiced"
+      ],
+      "assertions": [
+        {
+          "name": "record-progress",
+          "check": "progress.md exists with exact header and valid statuses"
+        },
+        {
+          "name": "structured-lessons",
+          "check": "lesson uses the four-section shape"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "We run Infrahub in production for my team. I want to properly\nunderstand proposed changes by doing one for real on our instance, not\njust reading about it. Walk me through it.\n\nYou cannot reach the instance from this environment, so write the\nlesson with the exact steps I should run myself. Deliver the lesson as\nfiles: create the learning workspace ./.infrahub-learning/ as the\nskill's workflow describes and write every artifact the workflow\nproduces there.",
+      "expected_output": "A proposed-changes lesson whose exercise asks consent, scopes every write to a learning-* branch, ends with branch deletion, and never merges.",
+      "files": [],
+      "expectations": [
+        "An explicit consent question precedes any instance write",
+        "Every mutating step targets a learning-* branch",
+        "A cleanup step deletes the branch",
+        "The branch is never merged"
+      ],
+      "assertions": [
+        {
+          "name": "sandbox-safety",
+          "check": "writes are opt-in, learning-* scoped, cleaned up and never merged; read-only lessons need none of that ceremony"
+        },
+        {
+          "name": "structured-lessons",
+          "check": "lesson uses the four-section shape"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "My repo has this schema file at schemas/testbed.yml:\n\n    version: \"1.0\"\n    nodes:\n      - name: Sensor\n        namespace: Testbed\n        attributes:\n          - name: name\n            kind: Text\n            unique: true\n      - name: Zone\n        namespace: Testbed\n        attributes:\n          - name: name\n            kind: Text\n            unique: true\n\nTeach me how relationships work between nodes like these. I learn best\nby doing.\n\nThere is no live Infrahub instance reachable from this environment.\nDeliver the lesson as files: create the learning workspace\n./.infrahub-learning/ as the skill's workflow describes and write every\nartifact the workflow produces there.",
+      "expected_output": "A schema lesson plus a hidden reference solution file holding the solved exercise and its verification evidence; the lesson itself contains no solution.",
+      "files": [],
+      "expectations": [
+        "A solutions/ file exists for the lesson concept",
+        "It has Solution and Verification sections with content",
+        "The exercise in the lesson does not contain the solution"
+      ],
+      "assertions": [
+        {
+          "name": "verified-solution",
+          "check": "solution file has a Solution code block and Verification naming a command run or the docs page a conceptual answer derives from"
+        },
+        {
+          "name": "structured-lessons",
+          "check": "lesson uses the four-section shape"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "My repo has this schema file at schemas/testbed.yml:\n\n    version: \"1.0\"\n    nodes:\n      - name: Sensor\n        namespace: Testbed\n        attributes:\n          - name: name\n            kind: Text\n            unique: true\n          - name: model\n            kind: Text\n\nTeach me how object files work, and give me something to try myself so\nit sticks.\n\nThere is no live Infrahub instance reachable from this environment.\nDeliver the lesson as files: create the learning workspace\n./.infrahub-learning/ as the skill's workflow describes and write every\nartifact the workflow produces there.",
+      "expected_output": "An objects lesson whose exercise assigns the authoring to the learner, with a hidden verified solution that never appears in the lesson.",
+      "files": [],
+      "expectations": [
+        "The exercise carries the assignment marker",
+        "No completed exercise artifact appears in the lesson",
+        "The reference solution stays in solutions/"
+      ],
+      "assertions": [
+        {
+          "name": "learner-authors",
+          "check": "assignment marker present, no solution leak in the lesson"
+        },
+        {
+          "name": "verified-solution",
+          "check": "hidden solution with verification evidence exists"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "We are mid-lesson. The workspace ./.infrahub-learning/ already\nexists with this lesson at lessons/schema.md:\n\n    # Lesson: schema relationships\n\n    ## Probe\n    1. What does a relationship connect?\n    2. Have you used foreign keys before?\n\n    ## Explain\n    A relationship connects two schema nodes. See\n    https://docs.infrahub.app/schema/overview for the model.\n\n    ## Exercise\n    **Your task:** Add a relationship from TestbedSensor to\n    TestbedZone in your schema file with the right cardinality.\n\n    ## Check\n    1. What happens if you omit cardinality?\n\nand this reference solution at solutions/schema.md:\n\n    ## Solution\n    ```yaml\n    relationships:\n      - name: zone\n        peer: TestbedZone\n        cardinality: one\n        kind: Attribute\n    ```\n\n    ## Verification\n    Offline schema validation: loads cleanly.\n\nRecreate those two files verbatim first. This is my first attempt and\nit is not validating, I don't get why:\n\n    relationships:\n      - name: zone\n        peer: zone\n        cardinality: ones\n\nI'm stuck. Help me get unstuck without just handing me the answer,\nwrite every artifact your workflow produces into\n./.infrahub-learning/, and bring ./.infrahub-learning/progress.md up\nto date for the schema concept.",
+      "expected_output": "A hints/schema.md whose first rung nudges (no multi-line code, no pasted solution) and a progress.md keeping the schema concept at introduced.",
+      "files": [],
+      "expectations": [
+        "The escalation log opens at Hint 1, not at a reveal",
+        "No code block in the first hint exceeds two lines",
+        "progress.md records schema as introduced"
+      ],
+      "assertions": [
+        {
+          "name": "hint-before-solution",
+          "check": "escalation log starts at a conceptual hint and leaks no solution"
+        },
+        {
+          "name": "attempt-not-promoted",
+          "check": "the unfinished concept stays at introduced in progress.md"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "My repo has this schema file at schemas/testbed.yml:\n\n    version: \"1.0\"\n    nodes:\n      - name: Sensor\n        namespace: Testbed\n        attributes:\n          - name: name\n            kind: Text\n            unique: true\n          - name: reading_interval\n            kind: Number\n      - name: Zone\n        namespace: Testbed\n        attributes:\n          - name: name\n            kind: Text\n            unique: true\n\nRecreate that schema file at ./schemas/testbed.yml verbatim first.\nI inherited this project and want to actually understand what\nattributes are and what mine are doing. Teach me.\n\nThere is no live Infrahub instance reachable from this environment.\nDeliver the lesson as files: create the learning workspace\n./.infrahub-learning/ as the skill's workflow describes and write every\nartifact the workflow produces there.",
+      "expected_output": "A schema lesson anchored to the learner's TestbedSensor and TestbedZone nodes rather than invented examples.",
+      "files": [],
+      "expectations": [
+        "The Explain section names a kind from the learner's own schema",
+        "No invented generic example displaces the learner's schema"
+      ],
+      "assertions": [
+        {
+          "name": "own-artifacts",
+          "check": "Explain is anchored to at least one node kind from the learner's own schema file"
+        },
+        {
+          "name": "structured-lessons",
+          "check": "lesson uses the four-section shape"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "What are transforms in Infrahub? Teach me properly, I keep\nhearing the term and nodding along.\n\nThere is no live Infrahub instance reachable from this environment.\nDeliver the lesson as files: create the learning workspace\n./.infrahub-learning/ as the skill's workflow describes and write every\nartifact the workflow produces there.",
+      "expected_output": "A transforms lesson whose explanation cites docs.infrahub.app beside its behavior claims.",
+      "files": [],
+      "expectations": [
+        "The Explain section carries at least one docs.infrahub.app link"
+      ],
+      "assertions": [
+        {
+          "name": "cite-docs",
+          "check": "Explain section links to docs.infrahub.app"
+        },
+        {
+          "name": "structured-lessons",
+          "check": "lesson uses the four-section shape"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Teach me what generators are in Infrahub and when I'd want one.\n\nThere is no live Infrahub instance reachable from this environment.\nDeliver the lesson as files: create the learning workspace\n./.infrahub-learning/ as the skill's workflow describes and write every\nartifact the workflow produces there.",
+      "expected_output": "A generators lesson that closes by naming the sibling skill that builds real generators.",
+      "files": [],
+      "expectations": [
+        "The lesson ends by pointing at the matching sibling skill"
+      ],
+      "assertions": [
+        {
+          "name": "graduation-pointer",
+          "check": "lesson names its sibling infrahub-managing-*/analyzing-* skill, or the next concept when the map gives it no graduation skill"
+        },
+        {
+          "name": "structured-lessons",
+          "check": "lesson uses the four-section shape"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Teach me how webhooks work in Infrahub. We want to notify an\nexternal system when data changes.\n\nThere is no live Infrahub instance reachable from this environment.\nDeliver the lesson as files: create the learning workspace\n./.infrahub-learning/ as the skill's workflow describes and write every\nartifact the workflow produces there.",
+      "expected_output": "A webhooks lesson under its own slug (webhooks is not a curriculum concept), in the four-section shape, grounded in a docs.infrahub.app page found through the docs index.",
+      "files": [],
+      "expectations": [
+        "The lesson file uses an off-map slug, not a curriculum slug",
+        "The four lesson sections appear in order",
+        "The Explain section cites the docs page the topic was found on"
+      ],
+      "assertions": [
+        {
+          "name": "off-map-lesson",
+          "check": "off-map slug, four-section shape, docs.infrahub.app citation"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "I'm coming from NetBox, where we lean heavily on config\ncontexts. What's the equivalent way of doing that in Infrahub? Teach\nme so I stop thinking in NetBox terms.\n\nThere is no live Infrahub instance reachable from this environment,\nand treat outbound web access as unavailable too. Deliver the lesson\nas files: create the learning workspace ./.infrahub-learning/ as the\nskill's workflow describes and write every artifact the workflow\nproduces there.",
+      "expected_output": "A lesson translating the NetBox concept into Infrahub terms, whose Explain carries a Comparison source line that is an official NetBox docs URL or the word unverified (with the prose saying the NetBox side is unsure), plus the usual docs.infrahub.app citation.",
+      "files": [],
+      "expectations": [
+        "The Explain section carries the comparison source marker line",
+        "The marker's value is an official competitor docs URL or unverified",
+        "The Infrahub side still cites docs.infrahub.app"
+      ],
+      "assertions": [
+        {
+          "name": "competitor-mapping",
+          "check": "comparison declared unverified with matching prose"
+        },
+        {
+          "name": "structured-lessons",
+          "check": "lesson uses the four-section shape"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "I'm coming from NetBox. Here is the page our team works from\nfor config contexts:\n\n    https://docs.netbox.dev/en/stable/features/context-data/\n\nIt says config context data is JSON attached to objects by scope,\nmerged by weight, and rendered onto a device at request time.\nWhat's the equivalent way of doing that in Infrahub? Teach me.\n\nThere is no live Infrahub instance reachable from this environment.\nDeliver the lesson as files: create the learning workspace\n./.infrahub-learning/ as the skill's workflow describes and write\nevery artifact the workflow produces there.",
+      "expected_output": "A lesson whose Explain carries a Comparison source line pointing at the official NetBox docs URL the learner supplied, not the word unverified, plus the usual docs.infrahub.app citation.",
+      "files": [],
+      "expectations": [
+        "The comparison source is the official docs URL, not \"unverified\"",
+        "The NetBox claim taught matches what that page says",
+        "The Infrahub side still cites docs.infrahub.app"
+      ],
+      "assertions": [
+        {
+          "name": "competitor-mapping",
+          "check": "comparison sourced from the official competitor docs URL"
+        },
+        {
+          "name": "structured-lessons",
+          "check": "lesson uses the four-section shape"
+        }
+      ]
+    }
+  ]
+}

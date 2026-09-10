@@ -113,6 +113,7 @@ A team already running Infrahub who needs to continue extending it — adding sc
 | **collecting-diagnostics** | When Infrahub is misbehaving, use the infrahub-collect tool to gather logs, config, and state into a bundle, review it, and hand it to OpsMill support |
 | **analyzing-diagnostics** | Analyze a collected diagnostic bundle: triage tracebacks and failures, correlate errors into incidents, and match findings against existing GitHub issues |
 | **importing-data** | Convert CSV/TSV inputs into Infrahub object YAML, validate, and load onto a fresh branch |
+| **teaching-concepts** | Tutor for Infrahub concepts: probes what you know, teaches through your own repo and instance, sets verified hands-on exercises, and tracks progress across sessions |
 | **converting-netbox-device-types** | Convert NetBox device-type definitions (devicetype-library / NDX) into Infrahub object templates with a bundled converter, and report what the target schema could not hold |
 
 Each skill lives in `skills/infrahub-<name>/` with a `SKILL.md` entry point, reference docs, examples, and modular rules. Shared references (GraphQL patterns, `.infrahub.yml` format, git integration) are in `skills/infrahub-common/`. Skills use gerund-form names following the [Agent Skills best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
@@ -222,6 +223,7 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 │   ├── infrahub-collecting-diagnostics/ # Diagnostic-bundle collection for support hand-off
 │   ├── infrahub-analyzing-diagnostics/ # Bundle triage, correlation, and known-issue matching
 │   ├── infrahub-importing-data/    # CSV/TSV → Infrahub objects
+│   ├── infrahub-teaching-concepts/ # Guided tutor for Infrahub concepts
 │   └── infrahub-converting-netbox-device-types/ # NetBox device types → object templates
 ├── CLAUDE.md
 ├── README.md
