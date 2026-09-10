@@ -85,6 +85,13 @@ NETBOX_COMPONENT_LISTS: tuple[str, ...] = (
     "inventory-items",
 )
 
+#: Library keys that are neither a component list nor a scalar field. They
+#: are structural rather than convertible — `port-mappings` wires front ports
+#: to rear ports, which no Infrahub schema here models — but they still have
+#: to be named, or a file carrying one is silently ignored rather than
+#: reported as skipped.
+NETBOX_OTHER_LISTS: tuple[str, ...] = ("port-mappings",)
+
 #: Every top-level scalar field a NetBox device-type file may declare.
 NETBOX_TOP_LEVEL_FIELDS: tuple[str, ...] = (
     "manufacturer",
@@ -1096,7 +1103,7 @@ def convert_device_type(device: DeviceType, profile: Profile) -> tuple[dict[str,
         coverage.converted[component.netbox_list] = len(children)
         _record_dropped_component_fields(component, entries, coverage)
 
-    for list_name in NETBOX_COMPONENT_LISTS:
+    for list_name in (*NETBOX_COMPONENT_LISTS, *NETBOX_OTHER_LISTS):
         if list_name in profile.mapped_lists:
             continue
         entries = device.components(list_name)
