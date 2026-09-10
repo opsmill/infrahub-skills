@@ -215,6 +215,9 @@ REQUIRED_DEVICE_TYPE_FIELDS: tuple[str, ...] = (
     "is_full_depth",
 )
 
+#: Fields the library schema requires of a module type.
+REQUIRED_MODULE_TYPE_FIELDS: tuple[str, ...] = ("manufacturer", "model")
+
 #: Fields that are numeric in the library format. NetBox may serialize a
 #: DecimalField as a string, which YAML would then quote.
 NUMERIC_FIELDS = frozenset(
@@ -526,12 +529,14 @@ def build_document(
 
     if is_module and field(source, "attributes"):
         notes.append("attributes — NetBox module-type profile data, no library field")
-    if not is_module:
-        absent = [f for f in REQUIRED_DEVICE_TYPE_FIELDS if f not in document]
-        if absent:
-            notes.append(
-                f"unset in NetBox but required by the library schema: {', '.join(absent)}"
-            )
+    required = (
+        REQUIRED_MODULE_TYPE_FIELDS if is_module else REQUIRED_DEVICE_TYPE_FIELDS
+    )
+    absent = [f for f in required if f not in document]
+    if absent:
+        notes.append(
+            f"unset in NetBox but required by the library schema: {', '.join(absent)}"
+        )
     return document, notes
 
 
@@ -573,23 +578,65 @@ def render_document(document: dict[str, Any]) -> str:
     return f"---\n{body}"
 
 
-def output_path(document: dict[str, Any], out_dir: Path, is_module: bool) -> Path:
-    """Return the library's path for a document.
+def output_path(
+    document: dict[str, Any],
+    out_dir: Path,
+    is_module: bool,
+    taken: set[Path] | None = None,
+) -> Path:
+    """Return the library's path for a document, avoiding collisions.
 
     The library lays files out as ``<Manufacturer>/<slug>.yaml``. Module
     types have no slug, so the model stands in, matching how the converter
     identifies them.
+
+    Sanitising a name can collapse two distinct records onto one path.
+    NetBox enforces ``(manufacturer, slug)`` and ``(manufacturer, model)``
+    uniqueness, but not after the substitutions below: a module type named
+    ``EX9200 32XS`` and one named ``EX9200-32XS`` are both legal and both
+    want ``EX9200-32XS.yaml``. Passing ``taken`` makes the second one land
+    beside the first instead of on top of it.
+
+    Args:
+        document: The assembled library document.
+        out_dir: Root of the output tree.
+        is_module: Whether this is a module type.
+        taken: Paths already claimed, updated in place. When ``None`` no
+            collision handling is applied.
+
+    Returns:
+        The path to write to.
     """
     manufacturer = str(document.get("manufacturer") or "Unknown")
     stem = str(document.get("slug") or document.get("model") or "unnamed")
     safe = stem.replace("/", "-").replace(" ", "-")
-    root = out_dir / ("module-types" if is_module else "device-types")
-    return root / manufacturer.replace("/", "-") / f"{safe}.yaml"
+    root = out_dir / ("module-types" if is_module else "device-types") / _safe(manufacturer)
+
+    path = root / f"{safe}.yaml"
+    if taken is None:
+        return path
+    suffix = 1
+    while path in taken:
+        suffix += 1
+        path = root / f"{safe}-{suffix}.yaml"
+    taken.add(path)
+    return path
+
+
+def _safe(name: str) -> str:
+    """Reduce a name to something usable as a single path segment."""
+    return name.replace("/", "-").strip() or "Unknown"
 
 
 # --------------------------------------------------------------------------
 # Export
 # --------------------------------------------------------------------------
+
+
+def _expected_stem(document: dict[str, Any]) -> str:
+    """The file stem a document would get if nothing else had claimed it."""
+    stem = str(document.get("slug") or document.get("model") or "unnamed")
+    return stem.replace("/", "-").replace(" ", "-")
 
 
 def chunked(items: list[Any], size: int) -> list[list[Any]]:
@@ -651,6 +698,7 @@ def export(
     """
     written: list[Path] = []
     notes: list[str] = []
+    taken: set[Path] = set()
 
     for is_module, endpoint in ((False, DEVICE_TYPES), (True, MODULE_TYPES)):
         if is_module and not include_modules:
@@ -667,7 +715,12 @@ def export(
         for obj in objects:
             owned = components.get(field(obj, "id")) or {}
             document, doc_notes = build_document(obj, owned, is_module=is_module)
-            path = output_path(document, out_dir, is_module)
+            path = output_path(document, out_dir, is_module, taken)
+            if path.stem != _expected_stem(document):
+                doc_notes.append(
+                    f"file name collided after sanitising; written as {path.name} "
+                    "so it does not overwrite the record it collided with"
+                )
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(render_document(document), encoding="utf-8")
             written.append(path)
