@@ -17,11 +17,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       markdown: ${{ steps.changes.outputs.markdown_all }}
-      pytest: ${{ steps.changes.outputs.pytest_all }}
       yaml: ${{ steps.changes.outputs.yaml_all }}
       skills: ${{ steps.changes.outputs.skills_all }}
       cli: ${{ steps.changes.outputs.cli_invocations_all }}
       documentation: ${{ steps.changes.outputs.documentation_all }}
+      tests: ${{ steps.changes.outputs.tests_all }}
     steps:
       - uses: actions/checkout@v6
       - uses: opsmill/paths-filter@v3.0.2
@@ -54,16 +54,30 @@ jobs:
       - run: yamllint -c .yamllint.yml .
 
   # ---------------------------------------------------------------------------
-  # Run the grader unit tests
+  # Run the Python test suite — grader libraries and the bundled skill scripts
+  #
+  # Matrixed over the floor and the current interpreter: pyproject declares
+  # requires-python >=3.10, and the graders and skill scripts run on
+  # contributors' own machines, so a 3.11+ only construct slipping into one is a
+  # real break rather than a hypothetical.
   # ---------------------------------------------------------------------------
-  pytest:
+  test:
     needs: files-changed
-    if: needs.files-changed.outputs.pytest == 'true'
+    if: needs.files-changed.outputs.tests == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.13"]
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v6
-      - run: uv run pytest tests -q
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+      # The test deps sit in an opt-in `test` group, kept out of `dev` so the
+      # lint jobs above do not install the SDK's dependency tree.
+      - run: uv run --group test pytest
 
   # ---------------------------------------------------------------------------
   # Verify every infrahubctl command printed in the repo exists

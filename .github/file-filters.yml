@@ -14,6 +14,10 @@ doc_files: &doc_files
 python_all: &python_all
   - "**/*.py"
 
+python_deps: &python_deps
+  - pyproject.toml
+  - uv.lock
+
 yaml_all: &yaml_all
   - "**/*.{yml,yaml}"
 
@@ -35,12 +39,17 @@ cli_invocations_all:
   - "eval.yaml"
   - "scripts/check-cli-invocations.py"
 
-pytest_all: &pytest_all
-  - "graders/**"
-  - "tests/**"
-  - "pyproject.toml"
-  - "uv.lock"
-
 documentation_all:
   - *doc_files
   - *markdown_all
+
+# What the pytest suite covers: every Python file, the dependency declarations
+# it runs against, and the mapping profiles / fixtures the converter tests read
+# out of the skill directories.
+tests_all:
+  - *python_all
+  - *python_deps
+  - *ci_config
+  - "tests/**"
+  - "graders/**"
+  - "skills/**/scripts/**"

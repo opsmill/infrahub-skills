@@ -1,5 +1,91 @@
 # Repo Auditor Examples
 
+## Comparing against a committed revision without writing
+
+The most common reason an audit reaches for a write is
+to see committed content while the tree is dirty. It
+never needs to. Every question below has a read-only
+answer, and
+[rules/audit-is-read-only.md](./rules/audit-is-read-only.md)
+is the rule these implement.
+
+| Question | Read-only command |
+| -------- | ----------------- |
+| What does this file look like as committed? | `git show HEAD:objects/racks.yml` |
+| What did the audit's target change? | `git diff HEAD -- generators/` |
+| Which files existed at that revision? | `git ls-tree -r --name-only HEAD objects/` |
+| Does committed output match committed input? | `git show HEAD:generators/build_racks.py`, then reason from the source; do not run it against the tree |
+
+The wrong shape, and the one that has already
+destroyed work:
+
+```bash
+# WRONG. Line 4 is what destroys work: it deletes every
+# uncommitted file under objects/, not only the ones the
+# generator wrote, including another agent's or the
+# user's. The stash around it is what makes the sequence
+# look tidy enough to run.
+git stash push generators/build_racks.py
+python generators/build_racks.py --check     # this flag writes
+git stash pop
+git checkout -- objects/                     # the destructive step
+```
+
+Dropping the stash does not make this safe. The
+`git checkout --` is the delete, and it is still there.
+
+The right shape:
+
+```bash
+# Read the committed generator without touching the tree.
+git show HEAD:generators/build_racks.py
+
+# Read the committed output the same way.
+git show HEAD:objects/racks-generated.yml
+
+# Report what the tree looks like, do not change it.
+git status --porcelain
+```
+
+If answering the question genuinely requires executing
+the generator, the answer is that the check cannot be
+performed here. Report it as not performed, say why,
+and point at a clean clone or CI. An honest gap in the
+report costs the reader a minute; a silent revert costs
+them their work.
+
+## Reporting a tree you have already dirtied
+
+Rule check 5 applies after the fact: if the audit has
+already written, say so and leave it. That header and
+finding look like this.
+
+```markdown
+**Working tree at audit time**: 2 uncommitted files
+**Tree modified by this audit**: yes, listing paths
+```
+
+```markdown
+### CRITICAL: Audit modified the working tree
+
+**Category**: Conduct
+**File**: `objects/racks-generated.yml`
+**Finding**: This audit ran
+`python generators/build_racks.py --check` before
+establishing that the flag writes. The run overwrote
+`objects/racks-generated.yml`, which held uncommitted
+work. The file has been left exactly as the run left
+it, and nothing was reverted.
+**Fix**: Recover the previous content from the other
+writer, or from a commit's parent if it was ever
+committed. Do not run `git checkout -- objects/`: that
+would delete the rest of the directory's uncommitted
+files as well.
+```
+
+A visible mess is recoverable. The revert that hides
+it is not.
+
 ## Example Report Output
 
 Below is a sample `AUDIT_REPORT.md` showing the expected format and types of findings.
@@ -12,6 +98,8 @@ Below is a sample `AUDIT_REPORT.md` showing the expected format and types of fin
 **Date**: 2026-03-16
 **Repository**: my-infrahub-project
 **Branch**: main
+**Working tree at audit time**: 2 uncommitted files
+**Tree modified by this audit**: no
 
 ## Summary
 
@@ -27,6 +115,7 @@ Below is a sample `AUDIT_REPORT.md` showing the expected format and types of fin
 | Category | Status |
 | ---------- | -------- |
 | Project Structure | PASS |
+| Conduct | PASS |
 | Schema Validation | FAIL (2 critical) |
 | Object Data | PASS |
 | Python Components | FAIL (1 critical) |
@@ -209,12 +298,25 @@ with shared attributes
 
 ## Deployment Readiness
 
-**Status**: PASS
+**Status**: WARN
 
 - All referenced files are tracked by git
-- No uncommitted changes detected
+- 2 uncommitted files at audit time:
+  `generators/build_racks.py`, `objects/racks-generated.yml`
 - Bootstrap files are outside `objects/` directory
 - `.infrahub.yml` is committed
+
+### INFO: Check not performed — generator reproducibility
+
+**File**: `generators/build_racks.py`
+**Finding**: Whether the committed files under
+`objects/` are still reproducible from the committed
+generator could not be established. The generator's
+`--check` flag writes to `objects/` (confirmed by
+reading the script), and the tree holds uncommitted
+work, so running it would have destroyed that work.
+**Fix**: Run the generator's check on a clean clone or
+in CI, not against a working tree.
 
 ---
 
