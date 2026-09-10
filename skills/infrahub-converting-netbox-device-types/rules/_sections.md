@@ -14,6 +14,7 @@
 | Rule | Impact |
 | ---- | ------ |
 | [workflow-schema-prerequisites.md](./workflow-schema-prerequisites.md) | CRITICAL |
+| [workflow-use-the-bundled-scripts.md](./workflow-use-the-bundled-scripts.md) | CRITICAL |
 | [mapping-profile-driven.md](./mapping-profile-driven.md) | CRITICAL |
 | [mapping-shared-relationships.md](./mapping-shared-relationships.md) | CRITICAL |
 | [mapping-fallback-sources.md](./mapping-fallback-sources.md) | HIGH |
