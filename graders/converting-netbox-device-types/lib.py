@@ -189,6 +189,71 @@ def _read_all_text(output_dir: Path) -> str:
     return _read_text_files(output_dir, (".md", ".txt", ".yml", ".yaml"))
 
 
+#: Words a report uses on the line where it names something that did not
+#: survive the conversion. Matching component names anywhere in the report
+#: instead passes a report that merely lists NetBox's component lists in a
+#: preamble while claiming nothing was skipped.
+LOSS_MARKERS = (
+    "skip",
+    "drop",
+    "unmapped",
+    "not mapped",
+    "no equivalent",
+    "no place",
+    "lost",
+    "omit",
+    "discard",
+    "shadow",
+    "could not",
+    "cannot",
+)
+
+
+def _loss_lines(text: str) -> list[str]:
+    """Return the report lines that actually report a loss.
+
+    A line qualifies by naming a loss, not by sitting near one — so a
+    glossary of the component lists the converter understands is excluded,
+    while ``- Skipped `console-ports` (1 entry)`` is kept.
+    """
+    lines = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        lowered = line.lower()
+        if any(marker in lowered for marker in LOSS_MARKERS):
+            lines.append(line)
+    return lines
+
+
+def _schema_nodes(parsed: dict[Path, list[dict]]) -> list[tuple[str, dict]]:
+    """Return ``(section, node)`` pairs from every schema document parsed.
+
+    ``section`` is ``nodes``, ``generics``, or ``extensions`` so a caller can
+    tell a node-level flag from one placed on a generic.
+    """
+    found: list[tuple[str, dict]] = []
+    for docs in parsed.values():
+        for doc in docs:
+            for section in ("nodes", "generics"):
+                for node in doc.get(section) or []:
+                    if isinstance(node, dict):
+                        found.append((section, node))
+            extensions = doc.get("extensions")
+            if isinstance(extensions, dict):
+                for section in ("nodes", "generics"):
+                    for node in extensions.get(section) or []:
+                        if isinstance(node, dict):
+                            found.append((section, node))
+    return found
+
+
+def _is_true(value: Any) -> bool:
+    """True for a YAML boolean true, or the string a hand-written file uses."""
+    return value is True or (isinstance(value, str) and value.strip().lower() == "true")
+
+
 # ---------------------------------------------------------------------------
 # Checks
 # ---------------------------------------------------------------------------
@@ -417,15 +482,17 @@ def check_coverage_report(
     for row in _template_rows(parsed):
         converted.update(relationship for relationship, _ in component_blocks(row))
 
-    mentioned = [name for name in NETBOX_COMPONENT_LISTS if name in text]
+    loss_text = "\n".join(_loss_lines(text)).lower()
+    mentioned = [name for name in NETBOX_COMPONENT_LISTS if name in loss_text]
     if not mentioned:
         return False, (
-            "The report names none of the NetBox component lists; it cannot be "
-            "telling the reader what was skipped"
+            "No line of the report names a NetBox component list as skipped, "
+            "dropped, or unmapped; listing the component lists elsewhere in the "
+            "report does not tell the reader what was lost"
         )
     if not converted and "interfaces" not in text:
         return False, "The report does not account for the interfaces list"
-    return True, f"Coverage report names {len(mentioned)} component list(s)"
+    return True, f"Coverage report names {len(mentioned)} component list(s) as lost"
 
 
 def check_shared_relationship_blocks(parsed: dict[Path, list[dict]], **_: Any) -> tuple[bool, str]:
@@ -526,28 +593,72 @@ def check_fallback_precedence(
     text = _report_text(output_dir or Path("."))
     if not text.strip():
         return False, "No coverage report found, so shadowed values cannot be reported"
-    if "hadow" not in text:
+
+    # A shadowing entry has to name the field it discarded. Matching the bare
+    # word passes "No values were shadowed", which is the opposite claim.
+    shadow_entries = [
+        line
+        for line in _loss_lines(text)
+        if "shadow" in line.lower() and (re.search(r"`[^`]+`", line) or "lost to" in line.lower())
+    ]
+    if not shadow_entries:
         return False, (
-            "The report records no shadowed value even though competing fields "
+            "The report names no shadowed field even though competing fields "
             "were present; a discarded value went unreported"
         )
-    return True, f"Fallback used across {len(device_types)} device type(s), shadowing reported"
+    return (
+        True,
+        f"Fallback used across {len(device_types)} device type(s), "
+        f"{len(shadow_entries)} shadowed value(s) named",
+    )
 
 
 def check_generate_template_prerequisite(
-    _parsed: dict[Path, list[dict]], output_dir: Path | None = None, **_: Any
+    parsed: dict[Path, list[dict]], output_dir: Path | None = None, **_: Any
 ) -> tuple[bool, str]:
-    """The schema prerequisite ``generate_template: true`` is surfaced."""
+    """``generate_template: true`` is really set, on a node rather than a generic.
+
+    Read as text this passes a commented-out flag and prose that argues
+    *against* enabling it, so the emitted schema is parsed instead: the flag
+    has to survive ``yaml.safe_load`` as a node property.
+    """
     directory = output_dir or Path(".")
-    haystack = _read_all_text(directory)
-    if "generate_template" not in haystack:
+    nodes = _schema_nodes(parsed)
+
+    if nodes:
+        enabled = [
+            (section, node) for section, node in nodes if _is_true(node.get("generate_template"))
+        ]
+        on_node = [node for section, node in enabled if section == "nodes"]
+        if on_node:
+            names = ", ".join(str(node.get("name", "?")) for node in on_node)
+            return True, f"generate_template: true is set on node(s) {names}"
+        on_generic = [node for section, node in enabled if section == "generics"]
+        if on_generic:
+            names = ", ".join(str(n.get("name", "?")) for n in on_generic)
+            return False, (
+                f"generate_template is set on generic(s) {names}; it is a node "
+                "property, so no Template* kind is generated from a generic"
+            )
         return False, (
-            "Nothing in the output mentions generate_template; the Template* "
-            "kinds do not exist until it is enabled on the node"
+            "The emitted schema parses, but no node carries generate_template: "
+            "true — a commented-out or prose-only flag generates nothing"
         )
-    if not re.search(r"generate_template\s*:\s*true", haystack):
-        return False, "generate_template is mentioned but not shown set to true"
-    return True, "The generate_template prerequisite is surfaced"
+
+    # No schema file emitted: fall back to prose, but only outside comments.
+    prose = _report_text(directory)
+    stated = [
+        line
+        for line in prose.splitlines()
+        if re.search(r"generate_template\s*[:=]?\s*`?\s*true", line)
+        and not line.lstrip().startswith("#")
+    ]
+    if not stated:
+        return False, (
+            "Neither an emitted schema nor the notes set generate_template to "
+            "true; the Template* kinds do not exist until it is enabled"
+        )
+    return True, "The generate_template prerequisite is stated in the notes"
 
 
 CHECKS: dict[str, Callable[..., tuple[bool, str]]] = {

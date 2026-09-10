@@ -290,7 +290,43 @@ def test_report_without_component_lists_is_rejected(tmp_path):
     )
     ok, message = CHECKS["coverage-report"](load_output_dir(out), output_dir=out)
     assert not ok
-    assert "component lists" in message
+    assert "component list" in message
+
+
+def test_report_listing_component_lists_without_reporting_loss_is_rejected(tmp_path):
+    """The near-miss: every component list is named, none of them as lost."""
+    out = _write_dir(
+        tmp_path,
+        {
+            "03_device_templates.yml": _object_doc("TemplateDcimDevice", [COMPLIANT_TEMPLATE]),
+            "coverage-report.md": (
+                "# Coverage\n\n## About this converter\n\n"
+                "It understands console-ports, power-ports, module-bays, "
+                "interfaces, front-ports and rear-ports.\n\n"
+                "## Result\n\nEverything converted.\n"
+            ),
+        },
+    )
+    ok, message = CHECKS["coverage-report"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "component list" in message
+
+
+def test_report_naming_a_loss_in_its_own_words_is_accepted(tmp_path):
+    """A compliant report phrased differently still passes."""
+    out = _write_dir(
+        tmp_path,
+        {
+            "03_device_templates.yml": _object_doc("TemplateDcimDevice", [COMPLIANT_TEMPLATE]),
+            "coverage-report.md": (
+                "# What did not make it across\n\n"
+                "The schema has no equivalent for console-ports, and "
+                "module-bays could not be carried.\n"
+            ),
+        },
+    )
+    ok, message = CHECKS["coverage-report"](load_output_dir(out), output_dir=out)
+    assert ok, message
 
 
 def test_generate_template_prerequisite_detected(tmp_path):
@@ -319,7 +355,51 @@ def test_generate_template_mentioned_but_not_enabled(tmp_path):
     )
     ok, message = CHECKS["generate-template-prerequisite"](load_output_dir(out), output_dir=out)
     assert not ok
-    assert "not shown set to true" in message
+    assert "generate_template" in message
+
+
+def test_generate_template_rejects_a_commented_out_flag(tmp_path):
+    """The near-miss: the keyword is in the file, but only inside a comment."""
+    out = _write_dir(
+        tmp_path,
+        {
+            "schema.yml": "nodes:\n  - name: Device\n    # generate_template: true\n",
+            "notes.md": "We considered `generate_template: true` and decided against it.\n",
+        },
+    )
+    ok, message = CHECKS["generate-template-prerequisite"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "no node carries" in message
+
+
+def test_generate_template_rejects_the_flag_on_a_generic(tmp_path):
+    out = _write_dir(
+        tmp_path,
+        {
+            "schema.yml": (
+                "generics:\n  - name: GenericDevice\n    generate_template: true\n"
+                "nodes:\n  - name: Device\n"
+            )
+        },
+    )
+    ok, message = CHECKS["generate-template-prerequisite"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "generic" in message
+
+
+def test_generate_template_accepts_an_extension_block(tmp_path):
+    """A compliant answer written differently still passes."""
+    out = _write_dir(
+        tmp_path,
+        {
+            "schema.yml": (
+                "extensions:\n  nodes:\n    - namespace: Dcim\n"
+                "      generate_template: true\n      name: Device\n"
+            )
+        },
+    )
+    ok, _ = CHECKS["generate-template-prerequisite"](load_output_dir(out), output_dir=out)
+    assert ok
 
 
 def test_run_checks_reports_failed_names(tmp_path):
@@ -412,7 +492,20 @@ def test_fallback_precedence_rejects_unreported_shadowing(tmp_path):
     )
     ok, message = CHECKS["fallback-precedence"](load_output_dir(out), output_dir=out)
     assert not ok
-    assert "no shadowed value" in message
+    assert "no shadowed field" in message
+
+
+def test_fallback_precedence_rejects_a_report_denying_any_shadowing(tmp_path):
+    """The near-miss: the word "shadowed" is present, asserting the opposite."""
+    out = _fallback_dir(
+        tmp_path,
+        GOOD_DEVICE_TYPE,
+        GOOD_CHILDREN,
+        report="# Coverage\n\n## Shadowed values\n\nNo values were shadowed.\n",
+    )
+    ok, message = CHECKS["fallback-precedence"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "no shadowed field" in message
 
 
 def test_fallback_precedence_requires_a_report(tmp_path):

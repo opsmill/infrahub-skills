@@ -237,6 +237,15 @@ python skills/infrahub-converting-netbox-device-types/scripts/netbox_to_infrahub
 Exit codes: `0` converted, `1` bad profile or
 malformed input, `2` no files matched.
 
+Before writing or hand-editing any emitted file, read
+[rules/format-template-objects.md](./rules/format-template-objects.md)
+— the envelope, the `Template<Kind>` split, and the
+`{kind, data}` component wrapper are what makes the
+output loadable — and
+[rules/naming-template-names.md](./rules/naming-template-names.md),
+because component names collide across device types
+unless they are namespaced by their parent.
+
 ### 5. Read the coverage report, explain the loss, offer the fix
 
 Against a typical schema, a large part of each NetBox

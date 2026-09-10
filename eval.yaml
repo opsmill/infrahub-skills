@@ -5530,7 +5530,8 @@ tasks:
     assertions:
       - name: generate-template-prerequisite
         check: >-
-          generate_template is set to true in the emitted schema or notes
+          The emitted schema parses with generate_template: true on the
+          Device node — not commented out, and not on a generic
 
   - name: netbox-convert-full-pipeline
     trials: 3
