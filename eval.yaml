@@ -7514,3 +7514,76 @@ tasks:
         check: Both sides of the relationship share one identifier
 
   # --- Check Creator --- #
+
+  - name: netbox-convert-bundled-scripts
+    trials: 3
+    instruction: |
+      Read the skill at
+      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Convert this NetBox device type into Infrahub object templates
+      for the OpsMill schema-library DCIM schema, which has
+      `generate_template: true` on `DcimDevice`.
+
+          ---
+          manufacturer: Cisco
+          model: Catalyst 9300-24P
+          slug: cisco-c9300-24p
+          part_number: C9300-24P
+          u_height: 1
+          is_full_depth: true
+          weight: 7.59
+          weight_unit: kg
+          airflow: front-to-rear
+          console-ports:
+            - name: con 0
+              type: rj-45
+          interfaces:
+            - name: GigabitEthernet1/0/1
+              type: 1000base-t
+              poe_mode: pse
+            - name: GigabitEthernet1/0/2
+              type: 1000base-t
+              poe_mode: pse
+
+      Write the emitted files under `./output_dir/` (create the directory),
+      and tell me what did not convert.
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_bundled_scripts.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/ produced by the bundled converter: numeric attributes
+      are whole numbers (the 7.59 kg weight rounds rather than being written
+      as a float, which Infrahub's integer-backed Number attributes cannot
+      hold), no NetBox choice wrapper objects appear in the YAML, component
+      children nest under a kind + data wrapper, and a coverage report names
+      the console-ports and the dropped interface fields.
+    expectations:
+      - The device type weight is a whole number, not 7.59
+      - No emitted value is a NetBox choice object such as {value, label}
+      - Component children nest under a kind + data wrapper
+      - A coverage report is written naming what did not convert
+      - The console-ports list and the interface type/poe_mode fields are accounted for
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind,
+          and spec.data list
+      - name: template-kind
+        check: >-
+          Templates are authored under a Template<Kind> and every row has a
+          template_name
+      - name: bundled-script-output
+        check: >-
+          Numerics are integers, choice values are unwrapped, and a coverage
+          report exists — the guarantees a hand-rolled conversion loses
+      - name: component-kind-wrapper
+        check: >-
+          Component children nest under a kind + data wrapper naming a
+          Template* kind
+      - name: coverage-report
+        check: >-
+          A Markdown report names the NetBox component lists that did not
+          convert

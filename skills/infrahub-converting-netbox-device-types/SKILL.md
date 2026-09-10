@@ -128,7 +128,7 @@ these with links to the Infrahub docs.
 
 | Priority | Category | Prefix | Description |
 | -------- | -------- | ------ | ----------- |
-| CRITICAL | Workflow | `workflow-` | `generate_template` must be enabled first |
+| CRITICAL | Workflow | `workflow-` | `generate_template` must be enabled first; the bundled scripts do the work |
 | CRITICAL | Mapping | `mapping-` | Names come from the schema, never guessed; competing fields declare precedence |
 | CRITICAL | Format | `format-` | Envelope, `Template<Kind>`, nested components |
 | HIGH | Naming | `naming-` | Slug-based, parent-namespaced, unique |
@@ -216,6 +216,7 @@ a live instance over its REST API and writes the
 library file format:
 
 ```bash
+pip install pynetbox            # the official NetBox client
 export NETBOX_TOKEN=...
 python scripts/netbox_export_device_types.py \
   --url https://netbox.example.com \
@@ -257,6 +258,14 @@ The converter accepts files, directories (walked
 recursively), and globs.
 
 ### 4. Run the converter
+
+Run it — do not reimplement it. Both scripts carry
+correctness that a hand-rolled equivalent silently
+loses, and the failure looks like success: valid YAML,
+no error, no coverage report, wrong data. Read
+[rules/workflow-use-the-bundled-scripts.md](./rules/workflow-use-the-bundled-scripts.md).
+When a schema does not fit, the answer is a mapping
+profile, not a different script.
 
 ```bash
 python skills/infrahub-converting-netbox-device-types/scripts/netbox_to_infrahub_templates.py \

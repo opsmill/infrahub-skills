@@ -774,3 +774,67 @@ def test_unnamed_module_type_is_rejected(tmp_path):
     ok, message = CHECKS["module-type-object"](load_output_dir(out), output_dir=out)
     assert not ok
     assert "no name" in message
+
+
+# ---------------------------------------------------------------------------
+# The guarantees only the bundled scripts make
+# ---------------------------------------------------------------------------
+
+
+def _bundled_dir(tmp_path, device_type=None, template=None):
+    return _write_dir(
+        tmp_path,
+        {
+            "02_device_types.yml": _object_doc(
+                "DcimDeviceType", [device_type or COMPLIANT_DEVICE_TYPE]
+            ),
+            "03_device_templates.yml": _object_doc(
+                "TemplateDcimDevice", [template or COMPLIANT_TEMPLATE]
+            ),
+            "coverage-report.md": REPORT,
+        },
+    )
+
+
+def test_bundled_output_passes_on_converter_output(tmp_path):
+    out = _bundled_dir(tmp_path)
+    ok, message = CHECKS["bundled-script-output"](load_output_dir(out), output_dir=out)
+    assert ok, message
+
+
+def test_a_float_numeric_is_rejected(tmp_path):
+    """Infrahub Number attributes are integer-backed; 7.59 cannot load."""
+    out = _bundled_dir(tmp_path, device_type={**COMPLIANT_DEVICE_TYPE, "weight": 7.59})
+    ok, message = CHECKS["bundled-script-output"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "weight" in message
+
+
+def test_an_unwrapped_netbox_choice_object_is_rejected(tmp_path):
+    template = {
+        **COMPLIANT_TEMPLATE,
+        "interfaces": {
+            "kind": "TemplateInterfacePhysical",
+            "data": [
+                {
+                    "template_name": "cisco-c9300-48p__Gi1",
+                    "name": "Gi1",
+                    "type": {"value": "1000base-t", "label": "1000BASE-T"},
+                }
+            ],
+        },
+    }
+    out = _bundled_dir(tmp_path, template=template)
+    ok, message = CHECKS["bundled-script-output"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "choice object" in message
+
+
+def test_a_missing_coverage_report_is_rejected(tmp_path):
+    out = _write_dir(
+        tmp_path,
+        {"03_device_templates.yml": _object_doc("TemplateDcimDevice", [COMPLIANT_TEMPLATE])},
+    )
+    ok, message = CHECKS["bundled-script-output"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "coverage report" in message
