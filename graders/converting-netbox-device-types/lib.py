@@ -495,6 +495,24 @@ def check_coverage_report(
     return True, f"Coverage report names {len(mentioned)} component list(s) as lost"
 
 
+def _every_row(parsed: dict[Path, list[dict]]) -> list[tuple[str, dict]]:
+    """Return ``(label, row)`` for every object row and component child.
+
+    Component children are rows too. Anything that inspects only one level
+    misses half the traps it is looking for.
+    """
+    rows: list[tuple[str, dict]] = []
+    for doc in _object_docs(parsed):
+        kind = doc["spec"].get("kind")
+        for row in _rows(doc):
+            name = row.get("name") or row.get("template_name")
+            rows.append((f"{kind} row {name!r}", row))
+            for relationship, child in component_children(row):
+                child_name = child.get("template_name") or child.get("name")
+                rows.append((f"{kind} {relationship} child {child_name!r}", child))
+    return rows
+
+
 def check_bundled_script_output(
     parsed: dict[Path, list[dict]], output_dir: Path | None = None, **_: Any
 ) -> tuple[bool, str]:
@@ -509,26 +527,23 @@ def check_bundled_script_output(
     if not docs:
         return False, "No Infrahub object documents found"
 
-    # 1. Infrahub Number attributes are integer-backed; a float cannot load.
-    for doc in docs:
-        for row in _rows(doc):
-            floats = [k for k, v in row.items() if isinstance(v, float)]
-            if floats:
-                return False, (
-                    f"{doc['spec'].get('kind')} row {row.get('name') or row.get('template_name')!r} "
-                    f"has non-integer {floats}; Infrahub Number attributes hold integers, so this "
-                    "cannot load. The bundled converter rounds these."
-                )
-
-    # 2. Choice fields must be unwrapped, not written as their API wrapper.
-    for row in _template_rows(parsed):
-        for _, child in component_children(row):
-            wrapped = [k for k, v in child.items() if isinstance(v, dict) and "value" in v]
-            if wrapped:
-                return False, (
-                    f"component {child.get('template_name')!r} carries an unwrapped NetBox "
-                    f"choice object in {wrapped}; expected the bare value"
-                )
+    # Both predicates run over both levels. Checking floats only on top-level
+    # rows and choice wrappers only on children left each trap invisible at
+    # the other level — a nested maximum_draw: 7.5, or a top-level
+    # weight_unit: {value: kg}, both slipped through.
+    for label, row in _every_row(parsed):
+        floats = [k for k, v in row.items() if isinstance(v, float)]
+        if floats:
+            return False, (
+                f"{label} has non-integer {floats}; Infrahub Number attributes hold "
+                "integers, so this cannot load. The bundled converter rounds these."
+            )
+        wrapped = [k for k, v in row.items() if isinstance(v, dict) and "value" in v]
+        if wrapped:
+            return False, (
+                f"{label} carries an unwrapped NetBox choice object in {wrapped}; "
+                "expected the bare value"
+            )
 
     # 3. The coverage report is the mechanism for making loss visible.
     text = _report_text(output_dir or Path("."))
