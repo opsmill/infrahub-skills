@@ -28,7 +28,9 @@ sys.modules["netbox_export_device_types"] = _mod
 _spec.loader.exec_module(_mod)
 
 ExportError = _mod.ExportError
+NetBoxSource = _mod.NetBoxSource
 as_number = _mod.as_number
+field = _mod.field
 build_document = _mod.build_document
 carry_fields = _mod.carry_fields
 export = _mod.export
@@ -36,7 +38,6 @@ is_present = _mod.is_present
 main = _mod.main
 missing_required = _mod.missing_required
 output_path = _mod.output_path
-paginate = _mod.paginate
 port_mappings = _mod.port_mappings
 render_document = _mod.render_document
 unwrap = _mod.unwrap
@@ -46,7 +47,15 @@ unwrap = _mod.unwrap
 # Fixtures shaped like real NetBox responses
 # ---------------------------------------------------------------------------
 
-MANUFACTURER = {"id": 11, "name": "APC", "slug": "apc", "description": ""}
+# `url` matters: pynetbox only lazy-fetches a record that carries one, so a
+# fixture without it cannot reproduce the N+1 that bare getattr caused.
+MANUFACTURER = {
+    "id": 11,
+    "url": "http://127.0.0.1/api/dcim/manufacturers/11/",
+    "name": "APC",
+    "slug": "apc",
+    "description": "",
+}
 
 DEVICE_TYPE = {
     "id": 8,
@@ -85,7 +94,12 @@ POWER_OUTLET = {
     "label": "",
     "type": {"value": "nema-5-20r", "label": "NEMA 5-20R"},
     "color": "",
-    "power_port": {"id": 16, "name": "Input", "description": ""},
+    "power_port": {
+        "id": 16,
+        "url": "http://127.0.0.1/api/dcim/power-port-templates/16/",
+        "name": "Input",
+        "description": "",
+    },
     "feed_leg": None,
     "description": "",
 }
@@ -137,35 +151,38 @@ MODULE_TYPE = {
 }
 
 
-def make_fetch(tables):
-    """Return a fetcher serving canned tables, honouring the id filters."""
+class FakeSource:
+    """A Source serving canned tables, honouring the id filters.
 
-    def fetch(endpoint, params):
-        rows = list(tables.get(endpoint, []))
-        multi = {}
-        for key, value in params:
-            multi.setdefault(key, []).append(value)
+    pynetbox itself does the pagination, so there is none to model here; what
+    matters is that the exporter asks for the right things and attributes the
+    answers to the right parent.
+    """
+
+    def __init__(self, tables):
+        self.tables = tables
+        self.calls = []
+
+    def records(self, endpoint, **filters):
+        self.calls.append((endpoint, filters))
+        rows = list(self.tables.get(endpoint, []))
         for key, parent in (
             ("device_type_id", "device_type"),
             ("module_type_id", "module_type"),
         ):
-            if key in multi:
-                want = {int(v) for v in multi[key]}
+            if key in filters:
+                want = set(filters[key])
+                rows = [r for r in rows if (r.get(parent) or {}).get("id") in want]
+        for key in ("manufacturer", "slug"):
+            if key in filters:
+                want = set(filters[key])
                 rows = [
                     r
                     for r in rows
-                    if isinstance(r.get(parent), dict) and r[parent].get("id") in want
+                    if (r.get(key) if key == "slug" else (r.get("manufacturer") or {}).get("slug"))
+                    in want
                 ]
-        limit = int(multi.get("limit", [250])[0])
-        offset = int(multi.get("offset", [0])[0])
-        page = rows[offset : offset + limit]
-        return {
-            "count": len(rows),
-            "next": (offset + limit) < len(rows),
-            "results": page,
-        }
-
-    return fetch
+        return rows
 
 
 # ---------------------------------------------------------------------------
@@ -355,23 +372,60 @@ def test_path_separators_in_a_model_do_not_escape_the_output_directory(tmp_path)
 
 
 # ---------------------------------------------------------------------------
-# Pagination and fetching
+# Reading fields from records as well as mappings
 # ---------------------------------------------------------------------------
 
 
-def test_pagination_walks_every_page():
-    rows = [{"id": n, "device_type": {"id": 1}} for n in range(600)]
-    fetch = make_fetch({"dcim/interface-templates": rows})
+class FakeRecord:
+    """Stands in for a pynetbox Record, which exposes fields as attributes."""
 
-    assert len(paginate(fetch, "dcim/interface-templates", [])) == 600
+    def __init__(self, **values):
+        self.__dict__.update(values)
 
 
-def test_a_response_without_results_is_rejected():
-    def fetch(endpoint, params):
-        return {"detail": "Authentication credentials were not provided."}
+def test_field_reads_mappings_and_records_alike():
+    assert field({"name": "Input"}, "name") == "Input"
+    assert field(FakeRecord(name="Input"), "name") == "Input"
+    assert field({"a": 1}, "missing") is None
+    assert field(FakeRecord(a=1), "missing") is None
 
-    with pytest.raises(ExportError, match="no 'results' list"):
-        paginate(fetch, "dcim/device-types", [])
+
+def test_unwrap_handles_record_style_choices_and_relations():
+    assert unwrap(FakeRecord(value="nema-5-20r", label="NEMA 5-20R")) == "nema-5-20r"
+    assert unwrap(FakeRecord(id=16, name="Input")) == "Input"
+
+
+def test_carry_fields_works_on_records():
+    """The live path hands pynetbox records straight to the same code."""
+    record = FakeRecord(
+        name="Outlet 1",
+        label="",
+        type=FakeRecord(value="nema-5-20r", label="NEMA 5-20R"),
+        power_port=FakeRecord(id=16, name="Input"),
+        feed_leg=None,
+        description="",
+    )
+
+    carried = carry_fields(record, _mod.COMPONENT_FIELDS["power-outlets"])
+
+    assert carried == {"name": "Outlet 1", "type": "nema-5-20r", "power_port": "Input"}
+
+
+def test_components_are_requested_with_a_batched_id_filter():
+    """One call per endpoint per batch, not one per device type."""
+    source = FakeSource({"dcim.device_types": [DEVICE_TYPE]})
+    _mod.fetch_components(source, [1, 2, 3], is_module=False)
+
+    interface_calls = [c for c in source.calls if c[0] == "dcim.interface_templates"]
+    assert len(interface_calls) == 1
+    assert interface_calls[0][1] == {"device_type_id": [1, 2, 3]}
+
+
+def test_module_exports_skip_endpoints_a_module_cannot_own():
+    source = FakeSource({})
+    _mod.fetch_components(source, [1], is_module=True)
+
+    assert not [c for c in source.calls if c[0] == "dcim.device_bay_templates"]
 
 
 # ---------------------------------------------------------------------------
@@ -382,16 +436,16 @@ def test_a_response_without_results_is_rejected():
 @pytest.fixture
 def tables():
     return {
-        "dcim/device-types": [DEVICE_TYPE],
-        "dcim/module-types": [MODULE_TYPE],
-        "dcim/power-port-templates": [POWER_PORT],
-        "dcim/power-outlet-templates": [POWER_OUTLET],
+        "dcim.device_types": [DEVICE_TYPE],
+        "dcim.module_types": [MODULE_TYPE],
+        "dcim.power_port_templates": [POWER_PORT],
+        "dcim.power_outlet_templates": [POWER_OUTLET],
     }
 
 
 def test_export_writes_one_file_per_type(tmp_path, tables):
     written, _ = export(
-        make_fetch(tables), tmp_path, filters=[], in_use=False, include_modules=True
+        FakeSource(tables), tmp_path, filters={}, in_use=False, include_modules=True
     )
 
     assert sorted(p.name for p in written) == ["EX9200-32XS.yaml", "ap7901.yaml"]
@@ -399,20 +453,20 @@ def test_export_writes_one_file_per_type(tmp_path, tables):
 
 def test_module_types_are_skipped_unless_asked_for(tmp_path, tables):
     written, _ = export(
-        make_fetch(tables), tmp_path, filters=[], in_use=False, include_modules=False
+        FakeSource(tables), tmp_path, filters={}, in_use=False, include_modules=False
     )
 
     assert [p.name for p in written] == ["ap7901.yaml"]
 
 
 def test_in_use_keeps_only_device_types_with_devices(tmp_path, tables):
-    tables["dcim/device-types"] = [
+    tables["dcim.device_types"] = [
         DEVICE_TYPE,
         {**DEVICE_TYPE, "id": 9, "slug": "unused", "device_count": 0},
     ]
 
     written, _ = export(
-        make_fetch(tables), tmp_path, filters=[], in_use=True, include_modules=False
+        FakeSource(tables), tmp_path, filters={}, in_use=True, include_modules=False
     )
 
     assert [p.name for p in written] == ["ap7901.yaml"]
@@ -422,12 +476,12 @@ def test_components_are_attributed_to_the_right_parent(tmp_path):
     """Two device types in one batched response must not pool their ports."""
     second = {**DEVICE_TYPE, "id": 2, "slug": "c9200", "model": "C9200"}
     tables = {
-        "dcim/device-types": [DEVICE_TYPE, second],
-        "dcim/power-port-templates": [POWER_PORT],
-        "dcim/interface-templates": [INTERFACE],
+        "dcim.device_types": [DEVICE_TYPE, second],
+        "dcim.power_port_templates": [POWER_PORT],
+        "dcim.interface_templates": [INTERFACE],
     }
     export(
-        make_fetch(tables), tmp_path, filters=[], in_use=False, include_modules=False
+        FakeSource(tables), tmp_path, filters={}, in_use=False, include_modules=False
     )
 
     ap = yaml.safe_load((tmp_path / "device-types/APC/ap7901.yaml").read_text())
@@ -439,7 +493,7 @@ def test_components_are_attributed_to_the_right_parent(tmp_path):
 
 def test_exported_files_reload_as_the_library_format(tmp_path, tables):
     written, _ = export(
-        make_fetch(tables), tmp_path, filters=[], in_use=False, include_modules=True
+        FakeSource(tables), tmp_path, filters={}, in_use=False, include_modules=True
     )
 
     for path in written:
@@ -488,3 +542,200 @@ def test_cli_reads_the_token_from_the_environment(tmp_path, monkeypatch):
     )
 
     assert args.token == "from-env"
+
+
+# ---------------------------------------------------------------------------
+# The live path, against a local server speaking NetBox's REST dialect
+# ---------------------------------------------------------------------------
+#
+# Everything above stops at the Source boundary. These exercise the real
+# NetBoxSource, and so pynetbox itself: auth header, pagination, filters,
+# and the record shapes the exporter then reads.
+
+
+@pytest.fixture
+def netbox_server():
+    """Serve a minimal NetBox REST API over loopback."""
+    import json as _json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from urllib.parse import parse_qs, urlparse
+
+    tables = {
+        "/api/dcim/device-types/": [DEVICE_TYPE],
+        # Reachable so a stray lazy fetch resolves rather than erroring, which
+        # keeps the N+1 test measuring requests instead of failures.
+        "/api/dcim/manufacturers/11/": MANUFACTURER,
+        "/api/dcim/power-port-templates/": [POWER_PORT],
+        "/api/dcim/power-outlet-templates/": [POWER_OUTLET],
+        # 300 rows forces pynetbox to page, since NetBox caps a page at 50 here.
+        "/api/dcim/interface-templates/": [
+            {**INTERFACE, "id": n, "name": f"Gi1/0/{n}", "device_type": {"id": 8}}
+            for n in range(300)
+        ],
+    }
+    # Endpoints a real NetBox has but this fixture leaves empty. Without
+    # these the server would 404 and the exporter would (correctly) report a
+    # missing endpoint, which is a different test.
+    for empty in (
+        "/api/dcim/console-port-templates/",
+        "/api/dcim/console-server-port-templates/",
+        "/api/dcim/front-port-templates/",
+        "/api/dcim/rear-port-templates/",
+        "/api/dcim/module-bay-templates/",
+        "/api/dcim/device-bay-templates/",
+        "/api/dcim/inventory-item-templates/",
+    ):
+        tables[empty] = []
+    seen = {"tokens": set(), "pages": 0, "paths": []}
+    page_size = 50
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802 - BaseHTTPRequestHandler's interface
+            seen["tokens"].add(self.headers.get("Authorization"))
+            seen["paths"].append(urlparse(self.path).path)
+            parsed = urlparse(self.path)
+            query = parse_qs(parsed.query)
+            rows = tables.get(parsed.path)
+            if isinstance(rows, dict):  # a detail endpoint, not a list
+                body = _json.dumps(rows).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            if rows is None:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b'{"detail":"Not found."}')
+                return
+            if "device_type_id" in query:
+                want = {int(v) for v in query["device_type_id"]}
+                rows = [r for r in rows if (r.get("device_type") or {}).get("id") in want]
+            offset = int(query.get("offset", [0])[0])
+            # NetBox treats limit=0 as "no client limit", capped by the server.
+            requested = int(query.get("limit", [page_size])[0]) or page_size
+            limit = min(requested, page_size)
+            page = rows[offset : offset + limit]
+            following = offset + limit
+            nxt = (
+                f"http://{self.headers['Host']}{parsed.path}?limit={limit}&offset={following}"
+                if following < len(rows)
+                else None
+            )
+            seen["pages"] += 1
+            body = _json.dumps({"count": len(rows), "next": nxt, "previous": None,
+                                "results": page}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_port}", seen
+    server.shutdown()
+
+
+def test_live_path_exports_through_pynetbox(netbox_server, tmp_path):
+    url, _ = netbox_server
+    source = NetBoxSource(url, "secret-token")
+
+    written, notes = export(source, tmp_path, filters={}, in_use=False, include_modules=False)
+
+    assert [p.name for p in written] == ["ap7901.yaml"]
+    document = yaml.safe_load(written[0].read_text())
+    assert document["manufacturer"] == "APC"
+    # The outlet's related power_port survived as a name, not a primary key.
+    assert document["power-outlets"][0]["power_port"] == "Input"
+    assert any("unset 'type'" in note for note in notes)
+
+
+def test_live_path_sends_the_token(netbox_server, tmp_path):
+    url, seen = netbox_server
+    export(
+        NetBoxSource(url, "secret-token"),
+        tmp_path,
+        filters={},
+        in_use=False,
+        include_modules=False,
+    )
+
+    assert "Token secret-token" in seen["tokens"]
+
+
+def test_live_path_follows_pagination(netbox_server, tmp_path):
+    """300 interfaces over a 50-row page cap must all arrive."""
+    url, _ = netbox_server
+    export(
+        NetBoxSource(url, "t"), tmp_path, filters={}, in_use=False, include_modules=False
+    )
+
+    document = yaml.safe_load((tmp_path / "device-types/APC/ap7901.yaml").read_text())
+    assert len(document["interfaces"]) == 300
+
+
+def test_live_path_reports_an_unreachable_host(tmp_path):
+    source = NetBoxSource("http://127.0.0.1:1", "t")
+
+    with pytest.raises(ExportError) as excinfo:
+        list(source.records("dcim.device_types"))
+
+    assert "127.0.0.1:1" in str(excinfo.value)
+
+
+def test_an_endpoint_this_netbox_lacks_is_reported_not_fatal(netbox_server, tmp_path):
+    """Component endpoints come and go across NetBox versions."""
+    url, _ = netbox_server
+    source = NetBoxSource(url, "t")
+    # Point one component list at an endpoint the server does not serve.
+    original = _mod.DEVICE_COMPONENTS
+    _mod.DEVICE_COMPONENTS = (*original, ("dcim.gone_templates", "device-bays"))
+    try:
+        written, notes = export(
+            source, tmp_path, filters={}, in_use=False, include_modules=False
+        )
+    finally:
+        _mod.DEVICE_COMPONENTS = original
+
+    assert written, "the rest of the export must still complete"
+    assert any("gone_templates" in note and "absent" in note for note in notes)
+
+
+def test_reading_a_nested_object_does_not_trigger_a_second_request(netbox_server, tmp_path):
+    """pynetbox lazily fetches unknown attributes; probing must not do that.
+
+    Record.__getattr__ calls full_details() for anything the record does not
+    already hold, which is an HTTP GET. unwrap() probes 'value' before 'name',
+    so a bare getattr fired one request per nested manufacturer, power_port
+    and device_type — thousands across a real catalogue, to learn nothing.
+    """
+    url, seen = netbox_server
+    export(
+        NetBoxSource(url, "t"), tmp_path, filters={}, in_use=False, include_modules=False
+    )
+
+    detail_calls = [
+        path
+        for path in seen["paths"]
+        if path.rstrip("/").rsplit("/", 1)[-1].isdigit()  # /api/dcim/manufacturers/11/
+    ]
+    assert detail_calls == [], f"lazy detail fetches leaked: {detail_calls}"
+
+
+def test_the_export_stays_within_one_call_per_endpoint(netbox_server, tmp_path):
+    """One list call per endpoint per batch, plus pagination — nothing per object."""
+    url, seen = netbox_server
+    export(
+        NetBoxSource(url, "t"), tmp_path, filters={}, in_use=False, include_modules=False
+    )
+
+    # 1 device-types call + 10 component endpoints + 5 extra interface pages
+    # (300 rows over a 50-row cap). Anything materially above that is N+1.
+    assert len(seen["paths"]) <= 20, seen["paths"]

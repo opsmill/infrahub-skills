@@ -67,9 +67,16 @@ See `module_type.position_placeholder`.
 ## Exporting from a live NetBox
 
 `scripts/netbox_export_device_types.py` reads a running
-instance and writes the library format. Field names on
-both sides were taken from NetBox's own serializers and
-the devicetype-library JSON schema, not inferred.
+instance through [pynetbox](https://github.com/netbox-community/pynetbox)
+and writes the library format. Field names on both sides
+were taken from NetBox's own serializers and the
+devicetype-library JSON schema, not inferred.
+
+Requires `pynetbox>=7.0`. Fields are read as attributes
+rather than via `Record.serialize()`, which flattens a
+related object to its primary key — an outlet's
+`power_port` would become `16` where the library needs
+the port's name.
 
 | Option | Meaning |
 | ------ | ------- |
