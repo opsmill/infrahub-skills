@@ -66,6 +66,13 @@ best practices → deployment → YAGNI / cost-to-fix)
 and the per-finding severity levels used in the final
 report.
 
+When Phase 7 reaches `.infrahub.yml`, read
+[rules/practices-watch-dependencies.md](./rules/practices-watch-dependencies.md)
+before judging a `watch` block: a missing key, an
+incomplete list, and an entry naming an untracked file
+each fail silently, and the key has to be confirmed
+against the version under audit before it is proposed.
+
 ## Audit Categories
 
 | Priority | Category | What It Checks |
@@ -77,7 +84,7 @@ report.
 | HIGH | Cross-References | Query names match, target groups |
 | HIGH | Relationships | Bidirectional IDs, cardinality |
 | HIGH | Registration | All files registered, no orphans |
-| MEDIUM | Best Practices | human_friendly_id, display_label |
+| MEDIUM | Best Practices | human_friendly_id, display_label, `watch` deps |
 | MEDIUM–LOW | YAGNI / Cost-to-Fix | Python doing what schema, GraphQL, Jinja2, or built-in IPAM/VLAN can do; denormalized data; un-extracted duplicate shapes; a whole domain hand-rolled when the marketplace ships it. Severity tracks the cost-to-fix ladder: steps 1–3 MEDIUM, steps 4–7 LOW |
 | MEDIUM | Deployment | Git status, bootstrap placement |
 | LOW | Patterns & Style | Code organization, naming |
