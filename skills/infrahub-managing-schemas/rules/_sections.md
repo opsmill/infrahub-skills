@@ -47,13 +47,15 @@
    (`generate_profile: true`) enable shared default values via
    a companion Profile<Kind> node.
 
-8. **Uniqueness (uniqueness-)** — MEDIUM. Uniqueness
-   constraint format with __value suffix for
-   attributes and bare names for relationships, plus
-   the preconditions a referenced relationship must
-   meet (`optional: false`, `cardinality: one`).
-   Incorrect format or an optional relationship causes
-   validation errors.
+8. **Uniqueness (uniqueness-)** — HIGH. Constraint
+   format (__value suffix for attributes, bare
+   relationships), the preconditions a referenced
+   relationship must meet (`optional: false`,
+   `cardinality: one`), and constraint scope. A
+   constraint on a generic is enforced across every
+   implementer, and `human_friendly_id` and
+   `unique: true` compile into one on the layer that
+   declares them.
 
 9. **Migration (migration-)** — MEDIUM. Adding,
    removing, and renaming attributes safely. Using
