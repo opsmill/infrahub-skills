@@ -39,7 +39,7 @@ part worth memorising:
 | Parameter | What it actually does |
 | --------- | --------------------- |
 | `kind_filter` | **Whitelist.** Only traverse through nodes of these kinds |
-| `included_kinds` | **Not a whitelist.** Re-includes kinds excluded *by default*. It is applied after `excluded_kinds`, so a kind you excluded yourself and re-included here ends up included; if you want it excluded, do not name it in both |
+| `included_kinds` | **Not a whitelist.** Re-includes kinds excluded *by default*, and nothing else. It subtracts from the defaults only, so it has **no effect on a kind you passed in `excluded_kinds` in the same request** — an explicit exclusion always wins |
 | `excluded_kinds` | Unioned with the defaults (`BuiltinIPNamespace` and its implementers) |
 | `excluded_namespaces` | Unioned with the defaults `Core, Internal, Builtin, Lineage, Profile, Template`. **The defaults cannot be opted out of** |
 | `relationship_filter` | Only follow these **schema relationship identifiers** |
@@ -126,10 +126,12 @@ accept the cost.
   **Check this before acting on the result.** It is the
   one shape-level signal that the answer is incomplete.
 - **`excluded_kinds`** — what was actually excluded:
-  the defaults plus your additions, minus anything
-  `included_kinds` put back. Read it when a path you
-  expected is missing; it is the authoritative answer to
-  "why is my kind still excluded", and to the reverse.
+  your additions, plus whichever defaults you did not
+  re-include. `included_kinds` is subtracted from the
+  defaults only, never from your own exclusions. Read it
+  when a path you expected is missing; it is the
+  authoritative answer to "why is my kind still
+  excluded", and to the reverse.
 
 ### Just asking whether a path exists
 
