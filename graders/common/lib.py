@@ -171,7 +171,31 @@ _TOKEN_VALUE = re.compile(rf"\$\{{?{_TOKEN_VAR}(?::?-)?\}}?(?![\w:?+])")
 # `${TOKEN:+word}` and `${TOKEN:?word}` are the safe forms: the first can
 # only ever expand to the word, the second writes to stderr and aborts.
 _PRINTS_TO_STDOUT = re.compile(r"\b(?:echo|printf|print)\b")
-_COMMAND_BREAK = re.compile(r";|\|\||&&|\||\n|\bthen\b|\bdo\b|\bfi\b|\bdone\b")
+# A backtick is a command boundary too. Without it an English sentence
+# containing the word "echo" counted as one command, so a safe
+# `${TOKEN:-}` test operand quoted later in the same sentence was reported
+# as a leak — the very presence test the rule recommends.
+_COMMAND_BREAK = re.compile(r";|\|\||&&|\||\n|`|\bthen\b|\bdo\b|\bfi\b|\bdone\b")
+
+
+def _command_pieces(text: str) -> list[tuple[int, str]]:
+    """Split into command-sized pieces, keeping each piece's offset."""
+    pieces: list[tuple[int, str]] = []
+    pos = 0
+    for match in _COMMAND_BREAK.finditer(text):
+        pieces.append((pos, text[pos : match.start()]))
+        pos = match.end()
+    pieces.append((pos, text[pos:]))
+    return pieces
+
+
+def _is_negated(text: str, start: int) -> bool:
+    """Whether what starts at ``start`` is introduced as something to avoid.
+
+    Case-folded here rather than in ``_NEGATED_BEFORE``: the other caller
+    passes text that is already lowered.
+    """
+    return bool(_NEGATED_BEFORE.search(text[max(0, start - 60) : start].lower()))
 
 
 def check_token_not_printed(text: str) -> tuple[bool, str]:
@@ -183,12 +207,22 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
     into the terminal, the shell history and the retained CI log. Forms that
     cannot reach stdout with the value pass: an explicit `[ -n ... ]`
     conditional, `${TOKEN:+set}`, or `: "${TOKEN:?not set}"`.
+
+    A leaking form quoted in order to warn against it is not a leak. The
+    rule teaches this trap by name, so the best answer names it too — and
+    matching it here failed the answer for repeating the lesson.
     """
     if not text.strip():
         return False, "no output to check"
-    offenders = {m.group(0) for m in _TOKEN_FALLBACK.finditer(text)}
-    for piece in _COMMAND_BREAK.split(text):
+    offenders = {
+        m.group(0)
+        for m in _TOKEN_FALLBACK.finditer(text)
+        if not _is_negated(text, m.start())
+    }
+    for start, piece in _command_pieces(text):
         if not _PRINTS_TO_STDOUT.search(piece):
+            continue
+        if _is_negated(text, start):
             continue
         offenders.update(m.group(0) for m in _TOKEN_VALUE.finditer(piece))
     if offenders:
@@ -281,13 +315,22 @@ def check_generator_target_is_key_value(text: str) -> tuple[bool, str]:
     to running the generator over every member of the target group, so a
     bare id is a mass write rather than the single-target run the author
     intended. The run also has to name a branch, because it writes.
+
+    An invocation introduced as something *not* to write is a
+    counter-example, not a recommendation. The rule teaches the bare-target
+    failure by showing it, and the task prompt asks what goes wrong when the
+    argument shape is wrong, so the best answer shows it too — matching it
+    here failed the answer for teaching the rule.
     """
     if not text.strip():
         return False, "no output to check"
-    invocations = _GENERATOR_INVOCATION.findall(_LINE_CONTINUATION.sub(" ", text))
-    if not invocations:
-        return False, "answer names no `infrahubctl generator <name> ...` invocation"
-    for name, rest in invocations:
+    folded = _LINE_CONTINUATION.sub(" ", text)
+    recommended = 0
+    for match in _GENERATOR_INVOCATION.finditer(folded):
+        if _is_negated(folded, match.start()):
+            continue
+        recommended += 1
+        name, rest = match.group(1), match.group(2)
         args = _positional_args(rest)
         if not args:
             return False, f"`generator {name}` passes no target at all"
@@ -299,6 +342,10 @@ def check_generator_target_is_key_value(text: str) -> tuple[bool, str]:
             )
         if "--branch" not in rest:
             return False, f"`generator {name}` runs with no --branch, so it writes to main"
+    if not recommended:
+        return False, (
+            "answer recommends no `infrahubctl generator <name> ...` invocation"
+        )
     return True, "generator target is a key=value variable on a named branch"
 
 

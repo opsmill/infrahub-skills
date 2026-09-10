@@ -756,12 +756,14 @@ def check_no_docs_gap_when_unsettled(text: str, **_: object) -> CheckResult:
 # check, transform, generator or render takes its target as a positional
 # argument; there is no `run` subcommand, and matching one here rewarded the
 # invented form that skills/infrahub-common/rules/deployment-gql-dry-run.md
-# exists to remove.
+# exists to remove. The rejected verb has to be the whole token: a `\b`
+# there ends at a hyphen, so a kebab-case name opening on a verb
+# (`create-dc`) read as the invented subcommand and lost a real verifier.
 _VERIFIER_CMD_RE = re.compile(
     r"infrahubctl\s+(?:schema\s+(?:load|check|format)|object\s+(?:load|validate)"
     r"|(?:check|transform|render|generator)\s+"
     r"(?!(?:run|list|get|create|delete|load|dump|check|validate|execute"
-    r"|show|new|add|export|import)\b)[a-z0-9][\w.-]*)"
+    r"|show|new|add|export|import)(?![\w-]))[a-z0-9][\w.-]*)"
     r"|\bpytest\b"
     r"|\bschema\s+(?:load|check|format)\b"
     r"|\bobject\s+(?:load|validate)\b"

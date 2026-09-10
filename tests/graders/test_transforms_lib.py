@@ -453,6 +453,19 @@ def test_dry_run_executes_query_accepts_a_generator():
     assert ok
 
 
+def test_dry_run_executes_query_accepts_a_kebab_case_name():
+    """A verb is only invented when it is the whole token.
+
+    `\\b` ends at a hyphen, so `create-dc` — the fixture name a model may
+    hyphenate — read as the invented `create` subcommand and failed a
+    correct answer.
+    """
+    ok, msg = _mod.CHECKS["dry-run-executes-query"](
+        md_text="Run `infrahubctl generator create-dc site=hq` before merging."
+    )
+    assert ok, msg
+
+
 def test_dry_run_executes_query_rejects_the_invented_run_subcommand():
     """The invented `run` subcommand: rewarding it undoes the rule."""
     ok, _ = _mod.CHECKS["dry-run-executes-query"](

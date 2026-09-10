@@ -79,6 +79,28 @@ def test_empty_answer_is_not_a_free_pass_on_the_token_check():
     assert not check_token_not_printed("")[0]
 
 
+def test_a_leak_quoted_as_a_warning_is_not_a_leak():
+    """The rule teaches this trap, so the best answer names it.
+
+    The safe presence test in the same sentence used to be reported as a
+    leak too: a backtick was not a command boundary, so the prose word
+    "echo" pulled the following `${TOKEN:-}` test operand in with it.
+    """
+    ok, msg = check_token_not_printed(
+        'Never run `echo "$INFRAHUB_API_TOKEN"` — that puts the secret in your '
+        'shell history and the CI log. Use `[ -n "${INFRAHUB_API_TOKEN:-}" ] '
+        '&& echo "token present"` instead.'
+    )
+    assert ok, msg
+
+
+def test_a_safe_operand_after_a_prose_echo_still_passes():
+    ok, msg = check_token_not_printed(
+        'Do not echo the token. Test it with `[ -n "${INFRAHUB_API_TOKEN:-}" ]`.'
+    )
+    assert ok, msg
+
+
 def test_the_rule_itself_prints_no_token():
     """The rule taught the leak it warns against. Hold it to its own check."""
     rule = (
@@ -309,6 +331,28 @@ def test_a_bare_target_on_the_first_line_still_fails():
         "infrahubctl generator create_dc 1809d0bc --branch dry-run\n"
         "infrahubctl branch list\n"
         "```"
+    )
+    assert not ok
+
+
+def test_a_bare_target_shown_as_a_counter_example_passes():
+    """The task prompt asks what goes wrong, so the answer shows it.
+
+    deployment-gql-dry-run.md teaches the failure by printing the bare-id
+    form itself. Failing an answer that mirrors the rule capped the best
+    answer at 0.65.
+    """
+    ok, msg = check_generator_target_is_key_value(
+        "Run `infrahubctl generator create_dc site_id=1809d0bc --branch dry-run`.\n"
+        "Do not write `infrahubctl generator create_dc dc-01-uuid --branch dry-run`: "
+        "a token with no `=` is dropped and the run writes the whole target group."
+    )
+    assert ok, msg
+
+
+def test_a_counter_example_alone_is_not_a_recommendation():
+    ok, _ = check_generator_target_is_key_value(
+        "Never run `infrahubctl generator create_dc dc-01-uuid --branch dry-run`."
     )
     assert not ok
 

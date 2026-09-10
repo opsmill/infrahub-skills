@@ -337,10 +337,13 @@ def check_polls_coreartifact_after_post(
 # and matching one here rewarded exactly the invented form
 # skills/infrahub-common/rules/deployment-gql-dry-run.md exists to remove.
 # A generic verb where the positional target belongs is an invented
-# subcommand, not a name, so it does not count as a live dry-run.
+# subcommand, not a name, so it does not count as a live dry-run. The verb
+# has to be the *whole* token: `\b` ends at a hyphen, so it rejected
+# kebab-case names whose first segment is a verb (`create-dc`, the fixture
+# name a model may well hyphenate) and failed a correct answer.
 _INVENTED_SUBCOMMAND = (
     r"(?!(?:run|list|get|create|delete|load|dump|check|validate|execute|"
-    r"show|new|add|export|import)\b)"
+    r"show|new|add|export|import)(?![\w-]))"
 )
 _DRY_RUN_CMD_PATTERNS = [
     re.compile(
