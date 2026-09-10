@@ -17,13 +17,17 @@ This is **not** a sync. It is a one-way snapshot into files you can read,
 diff, and keep. Continuous replication between a live NetBox and Infrahub is
 `infrahub-sync <https://docs.infrahub.app/sync/>`_, a separate product.
 
-Why the standard library rather than pynetbox
----------------------------------------------
-pynetbox is the official client and would handle pagination and auth for us.
-This script deliberately does not use it: the skill's scripts ship as
-reference material to be copied into a customer's repo and run, so an import
-that works with nothing but PyYAML installed is worth more here than the
-convenience. The HTTP surface used is one paginated ``GET``.
+Reading through pynetbox
+------------------------
+The official client handles pagination, auth, retries and TLS, and tracks the
+API as it changes across NetBox versions. Fields are read as **attributes**,
+not via ``Record.serialize()``: serialising flattens a related object to its
+primary key, so an outlet's ``power_port`` would become ``16`` where the
+library format needs the port's name.
+
+Everything downstream of the client works on plain mappings or pynetbox
+records interchangeably (see ``field``), which keeps the reshaping testable
+without a server while leaving the live path on the real client.
 
 Shape differences this has to reconcile
 ---------------------------------------
@@ -71,16 +75,12 @@ Exit codes
 from __future__ import annotations
 
 import argparse
-import json
 import os
-import ssl
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
-from collections.abc import Callable
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 try:
     import yaml
@@ -93,23 +93,23 @@ except ImportError:  # pragma: no cover - environment guard
 # NetBox API constants
 # --------------------------------------------------------------------------
 
-DEVICE_TYPES = "dcim/device-types"
-MODULE_TYPES = "dcim/module-types"
+DEVICE_TYPES = "dcim.device_types"
+MODULE_TYPES = "dcim.module_types"
 
 #: NetBox component-template endpoints, paired with the devicetype-library
 #: list each one becomes. Order matches the library's own field order so the
 #: emitted files read like the published ones.
 DEVICE_COMPONENTS: tuple[tuple[str, str], ...] = (
-    ("dcim/console-port-templates", "console-ports"),
-    ("dcim/console-server-port-templates", "console-server-ports"),
-    ("dcim/power-port-templates", "power-ports"),
-    ("dcim/power-outlet-templates", "power-outlets"),
-    ("dcim/interface-templates", "interfaces"),
-    ("dcim/front-port-templates", "front-ports"),
-    ("dcim/rear-port-templates", "rear-ports"),
-    ("dcim/module-bay-templates", "module-bays"),
-    ("dcim/device-bay-templates", "device-bays"),
-    ("dcim/inventory-item-templates", "inventory-items"),
+    ("dcim.console_port_templates", "console-ports"),
+    ("dcim.console_server_port_templates", "console-server-ports"),
+    ("dcim.power_port_templates", "power-ports"),
+    ("dcim.power_outlet_templates", "power-outlets"),
+    ("dcim.interface_templates", "interfaces"),
+    ("dcim.front_port_templates", "front-ports"),
+    ("dcim.rear_port_templates", "rear-ports"),
+    ("dcim.module_bay_templates", "module-bays"),
+    ("dcim.device_bay_templates", "device-bays"),
+    ("dcim.inventory_item_templates", "inventory-items"),
 )
 
 #: A module type has no bays of its own to fill, and no device bays.
@@ -234,100 +234,96 @@ class ExportError(Exception):
 
 
 # --------------------------------------------------------------------------
-# HTTP
+# NetBox access
 # --------------------------------------------------------------------------
 
-#: A callable taking (endpoint, params) and returning one decoded API page.
-Fetcher = Callable[[str, list[tuple[str, Any]]], dict[str, Any]]
+
+class Source(Protocol):
+    """The reading surface this exporter needs from NetBox.
+
+    Narrowing pynetbox to one method keeps the export logic testable against
+    canned data: a test supplies mappings, the live path supplies pynetbox
+    records, and everything downstream reads both through ``field``.
+    """
+
+    def records(self, endpoint: str, **filters: Any) -> Iterable[Any]:
+        """Return every object at ``endpoint`` matching ``filters``."""
+        ...  # pragma: no cover - protocol
 
 
-def build_fetcher(url: str, token: str, timeout: float, verify: bool) -> Fetcher:
-    """Return a fetcher bound to one NetBox instance.
-
-    Injecting the fetcher is what lets the reshaping logic be tested without
-    a server: every function below takes the callable rather than reaching
-    for the network itself.
+class NetBoxSource:
+    """Reads a live NetBox through pynetbox.
 
     Args:
-        url: Base URL of the NetBox instance.
-        token: API token, sent as a ``Token`` authorization header.
-        timeout: Per-request timeout in seconds.
+        url: Base URL of the instance, without ``/api``.
+        token: API token.
         verify: Whether to verify TLS certificates.
-
-    Returns:
-        A callable taking an endpoint and query parameters, returning the
-        decoded JSON page.
+        timeout: Per-request timeout in seconds.
     """
-    base = url.rstrip("/")
-    context = None if verify else ssl._create_unverified_context()  # noqa: S323
 
-    def fetch(endpoint: str, params: list[tuple[str, Any]]) -> dict[str, Any]:
-        target = f"{base}/api/{endpoint}/"
-        if params:
-            target = f"{target}?{urllib.parse.urlencode(params, doseq=True)}"
-        request = urllib.request.Request(  # noqa: S310 - scheme validated in main
-            target,
-            headers={
-                "Authorization": f"Token {token}",
-                "Accept": "application/json",
-                "User-Agent": "infrahub-skills-netbox-export/1.0",
-            },
-        )
+    #: Endpoints absent from this NetBox, reported once rather than per call.
+    missing_endpoints: set[str]
+
+    def __init__(self, url: str, token: str, *, verify: bool = True, timeout: float = 30.0):
         try:
-            with urllib.request.urlopen(
-                request, timeout=timeout, context=context
-            ) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as exc:
-            raise ExportError(_http_message(exc, target)) from exc
-        except urllib.error.URLError as exc:
-            raise ExportError(f"Cannot reach {base}: {exc.reason}") from exc
-        except json.JSONDecodeError as exc:
-            raise ExportError(f"{target} did not return JSON: {exc}") from exc
+            import pynetbox
+        except ImportError as exc:  # pragma: no cover - environment guard
+            raise ExportError("pynetbox is required: pip install pynetbox") from exc
 
-    return fetch
+        self._api = pynetbox.api(url.rstrip("/"), token=token)
+        self._api.http_session.verify = verify
+        self._timeout = timeout
+        self._url = url
+        self.missing_endpoints = set()
 
+    def records(self, endpoint: str, **filters: Any) -> Iterator[Any]:
+        """Yield every record at ``endpoint``, following pagination.
 
-def _http_message(exc: urllib.error.HTTPError, target: str) -> str:
-    """Turn an HTTP error into something a reader can act on."""
-    if exc.code in (401, 403):
-        return (
-            f"NetBox rejected the token ({exc.code}). Check --token / NETBOX_TOKEN, "
-            "and that the token has read access to dcim."
-        )
-    if exc.code == 404:
-        return f"{target} not found — is --url the base URL, without /api?"
-    return f"{target} returned HTTP {exc.code} {exc.reason}"
+        Args:
+            endpoint: Dotted pynetbox endpoint, e.g. ``dcim.device_types``.
+            **filters: Query filters. A list value becomes a repeated
+                parameter, which is how one call covers many parent ids.
 
+        Yields:
+            pynetbox records.
 
-def paginate(
-    fetch: Fetcher, endpoint: str, params: list[tuple[str, Any]]
-) -> list[dict[str, Any]]:
-    """Return every result across a paginated endpoint.
+        Raises:
+            ExportError: With a message naming the likely cause, since a bare
+                pynetbox traceback rarely says whether the token, the URL or
+                the network is at fault. An endpoint this NetBox does not have
+                is recorded and skipped instead: component endpoints come and
+                go across NetBox versions, and losing one list is not a reason
+                to lose the whole export.
+        """
+        app, name = endpoint.split(".", 1)
+        try:
+            source = getattr(getattr(self._api, app), name)
+            yield from (source.filter(**filters) if filters else source.all())
+        except Exception as exc:  # noqa: BLE001 - re-raised with context below
+            if self._is_missing_endpoint(exc):
+                self.missing_endpoints.add(endpoint)
+                return
+            raise ExportError(self._explain(exc, endpoint)) from exc
 
-    Args:
-        fetch: The fetcher to use.
-        endpoint: API endpoint, e.g. ``dcim/device-types``.
-        params: Query parameters, excluding pagination.
+    @staticmethod
+    def _is_missing_endpoint(exc: Exception) -> bool:
+        """True when the failure is 'this NetBox has no such endpoint'."""
+        text = str(exc)
+        return "could not be found" in text or "404" in text
 
-    Returns:
-        Every object the endpoint yields for those parameters.
-    """
-    results: list[dict[str, Any]] = []
-    offset = 0
-    while True:
-        page = fetch(
-            endpoint, [*params, ("limit", DEFAULT_PAGE_SIZE), ("offset", offset)]
-        )
-        batch = page.get("results")
-        if not isinstance(batch, list):
-            raise ExportError(
-                f"{endpoint} returned no 'results' list; is this a NetBox API?"
+    def _explain(self, exc: Exception, endpoint: str) -> str:
+        """Turn a client or transport error into something actionable."""
+        text = str(exc)
+        if "403" in text or "401" in text or "Invalid token" in text:
+            return (
+                f"NetBox rejected the token. Check --token / NETBOX_TOKEN, and that "
+                f"it grants read access to {endpoint.split('.', 1)[0]}."
             )
-        results.extend(item for item in batch if isinstance(item, dict))
-        if not page.get("next"):
-            return results
-        offset += DEFAULT_PAGE_SIZE
+        if "404" in text:
+            return f"{endpoint} not found — is --url the base URL, without /api?"
+        if "SSLError" in type(exc).__name__ or "certificate" in text.lower():
+            return f"TLS verification failed for {self._url}. Pass --insecure for a self-signed cert."
+        return f"Reading {endpoint} from {self._url} failed: {text}"
 
 
 # --------------------------------------------------------------------------
@@ -335,23 +331,58 @@ def paginate(
 # --------------------------------------------------------------------------
 
 
-def unwrap(value: Any) -> Any:
-    """Reduce a NetBox API value to its library-format equivalent.
+def field(obj: Any, name: str) -> Any:
+    """Read one field from a mapping or a pynetbox record.
 
-    Choice fields arrive as ``{"value": ..., "label": ...}`` and related
-    objects as nested documents; the library format wants the bare value and
-    the related object's name.
+    pynetbox exposes fields as attributes; canned test data is mappings.
+    Reading both the same way is what lets every function below be tested
+    without a server while running against the real client in production.
+
+    Reads a record's ``__dict__`` rather than using ``getattr``. This is not
+    style: pynetbox's ``Record.__getattr__`` calls ``full_details()`` for any
+    attribute the record does not already hold, which is an HTTP GET. Since
+    ``unwrap`` probes ``value`` before ``name``, a bare ``getattr`` fires one
+    request per nested object — thousands of them across a real catalogue,
+    against a customer's production NetBox, to learn nothing.
 
     Args:
-        value: A raw value from the API.
+        obj: A mapping or a pynetbox record.
+        name: The field to read.
+
+    Returns:
+        The field's value, or ``None`` when it is absent.
+    """
+    if isinstance(obj, dict):
+        return obj.get(name)
+    try:
+        return vars(obj).get(name)
+    except TypeError:  # objects without __dict__, e.g. slots
+        return getattr(obj, name, None)
+
+
+def unwrap(value: Any) -> Any:
+    """Reduce a NetBox value to its library-format equivalent.
+
+    Choice fields carry ``value`` and ``label``; related objects carry a
+    ``name``. The library format wants the bare choice value and the related
+    object's name, so the first of those that is present wins.
+
+    Note that pynetbox's own ``Record.serialize()`` is not usable here: it
+    flattens a related object to its primary key, so a power outlet's
+    ``power_port`` would become ``16`` where the library needs ``"Input"``.
+
+    Args:
+        value: A raw value from NetBox.
 
     Returns:
         The unwrapped value, or the input when nothing needs unwrapping.
     """
-    if isinstance(value, dict):
-        for key in ("value", "name", "slug"):
-            if key in value:
-                return value[key]
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    for key in ("value", "name", "slug"):
+        found = field(value, key)
+        if found is not None:
+            return found
     return value
 
 
@@ -402,12 +433,12 @@ def carry_fields(source: dict[str, Any], fields: tuple[str, ...]) -> dict[str, A
         The cleaned subset, with absent values omitted entirely.
     """
     carried: dict[str, Any] = {}
-    for field in fields:
-        value = unwrap(source.get(field))
-        if field in NUMERIC_FIELDS:
+    for name in fields:
+        value = unwrap(field(source, name))
+        if name in NUMERIC_FIELDS:
             value = as_number(value)
         if is_present(value):
-            carried[field] = value
+            carried[name] = value
     return carried
 
 
@@ -428,21 +459,20 @@ def port_mappings(
         The library's ``port-mappings`` entries, ordered by front port then
         position. Empty when nothing is mapped.
     """
-    by_id = {rear.get("id"): rear.get("name") for rear in rear_ports}
+    by_id = {field(rear, "id"): field(rear, "name") for rear in rear_ports}
     mappings: list[dict[str, Any]] = []
     for front in front_ports:
-        for mapping in front.get("rear_ports") or []:
-            if not isinstance(mapping, dict):
-                continue
-            rear_name = by_id.get(unwrap(mapping.get("rear_port")))
+        for mapping in field(front, "rear_ports") or []:
+            rear_ref = field(mapping, "rear_port")
+            rear_name = by_id.get(field(rear_ref, "id") if not isinstance(rear_ref, int) else rear_ref)
             if rear_name is None:
                 continue
             mappings.append(
                 {
-                    "front_port": front.get("name"),
-                    "front_port_position": as_number(mapping.get("position")),
+                    "front_port": field(front, "name"),
+                    "front_port_position": as_number(field(mapping, "position")),
                     "rear_port": rear_name,
-                    "rear_port_position": as_number(mapping.get("rear_port_position")),
+                    "rear_port_position": as_number(field(mapping, "rear_port_position")),
                 }
             )
     return mappings
@@ -494,7 +524,7 @@ def build_document(
     if mappings:
         document["port-mappings"] = mappings
 
-    if is_module and source.get("attributes"):
+    if is_module and field(source, "attributes"):
         notes.append("attributes — NetBox module-type profile data, no library field")
     if not is_module:
         absent = [f for f in REQUIRED_DEVICE_TYPE_FIELDS if f not in document]
@@ -568,58 +598,51 @@ def chunked(items: list[Any], size: int) -> list[list[Any]]:
 
 
 def fetch_components(
-    fetch: Fetcher, ids: list[int], *, is_module: bool
-) -> dict[int, dict[str, list[dict[str, Any]]]]:
+    source: Source, ids: list[Any], *, is_module: bool
+) -> dict[Any, dict[str, list[Any]]]:
     """Fetch every component template for a set of device or module types.
 
     NetBox accepts a repeated id filter, so components for many parents come
-    back per endpoint rather than per parent — ten requests per batch instead
-    of ten per device type.
+    back per endpoint rather than per parent — ten calls per batch instead of
+    ten per device type.
 
     Args:
-        fetch: The fetcher to use.
+        source: Where to read from.
         ids: Device-type or module-type ids.
         is_module: Whether the ids are module types.
 
     Returns:
-        Component objects keyed by parent id, then by library list name.
+        Components keyed by parent id, then by library list name.
     """
     key = "module_type_id" if is_module else "device_type_id"
     parent = "module_type" if is_module else "device_type"
-    grouped: dict[Any, dict[str, list[dict[str, Any]]]] = {i: {} for i in ids}
+    grouped: dict[Any, dict[str, list[Any]]] = {i: {} for i in ids}
 
     for endpoint, list_name in DEVICE_COMPONENTS:
         if is_module and list_name not in MODULE_COMPONENT_LISTS:
             continue
         for batch in chunked(ids, ID_BATCH):
-            for item in paginate(fetch, endpoint, [(key, i) for i in batch]):
-                owner = unwrap_id(item.get(parent))
+            for item in source.records(endpoint, **{key: batch}):
+                owner = field(field(item, parent), "id")
                 if owner in grouped:
                     grouped[owner].setdefault(list_name, []).append(item)
     return grouped
 
 
-def unwrap_id(value: Any) -> Any:
-    """Return the id of a nested related object, or the value itself."""
-    if isinstance(value, dict):
-        return value.get("id")
-    return value
-
-
 def export(
-    fetch: Fetcher,
+    source: Source,
     out_dir: Path,
     *,
-    filters: list[tuple[str, Any]],
+    filters: dict[str, Any],
     in_use: bool,
     include_modules: bool,
 ) -> tuple[list[Path], list[str]]:
     """Run the export.
 
     Args:
-        fetch: The fetcher to use.
+        source: Where to read from.
         out_dir: Directory to write the library tree into.
-        filters: Query parameters selecting which types to export.
+        filters: Query filters selecting which types to export.
         in_use: Restrict device types to those with at least one device.
         include_modules: Also export module types.
 
@@ -632,17 +655,17 @@ def export(
     for is_module, endpoint in ((False, DEVICE_TYPES), (True, MODULE_TYPES)):
         if is_module and not include_modules:
             continue
-        objects = paginate(fetch, endpoint, filters)
+        objects = list(source.records(endpoint, **filters))
         if in_use and not is_module:
-            objects = [o for o in objects if (o.get("device_count") or 0) > 0]
+            objects = [o for o in objects if (field(o, "device_count") or 0) > 0]
         if not objects:
             continue
 
-        ids = [o["id"] for o in objects if o.get("id") is not None]
-        components = fetch_components(fetch, ids, is_module=is_module)
+        ids = [field(o, "id") for o in objects if field(o, "id") is not None]
+        components = fetch_components(source, ids, is_module=is_module)
 
         for obj in objects:
-            owned = components.get(obj.get("id")) or {}
+            owned = components.get(field(obj, "id")) or {}
             document, doc_notes = build_document(obj, owned, is_module=is_module)
             path = output_path(document, out_dir, is_module)
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -650,6 +673,8 @@ def export(
             written.append(path)
             notes.extend(f"{document.get('model', '?')}: {note}" for note in doc_notes)
 
+    for endpoint in sorted(getattr(source, "missing_endpoints", ())):
+        notes.append(f"{endpoint} — endpoint absent from this NetBox, list not exported")
     return written, notes
 
 
@@ -706,12 +731,18 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def selection_filters(args: argparse.Namespace) -> list[tuple[str, Any]]:
-    """Turn CLI selection arguments into API query parameters."""
-    return [
-        *[("manufacturer", value) for value in args.manufacturer],
-        *[("slug", value) for value in args.slug],
-    ]
+def selection_filters(args: argparse.Namespace) -> dict[str, Any]:
+    """Turn CLI selection arguments into pynetbox filters.
+
+    A list value becomes a repeated query parameter, which is how NetBox
+    expresses "any of these".
+    """
+    filters: dict[str, Any] = {}
+    if args.manufacturer:
+        filters["manufacturer"] = args.manufacturer
+    if args.slug:
+        filters["slug"] = args.slug
+    return filters
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -730,9 +761,11 @@ def main(argv: list[str] | None = None) -> int:
         if urllib.parse.urlparse(args.url).scheme not in ("http", "https"):
             raise ExportError(f"--url must be an http(s) URL, got {args.url!r}")
 
-        fetch = build_fetcher(args.url, args.token, args.timeout, not args.insecure)
+        source = NetBoxSource(
+            args.url, args.token, verify=not args.insecure, timeout=args.timeout
+        )
         written, notes = export(
-            fetch,
+            source,
             args.output_dir,
             filters=selection_filters(args),
             in_use=args.in_use,

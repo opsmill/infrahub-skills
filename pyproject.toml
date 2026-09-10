@@ -28,6 +28,11 @@ test = [
     # under test. 1.19.0 is the floor that has infrahub_sdk.generator and
     # SchemaNotFoundError where the generator expects them.
     "infrahub-sdk>=1.19.0",
+    # skills/infrahub-converting-netbox-device-types/scripts/netbox_export_device_types.py
+    # talks to a live NetBox through the official client. 7.0 is the floor that
+    # has RecordSet.filter() accepting a list for multi-value id filters, which
+    # is what lets one call fetch components for many device types.
+    "pynetbox>=7.0.0",
 ]
 
 [tool.pytest.ini_options]
