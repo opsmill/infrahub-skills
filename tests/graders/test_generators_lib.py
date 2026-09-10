@@ -1,5 +1,6 @@
 """Tests for graders/managing-generators/lib.py AST helpers."""
 
+import ast
 import importlib.util
 from pathlib import Path
 
@@ -22,8 +23,6 @@ is_bare_string = _mod.is_bare_string
 is_name_or_attribute = _mod.is_name_or_attribute
 load_output_py = _mod.load_output_py
 
-
-import ast
 
 
 def _parse(src: str) -> ast.Module:

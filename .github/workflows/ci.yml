@@ -54,6 +54,25 @@ jobs:
       - run: yamllint -c .yamllint.yml .
 
   # ---------------------------------------------------------------------------
+  # Lint Python files
+  #
+  # Reuses the `tests` filter deliberately: it already resolves to every
+  # `**/*.py`, `pyproject.toml`, `uv.lock` and `ci.yml` change, which is
+  # exactly the trigger set a Python lint job wants.
+  #
+  # The rule set is pinned in `pyproject.toml` rather than inherited from
+  # whichever ruff resolves, so this gate cannot widen on a version bump.
+  # ---------------------------------------------------------------------------
+  python-lint:
+    needs: files-changed
+    if: needs.files-changed.outputs.tests == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run ruff check .
+
+  # ---------------------------------------------------------------------------
   # Run the Python test suite — grader libraries and the bundled skill scripts
   #
   # Matrixed over the floor and the current interpreter: pyproject declares

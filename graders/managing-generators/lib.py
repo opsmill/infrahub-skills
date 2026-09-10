@@ -685,7 +685,7 @@ def check_uses_from_graphql(output: dict, **_: Any) -> tuple[bool, str]:
                 f"with client= and data= kwargs ({len(in_loop)} total)"
             )
     return False, (
-        f"InfrahubNode.from_graphql called inside a for-loop but missing "
+        "InfrahubNode.from_graphql called inside a for-loop but missing "
         "client= or data= kwargs"
     )
 

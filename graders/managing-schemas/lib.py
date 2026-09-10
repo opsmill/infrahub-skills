@@ -2496,7 +2496,6 @@ def run_checks(
     total = len(check_names)
     score = round(passed_count / total, 4) if total > 0 else 0.0
 
-    passed_names = [e["name"] for e in entries if e["passed"]]
     failed_names = [e["name"] for e in entries if not e["passed"]]
     if failed_names:
         details = f"{passed_count}/{total} checks passed. Failed: {', '.join(failed_names)}"

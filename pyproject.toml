@@ -8,6 +8,7 @@ requires-python = ">=3.10"
 dev = [
     "rumdl",
     "invoke>=2.2.0",
+    "ruff>=0.14.0",
     "yamllint>=1.37.1",
 ]
 
@@ -64,3 +65,11 @@ front-matter-title = ""
 # MD060: require leading and trailing pipes
 [tool.rumdl.MD060]
 enabled = true
+
+[tool.ruff.lint]
+# Pinned to what was ruff's default rule set through 0.15, which is the set
+# this repo was cleaned against. Left implicit, the gate would silently widen
+# on a ruff upgrade: 0.16 turned on RUF/EXE/I/BLE/N/SIM/UP and friends, which
+# report 352 further findings here. Adopting any of those is a deliberate
+# change with its own diff to clear, not a side effect of bumping a floor.
+select = ["E4", "E7", "E9", "F"]
