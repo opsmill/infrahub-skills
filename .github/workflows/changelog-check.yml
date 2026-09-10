@@ -1,0 +1,65 @@
+---
+# yamllint disable rule:truthy
+name: Changelog
+
+# A release is assembled from news fragments, so every pull request that
+# changes behaviour must carry one. Failing here — rather than at release
+# time, the way the shared platform does — puts the cost on the author while
+# they still have the context, instead of on whoever cuts the release.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  fragment:
+    name: News fragment present
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Require a news fragment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          set -euo pipefail
+
+          # Trivial changes (dependency bumps, typo fixes) opt out. The
+          # platform's rule is at least one fragment per *release*, not per
+          # PR, so skipping here still satisfies it.
+          case ",${LABELS}," in
+            *,ci/skip-changelog,*)
+              echo "ci/skip-changelog is set — no fragment required."
+              exit 0
+              ;;
+          esac
+
+          # Ask the API which files the PR adds rather than diffing locally:
+          # no dependence on checkout depth or on which commit is HEAD.
+          ADDED=$(gh pr view "${PR}" --json files \
+            --jq '.files[] | select(.additions > 0) | .path' \
+            | { grep -E '^changelog/.+\.md$' || true; } \
+            | { grep -v '^changelog/towncrier\.md\.template$' || true; })
+
+          if [ -z "${ADDED}" ]; then
+            MSG="No news fragment found. Add one under changelog/ describing"
+            MSG="${MSG} this change, e.g. uv run towncrier create -c"
+            MSG="${MSG} \"What changed\" ${PR}.fixed.md — types: security,"
+            MSG="${MSG} removed, deprecated, added, changed, fixed,"
+            MSG="${MSG} housekeeping. Label the PR ci/skip-changelog if it"
+            MSG="${MSG} genuinely needs no entry."
+            echo "::error::${MSG}"
+            exit 1
+          fi
+
+          echo "Found news fragment(s):"
+          echo "${ADDED}"

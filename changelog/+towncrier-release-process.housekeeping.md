@@ -1,0 +1,1 @@
+Assemble release notes with towncrier instead of release-drafter: pull requests now require a news fragment, releases arrive as a reviewable pull request gated by the regression eval suite, and the assembled changelog becomes the GitHub Release body.
