@@ -1,0 +1,88 @@
+---
+title: NetBox Device Type Converter
+sidebar_position: 15
+---
+
+The NetBox Device Type Converter turns NetBox device-type and module-type YAML — the [netbox-community/devicetype-library](https://github.com/netbox-community/devicetype-library) format, browsable at the [NetBox Data Exchange](https://netboxlabs.com/ndx/) — into Infrahub Object Templates: reusable blueprints that create a device with all its ports already in place. A bundled Python script does the conversion, driven by a mapping profile that describes your target schema, so the skill is about pointing it at the right schema and reading what it reports back — without editing your schema for you or guessing a field name the profile does not define.
+
+## When to use
+
+- Seeding a new Infrahub instance with vendor device models from the NetBox library
+- Converting a handful of device types for a specific project or lab topology
+- Re-running a conversion after the upstream library or your local schema changed
+- Building the mapping profile that binds NetBox fields to a custom Infrahub schema
+
+Not for syncing a **live** NetBox instance into Infrahub — that is [infrahub-sync](https://docs.infrahub.app/sync/), a separate product. This skill converts the static YAML definitions.
+
+## What it produces
+
+One NetBox file becomes several Infrahub artifacts, because Infrahub splits what NetBox keeps together:
+
+| NetBox | Infrahub | Why |
+| -------- | ---------- | ----- |
+| `manufacturer: Cisco` | `OrganizationManufacturer` object | Manufacturers are first-class objects |
+| `model`, `part_number`, `u_height`, `weight` | `DcimDeviceType` object | Templates hold no model data |
+| `interfaces:` and other component lists | `TemplateDcimDevice` plus component templates | The reusable blueprint |
+| `module-types/*.yaml` | `DcimModuleType` object, optionally a module template | A second input family, told apart by the absence of a `slug` |
+
+The files are numbered in dependency order, so loading them in sequence satisfies each file's references:
+
+- `01_manufacturers.yml`
+- `02_device_types.yml`
+- `03_device_templates.yml`
+- `04_module_types.yml`
+- `05_module_templates.yml`
+- a Markdown coverage report naming everything the profile could not map
+
+Empty files are not written, so a device-types-only run produces the first three plus the report.
+
+## Example prompts
+
+- "Convert these Cisco device types into Infrahub object templates"
+- "Seed my instance with device models from the NetBox devicetype-library"
+- "Build a mapping profile for my custom DCIM schema"
+- "Re-run the device-type conversion — we upgraded schema-library"
+- "Convert the module types too, including the line cards"
+
+## Key rules enforced
+
+- **`generate_template: true` comes first** — `Template*` kinds exist only where a node declares it, so the skill checks the target schema rather than assuming either way; this is the most common reason a conversion loads nothing
+- **Names come from the profile, never guessed** — every Infrahub kind, attribute, and relationship name is read from a YAML mapping profile, so a custom schema needs a new profile rather than a forked script
+- **Competing fields declare precedence** — NetBox carries more free-text fields than most schemas have room for, so the profile names one as another's fallback; the loser is reported as shadowed, and an undeclared collision is refused rather than letting mapping order decide it silently
+- **Shared relationships accumulate** — where two NetBox component lists map to the same Infrahub relationship, both are kept; assigning rather than accumulating silently erased the first list
+- **Integers only** — Infrahub has no float or decimal attribute kind, so every numeric transform emits a whole number
+- **Nothing is dropped silently** — anything the profile cannot map is skipped and named in the coverage report, which closes with an explanation of why each gap exists
+- **Template names are slug-based and parent-namespaced** — so names stay unique across the whole library rather than colliding between vendors
+- **The skill offers schema changes, it does not make them** — enabling `generate_template` is a migration against your source of truth, so it is proposed for you to apply
+
+## Running the converter
+
+```bash
+python skills/infrahub-converting-netbox-device-types/scripts/netbox_to_infrahub_templates.py \
+  devicetype-library/device-types/Cisco/ \
+  --mapping skills/infrahub-converting-netbox-device-types/scripts/mappings/schema-library.yml \
+  --output-dir ./generated \
+  --report ./generated/coverage-report.md
+```
+
+Point it at a single file, a folder, or a mixed tree of device types and module types — the two families are told apart automatically, so a mixed tree converts in one pass. Three mapping profiles ship: `schema-library.yml`, `schema-library-modules.yml`, and an annotated `_template.yml` to copy for a custom schema.
+
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --------- | --------------------------- |
+| Assuming `Template*` kinds already exist | Checks the target schema for `generate_template: true` before converting |
+| Hand-transcribing a 48-port switch | Runs the script, which is exact and repeatable across thousands of device types |
+| Editing the script for a custom schema | Writes a new mapping profile, leaving the script untouched |
+| Reading a clean run as a lossless one | Points you at the coverage report, which names what did not convert |
+| Loading the output files in arbitrary order | Numbers them `01`–`05` in dependency order |
+| Expecting `{module}` port names to resolve | Explains that the bay position is known only once a module is installed |
+| Reaching for this to sync a live NetBox | Sends you to infrahub-sync, which is a different product |
+
+:::warning
+Read the coverage report before loading anything. Against the stock `schema-library.yml` profile most NetBox component lists have no equivalent node, so a report full of unmapped entries is the normal path rather than an error — it is the list of schema changes a lossless conversion would need.
+:::
+
+:::tip
+Module port names carry NetBox's `{module}` token, which no conversion can resolve, because the bay position is known only once a module is installed. Once the schema-library module extensions are loaded, a bundled generator resolves the token per installed module and creates the real device interfaces.
+:::

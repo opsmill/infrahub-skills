@@ -27,7 +27,7 @@ description: Four new skills — NetBox device-type conversion, concept tutoring
 
 ## Release summary
 
-After upgrading, you can convert NetBox device-type definitions into Infrahub object templates, learn Infrahub concepts through your own repository and instance, triage a diagnostic bundle before escalating it, and report a skill's own missing guidance as a reviewed issue. The schema, check, transform, and generator guidance also changed: what a declaration on a generic imposes on every inheriting kind is now stated explicitly, and every `infrahubctl` command the skills print has been checked against the CLI.
+After upgrading, you can convert NetBox device-type definitions into Infrahub Object Templates, learn Infrahub concepts through your own repository and instance, triage a diagnostic bundle before escalating it, and report a skill's own missing guidance as a reviewed issue. The schema, check, transform, and generator guidance also changed: what a declaration on a generic imposes on every inheriting kind is now stated explicitly, and every `infrahubctl` command the skills print has been checked against the CLI.
 
 :::note What to expect after upgrading
 
@@ -39,9 +39,9 @@ See [Upgrade notes](#upgrade-notes) for full details.
 
 :::
 
-### Convert NetBox device-type definitions into Infrahub object templates
+### Convert NetBox device-type definitions into Infrahub Object Templates
 
-Turn NetBox device-type and module-type files — the [netbox-community/devicetype-library](https://github.com/netbox-community/devicetype-library) format — into Infrahub object templates with the new converting-netbox-device-types skill. A bundled Python converter reads a mapping profile describing your target schema and writes manufacturers, device types, module types, and component templates as object YAML, alongside a coverage report naming everything it could not map ([#80](https://github.com/opsmill/infrahub-skills/pull/80)).
+Turn NetBox device-type and module-type files — the [netbox-community/devicetype-library](https://github.com/netbox-community/devicetype-library) format — into Infrahub Object Templates with the new [converting-netbox-device-types](../skills-reference/converting-netbox-device-types.mdx) skill. A bundled Python converter reads a mapping profile describing your target schema and writes manufacturers, device types, module types, and component templates as object YAML, alongside a coverage report naming everything it could not map ([#80](https://github.com/opsmill/infrahub-skills/pull/80)).
 
 * Convert a single file, a folder, or a mixed tree of device types and module types in one pass. The two families are told apart by `slug`, which every device type carries and no module type does, so a mixed tree does not have to be split up first. Output files are numbered `01_manufacturers` through `05_module_templates` so `infrahubctl object load` runs them in dependency order.
 * Point the converter at your own schema with a mapping profile rather than editing the script. Every Infrahub kind, attribute, and relationship name is read from a YAML profile, so a custom schema needs a new profile instead of a forked converter. Three profiles ship: `schema-library.yml`, `schema-library-modules.yml`, and an annotated `_template.yml`.
@@ -59,7 +59,7 @@ Work through Infrahub concepts — foundations, schema, objects, GraphQL, branch
 
 ### Triage a diagnostic bundle before escalating it
 
-Read a bundle collected by [collecting-diagnostics](../skills-reference/collecting-diagnostics.mdx) yourself with the new analyzing-diagnostics skill. It reads the manifest first, sweeps every service's logs for tracebacks, ERROR and CRITICAL lines, OOM kills, and `*.previous.log` restart evidence, then reports correlated incidents with root causes separated from cascades rather than a flat list of errors ([#76](https://github.com/opsmill/infrahub-skills/pull/76)).
+Read a bundle collected by [collecting-diagnostics](../skills-reference/collecting-diagnostics.mdx) yourself with the new [analyzing-diagnostics](../skills-reference/analyzing-diagnostics.mdx) skill. It reads the manifest first, sweeps every service's logs for tracebacks, ERROR and CRITICAL lines, OOM kills, and `*.previous.log` restart evidence, then reports correlated incidents with root causes separated from cascades rather than a flat list of errors ([#76](https://github.com/opsmill/infrahub-skills/pull/76)).
 
 * Find out whether your crash is already known, and possibly already fixed, before anyone files an issue or waits on support. Findings are matched against existing `opsmill/infrahub` issues using stable search keys — exception class plus normalized message — with volatile tokens such as branch names, UUIDs, and hostnames stripped so a known issue actually matches. A match then resolves against the version the bundle reports running: a newer fix version means upgrade, and already running the fix means an unconfirmed match or a possible regression.
 * Read every finding against evidence you can check. Each claim cites a bundle path with a quoted excerpt, the report opens with the deployment context — running version, topology, replica counts — and what the bundle cannot answer is reported as an open question mapped to the `infrahub-collect create` flags a next bundle would need.
