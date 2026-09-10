@@ -19,6 +19,7 @@ jobs:
       markdown: ${{ steps.changes.outputs.markdown_all }}
       yaml: ${{ steps.changes.outputs.yaml_all }}
       skills: ${{ steps.changes.outputs.skills_all }}
+      cli: ${{ steps.changes.outputs.cli_invocations_all }}
       documentation: ${{ steps.changes.outputs.documentation_all }}
       tests: ${{ steps.changes.outputs.tests_all }}
     steps:
@@ -77,6 +78,20 @@ jobs:
       # The test deps sit in an opt-in `test` group, kept out of `dev` so the
       # lint jobs above do not install the SDK's dependency tree.
       - run: uv run --group test pytest
+
+  # ---------------------------------------------------------------------------
+  # Verify every infrahubctl command printed in the repo exists
+  # ---------------------------------------------------------------------------
+  cli-invocations:
+    needs: files-changed
+    if: needs.files-changed.outputs.cli == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python scripts/check-cli-invocations.py
 
   # ---------------------------------------------------------------------------
   # Build documentation (Docusaurus)

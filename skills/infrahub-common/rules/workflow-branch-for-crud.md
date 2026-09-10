@@ -11,7 +11,7 @@ Impact: CRITICAL
 When creating, updating, or deleting data in Infrahub —
 whether via `infrahubctl object load`, the MCP write tools
 (`node_upsert` / `node_delete` / `mutate_graphql`),
-`infrahubctl generator run`, or the Python SDK — default to
+`infrahubctl generator <name>`, or the Python SDK — default to
 working on a dedicated branch. Reach for the **default
 branch** (the branch operations target when no branch is
 given — `main` by convention, but it can be renamed per

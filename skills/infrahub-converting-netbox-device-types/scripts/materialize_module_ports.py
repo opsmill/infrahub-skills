@@ -122,8 +122,8 @@ Unit tests for the planning logic:
 shape -- run it end to end against a live instance before declaring it done,
 per ``skills/infrahub-managing-generators/rules/testing-integration.md``::
 
-    infrahubctl generator list
-    infrahubctl generator run materialize_module_ports --branch <branch>
+    infrahubctl generator --list
+    infrahubctl generator materialize_module_ports --branch <branch>
 """
 
 from __future__ import annotations

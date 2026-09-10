@@ -98,12 +98,12 @@
     {
       "id": 5,
       "prompt": "Write an Infrahub Generator that creates three DcimDevice instances\nfrom a TopologyDataCenter design. After the generator class, include a\nshort section (as a Python triple-quoted string named TEST_PLAN at the\nbottom of the file, or as a # block comment) explaining how to test the\ngenerator end-to-end against a live Infrahub instance before merging.",
-      "expected_output": "A Python generator plus end-to-end test guidance. The guidance should mention infrahubctl generator run against a live instance and note that input-dict unit tests don't cover SDK call shape.",
+      "expected_output": "A Python generator plus end-to-end test guidance. The guidance should name a live-instance run of the generator \u2014 `infrahubctl generator <name> <param>=<target_id>`, not a `run` subcommand \u2014 and note that input-dict unit tests don't cover SDK call shape.",
       "files": [],
       "expectations": [
         "Generator class is present and creates DcimDevice instances",
         "TEST_PLAN string or block comment exists at the bottom of the file",
-        "The guidance mentions infrahubctl generator run against a real Infrahub instance",
+        "The guidance names a live run of the generator against a real Infrahub instance, in the form `infrahubctl generator <name> <param>=<target_id>`",
         "The guidance notes that unit tests on the input dict do not cover SDK call shape"
       ],
       "assertions": []

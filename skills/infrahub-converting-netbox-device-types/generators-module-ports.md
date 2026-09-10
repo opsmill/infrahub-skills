@@ -426,8 +426,8 @@ run it end to end before declaring it done:
 
 ```bash
 infrahubctl branch create module-ports
-infrahubctl generator list
-infrahubctl generator run materialize_module_ports --branch module-ports
+infrahubctl generator --list
+infrahubctl generator materialize_module_ports --branch module-ports
 ```
 
 Then check the created interfaces exist on the device
