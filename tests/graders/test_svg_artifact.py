@@ -155,3 +155,35 @@ class T:
 '''
     )
     assert ok, msg
+
+
+def _content_type(md: str):
+    return _mod.check_artifact_content_type_declared(md_text=md)
+
+
+def test_a_prose_mention_before_the_registration_does_not_decide_the_check():
+    """Answers that explain the choice first were failed by first-match."""
+    ok, msg = _content_type(
+        """Do not use `content_type: text/plain` here -- the artifact IS a
+diagram, so it needs the vector type:
+
+```yaml
+artifact_definitions:
+  - name: rack_elevation
+    content_type: image/svg+xml
+```
+"""
+    )
+    assert ok, msg
+
+
+def test_a_registration_with_the_wrong_content_type_still_fails():
+    ok, msg = _content_type(
+        """```yaml
+artifact_definitions:
+  - name: rack_elevation
+    content_type: text/plain
+```
+"""
+    )
+    assert not ok and "text/plain" in msg

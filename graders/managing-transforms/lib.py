@@ -611,13 +611,27 @@ def check_artifact_content_type_declared(
 
     All eight values are supported; the point of the check is that the
     non-text one is reachable and gets used when the output is a diagram.
+
+    Only line-anchored declarations count, and every one of them is
+    collected. A prose mention -- "not `content_type: text/plain`, the
+    artifact IS a diagram" -- sits mid-sentence, so matching the first
+    occurrence anywhere in the file failed answers that explained the
+    choice before showing the registration.
     """
-    match = re.search(r"content_type:\s*[\"']?([\w./+-]+)", md_text)
-    if not match:
+    declared = [
+        match.group(1)
+        for match in re.finditer(
+            r"^[ \t]*-?[ \t]*content_type:\s*[\"']?([\w./+-]+)",
+            md_text,
+            re.MULTILINE,
+        )
+    ]
+    if not declared:
         return False, "no content_type declared in the artifact definition"
-    value = match.group(1)
-    if value != "image/svg+xml":
-        return False, f"content_type is {value!r}, expected image/svg+xml for a diagram"
+    if "image/svg+xml" not in declared:
+        return False, (
+            f"content_type is {declared[0]!r}, expected image/svg+xml for a diagram"
+        )
     return True, "content_type: image/svg+xml"
 
 

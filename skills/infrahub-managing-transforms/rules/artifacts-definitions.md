@@ -146,8 +146,11 @@ nodes:
   is materialised for
 - `parameters:` maps target object attributes onto
   named query variables (missing keys pass `None`)
-- `content_type:` must match the transform's actual
-  output shape, since it drives the served MIME type
+- `content_type:` selects the serialiser, so the
+  transform's return value has to match it: only
+  `application/json` and `application/yaml` accept a
+  `dict`, the other six require a `str` -- a `dict`
+  under any of them is stored as `str(dict)`, silently
 
 Reference:
 [infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md)

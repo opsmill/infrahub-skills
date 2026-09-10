@@ -10,7 +10,7 @@ quick-reference.
 - [Two Transform Kinds](#two-transform-kinds)
 - [InfrahubTransform (Python) — Class API](#infrahubtransform-python--class-api)
 - [Lifecycle: collect_data → transform → return](#lifecycle-collect_data--transform--return)
-- [Return Type Drives `content_type`](#return-type-drives-content_type)
+- [`content_type` and the Return Type](#content_type-and-the-return-type)
 - [Jinja2-Only Transform](#jinja2-only-transform)
 - [Hybrid Python + Jinja2](#hybrid-python--jinja2)
 - [.infrahub.yml Registration](#infrahubyml-registration)
@@ -99,7 +99,7 @@ canonical "I get None back" symptom.
 
 ---
 
-## Return Type Drives `content_type`
+## `content_type` and the Return Type
 
 | Return type | Suitable `artifact_definitions.content_type` |
 | ----------- | -------------------------------------------- |
