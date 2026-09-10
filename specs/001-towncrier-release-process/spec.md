@@ -134,6 +134,7 @@ Generic gates: **CI/CD change** — yes, the release pipeline is replaced. **New
 - PR #131 merges first; this feature depends on the towncrier configuration it adds.
 - PR labels are applied reliably; conventional-commit type prefixes are **not** trustworthy in this repo — `docs:` has landed on commits that were really fixes — which is why the bump stays label-driven rather than adopting the platform's commit-driven `auto-semver`.
 - A release PR is an acceptable substitute for a `develop` branch as the quality gate and admin review point. This replaces the proposal to add `develop` here, and needs the proposer's agreement.
+- **"Blocking" in FR-008 depends on a repository setting this feature cannot supply.** Adding the `regression` job makes it *run* on the release PR; it only *blocks* the merge if `skill-evals-regression` is added to `main`'s required status checks. At specification time `main` required 1 approving review but **0 required status checks**, so a failing eval run would not by itself prevent a merge. Configuring that is a follow-up, and until it is done SC-005 is enforced by reviewer discipline rather than by the platform.
 - The single `main` branch model is retained.
 - SRE owns the eventual migration onto the shared reusable workflows, on their own timeline.
 - The `opsmill-cicd-workflows` `changelog-towncrier` composite currently hard-codes a `changes/` directory and will need to honour towncrier's configured `directory` before migration; tracked separately against that repository.
