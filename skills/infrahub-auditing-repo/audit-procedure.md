@@ -4,6 +4,25 @@ This document defines the step-by-step audit procedure.
 When running an audit, follow each phase in order and
 collect findings into a structured report.
 
+## Phase 0: The audit is read-only (CRITICAL)
+
+Read
+[rules/audit-is-read-only.md](./rules/audit-is-read-only.md)
+before Phase 1. It is not a phase you walk; it is the
+constraint every phase runs under.
+
+In one line: **do not write to the working tree or the
+index, and do not run a git command that would.** The
+report file (`AUDIT_REPORT.md`) is the only file this
+audit creates.
+
+That line is not enough to act on. Which git verbs are
+forbidden, which read another revision without touching
+the tree, what to do about a script whose `--check`
+flag may write, and how to report a tree you have
+already dirtied are all in the rule, and none of them
+are restated here. Open it.
+
 ## Phase 1: Project Structure (CRITICAL)
 
 ### 1.1 Check `.infrahub.yml` exists
