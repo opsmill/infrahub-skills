@@ -485,6 +485,22 @@ def watch_files(entry: dict) -> list[str] | None:
     return [canonical_watch_path(f) for f in files if isinstance(f, str)]
 
 
+def declared_watch_paths(entry: dict) -> list[str]:
+    """Every path the entry names under ``watch``, whatever shape it used.
+
+    ``watch_files`` deliberately returns ``None`` for a shape Infrahub
+    rejects at import. A check asking "does this answer name something that
+    never belongs in watch?" must still see those paths, or the bare-list
+    form launders the violation past it.
+    """
+    watch = entry.get("watch")
+    if isinstance(watch, dict):
+        watch = watch.get("files")
+    if not isinstance(watch, list):
+        return []
+    return [canonical_watch_path(f) for f in watch if isinstance(f, str)]
+
+
 def _covers(files: list[str], target: str) -> bool:
     """True if ``target`` is named outright or sits under a declared directory."""
     target = canonical_watch_path(target)
@@ -672,6 +688,30 @@ def check_watch_declares_dynamic_jinja2_partials(
     )
 
 
+def check_watch_no_third_party(
+    yml_doc: dict | None = None, **_: Any
+) -> tuple[bool, str]:
+    """Installed packages are not tracked repo files and never belong in watch.
+
+    Both rules teach this — ``artifacts-watch-dependencies.md`` calls them
+    "installed dependencies, not tracked" — and the generators task already
+    grades it. Without the mirror here, a manifest declaring
+    ``infrahub_sdk`` alongside a real path scores a clean sheet.
+    """
+    third_party = ("infrahub_sdk", "site-packages", "pydantic", "httpx")
+    doc = yml_doc or {}
+    for section in _WATCH_SECTIONS:
+        for entry in _entries(doc, section):
+            for path in declared_watch_paths(entry):
+                if any(token in path for token in third_party):
+                    return False, (
+                        f"{section}/{entry.get('name', '<unnamed>')}: watch names an "
+                        f"installed dependency ({path}), which is not a tracked "
+                        "repository file"
+                    )
+    return True, "No watch entry names an installed dependency"
+
+
 # ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
@@ -692,6 +732,7 @@ CHECKS: dict[str, Any] = {
     "watch-empty-for-self-contained": check_watch_empty_for_self_contained,
     "watch-omitted-for-static-jinja2": check_watch_omitted_for_static_jinja2,
     "watch-declares-dynamic-jinja2-partials": check_watch_declares_dynamic_jinja2_partials,
+    "watch-no-third-party": check_watch_no_third_party,
 }
 
 

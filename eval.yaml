@@ -1635,6 +1635,7 @@ tasks:
       - "interface_names declares watch.files as an empty list"
       - "arista_startup_config carries no watch entries (its closure is complete)"
       - "cisco_startup_config declares templates/partials/"
+      - "No watch list names an installed package such as infrahub_sdk"
     assertions:
       - name: watch-present-on-python-transforms
         check: >-
@@ -1668,6 +1669,10 @@ tasks:
         check: >-
           cisco_startup_config declares templates/partials/, which its
           variable include can reach
+      - name: watch-no-third-party
+        check: >-
+          No watch list names an installed package such as infrahub_sdk,
+          which is not a tracked repository file
 
   # --- Transforms: pre-merge GraphQL dry-run --- #
   # Backs the shared rule
@@ -3092,6 +3097,18 @@ tasks:
 
       This repository runs on Infrahub 1.11.1. Audit the registrations
       below against how Infrahub decides what to regenerate.
+
+      Emit one finding per defective registration entry, shaped:
+
+      {"findings": [{"rule": "...", "severity": "MEDIUM|LOW",
+                     "file": ".infrahub.yml",
+                     "entry": "<registered file_path or template_path
+                                of the entry the finding is about>",
+                     "description": "...", "fix": "..."}]}
+
+      `entry` is what the finding is against, so name only entries you are
+      actually flagging. Emit no finding for an entry that is already
+      correct.
 
       Repository layout:
 

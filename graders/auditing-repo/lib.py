@@ -1086,45 +1086,36 @@ def _identity_blob(finding: dict) -> str:
     return " ".join(str(finding.get(k, "")) for k in _IDENTITY_FIELDS).lower()
 
 
-def _full_blob(finding: dict) -> str:
-    return (
-        _identity_blob(finding)
-        + " "
-        + " ".join(
-            str(finding.get(k, ""))
-            for k in ("description", "fix", "replacement", "suggestion", "detail")
-        ).lower()
-    )
-
-
 def check_watch_flags_entry(
     findings: list[dict], rule: str, needle: str
 ) -> tuple[bool, str]:
-    """Assert some finding for ``rule`` picks out the definition ``needle`` names.
+    """Assert some finding for ``rule`` is *attributed to* the definition ``needle``.
 
     ``needle`` is the registered file path; the entry's own name (its last
     path segment without the extension) counts too. Both identify the same
     definition, and which one a finding cites is presentation, not substance
     — a defect in a ``.infrahub.yml`` entry is legitimately attributed to
-    ``.infrahub.yml`` with the entry named alongside.
+    ``.infrahub.yml`` with the entry named in the ``entry`` field, which the
+    task's finding shape requires.
 
-    Deliberately generous, and asymmetric with the negative control below:
-    the question here is "did the audit catch this one at all", so a match
-    anywhere in the finding counts. ``check_watch_does_not_flag_entry`` asks
-    the opposite question and stays strict, so a passing mention in prose
-    cannot manufacture a false failure there.
+    Identity fields only, symmetric with the negative control below. Reading
+    the prose too would let a single all-clear finding — one that names both
+    entries in a sentence saying they are already correct — satisfy every
+    positive assertion, which is the one thing this task exists to measure.
+    Requiring the entry in an identity field is what separates "flagged this
+    one" from "mentioned it".
     """
     matching = _findings_for(findings, rule)
     if not matching:
         return False, f"no {rule} finding emitted at all"
     stem = needle.lower().rsplit("/", 1)[-1].rsplit(".", 1)[0]
     for f in matching:
-        blob = _full_blob(f)
+        blob = _identity_blob(f)
         if needle.lower() in blob or (stem and stem in blob):
             return True, f"{rule} flags {needle}"
     return False, (
-        f"{rule} does not flag {needle} (nor the entry name {stem!r}); "
-        f"files flagged: {_finding_files(findings, rule)}"
+        f"{rule} does not flag {needle} (nor the entry name {stem!r}) in any "
+        f"identity field; files flagged: {_finding_files(findings, rule)}"
     )
 
 
