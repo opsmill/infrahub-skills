@@ -29,7 +29,7 @@ Plugin (plugin.json)
 │           schema files
 │
 ├── Skills (skills/)
-│   ├── infrahub-managing-schemas/
+│   ├── infrahub-<verb>-<noun>/   ← one per skill
 │   │   ├── SKILL.md          ← Entry point
 │   │   ├── rules/            ← Modular rules
 │   │   │   ├── _sections.md  ← Category index
@@ -38,31 +38,24 @@ Plugin (plugin.json)
 │   │   ├── reference.md      ← Property/format tables
 │   │   └── validation.md     ← Validation guidance
 │   │
-│   ├── infrahub-managing-objects/
-│   ├── infrahub-managing-checks/
-│   ├── infrahub-managing-generators/
-│   ├── infrahub-managing-transforms/
-│   ├── infrahub-managing-menus/
-│   ├── infrahub-analyzing-data/
-│   ├── infrahub-auditing-repo/
-│   │
 │   └── infrahub-common/      ← Cross-cutting refs
 │       ├── graphql-queries.md
 │       ├── infrahub-yml-reference.md
 │       ├── marketplace-reference.md
 │       └── rules/            ← Shared rules
 │
-├── eval.yaml                             ← skillgrade config (all skills)
+├── eval.yaml                 ← skillgrade config (all skills)
 │
-└── graders/                              ← Deterministic grader scripts
-    ├── managing-schemas/                  ← one directory per skill
-    ├── managing-menus/
-    ├── managing-checks/
-    ├── managing-objects/
-    ├── managing-generators/
-    ├── managing-transforms/
-    └── reporting-issues/
+└── graders/                  ← Deterministic grader scripts
+    └── <skill>/              ← one directory per skill,
+                                named without the
+                                `infrahub-` prefix
 ```
+
+The skill list itself lives in one place — the
+Quick Reference table in
+[AGENTS.md](../../AGENTS.md) — so it isn't repeated
+here.
 
 ## Progressive Disclosure Model
 
@@ -163,6 +156,14 @@ Cross-cutting concerns live in `skills/infrahub-common/` to
 avoid duplication. When multiple skills need GraphQL
 query guidance or `.infrahub.yml` format reference,
 they point to the same shared files.
+
+The shared files are also the most expensive place to
+write. Every skill that loads `infrahub-common` pays
+for all of it, so a rule that only two skills need
+belongs in those two skills, not here. Before adding
+to a shared file, check whether the concern is
+genuinely cross-cutting or just convenient to put in
+one place.
 
 ### Automatic Detection via Hooks
 

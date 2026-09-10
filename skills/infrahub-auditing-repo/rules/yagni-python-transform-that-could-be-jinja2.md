@@ -25,7 +25,19 @@ When the transform body is `f"interface {name}\n  description {desc}\n  ip {ip}"
 the cost of the Python form is everything around the string: an
 `InfrahubTransform` subclass, an async function, error handling for
 nothing, plus a registration entry under `python_transforms` instead
-of `jinja2_transforms`. The Jinja2 form is one `.j2` file. Reviewers
+of `jinja2_transforms`.
+
+That registration is not a like-for-like swap. A Python transform has
+to carry a `watch` list and keep it accurate for the life of the
+file — Infrahub never scans its imports, so without one the commit id
+goes into its fingerprint and the artifacts re-render on every commit,
+and with an inaccurate one they silently go stale. A Jinja2 transform
+needs none of that: its closure is built by following the template's
+own includes, so it is trusted on its own. Porting retires an ongoing
+maintenance obligation, not just the Python. See
+[practices-watch-dependencies.md](./practices-watch-dependencies.md).
+
+The Jinja2 form is one `.j2` file. Reviewers
 read it in two seconds. Operators can preview it from the proposed-
 change UI without running Python.
 

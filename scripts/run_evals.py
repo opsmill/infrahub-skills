@@ -959,7 +959,7 @@ def main():
             print(f"\n  Eval {eval_id}: {ev['prompt'][:80]}...")
 
             # Run with skill
-            print(f"    Running with skill...")
+            print("    Running with skill...")
             ws_dir = eval_dir / "with_skill" / "outputs"
             ws_timing = run_claude_prompt(
                 ev["prompt"], ws_dir, with_skill=True,
@@ -970,7 +970,7 @@ def main():
             # Run without skill
             wos_timing = {"total_tokens": 0, "duration_ms": 0, "total_duration_seconds": 0}
             if not args.skip_baseline:
-                print(f"    Running without skill (baseline)...")
+                print("    Running without skill (baseline)...")
                 wos_dir = eval_dir / "without_skill" / "outputs"
                 wos_timing = run_claude_prompt(
                     ev["prompt"], wos_dir, with_skill=False, model=args.model,
@@ -982,7 +982,7 @@ def main():
             ws_schema = eval_dir / "with_skill" / "outputs" / "schema.yml"
             wos_schema = eval_dir / "without_skill" / "outputs" / "schema.yml"
 
-            print(f"    Grading...")
+            print("    Grading...")
             ws_grading = grade_schema(ws_schema, assertions) if ws_schema.exists() else {
                 "expectations": [{"text": a.get("check", "<missing check>"), "passed": False, "evidence": "No schema file produced"} for a in assertions],
                 "summary": {"passed": 0, "failed": len(assertions), "total": len(assertions), "pass_rate": 0.0},

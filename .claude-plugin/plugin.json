@@ -22,7 +22,10 @@
     "mcp",
     "issue-reporting",
     "teaching",
-    "learning"
+    "learning",
+    "netbox",
+    "device-types",
+    "object-templates"
   ],
   "repository": "https://github.com/opsmill/infrahub-skills"
 }

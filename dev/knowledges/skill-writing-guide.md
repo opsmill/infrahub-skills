@@ -108,22 +108,49 @@ Every rule file should answer:
 2. **Why does it matter?** — The reasoning (failures,
    confusing behavior, data loss)
 3. **How to apply it** — The specific check or pattern
-4. **Examples** — Compliant and non-compliant, side
-   by side
+4. **Examples** — Compliant and non-compliant, in
+   two separate fenced blocks. One fence holding
+   both makes a single document the AI reads as one
+   artifact, so the WRONG half gets copied along
+   with the RIGHT half.
 5. **Common mistakes** — What typically goes wrong
    (this is gold for AI models)
 
 ### Category prefixes
 
-Rules are named with category prefixes from
-`_sections.md` for organization:
+Rules are named with a category prefix from
+`_sections.md` (`naming-conventions.md`,
+`relationship-identifiers.md`,
+`display-order-weight.md`), so rules are findable by
+domain and new ones need no renaming. Registering a
+new prefix touches more than `_sections.md` — see
+[adding-a-rule.md](../guides/adding-a-rule.md#1-write-the-rule).
 
-- `naming-conventions.md`
-- `relationship-identifiers.md`
-- `display-order-weight.md`
+### One fact, one home
 
-This makes it easy to find rules by domain and to add
-new ones without renaming.
+State a list, a claim, or a command in exactly one
+file and point at it from everywhere else. The
+failure is not the duplication itself, it is that the
+copies drift: a read-only command allowlist written
+into four files ends up with three different
+memberships, and nobody can tell which is current.
+
+This binds graders too. A grader that hard-codes a
+command tree, a kind list, or a set of valid flags
+holds a second copy of the skill's prose, and the two
+diverge the first time the prose changes. Derive it
+from one place, or assert the shape rather than the
+membership.
+
+### Say only what you verified
+
+Write the claim you actually tested, at the strength
+you tested it. "Verified against Infrahub 1.11.0"
+means the check ran on 1.11.0 — if it ran on
+something else, or on nothing, drop the line. An
+unverified provenance claim is worse than no claim,
+because the next author trusts it instead of
+re-checking.
 
 ## Examples File
 
@@ -150,6 +177,26 @@ abstract instructions.
 - Examples that work around bugs or legacy behavior
   (document the current best practice)
 
+### Every snippet must stand on its own
+
+An example is copied, not read. Each one has to name
+only kinds, attributes, fields, and packages that
+exist in what it shows — a snippet referring to an
+attribute the schema above it never defines cannot be
+run, and the quoted error it promises will never
+appear. Before shipping a snippet, load or execute it
+against the artifact it sits next to.
+
+### Read the example back against the rule
+
+The commonest defect in a corrected rule is an
+example that demonstrates something other than the
+sentence introducing it — often the inverse, because
+the rule's lead was rewritten and the example wasn't.
+After editing either half, read the lead sentence and
+the example together and check the example would fail
+for the reason the lead gives.
+
 ## Common Pitfalls
 
 ### Overfitting to specific examples
@@ -166,10 +213,3 @@ Piling on rigid constraints ("MUST use X", "NEVER do
 Y", "ALWAYS check Z") makes the skill brittle and
 hard to maintain. Use explanation and reasoning
 instead — the AI will generalize better.
-
-### Neglecting the description
-
-A perfect SKILL.md body is useless if the description
-doesn't trigger. After writing or updating a skill,
-check whether the description covers the realistic
-ways users ask for this task.

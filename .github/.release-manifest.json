@@ -13,6 +13,7 @@
     "infrahub-collecting-diagnostics",
     "infrahub-analyzing-diagnostics",
     "infrahub-importing-data",
-    "infrahub-teaching-concepts"
+    "infrahub-teaching-concepts",
+    "infrahub-converting-netbox-device-types"
   ]
 }

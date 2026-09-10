@@ -53,18 +53,32 @@ AI command definitions live in [dev/commands/](dev/commands/).
 | `infrahub-analyzing-diagnostics` | `skills/infrahub-analyzing-diagnostics/` | Analyze a collected diagnostic bundle: triage tracebacks/failures, correlate into incidents, match against existing GitHub issues |
 | `infrahub-importing-data` | `skills/infrahub-importing-data/` | Convert CSV/TSV inputs into Infrahub object YAML and load onto a fresh branch |
 | `infrahub-teaching-concepts` | `skills/infrahub-teaching-concepts/` | Tutor for Infrahub concepts: probes the learner, teaches through their own repo/instance, verified hands-on exercises, tracked progress |
+| `infrahub-converting-netbox-device-types` | `skills/infrahub-converting-netbox-device-types/` | Convert NetBox device-type definitions into Infrahub object templates via a bundled, mapping-profile-driven Python converter |
 
 ### Rule = Test (Required)
 
 Adding a new rule under `skills/<skill>/rules/` must
 ship with its eval coverage in the same change:
 
-1. New check function in `graders/<skill>/lib.py`
-   registered in `CHECKS`.
-2. New task block in `eval.yaml` whose prompt
-   naturally exercises the rule.
-3. Task grader script under `graders/<skill>/`.
-4. `python scripts/sync-evals.py` to regenerate
+1. The rule linked from `SKILL.md` at the workflow
+   step that needs it — `_sections.md` alone is read
+   after the mistake, not before it.
+2. New check function in `graders/<skill>/lib.py`
+   registered in `CHECKS`, parsing the answer
+   (`yaml`, `ast`, `shlex`) rather than
+   substring-matching it.
+3. New task block in `eval.yaml` whose prompt
+   naturally exercises the rule and fails with the
+   instruction's `Read the skill at ...` line
+   commented out (procedure in
+   [dev/guides/running-evals.md](dev/guides/running-evals.md#writing-good-eval-prompts)).
+4. Task grader script under `graders/<skill>/`, run
+   against four fixtures: compliant, compliant
+   phrased differently, violating, and a violating
+   near-miss that satisfies the check's keyword.
+5. Old claims the rule contradicts swept from
+   `skills/`, `graders/`, and `eval.yaml`.
+6. `python scripts/sync-evals.py` to regenerate
    `evaluations/*.json` (commit alongside `eval.yaml`).
 
 Full walkthrough in
@@ -72,6 +86,8 @@ Full walkthrough in
 A rule without a grader is a rule that can rot
 silently — the next refactor of the skill's prose
 loses the constraint with no failing test to flag it.
+A grader that cannot fail is worse: it reports the
+rule as covered forever.
 
 ### Versioning
 

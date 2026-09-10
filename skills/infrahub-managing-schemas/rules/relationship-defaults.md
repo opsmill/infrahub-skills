@@ -12,6 +12,13 @@ Relationship defaults diverge from attribute
 defaults: `cardinality` defaults to `many`, and
 `optional` defaults to `true`.
 
+> Setting `cardinality: one` is not only a shape
+> choice: it is a write-time data constraint, and the
+> side that declares it is not always the side that
+> caps. Before you set `one` on anything, read
+> [relationship-cardinality-consequences.md](./relationship-cardinality-consequences.md).
+> It is cheap at design time and expensive after a load.
+
 ### Why it matters
 
 The cardinality default is the trap — a relationship

@@ -240,7 +240,11 @@ def check_hint_before_solution(ws: Path) -> tuple[bool, str]:
     found, err = _all_lessons(ws)
     if not found:
         return False, err
-    logged = [(l, hints_for(ws, l)) for l in found if hints_for(ws, l).is_file()]
+    logged = [
+        (lesson, hints_for(ws, lesson))
+        for lesson in found
+        if hints_for(ws, lesson).is_file()
+    ]
     if not logged:
         return False, (
             f"no {LEARNING_DIR}/hints/<concept>.md; the escalation the "
