@@ -1253,6 +1253,7 @@ def check_uniqueness_rel_mandatory(schema: dict, **_: Any) -> tuple[bool, str]:
     is checked here too.
     """
     problems: list[str] = []
+    found_any = False
     for _section, entity in _entities(schema):
         _attrs, rels = _resolved_members(schema, entity)
 
@@ -1272,10 +1273,25 @@ def check_uniqueness_rel_mandatory(schema: dict, **_: Any) -> tuple[bool, str]:
                 if isinstance(path, str) and "__" in path:
                     reached.setdefault(path.split("__")[0], path)
 
+        # An HFID must reach a relationship through a peer-attribute path;
+        # the bare name is rejected with "Must use attributes of related
+        # node." The inverse shape — a peer-attribute path inside
+        # uniqueness_constraints — is owned by
+        # `uniqueness-attr-value-suffix`.
+        if isinstance(hfid, list):
+            for path in hfid:
+                if isinstance(path, str) and "__" not in path and path in rels:
+                    problems.append(
+                        f"{entity.get('name')}.human_friendly_id names the bare "
+                        f"relationship {path!r}; an HFID needs a peer-attribute "
+                        f"path such as {path}__<attr>__value"
+                    )
+
         for field, label in reached.items():
             rel = rels.get(field)
             if rel is None:
                 continue  # an attribute path, or inherited from another file
+            found_any = True
             if rel.get("cardinality") != "one":
                 problems.append(
                     f"{entity.get('name')}.{label} cardinality="
@@ -1290,6 +1306,11 @@ def check_uniqueness_rel_mandatory(schema: dict, **_: Any) -> tuple[bool, str]:
                 )
     if problems:
         return False, "; ".join(problems)
+    if not found_any:
+        return False, (
+            "no relationship is reached by uniqueness_constraints or "
+            "human_friendly_id, so nothing scopes the uniqueness"
+        )
     return True, "constrained relationships are cardinality one and mandatory"
 
 
@@ -1523,6 +1544,7 @@ CHECKS: dict[str, Any] = {
     "attribute-kind-relationships": check_attribute_kind_relationships,
     "endpoint-device-relationship": check_endpoint_device_relationship,
     "parent-rel-optional-false": check_parent_rel_optional_false,
+    "uniqueness-rel-mandatory": check_uniqueness_rel_mandatory,
     "parent-rel-single": check_parent_rel_single,
     "computed-jinja2-readonly": check_computed_jinja2_readonly,
     "computed-jinja2-kind": check_computed_jinja2_kind,

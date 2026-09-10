@@ -5,7 +5,7 @@ helpers for ``.py`` files, individual check functions, a
 ``CHECKS`` registry, and the top-level ``run_checks`` entry
 point that returns skillgrade JSON.
 
-Three output kinds are supported:
+Four output kinds are supported:
 
 - ``output.gql`` — raw GraphQL query text. The union-fragments
   checks use simple regex/text matching rather than a full
@@ -16,6 +16,9 @@ Three output kinds are supported:
 - ``output.md`` — a workflow plan (Markdown). The pre-merge
   dry-run checks scan it for the dry-run command and pre-merge
   framing.
+- ``output.yml`` — an ``.infrahub.yml`` manifest for the
+  watch.files eval. Checks inspect the parsed mapping to see
+  which dependencies each transform declares.
 
 Usage (in a per-task grader script)::
 
@@ -34,6 +37,8 @@ import ast
 import re
 from pathlib import Path
 from typing import Any, Iterator
+
+import yaml
 
 
 # ---------------------------------------------------------------------------
@@ -55,6 +60,30 @@ def load_output_md(path: Path) -> str:
         return Path(path).read_text(encoding="utf-8", errors="replace")
     except (FileNotFoundError, OSError):
         return ""
+
+
+_YAML_FENCE = re.compile(r"^```(?:yaml|yml)\s*\n(.*?)^```", re.MULTILINE | re.DOTALL)
+
+
+def load_output_yaml(path: Path) -> dict:
+    """Load an ``.infrahub.yml`` manifest and return the parsed mapping.
+
+    Returns ``{}`` when the file is missing, unparseable, or not a
+    mapping. A document wrapped in a ```yaml fence is unwrapped first,
+    so a model that formats its answer as a code block still grades.
+    """
+    try:
+        raw = Path(path).read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError):
+        return {}
+    fence = _YAML_FENCE.search(raw)
+    if fence:
+        raw = fence.group(1)
+    try:
+        doc = yaml.safe_load(raw)
+    except yaml.YAMLError:
+        return {}
+    return doc if isinstance(doc, dict) else {}
 
 
 def load_output_py(path: Path) -> tuple[ast.Module | None, str]:
@@ -330,11 +359,27 @@ def check_polls_coreartifact_after_post(
 # ---------------------------------------------------------------------------
 
 # The plan must dry-run the changed query by *executing* it against a live
-# schema — `infrahubctl render` for a transform, or running the check /
-# generator that owns the query — not rely on static `schema check` alone.
+# schema, not rely on static `schema check` alone. Which command depends on
+# what owns the query: `render` for a jinja2_transforms entry, `transform`
+# for a python_transforms entry, or the check / generator itself. All three
+# take their target as a positional argument. There is no `run` subcommand,
+# and matching one here rewarded exactly the invented form
+# skills/infrahub-common/rules/deployment-gql-dry-run.md exists to remove.
+# A generic verb where the positional target belongs is an invented
+# subcommand, not a name, so it does not count as a live dry-run. The verb
+# has to be the *whole* token: `\b` ends at a hyphen, so it rejected
+# kebab-case names whose first segment is a verb (`create-dc`, the fixture
+# name a model may well hyphenate) and failed a correct answer.
+_INVENTED_SUBCOMMAND = (
+    r"(?!(?:run|list|get|create|delete|load|dump|check|validate|execute|"
+    r"show|new|add|export|import)(?![\w-]))"
+)
 _DRY_RUN_CMD_PATTERNS = [
-    re.compile(r"infrahubctl\s+render\b", re.IGNORECASE),
-    re.compile(r"infrahubctl\s+(?:check|generator)\s+run\b", re.IGNORECASE),
+    re.compile(
+        rf"infrahubctl\s+(?:render|transform|check|generator)\s+"
+        rf"{_INVENTED_SUBCOMMAND}[a-z0-9][\w.-]*",
+        re.IGNORECASE,
+    ),
 ]
 
 # The dry-run must be framed as a pre-merge gate (before opening / merging
@@ -354,16 +399,21 @@ _PRE_MERGE_PATTERNS = [
 
 
 def check_dry_run_executes_query(md_text: str = "", **_: Any) -> tuple[bool, str]:
-    """Plan must dry-run the query live (render / check run / generator run),
-    not rely on static ``schema check`` alone."""
+    """Plan must dry-run the query live, not rely on static ``schema check``.
+
+    Live means executing the query: ``infrahubctl render <name>`` or
+    ``transform <name>`` for the transform that owns it, or ``check <name>``
+    / ``generator <name>`` for a check or generator. Each takes its target
+    as a positional argument.
+    """
     if not md_text:
         return False, "No plan text to inspect"
     for pat in _DRY_RUN_CMD_PATTERNS:
         if pat.search(md_text):
             return True, f"Dry-runs the query live (matched {pat.pattern!r})"
     return False, (
-        "No live dry-run command (infrahubctl render / check run / "
-        "generator run) — static schema check alone misses GQL mismatches"
+        "No live dry-run command (infrahubctl render/transform/check/"
+        "generator <name>) — static schema check alone misses GQL mismatches"
     )
 
 
@@ -378,6 +428,251 @@ def check_dry_run_before_merge(md_text: str = "", **_: Any) -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
+# watch.files checks (artifacts-watch-dependencies)
+# ---------------------------------------------------------------------------
+#
+# Fixture-coupled, like the union-fragment checks above: the eval task hands
+# the model a repo whose transforms/ holds device_config.py (importing the
+# sibling .device_config_query and my_package.formatting from src/) and the
+# self-contained interface_names.py, plus one Jinja2 template whose includes
+# are all literal and one that resolves its partial through a variable.
+
+_WATCH_SECTIONS = ("python_transforms", "jinja2_transforms", "generator_definitions")
+
+
+def _entries(yml_doc: dict, section: str) -> list[dict]:
+    """Return the mapping entries of a manifest section."""
+    items = yml_doc.get(section) or []
+    if not isinstance(items, list):
+        return []
+    return [item for item in items if isinstance(item, dict)]
+
+
+def _entry_named(yml_doc: dict, section: str, name: str) -> dict | None:
+    for entry in _entries(yml_doc, section):
+        if entry.get("name") == name:
+            return entry
+    return None
+
+
+def canonical_watch_path(path: str) -> str:
+    """Normalize a watch entry the way Infrahub's canonicalizer does."""
+    normalized = str(path).replace("\\", "/")
+    while True:
+        previous = normalized
+        normalized = normalized.lstrip("/").removeprefix("./").rstrip("/")
+        if normalized == previous:
+            return normalized
+
+
+def watch_files(entry: dict) -> list[str] | None:
+    """Return an entry's canonicalized ``watch.files``.
+
+    ``None`` means the entry carries no ``watch`` key at all, which is the
+    case the rule treats as "regenerates on every commit". A ``watch`` in
+    any shape other than a mapping with a ``files`` list — the bare-list
+    form Infrahub rejects at import — also returns ``None``, and is caught
+    separately by ``check_watch_uses_object_form``.
+    """
+    if "watch" not in entry:
+        return None
+    watch = entry["watch"]
+    if not isinstance(watch, dict):
+        return None
+    files = watch.get("files")
+    if not isinstance(files, list):
+        return None
+    return [canonical_watch_path(f) for f in files if isinstance(f, str)]
+
+
+def _covers(files: list[str], target: str) -> bool:
+    """True if ``target`` is named outright or sits under a declared directory."""
+    target = canonical_watch_path(target)
+    return any(target == f or target.startswith(f"{f}/") for f in files)
+
+
+def check_watch_present_on_python_transforms(
+    yml_doc: dict | None = None, **_: Any
+) -> tuple[bool, str]:
+    """Every python_transforms entry must carry a watch key.
+
+    Without one — or with a bare ``watch:`` that parses to null — the
+    fingerprint folds in the commit id and the artifacts re-render on
+    every commit.
+    """
+    entries = _entries(yml_doc or {}, "python_transforms")
+    if not entries:
+        return False, "No python_transforms entries found to inspect"
+    # ``watch:`` with nothing under it parses to null, which
+    # ``fold_commit_id`` cannot tell apart from the key being absent. It
+    # reads as a declaration without being one, so it fails like a
+    # missing key rather than passing on the key's mere presence.
+    missing = [
+        e.get("name", "<unnamed>")
+        for e in entries
+        if e.get("watch") is None
+    ]
+    if missing:
+        return False, f"python_transforms entries with no watch key: {', '.join(missing)}"
+    return True, f"All {len(entries)} python_transforms entries declare watch"
+
+
+def check_watch_uses_object_form(yml_doc: dict | None = None, **_: Any) -> tuple[bool, str]:
+    """Every watch must be ``{files: [...]}``; the bare-list form fails import."""
+    doc = yml_doc or {}
+    for section in _WATCH_SECTIONS:
+        for entry in _entries(doc, section):
+            if "watch" not in entry:
+                continue
+            name = entry.get("name", "<unnamed>")
+            watch = entry["watch"]
+            if not isinstance(watch, dict):
+                return False, (
+                    f"{section}/{name}: watch is {type(watch).__name__}, not an object — "
+                    "the bare-list form is rejected when the repository is imported"
+                )
+            unknown = set(watch) - {"files"}
+            if unknown:
+                return False, f"{section}/{name}: unknown key(s) under watch: {sorted(unknown)}"
+            if not isinstance(watch.get("files"), list):
+                return False, f"{section}/{name}: watch.files is not a list"
+    return True, "Every watch block uses the object form with a files list"
+
+
+def check_watch_declares_sibling_import(
+    yml_doc: dict | None = None, **_: Any
+) -> tuple[bool, str]:
+    """device_config imports .device_config_query, so it must be declared.
+
+    Sharing a directory is not a dependency relationship: imports are never
+    followed, and the directory listing that used to cover siblings was
+    withdrawn in 1.11 (opsmill/infrahub#9644).
+    """
+    entry = _entry_named(yml_doc or {}, "python_transforms", "device_config")
+    if entry is None:
+        return False, "No python_transforms entry named device_config"
+    files = watch_files(entry)
+    if files is None:
+        return False, "device_config declares no usable watch.files"
+    if _covers(files, "transforms/device_config_query.py"):
+        return True, "device_config declares its sibling query model"
+    return False, (
+        "device_config does not declare the sibling module it imports "
+        f"(transforms/device_config_query.py); watch.files = {files}"
+    )
+
+
+def check_watch_declares_outside_package_import(
+    yml_doc: dict | None = None, **_: Any
+) -> tuple[bool, str]:
+    """device_config imports my_package.formatting, which lives under src/."""
+    entry = _entry_named(yml_doc or {}, "python_transforms", "device_config")
+    if entry is None:
+        return False, "No python_transforms entry named device_config"
+    files = watch_files(entry)
+    if files is None:
+        return False, "device_config declares no usable watch.files"
+    if _covers(files, "src/my_package/formatting.py"):
+        return True, "device_config declares the shared src/ package it imports"
+    return False, (
+        "device_config does not declare src/my_package/formatting.py (or the "
+        f"package holding it); watch.files = {files}"
+    )
+
+
+def check_watch_avoids_entry_directory(
+    yml_doc: dict | None = None, **_: Any
+) -> tuple[bool, str]:
+    """No entry may watch the directory its own file_path sits in.
+
+    Naming that directory re-creates the closure 1.10 built automatically and
+    1.11 withdrew: every unrelated edit beside the entry point re-renders the
+    artifacts. It also passes the declares-* checks for free, because a
+    directory covers whatever sits under it — which is exactly why the answer
+    has to be graded on it separately.
+    """
+    for entry in _entries(yml_doc or {}, "python_transforms"):
+        files = watch_files(entry)
+        if not files:
+            continue
+        file_path = canonical_watch_path(str(entry.get("file_path", "")))
+        if "/" not in file_path:
+            continue
+        own_dir = file_path.rsplit("/", 1)[0]
+        if own_dir in files:
+            return False, (
+                f"{entry.get('name', '<unnamed>')}: watch.files names its own directory "
+                f"({own_dir}/), so every unrelated edit beside the entry point re-renders "
+                "the artifacts; name the modules it actually imports"
+            )
+    return True, "No entry watches the directory holding its own file_path"
+
+
+def check_watch_empty_for_self_contained(
+    yml_doc: dict | None = None, **_: Any
+) -> tuple[bool, str]:
+    """interface_names has no first-party import, so it declares an empty list.
+
+    ``files: []`` is the assertion that there is nothing to declare; it is
+    what stops the commit id being folded into the fingerprint.
+    """
+    entry = _entry_named(yml_doc or {}, "python_transforms", "interface_names")
+    if entry is None:
+        return False, "No python_transforms entry named interface_names"
+    files = watch_files(entry)
+    if files is None:
+        return False, "interface_names declares no usable watch.files (expected [])"
+    if files == []:
+        return True, "interface_names declares an explicit empty watch.files"
+    return False, (
+        "interface_names imports nothing first-party, so watch.files should be "
+        f"empty; got {files}"
+    )
+
+
+def check_watch_omitted_for_static_jinja2(
+    yml_doc: dict | None = None, **_: Any
+) -> tuple[bool, str]:
+    """A Jinja2 transform whose includes are all literal needs no watch.
+
+    Its closure is built by parsing the template and following every
+    reference, so it is trusted on its own.
+    """
+    entry = _entry_named(yml_doc or {}, "jinja2_transforms", "arista_startup_config")
+    if entry is None:
+        return False, "No jinja2_transforms entry named arista_startup_config"
+    files = watch_files(entry)
+    if "watch" not in entry or files == []:
+        return True, "arista_startup_config carries no superfluous watch entries"
+    return False, (
+        "arista_startup_config includes only literal templates, so its closure is "
+        f"already complete; the watch entries are noise: {files}"
+    )
+
+
+def check_watch_declares_dynamic_jinja2_partials(
+    yml_doc: dict | None = None, **_: Any
+) -> tuple[bool, str]:
+    """A template that resolves its partial through a variable needs watch.
+
+    The parser cannot follow ``{% include partial_name %}``, so the closure
+    is incomplete until the candidate partials are declared.
+    """
+    entry = _entry_named(yml_doc or {}, "jinja2_transforms", "cisco_startup_config")
+    if entry is None:
+        return False, "No jinja2_transforms entry named cisco_startup_config"
+    files = watch_files(entry)
+    if files is None:
+        return False, "cisco_startup_config declares no usable watch.files"
+    if _covers(files, "templates/partials/header.j2"):
+        return True, "cisco_startup_config declares the partials its dynamic include can reach"
+    return False, (
+        "cisco_startup_config resolves its partial through a variable but does not "
+        f"declare templates/partials/; watch.files = {files}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
 
@@ -389,6 +684,14 @@ CHECKS: dict[str, Any] = {
     "polls-coreartifact-after-post": check_polls_coreartifact_after_post,
     "dry-run-executes-query": check_dry_run_executes_query,
     "dry-run-before-merge": check_dry_run_before_merge,
+    "watch-present-on-python-transforms": check_watch_present_on_python_transforms,
+    "watch-uses-object-form": check_watch_uses_object_form,
+    "watch-declares-sibling-import": check_watch_declares_sibling_import,
+    "watch-declares-outside-package-import": check_watch_declares_outside_package_import,
+    "watch-avoids-entry-directory": check_watch_avoids_entry_directory,
+    "watch-empty-for-self-contained": check_watch_empty_for_self_contained,
+    "watch-omitted-for-static-jinja2": check_watch_omitted_for_static_jinja2,
+    "watch-declares-dynamic-jinja2-partials": check_watch_declares_dynamic_jinja2_partials,
 }
 
 
@@ -409,8 +712,8 @@ def run_checks(
         List of assertion names from ``CHECKS``.
     output_paths:
         Mapping of output kind to path. Recognised keys: ``"gql"``,
-        ``"py"``, ``"md"``. Each check function declares which input
-        it needs via ``**kwargs``.
+        ``"py"``, ``"md"``, ``"yml"``. Each check function declares which
+        input it needs via ``**kwargs``.
 
     Returns skillgrade JSON ``{"score", "details", "checks"}``.
     Raises ``KeyError`` if any check name is unknown.
@@ -418,6 +721,7 @@ def run_checks(
     gql_text = load_output_gql(output_paths.get("gql", Path("output.gql")))
     tree, py_raw = load_output_py(output_paths.get("py", Path("output.py")))
     md_text = load_output_md(output_paths.get("md", Path("output.md")))
+    yml_doc = load_output_yaml(output_paths.get("yml", Path("output.yml")))
 
     entries: list[dict] = []
     passed_count = 0
@@ -425,7 +729,13 @@ def run_checks(
     for name in check_names:
         fn = CHECKS[name]
         try:
-            ok, msg = fn(gql_text=gql_text, tree=tree, py_raw=py_raw, md_text=md_text)
+            ok, msg = fn(
+                gql_text=gql_text,
+                tree=tree,
+                py_raw=py_raw,
+                md_text=md_text,
+                yml_doc=yml_doc,
+            )
         except Exception as exc:  # defensive — never let one check crash all
             ok, msg = False, f"Error running check: {exc}"
 

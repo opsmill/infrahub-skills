@@ -752,12 +752,22 @@ def check_no_docs_gap_when_unsettled(text: str, **_: object) -> CheckResult:
 # `infrahubctl` invocations because a redacted report often paraphrases the
 # command rather than pasting it, and paraphrasing is what
 # evidence-no-customer-data.md asks for.
+# The forms mirror rules/evidence-detection-ladder.md's Probe A list. A
+# check, transform, generator or render takes its target as a positional
+# argument; there is no `run` subcommand, and matching one here rewarded the
+# invented form that skills/infrahub-common/rules/deployment-gql-dry-run.md
+# exists to remove. The rejected verb has to be the whole token: a `\b`
+# there ends at a hyphen, so a kebab-case name opening on a verb
+# (`create-dc`) read as the invented subcommand and lost a real verifier.
 _VERIFIER_CMD_RE = re.compile(
-    r"infrahubctl\s+(?:schema\s+(?:load|validate|check)|object\s+load"
-    r"|check\s+run|transform\s+run|generator\s+run)"
+    r"infrahubctl\s+(?:schema\s+(?:load|check|format)|object\s+(?:load|validate)"
+    r"|(?:check|transform|render|generator)\s+"
+    r"(?!(?:run|list|get|create|delete|load|dump|check|validate|execute"
+    r"|show|new|add|export|import)(?![\w-]))[a-z0-9][\w.-]*)"
     r"|\bpytest\b"
-    r"|\bschema\s+(?:load|validate)\b"
-    r"|\bobject\s+load\b",
+    r"|\bschema\s+(?:load|check|format)\b"
+    r"|\bobject\s+(?:load|validate)\b"
+    r"|\b(?:check|transform|render|generator)\s+<name>",
     re.IGNORECASE,
 )
 
@@ -1003,6 +1013,88 @@ def check_states_skills_version(text: str, **_: object) -> CheckResult:
     return False, (
         "no skills-version header line found; a maintainer cannot tell "
         "which revision of the rule failed"
+    )
+
+
+# The infrahub-sdk version the session ran against. Matched as its own
+# header line, and `sdk` is required, so neither the `**Skills version**`
+# line above nor the `**Infrahub version**` line below can satisfy this
+# check, and prose that happens to mention a version cannot either. A
+# trailing suffix is allowed because prereleases exist (`1.14.0b1`,
+# `1.14.0rc1`). `unknown` is accepted: no SDK may be installed at all,
+# and saying so beats a guess.
+_SDK_VERSION_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?\*{0,2}(?:infrahub[ \-]?)?sdk\s+version\*{0,2}\s*[:\-]\s*"
+    r"[`\'\"]?(v?\d+\.\d+(?:\.\d+)?[0-9a-z.\-]*|unknown)",
+    re.IGNORECASE | re.MULTILINE,
+)
+# The Infrahub version the session talked to, which `infrahubctl info`
+# reports as `Infrahub Version` alongside `SDK Version`. `infrahub` has to
+# be followed directly by `version` (or by `server version`), so the
+# adjacent `**Infrahub SDK version**` line cannot satisfy this check.
+# `n/a` is accepted next to `unknown` because that is the literal value
+# `infrahubctl info` prints when no server is reachable, and a model
+# copying it through is being accurate rather than guessing.
+_INFRAHUB_VERSION_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?\*{0,2}infrahub(?:\s+server)?\s+version\*{0,2}\s*[:\-]\s*"
+    r"[`\'\"]?(v?\d+\.\d+(?:\.\d+)?[0-9a-z.\-]*|unknown|n/a)",
+    re.IGNORECASE | re.MULTILINE,
+)
+_UNFILLED_INFRAHUB_VERSION_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?\*{0,2}infrahub(?:\s+server)?\s+version\*{0,2}\s*[:\-]\s*\[",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def check_states_infrahub_version(text: str, **_: object) -> CheckResult:
+    """Output's header records the Infrahub version the session talked to.
+
+    Rules split by target. One naming a CLI flag or a client method is
+    aimed at an SDK version; one about schema loading, branch behavior, or
+    a check pipeline is aimed at a server version. A report that carries
+    only the SDK version leaves the second kind unanchored.
+
+    Accepts `unknown` and `n/a`. Work done against files alone never
+    reaches a server, and `infrahubctl info` prints `N/A` when none is
+    reachable, so both are honest readings rather than guesses.
+    """
+    if _UNFILLED_INFRAHUB_VERSION_RE.search(text):
+        return False, "Infrahub-version line is still an unfilled template placeholder"
+    match = _INFRAHUB_VERSION_RE.search(text)
+    if match:
+        return True, f"records the Infrahub version ({match.group(1)!r})"
+    return False, (
+        "no Infrahub-version header line found; a maintainer cannot tell "
+        "which server behavior the cited rule was aimed at"
+    )
+# The template's own unfilled placeholder, the same trap
+# `_UNFILLED_VERSION_RE` guards for on the skills-version line.
+_UNFILLED_SDK_VERSION_RE = re.compile(
+    r"sdk\s+version\*{0,2}\s*[:\-]\s*\[", re.IGNORECASE
+)
+
+
+def check_states_sdk_version(text: str, **_: object) -> CheckResult:
+    """Output's header records the infrahub-sdk version the session ran against.
+
+    Skill rules encode SDK behavior: a CLI flag, a client method, a
+    generated protocol. Without the SDK version a maintainer cannot tell
+    whether the cited rule is wrong or merely older than the SDK that ran,
+    which is the difference between rewriting the guidance and adding a
+    version note to it.
+
+    Accepts `unknown` as a value. The read can genuinely fail, and no SDK
+    may be installed in the session at all; an explicit `unknown` is
+    honest, while a plausible-looking guess is worse than nothing.
+    """
+    if _UNFILLED_SDK_VERSION_RE.search(text):
+        return False, "SDK-version line is still an unfilled template placeholder"
+    match = _SDK_VERSION_RE.search(text)
+    if match:
+        return True, f"records the SDK version ({match.group(1)!r})"
+    return False, (
+        "no SDK-version header line found; a maintainer cannot tell whether "
+        "the cited rule is wrong or older than the SDK that ran"
     )
 
 
@@ -1599,6 +1691,8 @@ CHECKS: dict[str, CheckFn] = {
     "no-direct-filing": check_no_direct_filing,
     "payload-is-complete": check_payload_is_complete,
     "states-skills-version": check_states_skills_version,
+    "states-sdk-version": check_states_sdk_version,
+    "states-infrahub-version": check_states_infrahub_version,
     "leaves-routing-to-reporter": check_leaves_routing_to_reporter,
     "title-uses-kind-prefix": check_title_uses_kind_prefix,
     "cites-rule-file": check_cites_rule_file,

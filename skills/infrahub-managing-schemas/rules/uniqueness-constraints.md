@@ -66,6 +66,11 @@ Every message is prefixed `<Kind>.uniqueness_constraints:`
 and every one is raised at schema load, before any data
 is touched.
 
+Only the first failing condition is reported. An
+optional relationship written as a peer-attribute path
+reports the mandatory error; fix that and the path
+error surfaces on the next load.
+
 The mandatory requirement is the one that costs a full
 design cycle, because a constraint designed against an
 optional relationship looks reasonable and only fails
@@ -73,6 +78,14 @@ at schema load, after the surrounding model is
 committed to. If the relationship genuinely has to be
 optional, the constraint cannot express the rule and it
 belongs in a check.
+
+This bites hardest on `kind: Attribute` relationships,
+which are optional unless you say otherwise. A
+`kind: Parent` relationship is already required to be
+`optional: false` and `cardinality: one`, so it
+satisfies the preconditions for free — see
+[relationship-defaults.md](relationship-defaults.md)
+for the defaults.
 
 WRONG. `rack` is optional, so this is rejected at
 load:
@@ -241,6 +254,52 @@ nodes:
     human_friendly_id:
       - name__value
       - rack__name__value
+    attributes:
+      - name: name
+        kind: Text
+    relationships:
+      - name: rack
+        peer: DcimRack
+        kind: Attribute
+        cardinality: one
+        optional: false           # Required — see the preconditions above
+        identifier: rack__pdu
 ```
+
+### The path shape is inverted between the two keys
+
+A relationship reached by an HFID path must meet the
+same preconditions — `optional: false`,
+`cardinality: one` — but is written the other way
+round, so do not carry the bare-name habit across:
+
+| Field | Relationship written as | Rejects |
+| ----- | ----------------------- | ------- |
+| `uniqueness_constraints` | bare name (`rack`) | a peer-attribute path, with `cannot use attributes of related node, only the relationship` |
+| `human_friendly_id` | peer-attribute path (`rack__name__value`) | a bare name, with `Must use attributes of related node.` |
+
+The confusing part is the mandatory error: it is
+reported against `uniqueness_constraints` even when
+you never wrote one.
+
+```yaml
+# No uniqueness_constraints on this node at all, yet
+# schema load fails with:
+#   DcimPDU.uniqueness_constraints: cannot use rack
+#   relationship, relationship must be mandatory. (`rack`)
+human_friendly_id:
+  - name__value
+  - rack__name__value
+relationships:
+  - name: rack
+    peer: DcimRack
+    kind: Attribute
+    cardinality: one
+    optional: true              # <-- the actual cause
+```
+
+If a `uniqueness_constraints` error names a
+relationship you never put in a constraint, look at
+the node's `human_friendly_id`.
 
 Reference: [Infrahub Schema Docs](https://docs.infrahub.app)

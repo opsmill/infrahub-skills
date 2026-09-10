@@ -25,7 +25,11 @@ layer.
 
 Generators are Python that runs in the pipeline: they need a
 `generator_definition`, a GraphQL query, a `CoreArtifactTarget`
-group, and Python maintenance. An Object Template is
+group, a `watch` list kept accurate against their imports, and
+Python maintenance. An Object Template is data, registered under
+`objects:` — it has no dependency closure, so none of the
+`watch` upkeep applies
+([practices-watch-dependencies.md](./practices-watch-dependencies.md)). An Object Template is
 declarative — enable the flag, build one curated instance,
 clone it. When the generator adds nothing a template couldn't
 (no computed values, no conditional structure), it is imperative

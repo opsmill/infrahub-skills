@@ -29,12 +29,12 @@ the underlying documentation.
 
 ### What this skill can and cannot see
 
-This skill observes a Claude Code session: what the
+This skill observes an assistant session: what the
 model read, ran, and failed at. **It cannot see what a
 human read.** "The user didn't have the docs open" is
 not a signal available here, and this rule never
 pretends otherwise. The discriminator below is built
-entirely out of things visible in the transcript.
+entirely out of things visible in the session.
 
 ### The discriminating question
 

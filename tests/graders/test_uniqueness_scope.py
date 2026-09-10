@@ -273,3 +273,56 @@ nodes:
 """)
     ok, msg = _mod.CHECKS["uniqueness-rel-mandatory"](schema=schema)
     assert ok, msg
+
+
+def test_hfid_naming_a_bare_relationship_fails():
+    """An HFID reaches a relationship by peer-attribute path, never bare.
+
+    The two keys take inverted path shapes, so the bare-name habit from
+    `uniqueness_constraints` carries across as a load-time rejection:
+    "Must use attributes of related node."
+    """
+    schema = yaml.safe_load("""
+version: "1.0"
+nodes:
+  - name: VirtualMachine
+    namespace: Virtualization
+    human_friendly_id: ["cluster", "vmid__value"]
+    attributes:
+      - name: vmid
+        kind: Number
+    relationships:
+      - name: cluster
+        peer: VirtualizationCluster
+        cardinality: one
+        optional: false
+""")
+    ok, msg = _mod.CHECKS["uniqueness-rel-mandatory"](schema=schema)
+    assert not ok and "bare relationship" in msg
+
+
+def test_a_constraint_reaching_no_relationship_does_not_pass_vacuously():
+    """Estate-wide uniqueness scopes nothing, so the check must not pass it.
+
+    Without this the relationship checks only inspect relationships some
+    constraint already names, so leaving the relationship out entirely was
+    unpunished here.
+    """
+    schema = yaml.safe_load("""
+version: "1.0"
+nodes:
+  - name: VirtualMachine
+    namespace: Virtualization
+    uniqueness_constraints:
+      - ["vmid__value"]
+    attributes:
+      - name: vmid
+        kind: Number
+    relationships:
+      - name: cluster
+        peer: VirtualizationCluster
+        cardinality: one
+        optional: false
+""")
+    ok, msg = _mod.CHECKS["uniqueness-rel-mandatory"](schema=schema)
+    assert not ok and "no relationship is reached" in msg

@@ -68,6 +68,7 @@ delete data via the tracking cleanup.
 | Reads a "design" node to drive output | Define that node's `human_friendly_id` so the generator's tracking key stays stable across runs | [../infrahub-managing-schemas/rules/display-human-friendly-id.md](../infrahub-managing-schemas/rules/display-human-friendly-id.md) |
 | Is triggered by membership in a group | The target group must be a `CoreGeneratorGroup` (not `CoreStandardGroup`) — the dispatcher only recognizes the former | [rules/registration-config.md](./rules/registration-config.md) |
 | Should be idempotent on re-run | Every `save()` uses `allow_upsert=True`; the run's tracking context deletes objects from prior runs that aren't recreated | [rules/tracking-idempotent.md](./rules/tracking-idempotent.md) |
+| Imports anything from the repository (a shared package, generated protocols, its own query model) | Carry a `watch:` block in `.infrahub.yml` naming every one of those paths — imports are never followed, so an undeclared helper means the Generator silently stops re-running when that helper changes | [rules/registration-watch-dependencies.md](./rules/registration-watch-dependencies.md) |
 
 ## Before writing Python
 
@@ -155,6 +156,15 @@ Follow these steps when creating a generator:
 6. **Register in .infrahub.yml** — Add under
    `generator_definitions` with the target group. See
    [rules/registration-config.md](./rules/registration-config.md).
+   Then declare the Generator's dependencies with
+   `watch.files`: read its imports and runtime file reads,
+   and name every first-party path they resolve to —
+   sibling query models included. Always carry the key;
+   `files: []` when the Generator genuinely has no
+   dependency beyond its own file. Read
+   [rules/registration-watch-dependencies.md](./rules/registration-watch-dependencies.md),
+   which also covers reviewing an existing `watch` block
+   for entries that are missing, stale, or wrong.
 7. **Test** — Run `infrahubctl generator` to validate.
    See [rules/testing-commands.md](./rules/testing-commands.md).
 

@@ -153,12 +153,33 @@ infrastructure or organization per
 This is security-critical and applies before the draft
 ever leaves this skill.
 
-The header carries the skills-plugin version whose
-guidance failed, read from `metadata.version` in the
-implicated skill's own SKILL.md frontmatter. Without it a
-maintainer cannot tell whether the rule they are looking
-at is the one that failed. Write `unknown` if it cannot be
-read; never guess.
+The header carries three versions, and a report is not
+ready without all three:
+
+1. **Skills**, from `metadata.version` in the implicated
+   skill's own SKILL.md frontmatter. Says which revision
+   of the rule failed.
+2. **Infrahub SDK**, from the `SDK Version` line of
+   `infrahubctl info`. Says what a rule naming a CLI
+   flag or client method was aimed at.
+3. **Infrahub**, from the `Infrahub Version` line of
+   the same output. Says what a rule about schema
+   loading, branch behavior, or a check pipeline was
+   aimed at.
+
+Run `infrahubctl info` as
+[../infrahub-common/rules/connectivity-server-check.md](../infrahub-common/rules/connectivity-server-check.md)
+prescribes; the runner prefix matters.
+
+Without them a maintainer cannot tell whether the
+guidance is wrong or merely older than what ran, which
+is the difference between rewriting a rule and adding a
+version note to it. Copy only the version values:
+`infrahubctl info` also prints the server address and
+deployment ID, which
+[rules/evidence-no-customer-data.md](rules/evidence-no-customer-data.md)
+forbids. Write `unknown` for any of the three that
+cannot be read; never guess.
 
 This produces the three handoff fields `type`, `title`,
 and `body`. It does **not** produce a target repository:
