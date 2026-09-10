@@ -35,12 +35,18 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
-  # Bump: calculate next version, update files, commit
+  # Bump: calculate the next version, assemble the changelog, open a release PR
   #
-  # Tag creation is deferred to release publication. When a maintainer
-  # publishes the draft maintained by release-drafter, GitHub creates the
-  # tag against the release's targetCommitish (main HEAD at that moment),
-  # guaranteeing the tag includes every PR merged up to publish time.
+  # Nothing is pushed to `main` directly and no tag is created here. The
+  # version bump and the assembled changelog land as a reviewable pull
+  # request on which the regression eval suite runs; merging it is the act
+  # that authorises the release, and release-publish.yml then creates the
+  # tag and the GitHub Release.
+  #
+  # The version is computed in its own step whose sole output is a version
+  # string. That is the seam for a later migration onto the shared
+  # `release-prepare` workflow, which accepts exactly that as
+  # `bump-strategy: manual` + `version:`.
   # ---------------------------------------------------------------------------
   bump:
     needs: guard
@@ -54,6 +60,11 @@ jobs:
         with:
           token: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}
           fetch-depth: 0
+
+      # Needed to run towncrier, which is pinned in the dev group.
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
 
       - name: Calculate next version from PR labels
         uses: patrickjahns/version-drafter-action@v1.3.1
@@ -88,38 +99,86 @@ jobs:
         if: steps.compare.outputs.changed == 'true'
         run: bash scripts/sync-versions.sh "${{ steps.next.outputs.next-version }}"
 
-      - name: Commit version bump
+      - name: Assemble the changelog
         if: steps.compare.outputs.changed == 'true'
+        env:
+          VERSION: ${{ steps.next.outputs.next-version }}
         run: |
-          VERSION="${{ steps.next.outputs.next-version }}"
+          set -euo pipefail
+
+          # A release must say what changed. Fail loudly rather than tag a
+          # version whose notes are empty — the same rule the shared
+          # changelog-towncrier composite enforces, with no opt-out.
+          shopt -s nullglob
+          KEPT=()
+          for f in changelog/*.md; do
+            [ "$f" = "changelog/towncrier.md.template" ] && continue
+            KEPT+=("$f")
+          done
+          if [ ${#KEPT[@]} -eq 0 ]; then
+            MSG="No news fragments in changelog/ — refusing to cut"
+            MSG="${MSG} v${VERSION} with an empty changelog."
+            MSG="${MSG} Add a fragment (housekeeping is fine) and re-run."
+            echo "::error::${MSG}"
+            exit 1
+          fi
+
+          uv run towncrier build --version "${VERSION}" --yes
+
+      - name: Open the release pull request
+        if: steps.compare.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}
+          VERSION: ${{ steps.next.outputs.next-version }}
+        run: |
+          set -euo pipefail
+          BRANCH="release/v${VERSION}"
+
           git config user.name "opsmill-bot"
           git config user.email "opsmill-bot@users.noreply.github.com"
-          # Stage only files version-sync is allowed to touch — avoids
-          # picking up stray files dropped by third-party tools.
+          git switch -c "${BRANCH}"
+
+          # Stage only files the bump and changelog assembly are allowed to
+          # touch — avoids picking up stray files dropped by third-party
+          # tools. uv.lock is included because any `uv run` rewrites it, and
+          # nothing else validates it against the tag.
           git add .claude-plugin/plugin.json \
                   skills/*/SKILL.md \
                   pyproject.toml \
-                  .github/.release-manifest.json
-          git commit -m "chore(release): bump to v${VERSION}"
-          git push origin main
+                  uv.lock \
+                  .github/.release-manifest.json \
+                  CHANGELOG.md \
+                  changelog/
+          git commit -m "chore(release): v${VERSION}"
 
-  # ---------------------------------------------------------------------------
-  # Release draft: create/update a draft GitHub release.
-  # The draft's tag (`v${VERSION}`) is materialized by GitHub only when the
-  # maintainer publishes the draft — guaranteeing the tag points at HEAD at
-  # publish time, with every subsequent PR included.
-  # ---------------------------------------------------------------------------
-  release-draft:
-    needs: bump
-    if: always() && needs.bump.result == 'success'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: release-drafter/release-drafter@v7
-        with:
-          tag: "v${{ needs.bump.outputs.version }}"
-          version: "${{ needs.bump.outputs.version }}"
-          publish: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}
+          # Re-running on a later push to main refreshes the same branch
+          # rather than opening a second PR for the same version. Plain
+          # --force rather than --force-with-lease: checkout does not fetch
+          # this branch's remote ref, so a lease has nothing to compare
+          # against. The branch is bot-owned and regenerated every run.
+          git push --force origin "${BRANCH}"
+
+          if gh pr view "${BRANCH}" --json number >/dev/null 2>&1; then
+            echo "Release PR for ${BRANCH} already open — updated in place."
+            exit 0
+          fi
+
+          gh pr create \
+            --base main \
+            --head "${BRANCH}" \
+            --title "chore(release): v${VERSION}" \
+            --label "ci/skip-changelog" \
+            --body "$(cat <<EOF
+          Prepared automatically. Merging this pull request authorises the release:
+          \`release-publish.yml\` then tags \`v${VERSION}\` and publishes the GitHub
+          Release using the assembled changelog as its body.
+
+          The \`regression\` eval suite runs on this pull request and must pass
+          before it can be merged — this is the quality gate for the release.
+
+          - Version bumped to \`${VERSION}\` across plugin.json, the release manifest, pyproject and every SKILL.md
+          - \`CHANGELOG.md\` assembled from the news fragments, which are consumed by this commit
+
+          Review the assembled changelog and the eval results before merging.
+          EOF
+          )"

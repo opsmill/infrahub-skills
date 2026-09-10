@@ -100,12 +100,20 @@ Skill and tooling work goes under `housekeeping`. Add a fragment in the same PR 
   e.g. `+netbox-device-types.added.md`.
 - Types: `security`, `removed`, `deprecated`, `added`, `changed`, `fixed`, `housekeeping`.
 - `uv run towncrier build --draft --version X.Y.Z` — preview the rendered changelog.
-- `uv run towncrier build --version "$(jq -r .version .claude-plugin/plugin.json)"` — assemble
-  `CHANGELOG.md` at release time (consumes the fragments). The version is always passed
-  explicitly: it lives in `plugin.json`, not in an importable package towncrier could read.
+- Label a PR `ci/skip-changelog` when it genuinely needs no entry (dependency bumps, typo fixes).
+  CI fails a PR that adds neither a fragment nor that label.
+
+Do not run `towncrier build` or bump versions by hand. A push to `main` opens a
+`chore(release): vX.Y.Z` pull request carrying the bump and the assembled changelog; the
+`regression` eval suite runs on it as the release gate, and merging it tags and publishes the
+release with that changelog as the body. The version is always passed explicitly because it lives
+in `plugin.json`, not in an importable package towncrier could read.
 
 This accumulates the raw entries per PR; the curated `docs/docs/release-notes/release-X_Y_Z.mdx`
 page stays a separate, hand-written narrative for each release.
+
+Evals are tiered by cost: `smoke` on any PR touching `skills/`, the full `regression` suite weekly
+against `main` and as a blocking check on the release PR.
 
 ### Versioning
 
