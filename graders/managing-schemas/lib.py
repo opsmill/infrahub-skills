@@ -1184,6 +1184,26 @@ def check_uniqueness_attr_value_suffix(schema: dict, **_: Any) -> tuple[bool, st
     return True, "constraint fields use __value for attributes and bare relationships"
 
 
+def _compiled_hfid_group(hfid: list, rels: dict[str, dict]) -> list[str]:
+    """The uniqueness-constraint group a ``human_friendly_id`` compiles into.
+
+    The declared form and the compiled form are not the same text. An HFID
+    names a relationship by a peer-attribute path — ``rack__name__value``,
+    the only shape ``validate_human_friendly_id`` accepts for a
+    relationship — and that collapses to the bare relationship ``rack`` in
+    the constraint it becomes. Matching the declared text against
+    relationship names therefore finds nothing, and a constraint moved
+    down as an HFID reads as no constraint at all.
+    """
+    group: list[str] = []
+    for field in hfid:
+        if not isinstance(field, str):
+            continue
+        head = field.split("__")[0]
+        group.append(head if head in rels else field)
+    return group
+
+
 def _ancestor_kinds(schema: dict, entity: dict) -> set[str]:
     """Every kind ``entity`` inherits from, following chains within the file."""
     generics_by_kind = {
@@ -1227,24 +1247,45 @@ def check_uniqueness_rel_mandatory(schema: dict, **_: Any) -> tuple[bool, str]:
     Both are load-time rejections. The mandatory one is the expensive
     mistake, because a constraint designed against an optional relationship
     looks reasonable and only fails after the surrounding model is written.
+
+    A ``human_friendly_id`` compiles into a uniqueness constraint, so the
+    relationship its path traverses carries the same two requirements and
+    is checked here too.
     """
     problems: list[str] = []
     for _section, entity in _entities(schema):
         _attrs, rels = _resolved_members(schema, entity)
+
+        # Relationship name -> the text that reached it. Both keys that
+        # compile into a constraint are walked: reading only
+        # uniqueness_constraints passes a schema whose constraint was
+        # declared as a human_friendly_id over an optional or
+        # cardinality-many relationship, which the load rejects
+        # (`REL_ONE_MANDATORY_ATTR` is the only relationship path type an
+        # HFID accepts).
+        reached: dict[str, str] = {}
         for field in _constraint_fields(entity):
+            reached.setdefault(field, field)
+        hfid = entity.get("human_friendly_id")
+        if isinstance(hfid, list):
+            for path in hfid:
+                if isinstance(path, str) and "__" in path:
+                    reached.setdefault(path.split("__")[0], path)
+
+        for field, label in reached.items():
             rel = rels.get(field)
             if rel is None:
                 continue  # an attribute path, or inherited from another file
             if rel.get("cardinality") != "one":
                 problems.append(
-                    f"{entity.get('name')}.{field} cardinality="
+                    f"{entity.get('name')}.{label} cardinality="
                     f"{rel.get('cardinality')!r}, must be one"
                 )
             if rel.get("optional") is not False and not _is_ip_namespace_carveout(
                 schema, entity, field
             ):
                 problems.append(
-                    f"{entity.get('name')}.{field} optional="
+                    f"{entity.get('name')}.{label} optional="
                     f"{rel.get('optional')!r}, must be false"
                 )
     if problems:
@@ -1298,15 +1339,18 @@ def check_uniqueness_constraint_scopes_by_relationship(
     problems: list[str] = []
     scoped: list[str] = []
     for entity in implementers:
+        _attrs, rels = _resolved_members(schema, entity)
         constraints = [
             group
-            for group in list(entity.get("uniqueness_constraints") or [])
-            + ([entity.get("human_friendly_id")] if entity.get("human_friendly_id") else [])
-            # A human_friendly_id compiles into a uniqueness constraint, so
-            # it expresses the same scoping and has to be read as one.
+            for group in (entity.get("uniqueness_constraints") or [])
             if isinstance(group, list)
         ]
-        _attrs, rels = _resolved_members(schema, entity)
+        # A human_friendly_id compiles into a uniqueness constraint, so it
+        # expresses the same scoping and has to be read as one — in the
+        # compiled form, not the declared text.
+        hfid = entity.get("human_friendly_id")
+        if isinstance(hfid, list):
+            constraints.append(_compiled_hfid_group(hfid, rels))
         kind = _full_kind(entity)
         match = next(
             (

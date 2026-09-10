@@ -28,7 +28,11 @@ TASK_CHECKS = [
 ]
 
 EXPLICIT = '    uniqueness_constraints:\n      - ["rack", "name__value"]'
-HFID = '    human_friendly_id: ["rack", "name__value"]'
+# The declarable HFID form, not the group it compiles into. Infrahub accepts
+# only ATTR_WITH_PROP or REL_ONE_MANDATORY_ATTR paths here, so a bare
+# relationship name (`rack`) is rejected at load and cannot stand in for the
+# peer-attribute path in a fixture.
+HFID = '    human_friendly_id: ["rack__name__value", "name__value"]'
 ESTATE_WIDE = '    uniqueness_constraints:\n      - ["serial__value"]'
 
 
@@ -199,6 +203,26 @@ def test_the_rack_nodes_own_uniqueness_is_not_asked_to_scope():
     ok, msg = _mod.CHECKS["uniqueness-scopes-by-relationship"](schema=schema)
     assert ok, msg
     assert _score(schema) == 1.0
+
+
+def test_an_hfid_declared_constraint_still_needs_a_mandatory_relationship():
+    """The HFID form is the sanctioned alternative, so it gets the same checks.
+
+    An HFID path may only traverse a mandatory, cardinality-one
+    relationship. Reading uniqueness_constraints alone gave full marks to a
+    schema that is rejected at load.
+    """
+    ok, msg = _mod.CHECKS["uniqueness-rel-mandatory"](
+        schema=_schema(optical_body=HFID, ethernet_body=HFID, optional="true")
+    )
+    assert not ok and "optional=True" in msg
+
+    schema = _schema(optical_body=HFID, ethernet_body=HFID)
+    for node in schema["nodes"]:
+        for rel in node.get("relationships") or []:
+            rel["cardinality"] = "many"
+    ok, msg = _mod.CHECKS["uniqueness-rel-mandatory"](schema=schema)
+    assert not ok and "must be one" in msg
 
 
 def test_optional_attribute_in_a_constraint_fails():

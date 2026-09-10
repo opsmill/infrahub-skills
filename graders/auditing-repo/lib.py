@@ -145,6 +145,13 @@ def check_yagni_replacement_mentions(
 # replacement precisely. A blind substring test rejects it.
 _CONTRAST_MARKERS = re.compile(
     r"\b(not|never|instead of|rather than|avoid|don't|do not|no longer|"
+    # `not` does not match these: they are single words, or inflections the
+    # list only carried in one fixed phrase. Ruling the generic out with
+    # "the constraint cannot go on DcimGenericDevice" or "that widens the
+    # rule to DcimRouter" is the answer the rule asks for, so it must not
+    # be marked down for its wording.
+    r"cannot|can not|can't|excluding|unconstrained|"
+    r"widen(?:s|ed|ing)?|broaden(?:s|ed|ing)?|"
     r"would (?:also|widen|apply)|which would|wrong|incorrect)\b",
     re.IGNORECASE,
 )
