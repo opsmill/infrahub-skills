@@ -1,0 +1,23 @@
+specs/001-towncrier-release-process/plan.md
+  s_e814976895190a::t_f35322253be68f 1-93
+specs/001-towncrier-release-process/tasks.md
+  s_e814976895190a::t_a30632a6da2f68 1-94
+.github/workflows/release.yml
+  s_e814976895190a::t_4eafa19658d56c 50-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0b59fbdce3d98d1c1f715cdf6fbecbb7cefe0ea5",
+  "prompts": {},
+  "sessions": {
+    "s_e814976895190a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f38e30c4-8c78-42ea-9268-f3396fdc0b01",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
