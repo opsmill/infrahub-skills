@@ -1,0 +1,49 @@
+docs/docs/release-notes/release-1_2_0.mdx
+  s_fdcc22629dad39::t_ac21242fde3d95 3
+AGENTS.md
+  s_fdcc22629dad39::t_d538f2b745290b 97-114
+docs/docs/release-notes/release-0_0_1.mdx
+  s_fdcc22629dad39::t_ac21242fde3d95 3
+docs/docs/release-notes/release-1_2_6.mdx
+  s_fdcc22629dad39::t_ac21242fde3d95 3
+docs/docs/release-notes/release-1_2_1.mdx
+  s_fdcc22629dad39::t_ac21242fde3d95 3
+docs/docs/release-notes/release-1_2_5.mdx
+  s_fdcc22629dad39::t_ac21242fde3d95 3
+docs/docs/release-notes/release-1_2_2.mdx
+  s_fdcc22629dad39::t_ac21242fde3d95 3
+docs/docs/release-notes/release-1_2_3.mdx
+  s_fdcc22629dad39::t_ac21242fde3d95 3
+docs/docs/release-notes/release-1_2_8.mdx
+  s_fdcc22629dad39::t_ae9790b3ea2db9 32-33,35,37-41
+  s_fdcc22629dad39::t_ce96ab89cca288 182
+  s_fdcc22629dad39::t_734608776b9a7e 102
+  s_fdcc22629dad39::t_5ecbcacc630e21 62,74
+  s_fdcc22629dad39::t_ef794c152b5f47 30,78,80
+  s_fdcc22629dad39::t_ce717429e1c67e 44,71,90,98
+  s_fdcc22629dad39::t_a3ea6eebf7ef35 34,108,117,122,126,145
+  s_fdcc22629dad39::t_e59dded37c7d4c 36,53,58,85,106,119,129
+  s_fdcc22629dad39::t_a32bf5c2a80f92 1-29,31,42-43,45-52,54-57,59-61,63-70,72-73,75-77,79,81-84,86-89,91-97,99-101,103-105,107,109-116,118,120-121,123-125,127-128,130-144,146-181,183-207
+docs/docs/release-notes/release-1_2_4.mdx
+  s_fdcc22629dad39::t_ac21242fde3d95 3
+docs/docs/release-notes/release-1_2_7.mdx
+  s_fdcc22629dad39::t_ac21242fde3d95 3
+.github/.release-manifest.json
+  s_fdcc22629dad39::t_14ed6fd24b4db6 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6d5be7842856e2b7e69b468ad8bc12cfdb309300",
+  "prompts": {},
+  "sessions": {
+    "s_fdcc22629dad39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "891efee3-4780-4bef-bf1f-8f3599114fbe",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
