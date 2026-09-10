@@ -1,0 +1,21 @@
+tests/graders/test_teaching_lib.py
+  s_fe99a41d5e7f9e::t_645a0503b7d28d 421-432
+graders/teaching-concepts/lib.py
+  s_fe99a41d5e7f9e::t_86c0cec09a8213 259-266
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "cd0c13b2346f1f1a3d338bc20950e30a1f569cc6",
+  "prompts": {},
+  "sessions": {
+    "s_fe99a41d5e7f9e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f610d975-3725-4fda-8281-a3570da3554a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
