@@ -16,17 +16,29 @@ turns target attributes into query variables.
 ### Why it matters
 
 `generator_definitions` carries a top-level `query:`
-field — the opposite of `check_definitions`, which
-embeds the query under the check itself. Copying the
-check shape into a generator block is the most
-common setup mistake; Infrahub rejects the config at
-load time, so the repository never finishes syncing and
-no run is ever enqueued. Read the sync status on the
-repository object, or `infrahubctl task list
---include-logs`, to see it. **Not `infrahubctl generator
---list`**: that reads the local `.infrahub.yml` and
-never contacts the server, so it lists the malformed
-entry happily. `targets:` resolves
+field, which `check_definitions` has no equivalent of.
+Copying the check shape into a generator block is the
+most common setup mistake, and it drops that required
+field; Infrahub rejects the config at load time, so the
+repository never finishes syncing and no run is ever
+enqueued. **`infrahubctl generator --list` is the
+fastest local check for this**: it validates
+`.infrahub.yml` before it lists anything, and exits
+non-zero naming each error
+(`generator_definitions/0/query | Field required`). The
+same applies to any key outside the allowed set, which
+is rejected as an extra input. What it cannot tell you
+is anything server-side — it never contacts the server,
+so for sync status and whether a run was enqueued, read
+the repository object or `infrahubctl task list
+--include-logs`.
+
+One malformed shape it will *not* catch: `query:` is
+typed as a plain string, so an inline GraphQL document
+passes validation and gets listed. It fails later, at
+dispatch, when no query of that name is found.
+
+`targets:` resolves
 strictly against `CoreGeneratorGroup`; pointing it
 at a `CoreStandardGroup` of the same name parses
 fine but the dispatcher never enqueues runs, so the
@@ -167,13 +179,12 @@ infrahubctl generator --list
 infrahubctl task list --include-logs
 ```
 
-`infrahubctl generator --list` reads
-`generator_definitions` out of `.infrahub.yml` and
-prints each name, file, class and target. It never
-contacts the server, so it says nothing about whether
-the group resolved or a run was enqueued. For that, read
-the task list above, or the proposed change's pipeline
-output.
+`infrahubctl generator --list` validates
+`.infrahub.yml` and then prints each definition's name,
+file, class and target. It never contacts the server, so
+it says nothing about whether the group resolved or a
+run was enqueued. For that, read the task list above, or
+the proposed change's pipeline output.
 
 In CI, assert non-emptiness explicitly. "The pipeline
 passed" and "the generator ran" are different claims.

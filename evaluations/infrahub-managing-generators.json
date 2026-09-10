@@ -110,8 +110,8 @@
     },
     {
       "id": 6,
-      "prompt": "Write a generator that provisions a service. It runs once per\nservice (one target per service) and has two jobs:\n\n1. **Find the routes.** Discover the candidate paths between the\n   service's `endpoint_a` and `endpoint_z`, then create one `NetLeg`\n   per path. Use the platform's traversal rather than walking the\n   graph yourself. Note that every endpoint points at a shared\n   `NetSegmentType` catalog object, and my first attempt returned\n   routes that hopped through that catalog object and joined\n   endpoints with no physical connection between them.\n\n2. **Nest under a shared trunk.** Every service nests its legs under\n   one `NetContainer` named `shared-trunk`, which is the same object\n   for every service.\n\nAlso show me the object-data snippet that puts my `NetTopology`\nobjects into the `topologies_dc` generator target group.\n\nSave the generator, the object-data snippet, and your explanation to:\noutput.md\nPut the generator in a ```python fence and the object data in a\n```yaml fence.",
-      "expected_output": "A generator constraining the traversal by `relationship_filter` (schema identifiers, not relationship names) plus a `max_depth`, because kind filtering restricts which nodes appear rather than which edges are followed and so does not stop the walk crossing the shared catalog object. It must check `truncated_at_depth` before using the paths. The shared `NetContainer` must be saved with `update_group_context=False`, since the tracking group is per target and every save (upsert included) claims the node, so whichever service stops writing it would delete it and orphan the other services' legs. Group membership must be written from the member side with `member_of_groups`.",
+      "prompt": "Write a generator that provisions a service. It runs once per\nservice (one target per service) and has two jobs:\n\n1. **Find the routes.** Discover the candidate paths between the\n   service's `endpoint_a` and `endpoint_z`, then create one `NetLeg`\n   per path. Use the platform's traversal rather than walking the\n   graph yourself. Note that every endpoint points at a shared\n   `NetSegmentType` catalog object, and my first attempt returned\n   routes that hopped through that catalog object and joined\n   endpoints with no physical connection between them. Name each\n   leg after the nodes its route crosses, joined by `-`, so I can\n   tell the legs apart in the UI.\n\n2. **Nest under a shared trunk.** Every service nests its legs under\n   one `NetContainer` named `shared-trunk`, which is the same object\n   for every service.\n\nAlso show me the object-data snippet that puts my `NetTopology`\nobjects into the `topologies_dc` generator target group.\n\nSave the generator, the object-data snippet, and your explanation to:\noutput.md\nPut the generator in a ```python fence and the object data in a\n```yaml fence.",
+      "expected_output": "A generator constraining the traversal by `relationship_filter` (schema identifiers, not relationship names) plus a `max_depth`, because kind filtering restricts which nodes appear rather than which edges are followed and so does not stop the walk crossing the shared catalog object. It must check `truncated_at_depth` before using the paths. The shared `NetContainer` must be saved with `update_group_context=False`, since the tracking group is per target and every save (upsert included) claims the node, so whichever service stops writing it would delete it and orphan the other services' legs. Group membership must be written from the member side with `member_of_groups`. Each leg's name must be built by walking that path's `hops` and reading `hop.node.display_label`; a `PathHop` exposes `node` and `relationship` only, so reaching for a label straight off the hop raises AttributeError at run time.",
       "files": [],
       "expectations": [
         "Uses traverse_paths and iterates the returned paths to create one leg per path, not a hand-written per-hop walk and not path_exists alone (it returns a bool and cannot enumerate paths)",
@@ -119,7 +119,8 @@
         "Does NOT pass included_kinds to the traversal; explains it only re-includes kinds excluded by default",
         "Checks truncated_at_depth before acting on the returned paths",
         "Saves the shared NetContainer with update_group_context=False while leaving the per-service legs tracked, and explains that an upsert otherwise claims ownership",
-        "Object data assigns membership via member_of_groups on the member, not via members on the group"
+        "Object data assigns membership via member_of_groups on the member, not via members on the group",
+        "Builds each leg's name from the hops of its path, reading the label through `hop.node.display_label` \u2014 a hop carries `node` and `relationship` only, so reading `hop.display_label` raises AttributeError"
       ],
       "assertions": [
         {
@@ -136,7 +137,7 @@
         },
         {
           "name": "path-hop-shape",
-          "check": "Path hops are read through `.node` / `.relationship`; the label is on the hop's node, not the hop"
+          "check": "Each path's hops are iterated to build the leg name, and the label is read through `.node` / `.relationship`; the label is on the hop's node, not the hop"
         },
         {
           "name": "group-membership-from-member-side",

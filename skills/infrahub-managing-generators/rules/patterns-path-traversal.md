@@ -85,7 +85,31 @@ class RouteBuilder(InfrahubGenerator):
             )
 
         for path in result.paths:
-            ...
+            # A hop carries `node` and `relationship` only. The label is
+            # on the hop's node: `hop.display_label` raises AttributeError.
+            name = "-".join(hop.node.display_label for hop in path.hops)
+            leg = await self.client.create(
+                kind="NetLeg", data={"name": name, "service": service["id"]}
+            )
+            await leg.save(allow_upsert=True)
+```
+
+### Walking a path
+
+`Path.hops` is the ordered list of steps. Each `PathHop`
+carries exactly two attributes:
+
+| Attribute | What it holds |
+| --------- | ------------- |
+| `node` | the `PathNode` stepped onto — `id`, `kind`, `label`, `display_label`, `hfid`, and `fetch()` to resolve the full node |
+| `relationship` | the `PathRelationship` followed to reach it (`from_rel`, `from_label`, `to_rel`, `to_label`, `kind`), or **`None` on the first hop**, which is anchored at the source |
+
+Reaching for a node attribute straight off the hop is
+the mistake this section exists for:
+
+```python
+hop.display_label       # WRONG: AttributeError at run time
+hop.node.display_label  # RIGHT: the label is on the hop's node
 ```
 
 ### `relationship_filter` takes identifiers, not names

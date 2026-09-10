@@ -1424,6 +1424,12 @@ def check_path_hop_shape(output: dict, **_: Any) -> tuple[bool, str]:
 
     Anything a path's hops are iterated into is a PathHop, so reading a
     node attribute straight off it is wrong however the loop is spelled.
+
+    The task names each leg after the nodes its route crosses, which can
+    only be read off the hops, so an answer that never iterates them has
+    not done the task. Passing when no hops are touched would hand out
+    the weight for free and report the rule as covered without having
+    exercised it.
     """
     tree = _answer_tree(output)
     if tree is None:
@@ -1445,7 +1451,10 @@ def check_path_hop_shape(output: dict, **_: Any) -> tuple[bool, str]:
                 hop_names.update(_target_names(target))
 
     if not hop_names:
-        return True, "the answer iterates no path hops, so nothing to check"
+        return False, (
+            "never iterates a path's .hops, so the leg name cannot be built "
+            "from the nodes the route crosses"
+        )
 
     bad = sorted({
         f"{ast.unparse(n.value)}.{n.attr}"

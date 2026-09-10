@@ -1626,7 +1626,9 @@ tasks:
          graph yourself. Note that every endpoint points at a shared
          `NetSegmentType` catalog object, and my first attempt returned
          routes that hopped through that catalog object and joined
-         endpoints with no physical connection between them.
+         endpoints with no physical connection between them. Name each
+         leg after the nodes its route crosses, joined by `-`, so I can
+         tell the legs apart in the UI.
 
       2. **Nest under a shared trunk.** Every service nests its legs under
          one `NetContainer` named `shared-trunk`, which is the same object
@@ -1654,7 +1656,10 @@ tasks:
       and every save (upsert included) claims the node, so whichever
       service stops writing it would delete it and orphan the other
       services' legs. Group membership must be written from the member side
-      with `member_of_groups`.
+      with `member_of_groups`. Each leg's name must be built by walking
+      that path's `hops` and reading `hop.node.display_label`; a `PathHop`
+      exposes `node` and `relationship` only, so reaching for a label
+      straight off the hop raises AttributeError at run time.
     expectations:
       - >-
         Uses traverse_paths and iterates the returned paths to create one
@@ -1674,6 +1679,11 @@ tasks:
       - >-
         Object data assigns membership via member_of_groups on the member,
         not via members on the group
+      - >-
+        Builds each leg's name from the hops of its path, reading the
+        label through `hop.node.display_label` — a hop carries `node` and
+        `relationship` only, so reading `hop.display_label` raises
+        AttributeError
     assertions:
       - name: traversal-uses-relationship-filter
         check: >-
@@ -1690,8 +1700,9 @@ tasks:
           carries the flag
       - name: path-hop-shape
         check: >-
-          Path hops are read through `.node` / `.relationship`; the label
-          is on the hop's node, not the hop
+          Each path's hops are iterated to build the leg name, and the
+          label is read through `.node` / `.relationship`; the label is on
+          the hop's node, not the hop
       - name: group-membership-from-member-side
         check: >-
           The YAML object data assigns membership via member_of_groups, not

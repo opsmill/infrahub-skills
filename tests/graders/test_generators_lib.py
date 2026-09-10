@@ -420,7 +420,10 @@ class RouteBuilder(InfrahubGenerator):
         container = await self.client.create(kind="NetContainer", data={"name": "shared-trunk"})
         await container.save(allow_upsert=True, update_group_context=False)
         for path in result.paths:
-            leg = await self.client.create(kind="NetLeg", data={"container": container})
+            name = "-".join(hop.node.display_label for hop in path.hops)
+            leg = await self.client.create(
+                kind="NetLeg", data={"name": name, "container": container}
+            )
             await leg.save(allow_upsert=True)
 """
 
@@ -973,4 +976,66 @@ class G:
             pass
 ''',
     )
+    assert not ok
+
+
+# --- path-hop-shape must bite on this task ---
+
+def test_the_reference_answer_passes_every_check(tmp_path):
+    """GEN_GOOD is the shape the task asks for, so all five must pass."""
+    output = _answer(tmp_path)
+    for name in (
+        "traversal-uses-relationship-filter",
+        "traversal-enumerates-and-checks-truncation",
+        "shared-save-opts-out-of-tracking",
+        "group-membership-from-member-side",
+        "path-hop-shape",
+    ):
+        ok, msg = _check(name, output)
+        assert ok, f"{name}: {msg}"
+
+
+def test_an_answer_that_never_reads_the_hops_fails(tmp_path):
+    """The task names each leg after the nodes its route crosses.
+
+    Passing when no hops are touched handed out the weight for free and
+    reported the rule as covered without ever exercising it.
+    """
+    src = GEN_GOOD.replace(
+        '            name = "-".join(hop.node.display_label for hop in path.hops)\n',
+        '            name = "leg"\n',
+    )
+    ok, msg = _check("path-hop-shape", _answer(tmp_path, python=src))
+    assert not ok
+    assert ".hops" in msg
+
+
+def test_reading_the_label_off_the_hop_still_fails_on_the_full_answer(tmp_path):
+    src = GEN_GOOD.replace("hop.node.display_label", "hop.display_label")
+    ok, msg = _check("path-hop-shape", _answer(tmp_path, python=src))
+    assert not ok
+    assert "hop.node.display_label" in msg
+
+
+def test_prose_about_hops_does_not_stand_in_for_reading_them(tmp_path):
+    """The near-miss: the right words in the explanation, no hops in the code."""
+    src = GEN_GOOD.replace(
+        '            name = "-".join(hop.node.display_label for hop in path.hops)\n',
+        '            name = "leg"\n',
+    )
+    output = _answer(
+        tmp_path,
+        python=src,
+        prose="Each leg is named from its hops via `hop.node.display_label`.",
+    )
+    ok, _ = _check("path-hop-shape", output)
+    assert not ok
+
+
+def test_counting_hops_is_not_reading_their_labels(tmp_path):
+    src = GEN_GOOD.replace(
+        '            name = "-".join(hop.node.display_label for hop in path.hops)\n',
+        '            name = f"leg-{len(path.hops)}"\n',
+    )
+    ok, _ = _check("path-hop-shape", _answer(tmp_path, python=src))
     assert not ok
