@@ -202,14 +202,59 @@ variables.
 
 `watch` declares the files a Transformation or Generator
 depends on that Infrahub's automatic detection cannot see.
-It is a strict object with one key, `files`, holding paths
-relative to the repository root:
+It is a strict object whose only key today is `files`, holding
+paths relative to the repository root. Further dependency keys
+(`strict`, `exclude`) are planned to sit alongside it:
 
 ```yaml
 watch:
   files:
     - src/my_package/       # directory: every tracked file beneath it
     - shared/constants.py   # single file
+```
+
+A bare `watch:` with nothing under it is **not** a
+declaration. It parses to null, which is indistinguishable
+from omitting the key, so the commit id still goes into the
+fingerprint — while the manifest reads as though the
+dependencies were declared. Write `files: []` when the answer
+is "nothing to add".
+
+The three eligible sections, each showing the case that needs
+`watch` most:
+
+```yaml
+# Jinja2: only when the parser cannot follow a reference.
+jinja2_transforms:
+  - name: device_config
+    query: device_config_query
+    template_path: templates/device_config.j2
+    watch:
+      files:
+        - templates/partials/   # {% include partial_name %}
+
+# Python: always, because imports are never analyzed.
+python_transforms:
+  - name: device_name_attribute
+    class_name: DeviceNameAttribute
+    file_path: transforms/device_name_attribute.py
+    watch:
+      files:
+        - transforms/device_name_helpers.py   # sibling module
+        - shared/helpers.py                   # other package
+        - utils/
+
+# Generators: same rule as Python transforms.
+generator_definitions:
+  - name: device_tags
+    file_path: generators/device_tags.py
+    class_name: DeviceTags
+    query: device_tags_query
+    targets: device_group
+    watch:
+      files:
+        - common/constants.py
+        - shared/
 ```
 
 Valid **only** on `python_transforms`, `jinja2_transforms`,
@@ -308,6 +353,9 @@ and
 ```yaml
 ---
 jinja2_transforms:
+  # No watch. Every reference this template makes is a literal
+  # path, so its closure is built by the parser and trusted on
+  # its own. A watch here would be noise.
   - name: topology_clab
     description: >-
       Template to generate a containerlab topology
@@ -341,6 +389,15 @@ python_transforms:
       files:
         - transforms/common.py
         - templates/configs/spines/
+
+  # Imports nothing first-party and reads no file at runtime.
+  # The empty list says exactly that, and is what unties the
+  # fingerprint from the commit. A bare `watch:` would not.
+  - name: topology_cabling
+    class_name: TopologyCabling
+    file_path: transforms/topology_cabling.py
+    watch:
+      files: []
 
 generator_definitions:
   - name: create_dc

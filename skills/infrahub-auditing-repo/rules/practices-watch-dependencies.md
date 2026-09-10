@@ -107,7 +107,10 @@ For each entry in the three eligible sections:
    that turns out to need `files: []`.
 2. **Shape.** `watch` is a mapping whose only key is `files`,
    holding a list. The bare-list form (`watch: [a, b]`) and any
-   other key fail the repository import.
+   other key fail the repository import. A bare `watch:` with
+   nothing under it does **not** fail: it parses to null, so it
+   counts as no declaration while reading as one. Flag it the
+   same as a missing key — it is the harder of the two to see.
 3. **Completeness.** Read the entry point. Resolve every import
    to a repository path and confirm the list covers it —
    relative imports of siblings included, since those are not

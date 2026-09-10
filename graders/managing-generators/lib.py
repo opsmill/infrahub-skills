@@ -846,11 +846,21 @@ def _covers(files: list[str], target: str) -> bool:
 
 
 def check_gen_watch_present(output: dict) -> tuple[bool, str]:
-    """Every generator_definitions entry must carry a watch key."""
+    """Every generator_definitions entry must carry a real watch declaration.
+
+    A bare ``watch:`` with nothing under it parses to null, which
+    ``fold_commit_id`` cannot tell apart from the key being absent — the
+    commit id still goes into the fingerprint. It reads as a declaration
+    without being one, so it fails here exactly like a missing key.
+    """
     entries = _generator_entries(output)
     if not entries:
         return False, "No generator_definitions entries found to inspect"
-    missing = [e.get("name", "<unnamed>") for e in entries if "watch" not in e]
+    missing = [
+        e.get("name", "<unnamed>")
+        for e in entries
+        if e.get("watch") is None
+    ]
     if missing:
         return False, (
             f"generator_definitions entries with no watch key: {', '.join(missing)} — "

@@ -180,6 +180,14 @@ python_transforms:
     class_name: CiliumManifest
     file_path: transforms/cilium_manifest.py
 
+  # WRONG — a bare `watch:` with nothing under it. It parses to
+  # null, which is indistinguishable from omitting the key, so
+  # the commit id still goes in. Nothing errors; the manifest
+  # just reads as declared when it is not. Write `files: []`.
+  - name: interface_names
+    file_path: transforms/interface_names.py
+    watch:
+
   # WRONG — bare list. watch is an object whose only key is
   # `files`; this is rejected when the repository is imported.
   - name: cabling_plan
@@ -217,7 +225,10 @@ each Transformation:
    entry? A missing key means re-render-on-every-commit.
 2. **Is it the object form**, `watch: {files: [...]}`? A bare
    list or an unknown key under `watch` fails the import
-   outright.
+   outright. A bare `watch:` with nothing under it does not
+   fail — it parses to null and counts as no declaration at
+   all, which is the version of this mistake you have to read
+   for rather than wait for.
 3. **Does every entry resolve** to a Git-tracked file or
    directory? Infrahub expands each entry with `git ls-files`,
    so run the same check locally — no server needed:

@@ -475,13 +475,22 @@ def check_watch_present_on_python_transforms(
 ) -> tuple[bool, str]:
     """Every python_transforms entry must carry a watch key.
 
-    Without one the fingerprint folds in the commit id and the artifacts
-    re-render on every commit.
+    Without one — or with a bare ``watch:`` that parses to null — the
+    fingerprint folds in the commit id and the artifacts re-render on
+    every commit.
     """
     entries = _entries(yml_doc or {}, "python_transforms")
     if not entries:
         return False, "No python_transforms entries found to inspect"
-    missing = [e.get("name", "<unnamed>") for e in entries if "watch" not in e]
+    # ``watch:`` with nothing under it parses to null, which
+    # ``fold_commit_id`` cannot tell apart from the key being absent. It
+    # reads as a declaration without being one, so it fails like a
+    # missing key rather than passing on the key's mere presence.
+    missing = [
+        e.get("name", "<unnamed>")
+        for e in entries
+        if e.get("watch") is None
+    ]
     if missing:
         return False, f"python_transforms entries with no watch key: {', '.join(missing)}"
     return True, f"All {len(entries)} python_transforms entries declare watch"
