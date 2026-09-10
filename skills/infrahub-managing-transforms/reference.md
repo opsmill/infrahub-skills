@@ -10,7 +10,7 @@ quick-reference.
 - [Two Transform Kinds](#two-transform-kinds)
 - [InfrahubTransform (Python) — Class API](#infrahubtransform-python--class-api)
 - [Lifecycle: collect_data → transform → return](#lifecycle-collect_data--transform--return)
-- [Return Type Drives `content_type`](#return-type-drives-content_type)
+- [`content_type` and the Return Type](#content_type-and-the-return-type)
 - [Jinja2-Only Transform](#jinja2-only-transform)
 - [Hybrid Python + Jinja2](#hybrid-python--jinja2)
 - [.infrahub.yml Registration](#infrahubyml-registration)
@@ -99,19 +99,22 @@ canonical "I get None back" symptom.
 
 ---
 
-## Return Type Drives `content_type`
+## `content_type` and the Return Type
 
 | Return type | Suitable `artifact_definitions.content_type` |
 | ----------- | -------------------------------------------- |
-| `dict` | `application/json` |
-| `str` | `text/plain` / `text/markdown` / `text/csv` / `application/yaml` / `application/xml` / `application/hcl` / `image/svg+xml` |
+| `dict` | `application/json` / `application/yaml` (the only two that serialise a dict) |
+| `str` | all eight, and the only correct return type for the other six: `text/plain` / `text/markdown` / `text/csv` / `application/xml` / `application/hcl` / `image/svg+xml` |
 
 Mismatched return + content_type writes the wrong
-shape into the artifact. The server enforces
-`content_type` against a closed enum of 8 values —
-`text/yaml` is **not** one of them; use
-`application/yaml`. See
-[rules/artifacts-definitions.md](./rules/artifacts-definitions.md).
+shape into the artifact: a `dict` returned for any of
+the other six is stored as `str(dict)`, silently. The
+server enforces `content_type` against a closed enum
+of 8 values — `text/yaml` is **not** one of them; use
+`application/yaml`.
+[rules/artifacts-definitions.md](./rules/artifacts-definitions.md)
+is the authority on both the allowlist and the
+serialisation behaviour.
 
 ---
 
