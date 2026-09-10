@@ -179,6 +179,13 @@ python_transforms:
   - name: spine
     class_name: Spine
     file_path: transforms/spine.py
+    # Imports .common, and loads its template through a
+    # FileSystemLoader whose name comes from the platform —
+    # neither is auto-detected, so both are declared.
+    watch:
+      files:
+        - transforms/common.py
+        - templates/configs/spines/
 
 artifact_definitions:
   - name: spine_config
@@ -280,6 +287,10 @@ python_transforms:
   - name: topology_cabling
     class_name: TopologyCabling
     file_path: transforms/topology_cabling.py
+    # Imports nothing first-party and reads no files at
+    # runtime; the empty list asserts that.
+    watch:
+      files: []
 
 artifact_definitions:
   - name: Cable matrix for Topology
@@ -383,6 +394,10 @@ python_transforms:
   - name: simple_transform
     class_name: SimpleTransform
     file_path: transforms/simple.py
+    # Self-contained transform. The key is still present:
+    # without it the artifacts re-render on every commit.
+    watch:
+      files: []
 ```
 
 ---

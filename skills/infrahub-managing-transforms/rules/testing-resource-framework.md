@@ -205,6 +205,8 @@ python_transforms:
   - name: simple_transform
     class_name: SimpleTransform
     file_path: transforms/simple.py
+    watch:
+      files: []
 # No test file created
 ```
 

@@ -21,6 +21,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from typing import Any
+import ast
+import io
+import tokenize
 
 try:
     import yaml
@@ -1056,8 +1059,1342 @@ def check_choice_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
     return True, f"All {seen} dropdown choice(s) are in canonical key order"
 
 
+
+# ---------------------------------------------------------------------------
+# Generic inheritance semantics
+#
+# All three verified against Infrahub's in-memory schema validator: order_by
+# on a generic resolves only against that generic's own declarations; an
+# inherited Dropdown override must restate kind + the full choice list, and a
+# mismatched list loads silently; an inherited relationship's peer is fixed.
+# ---------------------------------------------------------------------------
+
+
+# A trailing `__asc` / `__desc` is a direction suffix, not part of the path.
+# It is legal on every order_by form, node metadata included.
+_ORDER_BY_DIRECTIONS = {"asc", "desc"}
+
+
+def _strip_order_direction(entry: str) -> str:
+    """Drop a trailing ``__asc`` / ``__desc`` direction suffix from an entry."""
+    head, sep, tail = entry.rpartition("__")
+    if sep and head and tail in _ORDER_BY_DIRECTIONS:
+        return head
+    return entry
+
+
+def _entities(schema: dict) -> list[tuple[str, dict]]:
+    """Yield ``(section, entity)`` for every node and generic in the schema."""
+    out: list[tuple[str, dict]] = []
+    for section in ("generics", "nodes"):
+        for entity in schema.get(section) or []:
+            if isinstance(entity, dict):
+                out.append((section, entity))
+    return out
+
+
+def _generic_map(schema: dict) -> dict[str, dict]:
+    """Return generics keyed by full kind."""
+    return {
+        f"{g.get('namespace', '')}{g.get('name', '')}": g
+        for g in (schema.get("generics") or [])
+        if isinstance(g, dict)
+    }
+
+
+def _generics_by_kind(schema: dict) -> dict[str, dict]:
+    return {
+        f"{g.get('namespace', '')}{g.get('name', '')}": g
+        for g in (schema.get("generics") or [])
+        if isinstance(g, dict)
+    }
+
+
+def _all_parents_in_file(schema: dict, entity: dict) -> bool:
+    """True when every generic the entity inherits is declared in this file."""
+    declared = _generics_by_kind(schema)
+    return all(k in declared for k in (entity.get("inherit_from") or []))
+
+
+def _inherited_member_names(schema: dict, entity: dict) -> set[str]:
+    """Attribute and relationship names the entity gets from in-file generics."""
+    generics = _generics_by_kind(schema)
+    names: set[str] = set()
+    for parent_kind in entity.get("inherit_from") or []:
+        parent = generics.get(parent_kind)
+        if not parent:
+            continue
+        for group in ("attributes", "relationships"):
+            names |= {
+                member["name"]
+                for member in (parent.get(group) or [])
+                if isinstance(member, dict) and member.get("name")
+            }
+    return names
+
+
+def check_order_by_resolves_locally(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Every order_by entry must resolve against the schema that declares it.
+
+    A generic is the source of inheritance, so it has no inherited fields to
+    resolve against. Naming an attribute only the implementers declare is
+    rejected at load with "attribute '<name>' not defined on this schema".
+    """
+    problems: list[str] = []
+    seen = 0
+    for section, entity in _entities(schema):
+        entries = entity.get("order_by") or []
+        if not entries:
+            continue
+        seen += 1
+        own_attrs = {
+            a["name"] for a in (entity.get("attributes") or [])
+            if isinstance(a, dict) and a.get("name")
+        }
+        own_rels = {
+            r["name"] for r in (entity.get("relationships") or [])
+            if isinstance(r, dict) and r.get("name")
+        }
+        targets: dict[str, str] = {}
+        for entry in entries:
+            if not isinstance(entry, str):
+                continue
+            # "Each target at most once, even with opposite directions" is a
+            # load-time rejection, so the duplicate has to fail here too.
+            target = _strip_order_direction(entry)
+            if target in targets:
+                problems.append(
+                    f"{entity.get('name')}.order_by names {target!r} twice "
+                    f"({targets[target]!r} and {entry!r}); each target may "
+                    "appear at most once, even with opposite directions"
+                )
+            targets[target] = entry
+            if entry.startswith("node_metadata__"):
+                field = _strip_order_direction(entry).split("__", 1)[1]
+                if field not in {"created_at", "updated_at"}:
+                    problems.append(
+                        f"{entity.get('name')}.order_by {entry!r}: unknown metadata field"
+                    )
+                continue
+            head = entry.split("__")[0]
+            if head in own_attrs or head in own_rels:
+                continue
+            if section == "generics":
+                # A generic is the source of inheritance, so it has nothing
+                # to inherit the field from.
+                problems.append(
+                    f"{entity.get('name')}.order_by {entry!r}: "
+                    f"{head!r} is not declared on this generic"
+                )
+                continue
+            # On a node the field may be inherited, so resolve the parents
+            # declared in this file before calling it undeclared. Only a
+            # field that exists nowhere is a defect.
+            if head in _inherited_member_names(schema, entity):
+                continue
+            if entity.get("inherit_from") and not _all_parents_in_file(schema, entity):
+                continue  # inherited from a generic declared elsewhere
+            problems.append(
+                f"{entity.get('name')}.order_by {entry!r}: "
+                f"{head!r} is declared neither here nor on any generic it inherits"
+            )
+    if problems:
+        return False, "; ".join(problems)
+    if seen == 0:
+        return False, "no order_by declared anywhere"
+    return True, "order_by entries resolve against their declaring schema"
+
+
+def check_dropdown_override_complete(schema: dict, **_: Any) -> tuple[bool, str]:
+    """A Dropdown override must restate `kind` and the generic's full choice list.
+
+    Omitting choices is rejected at load; a shorter or longer list loads
+    silently and fails later at object-write time, so an exact match is the
+    only safe shape.
+    """
+    generic_dropdowns: dict[str, dict[str, list]] = {}
+    for kind, generic in _generic_map(schema).items():
+        for attr in generic.get("attributes") or []:
+            if isinstance(attr, dict) and attr.get("kind") == "Dropdown":
+                generic_dropdowns.setdefault(kind, {})[attr["name"]] = [
+                    c.get("name") for c in (attr.get("choices") or [])
+                    if isinstance(c, dict)
+                ]
+
+    if not generic_dropdowns:
+        return False, "no Dropdown declared on any generic"
+
+    problems: list[str] = []
+    overrides = 0
+    for node in schema.get("nodes") or []:
+        if not isinstance(node, dict):
+            continue
+        inherited: dict[str, list] = {}
+        for parent_kind in node.get("inherit_from") or []:
+            inherited.update(generic_dropdowns.get(parent_kind, {}))
+        for attr in node.get("attributes") or []:
+            if not isinstance(attr, dict) or attr.get("name") not in inherited:
+                continue
+            overrides += 1
+            name = attr["name"]
+            expected = inherited[name]
+            if attr.get("kind") != "Dropdown":
+                problems.append(
+                    f"{node.get('name')}.{name} override kind="
+                    f"{attr.get('kind')!r}, must restate Dropdown"
+                )
+                continue
+            actual = [
+                c.get("name") for c in (attr.get("choices") or [])
+                if isinstance(c, dict)
+            ]
+            if not actual:
+                problems.append(
+                    f"{node.get('name')}.{name} override omits choices "
+                    "(rejected at load)"
+                )
+            elif sorted(actual) != sorted(expected):
+                problems.append(
+                    f"{node.get('name')}.{name} choices {actual} != generic's "
+                    f"{expected} (loads silently, fails at write time)"
+                )
+    if problems:
+        return False, "; ".join(problems)
+    if overrides == 0:
+        return False, "no inherited Dropdown was overridden"
+    return True, f"{overrides} Dropdown override(s) restate kind and the full choice list"
+
+
+def check_inherited_peer_unchanged(schema: dict, **_: Any) -> tuple[bool, str]:
+    """No kind may redeclare an inherited relationship with a different peer.
+
+    Rejected at `infrahubctl schema check` from either side. Hierarchy
+    relationships are exempt, so they are skipped here too.
+    """
+    generic_rels: dict[str, dict[str, dict]] = {
+        kind: {
+            r["name"]: r for r in (generic.get("relationships") or [])
+            if isinstance(r, dict) and r.get("name")
+        }
+        for kind, generic in _generic_map(schema).items()
+    }
+
+    problems: list[str] = []
+    inheritors = 0
+    for node in schema.get("nodes") or []:
+        if not isinstance(node, dict):
+            continue
+        inherited: dict[str, dict] = {}
+        for parent_kind in node.get("inherit_from") or []:
+            inherited.update(generic_rels.get(parent_kind, {}))
+        if inherited:
+            inheritors += 1
+        for rel in node.get("relationships") or []:
+            if not isinstance(rel, dict):
+                continue
+            parent_rel = inherited.get(rel.get("name"))
+            if parent_rel is None:
+                continue
+            if "Hierarchy" in (rel.get("kind", ""), parent_rel.get("kind", "")):
+                continue  # exempt
+            if rel.get("peer") != parent_rel.get("peer"):
+                problems.append(
+                    f"{node.get('name')}.{rel['name']} peer={rel.get('peer')!r} "
+                    f"but inherited peer is {parent_rel.get('peer')!r}"
+                )
+    if problems:
+        return False, "inherited peer narrowed: " + "; ".join(problems)
+    # Floor guard: a schema with no inherited relationship at all satisfies
+    # "nothing is narrowed" without exercising the rule. Declaring the
+    # relationship on the concrete kinds instead of the generic sidesteps the
+    # constraint the task is about, so that shape must not score.
+    if inheritors == 0:
+        return False, "no node inherits a relationship, so nothing exercises the rule"
+    return True, "no inherited relationship peer is narrowed"
+
+
+# The pairing requirement cannot be expressed in the schema, so the only place
+# the answer can carry it is prose. Accept any wording that (a) says the
+# schema cannot express it and (b) names the place it has to live instead.
+_PAIRING_NOT_EXPRESSIBLE_PATTERNS = [
+    re.compile(r"\b(?:not|cannot|can't|isn't|is not|un)\s*\w*\s*express\w*", re.IGNORECASE),
+    re.compile(r"\bschema\s+cannot\b", re.IGNORECASE),
+    re.compile(r"\b(?:same|identical|fixed|frozen)\s+peer\b", re.IGNORECASE),
+    re.compile(r"\bpeer\b[^.\n]{0,60}\b(?:cannot|can't|may not)\b[^.\n]{0,30}\b(?:narrow|change|override)", re.IGNORECASE),
+    # The substance is "the schema will not carry this rule", however it is
+    # worded. Requiring the token "express" graded vocabulary: "Infrahub
+    # rejects a narrowed peer on an inherited relationship, so the rule has
+    # to live in a check" was scored as not stating the limit.
+    re.compile(
+        r"\b(?:reject|refus|forbid|disallow|prevent|block)\w*\b[^.\n]{0,80}"
+        r"\b(?:narrow\w*|override|overriding|changing|different)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:narrow\w*|override|overrid\w+)\b[^.\n]{0,60}"
+        r"\b(?:inherited|generic)\b[^.\n]{0,60}"
+        r"\b(?:reject|refus|not allowed|not permitted|fails?|error)\w*",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bhas to live\b[^.\n]{0,60}\b(?:in|as)\s+a\s+(?:python\s+)?check",
+        re.IGNORECASE,
+    ),
+]
+
+# The enforcement home has to be a check or the proposed-change pipeline.
+# A bare "check" matches an `infrahubctl schema check` comment, so the word
+# needs a qualifier that makes it the artifact rather than the verb.
+_PAIRING_ENFORCEMENT_HOME_PATTERNS = [
+    re.compile(r"\bcheck[_-]?definitions?\b", re.IGNORECASE),
+    re.compile(r"\b(?:python|custom|a|the)\s+check\b(?!\s*(?:that\s+)?the\s+schema)", re.IGNORECASE),
+    re.compile(r"\bchecks?\b[^.\n]{0,40}\bproposed[-\s]?change\b", re.IGNORECASE),
+    re.compile(r"\bproposed[-\s]?change\b", re.IGNORECASE),
+    re.compile(r"\bInfrahubCheck\b"),
+]
+
+
+def check_pairing_note_present(schema: dict, *, raw_text: str = "", **_: Any) -> tuple[bool, str]:
+    """The answer must say the kind-to-kind pairing is not expressible in schema.
+
+    Naming a Python check (or the proposed-change pipeline) as the place the
+    rule has to live instead is part of the requirement: "you cannot do it"
+    without "here is where it goes" leaves the user stuck.
+    """
+    said_inexpressible = next(
+        (p for p in _PAIRING_NOT_EXPRESSIBLE_PATTERNS if p.search(raw_text)), None
+    )
+    if said_inexpressible is None:
+        return False, "does not state that the kind-to-kind pairing is inexpressible in the schema"
+    named_home = next(
+        (p for p in _PAIRING_ENFORCEMENT_HOME_PATTERNS if p.search(raw_text)), None
+    )
+    if named_home is None:
+        return False, "states the limit but never names a check as where the pairing must live"
+    return True, f"pairing note present (matched {said_inexpressible.pattern!r} and {named_home.pattern!r})"
+
+
+
+# ---------------------------------------------------------------------------
+# Uniqueness constraint format and scope
+#
+# Verified against Infrahub 1.10.8+19, the 1.11.0 development line, via the
+# in-memory schema validator: a relationship is usable in a constraint only
+# when it is cardinality one, mandatory, and referenced bare. Each violation
+# has its own load-time message, so all of these are hard failures rather
+# than style points.
+# ---------------------------------------------------------------------------
+
+def _constraint_fields(entity: dict) -> list[str]:
+    """Flatten every field path named in an entity's uniqueness_constraints."""
+    fields: list[str] = []
+    for group in entity.get("uniqueness_constraints") or []:
+        if isinstance(group, list):
+            fields.extend(f for f in group if isinstance(f, str))
+    return fields
+
+
+def _resolved_attributes(schema: dict, entity: dict) -> dict[str, dict]:
+    """Attribute definitions by name, including those inherited in-file."""
+    generics_by_kind = {
+        f"{g.get('namespace', '')}{g.get('name', '')}": g
+        for g in (schema.get("generics") or [])
+        if isinstance(g, dict)
+    }
+    out: dict[str, dict] = {}
+    for parent_kind in entity.get("inherit_from") or []:
+        parent = generics_by_kind.get(parent_kind)
+        if parent:
+            for attr in parent.get("attributes") or []:
+                if isinstance(attr, dict) and attr.get("name"):
+                    out[attr["name"]] = attr
+    for attr in entity.get("attributes") or []:
+        if isinstance(attr, dict) and attr.get("name"):
+            out[attr["name"]] = attr
+    return out
+
+
+def _resolved_members(schema: dict, entity: dict) -> tuple[set[str], dict[str, dict]]:
+    """Return ``(attribute_names, relationships_by_name)`` including inherited.
+
+    A constraint on a concrete kind routinely names a field the kind gets
+    from its generic, so a per-entity view alone sees neither the attribute
+    nor the relationship and silently checks nothing. Inherited members are
+    merged in from every generic listed in ``inherit_from``, with the kind's
+    own declarations winning.
+    """
+    generics_by_kind: dict[str, dict] = {}
+    for generic in schema.get("generics") or []:
+        if not isinstance(generic, dict):
+            continue
+        namespace = generic.get("namespace", "")
+        name = generic.get("name", "")
+        generics_by_kind[f"{namespace}{name}"] = generic
+
+    attrs: set[str] = set()
+    rels: dict[str, dict] = {}
+
+    for parent_kind in entity.get("inherit_from") or []:
+        parent = generics_by_kind.get(parent_kind)
+        if not parent:
+            continue
+        attrs |= {
+            a["name"] for a in (parent.get("attributes") or [])
+            if isinstance(a, dict) and a.get("name")
+        }
+        for r in parent.get("relationships") or []:
+            if isinstance(r, dict) and r.get("name"):
+                rels[r["name"]] = r
+
+    attrs |= {
+        a["name"] for a in (entity.get("attributes") or [])
+        if isinstance(a, dict) and a.get("name")
+    }
+    for r in entity.get("relationships") or []:
+        if isinstance(r, dict) and r.get("name"):
+            rels[r["name"]] = r
+
+    return attrs, rels
+
+
+def check_uniqueness_attr_value_suffix(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Attribute paths in a constraint must end in ``__value``.
+
+    A bare attribute name is rejected at load with "invalid attribute, it
+    must end with one of the following properties: value".
+
+    Heads that resolve to neither an attribute nor a relationship are
+    skipped, not failed: a schema file may legitimately constrain a field
+    it inherits from a generic defined in another file, and this grader
+    only ever sees one file.
+    """
+    problems: list[str] = []
+    skipped: list[str] = []
+    for _section, entity in _entities(schema):
+        attr_names, rels = _resolved_members(schema, entity)
+        for field in _constraint_fields(entity):
+            head = field.split("__")[0]
+            if head in attr_names and not field.endswith("__value"):
+                problems.append(f"{entity.get('name')}.{field} (attribute needs __value)")
+            elif head in rels and "__" in field:
+                problems.append(
+                    f"{entity.get('name')}.{field} (relationship must be bare)"
+                )
+            elif head not in attr_names and head not in rels:
+                skipped.append(f"{entity.get('name')}.{field}")
+    if problems:
+        return False, "malformed constraint field(s): " + "; ".join(problems)
+    if skipped:
+        return True, (
+            "constraint fields use __value for attributes and bare "
+            f"relationships; unresolved in this file (skipped): {skipped}"
+        )
+    return True, "constraint fields use __value for attributes and bare relationships"
+
+
+def _compiled_hfid_group(hfid: list, rels: dict[str, dict]) -> list[str]:
+    """The uniqueness-constraint group a ``human_friendly_id`` compiles into.
+
+    The declared form and the compiled form are not the same text. An HFID
+    names a relationship by a peer-attribute path — ``rack__name__value``,
+    the only shape ``validate_human_friendly_id`` accepts for a
+    relationship — and that collapses to the bare relationship ``rack`` in
+    the constraint it becomes. Matching the declared text against
+    relationship names therefore finds nothing, and a constraint moved
+    down as an HFID reads as no constraint at all.
+    """
+    group: list[str] = []
+    for field in hfid:
+        if not isinstance(field, str):
+            continue
+        head = field.split("__")[0]
+        group.append(head if head in rels else field)
+    return group
+
+
+def _ancestor_kinds(schema: dict, entity: dict) -> set[str]:
+    """Every kind ``entity`` inherits from, following chains within the file."""
+    generics_by_kind = {
+        f"{g.get('namespace', '')}{g.get('name', '')}": g
+        for g in (schema.get("generics") or [])
+        if isinstance(g, dict)
+    }
+    seen: set[str] = set()
+    queue = list(entity.get("inherit_from") or [])
+    while queue:
+        kind = str(queue.pop())
+        if kind in seen:
+            continue
+        seen.add(kind)
+        parent = generics_by_kind.get(kind)
+        if parent:
+            queue.extend(parent.get("inherit_from") or [])
+    return seen
+
+
+def _is_ip_namespace_carveout(schema: dict, entity: dict, field: str) -> bool:
+    """True for the one optional relationship Infrahub exempts.
+
+    ``ip_namespace`` on a kind descended from ``BuiltinIPAddress`` or
+    ``BuiltinIPPrefix`` may be optional and still appear in a constraint.
+    Every other optional relationship is a load-time rejection.
+
+    The ancestry is resolved through the file's own generics, because a
+    node reaching ``BuiltinIPPrefix`` through a local generic is exempt at
+    load exactly as a direct implementer is.
+    """
+    if field != "ip_namespace":
+        return False
+    inherits = " ".join(_ancestor_kinds(schema, entity))
+    return "IPAddress" in inherits or "IPPrefix" in inherits
+
+
+def check_uniqueness_rel_mandatory(schema: dict, **_: Any) -> tuple[bool, str]:
+    """A relationship used in a constraint must be cardinality one and mandatory.
+
+    Both are load-time rejections. The mandatory one is the expensive
+    mistake, because a constraint designed against an optional relationship
+    looks reasonable and only fails after the surrounding model is written.
+
+    A ``human_friendly_id`` compiles into a uniqueness constraint, so the
+    relationship its path traverses carries the same two requirements and
+    is checked here too.
+    """
+    problems: list[str] = []
+    found_any = False
+    for _section, entity in _entities(schema):
+        _attrs, rels = _resolved_members(schema, entity)
+
+        # Relationship name -> the text that reached it. Both keys that
+        # compile into a constraint are walked: reading only
+        # uniqueness_constraints passes a schema whose constraint was
+        # declared as a human_friendly_id over an optional or
+        # cardinality-many relationship, which the load rejects
+        # (`REL_ONE_MANDATORY_ATTR` is the only relationship path type an
+        # HFID accepts).
+        reached: dict[str, str] = {}
+        for field in _constraint_fields(entity):
+            reached.setdefault(field, field)
+        hfid = entity.get("human_friendly_id")
+        if isinstance(hfid, list):
+            for path in hfid:
+                if isinstance(path, str) and "__" in path:
+                    reached.setdefault(path.split("__")[0], path)
+
+        # An HFID must reach a relationship through a peer-attribute path;
+        # the bare name is rejected with "Must use attributes of related
+        # node." The inverse shape — a peer-attribute path inside
+        # uniqueness_constraints — is owned by
+        # `uniqueness-attr-value-suffix`.
+        if isinstance(hfid, list):
+            for path in hfid:
+                if isinstance(path, str) and "__" not in path and path in rels:
+                    problems.append(
+                        f"{entity.get('name')}.human_friendly_id names the bare "
+                        f"relationship {path!r}; an HFID needs a peer-attribute "
+                        f"path such as {path}__<attr>__value"
+                    )
+
+        for field, label in reached.items():
+            rel = rels.get(field)
+            if rel is None:
+                continue  # an attribute path, or inherited from another file
+            found_any = True
+            if rel.get("cardinality") != "one":
+                problems.append(
+                    f"{entity.get('name')}.{label} cardinality="
+                    f"{rel.get('cardinality')!r}, must be one"
+                )
+            if rel.get("optional") is not False and not _is_ip_namespace_carveout(
+                schema, entity, field
+            ):
+                problems.append(
+                    f"{entity.get('name')}.{label} optional="
+                    f"{rel.get('optional')!r}, must be false"
+                )
+    if problems:
+        return False, "; ".join(problems)
+    if not found_any:
+        return False, (
+            "no relationship is reached by uniqueness_constraints or "
+            "human_friendly_id, so nothing scopes the uniqueness"
+        )
+    return True, "constrained relationships are cardinality one and mandatory"
+
+
+def check_uniqueness_constraint_scopes_by_relationship(
+    schema: dict, **_: Any
+) -> tuple[bool, str]:
+    """Every implementer scopes the *requested* attribute within its parent.
+
+    ``uniqueness_constraints: [["serial__value"]]`` is a valid constraint
+    and expresses estate-wide uniqueness of one attribute, which is a
+    different rule from the one the author was asked for. Without this,
+    every other check in the task passes on it: the relationship checks
+    only inspect relationships that already appear in a constraint, so
+    leaving the parent out and leaving it optional is unpunished.
+
+    Asking only that *some* constraint pair *any* relationship with *any*
+    attribute is not enough, because that is satisfied by a pair the task
+    never asked for: ``[["rack", "serial__value"]]`` on both kinds scores
+    while neither enforces name-within-rack. So the requirement is
+    per-implementer and names the attribute: every concrete kind that
+    inherits a generic declared in this file must carry a constraint
+    pairing a relationship with the endpoint ``name``. Additional
+    constraints alongside it are fine, and a node that implements nothing
+    — the standalone rack, whose own ``[["name__value"]]`` is correct and
+    has no relationship to pair — is not asked for one.
+
+    ``name`` is accepted with or without the ``__value`` suffix:
+    ``uniqueness-attr-value-suffix`` owns the suffix, and one mistake
+    should cost one check.
+    """
+    scoped_attr_names = {"name", "name__value"}
+
+    generics_by_kind = {
+        _full_kind(entity)
+        for section, entity in _entities(schema)
+        if section == "generics"
+    }
+    implementers = [
+        entity
+        for section, entity in _entities(schema)
+        if section == "nodes"
+        and any(p in generics_by_kind for p in (entity.get("inherit_from") or []))
+    ]
+    if not implementers:
+        return False, "no node in this file inherits from a generic declared here"
+
+    problems: list[str] = []
+    scoped: list[str] = []
+    for entity in implementers:
+        _attrs, rels = _resolved_members(schema, entity)
+        constraints = [
+            group
+            for group in (entity.get("uniqueness_constraints") or [])
+            if isinstance(group, list)
+        ]
+        # A human_friendly_id compiles into a uniqueness constraint, so it
+        # expresses the same scoping and has to be read as one — in the
+        # compiled form, not the declared text.
+        hfid = entity.get("human_friendly_id")
+        if isinstance(hfid, list):
+            constraints.append(_compiled_hfid_group(hfid, rels))
+        kind = _full_kind(entity)
+        match = next(
+            (
+                group
+                for group in constraints
+                if any(f in rels for f in group)
+                and any(f in scoped_attr_names for f in group)
+            ),
+            None,
+        )
+        if match is not None:
+            scoped.append(f"{kind} {match}")
+        elif not constraints:
+            problems.append(f"{kind} declares no constraint at all")
+        else:
+            problems.append(
+                f"{kind} {constraints} pairs no relationship with the "
+                "endpoint name"
+            )
+    if problems:
+        return False, (
+            "implementer(s) do not scope the name within a parent: "
+            + "; ".join(problems)
+        )
+    return True, f"every implementer scopes the name within a relationship: {scoped}"
+
+
+def check_uniqueness_no_optional_attr(schema: dict, **_: Any) -> tuple[bool, str]:
+    """An optional attribute inside a constraint collides on null.
+
+    An unset attribute is compared as the literal sentinel ``"NULL"``
+    rather than skipped, so a constraint spanning an optional attribute
+    permits at most one row with that attribute unset. That is rarely the
+    intent, and nothing rejects it at load, so the model has to get it
+    right rather than be told.
+    """
+    problems: list[str] = []
+    for _section, entity in _entities(schema):
+        _attrs, rels = _resolved_members(schema, entity)
+        attrs_by_name = _resolved_attributes(schema, entity)
+        for field in _constraint_fields(entity):
+            if field in rels:
+                continue
+            attr = attrs_by_name.get(field.removesuffix("__value"))
+            if attr is None:
+                continue  # inherited from another file
+            if attr.get("optional") is True:
+                problems.append(
+                    f"{entity.get('name')}.{field} is optional; unset values "
+                    'compare as the literal "NULL" and collide'
+                )
+    if problems:
+        return False, "; ".join(problems)
+    return True, "no constrained attribute is optional"
+
+
+def _declared_uniqueness(entity: dict) -> list[str]:
+    """Every key on an entity that produces a uniqueness constraint.
+
+    ``uniqueness_constraints`` is the obvious one. ``human_friendly_id``
+    and an attribute with ``unique: true`` are compiled into
+    ``uniqueness_constraints`` on the declaring entity at schema load, so
+    they carry exactly the same scope as the explicit key.
+
+    This applies to a node and a generic alike. Reading only the explicit
+    key on the node side would fail the schema
+    rules/uniqueness-constraints.md tells the author to write, which is to
+    move "the human_friendly_id and any unique: true" down with the
+    constraint: two schemas that load to the same constraints would score
+    0 and 1.
+    """
+    reasons: list[str] = []
+    if entity.get("uniqueness_constraints"):
+        reasons.append("uniqueness_constraints")
+    if entity.get("human_friendly_id"):
+        reasons.append("human_friendly_id")
+    unique_attrs = [
+        a.get("name")
+        for a in (entity.get("attributes") or [])
+        if isinstance(a, dict) and a.get("unique") is True
+    ]
+    if unique_attrs:
+        reasons.append(f"unique: true on {unique_attrs}")
+    return reasons
+
+
+def check_uniqueness_not_on_generic(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Every implementer declares its own constraint; the generic declares none.
+
+    For a split where the new kinds are allowed to reuse each other's
+    values, the constraint has to sit on the concrete kinds. On the generic
+    it spans every implementer, and a concrete kind cannot narrow it back.
+
+    Only generics that are actually inherited within this file are
+    inspected, because estate-wide uniqueness on a standalone generic is a
+    legitimate choice. For each such generic, every kind that inherits it
+    must declare its own ``uniqueness_constraints``. One implementer
+    constrained and its sibling left open is the wrong answer, not a
+    partial one.
+    """
+    generics_by_kind = {
+        _full_kind(entity): entity
+        for section, entity in _entities(schema)
+        if section == "generics"
+    }
+    nodes = [entity for section, entity in _entities(schema) if section == "nodes"]
+
+    implementers: dict[str, list[dict]] = {}
+    for node in nodes:
+        for parent_kind in node.get("inherit_from") or []:
+            if parent_kind in generics_by_kind:
+                implementers.setdefault(parent_kind, []).append(node)
+
+    if not implementers:
+        return False, "no node in this file inherits from a generic declared here"
+
+    offenders: list[str] = []
+    for parent_kind in implementers:
+        reasons = _declared_uniqueness(generics_by_kind[parent_kind])
+        if reasons:
+            offenders.append(f"{parent_kind} ({', '.join(reasons)})")
+    if offenders:
+        return False, (
+            f"generic(s) carry estate-wide uniqueness: {'; '.join(offenders)}. "
+            "Each of these is enforced across every implementer; "
+            "human_friendly_id and unique: true compile into "
+            "uniqueness_constraints on the layer that declares them"
+        )
+
+    missing: list[str] = []
+    constrained: list[str] = []
+    for parent_kind, kids in implementers.items():
+        for node in kids:
+            label = f"{_full_kind(node)} (inherits {parent_kind})"
+            declared = _declared_uniqueness(node)
+            if declared:
+                constrained.append(f"{_full_kind(node)} ({', '.join(declared)})")
+            else:
+                missing.append(label)
+    if missing:
+        return False, (
+            "implementer(s) declare no uniqueness of their own: "
+            f"{'; '.join(missing)}. Moving the constraint down means every "
+            "implementer gets one, as uniqueness_constraints, a "
+            "human_friendly_id, or an attribute with unique: true"
+        )
+    return True, f"constraint scoped to each concrete kind: {sorted(set(constrained))}"
+
+
+_BUILTIN_KINDS = frozenset(
+    {"BuiltinIPAddress", "BuiltinIPNamespace", "BuiltinIPPrefix", "BuiltinTag"}
+)
+
+_PLATFORM_KINDS = _BUILTIN_KINDS | frozenset(
+    {
+        # Ipam
+        "IpamNamespace",
+        # Internal
+        "InternalAccountToken", "InternalExternalIdentity", "InternalIPPrefixAvailable",
+        "InternalIPRangeAvailable", "InternalRefreshToken",
+        # Lineage
+        "LineageOwner", "LineageSource",
+        # Core
+        "CoreAccount", "CoreAccountGroup", "CoreAccountRole", "CoreArtifact",
+        "CoreArtifactCheck", "CoreArtifactDefinition", "CoreArtifactTarget",
+        "CoreArtifactThread", "CoreArtifactValidator", "CoreBasePermission",
+        "CoreChangeComment", "CoreChangeThread", "CoreCheck", "CoreCheckDefinition",
+        "CoreComment", "CoreCredential", "CoreCustomWebhook", "CoreDataCheck",
+        "CoreDataValidator", "CoreEnvKeyValue", "CoreFileCheck", "CoreFileObject",
+        "CoreFileThread", "CoreGeneratorAwareGroup", "CoreGeneratorCheck",
+        "CoreGeneratorDefinition", "CoreGeneratorGroup", "CoreGeneratorInstance",
+        "CoreGeneratorValidator", "CoreGenericAccount", "CoreGenericRepository",
+        "CoreGlobalPermission", "CoreGraphQLQuery", "CoreGraphQLQueryGroup", "CoreGroup",
+        "CoreIPAddressPool", "CoreIPPool", "CoreIPPrefixPool", "CoreKeyValue", "CoreMenu",
+        "CoreMenuItem", "CoreNode", "CoreNumberPool", "CoreObjectComponentTemplate",
+        "CoreObjectPermission", "CoreObjectTemplate", "CoreObjectThread",
+        "CorePasswordCredential", "CoreProfile", "CoreProposedChange",
+        "CoreReadOnlyRepository", "CoreRepository", "CoreRepositoryGroup",
+        "CoreRepositoryValidator", "CoreResourcePool", "CoreSchemaCheck",
+        "CoreSchemaValidator", "CoreStandardCheck", "CoreStandardGroup",
+        "CoreStandardWebhook", "CoreStaticKeyValue", "CoreTaskTarget", "CoreThread",
+        "CoreThreadComment", "CoreTransformJinja2", "CoreTransformPython",
+        "CoreTransformation", "CoreUserValidator", "CoreValidator", "CoreWebhook",
+        "CoreWeightedPoolResource",
+    }
+)
+
+# Namespaces the platform reserves. A kind in one of these that is not in
+# _PLATFORM_KINDS is invented, not core.
+_PLATFORM_NAMESPACES = ("Builtin", "Core", "Internal", "Ipam", "Lineage")
+
+# Profile<Kind> and Template<Kind> are generated by the platform from a
+# concrete kind, so they are real exactly when that kind is.
+_DERIVED_PREFIXES = ("Profile", "Template")
+
+# A version pin, a commit pin, or -- for the documented default
+# invocation, which fetches "latest published" -- the word "latest" next to
+# a date, which is what a reader actually needs in order to tell later
+# whether the local copy has drifted.
+_PROVENANCE_VERSION_RE = re.compile(
+    r"(?:-v|--version)\s+v?\d+\.\d+"
+    r"|version[\s:=]+v?\d+\.\d+"
+    r"|\b(?:commit|sha|rev)[\s:=]+[0-9a-f]{7,40}\b"
+    r"|\blatest\b[^\n]{0,40}\d{4}-\d{2}-\d{2}"
+    r"|\d{4}-\d{2}-\d{2}[^\n]{0,40}\blatest\b",
+    re.IGNORECASE,
+)
+
+
+def _defined_kinds(schema: dict) -> set[str]:
+    return {
+        f"{e.get('namespace', '')}{e.get('name', '')}" for _section, e in _entities(schema)
+    }
+
+
+def _referenced_external_kinds(schema: dict) -> set[str]:
+    """Kinds referenced but not defined in this schema file."""
+    defined = _defined_kinds(schema)
+    referenced: set[str] = set()
+    for _section, entity in _entities(schema):
+        referenced.update(entity.get("inherit_from") or [])
+        for field in ("parent", "children", "menu_placement"):
+            value = entity.get(field)
+            if isinstance(value, str) and value:
+                referenced.add(value)
+        for rel in entity.get("relationships") or []:
+            if isinstance(rel, dict) and rel.get("peer"):
+                referenced.add(rel["peer"])
+    return {k for k in referenced if k and k not in defined}
+
+
+def _comment_runs(raw_text: str) -> list[str]:
+    """Maximal runs of consecutive comment lines, each joined into one string.
+
+    A `#`-only line ends a run. Without that, a file header separated into
+    paragraphs by bare `#` lines is one block, and per-block provenance
+    scoping is per-file scoping again: one `marketplace get` line vouches
+    for every kind named anywhere in the header.
+    """
+    runs: list[str] = []
+    current: list[str] = []
+    for line in raw_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#") and stripped.lstrip("#").strip():
+            current.append(line)
+        elif current:
+            runs.append("\n".join(current))
+            current = []
+    if current:
+        runs.append("\n".join(current))
+    return runs
+
+
+def _provenance_blocks(raw_text: str) -> list[str]:
+    """Comment runs that carry an `infrahubctl marketplace get` line.
+
+    Provenance is read per block rather than per file so a single command
+    comment cannot vouch for unrelated kinds elsewhere in the file, and so the
+    schema's own `version:` key cannot pass as a marketplace version.
+    """
+    return [run for run in _comment_runs(raw_text) if "marketplace get" in run]
+
+
+def check_external_kinds_are_core_or_sourced(
+    schema: dict, *, raw_text: str = "", **_: Any
+) -> tuple[bool, str]:
+    """Every kind referenced but not defined must be core, or carry provenance.
+
+    A `Builtin*` or `Core*` spelling that is not a kind the platform ships is
+    the specific trap: it reads as a platform guarantee and is not one.
+    Marketplace-sourced kinds are fine, but the provenance comment has to name
+    the kind it vouches for, so a clean deploy loads it first.
+    """
+    external = _referenced_external_kinds(schema)
+    if not external:
+        return True, "no external kinds referenced"
+
+    defined = _defined_kinds(schema)
+    blocks = _provenance_blocks(raw_text)
+
+    problems: list[str] = []
+    for kind in sorted(external):
+        if kind in _PLATFORM_KINDS:
+            continue
+        if kind.startswith(_PLATFORM_NAMESPACES):
+            problems.append(
+                f"{kind} is spelled like a platform kind, but Infrahub ships no "
+                f"such kind (the Builtin namespace is exactly {sorted(_BUILTIN_KINDS)})"
+            )
+            continue
+        derived_base = next(
+            (kind[len(p):] for p in _DERIVED_PREFIXES if kind.startswith(p) and kind != p),
+            None,
+        )
+        if derived_base and (derived_base in defined or derived_base in _PLATFORM_KINDS):
+            continue
+        if not any(re.search(rf"\b{re.escape(kind)}\b", block) for block in blocks):
+            problems.append(
+                f"{kind} is not a platform kind and no `infrahubctl marketplace get` "
+                "provenance comment names it"
+            )
+    if problems:
+        return False, "; ".join(problems)
+    return True, f"external kinds accounted for: {sorted(external)}"
+
+
+def check_records_marketplace_provenance(
+    schema: dict, *, raw_text: str = "", **_: Any
+) -> tuple[bool, str]:
+    """A reused or vendored shape must record identifier and version.
+
+    Without both, nobody can tell later whether the local copy has drifted
+    from upstream or was changed on purpose. The version has to sit in the
+    provenance comment itself, so the file's own `version:` key does not
+    stand in for a marketplace version.
+    """
+    blocks = _provenance_blocks(raw_text)
+    if not blocks:
+        return False, "no `infrahubctl marketplace get` provenance comment recorded"
+    if not any(re.search(r"marketplace get\s+\S+/\S+", block) for block in blocks):
+        return False, "provenance records no `<namespace>/<name>` marketplace identifier"
+    if not any(_PROVENANCE_VERSION_RE.search(block) for block in blocks):
+        return False, (
+            "provenance names no version; record `-v <version>`, a commit pin, "
+            "or -- if you took the default `marketplace get <ns>/<name>`, which "
+            "fetches the latest published version -- `latest at <YYYY-MM-DD>` "
+            "in the same comment"
+        )
+    return True, "provenance records the marketplace identifier and a version"
+
+
+def check_corrects_builtin_core_premise(
+    schema: dict, *, raw_text: str = "", **_: Any
+) -> tuple[bool, str]:
+    """The file must say what the platform actually ships, not repeat the myth.
+
+    The premise under test is "it is built into Infrahub". Correcting it means
+    naming the four kinds the Builtin namespace really has and saying the
+    candidate is not one of them.
+    """
+    comments = "\n".join(_comment_runs(raw_text))
+    if not comments:
+        return False, "file records no comments, so it corrects nothing"
+
+    # What Builtin holds, stated either by naming the kinds or by describing
+    # the set. Requiring all four literal names graded transcription: "the
+    # Builtin namespace ships only the tag kind and the three IPAM
+    # primitives" is correct and complete and was failing, while a list of
+    # the four names plus a false claim was passing.
+    named = [k for k in _BUILTIN_KINDS if k in comments]
+    described = re.search(
+        r"\bbuiltin\b[^\n]{0,120}\b(?:tag|ipam|ip address|ip prefix|ip namespace)\b",
+        comments,
+        re.IGNORECASE,
+    )
+    if len(named) < len(_BUILTIN_KINDS) and not described:
+        return False, (
+            "comments do not say what the Builtin namespace holds; name the "
+            f"kinds ({sorted(_BUILTIN_KINDS)}) or describe the set"
+        )
+
+    # And the claim under test: the *reused* kind is not one of them. A
+    # denial whose subject is a Builtin kind is the opposite claim --
+    # "BuiltinTag is not core" is false, and asserting it should not earn
+    # the check the way a token list did.
+    denial_re = re.compile(
+        r"\bnot\b[^\n]{0,80}\b(?:core|built[\s-]?in|platform|shipped)\b"
+        r"|\b(?:no|not a)\b[^\n]{0,80}\blocation\b[^\n]{0,40}\b(?:kind|core|generic)\b"
+        r"|\bships no\b[^\n]{0,60}\blocation\b",
+        re.IGNORECASE,
+    )
+    denial = None
+    for sentence in re.split(r"(?<=[.;])\s+|\n", comments):
+        hit = denial_re.search(sentence)
+        if not hit:
+            continue
+        if any(kind in sentence for kind in _BUILTIN_KINDS):
+            continue  # a Builtin kind *is* core; this denies the wrong thing
+        denial = hit
+        break
+    if denial is None:
+        return False, (
+            "comments say what Builtin holds but never say the reused kind is "
+            "not platform core (a denial naming a Builtin kind does not count: "
+            "those are core)"
+        )
+    return True, "comments state what Builtin ships and that the reused kind is not core"
+
+
+def check_names_kind_verification_command(
+    schema: dict, *, raw_text: str = "", **_: Any
+) -> tuple[bool, str]:
+    """The file must name a command that can actually confirm the kind.
+
+    `infrahubctl schema show <Kind>` resolves nodes and generics alike.
+    `infrahubctl schema list` prints node kinds only, so it cannot confirm a
+    generic, which is what reuse candidates usually are.
+    """
+    comments = "\n".join(_comment_runs(raw_text))
+    if re.search(r"infrahubctl\s+schema\s+show\b", comments):
+        return True, "comments name `infrahubctl schema show <Kind>`"
+    if re.search(r"infrahubctl\s+schema\s+list\b", comments):
+        return False, (
+            "comments name only `infrahubctl schema list`, which prints node "
+            "kinds and cannot confirm a generic; use `schema show <Kind>`"
+        )
+    return False, "comments name no command that confirms a kind exists"
+
+
+def check_records_subset_rationale(
+    schema: dict, *, raw_text: str = "", **_: Any
+) -> tuple[bool, str]:
+    """A partial adoption must record what was taken and why the rest was not.
+
+    The exclusion reason is the part that stops the next reader repeating the
+    evaluation, and it is the part that shows the file was judged per generic
+    rather than as a unit.
+    """
+    blocks = _provenance_blocks(raw_text)
+    if not blocks:
+        return False, "no `infrahubctl marketplace get` provenance comment recorded"
+
+    # The rationale is read across the whole comment header, not just the run
+    # carrying the `marketplace get` line. The canonical header in
+    # reuse-evaluate-per-generic.md separates its paragraphs with bare `#`
+    # lines, which `_comment_runs` treats as run boundaries, so `Taken:` and
+    # `Excluded:` land in a different run from the command and per-run scoping
+    # failed the rule's own documented example. Per-run scoping stays where it
+    # is load-bearing: binding a kind to the command that vouches for it, in
+    # check_external_kinds_are_core_or_sourced.
+    text = "\n".join(_comment_runs(raw_text))
+    taken = re.search(r"\b(taken|adopted|reused|kept|using only|only the)\b", text, re.I)
+    excluded = re.search(
+        r"\b(excluded|omitted|left out|not taken|dropped|skipped|rejected)\b", text, re.I
+    )
+    if not taken:
+        return False, "provenance does not say which generic or node was taken"
+    if not excluded:
+        return False, "provenance does not say what was excluded, or why"
+    return True, "provenance records what was taken and what was excluded"
+
+
+def _python_code_only(src: str) -> str:
+    """``src`` with comments and docstrings removed.
+
+    Keyword matching over raw source counts a `# TODO: read inherit_from
+    properly; report added / removed kinds` comment as an implementation of
+    exactly what it says is missing. Other string literals are kept, because
+    `n.get("inherit_from")` is how the test does the reading.
+    """
+    try:
+        tokens = [
+            t for t in tokenize.generate_tokens(io.StringIO(src).readline)
+            if t.type != tokenize.COMMENT
+        ]
+        without_comments = tokenize.untokenize(tokens)
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        without_comments = re.sub(r"#[^\n]*", "", src)
+    try:
+        tree = ast.parse(without_comments)
+    except SyntaxError:
+        return without_comments
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if not isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
+                                 ast.AsyncFunctionDef)) or not body:
+            continue
+        first = body[0]
+        if (isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant)
+                and isinstance(first.value.value, str)):
+            first.value.value = ""
+    return ast.unparse(tree)
+
+
+def _pinned_kind_sets(src: str) -> list[tuple[str, set[str]]]:
+    """Assigned literal collections of kind-looking strings, by target name."""
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return []
+    out: list[tuple[str, set[str]]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        value = node.value
+        if isinstance(value, ast.Call) and value.args:
+            value = value.args[0]  # set([...]) / frozenset([...])
+        if not isinstance(value, (ast.Set, ast.List, ast.Tuple)):
+            continue
+        items = {
+            e.value for e in value.elts
+            if isinstance(e, ast.Constant) and isinstance(e.value, str)
+        }
+        if not items or not all(re.fullmatch(r"[A-Z][A-Za-z0-9]+", i) for i in items):
+            continue
+        targets = [node.target] if isinstance(node, ast.AnnAssign) else node.targets
+        for target in targets:
+            if isinstance(target, ast.Name):
+                out.append((target.id, items))
+    return out
+
+
+def check_generic_implementer_set_pinned(
+    schema: dict, *, sources: dict[str, str] | None = None, **_: Any
+) -> tuple[bool, str]:
+    """The offline test must pin the implementer set, not query a live instance.
+
+    An assertion against a loaded graph proves what the platform returns; an
+    assertion over the schema YAML proves what the schema declares, and only
+    that one runs fast enough to block a pull request.
+
+    The pinned set is compared against the implementers the schema actually
+    declares. Without that link the check was keyword matching: a stub whose
+    only mention of `inherit_from`, `added` and `removed` was inside a
+    `# TODO` comment scored full marks.
+    """
+    test_src = (sources or {}).get("py", "")
+    if not test_src.strip():
+        return False, "no Python test produced"
+    code = _python_code_only(test_src)
+    if re.search(r"InfrahubClient|infrahub_sdk|\.execute_graphql\(|await client", code):
+        return False, (
+            "the test reaches a live instance; pin the set over the schema YAML "
+            "so the gate runs offline"
+        )
+    if not re.search(r"inherit_from", code):
+        return False, "the test never reads `inherit_from`, so it pins nothing"
+    if not re.search(r"\bassert\b", code):
+        return False, "the test asserts nothing"
+    if not (re.search(r"\badded\b", code, re.I) and re.search(r"\bremoved\b", code, re.I)):
+        return False, (
+            "the failure path does not report what was added and removed, so the "
+            "fix is not mechanical"
+        )
+
+    declared = _implementers_by_generic(schema)
+    if not declared:
+        return False, "the schema declares no generic with implementers to pin"
+    pinned = _pinned_kind_sets(test_src)
+    if not pinned:
+        return False, "the test declares no pinned expected implementer set"
+    for _name, items in pinned:
+        for generic, kinds in declared.items():
+            if items == kinds:
+                return True, (
+                    f"the test pins {sorted(kinds)} for {generic}, matching the "
+                    "schema, offline, and reports added/removed"
+                )
+    return False, (
+        f"the pinned set(s) {[sorted(i) for _n, i in pinned]} match no generic's "
+        f"implementers in the schema {({g: sorted(k) for g, k in declared.items()})}; "
+        "the pin has to be of what the schema declares"
+    )
+
+
+def _implementers_by_generic(schema: dict) -> dict[str, set[str]]:
+    """Generics declared in this file, mapped to the kinds that inherit them."""
+    generics = {
+        f"{g.get('namespace', '')}{g.get('name', '')}"
+        for _s, g in _entities(schema)
+        if _s == "generics"
+    }
+    out: dict[str, set[str]] = {}
+    for section, entity in _entities(schema):
+        if section != "nodes":
+            continue
+        kind = f"{entity.get('namespace', '')}{entity.get('name', '')}"
+        for parent in entity.get("inherit_from") or []:
+            if parent in generics:
+                out.setdefault(parent, set()).add(kind)
+    return out
+
+
+def check_generic_membership_consumers_noted(
+    schema: dict, *, raw_text: str = "", **_: Any
+) -> tuple[bool, str]:
+    """Joining a generic must be recorded as a decision about its consumers.
+
+    Adding an implementer changes what every query, constraint, and consumer
+    over that generic answers, and nothing in the platform flags it.
+    """
+    comments = "\n".join(_comment_runs(raw_text))
+    if not comments:
+        return False, "file records no comments about the membership change"
+    # The prompt hands the model "`infrahubctl schema check` passes either
+    # way", so the words in it cannot be what earns the check.
+    prompt_echo = re.compile(
+        r"infrahubctl\s+schema\s+check|schema\s+check\s+passes", re.IGNORECASE
+    )
+    scored = prompt_echo.sub(" ", comments)
+    hits = sorted(
+        {
+            term
+            for term, pattern in (
+                ("queries", r"\bquer(?:y|ies)\b"),
+                ("constraints", r"uniqueness_constraints|human_friendly_id|constraint"),
+                (
+                    "consumers",
+                    r"\bconsumer|\bgenerator|\btransform|check[_\s-]?definition"
+                    r"|\biterat|\bsums?\b|\bsummed\b|\bsumming\b|\breport\b",
+                ),
+            )
+            if re.search(pattern, scored, re.IGNORECASE)
+        }
+    )
+    # And the comments have to be about the generic that gained the
+    # implementer, not consumer nouns floating anywhere in the file.
+    declared = _implementers_by_generic(schema)
+    if declared and not any(generic in scored for generic in declared):
+        return False, (
+            "comments never name the generic that gained an implementer "
+            f"({sorted(declared)}), so they record no decision about it"
+        )
+    if len(hits) < 2:
+        return False, (
+            "comments name fewer than two consumer classes affected by the new "
+            f"implementer (found {hits or 'none'}); name queries, constraints and "
+            "code that iterates the generic"
+        )
+    return True, f"comments name affected consumers: {hits}"
+
+
+def implicit_identifier(kind: str, peer: str) -> str:
+    """Reproduce the identifier Infrahub derives when none is declared.
+
+    A relationship without an explicit ``identifier`` still gets one, built
+    from its kind and peer sorted and lowercased. Deriving it here means the
+    identifier-keyed checks see the same graph whether the schema spells the
+    identifier out or relies on the default.
+    """
+    return "__".join(sorted([kind, peer])).lower()
+
+
+def rels_by_identifier(schema: dict) -> dict[str, list[tuple[str, dict]]]:
+    """Map identifier -> [(owning kind, relationship), ...] across the file."""
+    out: dict[str, list[tuple[str, dict]]] = {}
+    for section in ("generics", "nodes"):
+        for entity in schema.get(section) or []:
+            if not isinstance(entity, dict):
+                continue
+            kind = f"{entity.get('namespace', '')}{entity.get('name', '')}"
+            for rel in entity.get("relationships") or []:
+                if not isinstance(rel, dict):
+                    continue
+                identifier = rel.get("identifier") or implicit_identifier(
+                    kind, str(rel.get("peer", ""))
+                )
+                out.setdefault(identifier, []).append((kind, rel))
+    return out
+
+
+def check_identifier_unique_per_direction(schema: dict, **_: Any) -> tuple[bool, str]:
+    """One relationship per identifier per direction on any given kind.
+
+    A kind may declare two relationships on one identifier only when one is
+    `inbound` and the other `outbound` — the self-referential pattern. Any
+    other pair is rejected at load; the usual cause is widening a cardinality
+    and renaming to a plural in the same change, leaving both declarations
+    behind.
+    """
+    by_identifier = rels_by_identifier(schema)
+    if not by_identifier:
+        return False, "no relationship declares an identifier, so nothing was checked"
+    problems: list[str] = []
+    for identifier, entries in by_identifier.items():
+        per_kind: dict[str, list[tuple[str, str]]] = {}
+        for kind, rel in entries:
+            direction = str(rel.get("direction") or "bidirectional")
+            per_kind.setdefault(kind, []).append((str(rel.get("name", "?")), direction))
+        for kind, decls in per_kind.items():
+            if len(decls) == 1:
+                continue
+            if sorted(d for _name, d in decls) == ["inbound", "outbound"]:
+                continue
+            problems.append(f"{kind} declares {decls} on identifier {identifier!r}")
+    if problems:
+        return False, "; ".join(problems)
+    return True, "each kind declares at most one relationship per identifier and direction"
+
+
+def check_many_max_count_valid(schema: dict, **_: Any) -> tuple[bool, str]:
+    """`max_count: 1` on a cardinality-many relationship is rejected at load.
+
+    ``cardinality`` defaults to ``many`` when unset, so an omitted key is a
+    ``many`` relationship here too — otherwise a schema Infrahub rejects
+    passes this check.
+    """
+    by_identifier = rels_by_identifier(schema)
+    if not by_identifier:
+        return False, "no relationship declares an identifier, so nothing was checked"
+    problems: list[str] = []
+    for _identifier, entries in by_identifier.items():
+        for kind, rel in entries:
+            cardinality = str(rel.get("cardinality") or "many")
+            if cardinality == "many" and rel.get("max_count") == 1:
+                problems.append(
+                    f"{kind}.{rel.get('name')} is cardinality many with max_count 1; "
+                    "use cardinality one for a genuine cap of one"
+                )
+    if problems:
+        return False, "; ".join(problems)
+    return True, "no cardinality-many relationship carries max_count 1"
+
+
 CHECKS: dict[str, Any] = {
+    "uniqueness-scopes-by-relationship": check_uniqueness_constraint_scopes_by_relationship,
+    "uniqueness-no-optional-attr": check_uniqueness_no_optional_attr,
+    "uniqueness-attr-value-suffix": check_uniqueness_attr_value_suffix,
+    "uniqueness-rel-mandatory": check_uniqueness_rel_mandatory,
+    "uniqueness-not-on-generic": check_uniqueness_not_on_generic,
     "attr-min-length": check_attr_min_length,
+    "order-by-resolves-locally": check_order_by_resolves_locally,
+    "dropdown-override-complete": check_dropdown_override_complete,
+    "inherited-peer-unchanged": check_inherited_peer_unchanged,
+    "pairing-note-present": check_pairing_note_present,
     "dropdown-for-status": check_dropdown_for_status,
     "no-deprecated-string": check_no_deprecated_string,
     "full-kind-references": check_full_kind_references,
@@ -1092,6 +2429,15 @@ CHECKS: dict[str, Any] = {
     "entity-key-order": check_entity_key_order,
     "order-weight-key-last": check_order_weight_key_last,
     "choice-key-order": check_choice_key_order,
+    "external-kinds-core-or-sourced": check_external_kinds_are_core_or_sourced,
+    "records-marketplace-provenance": check_records_marketplace_provenance,
+    "corrects-builtin-core-premise": check_corrects_builtin_core_premise,
+    "names-kind-verification-command": check_names_kind_verification_command,
+    "records-subset-rationale": check_records_subset_rationale,
+    "generic-implementer-set-pinned": check_generic_implementer_set_pinned,
+    "generic-membership-consumers-noted": check_generic_membership_consumers_noted,
+    "identifier-unique-per-direction": check_identifier_unique_per_direction,
+    "many-max-count-valid": check_many_max_count_valid,
 }
 
 
@@ -1150,7 +2496,6 @@ def run_checks(
     total = len(check_names)
     score = round(passed_count / total, 4) if total > 0 else 0.0
 
-    passed_names = [e["name"] for e in entries if e["passed"]]
     failed_names = [e["name"] for e in entries if not e["passed"]]
     if failed_names:
         details = f"{passed_count}/{total} checks passed. Failed: {', '.join(failed_names)}"

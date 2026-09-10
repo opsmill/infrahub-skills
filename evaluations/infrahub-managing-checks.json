@@ -115,6 +115,70 @@
           "check": "An unresolvable device is flagged with log_error, not skipped with a bare continue/return"
         }
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "Write a check that has to distinguish two different problems on\na `NetVlan`:\n\n1. a `vlan_id` that is present but outside our allowed range, which\n   the check can see for itself, and\n2. a `vlan_id` the **server** refuses, because the schema has an\n   attribute bound on it.\n\nFor case 2 the check needs to attempt the write and observe whether\nthe server accepted it.\n\nMy first attempt handled case 2 like this:\n\n```python\nresp = httpx.post(f\"{url}/graphql/{branch}\", json={\"query\": mutation})\nif resp.status_code == 200:\n    self.log_info(message=\"accepted\")\nelse:\n    self.log_error(message=\"rejected\")\n```\n\nReview that approach, then write the check you would ship.\n\nSave the check to: output.py\nSave the `.infrahub.yml` registration to: output.yml",
+      "expected_output": "An explanation that every executed GraphQL request returns HTTP 200 and puts rejections in the body's `errors` array, so branching on the status code takes the success branch on a rejection and the check fails open. The correct check uses `self.client.execute_graphql`, which raises `GraphQLError` when the response carries errors, catches that specific exception, and calls `log_error`. It must not catch bare `Exception`, which reintroduces fail-open.",
+      "files": [],
+      "expectations": [
+        "Explains that an executed GraphQL request always returns 200 and carries rejections in the body's errors array",
+        "States that branching on the status code fails OPEN: the check passes on the case it exists to catch",
+        "Uses self.client.execute_graphql rather than raw httpx or requests",
+        "Catches GraphQLError specifically, not bare Exception, and calls log_error in the handler",
+        "Handles the locally-detectable out-of-range case separately, since only a server rejection raises",
+        "Recommends a test asserting the check FAILS on a known-bad value, since a fail-open check looks identical to a passing one"
+      ],
+      "assertions": [
+        {
+          "name": "uses-sdk-execute-graphql",
+          "check": "Uses self.client.execute_graphql and no raw HTTP client"
+        },
+        {
+          "name": "no-status-code-branch",
+          "check": "Does not branch on an HTTP status code"
+        },
+        {
+          "name": "catches-graphql-error",
+          "check": "Catches GraphQLError specifically (not Exception or a bare except) and calls log_error in the handler"
+        },
+        {
+          "name": "separate-local-bounds-branch",
+          "check": "The out-of-range value is reported by its own branch, outside the exception path, since only a server rejection raises"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "One piece of logic in our repository, a VLAN allocation planner,\nis now needed by three artifacts: a check, a generator and a transform.\nToday it is copied into all three directories and the copies have\ndrifted.\n\nGive me the layout that lets all three call one implementation, and\nthe pieces needed to make it run in the workers.\n\nThe base image is registry.opsmill.io/opsmill/infrahub:1.11.0 and the\nshared package should be called `netdomain`.\n\nProduce three files:\n- the check that uses the shared logic, saved to: output.py\n- the image that makes it available to the workers, saved to:\n  output.dockerfile\n- the `.infrahub.yml` registering the check, the generator\n  (`plan_vlans`, targets `vlan_pools`, query `vlan_pool_state`) and\n  the Python transform (`render_vlan_plan`, class\n  `RenderVlanPlan`), saved to: output.yml",
+      "expected_output": "A `src/` layout package installed into the worker image and imported absolutely from every artifact directory, because a relative import cannot span artifact directories. The Dockerfile derives from the Infrahub image, sets `UV_PROJECT_ENVIRONMENT=/.venv` so the install lands in the virtualenv the workers already run, and calls `uv sync --inexact --no-dev --frozen` so the sync does not remove the Infrahub install. The `.infrahub.yml` declares the package under `watch:` on the generator and Python transform entries, since an installed package is invisible to Infrahub's dependency detection.",
+      "files": [],
+      "expectations": [
+        "Explains that a relative import only reaches within one artifact directory, so the shared logic has to be installed as a package",
+        "The check imports the package absolutely, with no relative import and no sys.path manipulation",
+        "Sets UV_PROJECT_ENVIRONMENT to the base image's /.venv rather than letting uv create its own",
+        "Uses `uv sync --inexact` and says that without --inexact the sync removes the Infrahub install from the image",
+        "Declares the shared package under `watch:` on the generator and Python transform entries, and notes that check_definitions has no such field",
+        "Says the package is worth it on the second consumer of the logic, not in anticipation of one"
+      ],
+      "assertions": [
+        {
+          "name": "shared-module-absolute-import",
+          "check": "The check imports the shared package absolutely, with no relative import and no sys.path edit"
+        },
+        {
+          "name": "dockerfile-targets-base-venv",
+          "check": "The Dockerfile sets UV_PROJECT_ENVIRONMENT to /.venv"
+        },
+        {
+          "name": "dockerfile-uv-sync-inexact",
+          "check": "Every `uv sync` line carries --inexact"
+        },
+        {
+          "name": "watch-declares-shared-package",
+          "check": "Every python_transforms and generator_definitions entry declares a `watch:` mapping"
+        }
+      ]
     }
   ]
 }

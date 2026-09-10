@@ -39,6 +39,9 @@ Infrahub skills. It is not meant to be invoked directly.
   - Caching display labels in queries
   - Python environment and connectivity checks
   - Git integration and deployment patterns
+  - Dry-running a changed `.gql` query against the live
+    schema before merge, and which `infrahubctl` command
+    does it for a transform, check or generator
   - Recovery from partial repository syncs
   - Generated file protocol conventions
   - Adopting generated protocols for typed SDK calls

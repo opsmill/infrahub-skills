@@ -80,5 +80,26 @@ class Spine(InfrahubTransform):
   based on query data
 - **Registered as a `python_transform`** in
   `.infrahub.yml` (not `jinja2_transform`)
+- **Both of its dependencies are invisible to
+  detection** — the sibling `.common` import and the
+  template directory reached through
+  `FileSystemLoader`. Neither is a detected
+  dependency, so the registration has to name them:
+
+```yaml
+python_transforms:
+  - name: spine
+    class_name: Spine
+    file_path: transforms/spine.py
+    watch:
+      files:
+        - transforms/common.py
+        - templates/configs/spines/
+```
+
+  Without that block the artifacts re-render on every
+  commit; with an incomplete one they silently go
+  stale. See
+  [artifacts-watch-dependencies.md](./artifacts-watch-dependencies.md).
 
 Reference: [examples.md](../examples.md) for complete hybrid examples.

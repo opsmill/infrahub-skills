@@ -20,6 +20,8 @@ Three components:
 2. **GraphQL query** (`.gql`) — fetches the design object(s) the generator will act on
 3. **Python class** (`InfrahubGenerator` subclass) — implements the `async generate()` method, uses `self.client.create()` with `allow_upsert=True`
 
+The `.infrahub.yml` entry tying them together carries a `watch` dependency declaration alongside them.
+
 ## Example prompts
 
 - "Create a generator that takes a fabric design object and creates all spine and leaf devices with their loopback interfaces"
@@ -33,6 +35,7 @@ Three components:
 - **Target group** — generator must reference a `CoreGeneratorGroup`; this is what connects design objects to the generator execution
 - **Async `generate()` method** — the method signature must be `async def generate(self, data):`
 - **GraphQL query naming** — query name must match the `query` class attribute
+- **`watch` dependencies** — the `generator_definitions` entry always carries a `watch` block naming every first-party module the generator imports, sibling query models included (`files: []` when there are none); imports are never analyzed, so without the key the generator re-runs on every commit, and with an incomplete list a change to a shared helper silently stops re-running it
 
 ## Common mistakes it catches
 
