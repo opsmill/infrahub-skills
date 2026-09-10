@@ -160,7 +160,7 @@ you never wrote one.
 ```yaml
 # No uniqueness_constraints on this node at all, yet
 # schema load fails with:
-#   DcimPdu.uniqueness_constraints: cannot use rack
+#   DcimPDU.uniqueness_constraints: cannot use rack
 #   relationship, relationship must be mandatory. (`rack`)
 human_friendly_id:
   - name__value

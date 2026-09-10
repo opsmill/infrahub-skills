@@ -1057,7 +1057,12 @@ def check_choice_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
 
 
 def _resolve_rel(schema: dict, node: dict, name: str) -> dict | None:
-    """Find relationship ``name`` on ``node`` or on any generic it inherits from."""
+    """Find relationship ``name`` on ``node`` or on any generic it inherits from.
+
+    The walk over ``inherit_from`` is single-level, which is complete only while
+    Infrahub generics cannot themselves inherit from other generics. If that
+    changes upstream, this needs to become a recursive walk.
+    """
     for rel in _all_rels(node):
         if rel.get("name") == name:
             return rel
