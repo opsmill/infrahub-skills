@@ -15,7 +15,11 @@ re-renders that Transformation's artifacts only if the file
 is inside its closure. `watch.files` in `.infrahub.yml` is
 how you declare the dependencies detection does not supply.
 
-Requires Infrahub 1.10 or later.
+Everything below is Infrahub 1.11 behavior, read off the
+1.11.2 source. The `watch` key itself parses from 1.10, but
+1.10 detected a Python transform's whole package directory
+and required an empty declaration on Jinja2 transforms —
+neither holds from 1.11 on.
 
 ### Why it matters
 
@@ -24,15 +28,15 @@ and for Python it is far weaker than it looks:
 
 | Type | Rely on being detected |
 | ---- | ---------------------- |
-| `python_transforms` | **Only the entry file at `file_path`.** Imports are never followed. Some versions also add every tracked file in the entry point's directory, but that directory listing is being withdrawn ([opsmill/infrahub#9644](https://github.com/opsmill/infrahub/issues/9644)) — never write a `watch` list that leans on it. |
+| `python_transforms` | **Only the entry file at `file_path`.** Imports are never followed, and a sibling in the same directory is not included either. 1.10 did add the entry point's whole directory; 1.11 withdrew it ([opsmill/infrahub#9644](https://github.com/opsmill/infrahub/issues/9644)), so a list written against that behavior now under-declares. |
 | `jinja2_transforms` | The template plus every template reachable through a **literal** `{% include %}` / `{% import %}` / `{% extends %}`, transitively. |
 
 For a Python transform, treat **every first-party module the
 entry point imports as undeclared until you list it** — a
 sibling module in the same directory included. Sharing a
-directory is not a dependency relationship, and a transform
-whose `watch` list relies on it breaks the moment the
-directory listing is withdrawn.
+directory is not a dependency relationship, and a `watch`
+list carried over from 1.10, where the directory was
+detected, is already short of its siblings.
 
 Because those imports were never scanned, Infrahub does not
 trust the result: for a Python transform with no `watch` key
@@ -192,8 +196,8 @@ python_transforms:
   # AVOID — a whole-directory entry that happens to contain the
   # dependency. It works, but every unrelated edit under
   # transforms/ re-renders this artifact. Name the modules.
-  - name: device_config
-    file_path: transforms/device_config.py
+  - name: bgp_config
+    file_path: transforms/bgp_config.py
     watch:
       files:
         - transforms/
@@ -211,8 +215,16 @@ each Transformation:
    list or an unknown key under `watch` fails the import
    outright.
 3. **Does every entry resolve** to a Git-tracked file or
-   directory? Check for typos, gitignored paths, and symlinks
-   — these silently contribute nothing.
+   directory? Infrahub expands each entry with `git ls-files`,
+   so run the same check locally — no server needed:
+
+   ```bash
+   git ls-files -- transforms/device_config_query.py src/my_package/
+   ```
+
+   An entry printing nothing is a typo, a gitignored path, or
+   a symlink; it contributes nothing while still counting as
+   a declaration.
 4. **Is the list complete?** Re-run the derivation above
    against the current code and compare. Two gaps recur:
    imports added after the `watch` block was written, and
@@ -226,4 +238,4 @@ each Transformation:
    repository import.
 
 Reference:
-[../infrahub-common/infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md)
+[infrahub-common/infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md)

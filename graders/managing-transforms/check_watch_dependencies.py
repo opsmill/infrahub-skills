@@ -16,6 +16,7 @@ CHECKS = [
     "watch-uses-object-form",
     "watch-declares-sibling-import",
     "watch-declares-outside-package-import",
+    "watch-avoids-entry-directory",
     "watch-empty-for-self-contained",
     "watch-omitted-for-static-jinja2",
     "watch-declares-dynamic-jinja2-partials",

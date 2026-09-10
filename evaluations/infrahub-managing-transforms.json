@@ -56,6 +56,7 @@
       "expectations": [
         "Every python_transforms entry carries a watch key",
         "device_config declares both the sibling query model and src/my_package/",
+        "No entry watches the directory holding its own file_path",
         "interface_names declares watch.files as an empty list",
         "arista_startup_config carries no watch entries (its closure is complete)",
         "cisco_startup_config declares templates/partials/"
@@ -76,6 +77,10 @@
         {
           "name": "watch-declares-outside-package-import",
           "check": "device_config declares src/my_package/ (or the module within it) that it imports"
+        },
+        {
+          "name": "watch-avoids-entry-directory",
+          "check": "No entry watches the directory holding its own file_path, which would re-create the closure 1.11 withdrew and re-render on every unrelated edit beside the entry point"
         },
         {
           "name": "watch-empty-for-self-contained",

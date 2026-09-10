@@ -515,8 +515,8 @@ def check_watch_declares_sibling_import(
     """device_config imports .device_config_query, so it must be declared.
 
     Sharing a directory is not a dependency relationship: imports are never
-    followed, and the directory listing that used to cover siblings is being
-    withdrawn (opsmill/infrahub#9644).
+    followed, and the directory listing that used to cover siblings was
+    withdrawn in 1.11 (opsmill/infrahub#9644).
     """
     entry = _entry_named(yml_doc or {}, "python_transforms", "device_config")
     if entry is None:
@@ -548,6 +548,34 @@ def check_watch_declares_outside_package_import(
         "device_config does not declare src/my_package/formatting.py (or the "
         f"package holding it); watch.files = {files}"
     )
+
+
+def check_watch_avoids_entry_directory(
+    yml_doc: dict | None = None, **_: Any
+) -> tuple[bool, str]:
+    """No entry may watch the directory its own file_path sits in.
+
+    Naming that directory re-creates the closure 1.10 built automatically and
+    1.11 withdrew: every unrelated edit beside the entry point re-renders the
+    artifacts. It also passes the declares-* checks for free, because a
+    directory covers whatever sits under it — which is exactly why the answer
+    has to be graded on it separately.
+    """
+    for entry in _entries(yml_doc or {}, "python_transforms"):
+        files = watch_files(entry)
+        if not files:
+            continue
+        file_path = canonical_watch_path(str(entry.get("file_path", "")))
+        if "/" not in file_path:
+            continue
+        own_dir = file_path.rsplit("/", 1)[0]
+        if own_dir in files:
+            return False, (
+                f"{entry.get('name', '<unnamed>')}: watch.files names its own directory "
+                f"({own_dir}/), so every unrelated edit beside the entry point re-renders "
+                "the artifacts; name the modules it actually imports"
+            )
+    return True, "No entry watches the directory holding its own file_path"
 
 
 def check_watch_empty_for_self_contained(
@@ -630,6 +658,7 @@ CHECKS: dict[str, Any] = {
     "watch-uses-object-form": check_watch_uses_object_form,
     "watch-declares-sibling-import": check_watch_declares_sibling_import,
     "watch-declares-outside-package-import": check_watch_declares_outside_package_import,
+    "watch-avoids-entry-directory": check_watch_avoids_entry_directory,
     "watch-empty-for-self-contained": check_watch_empty_for_self_contained,
     "watch-omitted-for-static-jinja2": check_watch_omitted_for_static_jinja2,
     "watch-declares-dynamic-jinja2-partials": check_watch_declares_dynamic_jinja2_partials,

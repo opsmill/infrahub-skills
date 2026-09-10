@@ -213,8 +213,12 @@ watch:
 ```
 
 Valid **only** on `python_transforms`, `jinja2_transforms`,
-and `generator_definitions` (1.10+ for Transformations,
-1.11+ for Generators). The models use `extra="forbid"`, so
+and `generator_definitions`. The key parses on Transformations
+from 1.10 and on Generators from 1.11, but the semantics
+described here are 1.11's — 1.10 detected a Python
+transform's whole package directory and required an empty
+declaration on Jinja2 transforms. The models use
+`extra="forbid"`, so
 `watch` on `check_definitions` or `artifact_definitions`
 fails the repository import, as does the bare-list form
 `watch: [a, b]` or any key other than `files`.
@@ -228,7 +232,7 @@ instances) only if the file is in that closure.
 
 | Kind | Rely on being detected |
 | ---- | ---------------------- |
-| `python_transforms`, `generator_definitions` | **Only the entry file at `file_path`.** Imports are never followed. Some versions also add every tracked file in the entry point's directory, but that listing is being withdrawn ([opsmill/infrahub#9644](https://github.com/opsmill/infrahub/issues/9644)) — never build a `watch` list that leans on it. |
+| `python_transforms`, `generator_definitions` | **Only the entry file at `file_path`.** Imports are never followed, and a sibling in the same directory is not included either. 1.10 did add the entry point's whole directory; 1.11 withdrew it ([opsmill/infrahub#9644](https://github.com/opsmill/infrahub/issues/9644)), so a list written against that behavior now under-declares. |
 | `jinja2_transforms` | The template, plus every template reachable through a **literal** `{% include %}` / `{% import %}` / `{% extends %}`, transitively. |
 
 So for a Python transform or a Generator, treat **every

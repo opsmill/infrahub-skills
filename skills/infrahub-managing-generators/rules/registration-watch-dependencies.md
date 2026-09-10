@@ -15,7 +15,8 @@ Generator's instances only if the file is inside its closure.
 `watch.files` on the `generator_definitions` entry is how you
 declare the dependencies detection does not supply.
 
-Requires Infrahub 1.11 or later. A Generator imported before
+Requires Infrahub 1.11 or later; the behavior below was read
+off the 1.11.2 source. A Generator imported before
 precise triggering shipped has no stored closure and falls
 back to re-running on any file change; it adopts precise
 behavior on the next import, with no error either way.
@@ -24,11 +25,11 @@ behavior on the next import, with no error either way.
 
 Generators are Python-only, and for Python the only thing to
 rely on being detected is **the entry file at `file_path`**.
-Imports are never followed. Some versions also add every
-tracked file sitting in the entry point's directory, but that
-directory listing is being withdrawn
-([opsmill/infrahub#9644](https://github.com/opsmill/infrahub/issues/9644))
-— never write a `watch` list that leans on it.
+Imports are never followed, and a sibling in the same
+directory is not included either — Generators share the
+closure builder with Python transforms, whose directory
+listing 1.11 withdrew
+([opsmill/infrahub#9644](https://github.com/opsmill/infrahub/issues/9644)).
 
 So treat **every first-party module the Generator imports as
 undeclared until you list it**, including a relative import of
@@ -168,10 +169,10 @@ generator_definitions:
   # AVOID — a whole-directory entry that happens to contain the
   # dependency. It works, but every unrelated edit under
   # generators/ re-runs this Generator. Name the modules.
-  - name: generate_server
-    file_path: generators/generate_server.py
-    query: generate_server
-    targets: server_services
+  - name: generate_circuit
+    file_path: generators/generate_circuit.py
+    query: generate_circuit
+    targets: circuits
     watch:
       files:
         - generators/
@@ -188,8 +189,16 @@ missing. For each `generator_definitions` entry:
 2. **Is it the object form**, `watch: {files: [...]}`? A bare
    list or an unknown key under `watch` fails the import.
 3. **Does every entry resolve** to a Git-tracked file or
-   directory? Typos, gitignored paths, and symlinks contribute
-   nothing while still counting as a declaration.
+   directory? Infrahub expands each entry with `git ls-files`,
+   so run the same check locally — no server needed:
+
+   ```bash
+   git ls-files -- generators/fabric_generator_query.py src/my_package/
+   ```
+
+   An entry printing nothing is a typo, a gitignored path, or
+   a symlink; it contributes nothing while still counting as
+   a declaration.
 4. **Is the list complete?** Re-derive it from the current
    imports and compare. Two gaps recur: an import added after
    the `watch` block was written, and the Generator's own
@@ -204,5 +213,5 @@ missing. For each `generator_definitions` entry:
    `artifact_definitions` it fails the repository import.
 
 Reference:
-[../infrahub-common/infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md),
-[../infrahub-managing-transforms/rules/artifacts-watch-dependencies.md](../../infrahub-managing-transforms/rules/artifacts-watch-dependencies.md)
+[infrahub-common/infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md),
+[infrahub-managing-transforms/rules/artifacts-watch-dependencies.md](../../infrahub-managing-transforms/rules/artifacts-watch-dependencies.md)
