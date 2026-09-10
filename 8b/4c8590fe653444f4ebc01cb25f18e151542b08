@@ -1,0 +1,27 @@
+tests/graders/test_uniqueness_scope.py
+  s_fe99a41d5e7f9e::t_791ec992b634b5 208-227
+  s_fe99a41d5e7f9e::t_0eb5791f93ba59 31-35
+graders/auditing-repo/lib.py
+  s_fe99a41d5e7f9e::t_d4a8fd74a3bf00 148-154
+graders/managing-schemas/lib.py
+  s_fe99a41d5e7f9e::t_ec7c8a3671806b 1258-1266,1268-1275,1281,1288
+  s_fe99a41d5e7f9e::t_2f8630d7f0e846 1187-1206
+  s_fe99a41d5e7f9e::t_94aba37cd0aa1e 1342,1345,1348-1353
+  s_fe99a41d5e7f9e::t_171dd73ae45306 1250-1253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "8b4c8590fe653444f4ebc01cb25f18e151542b08",
+  "prompts": {},
+  "sessions": {
+    "s_fe99a41d5e7f9e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f610d975-3725-4fda-8281-a3570da3554a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
