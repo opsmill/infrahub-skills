@@ -1250,3 +1250,38 @@ def test_learner_authors_multiline_leak_still_caught(tmp_path):
     ws = make_ws(tmp_path, lesson=leaked, solution=COMPLIANT_SOLUTION)
     ok, msg = teaching_lib.CHECKS["learner-authors"](ws)
     assert not ok and "leaks" in msg
+
+
+# --- The rule's own examples are fixtures --------------------------------
+# A grader that fails the canonical example of the rule it tests is the
+# disagreement this suite exists to catch, so the example is read out of
+# the rule file rather than retyped here: editing one without the other
+# fails the test.
+
+RULES_DIR = (
+    REPO_ROOT / "skills" / "infrahub-teaching-concepts" / "rules"
+)
+
+
+def _correct_block(rule: str) -> str:
+    """The indented '## Correct' example from a rule file, dedented."""
+    text = (RULES_DIR / rule).read_text()
+    body = text.split("## Correct", 1)[1].split("## Incorrect", 1)[0]
+    lines = [ln[4:] if ln.startswith("    ") else ln
+             for ln in body.splitlines() if not ln.strip() or ln.startswith("    ")]
+    return "\n".join(lines).strip("\n") + "\n"
+
+
+def test_verify_solution_rule_example_passes_its_own_check(tmp_path):
+    example = _correct_block("exercise-verify-solution.md")
+    assert "## Solution" in example and "## Verification" in example
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, solution=example)
+    ok, msg = teaching_lib.CHECKS["verified-solution"](ws)
+    assert ok, f"the rule's own Correct example fails the check: {msg}"
+
+
+def test_verify_solution_rule_example_names_evidence(tmp_path):
+    """Guards the other direction: the example must not go vacuous."""
+    example = _correct_block("exercise-verify-solution.md")
+    verification = teaching_lib.sections(example)["Verification"]
+    assert "`" in verification or "docs.infrahub.app" in verification
