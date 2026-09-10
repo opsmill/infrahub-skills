@@ -328,106 +328,6 @@
     },
     {
       "id": 16,
-      "prompt": "I have `devices.csv` with these columns and rows:\n\n    name,role,status,tier_label\n    spine-01,spine,Active,gold\n    spine-02,spine,Maintenance,gold\n    leaf-01,leaf,Active,silver\n\nThe schema declares `DcimDevice` with attributes `name` (Text),\n`role` (Text), `status` (Dropdown: active/maintenance/retired). The\nschema has NO `tier_label` attribute on DcimDevice. DcimDevice has\n`human_friendly_id: [name__value]`. The schema is fixed.\n\nBefore emitting any file, surface every decision you need from me in\nONE batch \u2014 unmapped columns, dropdown-label translation, target\nfile naming, branch name, and lineage opt-in. Do not start writing\nuntil I confirm. Echo back the full plan before any file is created.\nSave planned output under `./output_dir/`.",
-      "expected_output": "A single batched set of multi-choice questions covering every ambiguity (tier_label has no schema home; Status is a dropdown label; branch name; lineage opt-in) plus a confirm-and-lock summary of the proposed plan. No file is written until the user confirms.",
-      "files": [],
-      "expectations": [
-        "Every ambiguity is surfaced in one batched round, not one-by-one",
-        "The unmapped tier_label column is called out explicitly",
-        "Status values (Active/Maintenance) are flagged as dropdown labels",
-        "A branch name is proposed (e.g., csv-import-YYYYMMDD-HHMM)",
-        "Lineage opt-in is offered with an explanation of source vs. owner+is_protected",
-        "The plan is echoed back before any file is written"
-      ],
-      "assertions": []
-    },
-    {
-      "id": 17,
-      "prompt": "Before mapping `inventory.csv` (which I will provide\ncontent-wise inline below), profile it: report distinct-value counts,\nsample values, length ranges, numeric-only fractions, date-pattern\nmatches, and any sequence patterns. Use the profile to drive the\nmapping plan.\n\n    name,role,status,manufacturer_name,port_count,commissioned_at\n    spine-01,spine,Active,Arista,32,2024-03-15\n    spine-02,spine,Active,Arista,32,2024-03-15\n    leaf-01,leaf,Maintenance,Cisco,48,2023-09-01\n    leaf-02,leaf,Active,Cisco,48,2024-01-10\n\nSchema is fixed. Emit only the per-file profile summary \u2014 do not\nwrite any object YAML in this task.",
-      "expected_output": "A per-column profile of inventory.csv naming distinct-value counts (4 names, 2 roles, 2 statuses, 2 manufacturers, 2 port counts, 3 dates), sample values, length ranges, the 100% numeric port_count column, and the YYYY-MM-DD commissioned_at column as DateTime.",
-      "files": [],
-      "expectations": [
-        "The profile names per-column distinct-value counts",
-        "role and status are flagged as low-cardinality (dropdown candidates)",
-        "port_count is flagged as 100% numeric",
-        "commissioned_at is flagged as a YYYY-MM-DD DateTime pattern",
-        "manufacturer_name is flagged as a reference candidate (low cardinality)"
-      ],
-      "assertions": []
-    },
-    {
-      "id": 18,
-      "prompt": "After running `infrahubctl object validate ./output_dir/ --branch csv-import-20260622-1430`,\nthe server returned:\n\n    output_dir/04_devices.yml row 7 attribute 'status':\n      'Active' is not a valid choice for status\n\nThe skill produced the YAML from `inventory.csv` row 12. The skill\nknows the per-row mapping back to the source. Translate the\nvalidate error into a clear instruction that tells me which CSV\ncell to fix, and explicitly tells me NOT to edit the emitted YAML\ndirectly.",
-      "expected_output": "A traceback that names inventory.csv row 12 column \"Status\", explains that \"Active\" is the display label (the schema choice name is `active`), and lists fix options including re-running with the dropdown-label-to-name rule applied. The response must instruct the user not to edit the emitted YAML by hand.",
-      "files": [],
-      "expectations": [
-        "The error is traced back to inventory.csv row 12 column \"Status\"",
-        "The \"Active\" vs \"active\" label/name distinction is explained",
-        "Fix options include editing the CSV and re-running the skill",
-        "The user is told NOT to edit the emitted YAML directly"
-      ],
-      "assertions": []
-    },
-    {
-      "id": 19,
-      "prompt": "After emitting Infrahub object YAML to ./output_dir/ (do this\nstep first for the simple manufacturers CSV below), describe the\nlocal self-check you would run BEFORE creating any branch. Name the\nspecific managing-objects rules you check the emission against and\nwhat each one catches.\n\n    # manufacturers.csv\n    name,description,country\n    Dell,Server and storage vendor,US\n\nSchema defines `OrganizationManufacturer` with Text attributes\n`name`, `description`, `country`, and `human_friendly_id: [name__value]`.",
-      "expected_output": "The emitted YAML for OrganizationManufacturer under ./output_dir/, plus a description of the local self-check that walks each emitted file against managing-objects rules (format-structure, value-attributes, value-relationships, children-components, range-expansion, organization-load-order). No infrahubctl command is run in this task \u2014 the self-check is local-only.",
-      "files": [],
-      "expectations": [
-        "At least one YAML file is emitted to ./output_dir/",
-        "The self-check is described as running BEFORE infrahubctl branch create",
-        "The self-check is local-only (no server, no branch)",
-        "Specific managing-objects rule files are named",
-        "Each named rule is matched to the shape it verifies"
-      ],
-      "assertions": []
-    },
-    {
-      "id": 20,
-      "prompt": "Walk me through the validate-and-load sequence after the\nlocal self-check passes for a hypothetical ./output_dir/. Include\nthe exact infrahubctl commands in the order they should be run,\nusing a default branch name like `csv-import-YYYYMMDD-HHMM`. Do\nNOT actually execute them \u2014 just produce the command sequence\nwith one-line explanations.",
-      "expected_output": "The command sequence in order: (1) infrahubctl info to verify connectivity, (2) infrahubctl branch create <name>, (3) infrahubctl object validate ./output_dir/ --branch <name>, (4) infrahubctl object load ./output_dir/ --branch <name>. Plus a note about `infrahubctl branch delete <name>` on partial failure. The default branch is never the target.",
-      "files": [],
-      "expectations": [
-        "The sequence creates a branch BEFORE validate or load",
-        "infrahubctl info is mentioned as a connectivity check",
-        "The branch is created via infrahubctl branch create",
-        "validate and load both pass --branch <name>",
-        "The default branch is explicitly excluded as a target",
-        "branch delete is named as the cleanup on partial failure"
-      ],
-      "assertions": []
-    },
-    {
-      "id": 21,
-      "prompt": "Before mapping `devices.csv` to the schema, describe how you\nwould discover the schema. List the priority chain (MCP \u2192\ninfrahubctl schema export \u2192 /api/schema REST \u2192 local schemas/*.yml)\nand explain when to fall back to the next source. The schema is\nread-only throughout \u2014 do not propose any schema edit. Do not\nemit any YAML in this task \u2014 describe the introspection only.",
-      "expected_output": "A description of the four-source priority chain (MCP first, infrahubctl schema export, /api/schema REST, local schemas/*.yml last), with the trade-off of each source (freshness vs. availability) and an explicit \"schema is read-only \u2014 escalate to managing-schemas if a column has no home.\"",
-      "files": [],
-      "expectations": [
-        "The priority chain lists MCP first",
-        "infrahubctl schema export is listed as the next fallback after MCP",
-        "/api/schema REST is named as the third option",
-        "Local schemas/*.yml is named as the last resort with a freshness caveat",
-        "The response explicitly says no schema edit will be proposed",
-        "Escalation to managing-schemas is named for the unmappable-column case"
-      ],
-      "assertions": []
-    },
-    {
-      "id": 22,
-      "prompt": "I will hand you any of three input shapes \u2014 a single CSV\nfile, a directory of CSVs, or an explicit list of paths. Describe\nhow the skill normalizes each shape into a flat file list before\nprofiling, and what happens to non-CSV/TSV files in a directory.\nDo not emit any YAML in this task \u2014 describe the input\nnormalization only.",
-      "expected_output": "A description of the input normalization step: single file passes through, directory is recursively scanned for *.csv and *.tsv (case-insensitive), list of paths is expanded the same way. Non-CSV/TSV files in a directory are ignored or surface a fail-closed report depending on the rule.",
-      "files": [],
-      "expectations": [
-        "Single file is accepted directly",
-        "Directory is recursively scanned for .csv and .tsv files",
-        "Mixed input lists are normalized to a flat file set",
-        "Case-insensitive extension matching is mentioned",
-        "The response references the fail-closed posture for unsupported file types"
-      ],
-      "assertions": []
-    },
-    {
-      "id": 23,
       "prompt": "I have `devices.csv` with a `license_tier` column the schema does\nnot declare anywhere:\n\n    name,role,status,license_tier\n    spine-01,spine,active,gold\n    leaf-01,leaf,active,silver\n    leaf-02,leaf,active,gold\n\nThe DcimDevice schema declares `name`, `role`, and `status` only \u2014 there\nis no `license_tier` attribute, relationship, or dropdown, and I have not\napproved any schema change. This is non-interactive: you cannot ask me to\nskip the column.\n\nFollow the fail-closed rule. If any column has no schema home, stop and\nwrite nothing to `./output_dir/` \u2014 do not emit a partial file that drops\nthe column. Report the unmapped column instead.",
       "expected_output": "No object YAML in ./output_dir/ \u2014 the skill stops because `license_tier` has no schema home and emits a structured report naming the unmapped column and the kind it checked, pointing the user at infrahub-managing-schemas. No partial file that silently drops the column.",
       "files": [],
@@ -445,7 +345,7 @@
       ]
     },
     {
-      "id": 24,
+      "id": 17,
       "prompt": "I have a directory `./imports/` holding three CSV files, one kind\neach:\n\n    # imports/manufacturers.csv\n    name,country\n    Arista,US\n    Cisco,US\n\n    # imports/sites.csv\n    name,country\n    par-1,FR\n    nyc-1,US\n\n    # imports/devices.csv\n    name,role,site,manufacturer\n    spine-01,spine,par-1,Arista\n    edge-01,edge,nyc-1,Cisco\n\nSchema (fixed): OrganizationManufacturer (`human_friendly_id:\n[name__value]`), LocationSite (`human_friendly_id: [name__value]`), and\nDcimDevice (`human_friendly_id: [name__value]`, relationships `site` \u2192\nLocationSite and `manufacturer` \u2192 OrganizationManufacturer).\n\nTreat the directory as the input: scan it, normalize to a flat file list,\nand emit Infrahub object YAML for every file to `./output_dir/`, numbered\nfor load order.",
       "expected_output": "A directory ./output_dir/ with NN-prefixed files covering all three input kinds \u2014 OrganizationManufacturer, LocationSite, and DcimDevice \u2014 with manufacturers and sites loading before devices, and scalar HFID references from devices to each.",
       "files": [],
@@ -471,7 +371,7 @@
       ]
     },
     {
-      "id": 25,
+      "id": 18,
       "prompt": "I have ONE denormalized CSV that conflates three kinds \u2014 the site\nand manufacturer columns repeat on every device row:\n\n    # inventory.csv\n    device_name,device_role,site_name,site_country,manufacturer_name,manufacturer_country\n    spine-01,spine,par-1,FR,Arista,US\n    spine-02,spine,par-1,FR,Arista,US\n    leaf-01,leaf,par-1,FR,Arista,US\n    edge-01,edge,nyc-1,US,Cisco,US\n\nSchema (fixed): OrganizationManufacturer (`human_friendly_id:\n[name__value]`, attributes `name`, `country`), LocationSite\n(`human_friendly_id: [name__value]`, attributes `name`, `country`), and\nDcimDevice (`human_friendly_id: [name__value]`, attribute `role`,\nrelationships `site` \u2192 LocationSite and `manufacturer` \u2192\nOrganizationManufacturer).\n\nSplit this single sheet across the three kinds and emit Infrahub object\nYAML to `./output_dir/`, numbered for load order. Do not load anything.",
       "expected_output": "A directory ./output_dir/ with one NN-prefixed file per kind: manufacturers (Arista, Cisco \u2014 deduped) and sites (par-1, nyc-1 \u2014 deduped) loading before devices, and the four device rows carrying scalar HFID references `manufacturer` and `site`.",
       "files": [],
@@ -499,6 +399,106 @@
           "check": "The denormalized sheet is split into manufacturer, site, and device kinds; referents are deduped and load before the devices that reference them"
         }
       ]
+    },
+    {
+      "id": 19,
+      "prompt": "I have `devices.csv` with these columns and rows:\n\n    name,role,status,tier_label\n    spine-01,spine,Active,gold\n    spine-02,spine,Maintenance,gold\n    leaf-01,leaf,Active,silver\n\nThe schema declares `DcimDevice` with attributes `name` (Text),\n`role` (Text), `status` (Dropdown: active/maintenance/retired). The\nschema has NO `tier_label` attribute on DcimDevice. DcimDevice has\n`human_friendly_id: [name__value]`. The schema is fixed.\n\nBefore emitting any file, surface every decision you need from me in\nONE batch \u2014 unmapped columns, dropdown-label translation, target\nfile naming, branch name, and lineage opt-in. Do not start writing\nuntil I confirm. Echo back the full plan before any file is created.\nSave planned output under `./output_dir/`.\n\nSave the batched questions and the echoed plan to\n`./output_dir/answer.md`. Write no object YAML in this task.",
+      "expected_output": "A single batched set of multi-choice questions covering every ambiguity (tier_label has no schema home; Status is a dropdown label; branch name; lineage opt-in) plus a confirm-and-lock summary of the proposed plan. No file is written until the user confirms.",
+      "files": [],
+      "expectations": [
+        "Every ambiguity is surfaced in one batched round, not one-by-one",
+        "The unmapped tier_label column is called out explicitly",
+        "Status values (Active/Maintenance) are flagged as dropdown labels",
+        "A branch name is proposed (e.g., csv-import-YYYYMMDD-HHMM)",
+        "Lineage opt-in is offered with an explanation of source vs. owner+is_protected",
+        "The plan is echoed back before any file is written"
+      ],
+      "assertions": []
+    },
+    {
+      "id": 20,
+      "prompt": "Before mapping `inventory.csv` (which I will provide\ncontent-wise inline below), profile it: report distinct-value counts,\nsample values, length ranges, numeric-only fractions, date-pattern\nmatches, and any sequence patterns. Use the profile to drive the\nmapping plan.\n\n    name,role,status,manufacturer_name,port_count,commissioned_at\n    spine-01,spine,Active,Arista,32,2024-03-15\n    spine-02,spine,Active,Arista,32,2024-03-15\n    leaf-01,leaf,Maintenance,Cisco,48,2023-09-01\n    leaf-02,leaf,Active,Cisco,48,2024-01-10\n\nSchema is fixed. Emit only the per-file profile summary \u2014 do not\nwrite any object YAML in this task.\n\nSave the profile to `./output_dir/profile.yml`, one entry per\ncolumn. Write no object YAML in this task.",
+      "expected_output": "A per-column profile of inventory.csv naming distinct-value counts (4 names, 2 roles, 2 statuses, 2 manufacturers, 2 port counts, 3 dates), sample values, length ranges, the 100% numeric port_count column, and the YYYY-MM-DD commissioned_at column as DateTime.",
+      "files": [],
+      "expectations": [
+        "The profile names per-column distinct-value counts",
+        "role and status are flagged as low-cardinality (dropdown candidates)",
+        "port_count is flagged as 100% numeric",
+        "commissioned_at is flagged as a YYYY-MM-DD DateTime pattern",
+        "manufacturer_name is flagged as a reference candidate (low cardinality)"
+      ],
+      "assertions": []
+    },
+    {
+      "id": 21,
+      "prompt": "After running `infrahubctl object validate ./output_dir/ --branch csv-import-20260622-1430`,\nthe server returned:\n\n    output_dir/04_devices.yml row 7 attribute 'status':\n      'Active' is not a valid choice for status\n\nThe skill produced the YAML from `inventory.csv` row 12. The skill\nknows the per-row mapping back to the source. Translate the\nvalidate error into a clear instruction that tells me which CSV\ncell to fix, and explicitly tells me NOT to edit the emitted YAML\ndirectly.\n\nSave the instruction you would give me to `./output_dir/answer.md`.",
+      "expected_output": "A traceback that names inventory.csv row 12 column \"Status\", explains that \"Active\" is the display label (the schema choice name is `active`), and lists fix options including re-running with the dropdown-label-to-name rule applied. The response must instruct the user not to edit the emitted YAML by hand.",
+      "files": [],
+      "expectations": [
+        "The error is traced back to inventory.csv row 12 column \"Status\"",
+        "The \"Active\" vs \"active\" label/name distinction is explained",
+        "Fix options include editing the CSV and re-running the skill",
+        "The user is told NOT to edit the emitted YAML directly"
+      ],
+      "assertions": []
+    },
+    {
+      "id": 22,
+      "prompt": "After emitting Infrahub object YAML to ./output_dir/ (do this\nstep first for the simple manufacturers CSV below), describe the\nlocal self-check you would run BEFORE creating any branch. Name the\nspecific managing-objects rules you check the emission against and\nwhat each one catches.\n\n    # manufacturers.csv\n    name,description,country\n    Dell,Server and storage vendor,US\n\nSchema defines `OrganizationManufacturer` with Text attributes\n`name`, `description`, `country`, and `human_friendly_id: [name__value]`.\n\nSave the self-check description to `./output_dir/answer.md`,\nalongside the emitted YAML.",
+      "expected_output": "The emitted YAML for OrganizationManufacturer under ./output_dir/, plus a description of the local self-check that walks each emitted file against managing-objects rules (format-structure, value-attributes, value-relationships, children-components, range-expansion, organization-load-order). No infrahubctl command is run in this task \u2014 the self-check is local-only.",
+      "files": [],
+      "expectations": [
+        "At least one YAML file is emitted to ./output_dir/",
+        "The self-check is described as running BEFORE infrahubctl branch create",
+        "The self-check is local-only (no server, no branch)",
+        "Specific managing-objects rule files are named",
+        "Each named rule is matched to the shape it verifies"
+      ],
+      "assertions": []
+    },
+    {
+      "id": 23,
+      "prompt": "Walk me through the validate-and-load sequence after the\nlocal self-check passes for a hypothetical ./output_dir/. Include\nthe exact infrahubctl commands in the order they should be run,\nusing a default branch name like `csv-import-YYYYMMDD-HHMM`. Do\nNOT actually execute them \u2014 just produce the command sequence\nwith one-line explanations.\n\nSave the command sequence to `./output_dir/answer.md`.",
+      "expected_output": "The command sequence in order: (1) infrahubctl info to verify connectivity, (2) infrahubctl branch create <name>, (3) infrahubctl object validate ./output_dir/ --branch <name>, (4) infrahubctl object load ./output_dir/ --branch <name>. Plus a note about `infrahubctl branch delete <name>` on partial failure. The default branch is never the target.",
+      "files": [],
+      "expectations": [
+        "The sequence creates a branch BEFORE validate or load",
+        "infrahubctl info is mentioned as a connectivity check",
+        "The branch is created via infrahubctl branch create",
+        "validate and load both pass --branch <name>",
+        "The default branch is explicitly excluded as a target",
+        "branch delete is named as the cleanup on partial failure"
+      ],
+      "assertions": []
+    },
+    {
+      "id": 24,
+      "prompt": "Before mapping `devices.csv` to the schema, describe how you\nwould discover the schema. List the priority chain (MCP \u2192\ninfrahubctl schema export \u2192 /api/schema REST \u2192 local schemas/*.yml)\nand explain when to fall back to the next source. The schema is\nread-only throughout \u2014 do not propose any schema edit. Do not\nemit any YAML in this task \u2014 describe the introspection only.\n\nSave the introspection description to `./output_dir/answer.md`.",
+      "expected_output": "A description of the four-source priority chain (MCP first, infrahubctl schema export, /api/schema REST, local schemas/*.yml last), with the trade-off of each source (freshness vs. availability) and an explicit \"schema is read-only \u2014 escalate to managing-schemas if a column has no home.\"",
+      "files": [],
+      "expectations": [
+        "The priority chain lists MCP first",
+        "infrahubctl schema export is listed as the next fallback after MCP",
+        "/api/schema REST is named as the third option",
+        "Local schemas/*.yml is named as the last resort with a freshness caveat",
+        "The response explicitly says no schema edit will be proposed",
+        "Escalation to managing-schemas is named for the unmappable-column case"
+      ],
+      "assertions": []
+    },
+    {
+      "id": 25,
+      "prompt": "I will hand you any of three input shapes \u2014 a single CSV\nfile, a directory of CSVs, or an explicit list of paths. Describe\nhow the skill normalizes each shape into a flat file list before\nprofiling, and what happens to non-CSV/TSV files in a directory.\nDo not emit any YAML in this task \u2014 describe the input\nnormalization only.\n\nSave the normalization description to `./output_dir/answer.md`.",
+      "expected_output": "A description of the input normalization step: single file passes through, directory is recursively scanned for *.csv and *.tsv (case-insensitive), list of paths is expanded the same way. Non-CSV/TSV files in a directory are ignored or surface a fail-closed report depending on the rule.",
+      "files": [],
+      "expectations": [
+        "Single file is accepted directly",
+        "Directory is recursively scanned for .csv and .tsv files",
+        "Mixed input lists are normalized to a flat file set",
+        "Case-insensitive extension matching is mentioned",
+        "The response references the fail-closed posture for unsupported file types"
+      ],
+      "assertions": []
     }
   ]
 }
