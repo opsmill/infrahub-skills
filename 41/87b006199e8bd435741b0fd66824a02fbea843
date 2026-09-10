@@ -1,0 +1,377 @@
+.claude-plugin/plugin.json
+  s_b7542a300d39d2::t_677f1d84a72790 23-26
+.github/.release-manifest.json
+  s_b7542a300d39d2::t_ba836f6a33b516 15-16
+.github/file-filters.yml
+  s_b7542a300d39d2::t_0de76ab9b53390 17-20,32-41,45-55
+.github/workflows/ci.yml
+  s_b7542a300d39d2::t_80954e7efccbbf 22,24,56-114
+AGENTS.md
+  s_b7542a300d39d2::t_e7d0c168334b96 55,62-80,88-89
+README.md
+  s_b7542a300d39d2::t_f164ed3dbb8ad1 52,116,224-225
+dev/guides/adding-a-rule.md
+  s_b7542a300d39d2::t_f421373802d8e0 5,24,50-80,107-137,141-163,167-168,211-224,226-235,238-253,255-264,267-272,274,289,295-297,311-315,318-321,324-328
+dev/guides/running-evals.md
+  s_b7542a300d39d2::t_0fba229e57a7bd 85-90,94-107,109-114,117-130,133-138,140-142,144-155,158-163,165-170,195-200,202-207,209-212,214-219,231-242
+dev/knowledges/architecture.md
+  s_b7542a300d39d2::t_29870232c84dab 32,47,49-52,55-59,160-167
+dev/knowledges/skill-writing-guide.md
+  s_b7542a300d39d2::t_d01beae9484452 111-115,121-153,180-199
+docs/docs/readme.mdx
+  s_b7542a300d39d2::t_c3c70edc6fada2 64-65
+docs/docs/skills-reference/auditing-repo.mdx
+  s_b7542a300d39d2::t_a69af61c0ddc08 59
+docs/docs/skills-reference/managing-generators.mdx
+  s_b7542a300d39d2::t_cadda8412c305e 23-24,38
+docs/docs/skills-reference/managing-transforms.mdx
+  s_b7542a300d39d2::t_51194a416ffc35 42,57
+eval.yaml
+  s_b7542a300d39d2::t_17e9f4baf14eae 392-445,991-1082,1261-1409,1588-1593,1600-1602,1607-1609,1692-1820,1854-1856,1866-1868,2090-2314,3210,3213-3214,3216-3218,3220,3222-3228,3230-3267,3270,3273-3277,3279-3283,3285,3287-3307,3309,3312-3484,4126,4131-4132,4134-4137,4139-4142,4144-4150,4152-4155,4157-4165,4167,4172-4173,4175-4178,4180-4183,4185-4188,4190-4193,4195-4201,4203-4206,4208-4222,4224,4229-4230,4232-4237,4341,4344-4346,4348-4350,4352-4354,4358-4359,4362-4368,4371-4425,4430,4433-4442,4445-4507,5432-5516,5943-5946,5955-5956,5974-5981,6195-7589
+graders/auditing-repo/check_audit_read_only.py
+  s_b7542a300d39d2::t_22858c693d7540 1-47
+graders/auditing-repo/check_practices_watch_dependencies.py
+  s_b7542a300d39d2::t_1fb709e5450842 1-34
+graders/auditing-repo/check_yagni_duplicate_shape_paired_rel.py
+  s_b7542a300d39d2::t_195bae20e1137f 1-32
+graders/auditing-repo/check_yagni_missing_inverse.py
+  s_b7542a300d39d2::t_821bb896668057 1-31
+graders/auditing-repo/check_yagni_uniqueness_scope.py
+  s_b7542a300d39d2::t_762eafea48faf1 1-43
+graders/auditing-repo/lib.py
+  s_b7542a300d39d2::t_c70d6c5a8beb1a 46-47,74,76-79,81,85-91,96-97,113-193,315-318,320-1008,1011-1035,1055-1204,1216-1300,1303-1307,1312,1316-1331,1335,1340,1345-1349,1373-1377,1382-1388,1390,1396,1406-1408,1413-1414
+graders/common/check_dry_run_command.py
+  s_b7542a300d39d2::t_ca706b9adac07b 1-22
+graders/common/check_generator_dry_run.py
+  s_b7542a300d39d2::t_1a1427b1735372 1-26
+graders/common/check_preflight_write.py
+  s_b7542a300d39d2::t_1d88bdec1ad554 1-21
+graders/common/cli_tree.py
+  s_b7542a300d39d2::t_ab2eed70e0e31e 1-201
+graders/common/lib.py
+  s_b7542a300d39d2::t_a99ca3cbaf03a9 19,63-264,269-354,357-361,365-370,380
+graders/converting-netbox-device-types/check_coverage_report.py
+  s_b7542a300d39d2::t_a73c0419864df9 1-30
+graders/converting-netbox-device-types/check_fallback_sources.py
+  s_b7542a300d39d2::t_8f237564eb90bd 1-107
+graders/converting-netbox-device-types/check_full_conversion.py
+  s_b7542a300d39d2::t_76d6a7290bef89 1-39
+graders/converting-netbox-device-types/check_load_order.py
+  s_b7542a300d39d2::t_5b7122233169a7 1-30
+graders/converting-netbox-device-types/check_module_types.py
+  s_b7542a300d39d2::t_296e69f02bf8d8 1-34
+graders/converting-netbox-device-types/check_schema_prerequisite.py
+  s_b7542a300d39d2::t_db43f66d0ac346 1-30
+graders/converting-netbox-device-types/check_shared_relationship.py
+  s_b7542a300d39d2::t_930bf5316b078a 1-97
+graders/converting-netbox-device-types/check_template_names.py
+  s_b7542a300d39d2::t_07add6a17e211e 1-30
+graders/converting-netbox-device-types/check_template_objects.py
+  s_b7542a300d39d2::t_c13d4af4be04c9 1-30
+graders/converting-netbox-device-types/lib.py
+  s_b7542a300d39d2::t_df1b96a2c811a5 1-713
+graders/importing-data/check_create_branch_first.py
+  s_b7542a300d39d2::t_23b4757d1cff29 1-30
+graders/importing-data/check_file_folder_list_input.py
+  s_b7542a300d39d2::t_f342cbbc124b79 1-30
+graders/importing-data/check_introspect_first.py
+  s_b7542a300d39d2::t_1b7683a31f1a6a 1-30
+graders/importing-data/check_profile_sample.py
+  s_b7542a300d39d2::t_99ea8d5c8ff76a 1-30
+graders/importing-data/check_self_check_rules.py
+  s_b7542a300d39d2::t_42fd360d786a0d 1-30
+graders/importing-data/check_up_front_interview.py
+  s_b7542a300d39d2::t_c46bf0089a67fa 1-30
+graders/importing-data/check_validate_error_mapping.py
+  s_b7542a300d39d2::t_b8f17c0cd8a088 1-30
+graders/importing-data/lib.py
+  s_b7542a300d39d2::t_19a327e068d25e 1129-1424,1444-1450
+graders/managing-checks/check_error_surfaces.py
+  s_b7542a300d39d2::t_5211b765983f9e 1-25
+graders/managing-checks/check_shared_module.py
+  s_b7542a300d39d2::t_45d5e9d8b52783 1-37
+graders/managing-checks/lib.py
+  s_b7542a300d39d2::t_0b9fdd71afa28e 15,62-597,711-718,733-745,747-753,760,920-922
+graders/managing-generators/check_watch_dependencies.py
+  s_b7542a300d39d2::t_727cae5cdc4cc4 1-24
+graders/managing-generators/lib.py
+  s_b7542a300d39d2::t_94db9c972249aa 3,22-27,54-55,688,750-961,985-991,1005-1009,1016-1018,1021-1022,1032
+graders/managing-schemas/check_cardinality_sharing.py
+  s_b7542a300d39d2::t_24b666cdc001c6 1-147
+graders/managing-schemas/check_generic_inheritance.py
+  s_b7542a300d39d2::t_3f17c7d099ccea 1-23
+graders/managing-schemas/check_generic_membership.py
+  s_b7542a300d39d2::t_fb592e506c4474 1-37
+graders/managing-schemas/check_reuse_kind_availability.py
+  s_b7542a300d39d2::t_0efb1686745802 1-23
+graders/managing-schemas/check_reuse_per_generic.py
+  s_b7542a300d39d2::t_fd812e2689a4a6 1-27
+graders/managing-schemas/check_uniqueness_constraints.py
+  s_b7542a300d39d2::t_460b78404ebbf3 1-37
+graders/managing-schemas/check_uniqueness_scope.py
+  s_b7542a300d39d2::t_76649e85738cc4 1-30
+graders/managing-schemas/lib.py
+  s_b7542a300d39d2::t_b3582adf048fca 24-26,1062-2386,2388-2392,2394-2397,2432-2440
+graders/managing-transforms/check_watch_dependencies.py
+  s_b7542a300d39d2::t_aa92beacc52995 1-26
+graders/managing-transforms/lib.py
+  s_b7542a300d39d2::t_40f4de7aa0a9b6 8,19-21,41-42,65-88,362-376,378-382,402-408,415-416,430-674,1172-1179,1203-1204,1212,1220-1226
+graders/reporting-skill-gaps/check_handoff_to_reporting.py
+  s_b7542a300d39d2::t_857f6bdbeaadf9 16-17
+graders/reporting-skill-gaps/lib.py
+  s_b7542a300d39d2::t_6c17976cb6e4aa 755-761,763-766,768-770,1019-1100,1694-1695
+pyproject.toml
+  s_b7542a300d39d2::t_e6bde2dfb2f782 11,15-42,68-75
+scripts/check-cli-invocations.py
+  s_b7542a300d39d2::t_bd6fcee45b7426 1-142
+scripts/run_evals.py
+  s_b7542a300d39d2::t_8630ede21efb7d 962,973,985
+skills/infrahub-auditing-repo/SKILL.md
+  s_b7542a300d39d2::t_b653e7391eaf22 13,30-45,79-92,98,106,131-133,209-210
+skills/infrahub-auditing-repo/audit-procedure.md
+  s_b7542a300d39d2::t_069406380da837 7-25,356-378
+skills/infrahub-auditing-repo/examples.md
+  s_b7542a300d39d2::t_815a75faf2f325 3-88,101-102,118,301,304-305,309-320
+skills/infrahub-auditing-repo/rules/_sections.md
+  s_b7542a300d39d2::t_061322b7417d1e 8,15
+skills/infrahub-auditing-repo/rules/audit-is-read-only.md
+  s_b7542a300d39d2::t_ff6151163c2a28 1-164
+skills/infrahub-auditing-repo/rules/practices-watch-dependencies.md
+  s_b7542a300d39d2::t_639caec071d171 1-202
+skills/infrahub-auditing-repo/rules/structure-infrahub-yml.md
+  s_b7542a300d39d2::t_98c13ae4a027e4 47-52,54-56
+skills/infrahub-auditing-repo/rules/yagni-duplicate-shape-not-extracted-to-generic.md
+  s_b7542a300d39d2::t_55d988aeaabe77 45-80,85-87
+skills/infrahub-auditing-repo/rules/yagni-generator-that-should-be-template.md
+  s_b7542a300d39d2::t_6ceb3a291f4b10 28-32
+skills/infrahub-auditing-repo/rules/yagni-missing-inverse-forces-python-filter.md
+  s_b7542a300d39d2::t_5feefa1c6b64d0 75-106
+skills/infrahub-auditing-repo/rules/yagni-python-transform-that-could-be-jinja2.md
+  s_b7542a300d39d2::t_b3fa504e4bd112 28-40
+skills/infrahub-auditing-repo/rules/yagni-python-validator-vs-schema-constraint.md
+  s_b7542a300d39d2::t_b573b0bd51251b 45-70,76-81
+skills/infrahub-auditing-repo/rules/yagni-reuse-existing-marketplace-schema.md
+  s_b7542a300d39d2::t_73b95da448ffd8 77-106,131-133
+skills/infrahub-common/SKILL.md
+  s_b7542a300d39d2::t_ff6bae4a0b831f 42-44
+skills/infrahub-common/graphql-queries.md
+  s_b7542a300d39d2::t_62be3e48c43d2a 7-17,250-313
+skills/infrahub-common/infrahub-yml-reference.md
+  s_b7542a300d39d2::t_d0211da80d3bdc 44-46,54-56,80-82,146,156,182,201-350,356-358,386-400,410-416
+skills/infrahub-common/rules/connectivity-server-check.md
+  s_b7542a300d39d2::t_ebe7a99f0048db 26-27,30-33,94-95,98-103,106-189,193,195-200,203-212,220,236-240,250-273
+skills/infrahub-common/rules/deployment-gql-dry-run.md
+  s_b7542a300d39d2::t_66b95bfd906cb7 37-56,58-62,66-69,72-97,127-133
+skills/infrahub-common/rules/deployment-partial-sync-recovery.md
+  s_b7542a300d39d2::t_69c149d0b62c6b 51-59,92-98
+skills/infrahub-common/rules/workflow-branch-for-crud.md
+  s_b7542a300d39d2::t_b530763f8809cb 14
+skills/infrahub-converting-netbox-device-types/SKILL.md
+  s_b7542a300d39d2::t_ad52c4e380328d 1-360
+skills/infrahub-converting-netbox-device-types/concepts.md
+  s_b7542a300d39d2::t_37f0a35a6638bd 1-211
+skills/infrahub-converting-netbox-device-types/examples.md
+  s_b7542a300d39d2::t_2267baae225fd6 1-297
+skills/infrahub-converting-netbox-device-types/extending-your-schema.md
+  s_b7542a300d39d2::t_484b9121e064ee 1-635
+skills/infrahub-converting-netbox-device-types/generators-module-ports.md
+  s_b7542a300d39d2::t_f9a9847fc47fd0 1-449
+skills/infrahub-converting-netbox-device-types/reference.md
+  s_b7542a300d39d2::t_26f80ce5df3ce3 1-248
+skills/infrahub-converting-netbox-device-types/rules/_sections.md
+  s_b7542a300d39d2::t_a6636d727d912d 1-23
+skills/infrahub-converting-netbox-device-types/rules/coverage-report-unmapped.md
+  s_b7542a300d39d2::t_f3e542211a0aec 1-93
+skills/infrahub-converting-netbox-device-types/rules/format-template-objects.md
+  s_b7542a300d39d2::t_c7deae53c98b3d 1-89
+skills/infrahub-converting-netbox-device-types/rules/mapping-fallback-sources.md
+  s_b7542a300d39d2::t_6c9ed1b666a0cd 1-89
+skills/infrahub-converting-netbox-device-types/rules/mapping-profile-driven.md
+  s_b7542a300d39d2::t_87dcf4851f80af 1-96
+skills/infrahub-converting-netbox-device-types/rules/mapping-shared-relationships.md
+  s_b7542a300d39d2::t_5e5d193d10070b 1-167
+skills/infrahub-converting-netbox-device-types/rules/naming-template-names.md
+  s_b7542a300d39d2::t_0d6f368541a9b3 1-74
+skills/infrahub-converting-netbox-device-types/rules/output-load-order.md
+  s_b7542a300d39d2::t_d17ab2ee40bb26 1-75
+skills/infrahub-converting-netbox-device-types/rules/workflow-schema-prerequisites.md
+  s_b7542a300d39d2::t_e3c3b4297851bf 1-118
+skills/infrahub-converting-netbox-device-types/scripts/mappings/_template.yml
+  s_b7542a300d39d2::t_0382d8a08b61e9 1-79
+skills/infrahub-converting-netbox-device-types/scripts/mappings/schema-library-modules.yml
+  s_b7542a300d39d2::t_9e46796364f84e 1-138
+skills/infrahub-converting-netbox-device-types/scripts/mappings/schema-library.yml
+  s_b7542a300d39d2::t_a94958507fd489 1-81
+skills/infrahub-converting-netbox-device-types/scripts/materialize_module_ports.gql
+  s_b7542a300d39d2::t_0342aacd4539c2 1-121
+skills/infrahub-converting-netbox-device-types/scripts/materialize_module_ports.py
+  s_b7542a300d39d2::t_386652fe0fcd91 1-740
+skills/infrahub-converting-netbox-device-types/scripts/netbox_to_infrahub_templates.py
+  s_b7542a300d39d2::t_8361cdaf4ce77b 1-1550
+skills/infrahub-importing-data/SKILL.md
+  s_b7542a300d39d2::t_276b09ed26f536 7,80-84
+skills/infrahub-managing-checks/SKILL.md
+  s_b7542a300d39d2::t_6245e7872de788 58,60,168-176
+skills/infrahub-managing-checks/rules/_sections.md
+  s_b7542a300d39d2::t_b90c0c3977a10a 17-20,27-28,32-36
+skills/infrahub-managing-checks/rules/api-error-surfaces.md
+  s_b7542a300d39d2::t_ea5d4d25e5905e 1-166
+skills/infrahub-managing-checks/rules/patterns-common.md
+  s_b7542a300d39d2::t_306a16656865be 92-102
+skills/infrahub-managing-checks/rules/patterns-shared-module.md
+  s_b7542a300d39d2::t_13a608b5f493ff 1-217
+skills/infrahub-managing-generators/SKILL.md
+  s_b7542a300d39d2::t_f0cd05dd63063a 71,159-167
+skills/infrahub-managing-generators/examples.md
+  s_b7542a300d39d2::t_295dca3600525d 175-179,356-359,400-402
+skills/infrahub-managing-generators/reference.md
+  s_b7542a300d39d2::t_6392e75a8f7dd9 175-176
+skills/infrahub-managing-generators/rules/_sections.md
+  s_b7542a300d39d2::t_57231e59d85201 26-28
+skills/infrahub-managing-generators/rules/patterns-common.md
+  s_b7542a300d39d2::t_125c4c7af73d8d 108-131
+skills/infrahub-managing-generators/rules/registration-config.md
+  s_b7542a300d39d2::t_dfb55e7e810344 52-57
+skills/infrahub-managing-generators/rules/registration-watch-dependencies.md
+  s_b7542a300d39d2::t_8f5c77eb5e824f 1-235
+skills/infrahub-managing-generators/rules/testing-integration.md
+  s_b7542a300d39d2::t_69fe6a749bd694 29-49
+skills/infrahub-managing-objects/rules/value-profiles-templates.md
+  s_b7542a300d39d2::t_fae4273fd67e28 76-82
+skills/infrahub-managing-schemas/SKILL.md
+  s_b7542a300d39d2::t_43007da4d4b940 56,58,62-63,122,125,153-161,168-178,182-188,200-203
+skills/infrahub-managing-schemas/examples.md
+  s_b7542a300d39d2::t_8b5ccaae78760f 13-14,223-227,523-856,1116-1121
+skills/infrahub-managing-schemas/rules/_sections.md
+  s_b7542a300d39d2::t_dfa00aa50c3f90 19-22,30-34,42-44,59-67,81-99
+skills/infrahub-managing-schemas/rules/attribute-defaults-and-types.md
+  s_b7542a300d39d2::t_685ee0fcbc5cec 4,92-191
+skills/infrahub-managing-schemas/rules/display-human-friendly-id.md
+  s_b7542a300d39d2::t_f91b5517358e1f 4,79-131
+skills/infrahub-managing-schemas/rules/display-menu-placement.md
+  s_b7542a300d39d2::t_2c062cd42dfb87 110-115
+skills/infrahub-managing-schemas/rules/display-order-by-scope.md
+  s_b7542a300d39d2::t_b580ac34d1c1e3 1-146
+skills/infrahub-managing-schemas/rules/generic-membership-is-a-published-interface.md
+  s_b7542a300d39d2::t_b7319e0c1b3fc0 1-164
+skills/infrahub-managing-schemas/rules/hierarchy-setup.md
+  s_b7542a300d39d2::t_c99869a5e66a40 49-56
+skills/infrahub-managing-schemas/rules/relationship-cardinality-consequences.md
+  s_b7542a300d39d2::t_1a214ef3540bf6 1-224
+skills/infrahub-managing-schemas/rules/relationship-defaults.md
+  s_b7542a300d39d2::t_e0f37d0828aa43 15-21
+skills/infrahub-managing-schemas/rules/relationship-peer-kind.md
+  s_b7542a300d39d2::t_c10d5bfac9be13 4,49-128
+skills/infrahub-managing-schemas/rules/reuse-evaluate-per-generic.md
+  s_b7542a300d39d2::t_3c76ae156184c9 1-138
+skills/infrahub-managing-schemas/rules/reuse-verify-kind-availability.md
+  s_b7542a300d39d2::t_22839f41526ca3 1-175
+skills/infrahub-managing-schemas/rules/uniqueness-constraints.md
+  s_b7542a300d39d2::t_60ac195d42b732 2-4,7,9,12-14,18-34,40,48,51,53-215,217-246,250,253,257-266,269-304
+skills/infrahub-managing-schemas/rules/validation-common-errors.md
+  s_b7542a300d39d2::t_2cbbd0ef27fb3e 16-17,19,101-139,169-224,245-248
+skills/infrahub-managing-transforms/SKILL.md
+  s_b7542a300d39d2::t_d86616f98484d9 72-73,153-161
+skills/infrahub-managing-transforms/examples.md
+  s_b7542a300d39d2::t_d3837f6d5c68a4 182-188,290-293,397-400
+skills/infrahub-managing-transforms/reference.md
+  s_b7542a300d39d2::t_27f016dda975f3 198-202
+skills/infrahub-managing-transforms/rules/_sections.md
+  s_b7542a300d39d2::t_469b1eae3e9969 22-26
+skills/infrahub-managing-transforms/rules/artifacts-watch-dependencies.md
+  s_b7542a300d39d2::t_5e51488127abc0 1-256
+skills/infrahub-managing-transforms/rules/hybrid-python-jinja2.md
+  s_b7542a300d39d2::t_7445aac4453f65 83-103
+skills/infrahub-managing-transforms/rules/patterns-common.md
+  s_b7542a300d39d2::t_b0f7a1c1413104 92-115
+skills/infrahub-managing-transforms/rules/python-transform.md
+  s_b7542a300d39d2::t_c154fce53b95b7 78-83
+skills/infrahub-managing-transforms/rules/queries-union-fragments.md
+  s_b7542a300d39d2::t_235bab1489e360 104-106,108-112
+skills/infrahub-managing-transforms/rules/testing-commands.md
+  s_b7542a300d39d2::t_726e2296ede458 75
+skills/infrahub-managing-transforms/rules/testing-resource-framework.md
+  s_b7542a300d39d2::t_fa2197ae9fb2c9 208-209
+skills/infrahub-managing-transforms/rules/types-overview.md
+  s_b7542a300d39d2::t_0cfb0d5be6fe1d 41-44
+skills/infrahub-reporting-issues/SKILL.md
+  s_b7542a300d39d2::t_d0197c0573a079 258-259
+skills/infrahub-reporting-issues/rules/environment-info-sanitization.md
+  s_b7542a300d39d2::t_9b47e57c34d858 117-119
+skills/infrahub-reporting-issues/templates/bug.md
+  s_b7542a300d39d2::t_63bd8bf9676e93 24-25
+skills/infrahub-reporting-skill-gaps/SKILL.md
+  s_b7542a300d39d2::t_89101091c0769a 156-182
+skills/infrahub-reporting-skill-gaps/reference.md
+  s_b7542a300d39d2::t_f0a570f361d5d1 14,21-30,34-37,39-50,52-54,56-63,66-72
+skills/infrahub-reporting-skill-gaps/rules/evidence-detection-ladder.md
+  s_b7542a300d39d2::t_15dd4c0cfc192b 18-25
+skills/infrahub-reporting-skill-gaps/rules/workflow-bug-vs-feature.md
+  s_b7542a300d39d2::t_b719c7f9a5346c 32,37
+skills/infrahub-reporting-skill-gaps/templates/skill-friction.md
+  s_b7542a300d39d2::t_68ad168fd41832 71-95
+tasks.py
+  s_b7542a300d39d2::t_9bfa2d66a324d0 12,15-21
+tests/graders/test_auditing_repo_conduct.py
+  s_b7542a300d39d2::t_fb676329af931f 1-185
+tests/graders/test_cardinality_blast_radius.py
+  s_b7542a300d39d2::t_6300e6b6981281 1-164
+tests/graders/test_checks_error_surfaces.py
+  s_b7542a300d39d2::t_c033f0ab66ca5e 1-230
+tests/graders/test_common_lib.py
+  s_b7542a300d39d2::t_22b517ff3018a0 1-377
+tests/graders/test_generators_lib.py
+  s_b7542a300d39d2::t_1f0d9b21e3f80f 3
+tests/graders/test_generic_inheritance.py
+  s_b7542a300d39d2::t_20a8b21c83d712 1-258
+tests/graders/test_netbox_converter_lib.py
+  s_b7542a300d39d2::t_a5967b05aadbfc 1-776
+tests/graders/test_reporting_skill_gaps_lib.py
+  s_b7542a300d39d2::t_f651a1a7a462cd 1-233
+tests/graders/test_reuse_and_membership.py
+  s_b7542a300d39d2::t_f5b4473bed679f 1-244
+tests/graders/test_transforms_lib.py
+  s_b7542a300d39d2::t_c46439f76a30a4 435,437,442-476
+tests/graders/test_uniqueness_scope.py
+  s_b7542a300d39d2::t_fbe4dc4271d158 1-328
+tests/scripts/test_materialize_module_ports.py
+  s_b7542a300d39d2::t_436b515b039611 1-863
+tests/scripts/test_netbox_to_infrahub_templates.py
+  s_b7542a300d39d2::t_eb594b781f215a 1-1265
+uv.lock
+  s_b7542a300d39d2::t_e9385b9fd26f55 5-185,194,198-202,209,213-226,237-254,264-453,518-542,558-873
+evaluations/infrahub-auditing-repo.json
+  s_b7542a300d39d2::t_afbf706adc34f0 6-45,75-122,152,182,213,248,278,308,338,368,398,438,473,481,489,497,505,529-600
+evaluations/infrahub-common.json
+  s_b7542a300d39d2::t_b3d3cc0e6c2243 1-76
+evaluations/infrahub-converting-netbox-device-types.json
+  s_b7542a300d39d2::t_562c40ba9ffaa4 1-278
+evaluations/infrahub-importing-data.json
+  s_b7542a300d39d2::t_1cd3c24b96f5e8 331-405,419-420,433-434,446-447,460-461,475-476,490-491
+evaluations/infrahub-managing-checks.json
+  s_b7542a300d39d2::t_7d96a0195caa1a 118-181
+evaluations/infrahub-managing-generators.json
+  s_b7542a300d39d2::t_ea92e67e5298e1 101,106,149-187
+evaluations/infrahub-managing-schemas.json
+  s_b7542a300d39d2::t_5346f2d6e459c2 176-211,241,273,314,348,388,413,448,470,500-730
+evaluations/infrahub-managing-transforms.json
+  s_b7542a300d39d2::t_3e32cb0989caaf 53-100,105,112,121
+evaluations/infrahub-reporting-skill-gaps.json
+  s_b7542a300d39d2::t_74f2931ba7afe2 198,205-206,227-234
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "4187b006199e8bd435741b0fd66824a02fbea843",
+  "prompts": {},
+  "sessions": {
+    "s_b7542a300d39d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ffe84781-5146-45a1-b10f-3aa9bb09bb64",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
