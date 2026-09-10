@@ -854,6 +854,187 @@ def check_audit_declares_tree_untouched(raw: str) -> tuple[bool, str]:
     return False, f"tree_modified is {value!r}, expected false"
 
 
+# Named keyword groups a finding's prose must hit. Colon-encoded check names
+# cannot carry a regex, so eval.yaml names a group and the patterns live here.
+_REPLACEMENT_KEYWORD_GROUPS: dict[str, list[re.Pattern[str]]] = {
+    # yagni-duplicate-shape-not-extracted-to-generic must disclose that a
+    # relationship hoisted onto a generic has its peer frozen there, and must
+    # leave a precisely paired relationship on the concrete kinds.
+    "paired-relationship-stays-put": [
+        re.compile(r"\bpeer\b[^.\n]{0,80}\b(?:frozen|fixed|locked|immutable|same peer)\b", re.IGNORECASE),
+        re.compile(r"\b(?:same|identical|fixed|frozen)\s+peer\b", re.IGNORECASE),
+        # "leave/keep the relationship" only counts when the destination is
+        # named and it is the concrete kind. Without the destination,
+        # "keep the device relationships there too" -- meaning on the
+        # generic -- matched, which is the antipattern.
+        re.compile(
+            r"\b(?:leave|keep|retain)\b[^.\n]{0,80}\brelationships?\b[^.\n]{0,60}"
+            r"\bon\b[^.\n]{0,30}\b(?:concrete|node|each|per-kind|implementer|"
+            r"individual|specific)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(r"\b(?:do not|don't|not|never)\b[^.\n]{0,40}\b(?:hoist|move|extract|lift)\b[^.\n]{0,60}\brelationships?\b", re.IGNORECASE),
+        re.compile(r"\brelationships?\b[^.\n]{0,60}\b(?:stays?|remains?)\b[^.\n]{0,60}\b(?:concrete|node|kind)", re.IGNORECASE),
+        re.compile(r"\bpairing\b[^.\n]{0,100}\b(?:inexpressible|not expressible|unenforced|check)\b", re.IGNORECASE),
+    ],
+}
+
+# Words that turn a recommendation into a warning: "do not hoist the device
+# relationship", "hoisting it would freeze the peer". A direct negator
+# governs the rest of its sentence, so it still applies across a comma.
+_DIRECT_NEGATION = re.compile(
+    r"\b(?:do not|don't|never|not|avoid|resist|"
+    r"would|could|cannot|can't|must not|should not|shouldn't|if you)\b",
+    re.IGNORECASE,
+)
+
+# Cues that name an alternative rather than negate. "Instead of X, do Y"
+# negates X and *recommends* Y, so unlike a direct negator this one governs
+# only its own clause. Treating it as sentence-wide let
+# "Instead of duplicating the fields, move the relationship onto the
+# generic" read as a warning against the move it was urging.
+_ALTERNATIVE_CUE = re.compile(r"\b(?:instead of|rather than)\b", re.IGNORECASE)
+
+# The destination is "the generic", and a finding routinely names it: "onto
+# the DcimPort generic", "onto the new shared generic". Matching only the
+# bare word missed every recommendation that named the kind it proposed.
+# The window is two words so it cannot reach across a contrast —
+# "on the concrete kinds, not the generic" stays out.
+_GENERIC_DESTINATION = r"(?:(?:the|a|an)\s+)?(?:[\w-]+\s+){0,2}generics?\b"
+
+# A positive match is not enough on its own. A finding can disclose the
+# frozen-peer cost in one sentence and still recommend hoisting the
+# relationship in the next, which is the recommendation the rule forbids.
+_REPLACEMENT_DISQUALIFIERS: dict[str, list[re.Pattern[str]]] = {
+    "paired-relationship-stays-put": [
+        # The verb stems are matched with a trailing `\w*`, not `\b`: bare
+        # stems let every inflected form of the same recommendation through.
+        # "Moving the device relationship onto the DcimPort generic" and
+        # "The audit moves it onto the generic" are the same antipattern as
+        # "Move it onto the generic".
+        re.compile(
+            r"\b(?:hoist|mov|lift|extract|pull|put|plac|keep|leav)\w*"
+            r"[^.\n]{0,60}\brelationships?\b[^.\n]{0,40}"
+            r"\b(?:on|onto|to|into|up to)\s+" + _GENERIC_DESTINATION,
+            re.IGNORECASE,
+        ),
+        # The nominalised form names no verb at all: "a generic holding the
+        # six attributes plus the device relationship".
+        re.compile(
+            r"\bgeneric\b[^.\n]{0,60}\b(?:with|including|and|plus)\b[^.\n]{0,40}"
+            r"\brelationships?\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\brelationships?\b[^.\n]{0,40}\b(?:there|on it)\b[^.\n]{0,20}\btoo\b",
+            re.IGNORECASE,
+        ),
+        # The trailing appositive: "pull the shared shape up to a generic,
+        # relationships included". Its own clause carries no destination, so
+        # it needs a pattern that does not depend on being near `generic`.
+        re.compile(
+            r"\brelationships?\b[^.\n]{0,20}\bincluded\b",
+            re.IGNORECASE,
+        ),
+    ],
+}
+
+
+# A clause that gives the relationship a concrete-kind home is the correct
+# recommendation, however the generic is named earlier in the same clause.
+# Without this, the eval's own expected replacement -- "Extract a `DcimPort`
+# generic with the six attributes and leave the `device` relationship on the
+# concrete kinds" -- was graded as the antipattern, because a disqualifier
+# bound `generic` to `relationship` through the coordinator and never looked
+# at where the relationship was actually being put.
+_CONCRETE_DESTINATION = re.compile(
+    r"\brelationships?\b[^.\n]{0,60}\b(?:on|onto|to|with)\b[^.\n]{0,30}"
+    r"\b(?:concrete|node|each|every|per-kind|implementer|individual|specific|"
+    r"sibling)\b",
+    re.IGNORECASE,
+)
+
+
+# A disqualifier has to match inside one clause. Spanning a comma or a
+# subordinator paired the verb of a correct recommendation with a `generic`
+# mentioned in the explanation after it: "Leave the relationship on each
+# concrete kind, because a relationship hoisted onto a generic has its peer
+# frozen there" is the right answer, not a hoist.
+_CLAUSE_BOUNDARY = re.compile(
+    r",\s*|\s+(?:because|since|as|so|whereas|while|which|that)\s+"
+)
+
+
+def _clauses(sentence: str) -> list[tuple[int, str]]:
+    """Each clause of a sentence with its offset in that sentence."""
+    out: list[tuple[int, str]] = []
+    start = 0
+    for boundary in _CLAUSE_BOUNDARY.finditer(sentence):
+        out.append((start, sentence[start:boundary.start()]))
+        start = boundary.end()
+    out.append((start, sentence[start:]))
+    return out
+
+
+def _recommends(sentence: str, hit_end: int) -> bool:
+    """True when the hoist matched in this sentence is urged, not ruled out.
+
+    The cue has to govern the hoist. A direct negator does, wherever it sits
+    in the sentence: "do not, under any circumstances, move it onto the
+    generic". An alternative cue governs only its own clause, because its
+    object is the thing being rejected and what follows the comma is the
+    recommendation: "instead of duplicating the fields, move it onto the
+    generic" recommends the move.
+    """
+    before = sentence[:hit_end]
+    clause_start = before.rfind(",")
+    own_clause = before[clause_start + 1:]
+    if _DIRECT_NEGATION.search(own_clause) or _ALTERNATIVE_CUE.search(own_clause):
+        return False
+    return not _DIRECT_NEGATION.search(before[: clause_start + 1])
+
+
+def check_yagni_finding_replacement_mentions(
+    findings: list[dict], rule: str, group: str
+) -> tuple[bool, str]:
+    """Assert the named rule's finding prose discloses a required cost.
+
+    Presence, severity and ladder_step all pass on a finding that says only
+    "extract a generic". The rule requires the finding to name what the
+    extraction costs, so this reads the finding's own text.
+    """
+    patterns = _REPLACEMENT_KEYWORD_GROUPS.get(group)
+    if patterns is None:
+        return False, f"unknown keyword group: {group}"
+    f = _find(findings, rule)
+    if f is None:
+        return False, f"{rule} missing — cannot check its prose"
+    text = " ".join(
+        str(f.get(field, "")) for field in ("replacement", "description", "message", "detail", "recommendation")
+    )
+    for sentence in re.split(r"(?<=[.;:])\s+|\n", text):
+        for offset, clause in _clauses(sentence):
+            if _CONCRETE_DESTINATION.search(clause):
+                continue  # this clause puts the relationship on the kinds
+            for bad in _REPLACEMENT_DISQUALIFIERS.get(group, []):
+                hit = bad.search(clause)
+                if not hit:
+                    continue
+                # Negation is read over the whole sentence: a direct
+                # negator before the clause still governs the hoist.
+                if not _recommends(sentence, offset + hit.end()):
+                    continue  # named in order to rule it out
+                return False, (
+                    f"{rule} replacement recommends hoisting the relationship "
+                    "onto the generic, which is what the carve-out forbids: "
+                    f"{sentence!r}"
+                )
+    for pat in patterns:
+        if pat.search(text):
+            return True, f"{rule} discloses {group} (matched {pat.pattern!r})"
+    return False, f"{rule} prose does not disclose {group}"
+
+
 def check_yagni_no_finding_on_file(
     findings: list[dict], substring: str
 ) -> tuple[bool, str]:
@@ -1043,6 +1224,7 @@ _CHECKS: dict[str, tuple[Any, list[str]]] = {
     "yagni-finding-ladder-step": (check_yagni_finding_ladder_step, ["str", "int"]),
     "yagni-finding-file": (check_yagni_finding_file, ["str", "str"]),
     "yagni-finding-file-excludes": (check_yagni_no_finding_on_file, ["str"]),
+    "yagni-finding-discloses": (check_yagni_finding_replacement_mentions, ["str", "str"]),
     "yagni-findings-sorted": (check_yagni_findings_sorted_by_ladder, []),
     "yagni-bootstrap-carveout": (check_yagni_finding_carves_out_bootstrap, []),
     "yagni-no-above-medium": (check_yagni_no_finding_above_medium, []),

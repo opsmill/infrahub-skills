@@ -562,6 +562,42 @@
           "check": "The output reports tree_modified false"
         }
       ]
+    },
+    {
+      "id": 21,
+      "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this schema (schemas/ports.yml) \u2014 three port nodes each\nrepeating the same six attributes, and each with a `device`\nrelationship pointing at a different peer:\n\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: OpticalPort\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: serial, kind: Text}\n      - {name: connector, kind: Text}\n      - {name: vendor, kind: Text}\n      - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}\n      - {name: notes, kind: Text, optional: true}\n    relationships:\n      - name: device\n        peer: DcimOpticalDevice\n        cardinality: one\n        identifier: opticalport__device\n  - name: CopperPort\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: serial, kind: Text}\n      - {name: connector, kind: Text}\n      - {name: vendor, kind: Text}\n      - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}\n      - {name: notes, kind: Text, optional: true}\n    relationships:\n      - name: device\n        peer: DcimCopperDevice\n        cardinality: one\n        identifier: copperport__device\n  - name: VirtualPort\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: serial, kind: Text}\n      - {name: connector, kind: Text}\n      - {name: vendor, kind: Text}\n      - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}\n      - {name: notes, kind: Text, optional: true}\n    relationships:\n      - name: device\n        peer: DcimVirtualDevice\n        cardinality: one\n        identifier: virtualport__device\n```\n\nEach port kind attaches to exactly one device kind, and the schema\nis currently enforcing that pairing.\n\nSave ONLY the JSON findings to: output.json",
+      "expected_output": "JSON listing one yagni-duplicate-shape-not-extracted-to-generic finding with severity MEDIUM and ladder_step 2, covering the six duplicated attributes. Its replacement must leave the `device` relationship on the concrete kinds and say why: a relationship hoisted onto a generic has its peer frozen there, so the per-kind pairing would stop being expressible in the schema.",
+      "files": [],
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-duplicate-shape-not-extracted-to-generic finding",
+        "That finding has severity MEDIUM and ladder_step 2",
+        "The replacement hoists the duplicated attributes but not the `device` relationship",
+        "The finding states that a relationship on a generic has its peer fixed for every implementer",
+        "No yagni finding exceeds MEDIUM severity"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-duplicate-shape-not-extracted-to-generic finding is emitted"
+        },
+        {
+          "name": "correct-severity",
+          "check": "The yagni-duplicate-shape-not-extracted-to-generic finding has severity MEDIUM"
+        },
+        {
+          "name": "correct-ladder-step",
+          "check": "The yagni-duplicate-shape-not-extracted-to-generic finding has ladder_step 2"
+        },
+        {
+          "name": "discloses-frozen-peer",
+          "check": "The finding says the paired `device` relationship stays on the concrete kinds because a generic freezes its peer"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        }
+      ]
     }
   ]
 }
