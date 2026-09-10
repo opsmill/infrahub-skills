@@ -11,6 +11,7 @@ infrastructure modeling scenarios.
 - [Hierarchical Location Schema](#hierarchical-location-schema)
 - [Device Management with Generics and Inheritance](#device-management-with-generics-and-inheritance)
 - [What a Generic Fixes for Its Implementers](#what-a-generic-fixes-for-its-implementers)
+- [Uniqueness Scope: Generic vs Concrete Kind](#uniqueness-scope-generic-vs-concrete-kind)
 - [Component Pattern (Modules/Slots)](#component-pattern-modulesslots)
 - [IPAM Schema (Inheriting Built-in Types)](#ipam-schema-inheriting-built-in-types)
 - [Extensions Pattern (Cross-File Relationships)](#extensions-pattern-cross-file-relationships)
@@ -657,6 +658,196 @@ be a sibling kind. When the named kind has no
 `order_by`, look at its generics.
 `DcimPort` gets away with `name__value` only because it
 declares `name` itself.
+
+## Uniqueness Scope: Generic vs Concrete Kind
+
+The layer a `uniqueness_constraints` entry sits on
+changes what it means, and the schema loads either way.
+Verified against Infrahub `1.10.8+19` (the 1.11.0 development
+line) using the in-memory schema validator.
+
+### On a generic: enforced across every implementer
+
+```yaml
+---
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+version: "1.0"
+
+generics:
+  - name: Endpoint
+    namespace: Net
+    human_friendly_id:
+      - parent__name__value
+      - name__value
+      - media__value
+    uniqueness_constraints:
+      # Spans ALL implementers, not each one separately.
+      - ["parent", "name__value"]
+    attributes:
+      - name: name
+        kind: Text
+      - name: media
+        kind: Text
+    relationships:
+      - name: parent
+        peer: LocRack
+        kind: Parent
+        cardinality: one
+        optional: false        # required: a constrained rel must be mandatory
+        identifier: rack__endpoints
+
+nodes:
+  - name: Rack
+    namespace: Loc
+    human_friendly_id:
+      - name__value
+    attributes:
+      - name: name
+        kind: Text
+
+  - name: OpticalEndpoint
+    namespace: Net
+    inherit_from:
+      - NetEndpoint
+
+  - name: EthernetEndpoint
+    namespace: Net
+    inherit_from:
+      - NetEndpoint
+```
+
+Loading these two objects in order:
+
+```yaml
+# 1. Succeeds
+- kind: NetOpticalEndpoint
+  data:
+    - name: e1
+      media: fibre
+      parent: rack-a
+
+# 2. REJECTED, even though the kind differs
+- kind: NetEthernetEndpoint
+  data:
+    - name: e1
+      media: copper
+      parent: rack-a
+```
+
+```text
+Violates uniqueness constraint 'parent-name'
+```
+
+The two objects differ in kind and differ in `media`,
+so their `human_friendly_id` values differ too. They
+collide only on the constrained pair, which is declared
+in exactly one place.
+
+**Declaring `uniqueness_constraints` on
+`NetEthernetEndpoint` does not fix this.** A concrete
+kind cannot narrow what it inherits; its own constraints
+are checked *in addition to* the generic's.
+
+### On each concrete kind: scoped per kind
+
+Move the constraint down when the implementers are
+allowed to overlap. `human_friendly_id` moves with it:
+an HFID left on the generic compiles back into a
+generic-scoped constraint and undoes the fix.
+
+```yaml
+---
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+version: "1.0"
+
+generics:
+  - name: Endpoint
+    namespace: Net
+    # No uniqueness_constraints, no human_friendly_id, and no
+    # attribute with `unique: true`. All three would be enforced
+    # across every implementer from here, so all three go on the
+    # concrete kinds below instead.
+    attributes:
+      - name: name
+        kind: Text
+      - name: media
+        kind: Text
+    relationships:
+      - name: parent
+        peer: LocRack
+        kind: Parent
+        cardinality: one
+        optional: false
+        identifier: rack__endpoints
+
+nodes:
+  - name: Rack
+    namespace: Loc
+    human_friendly_id:
+      - name__value
+    attributes:
+      - name: name
+        kind: Text
+
+  - name: OpticalEndpoint
+    namespace: Net
+    inherit_from:
+      - NetEndpoint
+    human_friendly_id:
+      - parent__name__value
+      - name__value
+    uniqueness_constraints:
+      - ["parent", "name__value"]
+
+  - name: EthernetEndpoint
+    namespace: Net
+    inherit_from:
+      - NetEndpoint
+    human_friendly_id:
+      - parent__name__value
+      - name__value
+    uniqueness_constraints:
+      - ["parent", "name__value"]
+```
+
+Now `e1` may exist once per kind per rack.
+
+### Why this decides a migration's load order
+
+Splitting one kind into several that share a generic:
+
+| Constraint lives on | Old and new instances | Consequence |
+| ------------------- | --------------------- | ----------- |
+| the generic | collide | old rows must be deleted **before** the new ones load; a half-finished migration leaves neither set complete |
+| each concrete kind | coexist | both sets can run side by side while the change is verified, old rows removed last |
+
+Where both would work, putting the constraint on the
+concrete kinds buys a reversible migration.
+
+### The same trap through `human_friendly_id`
+
+A `human_friendly_id` is compiled into a
+`uniqueness_constraints` group on whatever declares it,
+with relationship paths collapsed to the bare
+relationship. The first generic above therefore carries
+two generic-scoped groups: the one it declares, plus
+`["parent", "name__value", "media__value"]` from its
+HFID. Adding `media` is what keeps them apart, so the
+two objects have *different* human-friendly IDs while
+still colliding on the constrained pair.
+
+Without that separation the HFID fires first, and it
+fails with a message about rebasing:
+
+```text
+Node <id> / NetOpticalEndpoint uses this human-friendly ID, but does not
+exist on this branch. Please rebase this branch to access <id> / NetOpticalEndpoint
+```
+
+That is not a branch problem. The upsert of the
+Ethernet kind matched the Optical object, then failed
+to load it under the kind it asked for. See
+[rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md).
 
 ## Component Pattern (Modules/Slots)
 

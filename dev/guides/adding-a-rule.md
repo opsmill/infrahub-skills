@@ -2,7 +2,7 @@
 
 A rule is a single-concern best practice that lives
 in a skill's `rules/` directory (e.g.,
-`skills/infrahub-managing-schemas/rules/parent-rel-optional-false.md`).
+`skills/infrahub-managing-schemas/rules/relationship-component-parent.md`).
 Adding a rule without a corresponding test means the
 rule lives in the skill's prose only — the AI may
 follow it, may not, and there is no automated signal
@@ -21,9 +21,7 @@ walks through the full path.
   field that the schema validator now rejects when
   absent).
 - Documenting an antipattern in an existing rule that
-  the AI tends to produce — the eval should reproduce
-  the antipattern conditions and the grader should
-  fail on the antipattern shape.
+  the AI tends to produce.
 
 If the rule is purely advisory (taste-based prose
 with no observable structural outcome), it does not
@@ -49,10 +47,37 @@ skills/<skill>/rules/<category>-<concern>.md
 ```
 
 Use the existing category prefixes from the skill's
-`rules/_sections.md`. If the rule introduces a new
-concern that doesn't fit any prefix, update
-`_sections.md` to add the prefix and document its
-scope.
+`rules/_sections.md`. A new prefix has to be
+registered everywhere the skill enumerates its
+categories, not only in `_sections.md`:
+
+- `rules/_sections.md` — the prefix and its scope
+- the `Rule Categories` table in `SKILL.md`
+- any severity or ladder legend the skill keeps
+  (`infrahub-auditing-repo` has one in both
+  `audit-procedure.md` and `SKILL.md`)
+
+A prefix registered in only one of those is a rule
+the skill never emits, while its eval still passes.
+
+#### Make the rule reachable
+
+`_sections.md` is a table of contents, not a load
+trigger — an agent reads it once it already knows
+which category it wants. Link the new rule from
+`SKILL.md` at the workflow step where an agent needs
+it, and say *when* to read it, not just what it
+covers:
+
+```markdown
+Before adding a relationship, read
+[rules/relationship-identifiers.md](./rules/relationship-identifiers.md)
+— both sides must share one identifier.
+```
+
+A rule reachable only from `_sections.md` gets read
+after the mistake, which is the same as not writing
+it down.
 
 ### 2. Add a Grader Check Function
 
@@ -79,47 +104,68 @@ If the rule cuts across multiple skills (rare),
 duplicate the check function in each affected
 `graders/<skill>/lib.py` rather than hoisting to a
 shared module — the skills are deliberately
-independently owned.
+independently owned. Rules that belong to
+`infrahub-common` itself grade from
+`graders/common/`.
+
+#### Parse the answer; never substring-match it
+
+`"x" in text` is the reflexive first draft, and it is
+the commonest way a check goes wrong: it passes an
+answer that merely mentions the trap and fails a
+correct answer that words it differently. Parse the
+artifact instead:
+
+| Artifact | Parse with |
+| -------- | ---------- |
+| Schema / object / menu YAML | `yaml.safe_load`, then walk the structure |
+| Python (checks, generators, transforms) | `ast` — see `graders/managing-generators/lib.py` |
+| Shell commands | `shlex.split`; never split on `[;\|&]`, which fabricates segments inside quotes |
+| Prose reports | locate the section, then match inside it |
+
+Three failure modes follow from matching raw text:
+
+- **Comments and docstrings count as code.** Strip
+  them before asserting, or a `# WRONG:` contrast
+  block in the answer satisfies the check meant to
+  fail it.
+- **Only the first fence gets graded.** Extract every
+  fenced block, and accept an answer whose entire
+  output is fenced.
+- **Adjacency is not structure.** A verb next to a
+  path does not mean the command ran against that
+  path.
 
 ### 3. Add an Eval Task
 
-Add a new task block to the root `eval.yaml`
-following the existing schema. The task prompt should
-be a realistic user request that *would naturally
-exercise the rule* — not a meta-prompt asking the AI
-to "follow the rule." Keep prompts at the
-abstraction level a real user would type.
+Add a task block to the root `eval.yaml`. The block
+schema is documented once, in
+[running-evals.md](./running-evals.md#evalyaml-format).
 
-```yaml
-  - name: my-rule-task
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/<skill>/SKILL.md
-      and follow its workflow and rules.
+The prompt is where new tasks go wrong. It has to be
+a realistic user request that *would naturally
+exercise the rule*, and it must not carry the answer:
 
-      Task: <realistic prompt that naturally requires
-      the rule to be applied>
-
-      Save ONLY the final YAML to: output.yml
-    graders:
-      - type: deterministic
-        run: python graders/<skill>/check_my_rule.py
-        weight: 1.0
-    expected_output: >-
-      <one-paragraph description of correct output>
-    expectations:
-      - <human-readable expectation 1>
-      - <human-readable expectation 2>
-    assertions:
-      - name: <assertion-name-from-CHECKS>
-        check: <human-readable description>
-```
+- **No meta-prompts.** Don't ask the AI to "follow
+  the rule", and don't dictate the output schema — a
+  prompt that names the fields it wants back is
+  answerable without the skill.
+- **Prove it discriminates.** Comment out the
+  instruction's `Read the skill at ...` line and run
+  `skillgrade --eval=<task-name> --trials=1`
+  ([procedure](./running-evals.md#writing-good-eval-prompts)).
+  If the grader still scores 1.0, the task measures
+  the model, not the skill; make the prompt harder,
+  or grade something only the rule produces.
+- **Reproduce the antipattern conditions.** Where the
+  rule has a tempting wrong shape, put the temptation
+  in the prompt instead of hoping the AI stumbles
+  into it.
 
 Set `trials: 3` for new tasks unless the rule is
 particularly noisy (in which case 5 may help). The
-defaults file uses 3 trials; the smoke preset
-overrides to 5 only for tasks that don't set a
-per-task `trials` value.
+`defaults` block in `eval.yaml` already sets 3, so a
+new task only needs the key to differ from it.
 
 ### 4. Add a Task Grader Script
 
@@ -162,27 +208,70 @@ script only when the task needs file-attribution or
 carve-out checks the parameterized grader can't express
 (see `graders/auditing-repo/check_yagni_reuse_marketplace.py`).
 
-### 5. Verify the Grader Locally
+### 5. Verify the Grader Both Ways
 
-Before committing, hand-craft two fixture files —
-one compliant and one violating — and confirm the
-grader returns 1.0 on the compliant case and < 1.0
-on the violating one, with a failure message that
-correctly names the violated assertion.
+A check is wrong in two directions, and the obvious
+compliant/violating pair catches neither. Hand-craft
+**four** fixtures and run the grader on each:
+
+| Fixture | Expected |
+| ------- | -------- |
+| Compliant, written the way the rule shows | 1.0 |
+| Compliant, written differently — other field order, a helper, a synonym | 1.0 |
+| Violating, obviously | < 1.0 |
+| Violating **near-miss** — satisfies the check's keyword while breaking the rule | < 1.0 |
+
+The last of each pair is the one that finds bugs:
+
+- **False fail.** A correct answer phrased differently
+  scores < 1.0. Write out the answer the rule's own
+  example shows and watch whether it passes.
+- **Laundering.** A violating answer scores 1.0
+  because it mentions the right word, imports the
+  right module, or names the right helper somewhere
+  in the file. Ask what the smallest edit is that
+  makes the violating fixture pass — if a comment or
+  a bare string is enough, the check grades
+  vocabulary, not substance.
 
 ```bash
-mkdir -p /tmp/grader-test/{pass,fail}
-# write /tmp/grader-test/pass/output.yml (compliant)
-# write /tmp/grader-test/fail/output.yml (violating)
+mkdir -p /tmp/grader-test/{pass,pass-variant,fail,fail-nearmiss}
+# write output.yml in each
 
-cd /tmp/grader-test/pass && python /path/to/graders/<skill>/check_my_rule.py
-cd /tmp/grader-test/fail && python /path/to/graders/<skill>/check_my_rule.py
+for d in pass pass-variant fail fail-nearmiss; do
+  echo "--- $d"
+  (cd /tmp/grader-test/$d &&
+    python /path/to/graders/<skill>/check_my_rule.py)
+done
 ```
 
-A grader that scores 1.0 on a violating fixture is a
-silently broken assertion — fix it before committing.
+Check the failure message too: it has to name the
+assertion that actually broke. A check that cannot
+fail is worse than no check — it reports the rule as
+covered forever.
 
-### 6. Sync the JSON Evaluations
+### 6. Sweep the Layers the Rule Contradicts
+
+If the rule corrects something the repo said before,
+the prose layer is not the only place the old claim
+lives. Grep the whole tree and fix every hit in the
+same change — except `evaluations/`, which step 7
+regenerates from `eval.yaml` rather than taking
+hand edits:
+
+```bash
+grep -rn "<old claim, command, or field>" \
+  skills/ graders/ eval.yaml evaluations/ dev/
+```
+
+The hits that get missed are the ones outside
+`skills/`: a grader still asserting a command the
+rule deletes, an `eval.yaml` expectation restating
+the old causality, an `expectations` rubric that
+rewards it. An impact or severity label bumped in
+the rule has to move in the skill's index too.
+
+### 7. Sync the JSON Evaluations
 
 `evaluations/<skill>.json` files are auto-generated
 from `eval.yaml` for the `/skill-creator` evals
@@ -197,18 +286,15 @@ Commit both `eval.yaml` and the regenerated
 auto-run sync-evals, so a stale JSON will diverge
 from the YAML over time.
 
-### 7. Run a Smoke Pass
+### 8. Run a Smoke Pass
 
 ```bash
 skillgrade --smoke
 ```
 
-The smoke preset uses 5 trials per task by default,
-but tasks that set `trials: 3` (the new
-recommendation) use that. A passing smoke run with
-your new rule means the AI follows the rule
-reliably under the skill's current prose. If smoke
-fails:
+A passing smoke run with your new rule means the AI
+follows the rule reliably under the skill's current
+prose. If smoke fails:
 
 - Re-read the rule file. If the *why* is buried, the
   AI may not internalize it.
@@ -222,16 +308,24 @@ fails:
 ## Required Files Checklist
 
 - [ ] `skills/<skill>/rules/<category>-<concern>.md`
-- [ ] (if new prefix)
-  `skills/<skill>/rules/_sections.md` updated
+- [ ] Rule linked from `SKILL.md` at the workflow
+  step that needs it
+- [ ] (if new prefix) `rules/_sections.md`, the
+  `SKILL.md` `Rule Categories` table, and any ladder
+  legend all updated
 - [ ] New check function added to
   `graders/<skill>/lib.py` and registered in
-  `CHECKS`
-- [ ] New task block added to `eval.yaml`
+  `CHECKS`, parsing rather than substring-matching
+- [ ] New task block added to `eval.yaml`, verified
+  to fail with the skill's `Read the skill at ...`
+  line commented out
 - [ ] `graders/<skill>/check_<task>.py` task grader
   script
-- [ ] Grader verified against compliant + violating
-  fixtures locally
+- [ ] Grader run against all four fixtures, including
+  the compliant variant and the violating
+  near-miss
+- [ ] Old claims the rule contradicts swept from
+  `skills/`, `graders/`, and `eval.yaml`
 - [ ] `python scripts/sync-evals.py` run and the
   regenerated `evaluations/*.json` committed
 - [ ] `skillgrade --smoke` passes (or smoke failures

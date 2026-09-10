@@ -114,8 +114,9 @@ the partial value.
 
 ## Common Mistakes
 
-- Pasting `infrahubctl --version` output verbatim
-  when it includes a server URL.
+- Pasting `infrahubctl info` output verbatim. It
+  reports the versions you want alongside the server
+  address and deployment ID, which you do not.
 - Including stack traces without scrubbing file
   paths (they typically contain `/Users/<name>/`).
 - Pasting `pip list` or `pip freeze` output — far
