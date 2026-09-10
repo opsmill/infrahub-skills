@@ -317,7 +317,8 @@ prose. If smoke fails:
 - [ ] `graders/<skill>/check_<task>.py` task grader
   script
 - [ ] Grader run against all four fixtures, including
-  both near-misses
+  the compliant variant and the violating
+  near-miss
 - [ ] Old claims the rule contradicts swept from
   `skills/`, `graders/`, and `eval.yaml`
 - [ ] `python scripts/sync-evals.py` run and the
