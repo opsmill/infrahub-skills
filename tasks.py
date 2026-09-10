@@ -12,3 +12,9 @@ def lint(ctx):
     """Run all linters (markdown + YAML)."""
     ctx.run("uv run rumdl check .", pty=True)
     ctx.run("uv run yamllint -c .yamllint.yml .", pty=True)
+
+
+@task
+def test(ctx):
+    """Run the test suite (grader libraries and bundled skill scripts)."""
+    ctx.run("uv run --group test pytest", pty=True)
