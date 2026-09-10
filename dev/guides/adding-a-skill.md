@@ -253,12 +253,18 @@ case once a skill exists), see
   (skills section + project structure)
 - Update `AGENTS.md` quick reference table
 
-Release notes are generated automatically by
-[release-drafter](../../.github/release-drafter.yml)
-from PR labels — no manual changelog edit is needed.
-Apply the appropriate `type/*` and `changes/*` labels
-to your PR so it lands in the right release-notes
-category.
+Add a news fragment describing the skill — CI fails
+the pull request without one:
+
+```bash
+uv run towncrier create -c "New skill: does X." 42.added.md
+```
+
+Release notes are assembled from these fragments by
+towncrier, so do not edit `CHANGELOG.md` by hand. Apply
+the appropriate `changes/*` label as well: it drives the
+version bump. See the Changelog section of
+[AGENTS.md](../../AGENTS.md).
 
 ### 8. Verification
 
