@@ -89,6 +89,17 @@ class MyCheck(InfrahubCheck):
         # ... validate using cleaned data ...
 ```
 
+`from .common import get_data` is a relative import, so
+it reaches `checks/common.py` and nothing outside
+`checks/`. The moment a generator or a transform needs
+the same logic, the relative import stops being an
+option: the module has to be installed into the worker
+image as a package. That pattern, including the three
+`uv` flags whose absence each fails differently, is in
+[patterns-shared-module.md](./patterns-shared-module.md).
+Reach for it on the **second** consumer, not in
+anticipation of one.
+
 ### Scoped Validation (Performance)
 
 For global checks on large datasets, group by parent

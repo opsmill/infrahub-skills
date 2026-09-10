@@ -14,17 +14,25 @@
 3. **API Reference (api-)** -- HIGH. Class attributes
    (query, timeout), instance properties (client,
    branch_name, params), execution lifecycle
-   (collect_data, validate, count errors).
+   (collect_data, validate, count errors), and how a
+   rejection surfaces: HTTP 200 with a populated
+   `errors` array, so branching on the status code
+   fails open.
 
 4. **Registration (registration-)** -- HIGH.
    .infrahub.yml check_definitions config, query name
    matching, targets for targeted checks, parameters
    mapping.
 
-5. **Patterns (patterns-)** -- MEDIUM. Error collection
+5. **Patterns (patterns-)** -- MEDIUM, except the
+   shared-module pattern which is HIGH. Error collection
    before logging, shared utility functions (common.py),
    scoped validation for performance on large datasets,
    relationship-traversal validation (comparing a node
-   against a related node's fetched state).
+   against a related node's fetched state), and sharing
+   one module across checks, generators and transforms
+   (a relative import cannot span artifact directories,
+   so the module must be installed into the worker
+   image).
 
 6. **Testing (testing-)** -- HIGH. Resources Testing Framework (YAML-driven pytest tests: smoke, unit, integration), infrahubctl check commands. Always create tests alongside new checks.
