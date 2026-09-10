@@ -6,14 +6,16 @@ description: >-
   into Infrahub object templates as Infrahub object YAML, using a bundled Python
   converter driven by a schema mapping profile.
   TRIGGER when: importing NetBox device types or module types into Infrahub,
-  converting devicetype-library YAML, building object templates from vendor
-  device models, seeding Infrahub with device types from NDX, converting line
-  cards / PSUs / transceivers from NetBox module types, turning NetBox hardware
-  definitions into Template* objects.
+  exporting device types out of a running NetBox instance, converting
+  devicetype-library YAML, building object templates from vendor device models,
+  seeding Infrahub with device types from NDX, converting line cards / PSUs /
+  transceivers from NetBox module types, turning NetBox hardware definitions
+  into Template* objects.
   DO NOT TRIGGER when: importing CSV/TSV data (use infrahub-importing-data),
   authoring schemas from scratch (use infrahub-managing-schemas), writing ordinary
-  object data files (use infrahub-managing-objects), or syncing live NetBox
-  instances (that is infrahub-sync, a separate product).
+  object data files (use infrahub-managing-objects), or setting up continuous
+  two-way replication with a live NetBox (that is infrahub-sync, a separate
+  product — a one-off export of device types is in scope here).
 allowed-tools:
   - Read
   - Write
@@ -204,8 +206,38 @@ provide.
 
 ### 3. Get the input
 
-The library is a git repo; NDX is its browsable front
-end. There is no public bulk API, so clone it — but
+Two sources, depending on where the device types live.
+
+**From a running NetBox.** The catalogue in someone's
+own instance is usually what they actually want to
+import, and it is not the same set as the published
+library. `scripts/netbox_export_device_types.py` reads
+a live instance over its REST API and writes the
+library file format:
+
+```bash
+export NETBOX_TOKEN=...
+python scripts/netbox_export_device_types.py \
+  --url https://netbox.example.com \
+  --in-use \
+  --module-types \
+  --output-dir ./netbox-export
+```
+
+`--in-use` keeps only device types with at least one
+device, which on a real instance is a much smaller and
+more relevant set than the whole catalogue. It reports
+anything NetBox holds that the library format has no
+field for, and anything NetBox left unset that the
+library format requires.
+
+This is a one-way snapshot into files, not a sync.
+Continuous replication is
+[infrahub-sync](https://docs.infrahub.app/sync/), a
+separate product.
+
+**From the published library.** For seeding vendor
+models nobody has yet, clone the upstream repo — but
 sparsely. A plain `--depth 1` clone pulls 1.6 GB,
 almost all of it rack elevation images the converter
 never reads. Restricting to `device-types/` gets the
@@ -328,6 +360,7 @@ uv run invoke test
 | File | Read it when |
 | ---- | ------------ |
 | [concepts.md](./concepts.md) | The Infrahub model is unfamiliar, or you need to explain it |
+| [scripts/netbox_export_device_types.py](./scripts/netbox_export_device_types.py) | The device types are in a running NetBox rather than in files |
 | [extending-your-schema.md](./extending-your-schema.md) | Turning a reported gap into a schema change |
 | [generators-module-ports.md](./generators-module-ports.md) | Module ports imported as declarations and the `{module}` token needs resolving into real device interfaces |
 | [reference.md](./reference.md) | Looking up a NetBox field or its Infrahub counterpart |

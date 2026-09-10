@@ -64,6 +64,56 @@ Component lists, by share of files: `interfaces`
 bay-position token NetBox substitutes at install time.
 See `module_type.position_placeholder`.
 
+## Exporting from a live NetBox
+
+`scripts/netbox_export_device_types.py` reads a running
+instance and writes the library format. Field names on
+both sides were taken from NetBox's own serializers and
+the devicetype-library JSON schema, not inferred.
+
+| Option | Meaning |
+| ------ | ------- |
+| `--url` | Base URL of the instance, without `/api` |
+| `--token` | API token; defaults to `$NETBOX_TOKEN` |
+| `--output-dir` | Writes `<dir>/device-types/<Manufacturer>/<slug>.yaml` |
+| `--in-use` | Only device types with at least one device |
+| `--manufacturer` | Restrict to a manufacturer slug; repeatable |
+| `--slug` | Restrict to a device-type slug; repeatable |
+| `--module-types` | Also export module types |
+| `--insecure` | Skip TLS verification |
+
+| Exit code | Meaning |
+| --------- | ------- |
+| 0 | Export completed |
+| 1 | Configuration, network, or authentication failure |
+| 2 | Nothing matched the filters |
+
+### Shape differences it reconciles
+
+| NetBox API | Library format |
+| ---------- | -------------- |
+| `type: {value, label}` | `type: <value>` |
+| `manufacturer: {id, name, slug, ...}` | `manufacturer: <name>` |
+| `power_port: {id, name}` | `power_port: <name>` |
+| `weight: "13.40"` (decimal as string) | `weight: 13.4` |
+| `airflow: null`, `description: ""` | field omitted |
+| `rear_ports: [{position, rear_port: <pk>}]` | `port-mappings` naming both ports |
+
+`is_full_depth: false` and `u_height: 0` are kept:
+absent and false are different things.
+
+### What it reports
+
+Two classes of note, on the same principle as the
+converter's coverage report:
+
+- **NetBox holds it, the library format has no field**
+  — module-type `attributes`, for instance.
+- **NetBox left it unset, the library format requires
+  it** — a power port with no `type` is valid in NetBox
+  and invalid in the library. The file is still
+  written; the note says which entries and how many.
+
 ## Infrahub object templates
 
 | Concept | Detail |
