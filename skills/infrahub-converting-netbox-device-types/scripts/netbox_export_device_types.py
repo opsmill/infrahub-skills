@@ -226,7 +226,16 @@ NUMERIC_FIELDS = frozenset(
 
 #: How many object ids to request per component-template call. NetBox accepts
 #: a repeated ``device_type_id``, so components for many device types come
-#: back in one round trip; the cap keeps the URL within normal server limits.
+#: back in one round trip; the cap keeps the URL inside the 2048 characters
+#: some proxies still enforce.
+#:
+#: This makes a *full* export chatty: 5,900 device types is ~120 batches
+#: across ten endpoints, so roughly 1,200 calls. Dropping the filter would
+#: make it ten calls plus pagination, but then every component in the
+#: instance is fetched even when exporting a handful of device types, and
+#: choosing between the two needs a heuristic that is wrong somewhere. The
+#: filtered path is predictable and is the one ``--in-use`` puts you on,
+#: which is the recommended way to run this.
 ID_BATCH = 50
 
 
@@ -630,7 +639,7 @@ def output_path(
     """
     manufacturer = str(document.get("manufacturer") or "Unknown")
     stem = str(document.get("slug") or document.get("model") or "unnamed")
-    safe = stem.replace("/", "-").replace(" ", "-")
+    safe = _safe(stem.replace(" ", "-"), "unnamed")
     root = out_dir / ("module-types" if is_module else "device-types") / _safe(manufacturer)
 
     path = root / f"{safe}.yaml"
@@ -644,9 +653,28 @@ def output_path(
     return path
 
 
-def _safe(name: str) -> str:
-    """Reduce a name to something usable as a single path segment."""
-    return name.replace("/", "-").strip() or "Unknown"
+#: Path segments that would move the write somewhere other than where the
+#: layout says. A NetBox manufacturer is free text, so these are reachable.
+_RESERVED_SEGMENTS = frozenset({"", ".", ".."})
+
+
+def _safe(name: str, fallback: str = "Unknown") -> str:
+    """Reduce a name to a single, inert path segment.
+
+    ``..`` has to be rejected rather than merely slash-stripped: a
+    manufacturer named ``..`` lands the file in the output root instead of
+    under ``device-types/``, where it can collide with the module-types
+    tree and breaks the layout the converter walks.
+
+    Args:
+        name: The raw NetBox name.
+        fallback: Used when the name reduces to nothing usable.
+
+    Returns:
+        A single path segment safe to join.
+    """
+    segment = name.replace("/", "-").replace("\\", "-").strip()
+    return fallback if segment in _RESERVED_SEGMENTS else segment
 
 
 # --------------------------------------------------------------------------
