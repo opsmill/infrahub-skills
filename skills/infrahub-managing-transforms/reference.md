@@ -192,6 +192,11 @@ python_transforms:
   - name: spine
     class_name: SpineConfig
     file_path: transforms/spine.py
+    # The hybrid pattern picks its template at runtime, so the
+    # template directory is a dependency nothing can detect.
+    watch:
+      files:
+        - templates/spines/
 
 # Pure Jinja2 transform — query must be declared HERE, not on a class
 jinja2_transforms:

@@ -389,6 +389,60 @@ tasks:
       - name: human-friendly-id
         check: human_friendly_id defined on each node
 
+  - name: uniqueness-scoped-by-relationship
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+
+      Task: Create an Infrahub schema in the 'Virtualization' namespace with a Cluster node
+      (name) and a VirtualMachine node with a numeric 'vmid'. A VM records which cluster it
+      currently runs on — VMs migrate between clusters, so the cluster is a plain reference
+      rather than an owning parent. Every VM always belongs to exactly one cluster. The vmid
+      must be unique within each cluster, but the same vmid can be reused on a different
+      cluster.
+
+      Save ONLY the final schema YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_uniqueness_constraints.py
+        weight: 1.0
+    expected_output: >-
+      A schema whose VirtualMachine node scopes uniqueness with
+      uniqueness_constraints combining the bare relationship name and the
+      vmid attribute with its __value suffix, where the cluster
+      relationship is declared cardinality: one and optional: false so the
+      constraint passes server-side validation.
+    expectations:
+      - >-
+        uniqueness_constraints on VirtualMachine combines the bare
+        relationship name (cluster) with vmid__value
+      - >-
+        The cluster relationship has optional: false and cardinality: one,
+        which the server requires for any relationship a uniqueness
+        constraint reaches
+      - >-
+        No uniqueness_constraints entry uses a peer-attribute path such as
+        cluster__name__value
+      - >-
+        Any relationship reached by a human_friendly_id path is likewise
+        mandatory and cardinality: one
+      - "human_friendly_id is defined on each node"
+      - 'Schema starts with version: "1.0"'
+    assertions:
+      - name: schema-version
+        check: "Schema starts with version: '1.0'"
+      - name: uniqueness-rel-mandatory
+        check: >-
+          Every relationship reached by uniqueness_constraints or
+          human_friendly_id has optional: false and cardinality: one, and
+          constraints use bare relationship names
+      - name: matching-identifiers
+        check: Relationship identifier pairs match on both sides
+      - name: full-kind-references
+        check: All peer references use full Namespace+Name kind
+      - name: human-friendly-id
+        check: human_friendly_id defined on each node
+
   - name: inverse-identifier-reuse
     trials: 3
     instruction: |
@@ -934,6 +988,98 @@ tasks:
           Dropdown choice keys follow name -> label -> description ->
           color
 
+  - name: uniqueness-scope-per-kind
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      and follow its workflow and rules.
+
+      Task: I have one node kind `NetEndpoint` and I am splitting it into
+      two more specific kinds, optical and ethernet, both inheriting a
+      shared `NetEndpoint` generic. Each endpoint sits in a rack.
+
+      The rule I need enforced: an endpoint name must be unique within its
+      rack **for its own kind**. An optical endpoint named `e1` in rack-a
+      and an ethernet endpoint named `e1` in rack-a must both be allowed to
+      exist at the same time, because during the migration I want to load
+      the new kinds while the old data is still present and verify before
+      deleting anything.
+
+      Write the schema: the generic, a `LocRack` node, and the two concrete
+      kinds. Put the uniqueness rule wherever it actually produces the
+      behaviour I described.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_uniqueness_scope.py
+        weight: 1.0
+    expected_output: >-
+      A schema where `uniqueness_constraints: [["parent", "name__value"]]`
+      is declared on BOTH concrete kinds and NOT on the shared generic,
+      because a constraint on a generic is enforced across every kind that
+      inherits it and a concrete kind cannot narrow it back. Declaring the
+      moved constraint as a `human_friendly_id` on the concrete kinds is
+      equally correct: it compiles into the same `uniqueness_constraints`
+      on the layer that declares it. The generic
+      must also carry no `human_friendly_id` and no attribute with
+      `unique: true`: both compile into `uniqueness_constraints` on the
+      layer that declares them, so either one on the generic reinstates
+      the cross-kind check. The rack relationship must be
+      `cardinality: one` with `optional: false`, since a relationship used
+      in a constraint has to be mandatory. The attribute is referenced as
+      `name__value` and the relationship bare.
+    expectations:
+      - >-
+        The uniqueness constraint is on both concrete kinds, not on the
+        shared generic
+      - >-
+        The generic carries no human_friendly_id and no unique: true
+        attribute, since both compile into a generic-scoped constraint
+      - >-
+        Explains that a constraint on a generic spans every implementer, so
+        the two kinds would collide
+      - >-
+        The constrained relationship is cardinality one and optional false,
+        because an optional relationship is rejected at load
+      - >-
+        The constraint pairs the rack relationship with name__value, so it
+        scopes the name within the rack rather than across the estate
+      - >-
+        No optional attribute appears in a constraint: an unset value is
+        compared as the literal "NULL" and collides
+      - Attribute referenced as name__value, relationship referenced bare
+      - Peers use full Namespace+Name kinds
+    assertions:
+      - name: uniqueness-scopes-by-relationship
+        check: >-
+          Every kind inheriting the generic pairs the rack relationship
+          with the endpoint name, so the name is scoped within the rack
+          rather than across the estate. An extra unrelated constraint
+          alongside it is fine, and the rack node's own uniqueness is not
+          asked to scope by anything
+      - name: uniqueness-no-optional-attr
+        check: >-
+          No constrained attribute is optional, since an unset value is
+          compared as "NULL" rather than skipped
+      - name: uniqueness-not-on-generic
+        check: >-
+          The inherited generic declares no uniqueness_constraints, no
+          human_friendly_id and no unique: true attribute, and every kind
+          inheriting it declares its own uniqueness_constraints
+      - name: uniqueness-rel-mandatory
+        check: >-
+          Every relationship named in a constraint is cardinality one and
+          optional false
+      - name: uniqueness-attr-value-suffix
+        check: >-
+          Attribute paths in constraints end in __value and relationships
+          are referenced bare
+      - name: schema-version
+        check: File declares version "1.0"
+      - name: full-kind-references
+        check: Relationship peers use full Namespace+Name kinds
+
   # --- Check Creator --- #
   - name: global-check-registration
     trials: 3
@@ -1439,24 +1585,28 @@ tasks:
              similar).
           2. The file contains either a Python triple-quoted string
              named TEST_PLAN, or a block of # comments, that explains
-             how to test the generator end-to-end. Mentions
-             "infrahubctl generator run" (or equivalent live-instance
-             command). At least one full sentence of guidance — not
-             just a stub.
+             how to test the generator end-to-end. Names a concrete
+             live-instance command; if it names infrahubctl, the form
+             is `infrahubctl generator <name> <param>=<target_id>`,
+             because the generator takes its target as a positional
+             key=value argument and there is no `run` subcommand. At
+             least one full sentence of guidance — not just a stub.
           3. The guidance explicitly notes that unit tests on the
              input dict do not cover SDK call shape (or equivalent
              warning that runtime SDK shape errors slip past
              type/unit checks).
     expected_output: >-
       A Python generator plus end-to-end test guidance. The guidance should
-      mention infrahubctl generator run against a live instance and note
-      that input-dict unit tests don't cover SDK call shape.
+      name a live-instance run of the generator — `infrahubctl generator
+      <name> <param>=<target_id>`, not a `run` subcommand — and note that
+      input-dict unit tests don't cover SDK call shape.
     expectations:
       - "Generator class is present and creates DcimDevice instances"
       - "TEST_PLAN string or block comment exists at the bottom of the file"
       - >-
-        The guidance mentions infrahubctl generator run against a real
-        Infrahub instance
+        The guidance names a live run of the generator against a real
+        Infrahub instance, in the form `infrahubctl generator <name>
+        <param>=<target_id>`
       - >-
         The guidance notes that unit tests on the input dict do not cover
         SDK call shape
@@ -1539,6 +1689,135 @@ tasks:
           A call passes kind="CoreArtifact" (read of artifact state
           after the POST)
 
+  - name: transform-watch-dependencies
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-transforms/SKILL.md and
+      follow its workflow and rules.
+
+      Task: I am not confident our transform registrations in
+      `.infrahub.yml` are right for artifact regeneration — I do not
+      think they reflect what these transforms actually depend on.
+      Review them against the code below and fix the registration.
+
+      Repository layout:
+
+      ```text
+      transforms/device_config.py
+      transforms/device_config_query.py
+      transforms/interface_names.py
+      templates/startup_config_arista.j2
+      templates/startup_config_cisco.j2
+      templates/partials/header.j2
+      src/my_package/formatting.py
+      ```
+
+      transforms/device_config.py — class DeviceConfig, renders a banner:
+      ```python
+      from infrahub_sdk.transforms import InfrahubTransform
+
+      from my_package.formatting import render_banner
+
+      from .device_config_query import DeviceConfigQuery
+      ```
+
+      transforms/interface_names.py — class InterfaceNames, reshapes the query
+      response into a dict:
+      ```python
+      from infrahub_sdk.transforms import InfrahubTransform
+      ```
+
+      templates/startup_config_arista.j2 (every include names its template
+      directly):
+      ```jinja
+      {% include "templates/partials/header.j2" %}
+      ```
+
+      templates/startup_config_cisco.j2 (the partial is chosen at render time):
+      ```jinja
+      {% include partial_name %}
+      ```
+
+      The current `.infrahub.yml` transform sections:
+      ```yaml
+      python_transforms:
+        - name: device_config
+          class_name: DeviceConfig
+          file_path: transforms/device_config.py
+          watch:
+            files:
+              - transforms/
+        - name: interface_names
+          class_name: InterfaceNames
+          file_path: transforms/interface_names.py
+
+      jinja2_transforms:
+        - name: arista_startup_config
+          query: device_startup_config
+          template_path: templates/startup_config_arista.j2
+          watch:
+            files:
+              - templates/
+        - name: cisco_startup_config
+          query: device_startup_config
+          template_path: templates/startup_config_cisco.j2
+      ```
+
+      Save ONLY the corrected `python_transforms` and `jinja2_transforms`
+      sections to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-transforms/check_watch_dependencies.py
+        weight: 1.0
+    expected_output: >-
+      The two transform sections with an accurate watch block per entry:
+      device_config naming transforms/device_config_query.py and
+      src/my_package/ instead of the whole transforms/ directory,
+      interface_names carrying an explicit empty files list, the
+      literal-include Arista template dropping its superfluous watch, and the
+      Cisco template declaring templates/partials/ for the include it resolves
+      at render time.
+    expectations:
+      - "Every python_transforms entry carries a watch key"
+      - "device_config declares both the sibling query model and src/my_package/"
+      - "No entry watches the directory holding its own file_path"
+      - "interface_names declares watch.files as an empty list"
+      - "arista_startup_config carries no watch entries (its closure is complete)"
+      - "cisco_startup_config declares templates/partials/"
+    assertions:
+      - name: watch-present-on-python-transforms
+        check: >-
+          Every python_transforms entry has a watch key, since a missing one
+          folds the commit id into the fingerprint
+      - name: watch-uses-object-form
+        check: >-
+          Every watch block is the object form {files: [...]}, not a bare list
+      - name: watch-declares-sibling-import
+        check: >-
+          device_config declares transforms/device_config_query.py, the sibling
+          module it imports
+      - name: watch-declares-outside-package-import
+        check: >-
+          device_config declares src/my_package/ (or the module within it) that
+          it imports
+      - name: watch-avoids-entry-directory
+        check: >-
+          No entry watches the directory holding its own file_path, which
+          would re-create the closure 1.11 withdrew and re-render on every
+          unrelated edit beside the entry point
+      - name: watch-empty-for-self-contained
+        check: >-
+          interface_names, which has no first-party import, declares
+          watch.files as []
+      - name: watch-omitted-for-static-jinja2
+        check: >-
+          arista_startup_config has no watch entries, since its includes are
+          all literal and its closure is already complete
+      - name: watch-declares-dynamic-jinja2-partials
+        check: >-
+          cisco_startup_config declares templates/partials/, which its
+          variable include can reach
+
   # --- Transforms: pre-merge GraphQL dry-run --- #
   # Backs the shared rule
   # skills/infrahub-common/rules/deployment-gql-dry-run.md. Hosted under
@@ -1572,8 +1851,9 @@ tasks:
     expectations:
       - >-
         Recommends executing the query live as a dry-run via a concrete
-        command (`infrahubctl render`, or `infrahubctl check run` /
-        `infrahubctl generator run`), not just `schema check`
+        command (`infrahubctl render <name>` or `infrahubctl transform
+        <name>`, or the owning `infrahubctl check <name>` /
+        `infrahubctl generator <name>`), not just `schema check`
       - >-
         Frames the dry-run as a pre-merge gate (before opening / merging
         the PR)
@@ -1583,8 +1863,9 @@ tasks:
     assertions:
       - name: dry-run-executes-query
         check: >-
-          Plan dry-runs the query live (infrahubctl render / check run /
-          generator run), not only static schema check
+          Plan dry-runs the query live (infrahubctl render/transform/
+          check/generator, each taking its target as a positional
+          argument), not only static schema check
       - name: dry-run-before-merge
         check: Plan frames the dry-run as a pre-merge / pre-PR step
 
@@ -1732,6 +2013,231 @@ tasks:
     assertions:
       - name: docs-fallback
         check: Output cites a docs.infrahub.app page and flags the gap
+
+  # --- Common: infrahubctl command truth --- #
+  - name: common-dry-run-python-transform
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-common/SKILL.md and follow
+      its rules.
+
+      Task: I changed `queries/spine.gql`. It is the query behind a
+      transform named `spine_config`, which my `.infrahub.yml` registers
+      like this:
+
+      ```yaml
+      python_transforms:
+        - name: spine_config
+          file_path: "transforms/spine_config.py"
+          class_name: SpineConfig
+      ```
+
+      A `.gql` change passes every static check and only fails when the
+      repository syncs, so I want to dry-run the query before I open the
+      PR. Give me the exact command, and tell me what else I need to
+      supply for it to run locally.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/common/check_dry_run_command.py
+        weight: 0.7
+      # The deterministic check only reads fenced blocks and code spans, so
+      # an invented command written as bare prose slips past it. This is the
+      # compensating control its docstring assumes.
+      - type: llm_rubric
+        provider: anthropic
+        weight: 0.3
+        rubric: |
+          Read output.md. Score each criterion 0.0 or 1.0; return the
+          average.
+
+          1. Every `infrahubctl` command the answer names, in prose or in
+             a code block, is a real command. Score 0.0 if any of check,
+             transform, render or generator is given a generic verb
+             (run, list, get, create, delete, execute) where its target
+             belongs: each takes its target as a positional argument, and
+             listing is a flag. Score 0.0 if `schema` is given any
+             subcommand other than check, export, format, list, load or
+             show.
+          2. The answer aims `infrahubctl transform` at `spine_config`
+             and does not recommend `infrahubctl render` for it.
+    expected_output: >-
+      An answer giving `infrahubctl transform spine_config <param>=<value>
+      --branch <branch>`, because the transform is registered under
+      python_transforms. It should note that `infrahubctl render` serves
+      jinja2_transforms only, and that a required query variable has to be
+      supplied by hand locally because the artifact definition binds it
+      from the target in the pipeline.
+    expectations:
+      - >-
+        Recommends `infrahubctl transform spine_config`, not
+        `infrahubctl render spine_config`
+      - >-
+        Explains that render serves jinja2_transforms and transform serves
+        python_transforms
+      - >-
+        Notes that a required query variable must be passed by hand on a
+        local run
+      - Every infrahubctl command named in the answer actually exists
+    assertions:
+      - name: python-transform-dry-run:spine_config
+        check: >-
+          Uses `infrahubctl transform` for the python_transforms entry and
+          does not aim `infrahubctl render` at it
+      - name: cli-commands-exist
+        check: >-
+          No invented subcommand (schema validate, check run,
+          generator list, import load) appears in the answer
+
+  - name: common-preflight-before-write
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-common/SKILL.md and follow
+      its rules.
+
+      Task: I am about to run `infrahubctl branch create` and then
+      `infrahubctl object load` against a local instance. My project keeps
+      its settings in a `.env` file that docker compose reads. I ran
+      `infrahubctl info` and it printed a green Connection Status with a
+      full version readout, so I assume I am good to go.
+
+      Am I? Tell me what to check before I run the writes.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/common/check_preflight_write.py
+        weight: 0.7
+      # As above: the deterministic half cannot see a command written as
+      # bare prose.
+      - type: llm_rubric
+        provider: anthropic
+        weight: 0.3
+        rubric: |
+          Read output.md. Score each criterion 0.0 or 1.0; return the
+          average.
+
+          1. Every `infrahubctl` command the answer names, in prose or in
+             a code block, is a real command. Score 0.0 if any of check,
+             transform, render or generator is given a generic verb
+             (run, list, get, create, delete, execute) where its target
+             belongs, or if `schema` is given any subcommand other than
+             check, export, format, list, load or show.
+          2. The answer does not print the value of `INFRAHUB_API_TOKEN`
+             (for example with `echo $INFRAHUB_API_TOKEN`). Testing
+             whether it is set is fine; echoing it puts the token in the
+             shell history and any CI log. `${INFRAHUB_API_TOKEN:-...}`
+             counts as printing it: the fallback word appears only when
+             the variable is unset, so a populated token is echoed.
+    expected_output: >-
+      An answer explaining that a green `infrahubctl info` does not prove
+      write authorisation: reads are served anonymously, and with no token
+      configured the user lookup is skipped entirely so the status is green
+      regardless. It should tell the user to confirm INFRAHUB_API_TOKEN is
+      exported in their shell (a value in `.env` reaches docker compose,
+      not necessarily infrahubctl), and to probe a write by creating and
+      deleting a throwaway branch.
+    expectations:
+      - >-
+        States that a green info result does not prove write access,
+        because reads are anonymous
+      - >-
+        Explains the absent-versus-invalid asymmetry: an absent token
+        still reports green, only the User line is missing
+      - >-
+        Says to confirm INFRAHUB_API_TOKEN is exported, and that a value
+        in `.env` is not necessarily in the shell
+      - >-
+        Recommends a write probe such as creating and deleting a
+        throwaway branch, not merely listing branches
+      - Every infrahubctl command named in the answer actually exists
+    assertions:
+      - name: preflight-write-probe
+        check: >-
+          Checks the token or probes a write rather than treating a green
+          `infrahubctl info` as clearance
+      - name: token-not-printed
+        check: >-
+          The token presence test cannot expand to the token's value:
+          no bare `echo $INFRAHUB_API_TOKEN` and no
+          `${INFRAHUB_API_TOKEN:-...}` fallback
+      - name: cli-commands-exist
+        check: No invented infrahubctl subcommand appears in the answer
+
+  - name: common-dry-run-generator
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-common/SKILL.md and follow
+      its rules.
+
+      Task: I changed `queries/dc_topology.gql`. It feeds a generator
+      registered in `.infrahub.yml` like this:
+
+      ```yaml
+      generator_definitions:
+        - name: create_dc
+          file_path: "generators/create_dc.py"
+          class_name: CreateDc
+          targets: dc_sites
+          query: dc_topology
+          parameters:
+            site_id: "id"
+      ```
+
+      I want to dry-run the query against my local instance before I open
+      the PR, for the one site whose id is
+      `1809d0bc-4f21-4a3e-9b2c-7e5a1d3c8f60`. Give me the exact command,
+      and tell me what goes wrong if I get the argument shape wrong.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/common/check_generator_dry_run.py
+        weight: 0.7
+      - type: llm_rubric
+        provider: anthropic
+        weight: 0.3
+        rubric: |
+          Read output.md. Score each criterion 0.0 or 1.0; return the
+          average.
+
+          1. The answer says that a token without an `=` is dropped, and
+             that the run then falls back to the definition's target
+             group and runs over every member of it. Saying it "runs with
+             no variables", "fails", "errors" or "looks like a query bug"
+             scores 0.0: the consequence is a mass write, and framing it
+             as a failure is what stops the reader looking for the
+             writes.
+          2. Every `infrahubctl` command the answer names, in prose or in
+             a code block, is a real command. Score 0.0 if `generator` is
+             given a generic verb (run, list, create, execute) where its
+             target belongs: the generator name is positional and
+             listing is a flag.
+    expected_output: >-
+      An answer giving `infrahubctl generator create_dc
+      site_id=1809d0bc-4f21-4a3e-9b2c-7e5a1d3c8f60 --branch <branch>`. The
+      target is passed as the `key=value` query variable the generator's
+      parameters declare, never as a bare id, and the run names a branch
+      because it writes. It should say that a bare id is dropped silently
+      and the generator then runs over every member of the `dc_sites`
+      group.
+    expectations:
+      - >-
+        The target is passed as `site_id=<uuid>`, a key=value query
+        variable, not as a bare id
+      - The run names a branch, because running a generator writes
+      - >-
+        Explains that a token with no `=` is dropped and the generator
+        then runs over the whole target group, which is a mass write
+      - Every infrahubctl command named in the answer actually exists
+    assertions:
+      - name: generator-target-is-key-value
+        check: >-
+          The generator target is a `key=value` query variable on a named
+          branch, not a bare id
+      - name: cli-commands-exist
+        check: No invented infrahubctl subcommand appears in the answer
 
   # --- Issue Reporter --- #
   - name: bug-sanitization
@@ -2628,6 +3134,236 @@ tasks:
           __typename appears inside the bgp_neighbors selection in
           the updated GraphQL query
 
+  - name: generator-watch-dependencies
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Register these two new Generators in `.infrahub.yml`. Both target
+      groups already exist as CoreGeneratorGroups, and both GraphQL queries are
+      already declared in the `queries:` section under the names used below.
+
+      Repository layout:
+
+      ```text
+      generators/generate_fabric.py
+      generators/fabric_generator_query.py
+      generators/generate_rack.py
+      src/my_package/generator.py
+      src/my_package/protocols.py
+      ```
+
+      generators/generate_fabric.py:
+      ```python
+      from infrahub_sdk.generator import InfrahubGenerator
+
+      from my_package.generator import GeneratorMixin
+
+      from .fabric_generator_query import FabricGeneratorQuery
+
+
+      class FabricGenerator(InfrahubGenerator, GeneratorMixin):
+          async def generate(self, data: dict) -> None:
+              parsed = FabricGeneratorQuery(**data)
+              await self.build_fabric(parsed.fabric)
+      ```
+
+      Uses query `generate_fabric`, targets group `fabrics`, and maps the query
+      variable `fabric_name` to the target's name attribute.
+
+      generators/generate_rack.py:
+      ```python
+      from infrahub_sdk.generator import InfrahubGenerator
+
+
+      class RackGenerator(InfrahubGenerator):
+          async def generate(self, data: dict) -> None:
+              rack = data["LocationRack"]["edges"][0]["node"]
+              for position in range(1, 43):
+                  unit = await self.client.create(
+                      kind="LocationRackUnit",
+                      data={"position": position, "rack": rack["id"]},
+                  )
+                  await unit.save(allow_upsert=True)
+      ```
+
+      Uses query `generate_rack`, targets group `racks`, and maps the query
+      variable `rack_name` to the target's name attribute.
+
+      Save ONLY the `generator_definitions` section to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_watch_dependencies.py
+        weight: 1.0
+    expected_output: >-
+      A generator_definitions section with both Generators registered (query,
+      targets, class_name, parameters) and an accurate watch block on each:
+      generate_fabric naming generators/fabric_generator_query.py and
+      src/my_package/, and generate_rack — which imports nothing first-party —
+      carrying an explicit empty files list rather than no watch key at all.
+    expectations:
+      - "Both generator_definitions entries carry a watch key"
+      - "generate_fabric declares generators/fabric_generator_query.py"
+      - "generate_fabric declares src/my_package/ (or the module within it)"
+      - "generate_rack declares watch.files as an empty list"
+      - "No watch entry names infrahub_sdk or another installed package"
+    assertions:
+      - name: gen-watch-present
+        check: >-
+          Every generator_definitions entry has a watch key, since a missing
+          one folds the commit id into the fingerprint and re-runs the
+          Generator on every commit
+      - name: gen-watch-object-form
+        check: >-
+          Every watch block is the object form {files: [...]}, not a bare list
+      - name: gen-watch-declares-sibling-query-model
+        check: >-
+          generate_fabric declares generators/fabric_generator_query.py, the
+          sibling module it imports
+      - name: gen-watch-declares-shared-package
+        check: >-
+          generate_fabric declares src/my_package/ (or the module within it)
+          that it imports
+      - name: gen-watch-no-third-party
+        check: >-
+          No watch entry names an installed dependency such as infrahub_sdk
+      - name: gen-watch-empty-for-self-contained
+        check: >-
+          generate_rack, which has no first-party import, declares
+          watch.files as []
+
+  - name: practices-watch-dependencies
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 7. Emit JSON findings to output.json.
+
+      This repository runs on Infrahub 1.11.1. Audit the registrations
+      below against how Infrahub decides what to regenerate.
+
+      Repository layout:
+
+      ```text
+      transforms/device_config.py
+      transforms/device_config_query.py
+      transforms/interface_names.py
+      generators/generate_fabric.py
+      generators/fabric_generator_query.py
+      templates/startup_config_arista.j2
+      templates/partials/header.j2
+      src/my_package/formatting.py
+      ```
+
+      transforms/device_config.py:
+      ```python
+      from infrahub_sdk.transforms import InfrahubTransform
+
+      from my_package.formatting import render_banner
+
+      from .device_config_query import DeviceConfigQuery
+      ```
+
+      transforms/interface_names.py:
+      ```python
+      from infrahub_sdk.transforms import InfrahubTransform
+      ```
+
+      generators/generate_fabric.py:
+      ```python
+      from infrahub_sdk.generator import InfrahubGenerator
+
+      from .fabric_generator_query import FabricGeneratorQuery
+      from my_package.formatting import render_banner
+      ```
+
+      templates/startup_config_arista.j2:
+      ```jinja
+      {% include "templates/partials/header.j2" %}
+      ```
+
+      The registrations in `.infrahub.yml`:
+      ```yaml
+      python_transforms:
+        - name: device_config
+          class_name: DeviceConfig
+          file_path: transforms/device_config.py
+        - name: interface_names
+          class_name: InterfaceNames
+          file_path: transforms/interface_names.py
+          watch:
+            files: []
+
+      generator_definitions:
+        - name: generate_fabric
+          file_path: generators/generate_fabric.py
+          query: generate_fabric
+          targets: fabrics
+          class_name: FabricGenerator
+          watch:
+            files:
+              - src/my_package/
+
+      jinja2_transforms:
+        - name: arista_startup_config
+          query: device_startup_config
+          template_path: templates/startup_config_arista.j2
+
+      artifact_definitions:
+        - name: device_config_artifact
+          artifact_name: device-config
+          content_type: text/plain
+          targets: devices
+          transformation: device_config
+      ```
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_practices_watch_dependencies.py
+        weight: 1.0
+    expected_output: >-
+      JSON findings flagging transforms/device_config.py (no watch key at
+      all, so the commit id is folded into its fingerprint) and
+      generators/generate_fabric.py (declares the shared package but omits
+      the sibling query model it imports, so the list reads complete while
+      a change to that module is missed). interface_names and the
+      Arista template are already correct and must not be flagged, and no
+      fix may put watch on the artifact_definitions entry.
+    expectations:
+      - "device_config is flagged for carrying no watch key"
+      - "generate_fabric is flagged for an incomplete list (sibling query model missing)"
+      - "interface_names, whose files: [] is correct, is not flagged"
+      - "The Arista template, whose includes are literal, is not flagged"
+      - "No finding proposes watch on the artifact_definitions entry"
+      - "No proposed list names infrahub_sdk or another installed package"
+    assertions:
+      - name: watch-flags-entry
+        check: >-
+          A finding is attributed to transforms/device_config.py, which
+          imports a sibling and the shared package yet declares no watch
+      - name: watch-flags-entry
+        check: >-
+          A finding is attributed to generators/generate_fabric.py, whose
+          watch names src/my_package/ but omits the sibling query model
+      - name: watch-does-not-flag-entry
+        check: >-
+          No finding is attributed to transforms/interface_names.py, whose
+          empty list is the correct declaration for a self-contained entry
+      - name: watch-does-not-flag-entry
+        check: >-
+          No finding is attributed to the Arista template, whose literal
+          includes give it a complete closure already
+      - name: watch-not-on-forbidden-section
+        check: >-
+          No finding places a watch fix on check_definitions or
+          artifact_definitions, whose models reject the key and fail the
+          whole repository import
+      - name: watch-no-third-party-in-fix
+        check: >-
+          No proposed watch list names an installed package, which is not a
+          tracked repository file
+
   # --- CSV Import --- #
   - name: csv-import-single-kind-envelope
     trials: 3
@@ -3313,207 +4049,6 @@ tasks:
           Every attribute on every emitted row uses the value+metadata
           mapping form with source set to csv-import-20260622
 
-  # --- Expectations-only tasks for process / conversation rules --- #
-
-  - name: csv-import-up-front-interview
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
-
-      Task: I have `devices.csv` with these columns and rows:
-
-          name,role,status,tier_label
-          spine-01,spine,Active,gold
-          spine-02,spine,Maintenance,gold
-          leaf-01,leaf,Active,silver
-
-      The schema declares `DcimDevice` with attributes `name` (Text),
-      `role` (Text), `status` (Dropdown: active/maintenance/retired). The
-      schema has NO `tier_label` attribute on DcimDevice. DcimDevice has
-      `human_friendly_id: [name__value]`. The schema is fixed.
-
-      Before emitting any file, surface every decision you need from me in
-      ONE batch — unmapped columns, dropdown-label translation, target
-      file naming, branch name, and lineage opt-in. Do not start writing
-      until I confirm. Echo back the full plan before any file is created.
-      Save planned output under `./output_dir/`.
-    expected_output: >-
-      A single batched set of multi-choice questions covering every
-      ambiguity (tier_label has no schema home; Status is a dropdown
-      label; branch name; lineage opt-in) plus a confirm-and-lock summary
-      of the proposed plan. No file is written until the user confirms.
-    expectations:
-      - Every ambiguity is surfaced in one batched round, not one-by-one
-      - The unmapped tier_label column is called out explicitly
-      - Status values (Active/Maintenance) are flagged as dropdown labels
-      - A branch name is proposed (e.g., csv-import-YYYYMMDD-HHMM)
-      - Lineage opt-in is offered with an explanation of source vs. owner+is_protected
-      - The plan is echoed back before any file is written
-
-  - name: csv-import-profile-sample
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
-
-      Task: Before mapping `inventory.csv` (which I will provide
-      content-wise inline below), profile it: report distinct-value counts,
-      sample values, length ranges, numeric-only fractions, date-pattern
-      matches, and any sequence patterns. Use the profile to drive the
-      mapping plan.
-
-          name,role,status,manufacturer_name,port_count,commissioned_at
-          spine-01,spine,Active,Arista,32,2024-03-15
-          spine-02,spine,Active,Arista,32,2024-03-15
-          leaf-01,leaf,Maintenance,Cisco,48,2023-09-01
-          leaf-02,leaf,Active,Cisco,48,2024-01-10
-
-      Schema is fixed. Emit only the per-file profile summary — do not
-      write any object YAML in this task.
-    expected_output: >-
-      A per-column profile of inventory.csv naming distinct-value counts
-      (4 names, 2 roles, 2 statuses, 2 manufacturers, 2 port counts, 3
-      dates), sample values, length ranges, the 100% numeric port_count
-      column, and the YYYY-MM-DD commissioned_at column as DateTime.
-    expectations:
-      - The profile names per-column distinct-value counts
-      - role and status are flagged as low-cardinality (dropdown candidates)
-      - port_count is flagged as 100% numeric
-      - commissioned_at is flagged as a YYYY-MM-DD DateTime pattern
-      - manufacturer_name is flagged as a reference candidate (low cardinality)
-
-  - name: csv-import-validate-error-mapping
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
-
-      Task: After running `infrahubctl object validate ./output_dir/ --branch csv-import-20260622-1430`,
-      the server returned:
-
-          output_dir/04_devices.yml row 7 attribute 'status':
-            'Active' is not a valid choice for status
-
-      The skill produced the YAML from `inventory.csv` row 12. The skill
-      knows the per-row mapping back to the source. Translate the
-      validate error into a clear instruction that tells me which CSV
-      cell to fix, and explicitly tells me NOT to edit the emitted YAML
-      directly.
-    expected_output: >-
-      A traceback that names inventory.csv row 12 column "Status", explains
-      that "Active" is the display label (the schema choice name is
-      `active`), and lists fix options including re-running with the
-      dropdown-label-to-name rule applied. The response must instruct the
-      user not to edit the emitted YAML by hand.
-    expectations:
-      - The error is traced back to inventory.csv row 12 column "Status"
-      - The "Active" vs "active" label/name distinction is explained
-      - Fix options include editing the CSV and re-running the skill
-      - The user is told NOT to edit the emitted YAML directly
-
-  - name: csv-import-self-check-against-managing-objects
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
-
-      Task: After emitting Infrahub object YAML to ./output_dir/ (do this
-      step first for the simple manufacturers CSV below), describe the
-      local self-check you would run BEFORE creating any branch. Name the
-      specific managing-objects rules you check the emission against and
-      what each one catches.
-
-          # manufacturers.csv
-          name,description,country
-          Dell,Server and storage vendor,US
-
-      Schema defines `OrganizationManufacturer` with Text attributes
-      `name`, `description`, `country`, and `human_friendly_id: [name__value]`.
-    expected_output: >-
-      The emitted YAML for OrganizationManufacturer under ./output_dir/,
-      plus a description of the local self-check that walks each emitted
-      file against managing-objects rules (format-structure,
-      value-attributes, value-relationships, children-components,
-      range-expansion, organization-load-order). No infrahubctl command
-      is run in this task — the self-check is local-only.
-    expectations:
-      - At least one YAML file is emitted to ./output_dir/
-      - The self-check is described as running BEFORE infrahubctl branch create
-      - The self-check is local-only (no server, no branch)
-      - Specific managing-objects rule files are named
-      - Each named rule is matched to the shape it verifies
-
-  - name: csv-import-create-branch-first
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
-
-      Task: Walk me through the validate-and-load sequence after the
-      local self-check passes for a hypothetical ./output_dir/. Include
-      the exact infrahubctl commands in the order they should be run,
-      using a default branch name like `csv-import-YYYYMMDD-HHMM`. Do
-      NOT actually execute them — just produce the command sequence
-      with one-line explanations.
-    expected_output: >-
-      The command sequence in order: (1) infrahubctl info to verify
-      connectivity, (2) infrahubctl branch create <name>, (3) infrahubctl
-      object validate ./output_dir/ --branch <name>, (4) infrahubctl
-      object load ./output_dir/ --branch <name>. Plus a note about
-      `infrahubctl branch delete <name>` on partial failure. The default
-      branch is never the target.
-    expectations:
-      - The sequence creates a branch BEFORE validate or load
-      - infrahubctl info is mentioned as a connectivity check
-      - The branch is created via infrahubctl branch create
-      - validate and load both pass --branch <name>
-      - The default branch is explicitly excluded as a target
-      - branch delete is named as the cleanup on partial failure
-
-  - name: csv-import-introspect-first
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
-
-      Task: Before mapping `devices.csv` to the schema, describe how you
-      would discover the schema. List the priority chain (MCP →
-      infrahubctl schema export → /api/schema REST → local schemas/*.yml)
-      and explain when to fall back to the next source. The schema is
-      read-only throughout — do not propose any schema edit. Do not
-      emit any YAML in this task — describe the introspection only.
-    expected_output: >-
-      A description of the four-source priority chain (MCP first,
-      infrahubctl schema export, /api/schema REST, local schemas/*.yml
-      last), with the trade-off of each source (freshness vs.
-      availability) and an explicit "schema is read-only — escalate to
-      managing-schemas if a column has no home."
-    expectations:
-      - The priority chain lists MCP first
-      - infrahubctl schema export is listed as the next fallback after MCP
-      - /api/schema REST is named as the third option
-      - Local schemas/*.yml is named as the last resort with a freshness caveat
-      - The response explicitly says no schema edit will be proposed
-      - Escalation to managing-schemas is named for the unmappable-column case
-
-  - name: csv-import-file-folder-list-input
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
-
-      Task: I will hand you any of three input shapes — a single CSV
-      file, a directory of CSVs, or an explicit list of paths. Describe
-      how the skill normalizes each shape into a flat file list before
-      profiling, and what happens to non-CSV/TSV files in a directory.
-      Do not emit any YAML in this task — describe the input
-      normalization only.
-    expected_output: >-
-      A description of the input normalization step: single file passes
-      through, directory is recursively scanned for *.csv and *.tsv
-      (case-insensitive), list of paths is expanded the same way.
-      Non-CSV/TSV files in a directory are ignored or surface a
-      fail-closed report depending on the rule.
-    expectations:
-      - Single file is accepted directly
-      - Directory is recursively scanned for .csv and .tsv files
-      - Mixed input lists are normalized to a flat file set
-      - Case-insensitive extension matching is mentioned
-      - The response references the fail-closed posture for unsupported file types
 
   - name: csv-import-fail-closed
     trials: 3
@@ -3727,6 +4262,137 @@ tasks:
         check: The yagni-python-validator-vs-schema-constraint finding has severity MEDIUM
       - name: correct-ladder-step
         check: The yagni-python-validator-vs-schema-constraint finding has ladder_step 3
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
+
+  - name: yagni-python-validator-uniqueness-scope
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9 of the audit procedure (YAGNI / Cost-to-Fix). For this
+      evaluation, emit findings as JSON to output.json (not the usual
+      AUDIT_REPORT.md). Shape:
+
+      {"findings": [{"rule": "...", "severity": "MEDIUM|LOW",
+                     "ladder_step": <int>, "file": "...",
+                     "line": "...", "replacement": "..."}]}
+
+      Audit these two artifacts.
+
+      checks/check_switch_name_unique.py:
+      ```python
+      from infrahub_sdk.checks import InfrahubCheck
+
+      class SwitchNameUniqueCheck(InfrahubCheck):
+          query = "switch_query"
+
+          async def validate(self, data):
+              seen = set()
+              for sw in data["DcimSwitch"]["edges"]:
+                  key = (sw["node"]["site"]["node"]["id"],
+                         sw["node"]["name"]["value"])
+                  if key in seen:
+                      self.log_error(message=f"duplicate switch name {key}")
+                  seen.add(key)
+      ```
+
+      checks/check_pdu_rack_unique.py:
+      ```python
+      from infrahub_sdk.checks import InfrahubCheck
+
+      class PduRackUniqueCheck(InfrahubCheck):
+          query = "pdu_query"
+
+          async def validate(self, data):
+              seen = set()
+              for pdu in data["DcimPdu"]["edges"]:
+                  rack = pdu["node"]["rack"]["node"]
+                  if rack is None:
+                      continue
+                  key = (rack["id"], pdu["node"]["name"]["value"])
+                  if key in seen:
+                      self.log_error(message=f"duplicate pdu {key}")
+                  seen.add(key)
+      ```
+
+      The schema (schemas/dcim.yml):
+      ```yaml
+      generics:
+        - name: GenericDevice
+          namespace: Dcim
+          attributes:
+            - name: name
+              kind: Text
+          relationships:
+            - name: site
+              peer: LocSite
+              cardinality: one
+              optional: false
+
+      nodes:
+        - name: Switch
+          namespace: Dcim
+          inherit_from:
+            - DcimGenericDevice
+
+        - name: Router
+          namespace: Dcim
+          inherit_from:
+            - DcimGenericDevice
+
+        - name: Pdu
+          namespace: Dcim
+          attributes:
+            - name: name
+              kind: Text
+          relationships:
+            - name: rack
+              peer: DcimRack
+              cardinality: one
+              optional: true
+      ```
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_uniqueness_scope.py
+        weight: 1.0
+    expected_output: >-
+      JSON with exactly one yagni-python-validator-vs-schema-constraint
+      finding, on checks/check_switch_name_unique.py, severity MEDIUM,
+      ladder_step 3. Its replacement puts
+      `uniqueness_constraints: [["site", "name__value"]]` on the concrete
+      kind DcimSwitch, not on the shared DcimGenericDevice generic: on the
+      generic it would also bar a DcimRouter from reusing a switch name,
+      which the Python check never did. No finding on
+      checks/check_pdu_rack_unique.py, because `rack` is optional and a
+      uniqueness constraint over an optional relationship is rejected at
+      schema load, so there is no cheaper layer to move it to.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - >-
+        The switch check is flagged with severity MEDIUM and ladder_step 3
+      - >-
+        The replacement names the concrete kind DcimSwitch, not the shared
+        DcimGenericDevice generic
+      - >-
+        The PDU check is not flagged, because its rack relationship is
+        optional and the schema rejects that in a constraint
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-python-validator-vs-schema-constraint finding is emitted
+      - name: correct-severity
+        check: The yagni-python-validator-vs-schema-constraint finding has severity MEDIUM
+      - name: correct-ladder-step
+        check: The yagni-python-validator-vs-schema-constraint finding has ladder_step 3
+      - name: flagged-on-switch-check
+        check: The finding is attributed to checks/check_switch_name_unique.py
+      - name: replacement-names-concrete-kind
+        check: The suggested replacement names DcimSwitch
+      - name: replacement-avoids-generic
+        check: The suggested replacement does not put the constraint on DcimGenericDevice
+      - name: optional-rel-carveout
+        check: No finding is emitted on checks/check_pdu_rack_unique.py
       - name: severity-cap
         check: No yagni finding exceeds MEDIUM severity
 
@@ -4690,6 +5356,91 @@ tasks:
       - name: severity-cap
         check: No yagni finding exceeds MEDIUM severity
 
+  - name: audit-read-only-comparison
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      follow its audit procedure.
+
+      Audit this repository. `git status --porcelain` reports:
+
+      ```text
+       M generators/build_interfaces.py
+      ?? objects/interfaces-generated.yml
+      ```
+
+      One audit question is outstanding: are the committed files under
+      `objects/` still reproducible from the **committed** version of
+      `generators/build_interfaces.py`? The version in the working tree
+      has uncommitted edits, and `generators/build_interfaces.py` accepts
+      a `--check` flag whose behaviour you have not established.
+
+      Another agent is working in this repository at the same time.
+
+      Include a verbatim transcript of the shell commands you ran, in
+      order, so the answer can be reproduced. Emit JSON to output.json
+      with this shape:
+
+      {"tree_modified": <bool>,
+       "commands": ["<exact shell command>", ...],
+       "findings": [{"rule": "...", "severity": "...", "file": "...",
+                     "note": "..."}]}
+
+      Save ONLY the JSON to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_audit_read_only.py
+        weight: 1.0
+    expected_output: >-
+      JSON reporting tree_modified false, a commands list that reaches the
+      committed generator with a read-only command such as
+      `git show HEAD:generators/build_interfaces.py`, and no destructive
+      git command, no non-git write (rm, mv, sed -i, a redirect into a
+      repository path other than the audit's own output) and no run of the
+      generator. The findings should record that
+      the tree held uncommitted changes at audit time and that the
+      `--check` flag's write behaviour could not be established, so that
+      comparison was reported as not performed rather than forced.
+    expectations:
+      - Output is JSON carrying a tree_modified key set to false
+      - >-
+        The committed generator is read with git show, git diff,
+        git cat-file or git ls-tree
+      - >-
+        No destructive git command is run, including as a cleanup step
+      - >-
+        No non-git write is run against the tree either: no rm, mv,
+        sed -i, or output redirected into a repository path. Writing the
+        audit's own deliverable does not count
+      - >-
+        The uncommitted state of the tree is recorded as a finding or note,
+        because it bounds what the audit is worth
+      - >-
+        The generator is not run for its output while its --check
+        behaviour is unestablished; that check is reported as not
+        performed
+    assertions:
+      - name: no-destructive-git
+        check: >-
+          The commands list runs no destructive git command, including one
+          undoing the audit's own side effect
+      - name: no-tree-writes
+        check: >-
+          The commands list runs no non-git write against the tree (rm,
+          mv, cp, touch, sed -i, or a redirect into a repository path),
+          the audit's own deliverable aside
+      - name: unverified-script-not-run
+        check: >-
+          The generator is not executed while its --check write behaviour
+          is unestablished, and the finding that names the generator
+          records the comparison as not performed
+      - name: uses-read-only-git
+        check: >-
+          At least one of git show, git diff, git cat-file or git ls-tree
+          is used to reach the committed revision
+      - name: declares-tree-untouched
+        check: The output reports tree_modified false
+
   # --- Skill Gap Reporter --- #
   - name: reporting-skill-gaps-tracker-no-match
     trials: 3
@@ -5116,8 +5867,10 @@ tasks:
     expected_output: >-
       A response that drafts a complete report (type feature, a title
       starting with `feat:`, a filled-in body, `searched` naming the
-      tracker already checked, and a Skills version header read from the
-      implicated skill's own frontmatter), then hands the payload to
+      tracker already checked, a Skills version header read from the
+      implicated skill's own frontmatter, and Infrahub SDK version and
+      Infrahub version headers read from `infrahubctl info`), then hands
+      the payload to
       infrahub-reporting-issues instead of running `gh issue create` or
       claiming an issue was filed itself. It names no target repository:
       routing belongs to the receiver, which resolves it from the type.
@@ -5126,6 +5879,8 @@ tasks:
       - Runs no `gh` write commands itself and claims no issue was filed
       - Carries a complete payload (type, title, body, searched)
       - Records the skills-plugin version whose guidance failed
+      - Records the infrahub-sdk version the session ran against
+      - Records the Infrahub version the session talked to
       - Names no repository as the filing destination
       - Uses a title starting with `feat:`
     assertions:
@@ -5143,6 +5898,14 @@ tasks:
         check: >-
           Response's header records the skills-plugin version whose
           guidance failed, or `unknown`
+      - name: states-sdk-version
+        check: >-
+          Response's header records the infrahub-sdk version the session
+          ran against, or `unknown`
+      - name: states-infrahub-version
+        check: >-
+          Response's header records the Infrahub version the session
+          talked to, or `unknown`
       - name: leaves-routing-to-reporter
         check: >-
           Response names no repository as the filing destination, leaving
@@ -5356,3 +6119,1398 @@ tasks:
         check: >-
           Response still describes the modelling problem generically, not
           only placeholder tokens
+  # --- NetBox Device Type Converter --- #
+  - name: netbox-convert-template-objects
+    trials: 3
+    instruction: |
+      Read the skill at
+      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: I have this NetBox device-type definition saved as
+      `device-types/Cisco/C9300-24P.yaml`:
+
+          ---
+          manufacturer: Cisco
+          model: Catalyst 9300-24P
+          slug: cisco-c9300-24p
+          part_number: C9300-24P
+          u_height: 1
+          is_full_depth: true
+          weight: 6.8
+          weight_unit: kg
+          interfaces:
+            - name: GigabitEthernet1/0/1
+              type: 1000base-t
+            - name: GigabitEthernet1/0/2
+              type: 1000base-t
+            - name: mgmt0
+              type: 1000base-t
+              mgmt_only: true
+
+      Our schema is the OpsMill schema-library DCIM schema with
+      `generate_template: true` already enabled on `DcimDevice`, so
+      `TemplateDcimDevice` and `TemplateInterfacePhysical` exist.
+
+      Convert it into Infrahub object templates and write the emitted files
+      under `./output_dir/` (create the directory). Do not load anything
+      against a server.
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_template_objects.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/ containing Infrahub object files. The template file
+      uses spec.kind TemplateDcimDevice, every row has a template_name, the
+      interfaces nest under a kind + data wrapper naming
+      TemplateInterfacePhysical, and no physical model data (height,
+      part_number, weight) appears on the template.
+    expectations:
+      - Every emitted document has apiVersion infrahub.app/v1 and kind Object
+      - The template document uses spec.kind TemplateDcimDevice, not DcimDevice
+      - Every template row carries a template_name
+      - Interfaces nest under a mapping with kind and data, not a bare list
+      - The component wrapper names a Template* kind
+      - Model data such as height and part_number is on the device type, not the template
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind,
+          and spec.data list
+      - name: template-kind
+        check: >-
+          Templates are authored under a Template<Kind> and every row has a
+          template_name
+      - name: no-model-data-on-template
+        check: >-
+          height, part_number, weight, and full_depth do not appear on any
+          template row
+      - name: component-kind-wrapper
+        check: >-
+          Component children nest under a kind + data wrapper naming a
+          Template* kind
+
+  - name: netbox-convert-template-names
+    trials: 3
+    instruction: |
+      Read the skill at
+      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Convert both of these NetBox device types into Infrahub object
+      templates. Note that they use the same interface names as each other.
+
+      `device-types/Arista/DCS-7010T-48.yaml`:
+
+          ---
+          manufacturer: Arista
+          model: DCS-7010T-48
+          slug: arista-dcs-7010t-48
+          u_height: 1
+          interfaces:
+            - name: Ethernet1
+              type: 1000base-t
+            - name: Ethernet2
+              type: 1000base-t
+            - name: Management1
+              type: 1000base-t
+              mgmt_only: true
+
+      `device-types/Arista/DCS-7050TX-48.yaml`:
+
+          ---
+          manufacturer: Arista
+          model: DCS-7050TX-48
+          slug: arista-dcs-7050tx-48
+          u_height: 1
+          interfaces:
+            - name: Ethernet1
+              type: 10gbase-t
+            - name: Ethernet2
+              type: 10gbase-t
+            - name: Management1
+              type: 1000base-t
+              mgmt_only: true
+
+      Our schema is the OpsMill schema-library DCIM schema with
+      `generate_template: true` enabled on `DcimDevice`.
+
+      Write the emitted files under `./output_dir/` (create the directory).
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_template_names.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/ where both device types converted, and every component
+      template_name is namespaced by its parent template (for example
+      arista-dcs-7010t-48__Ethernet1) so that the Ethernet1 templates of the
+      two device types do not collide.
+    expectations:
+      - Both device types produce a template row
+      - Parent template names derive from the NetBox slug
+      - Every component template_name contains its parent template's name
+      - No two component templates share a template_name
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind,
+          and spec.data list
+      - name: template-kind
+        check: >-
+          Templates are authored under a Template<Kind> and every row has a
+          template_name
+      - name: component-names-namespaced
+        check: >-
+          Component template names are namespaced by their parent template
+          and are unique across the whole output
+
+  - name: netbox-convert-load-order
+    trials: 3
+    instruction: |
+      Read the skill at
+      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Convert this NetBox device type into Infrahub object templates
+      for our OpsMill schema-library DCIM schema (`generate_template: true`
+      is already enabled on `DcimDevice`):
+
+          ---
+          manufacturer: Juniper
+          model: EX4300-32F
+          slug: juniper-ex4300-32f
+          part_number: EX4300-32F
+          u_height: 1
+          is_full_depth: true
+          weight: 18.0
+          weight_unit: lb
+          interfaces:
+            - name: ge-0/0/0
+              type: 1000base-x-sfp
+            - name: ge-0/0/1
+              type: 1000base-x-sfp
+
+      The manufacturer does not exist in Infrahub yet, so the output has to
+      create it too. Write the emitted files under `./output_dir/` (create
+      the directory) so that loading them in filename order works.
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_load_order.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/ with numbered files in dependency order — manufacturers
+      first, then device types, then templates — where the device type object
+      names its manufacturer and carries the physical model data (height,
+      part_number, weight converted to kilograms).
+    expectations:
+      - Emitted files are numbered so a filename sort is a valid load order
+      - Manufacturers are emitted before device types
+      - Device types are emitted before templates
+      - The device type object references its manufacturer
+      - The device type object carries the model data, not the template
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind,
+          and spec.data list
+      - name: load-order-numbering
+        check: >-
+          Files are numbered so manufacturers precede device types, which
+          precede templates
+      - name: device-type-object
+        check: >-
+          The device type object names a manufacturer and carries model data
+
+  - name: netbox-convert-coverage-report
+    trials: 3
+    instruction: |
+      Read the skill at
+      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Convert this NetBox device type for our OpsMill schema-library
+      DCIM schema (`generate_template: true` is enabled on `DcimDevice`;
+      the schema models interfaces as the only device component):
+
+          ---
+          manufacturer: Cisco
+          model: Catalyst 9500-16X
+          slug: cisco-c9500-16x
+          part_number: C9500-16X
+          u_height: 1
+          airflow: front-to-rear
+          console-ports:
+            - name: con 0
+              type: rj-45
+            - name: usb
+              type: usb-mini-b
+          power-ports:
+            - name: PSU0
+              type: iec-60320-c14
+              maximum_draw: 950
+          module-bays:
+            - name: NM slot
+              position: '1'
+          interfaces:
+            - name: TenGigabitEthernet1/0/1
+              type: 10gbase-x-sfpp
+            - name: TenGigabitEthernet1/0/2
+              type: 10gbase-x-sfpp
+
+      Write the emitted files under `./output_dir/` (create the directory).
+      I need to know exactly what did not make it across.
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_coverage_report.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/ containing the object files plus a Markdown coverage
+      report naming the component lists that were skipped (console-ports,
+      power-ports, module-bays) and the fields that were dropped, alongside
+      the interfaces that did convert.
+    expectations:
+      - A Markdown coverage report is written into the output directory
+      - The report names console-ports, power-ports, and module-bays as skipped
+      - The report accounts for the interfaces that did convert
+      - Dropped fields such as the interface type are named
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind,
+          and spec.data list
+      - name: coverage-report
+        check: >-
+          A Markdown report names the NetBox component lists that did not
+          convert
+      - name: template-kind
+        check: >-
+          Templates are authored under a Template<Kind> and every row has a
+          template_name
+
+  - name: netbox-convert-schema-prerequisite
+    trials: 3
+    instruction: |
+      Read the skill at
+      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: I want to import NetBox device types as object templates. Here
+      is the relevant part of our current schema, `schemas/dcim.yml`:
+
+          ---
+          version: "1.0"
+          nodes:
+            - name: Device
+              namespace: Dcim
+              label: Device
+              inherit_from:
+                - DcimGenericDevice
+              attributes:
+                - name: name
+                  kind: Text
+                  unique: true
+                - name: serial
+                  kind: Text
+                  optional: true
+              relationships:
+                - name: interfaces
+                  peer: DcimInterface
+                  cardinality: many
+                  kind: Component
+                - name: device_type
+                  peer: DcimDeviceType
+                  cardinality: one
+                  kind: Attribute
+
+      Work out what has to change in this schema before any converted
+      output can load, and write the corrected schema to
+      `./output_dir/dcim.yml` (create the directory). Explain the change in
+      a `./output_dir/notes.md`.
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_schema_prerequisite.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/dcim.yml where the DcimDevice node carries
+      generate_template: true, plus notes explaining that the Template*
+      kinds do not exist until that flag is set and the schema is loaded.
+    expectations:
+      - The corrected schema sets generate_template true on the Device node
+      - The flag is placed on the node, not on a generic
+      - The notes explain that Template* kinds are generated, not hand-written
+      - The notes note that only Component relationships generate component templates
+    assertions:
+      - name: generate-template-prerequisite
+        check: >-
+          The emitted schema parses with generate_template: true on the
+          Device node — not commented out, and not on a generic
+
+  - name: netbox-convert-full-pipeline
+    trials: 3
+    instruction: |
+      Read the skill at
+      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Convert these two NetBox device types into a complete, loadable
+      Infrahub object-template import for our OpsMill schema-library DCIM
+      schema (`generate_template: true` is already enabled on `DcimDevice`).
+      Neither manufacturer exists in Infrahub yet.
+
+      `device-types/Cisco/C9200-24P.yaml`:
+
+          ---
+          manufacturer: Cisco
+          model: Catalyst 9200-24P
+          slug: cisco-c9200-24p
+          part_number: C9200-24P
+          u_height: 1
+          is_full_depth: true
+          weight: 5.4
+          weight_unit: kg
+          airflow: front-to-rear
+          console-ports:
+            - name: con 0
+              type: rj-45
+          interfaces:
+            - name: GigabitEthernet1/0/1
+              type: 1000base-t
+              poe_mode: pse
+            - name: GigabitEthernet1/0/2
+              type: 1000base-t
+              poe_mode: pse
+
+      `device-types/Juniper/EX2300-24T.yaml`:
+
+          ---
+          manufacturer: Juniper
+          model: EX2300-24T
+          slug: juniper-ex2300-24t
+          part_number: EX2300-24T
+          u_height: 1
+          weight: 7.5
+          weight_unit: lb
+          module-bays:
+            - name: PSU 0
+              position: '0'
+          interfaces:
+            - name: ge-0/0/0
+              type: 1000base-t
+            - name: me0
+              type: 1000base-t
+              mgmt_only: true
+
+      Write everything needed to load this under `./output_dir/` (create the
+      directory), including a record of anything that did not convert.
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_full_conversion.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/ with numbered object files (manufacturers, device
+      types, templates) plus a Markdown coverage report. Templates use
+      Template* kinds with parent-namespaced component names, model data
+      sits on the device types, and the report names the skipped
+      console-ports and module-bays.
+    expectations:
+      - Both manufacturers are created, de-duplicated, and load first
+      - Device types carry height, part_number, and weight in kilograms
+      - Templates use Template* kinds and carry no model data
+      - Component templates nest under a kind + data wrapper
+      - Component template names are namespaced by their parent
+      - A coverage report names the skipped console-ports and module-bays
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind,
+          and spec.data list
+      - name: template-kind
+        check: >-
+          Templates are authored under a Template<Kind> and every row has a
+          template_name
+      - name: no-model-data-on-template
+        check: >-
+          height, part_number, weight, and full_depth do not appear on any
+          template row
+      - name: component-kind-wrapper
+        check: >-
+          Component children nest under a kind + data wrapper naming a
+          Template* kind
+      - name: component-names-namespaced
+        check: >-
+          Component template names are namespaced by their parent template
+          and are unique across the whole output
+      - name: device-type-object
+        check: >-
+          The device type object names a manufacturer and carries model data
+      - name: load-order-numbering
+        check: >-
+          Files are numbered so manufacturers precede device types, which
+          precede templates
+      - name: coverage-report
+        check: >-
+          A Markdown report names the NetBox component lists that did not
+          convert
+
+  - name: netbox-convert-fallback-sources
+    trials: 3
+    instruction: |
+      Read the skill at
+      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Convert this NetBox device type for our OpsMill schema-library
+      DCIM schema (`generate_template: true` is enabled on `DcimDevice`).
+      Note that NetBox carries two free-text fields at the device-type level
+      and two per interface, while `DcimDeviceType` and `InterfacePhysical`
+      each have only a single `description` attribute.
+
+          ---
+          manufacturer: Cisco
+          model: Catalyst 9200L-24T
+          slug: cisco-c9200l-24t
+          part_number: C9200L-24T-4G
+          u_height: 1
+          description: Fixed-uplink access switch for branch sites
+          comments: '[Catalyst 9200 Data Sheet](https://www.cisco.com/c/en/us/products/switches/cat9200.html)'
+          interfaces:
+            - name: GigabitEthernet1/0/1
+              type: 1000base-t
+              label: Uplink A
+              description: Primary uplink to the distribution layer
+            - name: GigabitEthernet1/0/2
+              type: 1000base-t
+              label: Uplink B
+            - name: GigabitEthernet1/0/3
+              type: 1000base-t
+              description: Spare access port
+            - name: GigabitEthernet1/0/4
+              type: 1000base-t
+
+      I do not want the datasheet URL ending up as the device type's
+      description, and I do not want to lose the interface text either.
+
+      Write the emitted files under `./output_dir/` (create the directory).
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_fallback_sources.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/ where the device type description is the NetBox
+      description (not the comments datasheet link), interfaces carry the
+      NetBox description where present and fall back to the label where it
+      is not, and the coverage report names the values lost to shadowing
+      where both fields were set.
+    expectations:
+      - The device type description is the NetBox description, not the comments URL
+      - GigabitEthernet1/0/1 takes its description from the NetBox description
+      - GigabitEthernet1/0/2 falls back to its label because it has no description
+      - GigabitEthernet1/0/3 takes its description with no label present
+      - The coverage report names the shadowed comments and interface label values
+      - Neither comments nor label is reported as an unmapped dropped field
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind,
+          and spec.data list
+      - name: template-kind
+        check: >-
+          Templates are authored under a Template<Kind> and every row has a
+          template_name
+      - name: fallback-precedence
+        check: >-
+          The semantic source wins, the fallback fills the gap, and shadowed
+          values are named in the coverage report
+      - name: coverage-report
+        check: >-
+          A Markdown report names the NetBox component lists that did not
+          convert
+
+  - name: netbox-convert-shared-relationship
+    trials: 3
+    instruction: |
+      Read the skill at
+      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Convert this NetBox device type into Infrahub object templates.
+
+          ---
+          manufacturer: Cisco
+          model: Catalyst 9300-24P
+          slug: cisco-c9300-24p
+          part_number: C9300-24P
+          u_height: 1
+          console-ports:
+            - name: con 0
+              type: rj-45
+            - name: usb
+              type: usb-mini-b
+          interfaces:
+            - name: GigabitEthernet1/0/1
+              type: 1000base-t
+            - name: GigabitEthernet1/0/2
+              type: 1000base-t
+            - name: GigabitEthernet1/0/3
+              type: 1000base-t
+            - name: GigabitEthernet1/0/4
+              type: 1000base-t
+
+      Our schema is based on the OpsMill schema-library with
+      `generate_template: true` on `DcimDevice`, and it adds a console-port
+      node:
+
+          nodes:
+            - name: ConsoleInterface
+              namespace: Dcim
+              label: Console Port
+              inherit_from:
+                - DcimInterface
+              attributes:
+                - name: speed
+                  kind: Number
+                  default_value: 115200
+
+      Because `DcimConsoleInterface` inherits `DcimInterface`, it is carried
+      by the device's existing `interfaces` Component relationship — there
+      is no separate console relationship on the device.
+
+      I need every physical interface AND every console port in the output.
+      Write the emitted files under `./output_dir/` (create the directory).
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_shared_relationship.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/ whose template carries both component lists on the
+      single `interfaces` relationship, as a flat list of {kind, data} items —
+      one child per item, `kind` repeated — totalling 4
+      TemplateInterfacePhysical children and 2 console-port children, with
+      template names that keep the two lists distinct.
+    expectations:
+      - Both console ports and all four physical interfaces appear in the output
+      - Both land on the single `interfaces` relationship
+      - The relationship carries a flat list of items, each with kind and a
+        single child mapping under data (a list of children nested inside an
+        item does not load)
+      - Neither component list overwrote the other
+      - Component template names distinguish console ports from physical interfaces
+      - Every component template name remains unique
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind,
+          and spec.data list
+      - name: template-kind
+        check: >-
+          Templates are authored under a Template<Kind> and every row has a
+          template_name
+      - name: component-kind-wrapper
+        check: >-
+          Component children nest under a kind + data wrapper naming a
+          Template* kind
+      - name: component-names-namespaced
+        check: >-
+          Component template names are namespaced by their parent template
+          and are unique across the whole output
+      - name: shared-relationship-blocks
+        check: >-
+          A relationship carrying several component lists keeps every child,
+          one per list item with a single child mapping under data
+
+  - name: netbox-convert-module-types
+    trials: 3
+    instruction: |
+      Read the skill at
+      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Convert these two NetBox **module type** definitions. Note they
+      are module types, not device types — they carry no `slug`.
+
+      `module-types/Arista/AWE-5300-550-A-PS.yaml`:
+
+          ---
+          manufacturer: Arista
+          model: AWE-5300-550-A-PS
+          part_number: AWE-5300-550-A-PS
+          comments: '[PSU datasheet](https://example.com/psu.pdf)'
+          power-ports:
+            - name: '{module}'
+              type: iec-60320-c14
+              maximum_draw: 550
+
+      `module-types/Arista/CCS-750X-48SX-LC.yaml`:
+
+          ---
+          manufacturer: Arista
+          model: CCS-750X-48SX-LC
+          part_number: CCS-750X-48SX-LC
+          interfaces:
+            - name: Ethernet{module}/1
+              type: 10gbase-x-sfpp
+            - name: Ethernet{module}/2
+              type: 10gbase-x-sfpp
+
+      We load the schema-library modules extension and have defined a
+      concrete node `DeviceLinecardType` inheriting `DeviceGenericModuleType`.
+      That node has `name`, `description`, `part_number`, and a
+      `manufacturer` relationship — and, like the generic it inherits, no
+      component relationships at all.
+
+      Convert them and write the emitted files under `./output_dir/` (create
+      the directory). Tell me what could not be carried across.
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_module_types.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/ with a manufacturer file and a module type file whose
+      spec.kind is DeviceLinecardType, carrying two rows named
+      AWE-5300-550-A-PS and CCS-750X-48SX-LC with their part numbers and
+      manufacturer, plus a coverage report naming the power-ports and
+      interfaces lists as skipped because the module type has no component
+      relationship to hold them.
+    expectations:
+      - The module types are recognised as module types, not device types
+      - Each module type row carries name, part_number, and manufacturer
+      - Module type identity comes from model, since module types carry no slug
+      - No object template is emitted for the modules
+      - The report names power-ports and interfaces as skipped
+      - The response explains that the module type has no component relationships
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind,
+          and spec.data list
+      - name: module-type-object
+        check: >-
+          Module type objects are uniquely named and each names a manufacturer
+      - name: coverage-report
+        check: >-
+          A Markdown report names the NetBox component lists that did not
+          convert
+
+  - name: csv-import-up-front-interview
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have `devices.csv` with these columns and rows:
+
+          name,role,status,tier_label
+          spine-01,spine,Active,gold
+          spine-02,spine,Maintenance,gold
+          leaf-01,leaf,Active,silver
+
+      The schema declares `DcimDevice` with attributes `name` (Text),
+      `role` (Text), `status` (Dropdown: active/maintenance/retired). The
+      schema has NO `tier_label` attribute on DcimDevice. DcimDevice has
+      `human_friendly_id: [name__value]`. The schema is fixed.
+
+      Before emitting any file, surface every decision you need from me in
+      ONE batch — unmapped columns, dropdown-label translation, target
+      file naming, branch name, and lineage opt-in. Do not start writing
+      until I confirm. Echo back the full plan before any file is created.
+      Save planned output under `./output_dir/`.
+
+      Save the batched questions and the echoed plan to
+      `./output_dir/answer.md`. Write no object YAML in this task.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_up_front_interview.py
+        weight: 1.0
+    expected_output: >-
+      A single batched set of multi-choice questions covering every
+      ambiguity (tier_label has no schema home; Status is a dropdown
+      label; branch name; lineage opt-in) plus a confirm-and-lock summary
+      of the proposed plan. No file is written until the user confirms.
+    expectations:
+      - Every ambiguity is surfaced in one batched round, not one-by-one
+      - The unmapped tier_label column is called out explicitly
+      - Status values (Active/Maintenance) are flagged as dropdown labels
+      - A branch name is proposed (e.g., csv-import-YYYYMMDD-HHMM)
+      - Lineage opt-in is offered with an explanation of source vs. owner+is_protected
+      - The plan is echoed back before any file is written
+
+  - name: csv-import-profile-sample
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: Before mapping `inventory.csv` (which I will provide
+      content-wise inline below), profile it: report distinct-value counts,
+      sample values, length ranges, numeric-only fractions, date-pattern
+      matches, and any sequence patterns. Use the profile to drive the
+      mapping plan.
+
+          name,role,status,manufacturer_name,port_count,commissioned_at
+          spine-01,spine,Active,Arista,32,2024-03-15
+          spine-02,spine,Active,Arista,32,2024-03-15
+          leaf-01,leaf,Maintenance,Cisco,48,2023-09-01
+          leaf-02,leaf,Active,Cisco,48,2024-01-10
+
+      Schema is fixed. Emit only the per-file profile summary — do not
+      write any object YAML in this task.
+
+      Save the profile to `./output_dir/profile.yml`, one entry per
+      column. Write no object YAML in this task.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_profile_sample.py
+        weight: 1.0
+    expected_output: >-
+      A per-column profile of inventory.csv naming distinct-value counts
+      (4 names, 2 roles, 2 statuses, 2 manufacturers, 2 port counts, 3
+      dates), sample values, length ranges, the 100% numeric port_count
+      column, and the YYYY-MM-DD commissioned_at column as DateTime.
+    expectations:
+      - The profile names per-column distinct-value counts
+      - role and status are flagged as low-cardinality (dropdown candidates)
+      - port_count is flagged as 100% numeric
+      - commissioned_at is flagged as a YYYY-MM-DD DateTime pattern
+      - manufacturer_name is flagged as a reference candidate (low cardinality)
+
+  - name: csv-import-validate-error-mapping
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: After running `infrahubctl object validate ./output_dir/ --branch csv-import-20260622-1430`,
+      the server returned:
+
+          output_dir/04_devices.yml row 7 attribute 'status':
+            'Active' is not a valid choice for status
+
+      The skill produced the YAML from `inventory.csv` row 12. The skill
+      knows the per-row mapping back to the source. Translate the
+      validate error into a clear instruction that tells me which CSV
+      cell to fix, and explicitly tells me NOT to edit the emitted YAML
+      directly.
+
+      Save the instruction you would give me to `./output_dir/answer.md`.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_validate_error_mapping.py
+        weight: 1.0
+    expected_output: >-
+      A traceback that names inventory.csv row 12 column "Status", explains
+      that "Active" is the display label (the schema choice name is
+      `active`), and lists fix options including re-running with the
+      dropdown-label-to-name rule applied. The response must instruct the
+      user not to edit the emitted YAML by hand.
+    expectations:
+      - The error is traced back to inventory.csv row 12 column "Status"
+      - The "Active" vs "active" label/name distinction is explained
+      - Fix options include editing the CSV and re-running the skill
+      - The user is told NOT to edit the emitted YAML directly
+
+  - name: csv-import-self-check-against-managing-objects
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: After emitting Infrahub object YAML to ./output_dir/ (do this
+      step first for the simple manufacturers CSV below), describe the
+      local self-check you would run BEFORE creating any branch. Name the
+      specific managing-objects rules you check the emission against and
+      what each one catches.
+
+          # manufacturers.csv
+          name,description,country
+          Dell,Server and storage vendor,US
+
+      Schema defines `OrganizationManufacturer` with Text attributes
+      `name`, `description`, `country`, and `human_friendly_id: [name__value]`.
+
+      Save the self-check description to `./output_dir/answer.md`,
+      alongside the emitted YAML.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_self_check_rules.py
+        weight: 1.0
+    expected_output: >-
+      The emitted YAML for OrganizationManufacturer under ./output_dir/,
+      plus a description of the local self-check that walks each emitted
+      file against managing-objects rules (format-structure,
+      value-attributes, value-relationships, children-components,
+      range-expansion, organization-load-order). No infrahubctl command
+      is run in this task — the self-check is local-only.
+    expectations:
+      - At least one YAML file is emitted to ./output_dir/
+      - The self-check is described as running BEFORE infrahubctl branch create
+      - The self-check is local-only (no server, no branch)
+      - Specific managing-objects rule files are named
+      - Each named rule is matched to the shape it verifies
+
+  - name: csv-import-create-branch-first
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: Walk me through the validate-and-load sequence after the
+      local self-check passes for a hypothetical ./output_dir/. Include
+      the exact infrahubctl commands in the order they should be run,
+      using a default branch name like `csv-import-YYYYMMDD-HHMM`. Do
+      NOT actually execute them — just produce the command sequence
+      with one-line explanations.
+
+      Save the command sequence to `./output_dir/answer.md`.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_create_branch_first.py
+        weight: 1.0
+    expected_output: >-
+      The command sequence in order: (1) infrahubctl info to verify
+      connectivity, (2) infrahubctl branch create <name>, (3) infrahubctl
+      object validate ./output_dir/ --branch <name>, (4) infrahubctl
+      object load ./output_dir/ --branch <name>. Plus a note about
+      `infrahubctl branch delete <name>` on partial failure. The default
+      branch is never the target.
+    expectations:
+      - The sequence creates a branch BEFORE validate or load
+      - infrahubctl info is mentioned as a connectivity check
+      - The branch is created via infrahubctl branch create
+      - validate and load both pass --branch <name>
+      - The default branch is explicitly excluded as a target
+      - branch delete is named as the cleanup on partial failure
+
+  - name: csv-import-introspect-first
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: Before mapping `devices.csv` to the schema, describe how you
+      would discover the schema. List the priority chain (MCP →
+      infrahubctl schema export → /api/schema REST → local schemas/*.yml)
+      and explain when to fall back to the next source. The schema is
+      read-only throughout — do not propose any schema edit. Do not
+      emit any YAML in this task — describe the introspection only.
+
+      Save the introspection description to `./output_dir/answer.md`.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_introspect_first.py
+        weight: 1.0
+    expected_output: >-
+      A description of the four-source priority chain (MCP first,
+      infrahubctl schema export, /api/schema REST, local schemas/*.yml
+      last), with the trade-off of each source (freshness vs.
+      availability) and an explicit "schema is read-only — escalate to
+      managing-schemas if a column has no home."
+    expectations:
+      - The priority chain lists MCP first
+      - infrahubctl schema export is listed as the next fallback after MCP
+      - /api/schema REST is named as the third option
+      - Local schemas/*.yml is named as the last resort with a freshness caveat
+      - The response explicitly says no schema edit will be proposed
+      - Escalation to managing-schemas is named for the unmappable-column case
+
+  - name: csv-import-file-folder-list-input
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I will hand you any of three input shapes — a single CSV
+      file, a directory of CSVs, or an explicit list of paths. Describe
+      how the skill normalizes each shape into a flat file list before
+      profiling, and what happens to non-CSV/TSV files in a directory.
+      Do not emit any YAML in this task — describe the input
+      normalization only.
+
+      Save the normalization description to `./output_dir/answer.md`.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_file_folder_list_input.py
+        weight: 1.0
+    expected_output: >-
+      A description of the input normalization step: single file passes
+      through, directory is recursively scanned for *.csv and *.tsv
+      (case-insensitive), list of paths is expanded the same way.
+      Non-CSV/TSV files in a directory are ignored or surface a
+      fail-closed report depending on the rule.
+    expectations:
+      - Single file is accepted directly
+      - Directory is recursively scanned for .csv and .tsv files
+      - Mixed input lists are normalized to a flat file set
+      - Case-insensitive extension matching is mentioned
+      - The response references the fail-closed posture for unsupported file types
+  - name: generic-inheritance-limits
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      and follow its workflow and rules.
+
+      Task: Model ports and devices with two flat generics, `DcimDevice`
+      and `DcimPort`, plus one concrete kind on each side (`DcimSwitch`
+      and `DcimOpticalPort`). Requirements:
+
+      1. `DcimPort` has a `media` Dropdown with choices `fibre` and
+         `copper`. Optical ports are always fibre, so I want that to be
+         the default on `DcimOpticalPort` and not repeated in every
+         object file.
+
+      1b. Every port attaches to exactly one device, and that is true of
+         all ports, so the port-to-device relationship belongs on the
+         `DcimPort` generic. Give it a matching side on `DcimDevice`.
+      2. Ports list in name order by default. Devices have no natural
+         sort key, but I still want a stable order for them.
+      3. An optical port should only ever attach to a switch. Express
+         that in the schema if the schema can express it; if it cannot,
+         say so and tell me where the rule has to live instead.
+
+      Save ONLY the final YAML to: output.yml, and put any explanation
+      in YAML comments inside that file.
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_generic_inheritance.py
+        weight: 1.0
+    expected_output: >-
+      A schema where DcimOpticalPort's media override restates
+      kind: Dropdown AND the complete choices list alongside
+      default_value: fibre, because omitting choices is rejected at load
+      and a partial list loads silently. order_by on DcimPort names
+      name__value (which DcimPort itself declares), while DcimDevice uses
+      node_metadata__updated_at or node_metadata__created_at since it
+      declares no sort key of its own. Requirement 3 is NOT expressed by
+      narrowing the inherited peer: that is rejected from either side, so
+      the answer should say the pairing must live in a Python check or go
+      unenforced.
+    expectations:
+      - >-
+        The media override restates kind: Dropdown and both choices, not
+        just default_value
+      - >-
+        order_by on DcimPort names an attribute DcimPort itself declares
+      - >-
+        DcimDevice orders by node_metadata__created_at or
+        node_metadata__updated_at rather than by an attribute it does not
+        declare
+      - >-
+        No kind redeclares an inherited relationship with a narrowed peer
+      - >-
+        States that kind-to-kind pairing between two generic-typed
+        families is not expressible, and names a check as the place it
+        must live
+    assertions:
+      - name: dropdown-override-complete
+        check: >-
+          The inherited Dropdown override restates kind and the generic's
+          full choice list
+      - name: order-by-resolves-locally
+        check: >-
+          Every order_by entry resolves against the schema that declares
+          it, metadata entries included
+      - name: inherited-peer-unchanged
+        check: No inherited relationship peer is narrowed on any kind
+      - name: pairing-note-present
+        check: >-
+          A comment states the kind-to-kind pairing is not expressible in
+          the schema and names a check as where it must live
+      - name: schema-version
+        check: File declares version "1.0"
+      - name: full-kind-references
+        check: Relationship peers use full Namespace+Name kinds
+
+  # --- Check Creator --- #
+  - name: yagni-duplicate-shape-paired-rel
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this schema (schemas/ports.yml) — three port nodes each
+      repeating the same six attributes, and each with a `device`
+      relationship pointing at a different peer:
+
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: OpticalPort
+          namespace: Dcim
+          attributes:
+            - {name: name, kind: Text}
+            - {name: serial, kind: Text}
+            - {name: connector, kind: Text}
+            - {name: vendor, kind: Text}
+            - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}
+            - {name: notes, kind: Text, optional: true}
+          relationships:
+            - name: device
+              peer: DcimOpticalDevice
+              cardinality: one
+              identifier: opticalport__device
+        - name: CopperPort
+          namespace: Dcim
+          attributes:
+            - {name: name, kind: Text}
+            - {name: serial, kind: Text}
+            - {name: connector, kind: Text}
+            - {name: vendor, kind: Text}
+            - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}
+            - {name: notes, kind: Text, optional: true}
+          relationships:
+            - name: device
+              peer: DcimCopperDevice
+              cardinality: one
+              identifier: copperport__device
+        - name: VirtualPort
+          namespace: Dcim
+          attributes:
+            - {name: name, kind: Text}
+            - {name: serial, kind: Text}
+            - {name: connector, kind: Text}
+            - {name: vendor, kind: Text}
+            - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}
+            - {name: notes, kind: Text, optional: true}
+          relationships:
+            - name: device
+              peer: DcimVirtualDevice
+              cardinality: one
+              identifier: virtualport__device
+      ```
+
+      Each port kind attaches to exactly one device kind, and the schema
+      is currently enforcing that pairing.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_yagni_duplicate_shape_paired_rel.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-duplicate-shape-not-extracted-to-generic
+      finding with severity MEDIUM and ladder_step 2, covering the six
+      duplicated attributes. Its replacement must leave the `device`
+      relationship on the concrete kinds and say why: a relationship
+      hoisted onto a generic has its peer frozen there, so the per-kind
+      pairing would stop being expressible in the schema.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-duplicate-shape-not-extracted-to-generic finding
+      - That finding has severity MEDIUM and ladder_step 2
+      - >-
+        The replacement hoists the duplicated attributes but not the
+        `device` relationship
+      - >-
+        The finding states that a relationship on a generic has its peer
+        fixed for every implementer
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-duplicate-shape-not-extracted-to-generic finding is emitted
+      - name: correct-severity
+        check: The yagni-duplicate-shape-not-extracted-to-generic finding has severity MEDIUM
+      - name: correct-ladder-step
+        check: The yagni-duplicate-shape-not-extracted-to-generic finding has ladder_step 2
+      - name: discloses-frozen-peer
+        check: >-
+          The finding says the paired `device` relationship stays on the
+          concrete kinds because a generic freezes its peer
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
+
+  - name: reuse-kind-availability
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      and follow its workflow and rules.
+
+      Task: I need a `NetEndpoint` node. Each endpoint is tagged, and each
+      one sits at a site.
+
+      For the site, I want to reuse the location generic everyone uses
+      rather than modelling locations myself. A colleague told me it is
+      built into Infrahub, so I can just peer it.
+
+      Write the schema. Tell me in YAML comments whether the location
+      generic really is built in, what reusing it commits this repository
+      to, and how I confirm on a clean instance that a kind exists before
+      I depend on it.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_reuse_kind_availability.py
+        weight: 1.0
+    expected_output: >-
+      A schema peering BuiltinTag (which is genuinely core) and a
+      marketplace-published location generic, with comments correcting the
+      "built into Infrahub" premise: the Builtin namespace ships only
+      BuiltinIPAddress, BuiltinIPNamespace, BuiltinIPPrefix and
+      BuiltinTag, and there is no location kind in the platform core. The
+      file records `infrahubctl marketplace get <namespace>/<name>`
+      provenance naming the reused kind and a version, states that the
+      fetched files are committed and loaded before this schema, and names
+      `infrahubctl schema show <Kind>` as the confirmation command
+      (`schema list` prints node kinds only, so it cannot confirm a
+      generic).
+    expectations:
+      - >-
+        States that the location generic is NOT platform core, and that
+        the Builtin namespace ships only four kinds
+      - >-
+        Records `infrahubctl marketplace get` provenance including a
+        version
+      - >-
+        States that reusing it makes it a dependency the repository must
+        carry, committed and loaded before this schema
+      - BuiltinTag is used correctly as a genuinely core kind
+    assertions:
+      - name: external-kinds-core-or-sourced
+        check: >-
+          Every kind referenced but not defined is a kind the platform
+          actually ships, or is named by a marketplace provenance comment;
+          no invented Builtin*/Core* kind
+      - name: records-marketplace-provenance
+        check: >-
+          A provenance comment records the `<namespace>/<name>`
+          marketplace identifier and a version
+      - name: corrects-builtin-core-premise
+        check: >-
+          Comments say what the Builtin namespace holds -- naming the four
+          kinds or describing the set -- and state the reused kind is not
+          platform core
+      - name: names-kind-verification-command
+        check: >-
+          Comments name `infrahubctl schema show <Kind>`, which resolves
+          generics, rather than only `schema list`
+      - name: schema-version
+        check: File declares version "1.0"
+      - name: full-kind-references
+        check: Relationship peers use full Namespace+Name kinds
+
+  - name: reuse-per-generic
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      and follow its workflow and rules.
+
+      Task: I need a `NetOpticalEndpoint` node, and each endpoint is
+      tagged.
+
+      A teammate looked at the published `infrahub/optical-transport`
+      schema file and rejected reusing any of it. That file defines two
+      generics: `NetOpticalEndpoint`, which peers one built-in kind, and
+      `NetTransportDevice`, whose `chassis` and `linecard` peers pull in a
+      second device and interface hierarchy competing with the DcimDevice
+      tree we already have. His reason was the second generic.
+
+      Write the schema. In YAML comments, tell me whether his rejection
+      holds, and record whatever the next reader needs to know about where
+      the reused shape came from.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_reuse_per_generic.py
+        weight: 1.0
+    expected_output: >-
+      A schema that adopts the cheap generic and rejects the blanket
+      rejection: a published file is evaluated per generic, so an
+      expensive sibling is not a reason to reinvent a cheap candidate. The
+      provenance comment records the `infrahubctl marketplace get
+      infrahub/optical-transport` identifier and version, names the
+      generic taken, and says the transport-device generic was excluded
+      and why.
+    expectations:
+      - >-
+        Corrects the teammate: cost is the transitive peer set of the
+        candidate, not the file
+      - >-
+        Records provenance with the marketplace identifier and a version
+      - Names which generic was taken and which was excluded, with the reason
+      - >-
+        Notes that a vendored subset is no longer refreshed by
+        `marketplace get`
+    assertions:
+      - name: external-kinds-core-or-sourced
+        check: >-
+          Every kind referenced but not defined is a kind the platform
+          actually ships, or is named by a marketplace provenance comment
+      - name: records-marketplace-provenance
+        check: >-
+          A provenance comment records the `<namespace>/<name>`
+          marketplace identifier and a version
+      - name: records-subset-rationale
+        check: >-
+          Provenance records what was taken and what was excluded, so the
+          per-generic decision survives in the file
+      - name: schema-version
+        check: File declares version "1.0"
+      - name: full-kind-references
+        check: Relationship peers use full Namespace+Name kinds
+
+  - name: generic-membership-addition
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      and follow its workflow and rules.
+
+      Task: We already have a `NetEndpoint` generic with two implementers,
+      `NetOpticalEndpoint` and `NetEthernetEndpoint`. I need a third kind,
+      `NetCoherentEndpoint`, and it has to inherit `NetEndpoint` because a
+      relationship on `NetCircuit` peers that generic. A capacity report
+      also sums over `NetEndpoint`, and the generic carries a
+      `uniqueness_constraints` entry.
+
+      Write the schema for all three implementers plus the generic and
+      `NetCircuit`, with YAML comments recording what the new implementer
+      changes for whatever reads that generic.
+
+      `infrahubctl schema check` passes either way, so also give me a test
+      that would have caught this in CI without a running Infrahub.
+
+      Produce two files:
+      - the schema, saved to: output.yml
+      - the test, saved to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_generic_membership.py
+        weight: 1.0
+    expected_output: >-
+      A schema where NetCoherentEndpoint inherits NetEndpoint, with
+      comments naming what the addition changes: queries rooted on the
+      generic, the uniqueness constraint the new kind must now satisfy,
+      and the capacity report that now counts it. Plus a test that pins
+      the implementer set by reading `inherit_from` out of the schema
+      YAML, with a failure message listing what was added and removed. The
+      test must not need a running instance.
+    expectations:
+      - >-
+        NetCoherentEndpoint inherits NetEndpoint and the relationship on
+        NetCircuit peers the generic
+      - >-
+        Comments name the consumers the addition changes: queries, the
+        uniqueness constraint, and the report that sums the generic
+      - >-
+        The test pins the implementer set against the schema YAML, not a
+        loaded graph, so it runs in CI without Infrahub
+      - >-
+        The failure message lists the added and removed kinds so the fix
+        is mechanical
+    assertions:
+      - name: generic-membership-consumers-noted
+        check: >-
+          Comments name at least two classes of consumer the new
+          implementer changes
+      - name: generic-implementer-set-pinned
+        check: >-
+          The test pins the expected implementer set offline from
+          `inherit_from` and reports added/removed on failure
+      - name: schema-version
+        check: File declares version "1.0"
+      - name: full-kind-references
+        check: Relationship peers use full Namespace+Name kinds
+
+  # --- Check Creator --- #
+
+  - name: cardinality-shared-peer
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      and follow its workflow and rules.
+
+      Task: I have this working schema. Today each service gets its own
+      wavelength:
+
+      ```yaml
+      nodes:
+        - name: Wavelength
+          namespace: Net
+          attributes:
+            - name: name
+              kind: Text
+          relationships:
+            - name: service
+              peer: NetService
+              cardinality: one
+              optional: true
+              identifier: service__wavelength
+        - name: Service
+          namespace: Net
+          attributes:
+            - name: name
+              kind: Text
+          relationships:
+            - name: wavelength
+              peer: NetWavelength
+              cardinality: one
+              optional: true
+              identifier: service__wavelength
+      ```
+
+      A new requirement says several services must be able to share one
+      wavelength. The first service provisions fine and the second one
+      fails at write time.
+
+      Give me the corrected schema. Also tell me, in YAML comments, what
+      else in the repository this change breaks, because I have `.gql`
+      files that select this relationship from both sides.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-schemas/check_cardinality_sharing.py
+        weight: 1.0
+    expected_output: >-
+      A schema where the WAVELENGTH side is widened to cardinality many,
+      because the inbound cap comes from the peer's own declaration on that
+      identifier; widening only the Service side loads cleanly and does not
+      lift the cap. The widened relationship must keep its singular name,
+      since renaming to a plural in the same change leaves two
+      declarations on one identifier and is rejected at load. Comments
+      should note that cardinality selects the GraphQL shape, so every
+      stored query selecting the relationship must migrate between
+      `{ node { … } }` and `{ edges { node { … } } }`. Only the side whose
+      cardinality changed breaks: queries selecting `service` on a
+      Wavelength must move to the paginated shape, while queries selecting
+      `wavelength` on a Service are untouched.
+    expectations:
+      - >-
+        The Wavelength side is widened to cardinality many, not only the
+        Service side -- and the Service side is left at cardinality one,
+        because widening both lifts the cap but also turns
+        Service.wavelength into a list for nothing
+      - >-
+        Explains that the inbound cap comes from the peer's own
+        declaration on that identifier
+      - >-
+        The widened relationship keeps its singular name, with a comment
+        explaining why
+      - >-
+        States that changing cardinality breaks every stored query
+        selecting the relationship, and names the two selection shapes
+      - >-
+        Scopes the query migration to the side that was widened, rather
+        than to every query that mentions the relationship
+      - >-
+        Notes the cap is enforced at write time and that schema check
+        reports the schema valid either way
+    assertions:
+      - name: shared-side-widened
+        check: >-
+          The Wavelength side of the identifier is cardinality many, so
+          several services can point at one wavelength, and the Service
+          side is still cardinality one, so widening did not turn
+          Service.wavelength into a list as well
+      - name: relationship-names-unchanged
+        check: >-
+          Both relationships keep the singular names the input schema
+          gave them
+      - name: comments-cover-query-migration
+        check: >-
+          YAML comments contrast the one-side `node { ... }` and many-side
+          `edges { node { ... } }` selection shapes, name the stored-query
+          impact, and name the failure it produces
+      - name: identifier-unique-per-direction
+        check: >-
+          No kind declares two relationships on the same identifier in
+          the same direction
+      - name: many-max-count-valid
+        check: No cardinality-many relationship carries max_count 1
+      - name: schema-version
+        check: File declares version "1.0"
+      - name: matching-identifiers
+        check: Both sides of the relationship share one identifier
+
+  # --- Check Creator --- #

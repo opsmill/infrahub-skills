@@ -46,6 +46,14 @@ generics:
 
 ### Step 2: Nodes with parent and children
 
+> `LocationGeneric` here is the generic Step 1 declares
+> in this same file, not a platform kind — Infrahub core
+> ships no location kind at all. If you meant to reuse
+> the location schema published on the marketplace
+> rather than declaring your own, confirm its tier and
+> record its provenance first, per
+> [reuse-verify-kind-availability.md](./reuse-verify-kind-availability.md).
+
 ```yaml
 nodes:
   - name: Region

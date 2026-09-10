@@ -74,6 +74,36 @@ repeating: reuse only from the marketplace (never a GitHub checkout),
 and an unreachable marketplace is a fallback path (mirror, then custom
 schema), never a reason to block schema work.
 
+## What the recommendation must not oversimplify
+
+Two things make a naive "adopt the published schema"
+finding wrong, and both were reported from the field.
+
+**A published file is not atomic.** It can define
+several generics with very different dependency costs.
+Judging the file as a unit lets one expensive generic
+veto every cheap one in it, and the observed outcome was
+the reverse of this rule's intent: reuse was rejected on
+the strength of a generic that dragged in a competing
+device hierarchy, and the shape was modelled from
+scratch instead. So the finding should name **which
+generic or node to adopt**, not just the file, and the
+cost of a candidate is its transitive peer set rather
+than its line count. See
+[../../infrahub-managing-schemas/rules/reuse-evaluate-per-generic.md](../../infrahub-managing-schemas/rules/reuse-evaluate-per-generic.md).
+
+**A marketplace kind is a carried dependency, not a
+platform guarantee.** Adopting it means the repository
+must fetch and commit the published files and load them
+before its own schema, or the result loads on the
+author's machine and fails on a clean instance. That is
+still usually the right trade, but it is a trade, and
+the finding should say so rather than presenting reuse
+as free. There is no location kind in the platform core,
+which is the most common place this assumption breaks.
+See
+[../../infrahub-managing-schemas/rules/reuse-verify-kind-availability.md](../../infrahub-managing-schemas/rules/reuse-verify-kind-availability.md).
+
 ## Checks
 
 1. A schema defines ≥2 signature nodes of a marketplace-published
@@ -98,6 +128,9 @@ schema), never a reason to block schema work.
   `yagni-custom-domain-primitives-instead-of-builtin`.
 - Airgapped repos that pull from an internal marketplace mirror via
   `--marketplace-url` — that IS marketplace reuse.
+- A repo that adopted part of a published file and recorded provenance
+  (identifier, version, what was taken, why the rest was excluded).
+  Vendoring a subset deliberately is reuse, not hand-rolling.
 
 ## Common Issues
 
