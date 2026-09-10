@@ -975,7 +975,7 @@ tasks:
 
       Give me the corrected schema. Also tell me, in YAML comments, what
       else in the repository this change breaks, because I have `.gql`
-      files that select `wavelength`.
+      files that select this relationship from both sides.
 
       Save ONLY the final YAML to: output.yml
     graders:
@@ -991,7 +991,10 @@ tasks:
       declarations on one identifier and is rejected at load. Comments
       should note that cardinality selects the GraphQL shape, so every
       stored query selecting the relationship must migrate between
-      `{ node { … } }` and `{ edges { node { … } } }`.
+      `{ node { … } }` and `{ edges { node { … } } }`. Only the side whose
+      cardinality changed breaks: queries selecting `service` on a
+      Wavelength must move to the paginated shape, while queries selecting
+      `wavelength` on a Service are untouched.
     expectations:
       - >-
         The Wavelength side is widened to cardinality many, not only the
@@ -1007,6 +1010,9 @@ tasks:
       - >-
         States that changing cardinality breaks every stored query
         selecting the relationship, and names the two selection shapes
+      - >-
+        Scopes the query migration to the side that was widened, rather
+        than to every query that mentions the relationship
       - >-
         Notes the cap is enforced at write time and that schema check
         reports the schema valid either way
