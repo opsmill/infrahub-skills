@@ -229,8 +229,6 @@ NUMERIC_FIELDS = frozenset(
 #: back in one round trip; the cap keeps the URL within normal server limits.
 ID_BATCH = 50
 
-DEFAULT_PAGE_SIZE = 250
-
 
 class ExportError(Exception):
     """Raised when the export cannot proceed."""
@@ -274,10 +272,22 @@ class NetBoxSource:
             raise ExportError("pynetbox is required: pip install pynetbox") from exc
 
         self._api = pynetbox.api(url.rstrip("/"), token=token)
-        self._api.http_session.verify = verify
+        session = self._api.http_session
+        session.verify = verify
+        # pynetbox has no timeout setting of its own, so wrap the session's
+        # request method. Without this --timeout parses and does nothing, and
+        # a NetBox that accepts the connection then stalls hangs the export.
+        original = session.request
+
+        def _with_timeout(method: str, url_: str, **kwargs: Any) -> Any:
+            kwargs.setdefault("timeout", timeout)
+            return original(method, url_, **kwargs)
+
+        session.request = _with_timeout  # type: ignore[method-assign]
         self._timeout = timeout
         self._url = url
         self.missing_endpoints = set()
+        self._reached = False
 
     def records(self, endpoint: str, **filters: Any) -> Iterator[Any]:
         """Yield every record at ``endpoint``, following pagination.
@@ -301,12 +311,18 @@ class NetBoxSource:
         app, name = endpoint.split(".", 1)
         try:
             source = getattr(getattr(self._api, app), name)
-            yield from (source.filter(**filters) if filters else source.all())
+            for record in source.filter(**filters) if filters else source.all():
+                self._reached = True
+                yield record
         except Exception as exc:  # noqa: BLE001 - re-raised with context below
-            if self._is_missing_endpoint(exc):
+            # A 404 is ambiguous: this NetBox may not have the endpoint, or
+            # --url may be wrong. Treat it as "absent" only once something has
+            # answered, so a bad URL fails loudly instead of exporting nothing.
+            if self._is_missing_endpoint(exc) and self._reached:
                 self.missing_endpoints.add(endpoint)
                 return
             raise ExportError(self._explain(exc, endpoint)) from exc
+        self._reached = True
 
     @staticmethod
     def _is_missing_endpoint(exc: Exception) -> bool:
@@ -322,8 +338,13 @@ class NetBoxSource:
                 f"NetBox rejected the token. Check --token / NETBOX_TOKEN, and that "
                 f"it grants read access to {endpoint.split('.', 1)[0]}."
             )
-        if "404" in text:
-            return f"{endpoint} not found — is --url the base URL, without /api?"
+        if self._is_missing_endpoint(exc):
+            # Reached only before anything has answered, so the endpoint being
+            # absent is far less likely than --url being wrong.
+            return (
+                f"{self._url} returned 404 for {endpoint}. Is --url the base URL of the "
+                "instance, without a trailing /api? pynetbox appends that itself."
+            )
         if "SSLError" in type(exc).__name__ or "certificate" in text.lower():
             return f"TLS verification failed for {self._url}. Pass --insecure for a self-signed cert."
         return f"Reading {endpoint} from {self._url} failed: {text}"
@@ -703,7 +724,11 @@ def export(
     for is_module, endpoint in ((False, DEVICE_TYPES), (True, MODULE_TYPES)):
         if is_module and not include_modules:
             continue
-        objects = list(source.records(endpoint, **filters))
+        # A module type has no slug, and NetBox's strict filtering rejects an
+        # unknown filter with a 400 rather than ignoring it — so passing the
+        # device-type slug filter here would abort the whole export.
+        applicable = {k: v for k, v in filters.items() if not (is_module and k == "slug")}
+        objects = list(source.records(endpoint, **applicable))
         if in_use and not is_module:
             objects = [o for o in objects if (field(o, "device_count") or 0) > 0]
         if not objects:
@@ -828,17 +853,20 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
+    # Print the notes before deciding the exit code: an empty export is
+    # exactly when the reader most needs to know what was skipped and why.
+    if notes:
+        print("\nNot carried into the library format:", file=sys.stderr)
+        for note in notes:
+            print(f"  - {note}", file=sys.stderr)
+
     if not written:
-        print("No device types matched the given filters.", file=sys.stderr)
+        print("\nNo device types matched the given filters.", file=sys.stderr)
         return 2
 
     for path in written:
         print(path)
     print(f"\n{len(written)} file(s) written to {args.output_dir}", file=sys.stderr)
-    if notes:
-        print("\nNot carried into the library format:", file=sys.stderr)
-        for note in notes:
-            print(f"  - {note}", file=sys.stderr)
     return 0
 
 

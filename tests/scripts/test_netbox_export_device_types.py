@@ -796,3 +796,99 @@ def test_a_manufacturer_with_a_slash_stays_one_directory(tmp_path):
     path = output_path({"manufacturer": "A/B", "slug": "x"}, tmp_path, False, taken)
 
     assert path.parent == tmp_path / "device-types" / "A-B"
+
+
+# ---------------------------------------------------------------------------
+# Failure modes found in review
+# ---------------------------------------------------------------------------
+
+
+def test_a_wrong_url_fails_loudly_rather_than_exporting_nothing(tmp_path):
+    """pynetbox reports a bad base URL as a 404 on every endpoint.
+
+    Treating that as "this NetBox lacks the endpoint" swallowed all twelve
+    reads and exited 2 with 'No device types matched the given filters',
+    pointing the user at their filters instead of their URL.
+    """
+    import json as _json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class NotFound(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            self.send_response(404)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(_json.dumps({"detail": "Not found."}).encode())
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), NotFound)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        source = NetBoxSource(f"http://127.0.0.1:{server.server_port}", "t")
+        with pytest.raises(ExportError) as excinfo:
+            export(source, tmp_path, filters={}, in_use=False, include_modules=False)
+        assert "--url" in str(excinfo.value)
+    finally:
+        server.shutdown()
+
+
+def test_slug_is_not_sent_to_the_module_type_query(tmp_path):
+    """ModuleType has no slug, and NetBox 400s on an unknown filter."""
+    source = FakeSource({"dcim.device_types": [], "dcim.module_types": []})
+
+    export(
+        source,
+        tmp_path,
+        filters={"slug": ["ap7901"], "manufacturer": ["apc"]},
+        in_use=False,
+        include_modules=True,
+    )
+
+    module_call = next(f for ep, f in source.calls if ep == "dcim.module_types")
+    device_call = next(f for ep, f in source.calls if ep == "dcim.device_types")
+    assert "slug" not in module_call
+    assert "manufacturer" in module_call  # manufacturer is valid on both
+    assert "slug" in device_call
+
+
+def test_notes_are_printed_even_when_nothing_was_written(tmp_path, capsys, monkeypatch):
+    """An empty export is exactly when the reader needs the diagnostics."""
+    monkeypatch.setattr(
+        _mod, "export", lambda *a, **k: ([], ["dcim.widget_templates — endpoint absent"])
+    )
+    monkeypatch.setattr(_mod, "NetBoxSource", lambda *a, **k: object())
+
+    code = main(["--url", "https://nb", "--token", "t", "--output-dir", str(tmp_path)])
+
+    assert code == 2
+    assert "endpoint absent" in capsys.readouterr().err
+
+
+def test_the_configured_timeout_reaches_the_session():
+    """--timeout parsed but never applied left a stalled NetBox hanging forever.
+
+    pynetbox has no timeout setting of its own, so the session's request
+    method is wrapped. This asserts the wrapper supplies the default.
+    """
+    source = NetBoxSource("http://127.0.0.1:9", "t", timeout=7.5)
+    seen: dict = {}
+    inner = source._api.http_session.request
+
+    # Replace what the wrapper delegates to, then call the wrapper.
+    source._api.http_session.__dict__["_probe"] = None
+    captured = []
+
+    def fake_send(*args, **kwargs):
+        captured.append(kwargs)
+        raise RuntimeError("stop before the socket")
+
+    source._api.http_session.send = fake_send
+    try:
+        inner("GET", "http://127.0.0.1:9/api/")
+    except RuntimeError:
+        pass
+    seen = captured[0] if captured else {}
+    assert seen.get("timeout") == 7.5
