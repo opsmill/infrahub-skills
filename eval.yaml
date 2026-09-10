@@ -6188,33 +6188,6 @@ tasks:
           A Markdown report names the NetBox component lists that did not
           convert
 
-# ---------------------------------------------------------------------------
-# Ungraded task definitions — NOT run by skillgrade
-# ---------------------------------------------------------------------------
-#
-# skillgrade requires every entry under `tasks:` to carry at least one grader
-# and refuses to load the whole file if any entry does not, so these seven
-# blocked `skillgrade` from running ANY task in this repo, for any skill.
-# They are parked here, verbatim, to make the file loadable again.
-#
-# Moving them costs no coverage that existed. CI never ran them either: the
-# discover step in .github/workflows/skill-evals.yml derives a task's skill
-# from `graders[0].run`, so a grader-less task is skipped when the matrix is
-# built.
-#
-# Why they have no graders: each asks for prose — an interview plan, a column
-# profile, an error translation, a command sequence — and six of the seven
-# explicitly instruct the model NOT to emit YAML, so there is no artifact on
-# disk for a deterministic grader to read. Writing one anyway would mean
-# substring-matching the transcript, which dev/knowledges/skill-writing-guide.md
-# rules out and which yields a check that cannot fail.
-#
-# To reinstate one: give it an artifact to write (without dictating the schema
-# in the prompt), add a check function to graders/importing-data/lib.py, add
-# its task grader, and move the block back under `tasks:`.
-
-ungraded_tasks:
-
   - name: csv-import-up-front-interview
     trials: 3
     instruction: |
@@ -6237,6 +6210,13 @@ ungraded_tasks:
       file naming, branch name, and lineage opt-in. Do not start writing
       until I confirm. Echo back the full plan before any file is created.
       Save planned output under `./output_dir/`.
+
+      Save the batched questions and the echoed plan to
+      `./output_dir/answer.md`. Write no object YAML in this task.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_up_front_interview.py
+        weight: 1.0
     expected_output: >-
       A single batched set of multi-choice questions covering every
       ambiguity (tier_label has no schema home; Status is a dropdown
@@ -6269,6 +6249,13 @@ ungraded_tasks:
 
       Schema is fixed. Emit only the per-file profile summary — do not
       write any object YAML in this task.
+
+      Save the profile to `./output_dir/profile.yml`, one entry per
+      column. Write no object YAML in this task.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_profile_sample.py
+        weight: 1.0
     expected_output: >-
       A per-column profile of inventory.csv naming distinct-value counts
       (4 names, 2 roles, 2 statuses, 2 manufacturers, 2 port counts, 3
@@ -6297,6 +6284,12 @@ ungraded_tasks:
       validate error into a clear instruction that tells me which CSV
       cell to fix, and explicitly tells me NOT to edit the emitted YAML
       directly.
+
+      Save the instruction you would give me to `./output_dir/answer.md`.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_validate_error_mapping.py
+        weight: 1.0
     expected_output: >-
       A traceback that names inventory.csv row 12 column "Status", explains
       that "Active" is the display label (the schema choice name is
@@ -6326,6 +6319,13 @@ ungraded_tasks:
 
       Schema defines `OrganizationManufacturer` with Text attributes
       `name`, `description`, `country`, and `human_friendly_id: [name__value]`.
+
+      Save the self-check description to `./output_dir/answer.md`,
+      alongside the emitted YAML.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_self_check_rules.py
+        weight: 1.0
     expected_output: >-
       The emitted YAML for OrganizationManufacturer under ./output_dir/,
       plus a description of the local self-check that walks each emitted
@@ -6351,6 +6351,12 @@ ungraded_tasks:
       using a default branch name like `csv-import-YYYYMMDD-HHMM`. Do
       NOT actually execute them — just produce the command sequence
       with one-line explanations.
+
+      Save the command sequence to `./output_dir/answer.md`.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_create_branch_first.py
+        weight: 1.0
     expected_output: >-
       The command sequence in order: (1) infrahubctl info to verify
       connectivity, (2) infrahubctl branch create <name>, (3) infrahubctl
@@ -6377,6 +6383,12 @@ ungraded_tasks:
       and explain when to fall back to the next source. The schema is
       read-only throughout — do not propose any schema edit. Do not
       emit any YAML in this task — describe the introspection only.
+
+      Save the introspection description to `./output_dir/answer.md`.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_introspect_first.py
+        weight: 1.0
     expected_output: >-
       A description of the four-source priority chain (MCP first,
       infrahubctl schema export, /api/schema REST, local schemas/*.yml
@@ -6402,6 +6414,12 @@ ungraded_tasks:
       profiling, and what happens to non-CSV/TSV files in a directory.
       Do not emit any YAML in this task — describe the input
       normalization only.
+
+      Save the normalization description to `./output_dir/answer.md`.
+    graders:
+      - type: deterministic
+        run: python graders/importing-data/check_file_folder_list_input.py
+        weight: 1.0
     expected_output: >-
       A description of the input normalization step: single file passes
       through, directory is recursively scanned for *.csv and *.tsv
