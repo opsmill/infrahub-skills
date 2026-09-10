@@ -3579,205 +3579,12 @@ tasks:
 
   # --- Expectations-only tasks for process / conversation rules --- #
 
-  - name: csv-import-up-front-interview
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
-      Task: I have `devices.csv` with these columns and rows:
 
-          name,role,status,tier_label
-          spine-01,spine,Active,gold
-          spine-02,spine,Maintenance,gold
-          leaf-01,leaf,Active,silver
 
-      The schema declares `DcimDevice` with attributes `name` (Text),
-      `role` (Text), `status` (Dropdown: active/maintenance/retired). The
-      schema has NO `tier_label` attribute on DcimDevice. DcimDevice has
-      `human_friendly_id: [name__value]`. The schema is fixed.
 
-      Before emitting any file, surface every decision you need from me in
-      ONE batch — unmapped columns, dropdown-label translation, target
-      file naming, branch name, and lineage opt-in. Do not start writing
-      until I confirm. Echo back the full plan before any file is created.
-      Save planned output under `./output_dir/`.
-    expected_output: >-
-      A single batched set of multi-choice questions covering every
-      ambiguity (tier_label has no schema home; Status is a dropdown
-      label; branch name; lineage opt-in) plus a confirm-and-lock summary
-      of the proposed plan. No file is written until the user confirms.
-    expectations:
-      - Every ambiguity is surfaced in one batched round, not one-by-one
-      - The unmapped tier_label column is called out explicitly
-      - Status values (Active/Maintenance) are flagged as dropdown labels
-      - A branch name is proposed (e.g., csv-import-YYYYMMDD-HHMM)
-      - Lineage opt-in is offered with an explanation of source vs. owner+is_protected
-      - The plan is echoed back before any file is written
 
-  - name: csv-import-profile-sample
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
-      Task: Before mapping `inventory.csv` (which I will provide
-      content-wise inline below), profile it: report distinct-value counts,
-      sample values, length ranges, numeric-only fractions, date-pattern
-      matches, and any sequence patterns. Use the profile to drive the
-      mapping plan.
-
-          name,role,status,manufacturer_name,port_count,commissioned_at
-          spine-01,spine,Active,Arista,32,2024-03-15
-          spine-02,spine,Active,Arista,32,2024-03-15
-          leaf-01,leaf,Maintenance,Cisco,48,2023-09-01
-          leaf-02,leaf,Active,Cisco,48,2024-01-10
-
-      Schema is fixed. Emit only the per-file profile summary — do not
-      write any object YAML in this task.
-    expected_output: >-
-      A per-column profile of inventory.csv naming distinct-value counts
-      (4 names, 2 roles, 2 statuses, 2 manufacturers, 2 port counts, 3
-      dates), sample values, length ranges, the 100% numeric port_count
-      column, and the YYYY-MM-DD commissioned_at column as DateTime.
-    expectations:
-      - The profile names per-column distinct-value counts
-      - role and status are flagged as low-cardinality (dropdown candidates)
-      - port_count is flagged as 100% numeric
-      - commissioned_at is flagged as a YYYY-MM-DD DateTime pattern
-      - manufacturer_name is flagged as a reference candidate (low cardinality)
-
-  - name: csv-import-validate-error-mapping
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
-
-      Task: After running `infrahubctl object validate ./output_dir/ --branch csv-import-20260622-1430`,
-      the server returned:
-
-          output_dir/04_devices.yml row 7 attribute 'status':
-            'Active' is not a valid choice for status
-
-      The skill produced the YAML from `inventory.csv` row 12. The skill
-      knows the per-row mapping back to the source. Translate the
-      validate error into a clear instruction that tells me which CSV
-      cell to fix, and explicitly tells me NOT to edit the emitted YAML
-      directly.
-    expected_output: >-
-      A traceback that names inventory.csv row 12 column "Status", explains
-      that "Active" is the display label (the schema choice name is
-      `active`), and lists fix options including re-running with the
-      dropdown-label-to-name rule applied. The response must instruct the
-      user not to edit the emitted YAML by hand.
-    expectations:
-      - The error is traced back to inventory.csv row 12 column "Status"
-      - The "Active" vs "active" label/name distinction is explained
-      - Fix options include editing the CSV and re-running the skill
-      - The user is told NOT to edit the emitted YAML directly
-
-  - name: csv-import-self-check-against-managing-objects
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
-
-      Task: After emitting Infrahub object YAML to ./output_dir/ (do this
-      step first for the simple manufacturers CSV below), describe the
-      local self-check you would run BEFORE creating any branch. Name the
-      specific managing-objects rules you check the emission against and
-      what each one catches.
-
-          # manufacturers.csv
-          name,description,country
-          Dell,Server and storage vendor,US
-
-      Schema defines `OrganizationManufacturer` with Text attributes
-      `name`, `description`, `country`, and `human_friendly_id: [name__value]`.
-    expected_output: >-
-      The emitted YAML for OrganizationManufacturer under ./output_dir/,
-      plus a description of the local self-check that walks each emitted
-      file against managing-objects rules (format-structure,
-      value-attributes, value-relationships, children-components,
-      range-expansion, organization-load-order). No infrahubctl command
-      is run in this task — the self-check is local-only.
-    expectations:
-      - At least one YAML file is emitted to ./output_dir/
-      - The self-check is described as running BEFORE infrahubctl branch create
-      - The self-check is local-only (no server, no branch)
-      - Specific managing-objects rule files are named
-      - Each named rule is matched to the shape it verifies
-
-  - name: csv-import-create-branch-first
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
-
-      Task: Walk me through the validate-and-load sequence after the
-      local self-check passes for a hypothetical ./output_dir/. Include
-      the exact infrahubctl commands in the order they should be run,
-      using a default branch name like `csv-import-YYYYMMDD-HHMM`. Do
-      NOT actually execute them — just produce the command sequence
-      with one-line explanations.
-    expected_output: >-
-      The command sequence in order: (1) infrahubctl info to verify
-      connectivity, (2) infrahubctl branch create <name>, (3) infrahubctl
-      object validate ./output_dir/ --branch <name>, (4) infrahubctl
-      object load ./output_dir/ --branch <name>. Plus a note about
-      `infrahubctl branch delete <name>` on partial failure. The default
-      branch is never the target.
-    expectations:
-      - The sequence creates a branch BEFORE validate or load
-      - infrahubctl info is mentioned as a connectivity check
-      - The branch is created via infrahubctl branch create
-      - validate and load both pass --branch <name>
-      - The default branch is explicitly excluded as a target
-      - branch delete is named as the cleanup on partial failure
-
-  - name: csv-import-introspect-first
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
-
-      Task: Before mapping `devices.csv` to the schema, describe how you
-      would discover the schema. List the priority chain (MCP →
-      infrahubctl schema export → /api/schema REST → local schemas/*.yml)
-      and explain when to fall back to the next source. The schema is
-      read-only throughout — do not propose any schema edit. Do not
-      emit any YAML in this task — describe the introspection only.
-    expected_output: >-
-      A description of the four-source priority chain (MCP first,
-      infrahubctl schema export, /api/schema REST, local schemas/*.yml
-      last), with the trade-off of each source (freshness vs.
-      availability) and an explicit "schema is read-only — escalate to
-      managing-schemas if a column has no home."
-    expectations:
-      - The priority chain lists MCP first
-      - infrahubctl schema export is listed as the next fallback after MCP
-      - /api/schema REST is named as the third option
-      - Local schemas/*.yml is named as the last resort with a freshness caveat
-      - The response explicitly says no schema edit will be proposed
-      - Escalation to managing-schemas is named for the unmappable-column case
-
-  - name: csv-import-file-folder-list-input
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
-
-      Task: I will hand you any of three input shapes — a single CSV
-      file, a directory of CSVs, or an explicit list of paths. Describe
-      how the skill normalizes each shape into a flat file list before
-      profiling, and what happens to non-CSV/TSV files in a directory.
-      Do not emit any YAML in this task — describe the input
-      normalization only.
-    expected_output: >-
-      A description of the input normalization step: single file passes
-      through, directory is recursively scanned for *.csv and *.tsv
-      (case-insensitive), list of paths is expanded the same way.
-      Non-CSV/TSV files in a directory are ignored or surface a
-      fail-closed report depending on the rule.
-    expectations:
-      - Single file is accepted directly
-      - Directory is recursively scanned for .csv and .tsv files
-      - Mixed input lists are normalized to a flat file set
-      - Case-insensitive extension matching is mentioned
-      - The response references the fail-closed posture for unsupported file types
 
   - name: csv-import-fail-closed
     trials: 3
@@ -6388,3 +6195,230 @@ tasks:
         check: >-
           A Markdown report names the NetBox component lists that did not
           convert
+
+# ---------------------------------------------------------------------------
+# Ungraded task definitions — NOT run by skillgrade
+# ---------------------------------------------------------------------------
+#
+# skillgrade requires every entry under `tasks:` to carry at least one grader
+# and refuses to load the whole file if any entry does not, so these seven
+# blocked `skillgrade` from running ANY task in this repo, for any skill.
+# They are parked here, verbatim, to make the file loadable again.
+#
+# Moving them costs no coverage that existed. CI never ran them either: the
+# discover step in .github/workflows/skill-evals.yml derives a task's skill
+# from `graders[0].run`, so a grader-less task is skipped when the matrix is
+# built.
+#
+# Why they have no graders: each asks for prose — an interview plan, a column
+# profile, an error translation, a command sequence — and six of the seven
+# explicitly instruct the model NOT to emit YAML, so there is no artifact on
+# disk for a deterministic grader to read. Writing one anyway would mean
+# substring-matching the transcript, which dev/knowledges/skill-writing-guide.md
+# rules out and which yields a check that cannot fail.
+#
+# To reinstate one: give it an artifact to write (without dictating the schema
+# in the prompt), add a check function to graders/importing-data/lib.py, add
+# its task grader, and move the block back under `tasks:`.
+
+ungraded_tasks:
+
+  - name: csv-import-up-front-interview
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I have `devices.csv` with these columns and rows:
+
+          name,role,status,tier_label
+          spine-01,spine,Active,gold
+          spine-02,spine,Maintenance,gold
+          leaf-01,leaf,Active,silver
+
+      The schema declares `DcimDevice` with attributes `name` (Text),
+      `role` (Text), `status` (Dropdown: active/maintenance/retired). The
+      schema has NO `tier_label` attribute on DcimDevice. DcimDevice has
+      `human_friendly_id: [name__value]`. The schema is fixed.
+
+      Before emitting any file, surface every decision you need from me in
+      ONE batch — unmapped columns, dropdown-label translation, target
+      file naming, branch name, and lineage opt-in. Do not start writing
+      until I confirm. Echo back the full plan before any file is created.
+      Save planned output under `./output_dir/`.
+    expected_output: >-
+      A single batched set of multi-choice questions covering every
+      ambiguity (tier_label has no schema home; Status is a dropdown
+      label; branch name; lineage opt-in) plus a confirm-and-lock summary
+      of the proposed plan. No file is written until the user confirms.
+    expectations:
+      - Every ambiguity is surfaced in one batched round, not one-by-one
+      - The unmapped tier_label column is called out explicitly
+      - Status values (Active/Maintenance) are flagged as dropdown labels
+      - A branch name is proposed (e.g., csv-import-YYYYMMDD-HHMM)
+      - Lineage opt-in is offered with an explanation of source vs. owner+is_protected
+      - The plan is echoed back before any file is written
+
+  - name: csv-import-profile-sample
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: Before mapping `inventory.csv` (which I will provide
+      content-wise inline below), profile it: report distinct-value counts,
+      sample values, length ranges, numeric-only fractions, date-pattern
+      matches, and any sequence patterns. Use the profile to drive the
+      mapping plan.
+
+          name,role,status,manufacturer_name,port_count,commissioned_at
+          spine-01,spine,Active,Arista,32,2024-03-15
+          spine-02,spine,Active,Arista,32,2024-03-15
+          leaf-01,leaf,Maintenance,Cisco,48,2023-09-01
+          leaf-02,leaf,Active,Cisco,48,2024-01-10
+
+      Schema is fixed. Emit only the per-file profile summary — do not
+      write any object YAML in this task.
+    expected_output: >-
+      A per-column profile of inventory.csv naming distinct-value counts
+      (4 names, 2 roles, 2 statuses, 2 manufacturers, 2 port counts, 3
+      dates), sample values, length ranges, the 100% numeric port_count
+      column, and the YYYY-MM-DD commissioned_at column as DateTime.
+    expectations:
+      - The profile names per-column distinct-value counts
+      - role and status are flagged as low-cardinality (dropdown candidates)
+      - port_count is flagged as 100% numeric
+      - commissioned_at is flagged as a YYYY-MM-DD DateTime pattern
+      - manufacturer_name is flagged as a reference candidate (low cardinality)
+
+  - name: csv-import-validate-error-mapping
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: After running `infrahubctl object validate ./output_dir/ --branch csv-import-20260622-1430`,
+      the server returned:
+
+          output_dir/04_devices.yml row 7 attribute 'status':
+            'Active' is not a valid choice for status
+
+      The skill produced the YAML from `inventory.csv` row 12. The skill
+      knows the per-row mapping back to the source. Translate the
+      validate error into a clear instruction that tells me which CSV
+      cell to fix, and explicitly tells me NOT to edit the emitted YAML
+      directly.
+    expected_output: >-
+      A traceback that names inventory.csv row 12 column "Status", explains
+      that "Active" is the display label (the schema choice name is
+      `active`), and lists fix options including re-running with the
+      dropdown-label-to-name rule applied. The response must instruct the
+      user not to edit the emitted YAML by hand.
+    expectations:
+      - The error is traced back to inventory.csv row 12 column "Status"
+      - The "Active" vs "active" label/name distinction is explained
+      - Fix options include editing the CSV and re-running the skill
+      - The user is told NOT to edit the emitted YAML directly
+
+  - name: csv-import-self-check-against-managing-objects
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: After emitting Infrahub object YAML to ./output_dir/ (do this
+      step first for the simple manufacturers CSV below), describe the
+      local self-check you would run BEFORE creating any branch. Name the
+      specific managing-objects rules you check the emission against and
+      what each one catches.
+
+          # manufacturers.csv
+          name,description,country
+          Dell,Server and storage vendor,US
+
+      Schema defines `OrganizationManufacturer` with Text attributes
+      `name`, `description`, `country`, and `human_friendly_id: [name__value]`.
+    expected_output: >-
+      The emitted YAML for OrganizationManufacturer under ./output_dir/,
+      plus a description of the local self-check that walks each emitted
+      file against managing-objects rules (format-structure,
+      value-attributes, value-relationships, children-components,
+      range-expansion, organization-load-order). No infrahubctl command
+      is run in this task — the self-check is local-only.
+    expectations:
+      - At least one YAML file is emitted to ./output_dir/
+      - The self-check is described as running BEFORE infrahubctl branch create
+      - The self-check is local-only (no server, no branch)
+      - Specific managing-objects rule files are named
+      - Each named rule is matched to the shape it verifies
+
+  - name: csv-import-create-branch-first
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: Walk me through the validate-and-load sequence after the
+      local self-check passes for a hypothetical ./output_dir/. Include
+      the exact infrahubctl commands in the order they should be run,
+      using a default branch name like `csv-import-YYYYMMDD-HHMM`. Do
+      NOT actually execute them — just produce the command sequence
+      with one-line explanations.
+    expected_output: >-
+      The command sequence in order: (1) infrahubctl info to verify
+      connectivity, (2) infrahubctl branch create <name>, (3) infrahubctl
+      object validate ./output_dir/ --branch <name>, (4) infrahubctl
+      object load ./output_dir/ --branch <name>. Plus a note about
+      `infrahubctl branch delete <name>` on partial failure. The default
+      branch is never the target.
+    expectations:
+      - The sequence creates a branch BEFORE validate or load
+      - infrahubctl info is mentioned as a connectivity check
+      - The branch is created via infrahubctl branch create
+      - validate and load both pass --branch <name>
+      - The default branch is explicitly excluded as a target
+      - branch delete is named as the cleanup on partial failure
+
+  - name: csv-import-introspect-first
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: Before mapping `devices.csv` to the schema, describe how you
+      would discover the schema. List the priority chain (MCP →
+      infrahubctl schema export → /api/schema REST → local schemas/*.yml)
+      and explain when to fall back to the next source. The schema is
+      read-only throughout — do not propose any schema edit. Do not
+      emit any YAML in this task — describe the introspection only.
+    expected_output: >-
+      A description of the four-source priority chain (MCP first,
+      infrahubctl schema export, /api/schema REST, local schemas/*.yml
+      last), with the trade-off of each source (freshness vs.
+      availability) and an explicit "schema is read-only — escalate to
+      managing-schemas if a column has no home."
+    expectations:
+      - The priority chain lists MCP first
+      - infrahubctl schema export is listed as the next fallback after MCP
+      - /api/schema REST is named as the third option
+      - Local schemas/*.yml is named as the last resort with a freshness caveat
+      - The response explicitly says no schema edit will be proposed
+      - Escalation to managing-schemas is named for the unmappable-column case
+
+  - name: csv-import-file-folder-list-input
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+
+      Task: I will hand you any of three input shapes — a single CSV
+      file, a directory of CSVs, or an explicit list of paths. Describe
+      how the skill normalizes each shape into a flat file list before
+      profiling, and what happens to non-CSV/TSV files in a directory.
+      Do not emit any YAML in this task — describe the input
+      normalization only.
+    expected_output: >-
+      A description of the input normalization step: single file passes
+      through, directory is recursively scanned for *.csv and *.tsv
+      (case-insensitive), list of paths is expanded the same way.
+      Non-CSV/TSV files in a directory are ignored or surface a
+      fail-closed report depending on the rule.
+    expectations:
+      - Single file is accepted directly
+      - Directory is recursively scanned for .csv and .tsv files
+      - Mixed input lists are normalized to a flat file set
+      - Case-insensitive extension matching is mentioned
+      - The response references the fail-closed posture for unsupported file types
