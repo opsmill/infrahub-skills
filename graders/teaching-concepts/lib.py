@@ -256,7 +256,14 @@ def check_status_stays_introduced(ws: Path) -> tuple[bool, str]:
 
 
 FIXTURE_KINDS = ("TestbedSensor", "TestbedZone")
-_MUTATING = ("object load", "schema load", "object update", "branch create")
+_MUTATING = (
+    "object load",
+    "object create",
+    "object update",
+    "object delete",
+    "schema load",
+    "branch create",
+)
 # Word-bounded so "not" does not match inside "note", "another", "nothing",
 # or "annotate": a substring check silenced genuine violations sitting next
 # to those words.

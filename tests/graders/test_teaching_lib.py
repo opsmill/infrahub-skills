@@ -418,6 +418,18 @@ def test_sandbox_safety_write_outside_learning_branch(tmp_path):
     assert not ok
 
 
+def test_sandbox_safety_every_mutating_subcommand_outside_branch_fails(tmp_path):
+    """The rule says *all* writes are branch-scoped, so the scan has to know
+    every mutating `infrahubctl object` subcommand, not just `load`."""
+    for sub in ("create", "update", "delete", "load"):
+        stray = SANDBOX_LESSON.replace(
+            "`infrahubctl object load sandbox/objects.yml --branch learning-pc-demo`",
+            f"`infrahubctl object {sub} sandbox/objects.yml`")
+        ws = make_ws(tmp_path / sub, lesson=stray, concept="proposed-changes")
+        ok, msg = teaching_lib.CHECKS["sandbox-safety"](ws)
+        assert not ok, f"object {sub} outside a learning-* branch was not flagged"
+
+
 def test_sandbox_safety_no_opt_in_question(tmp_path):
     silent = SANDBOX_LESSON.replace(
         "This exercise writes to your instance. Shall we create a scratch branch for it?\n\n",
