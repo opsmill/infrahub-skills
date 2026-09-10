@@ -274,33 +274,82 @@ def _finding_files(findings: list[dict], rule: str) -> list[str]:
     return [str(f.get("file", "")).lower() for f in _findings_for(findings, rule)]
 
 
+# Fields that identify *which* definition a finding is about. A watch defect
+# lives in the `.infrahub.yml` registration, so citing `.infrahub.yml` as the
+# file is correct and common; the entry is then named in one of these instead.
+_IDENTITY_FIELDS = (
+    "file", "section", "entry", "name", "definition", "target", "location", "line",
+)
+
+
+def _identity_blob(finding: dict) -> str:
+    return " ".join(str(finding.get(k, "")) for k in _IDENTITY_FIELDS).lower()
+
+
+def _full_blob(finding: dict) -> str:
+    return (
+        _identity_blob(finding)
+        + " "
+        + " ".join(
+            str(finding.get(k, ""))
+            for k in ("description", "fix", "replacement", "suggestion", "detail")
+        ).lower()
+    )
+
+
 def check_watch_flags_entry(
     findings: list[dict], rule: str, needle: str
 ) -> tuple[bool, str]:
-    """Assert some finding for ``rule`` is attributed to a file matching ``needle``.
+    """Assert some finding for ``rule`` picks out the definition ``needle`` names.
 
-    Matches on the finding's ``file`` field rather than the whole
-    stringified finding: a rule body that merely *mentions* a path in prose
-    is not the same as attributing a finding to it.
+    ``needle`` is the registered file path; the entry's own name (its last
+    path segment without the extension) counts too. Both identify the same
+    definition, and which one a finding cites is presentation, not substance
+    — a defect in a ``.infrahub.yml`` entry is legitimately attributed to
+    ``.infrahub.yml`` with the entry named alongside.
+
+    Deliberately generous, and asymmetric with the negative control below:
+    the question here is "did the audit catch this one at all", so a match
+    anywhere in the finding counts. ``check_watch_does_not_flag_entry`` asks
+    the opposite question and stays strict, so a passing mention in prose
+    cannot manufacture a false failure there.
     """
-    files = _finding_files(findings, rule)
-    if not files:
+    matching = _findings_for(findings, rule)
+    if not matching:
         return False, f"no {rule} finding emitted at all"
-    if any(needle.lower() in f for f in files):
-        return True, f"{rule} flags {needle}"
-    return False, f"{rule} does not flag {needle}; files flagged: {files}"
+    stem = needle.lower().rsplit("/", 1)[-1].rsplit(".", 1)[0]
+    for f in matching:
+        blob = _full_blob(f)
+        if needle.lower() in blob or (stem and stem in blob):
+            return True, f"{rule} flags {needle}"
+    return False, (
+        f"{rule} does not flag {needle} (nor the entry name {stem!r}); "
+        f"files flagged: {_finding_files(findings, rule)}"
+    )
 
 
 def check_watch_does_not_flag_entry(
     findings: list[dict], rule: str, needle: str
 ) -> tuple[bool, str]:
-    """Assert no finding for ``rule`` is attributed to a file matching ``needle``.
+    """Assert no finding for ``rule`` is *attributed to* the definition ``needle``.
 
     The negative control. A complete Jinja2 closure and a correct
     ``files: []`` are both already right; flagging them is noise, and noise
     is what makes an audit report get ignored.
+
+    Strict where the positive check is generous: only the identity fields
+    are searched, never the prose. A correct finding may well say "unlike
+    interface_names, which declares files: [] correctly", and that sentence
+    must not read as a finding against interface_names.
     """
-    offenders = [f for f in _finding_files(findings, rule) if needle.lower() in f]
+    stem = needle.lower().rsplit("/", 1)[-1].rsplit(".", 1)[0]
+    offenders = []
+    for f in _findings_for(findings, rule):
+        blob = _identity_blob(f)
+        # `.infrahub.yml` alone identifies no single entry, so it is only an
+        # offender when the entry itself is named in an identity field.
+        if needle.lower() in blob or (stem and stem in blob):
+            offenders.append(f.get("file", "<no-file>"))
     if offenders:
         return False, f"{rule} wrongly flags {needle}: {offenders}"
     return True, f"{rule} leaves {needle} alone"
