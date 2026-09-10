@@ -1,0 +1,19 @@
+dev/guides/adding-a-rule.md
+  s_fe99a41d5e7f9e::t_2ca2edfb845741 256-258
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "7e79e5c7a33d4410a864237a0752b3343ac1f9fa",
+  "prompts": {},
+  "sessions": {
+    "s_fe99a41d5e7f9e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f610d975-3725-4fda-8281-a3570da3554a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
