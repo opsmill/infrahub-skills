@@ -285,11 +285,20 @@ what to add to each is in
 [../guidelines/skill-registration.md](../guidelines/skill-registration.md),
 which loads on its own when you edit a `SKILL.md`.
 
-Apply the appropriate `type/*` and `changes/*` labels to
-your PR so [release-drafter](../../.github/release-drafter.yml)
-files it in the right category. The drafted body is a
-starting point, not the release notes: each release also
-gets a curated page, per the same rule.
+Add a news fragment describing the skill — CI fails
+the pull request without one:
+
+```bash
+uv run towncrier create -c "New skill: does X." 42.added.md
+```
+
+Release notes are assembled from these fragments by
+towncrier, so do not edit `CHANGELOG.md` by hand. Apply
+the appropriate `changes/*` label as well: it drives the
+version bump. The assembled section is a starting point,
+not the release notes: each release also gets a curated
+page, per the same rule. See the Changelog section of
+[AGENTS.md](../../AGENTS.md).
 
 ### 8. Verification
 
