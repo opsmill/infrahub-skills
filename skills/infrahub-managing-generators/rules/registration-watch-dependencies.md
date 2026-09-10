@@ -15,6 +15,10 @@ Generator's instances only if the file is inside its closure.
 `watch.files` on the `generator_definitions` entry is how you
 declare the dependencies detection does not supply.
 
+It is a *file*-change lever only. A proposed change that edits
+node attributes without touching the repository never engages
+`watch`, so it buys nothing for a workload of that shape.
+
 Requires Infrahub 1.11 or later; the behavior below was read
 off the 1.11.2 source. A Generator imported before
 precise triggering shipped has no stored closure and falls

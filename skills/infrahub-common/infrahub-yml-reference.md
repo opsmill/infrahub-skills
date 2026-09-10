@@ -220,8 +220,15 @@ transform's whole package directory and required an empty
 declaration on Jinja2 transforms. The models use
 `extra="forbid"`, so
 `watch` on `check_definitions` or `artifact_definitions`
-fails the repository import, as does the bare-list form
-`watch: [a, b]` or any key other than `files`.
+fails the import, as does the bare-list form
+`watch: [a, b]` or any key other than `files`. The failure is
+total rather than local: one unsupported key fails the **whole
+file**, leaving the repository in error-import status with no
+visible error in the UI. Confirm the target version accepts the
+key before adding it — read it off that version's own
+repository-config model, not the published docs, and read it
+from the deployed server's image rather than the local harness,
+since the server parses the config with its own vendored SDK.
 
 ### What detection supplies
 
@@ -229,6 +236,11 @@ On import, Infrahub computes a **dependency closure** per
 definition. In a proposed change, a changed file re-renders
 that definition's artifacts (or re-runs the Generator's
 instances) only if the file is in that closure.
+
+`watch` governs *file*-driven regeneration and nothing else. A
+proposed change that only edits node attributes, with no
+repository commit, never engages `watch` at all — so it is not
+a latency lever for a workload of that shape.
 
 | Kind | Rely on being detected |
 | ---- | ---------------------- |

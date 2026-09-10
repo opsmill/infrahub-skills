@@ -253,6 +253,107 @@ def check_yagni_no_finding_on_file(
 
 
 # ---------------------------------------------------------------------------
+# practices-watch-dependencies checks
+# ---------------------------------------------------------------------------
+#
+# The audit fixture registers two Python transforms, one generator and one
+# Jinja2 transform. Only the entries whose closure is genuinely incomplete
+# should be flagged, and no finding may propose ``watch`` on a section whose
+# config model rejects the key.
+
+_WATCH_ELIGIBLE = ("python_transforms", "jinja2_transforms", "generator_definitions")
+_WATCH_FORBIDDEN = ("check_definitions", "artifact_definitions")
+
+
+def _findings_for(findings: list[dict], rule: str) -> list[dict]:
+    return [f for f in findings if isinstance(f, dict) and f.get("rule") == rule]
+
+
+def _finding_files(findings: list[dict], rule: str) -> list[str]:
+    """Every ``file`` value attributed to the named rule, lowercased."""
+    return [str(f.get("file", "")).lower() for f in _findings_for(findings, rule)]
+
+
+def check_watch_flags_entry(
+    findings: list[dict], rule: str, needle: str
+) -> tuple[bool, str]:
+    """Assert some finding for ``rule`` is attributed to a file matching ``needle``.
+
+    Matches on the finding's ``file`` field rather than the whole
+    stringified finding: a rule body that merely *mentions* a path in prose
+    is not the same as attributing a finding to it.
+    """
+    files = _finding_files(findings, rule)
+    if not files:
+        return False, f"no {rule} finding emitted at all"
+    if any(needle.lower() in f for f in files):
+        return True, f"{rule} flags {needle}"
+    return False, f"{rule} does not flag {needle}; files flagged: {files}"
+
+
+def check_watch_does_not_flag_entry(
+    findings: list[dict], rule: str, needle: str
+) -> tuple[bool, str]:
+    """Assert no finding for ``rule`` is attributed to a file matching ``needle``.
+
+    The negative control. A complete Jinja2 closure and a correct
+    ``files: []`` are both already right; flagging them is noise, and noise
+    is what makes an audit report get ignored.
+    """
+    offenders = [f for f in _finding_files(findings, rule) if needle.lower() in f]
+    if offenders:
+        return False, f"{rule} wrongly flags {needle}: {offenders}"
+    return True, f"{rule} leaves {needle} alone"
+
+
+def check_watch_not_on_forbidden_section(findings: list[dict]) -> tuple[bool, str]:
+    """Assert no finding proposes ``watch`` on a section whose model rejects it.
+
+    Scoped to the finding's own ``file``, ``section`` and fix/replacement
+    text rather than the whole stringified finding. A finding is allowed to
+    *name* check_definitions or artifact_definitions while explaining that
+    the key does not go there; what it must not do is put the fix on one.
+    """
+    offenders = []
+    for f in findings:
+        if not isinstance(f, dict):
+            continue
+        section = str(f.get("section", "")).lower()
+        if any(tok in section for tok in _WATCH_FORBIDDEN):
+            offenders.append(f.get("rule", "<no-rule>"))
+            continue
+        fix = " ".join(
+            str(f.get(k, "")) for k in ("fix", "replacement", "suggestion")
+        ).lower()
+        if "watch" in fix and any(tok in fix for tok in _WATCH_FORBIDDEN):
+            offenders.append(f.get("rule", "<no-rule>"))
+    if offenders:
+        return False, (
+            "finding(s) place a watch fix on a section that forbids the key: "
+            f"{offenders}"
+        )
+    return True, "no watch fix targets check_definitions or artifact_definitions"
+
+
+def check_watch_no_third_party_in_fix(findings: list[dict], rule: str) -> tuple[bool, str]:
+    """Assert no proposed watch list names an installed package.
+
+    Installed dependencies are not tracked repository files, so naming one
+    produces an entry that matches nothing while still counting as a
+    declaration.
+    """
+    third_party = ("infrahub_sdk", "site-packages", "pydantic", "httpx", "netutils")
+    for f in _findings_for(findings, rule):
+        blob = " ".join(
+            str(f.get(k, "")) for k in ("fix", "replacement", "suggestion")
+        ).lower()
+        hit = next((t for t in third_party if t in blob), None)
+        if hit:
+            return False, f"{rule} proposes watching an installed package ({hit})"
+    return True, "no proposed watch list names an installed package"
+
+
+# ---------------------------------------------------------------------------
 # CHECKS registry
 # ---------------------------------------------------------------------------
 #
@@ -272,6 +373,10 @@ _CHECKS: dict[str, tuple[Any, list[str]]] = {
     "yagni-findings-sorted": (check_yagni_findings_sorted_by_ladder, []),
     "yagni-bootstrap-carveout": (check_yagni_finding_carves_out_bootstrap, []),
     "yagni-no-above-medium": (check_yagni_no_finding_above_medium, []),
+    "watch-flags-entry": (check_watch_flags_entry, ["str", "str"]),
+    "watch-does-not-flag-entry": (check_watch_does_not_flag_entry, ["str", "str"]),
+    "watch-not-on-forbidden-section": (check_watch_not_on_forbidden_section, []),
+    "watch-no-third-party-in-fix": (check_watch_no_third_party_in_fix, ["str"]),
 }
 
 

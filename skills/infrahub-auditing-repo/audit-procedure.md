@@ -334,6 +334,29 @@ convention).
 - Shared utility functions in common.py when patterns
   repeat
 
+### 7.4 Dependency declarations (`watch`)
+
+- Every `python_transforms` and `generator_definitions`
+  entry carries a `watch` key — absent, the commit id is
+  folded into its fingerprint and it re-renders or re-runs
+  on every commit
+- `watch.files` names every first-party import and every
+  file read at runtime, siblings included (imports are
+  never followed)
+- Every entry resolves to a Git-tracked file
+  (`git ls-files -- <entry>`); one that does not still
+  counts as a declaration
+- `watch` never on `check_definitions` or
+  `artifact_definitions` — the models reject it and the
+  whole repository import fails
+- `jinja2_transforms` flagged only where a computed
+  include leaves the closure incomplete
+- Confirm the version under audit accepts the key before
+  proposing it, and say how
+
+See
+[rules/practices-watch-dependencies.md](./rules/practices-watch-dependencies.md).
+
 ---
 
 ## Phase 8: Deployment Readiness (MEDIUM)

@@ -2124,6 +2124,137 @@ tasks:
           generate_rack, which has no first-party import, declares
           watch.files as []
 
+  - name: practices-watch-dependencies
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 7. Emit JSON findings to output.json.
+
+      This repository runs on Infrahub 1.11.1. Audit the registrations
+      below against how Infrahub decides what to regenerate.
+
+      Repository layout:
+
+      ```text
+      transforms/device_config.py
+      transforms/device_config_query.py
+      transforms/interface_names.py
+      generators/generate_fabric.py
+      generators/fabric_generator_query.py
+      templates/startup_config_arista.j2
+      templates/partials/header.j2
+      src/my_package/formatting.py
+      ```
+
+      transforms/device_config.py:
+      ```python
+      from infrahub_sdk.transforms import InfrahubTransform
+
+      from my_package.formatting import render_banner
+
+      from .device_config_query import DeviceConfigQuery
+      ```
+
+      transforms/interface_names.py:
+      ```python
+      from infrahub_sdk.transforms import InfrahubTransform
+      ```
+
+      generators/generate_fabric.py:
+      ```python
+      from infrahub_sdk.generator import InfrahubGenerator
+
+      from .fabric_generator_query import FabricGeneratorQuery
+      from my_package.formatting import render_banner
+      ```
+
+      templates/startup_config_arista.j2:
+      ```jinja
+      {% include "templates/partials/header.j2" %}
+      ```
+
+      The registrations in `.infrahub.yml`:
+      ```yaml
+      python_transforms:
+        - name: device_config
+          class_name: DeviceConfig
+          file_path: transforms/device_config.py
+        - name: interface_names
+          class_name: InterfaceNames
+          file_path: transforms/interface_names.py
+          watch:
+            files: []
+
+      generator_definitions:
+        - name: generate_fabric
+          file_path: generators/generate_fabric.py
+          query: generate_fabric
+          targets: fabrics
+          class_name: FabricGenerator
+          watch:
+            files:
+              - src/my_package/
+
+      jinja2_transforms:
+        - name: arista_startup_config
+          query: device_startup_config
+          template_path: templates/startup_config_arista.j2
+
+      artifact_definitions:
+        - name: device_config_artifact
+          artifact_name: device-config
+          content_type: text/plain
+          targets: devices
+          transformation: device_config
+      ```
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_practices_watch_dependencies.py
+        weight: 1.0
+    expected_output: >-
+      JSON findings flagging transforms/device_config.py (no watch key at
+      all, so the commit id is folded into its fingerprint) and
+      generators/generate_fabric.py (declares the shared package but omits
+      the sibling query model it imports, so the list reads complete while
+      a change to that module is missed). interface_names and the
+      Arista template are already correct and must not be flagged, and no
+      fix may put watch on the artifact_definitions entry.
+    expectations:
+      - "device_config is flagged for carrying no watch key"
+      - "generate_fabric is flagged for an incomplete list (sibling query model missing)"
+      - "interface_names, whose files: [] is correct, is not flagged"
+      - "The Arista template, whose includes are literal, is not flagged"
+      - "No finding proposes watch on the artifact_definitions entry"
+      - "No proposed list names infrahub_sdk or another installed package"
+    assertions:
+      - name: watch-flags-entry
+        check: >-
+          A finding is attributed to transforms/device_config.py, which
+          imports a sibling and the shared package yet declares no watch
+      - name: watch-flags-entry
+        check: >-
+          A finding is attributed to generators/generate_fabric.py, whose
+          watch names src/my_package/ but omits the sibling query model
+      - name: watch-does-not-flag-entry
+        check: >-
+          No finding is attributed to transforms/interface_names.py, whose
+          empty list is the correct declaration for a self-contained entry
+      - name: watch-does-not-flag-entry
+        check: >-
+          No finding is attributed to the Arista template, whose literal
+          includes give it a complete closure already
+      - name: watch-not-on-forbidden-section
+        check: >-
+          No finding places a watch fix on check_definitions or
+          artifact_definitions, whose models reject the key and fail the
+          whole repository import
+      - name: watch-no-third-party-in-fix
+        check: >-
+          No proposed watch list names an installed package, which is not a
+          tracked repository file
+
   # --- CSV Import --- #
   - name: csv-import-single-kind-envelope
     trials: 3

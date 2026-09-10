@@ -15,6 +15,10 @@ re-renders that Transformation's artifacts only if the file
 is inside its closure. `watch.files` in `.infrahub.yml` is
 how you declare the dependencies detection does not supply.
 
+It is a *file*-change lever only. A proposed change that edits
+node attributes without touching the repository never engages
+`watch`, so it buys nothing for a workload of that shape.
+
 Everything below is Infrahub 1.11 behavior, read off the
 1.11.2 source. The `watch` key itself parses from 1.10, but
 1.10 detected a Python transform's whole package directory
