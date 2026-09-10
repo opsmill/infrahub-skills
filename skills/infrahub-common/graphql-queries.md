@@ -271,16 +271,20 @@ Because cardinality selects the shape, **changing a
 relationship's cardinality invalidates every stored query
 that selects it.** The failure is a server error, not a
 validation message, and it names an internal wrapper type
-rather than the relationship:
+rather than the relationship. Which of the two messages
+you get depends on the direction of the change.
 
-```text
-Cannot query field 'edges' on type 'NestedEdged<Kind>'
-```
-
-The reverse migration gives the mirror:
+Widening `one` to `many` leaves the stored query on the
+node-shaped selection while the field is now paginated:
 
 ```text
 Cannot query field 'node' on type 'NestedPaginated<Kind>'
+```
+
+Narrowing `many` to `one` gives the mirror:
+
+```text
+Cannot query field 'edges' on type 'NestedEdged<Kind>'
 ```
 
 `NestedEdged<Kind>` and `NestedPaginated<Kind>` appear

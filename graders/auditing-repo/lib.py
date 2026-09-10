@@ -258,7 +258,12 @@ def _finding_text(finding: dict) -> str:
 
 
 def _recommendation_text(finding: dict) -> str:
-    """The finding's recommended fix, or its whole text if it names no field."""
+    """The finding's recommended fix, empty when it names no such field.
+
+    Deliberately does *not* fall back to the whole finding: a cardinality
+    quoted in evidence restates the declaration the prompt handed over
+    rather than choosing one for the inverse.
+    """
     parts = [
         s
         for field in _RECOMMENDATION_FIELDS

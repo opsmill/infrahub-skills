@@ -1132,14 +1132,20 @@ def check_identifier_unique_per_direction(schema: dict, **_: Any) -> tuple[bool,
 
 
 def check_many_max_count_valid(schema: dict, **_: Any) -> tuple[bool, str]:
-    """`max_count: 1` on a cardinality-many relationship is rejected at load."""
+    """`max_count: 1` on a cardinality-many relationship is rejected at load.
+
+    ``cardinality`` defaults to ``many`` when unset, so an omitted key is a
+    ``many`` relationship here too — otherwise a schema Infrahub rejects
+    passes this check.
+    """
     by_identifier = rels_by_identifier(schema)
     if not by_identifier:
         return False, "no relationship declares an identifier, so nothing was checked"
     problems: list[str] = []
     for _identifier, entries in by_identifier.items():
         for kind, rel in entries:
-            if rel.get("cardinality") == "many" and rel.get("max_count") == 1:
+            cardinality = str(rel.get("cardinality") or "many")
+            if cardinality == "many" and rel.get("max_count") == 1:
                 problems.append(
                     f"{kind}.{rel.get('name')} is cardinality many with max_count 1; "
                     "use cardinality one for a genuine cap of one"
