@@ -75,7 +75,7 @@ the new verb earns a case.
    git stash         git clean       git rm
    git mv            git apply       git am
    git revert        git merge       git rebase
-   git cherry-pick
+   git cherry-pick   git reset
    ```
 
    Writes the index, a ref, or history without
@@ -86,12 +86,16 @@ the new verb earns a case.
    git add           git commit      git branch -D
    git update-ref    git update-index
    git worktree add  git push
+   git filter-branch
    ```
 
    `git switch` overwrites files exactly as
    `git checkout` does, and `git mv` renames them on
    disk; both belong in the first group whatever their
-   name suggests. Read-only forms of a listed verb are
+   name suggests. `git reset` is in the first group for
+   the same reason: `--hard` deletes uncommitted tree
+   content, and the milder forms still rewrite the
+   index. Read-only forms of a listed verb are
    fine: `git stash list`, `git stash show`,
    `git worktree list` and a bare `git branch` inspect
    without writing.
