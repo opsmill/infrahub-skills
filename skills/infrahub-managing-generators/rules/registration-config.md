@@ -1,7 +1,7 @@
 ---
 title: Generator Registration in .infrahub.yml
 impact: HIGH
-tags: registration, config, infrahub-yml, targets, parameters
+tags: registration, config, infrahub-yml, targets, parameters, groups, membership
 ---
 
 ## Generator Registration in .infrahub.yml
@@ -16,12 +16,29 @@ turns target attributes into query variables.
 ### Why it matters
 
 `generator_definitions` carries a top-level `query:`
-field — the opposite of `check_definitions`, which
-embeds the query under the check itself. Copying the
-check shape into a generator block is the most
-common setup mistake; Infrahub rejects the config at
-load time and the generator never appears in
-`infrahubctl generator --list`. `targets:` resolves
+field, which `check_definitions` has no equivalent of.
+Copying the check shape into a generator block is the
+most common setup mistake, and it drops that required
+field; Infrahub rejects the config at load time, so the
+repository never finishes syncing and no run is ever
+enqueued. **`infrahubctl generator --list` is the
+fastest local check for this**: it validates
+`.infrahub.yml` before it lists anything, and exits
+non-zero naming each error
+(`generator_definitions/0/query | Field required`). The
+same applies to any key outside the allowed set, which
+is rejected as an extra input. What it cannot tell you
+is anything server-side — it never contacts the server,
+so for sync status and whether a run was enqueued, read
+the repository object or `infrahubctl task list
+--include-logs`.
+
+One malformed shape it will *not* catch: `query:` is
+typed as a plain string, so an inline GraphQL document
+passes validation and gets listed. It fails later, at
+dispatch, when no query of that name is found.
+
+`targets:` resolves
 strictly against `CoreGeneratorGroup`; pointing it
 at a `CoreStandardGroup` of the same name parses
 fine but the dispatcher never enqueues runs, so the
@@ -83,5 +100,95 @@ generator_definitions:
   `site__node__name__value`); the path is evaluated
   per group member at dispatch time.
 
+## Populating the Target Group
+
+`targets:` names a group that must **exist and have
+members** before the generator dispatches. A group that
+exists and is empty produces **no error and no run** —
+the pipeline is green and nothing happened. That is the
+failure mode to design against, because there is no log
+line to find.
+
+### Assign membership from the member side
+
+Group membership is one relationship with two ends,
+sharing the identifier `group_member`:
+
+| Declared on | Field | Peer |
+| ----------- | ----- | ---- |
+| `CoreGroup` | `members` | `CoreNode` |
+| every other kind (auto-generated) | `member_of_groups` | `CoreGroup` |
+
+In object data, **write it from the member side**:
+
+```yaml
+# WORKS: the peer is CoreGroup, which has a default_filter
+- kind: NetTopology
+  data:
+    - name: dc1-fabric
+      member_of_groups:
+        - topologies_dc          # resolved by name
+```
+
+```yaml
+# DOES NOT RESOLVE: the peer is CoreNode
+- kind: CoreGeneratorGroup
+  data:
+    - name: topologies_dc
+      members:
+        - dc1-fabric             # nothing to match this against
+```
+
+The reason is not arbitrary. `CoreGroup.members` peers
+**`CoreNode`**, which has no attributes, no
+`default_filter` and no `human_friendly_id` — so there
+is nothing for a name to resolve against. `CoreGroup`
+*does* have `default_filter: name__value`, so the member
+side resolves fine.
+
+The general principle, worth carrying beyond groups: **a
+relationship whose peer is a bare generic cannot be
+resolved by name in object data.** Write from the side
+whose peer has a `default_filter` or a
+`human_friendly_id`, or supply explicit IDs.
+
+`subscribers` / `subscriber_of_groups` mirror this
+exactly on the identifier `group_subscriber`.
+
+### Assert the group resolves and is non-empty
+
+A green pipeline does not mean the generator ran. Two
+things commonly leave the group empty on a clean install:
+
+- the data file that creates the group's members is not
+  in the loaded set (excluded from `objects:`, or ordered
+  after the generator's dispatch)
+- membership was written from the group side and silently
+  did not resolve
+
+So check it rather than assuming:
+
+```bash
+# Does the group exist, and what is in it?
+infrahubctl object get CoreGeneratorGroup --branch mybranch
+
+# Is the generator registered, and which group does it target?
+infrahubctl generator --list
+
+# Did a run actually happen?
+infrahubctl task list --include-logs
+```
+
+`infrahubctl generator --list` validates
+`.infrahub.yml` and then prints each definition's name,
+file, class and target. It never contacts the server, so
+it says nothing about whether the group resolved or a
+run was enqueued. For that, read the task list above, or
+the proposed change's pipeline output.
+
+In CI, assert non-emptiness explicitly. "The pipeline
+passed" and "the generator ran" are different claims.
+
 Reference:
-[../infrahub-common/infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md)
+[../infrahub-common/infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md),
+[tracking-idempotent.md](tracking-idempotent.md)
