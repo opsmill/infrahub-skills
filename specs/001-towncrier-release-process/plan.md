@@ -44,7 +44,7 @@ Additionally, give the expensive eval suite a decision point it currently lacks 
 This repository has **no constitution document** and its `AGENTS.md` defines **no "Ask First" list**. The two rules it does impose:
 
 | Rule | Applies? | Assessment |
-|---|---|---|
+| --- | --- | --- |
 | **Rule = Test** — a new rule under `skills/*/rules/` must ship with grader + `eval.yaml` coverage | No | This feature adds no rule. It changes how evals are *invoked*, not what they assert, and leaves the matrix derived from `eval.yaml`. |
 | **Versioning** — plugin.json, release-manifest, pyproject, every SKILL.md, and uv.lock must be bumped together | **Yes** | Directly in scope. The release commit now carries all five, and `release.yml` validation is extended to cover `uv.lock`, which nothing checked before. |
 
