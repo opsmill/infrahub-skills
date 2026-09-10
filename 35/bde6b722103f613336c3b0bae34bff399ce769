@@ -1,0 +1,28 @@
+docs/docs/release-notes/release-1_2_8.mdx
+  s_fdcc22629dad39::t_287cb3fd55fb96 62
+  s_fdcc22629dad39::t_5d6050d0a3e675 30,42,44
+docs/docs/skills-reference/converting-netbox-device-types.mdx
+  s_fdcc22629dad39::t_5d6050d0a3e675 6,52
+  s_fdcc22629dad39::t_e8b9a9a1cd6c97 1-5,7-51,53-88
+docs/docs/skills-reference/analyzing-diagnostics.mdx
+  s_fdcc22629dad39::t_d384e18fe79e07 1-71
+docs/docs/readme.mdx
+  s_fdcc22629dad39::t_5d6050d0a3e675 68
+  s_fdcc22629dad39::t_287cb3fd55fb96 67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "35bde6b722103f613336c3b0bae34bff399ce769",
+  "prompts": {},
+  "sessions": {
+    "s_fdcc22629dad39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "891efee3-4780-4bef-bf1f-8f3599114fbe",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
