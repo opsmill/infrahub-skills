@@ -253,7 +253,9 @@ covered forever.
 If the rule corrects something the repo said before,
 the prose layer is not the only place the old claim
 lives. Grep the whole tree and fix every hit in the
-same change:
+same change — except `evaluations/`, which step 7
+regenerates from `eval.yaml` rather than taking
+hand edits:
 
 ```bash
 grep -rn "<old claim, command, or field>" \
