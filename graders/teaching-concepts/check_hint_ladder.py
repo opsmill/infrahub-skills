@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Grader for eval task: teach-hint-ladder.
 
-Checks assertion names: hint-before-solution, status-stays-introduced.
+Checks assertion names: hint-before-solution, attempt-not-promoted.
 Usage: python check_hint_ladder.py <workspace_dir>
 Prints skillgrade JSON to stdout.
 """
@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import run_checks  # noqa: E402
 
-CHECK_NAMES = ["hint-before-solution", "status-stays-introduced"]
+CHECK_NAMES = ["hint-before-solution", "attempt-not-promoted"]
 
 
 def main() -> None:

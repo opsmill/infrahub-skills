@@ -94,7 +94,8 @@ consent, only in a `learning-*` branch, never merged, always deleted.
    [rules/exercise-learner-authors.md](./rules/exercise-learner-authors.md).
 7. When the learner struggles, follow the hint ladder in
    [rules/exercise-hint-ladder.md](./rules/exercise-hint-ladder.md)
-   before revealing anything.
+   before revealing anything, and log each rung to
+   `.infrahub-learning/hints/<concept>.md` as you give it.
 8. Record progress at the end of every lesson, before you reply:
    [rules/protocol-record-progress.md](./rules/protocol-record-progress.md).
 9. Close each concept by naming the sibling skill that does this work on

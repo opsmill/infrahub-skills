@@ -18,6 +18,8 @@ import re
 from pathlib import Path
 from typing import Callable
 
+import yaml
+
 LEARNING_DIR = ".infrahub-learning"
 SECTION_ORDER = ["Probe", "Explain", "Exercise", "Check"]
 VALID_STATUSES = {"not-seen", "introduced", "practiced"}
@@ -41,6 +43,10 @@ def lessons(ws: Path) -> list[Path]:
 
 def solution_for(ws: Path, lesson: Path) -> Path:
     return _learning(ws) / "solutions" / lesson.name
+
+
+def hints_for(ws: Path, lesson: Path) -> Path:
+    return _learning(ws) / "hints" / lesson.name
 
 
 def headings(text: str) -> list[str]:
@@ -218,44 +224,105 @@ def check_learner_authors(ws: Path) -> tuple[bool, str]:
     return True, "exercise assigned to the learner, solution kept hidden"
 
 
+_HINT_HEADING = re.compile(r"^Hint\s+(\d+)\b", re.IGNORECASE)
+REVEAL_RUNG = 3
+
+
 def check_hint_before_solution(ws: Path) -> tuple[bool, str]:
-    """A stuck-learner reply is a hint, not the answer."""
-    path = ws / "reply.md"
-    if not path.is_file():
-        return False, "no reply.md written for the stuck learner"
-    text = path.read_text()
-    for block in code_blocks(text):
-        if len(block.splitlines()) > 2:
-            return False, "reply hands over a multi-line code block; a first hint must not be the solution"
-    reply_norm = _normalize(text)
-    for lesson in lessons(ws):
+    """The escalation log climbs the ladder before it reveals anything.
+
+    Graded from ``hints/<concept>.md``, the durable escalation log in the
+    workspace contract (references/lesson-protocol.md). The ladder itself
+    plays out in conversation, but every rung the learner was handed is
+    written down, so the rule constrains a real session and not just an
+    eval scaffold.
+    """
+    found, err = _all_lessons(ws)
+    if not found:
+        return False, err
+    logged = [(l, hints_for(ws, l)) for l in found if hints_for(ws, l).is_file()]
+    if not logged:
+        return False, (
+            f"no {LEARNING_DIR}/hints/<concept>.md; the escalation the "
+            "learner was given was never written down"
+        )
+    solution_blocks = []
+    for lesson in found:
         sol = solution_for(ws, lesson)
         if not sol.is_file():
             continue
         for block in code_blocks(sections(sol.read_text()).get("Solution", "")):
-            if _normalize(block) in reply_norm:
-                return False, (
-                    f"reply contains the reference solution from "
-                    f"solutions/{lesson.name}"
-                )
-    return True, "reply is a hint, not the solution"
+            solution_blocks.append((lesson.name, _normalize(block)))
+    for lesson, path in logged:
+        rungs: dict[int, str] = {}
+        for heading, body in sections(path.read_text()).items():
+            match = _HINT_HEADING.match(heading)
+            if match:
+                rungs[int(match.group(1))] = body
+        if not rungs:
+            return False, (
+                f"hints/{lesson.name}: no '## Hint N' section; the log "
+                "records no escalation rung"
+            )
+        levels = sorted(rungs)
+        if levels != list(range(1, len(levels) + 1)):
+            return False, (
+                f"hints/{lesson.name}: escalation jumps to {levels}; the "
+                "ladder starts at rung 1 and climbs one step at a time"
+            )
+        for level in levels:
+            if level >= REVEAL_RUNG:
+                continue  # rung 3 is the reveal; it is allowed to show the answer
+            body = rungs[level]
+            if level == 1:
+                for block in code_blocks(body):
+                    if len(block.splitlines()) > 2:
+                        return False, (
+                            f"hints/{lesson.name}: Hint 1 hands over a "
+                            "multi-line code block; a first hint is "
+                            "conceptual"
+                        )
+            body_norm = _normalize(body)
+            for name, block in solution_blocks:
+                if block in body_norm:
+                    return False, (
+                        f"hints/{lesson.name}: Hint {level} contains the "
+                        f"reference solution from solutions/{name}"
+                    )
+    return True, "escalation climbs the ladder before revealing the solution"
 
 
-def check_status_stays_introduced(ws: Path) -> tuple[bool, str]:
-    """After a solution reveal, the concept stays at 'introduced'."""
+def check_attempt_not_promoted(ws: Path) -> tuple[bool, str]:
+    """A concept with an unfinished exercise is not promoted to 'practiced'.
+
+    The concepts come from the lesson files in the workspace, not a
+    hardcoded slug. A literal 'schema' here pins the check to one eval
+    prompt: reword the task to teach 'objects' and a fully compliant
+    workspace scores 0. Same discipline as known_slugs().
+    """
+    concepts = [lesson.stem for lesson in lessons(ws)]
+    if not concepts:
+        return False, f"no lesson file under {LEARNING_DIR}/lessons/"
     path = _learning(ws) / "progress.md"
     if not path.is_file():
         return False, f"no {LEARNING_DIR}/progress.md"
+    statuses: dict[str, str] = {}
     for row in path.read_text().splitlines():
         cells = [c.strip() for c in row.strip().strip("|").split("|")]
-        if len(cells) >= 2 and cells[0] == "schema":
-            if cells[1] == "introduced":
-                return True, "revealed concept stays at introduced"
-            return False, f"concept 'schema' is '{cells[1]}', expected 'introduced' after a solution reveal"
-    return False, "no progress row for concept 'schema'"
+        if len(cells) >= 2:
+            statuses.setdefault(cells[0].lower(), cells[1].lower())
+    for concept in concepts:
+        status = statuses.get(concept.lower())
+        if status is None:
+            return False, f"no progress row for concept '{concept}'"
+        if status != "introduced":
+            return False, (
+                f"concept '{concept}' is '{status}', expected 'introduced' "
+                "while the exercise is still unfinished"
+            )
+    return True, f"unfinished concepts stay at introduced: {concepts}"
 
 
-FIXTURE_KINDS = ("TestbedSensor", "TestbedZone")
 _MUTATING = (
     "object load",
     "object create",
@@ -325,20 +392,55 @@ def check_sandbox_safety(ws: Path) -> tuple[bool, str]:
     return True, "writes gated to an opt-in learning-* branch with cleanup"
 
 
+def learner_kinds(ws: Path) -> set[str]:
+    """The node kinds declared in the learner's own schema files.
+
+    The rule is "teach through the learner's artifacts", so the kinds
+    come from those artifacts. A literal tuple here would be a second
+    copy of the schema the eval prompt supplies: edit that schema and
+    the check would grade names the learner no longer has. Same
+    discipline as known_slugs().
+    """
+    kinds: set[str] = set()
+    for path in sorted(ws.rglob("*.y*ml")):
+        if LEARNING_DIR in path.parts:
+            continue
+        try:
+            parsed = yaml.safe_load(path.read_text())
+        except (yaml.YAMLError, OSError, UnicodeDecodeError):
+            continue
+        if not isinstance(parsed, dict):
+            continue
+        for group in ("nodes", "generics"):
+            for node in parsed.get(group) or []:
+                if not isinstance(node, dict):
+                    continue
+                name, namespace = node.get("name"), node.get("namespace")
+                if name and namespace:
+                    kinds.add(f"{namespace}{name}")
+    return kinds
+
+
 def check_own_artifacts(ws: Path) -> tuple[bool, str]:
-    """Every lesson teaches through the learner's fixture nodes."""
+    """Every lesson teaches through the kinds in the learner's schema."""
     found, err = _all_lessons(ws)
     if not found:
         return False, err
+    kinds = learner_kinds(ws)
+    if not kinds:
+        return False, (
+            "no learner schema file in the workspace; grounding cannot be "
+            "graded without the artifacts it is supposed to ground in"
+        )
     for lesson in found:
         text = lesson.read_text()
-        missing = [k for k in FIXTURE_KINDS if k not in text]
+        missing = sorted(k for k in kinds if k not in text)
         if missing:
             return False, (
                 f"{lesson.name}: never references the learner's nodes: "
                 f"{missing}"
             )
-    return True, "lesson grounded in the learner's own schema"
+    return True, f"lesson grounded in the learner's own kinds: {sorted(kinds)}"
 
 
 def check_graduation_pointer(ws: Path) -> tuple[bool, str]:
@@ -484,7 +586,7 @@ CHECKS.update({
     "verified-solution": check_verified_solution,
     "learner-authors": check_learner_authors,
     "hint-before-solution": check_hint_before_solution,
-    "status-stays-introduced": check_status_stays_introduced,
+    "attempt-not-promoted": check_attempt_not_promoted,
     "sandbox-safety": check_sandbox_safety,
     "own-artifacts": check_own_artifacts,
     "graduation-pointer": check_graduation_pointer,

@@ -125,28 +125,28 @@
     },
     {
       "id": 7,
-      "prompt": "We are mid-lesson. The workspace ./.infrahub-learning/ already\nexists with this lesson at lessons/schema.md:\n\n    # Lesson: schema relationships\n\n    ## Probe\n    1. What does a relationship connect?\n    2. Have you used foreign keys before?\n\n    ## Explain\n    A relationship connects two schema nodes. See\n    https://docs.infrahub.app/topics/schema for the model.\n\n    ## Exercise\n    **Your task:** Add a relationship from TestbedSensor to\n    TestbedZone in your schema file with the right cardinality.\n\n    ## Check\n    1. What happens if you omit cardinality?\n\nand this reference solution at solutions/schema.md:\n\n    ## Solution\n    ```yaml\n    relationships:\n      - name: zone\n        peer: TestbedZone\n        cardinality: one\n        kind: Attribute\n    ```\n\n    ## Verification\n    Offline schema validation: loads cleanly.\n\nRecreate those two files verbatim first. This is my first attempt and\nit is not validating, I don't get why:\n\n    relationships:\n      - name: zone\n        peer: zone\n        cardinality: ones\n\nI'm stuck. Write your reply to me in ./reply.md, and bring\n./.infrahub-learning/progress.md up to date for the schema concept.",
-      "expected_output": "A reply.md that nudges (no multi-line code, no pasted solution) and a progress.md keeping the schema concept at introduced.",
+      "prompt": "We are mid-lesson. The workspace ./.infrahub-learning/ already\nexists with this lesson at lessons/schema.md:\n\n    # Lesson: schema relationships\n\n    ## Probe\n    1. What does a relationship connect?\n    2. Have you used foreign keys before?\n\n    ## Explain\n    A relationship connects two schema nodes. See\n    https://docs.infrahub.app/topics/schema for the model.\n\n    ## Exercise\n    **Your task:** Add a relationship from TestbedSensor to\n    TestbedZone in your schema file with the right cardinality.\n\n    ## Check\n    1. What happens if you omit cardinality?\n\nand this reference solution at solutions/schema.md:\n\n    ## Solution\n    ```yaml\n    relationships:\n      - name: zone\n        peer: TestbedZone\n        cardinality: one\n        kind: Attribute\n    ```\n\n    ## Verification\n    Offline schema validation: loads cleanly.\n\nRecreate those two files verbatim first. This is my first attempt and\nit is not validating, I don't get why:\n\n    relationships:\n      - name: zone\n        peer: zone\n        cardinality: ones\n\nI'm stuck. Help me get unstuck without just handing me the answer,\nwrite every artifact your workflow produces into\n./.infrahub-learning/, and bring ./.infrahub-learning/progress.md up\nto date for the schema concept.",
+      "expected_output": "A hints/schema.md whose first rung nudges (no multi-line code, no pasted solution) and a progress.md keeping the schema concept at introduced.",
       "files": [],
       "expectations": [
-        "The reply is a hint, not the solution",
-        "No code block in the reply exceeds two lines",
+        "The escalation log opens at Hint 1, not at a reveal",
+        "No code block in the first hint exceeds two lines",
         "progress.md records schema as introduced"
       ],
       "assertions": [
         {
           "name": "hint-before-solution",
-          "check": "first stuck reply contains a hint and no solution"
+          "check": "escalation log starts at a conceptual hint and leaks no solution"
         },
         {
-          "name": "status-stays-introduced",
-          "check": "schema concept remains at introduced in progress.md"
+          "name": "attempt-not-promoted",
+          "check": "the unfinished concept stays at introduced in progress.md"
         }
       ]
     },
     {
       "id": 8,
-      "prompt": "My repo has this schema file at schemas/testbed.yml:\n\n    version: \"1.0\"\n    nodes:\n      - name: Sensor\n        namespace: Testbed\n        attributes:\n          - name: name\n            kind: Text\n            unique: true\n          - name: reading_interval\n            kind: Number\n      - name: Zone\n        namespace: Testbed\n        attributes:\n          - name: name\n            kind: Text\n            unique: true\n\nI inherited this project and want to actually understand what\nattributes are and what mine are doing. Teach me.\n\nThere is no live Infrahub instance reachable from this environment.\nDeliver the lesson as files: create the learning workspace\n./.infrahub-learning/ as the skill's workflow describes and write every\nartifact the workflow produces there.",
+      "prompt": "My repo has this schema file at schemas/testbed.yml:\n\n    version: \"1.0\"\n    nodes:\n      - name: Sensor\n        namespace: Testbed\n        attributes:\n          - name: name\n            kind: Text\n            unique: true\n          - name: reading_interval\n            kind: Number\n      - name: Zone\n        namespace: Testbed\n        attributes:\n          - name: name\n            kind: Text\n            unique: true\n\nRecreate that schema file at ./schemas/testbed.yml verbatim first.\nI inherited this project and want to actually understand what\nattributes are and what mine are doing. Teach me.\n\nThere is no live Infrahub instance reachable from this environment.\nDeliver the lesson as files: create the learning workspace\n./.infrahub-learning/ as the skill's workflow describes and write every\nartifact the workflow produces there.",
       "expected_output": "A schema lesson anchored to the learner's TestbedSensor and TestbedZone nodes rather than invented examples.",
       "files": [],
       "expectations": [

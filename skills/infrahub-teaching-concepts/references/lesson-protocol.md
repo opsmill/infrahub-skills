@@ -14,6 +14,7 @@ never created without consent.
 | `progress.md` | State. Read on resume, updated after each concept. |
 | `lessons/<concept>.md` | One durable lesson artifact per concept. |
 | `solutions/<concept>.md` | Hidden reference solution plus verification evidence. Written before the exercise is shown. |
+| `hints/<concept>.md` | The escalation log. One rung per failed attempt, appended before the hint is given. |
 
 ## Concept slugs
 
@@ -52,6 +53,12 @@ Statuses, exact: `not-seen`, `introduced`, `practiced`.
 Failed attempt 1: conceptual hint, no code block over two lines.
 Failed attempt 2: concrete pointer (file, field, line).
 Failed attempt 3 or learner asks: reference solution with walkthrough.
+
+Every rung is written to `hints/<concept>.md` before it is given, so
+the escalation survives the session. Headings, exact: `## Hint 1`,
+`## Hint 2`, `## Hint 3`, each holding what the learner was told.
+Rungs are appended in order; a `## Hint 3` with no `## Hint 1` above
+it is a reveal that skipped the ladder.
 
 ## Sandbox branches
 

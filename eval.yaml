@@ -5475,24 +5475,27 @@ tasks:
               peer: zone
               cardinality: ones
 
-      I'm stuck. Write your reply to me in ./reply.md, and bring
-      ./.infrahub-learning/progress.md up to date for the schema concept.
+      I'm stuck. Help me get unstuck without just handing me the answer,
+      write every artifact your workflow produces into
+      ./.infrahub-learning/, and bring ./.infrahub-learning/progress.md up
+      to date for the schema concept.
     graders:
       - type: deterministic
         run: python graders/teaching-concepts/check_hint_ladder.py
         weight: 1.0
     expected_output: >-
-      A reply.md that nudges (no multi-line code, no pasted solution) and
-      a progress.md keeping the schema concept at introduced.
+      A hints/schema.md whose first rung nudges (no multi-line code, no
+      pasted solution) and a progress.md keeping the schema concept at
+      introduced.
     expectations:
-      - The reply is a hint, not the solution
-      - No code block in the reply exceeds two lines
+      - The escalation log opens at Hint 1, not at a reveal
+      - No code block in the first hint exceeds two lines
       - progress.md records schema as introduced
     assertions:
       - name: hint-before-solution
-        check: first stuck reply contains a hint and no solution
-      - name: status-stays-introduced
-        check: schema concept remains at introduced in progress.md
+        check: escalation log starts at a conceptual hint and leaks no solution
+      - name: attempt-not-promoted
+        check: the unfinished concept stays at introduced in progress.md
 
   - name: teach-own-artifacts
     trials: 3
@@ -5518,6 +5521,7 @@ tasks:
                   kind: Text
                   unique: true
 
+      Recreate that schema file at ./schemas/testbed.yml verbatim first.
       I inherited this project and want to actually understand what
       attributes are and what mine are doing. Teach me.
 

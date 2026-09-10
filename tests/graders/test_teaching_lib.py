@@ -21,9 +21,30 @@ sys.modules["teaching_lib"] = teaching_lib
 spec.loader.exec_module(teaching_lib)
 
 
+FIXTURE_SCHEMA = """version: "1.0"
+nodes:
+  - name: Sensor
+    namespace: Testbed
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+  - name: Zone
+    namespace: Testbed
+    attributes:
+      - name: name
+        kind: Text
+"""
+
+
 def make_ws(tmp_path, lesson=None, solution=None, progress=None,
-            reply=None, concept="schema"):
-    """Build a .infrahub-learning workspace under tmp_path."""
+            hints=None, concept="schema", schema=FIXTURE_SCHEMA):
+    """Build a .infrahub-learning workspace under tmp_path.
+
+    ``schema`` is the learner's own schema file, which own-artifacts
+    derives the expected node kinds from. Pass ``schema=None`` for an
+    empty environment.
+    """
     root = tmp_path / ".infrahub-learning"
     if lesson is not None:
         (root / "lessons").mkdir(parents=True, exist_ok=True)
@@ -34,8 +55,12 @@ def make_ws(tmp_path, lesson=None, solution=None, progress=None,
     if progress is not None:
         root.mkdir(parents=True, exist_ok=True)
         (root / "progress.md").write_text(progress)
-    if reply is not None:
-        (tmp_path / "reply.md").write_text(reply)
+    if hints is not None:
+        (root / "hints").mkdir(parents=True, exist_ok=True)
+        (root / "hints" / f"{concept}.md").write_text(hints)
+    if schema is not None:
+        (tmp_path / "schemas").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "schemas" / "testbed.yml").write_text(schema)
     return tmp_path
 
 
@@ -315,58 +340,91 @@ def test_learner_authors_solution_leaked_into_lesson(tmp_path):
 
 
 def test_hint_before_solution_pass(tmp_path):
-    hint = ("Look again at the `peer` field. Which node kind should the "
-            "sensor point at? Check your zone definition first.")
+    hint = ("## Hint 1\nLook again at the `peer` field. Which node kind "
+            "should the sensor point at? Check your zone definition first.\n")
     ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON,
-                 solution=COMPLIANT_SOLUTION, reply=hint)
+                 solution=COMPLIANT_SOLUTION, hints=hint)
     ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
     assert ok, msg
 
 
-def test_hint_before_solution_missing_reply(tmp_path):
+def test_hint_before_solution_missing_log(tmp_path):
     ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON)
     ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
-    assert not ok
+    assert not ok and "hints/" in msg
 
 
-def test_hint_before_solution_reply_is_the_solution(tmp_path):
-    spoiler = ("Here you go:\n```yaml\nrelationships:\n  - name: rack\n"
-               "    peer: TestbedRack\n    cardinality: one\n"
+def test_hint_before_solution_first_rung_is_the_solution(tmp_path):
+    spoiler = ("## Hint 1\nHere you go:\n```yaml\nrelationships:\n"
+               "  - name: rack\n    peer: TestbedRack\n    cardinality: one\n"
                "    kind: Attribute\n```\n")
     ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON,
-                 solution=COMPLIANT_SOLUTION, reply=spoiler)
+                 solution=COMPLIANT_SOLUTION, hints=spoiler)
     ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
     assert not ok
 
 
 def test_hint_before_solution_rejects_any_long_code_block(tmp_path):
-    other_code = ("Try:\n```yaml\nnodes:\n  - name: Foo\n    namespace: Bar\n"
-                  "    label: Foo\n```\n")
+    other_code = ("## Hint 1\nTry:\n```yaml\nnodes:\n  - name: Foo\n"
+                  "    namespace: Bar\n    label: Foo\n```\n")
     ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON,
-                 solution=COMPLIANT_SOLUTION, reply=other_code)
+                 solution=COMPLIANT_SOLUTION, hints=other_code)
     ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
     assert not ok
 
 
-def test_status_stays_introduced_pass(tmp_path):
-    ws = make_ws(tmp_path, progress=COMPLIANT_PROGRESS)
-    ok, msg = teaching_lib.CHECKS["status-stays-introduced"](ws)
+def test_hint_before_solution_reveal_without_the_rungs_below_it(tmp_path):
+    """A log that opens at Hint 3 is wrong-to-answer in one step."""
+    straight_to_answer = ("## Hint 3\nThe fix is the `peer` value; here is "
+                          "the reference solution with a walkthrough.\n")
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, hints=straight_to_answer)
+    ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
+    assert not ok and "ladder" in msg
+
+
+def test_hint_before_solution_full_ladder_may_reveal_at_rung_three(tmp_path):
+    """Rung 3 is the reveal; the solution belongs there, not above it."""
+    ladder = ("## Hint 1\nWhich of your kinds belongs in `peer`?\n\n"
+              "## Hint 2\nLine 3 of `schemas/testbed.yml`, the `peer` field.\n\n"
+              "## Hint 3\nHere it is, with a walkthrough:\n```yaml\n"
+              "relationships:\n  - name: rack\n    peer: TestbedRack\n"
+              "    cardinality: one\n    kind: Attribute\n```\n")
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON,
+                 solution=COMPLIANT_SOLUTION, hints=ladder)
+    ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
     assert ok, msg
 
 
-def test_status_stays_introduced_promoted_anyway(tmp_path):
+def test_attempt_not_promoted_pass(tmp_path):
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON,
+                 progress=COMPLIANT_PROGRESS)
+    ok, msg = teaching_lib.CHECKS["attempt-not-promoted"](ws)
+    assert ok, msg
+
+
+def test_attempt_not_promoted_promoted_anyway(tmp_path):
     promoted = COMPLIANT_PROGRESS.replace(
         "| schema | introduced |", "| schema | practiced |")
-    ws = make_ws(tmp_path, progress=promoted)
-    ok, msg = teaching_lib.CHECKS["status-stays-introduced"](ws)
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, progress=promoted)
+    ok, msg = teaching_lib.CHECKS["attempt-not-promoted"](ws)
     assert not ok
 
 
-def test_status_stays_introduced_concept_missing(tmp_path):
+def test_attempt_not_promoted_concept_missing(tmp_path):
     only_other = "| concept | status | last-seen | notes |\n|---|---|---|---|\n| menus | practiced | 2026-09-09 | |\n"
-    ws = make_ws(tmp_path, progress=only_other)
-    ok, msg = teaching_lib.CHECKS["status-stays-introduced"](ws)
-    assert not ok
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, progress=only_other)
+    ok, msg = teaching_lib.CHECKS["attempt-not-promoted"](ws)
+    assert not ok and "schema" in msg
+
+
+def test_attempt_not_promoted_follows_the_lesson_not_a_fixed_slug(tmp_path):
+    """Teaching another concept must not be a false fail."""
+    objects_only = ("| concept | status | last-seen | notes |\n|---|---|---|---|\n"
+                    "| objects | introduced | 2026-09-10 | exercise in flight |\n")
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, progress=objects_only,
+                 concept="objects")
+    ok, msg = teaching_lib.CHECKS["attempt-not-promoted"](ws)
+    assert ok, msg
 
 
 SANDBOX_LESSON = """# Lesson: proposed changes
@@ -528,6 +586,43 @@ def test_own_artifacts_generic_example_instead(tmp_path):
     assert not ok
 
 
+OTHER_SCHEMA = """version: "1.0"
+nodes:
+  - name: Switch
+    namespace: Campus
+    attributes:
+      - name: name
+        kind: Text
+  - name: Site
+    namespace: Campus
+    attributes:
+      - name: name
+        kind: Text
+"""
+
+
+def test_own_artifacts_derives_kinds_from_the_learner_schema(tmp_path):
+    """A different schema moves the target; the check follows it."""
+    campus = COMPLIANT_LESSON.replace("TestbedSensor", "CampusSwitch").replace(
+        "TestbedZone", "CampusSite")
+    ws = make_ws(tmp_path, lesson=campus, schema=OTHER_SCHEMA)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert ok, msg
+
+
+def test_own_artifacts_stale_kinds_from_another_schema_fail(tmp_path):
+    """The old fixture names are not grounding for this learner."""
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, schema=OTHER_SCHEMA)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert not ok and "CampusSwitch" in msg
+
+
+def test_own_artifacts_no_learner_schema(tmp_path):
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, schema=None)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert not ok and "schema" in msg
+
+
 def test_graduation_pointer_pass(tmp_path):
     ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON)
     ok, msg = teaching_lib.CHECKS["graduation-pointer"](ws)
@@ -683,6 +778,7 @@ VARIANT_PROGRESS = """|  Concept  |  Status  |  Last-Seen  |  Notes  |
 | :--- | :--- | :--- | :--- |
 |  menus  |  not-seen  |  2026-09-07  |  queued  |
 |  schema  |  introduced  |  2026-09-09  |  hint ladder ran to reveal  |
+|  objects  |  introduced  |  2026-09-10  |  exercise in flight  |
 """
 
 
@@ -736,18 +832,20 @@ def test_record_progress_pass_variant(tmp_path):
     assert ok, msg
 
 
-def test_status_stays_introduced_pass_variant(tmp_path):
-    ws = make_ws(tmp_path, progress=VARIANT_PROGRESS)
-    ok, msg = teaching_lib.CHECKS["status-stays-introduced"](ws)
+def test_attempt_not_promoted_pass_variant(tmp_path):
+    ws = make_ws(tmp_path, lesson=VARIANT_LESSON, progress=VARIANT_PROGRESS,
+                 concept="objects")
+    ok, msg = teaching_lib.CHECKS["attempt-not-promoted"](ws)
     assert ok, msg
 
 
 def test_hint_before_solution_pass_variant_short_snippet(tmp_path):
-    hint = ("Compare the two lines below and re-read your `peer` value:\n"
+    hint = ("## Hint 1\n"
+            "Compare the two lines below and re-read your `peer` value:\n"
             "```yaml\npeer: <a node kind, not an attribute>\n```\n"
-            "Which of your kinds belongs there?")
+            "Which of your kinds belongs there?\n")
     ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON,
-                 solution=COMPLIANT_SOLUTION, reply=hint)
+                 solution=COMPLIANT_SOLUTION, hints=hint)
     ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
     assert ok, msg
 
@@ -930,9 +1028,9 @@ def transform(data):
 ## Verification
 Ran `infrahubctl transform sensor_export`: rendered without error.
 """
-    spoiler = ('Here you go:\n```python\ndef transform(data):\n'
+    spoiler = ('## Hint 1\nHere you go:\n```python\ndef transform(data):\n'
                '    return {"hostname": data["TestbedSensor"]["name"]}\n```\n')
     ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, solution=other_solution,
-                 reply=spoiler, concept="transforms")
+                 hints=spoiler, concept="transforms")
     ok, msg = teaching_lib.CHECKS["hint-before-solution"](ws)
     assert not ok and "transforms.md" in msg
