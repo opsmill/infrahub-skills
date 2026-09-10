@@ -1,0 +1,31 @@
+.github/workflows/ci.yml
+  s_fe99a41d5e7f9e::t_9e922153459264 56-62,65-74
+  s_fe99a41d5e7f9e::t_1439e0e4bac060 63-64
+graders/managing-generators/lib.py
+  s_fe99a41d5e7f9e::t_9e6fec71a35b60 688
+tests/graders/test_generators_lib.py
+  s_fe99a41d5e7f9e::t_9e6fec71a35b60 3
+pyproject.toml
+  s_fe99a41d5e7f9e::t_1439e0e4bac060 68-75
+  s_fe99a41d5e7f9e::t_9e922153459264 11
+scripts/run_evals.py
+  s_fe99a41d5e7f9e::t_9e6fec71a35b60 962,973,985
+uv.lock
+  s_fe99a41d5e7f9e::t_081fff75179937 194,209,518-542
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "89dfea6ade7928511b7965509a7f43178422ef79",
+  "prompts": {},
+  "sessions": {
+    "s_fe99a41d5e7f9e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f610d975-3725-4fda-8281-a3570da3554a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
