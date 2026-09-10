@@ -1060,8 +1060,10 @@ def check_choice_key_order(schema: dict, **_: Any) -> tuple[bool, str]:
 # ---------------------------------------------------------------------------
 # Cardinality consequences
 #
-# Verified against the validator: `cardinality: one` forces max_count 1, so
-# the inbound cap on a peer comes from that PEER's declaration on the same
+# Read from the Infrahub server source, not from anything in this repo
+# (opsmill/infrahub v1.10.8, core/relationship/constraints/count.py and
+# core/schema/schema_branch.py): `cardinality: one` forces max_count 1, so the
+# inbound cap on a peer comes from that PEER's declaration on the same
 # identifier. Widening only your own side loads cleanly and does not lift the
 # cap. Renaming while widening trips the identifier-uniqueness check.
 #

@@ -204,6 +204,19 @@ strings the server prints.
 - Loading the schema change without migrating the queries
   that select the relationship.
 
+### Where these behaviors come from
+
+Nothing above is enforced by this repository. Every error
+string and enforcement point was read from the Infrahub
+server source in
+[opsmill/infrahub](https://github.com/opsmill/infrahub) at
+**v1.10.8**: the peer-side cap and both count errors in
+`backend/infrahub/core/relationship/constraints/count.py`,
+the identifier-uniqueness and `max_count` rules in
+`backend/infrahub/core/schema/schema_branch.py`. Re-read
+those two files before trusting the strings on a later
+release.
+
 Related:
 [relationship-defaults.md](relationship-defaults.md),
 [validation-common-errors.md](validation-common-errors.md).
