@@ -66,8 +66,10 @@ ship with its eval coverage in the same change:
    (`yaml`, `ast`, `shlex`) rather than
    substring-matching it.
 3. New task block in `eval.yaml` whose prompt
-   naturally exercises the rule and fails without the
-   skill loaded.
+   naturally exercises the rule and fails with the
+   instruction's `Read the skill at ...` line
+   commented out (procedure in
+   [dev/guides/running-evals.md](dev/guides/running-evals.md#writing-good-eval-prompts)).
 4. Task grader script under `graders/<skill>/`, run
    against four fixtures: compliant, compliant
    phrased differently, violating, and a violating

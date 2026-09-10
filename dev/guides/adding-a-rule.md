@@ -150,11 +150,13 @@ exercise the rule*, and it must not carry the answer:
   the rule", and don't dictate the output schema — a
   prompt that names the fields it wants back is
   answerable without the skill.
-- **Prove it discriminates.** Run the task once with
-  the skill unloaded. If the grader still scores 1.0,
-  the task measures the model, not the skill; make
-  the prompt harder, or grade something only the rule
-  produces.
+- **Prove it discriminates.** Comment out the
+  instruction's `Read the skill at ...` line and run
+  `skillgrade --eval=<task-name> --trials=1`
+  ([procedure](./running-evals.md#writing-good-eval-prompts)).
+  If the grader still scores 1.0, the task measures
+  the model, not the skill; make the prompt harder,
+  or grade something only the rule produces.
 - **Reproduce the antipattern conditions.** Where the
   rule has a tempting wrong shape, put the temptation
   in the prompt instead of hoping the AI stumbles
@@ -162,8 +164,8 @@ exercise the rule*, and it must not carry the answer:
 
 Set `trials: 3` for new tasks unless the rule is
 particularly noisy (in which case 5 may help). The
-defaults block sets 3; the smoke preset overrides to
-5 only for tasks that leave `trials` unset.
+`defaults` block in `eval.yaml` already sets 3, so a
+new task only needs the key to differ from it.
 
 ### 4. Add a Task Grader Script
 
@@ -315,7 +317,8 @@ prose. If smoke fails:
   `graders/<skill>/lib.py` and registered in
   `CHECKS`, parsing rather than substring-matching
 - [ ] New task block added to `eval.yaml`, verified
-  to fail without the skill loaded
+  to fail with the skill's `Read the skill at ...`
+  line commented out
 - [ ] `graders/<skill>/check_<task>.py` task grader
   script
 - [ ] Grader run against all four fixtures, including

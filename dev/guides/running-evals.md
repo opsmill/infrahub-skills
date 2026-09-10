@@ -115,10 +115,18 @@ tasks:
 ```
 
 `graders` is what skillgrade scores, by weight.
-`expected_output`, `expectations`, and `assertions`
-document the task for whoever reads the results —
-keep them accurate, but don't expect them to fail a
-run on their own.
+Under skillgrade, `expected_output`, `expectations`,
+and `assertions` document the task for whoever reads
+the results and do not fail a run on their own.
+
+They are not inert, though: `scripts/sync-evals.py`
+copies all three into `evaluations/<skill>.json`, and
+whether the `/skill-creator` runner scores them is
+outside this repo. Write them as if they were
+graded: objectively verifiable and specific ("Status
+uses `kind: Dropdown`", not "the schema is well
+designed"), and about what the skill uniquely
+provides.
 
 ## Writing Grader Scripts
 
@@ -191,12 +199,24 @@ answerable without the skill. Keep the prompt at the
 abstraction level a real user would type and let the
 skill supply the shape.
 
-**Prove the task discriminates.** Run it once with
-the skill unloaded. If the grader still scores 1.0,
-the task measures the model rather than the skill —
-that is a broken task, not a passing one. Make the
-prompt harder, or grade something only the skill's
-rules produce.
+**Prove the task discriminates.** Every task's
+`instruction` opens with a `Read the skill at
+.agents/skills/<skill>/SKILL.md` line, and that line
+is the only thing that loads the skill. To run the
+task without it, comment the line out and run that
+task alone:
+
+```bash
+skillgrade --eval=<task-name> --trials=1
+# then restore the line
+```
+
+Leave the rest of the instruction untouched, since
+the task body is what you are testing. If the grader
+still scores 1.0, the task measures the model rather
+than the skill; that is a broken task, not a passing
+one. Make the prompt harder, or grade something only
+the skill's rules produce.
 
 ## Iteration Loop
 
