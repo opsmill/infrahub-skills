@@ -3577,14 +3577,6 @@ tasks:
           Every attribute on every emitted row uses the value+metadata
           mapping form with source set to csv-import-20260622
 
-  # --- Expectations-only tasks for process / conversation rules --- #
-
-
-
-
-
-
-
 
   - name: csv-import-fail-closed
     trials: 3
