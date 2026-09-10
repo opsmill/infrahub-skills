@@ -44,11 +44,16 @@ line finding.
    `check_definitions`, `python_transforms`,
    `jinja2_transforms`, `artifact_definitions`,
    `generator_definitions`
-4. Every `file_path`, `template_path`, and directory
+4. `watch` appears only on `python_transforms`,
+   `jinja2_transforms`, and `generator_definitions`;
+   on any other section it fails the whole file's
+   import (see
+   [practices-watch-dependencies.md](./practices-watch-dependencies.md))
+5. Every `file_path`, `template_path`, and directory
    path resolves to an existing file or directory
-5. Required fields per section type are present (see `.infrahub.yml` reference)
-6. No duplicate `name` values within any section
-7. Query names are unique across all `queries` entries
+6. Required fields per section type are present (see `.infrahub.yml` reference)
+7. No duplicate `name` values within any section
+8. Query names are unique across all `queries` entries
 
 ## Common Issues
 
