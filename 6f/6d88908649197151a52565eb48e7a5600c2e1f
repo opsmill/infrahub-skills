@@ -1,0 +1,33 @@
+skills/infrahub-managing-schemas/rules/display-menu-placement.md
+  s_fe99a41d5e7f9e::t_b8d50d86faf619 111-114
+tests/graders/test_reuse_and_membership.py
+  s_fe99a41d5e7f9e::t_e3a7f793e063e5 195-244
+skills/infrahub-managing-schemas/rules/reuse-verify-kind-availability.md
+  s_fe99a41d5e7f9e::t_eef3c09b0ea01d 121-123,126-129
+graders/managing-schemas/lib.py
+  s_fe99a41d5e7f9e::t_93fe9d676fcedf 1361-1369
+eval.yaml
+  s_fe99a41d5e7f9e::t_87332005de8129 995-997
+skills/infrahub-managing-schemas/rules/hierarchy-setup.md
+  s_fe99a41d5e7f9e::t_6fb88bc67b8d3b 49-55
+evaluations/infrahub-managing-schemas.json
+  s_fe99a41d5e7f9e::t_535e0db9361a12 487
+skills/infrahub-managing-schemas/examples.md
+  s_fe99a41d5e7f9e::t_724c92696f66fa 221-225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "6f6d88908649197151a52565eb48e7a5600c2e1f",
+  "prompts": {},
+  "sessions": {
+    "s_fe99a41d5e7f9e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f610d975-3725-4fda-8281-a3570da3554a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
