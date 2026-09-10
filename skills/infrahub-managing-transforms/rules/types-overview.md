@@ -38,6 +38,10 @@ Choose the right transform type based on your output needs.
 | **Python** | JSON or text | `transform()` |
 | **Jinja2** | Text         | `.j2` file    |
 
+Every `python_transforms` entry also carries a `watch`
+block declaring what the entry point depends on — see
+[artifacts-watch-dependencies.md](./artifacts-watch-dependencies.md).
+
 Register Python Transformations under `python_transforms`
 and Jinja2 Transformations under `jinja2_transforms` in
 `.infrahub.yml`.

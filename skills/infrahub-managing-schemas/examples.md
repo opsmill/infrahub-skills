@@ -10,6 +10,8 @@ infrastructure modeling scenarios.
 - [Organization Schema (Simplest Pattern)](#organization-schema-simplest-pattern)
 - [Hierarchical Location Schema](#hierarchical-location-schema)
 - [Device Management with Generics and Inheritance](#device-management-with-generics-and-inheritance)
+- [What a Generic Fixes for Its Implementers](#what-a-generic-fixes-for-its-implementers)
+- [Uniqueness Scope: Generic vs Concrete Kind](#uniqueness-scope-generic-vs-concrete-kind)
 - [Component Pattern (Modules/Slots)](#component-pattern-modulesslots)
 - [IPAM Schema (Inheriting Built-in Types)](#ipam-schema-inheriting-built-in-types)
 - [Extensions Pattern (Cross-File Relationships)](#extensions-pattern-cross-file-relationships)
@@ -517,6 +519,340 @@ nodes:
 - `display_label` uses Jinja2 to combine manufacturer + model
 
 ---
+
+## What a Generic Fixes for Its Implementers
+
+Three things a generic decides for every kind that
+inherits it. Only the first is truly one-way: an
+inherited relationship's peer cannot be narrowed at
+all. The other two *can* be changed per kind, but only
+in a specific form, and getting the form wrong fails
+quietly in one case and loudly in the other. Each was
+verified against Infrahub `1.10.8+19`, the 1.11.0
+development line; each is worth knowing before the type
+hierarchy is written rather than after.
+
+### 1. An inherited relationship's peer
+
+```yaml
+---
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+version: "1.0"
+
+generics:
+  - name: Device
+    namespace: Dcim
+    # No natural sort key, so order by metadata rather than
+    # inventing an attribute to satisfy order_by.
+    order_by:
+      - node_metadata__updated_at
+    attributes:
+      - name: label
+        kind: Text
+    relationships:
+      - name: ports
+        peer: DcimPort       # the matching side of device__ports
+        cardinality: many
+        optional: true
+        identifier: device__ports
+
+  - name: Port
+    namespace: Dcim
+    order_by:
+      - name__value          # Port declares `name`, so this resolves
+    attributes:
+      - name: name
+        kind: Text
+      - name: media
+        kind: Dropdown
+        choices:
+          - name: fibre
+          - name: copper
+    relationships:
+      - name: device
+        peer: DcimDevice     # fixed here for every implementer
+        cardinality: one
+        optional: false
+        identifier: device__ports
+
+nodes:
+  - name: Switch
+    namespace: Dcim
+    inherit_from:
+      - DcimDevice
+
+  - name: OpticalPort
+    namespace: Dcim
+    inherit_from:
+      - DcimPort
+    attributes:
+      # Per-kind default. Note it restates kind AND the full
+      # choice list; both are required.
+      - name: media
+        kind: Dropdown
+        choices:
+          - name: fibre
+          - name: copper
+        default_value: fibre
+```
+
+Trying to say "an optical port only attaches to a
+switch" by narrowing the peer is rejected, from either
+side:
+
+```yaml
+  - name: OpticalPort
+    namespace: Dcim
+    inherit_from:
+      - DcimPort
+    relationships:
+      - name: device
+        peer: DcimSwitch     # REJECTED at schema check
+        cardinality: one
+        optional: false
+        identifier: device__ports
+```
+
+```text
+DcimOpticalPort's relationship device inherited from DcimPort
+must have the same peer (DcimDevice != DcimSwitch)
+```
+
+So **kind-to-kind pairing between two generic-typed
+families is not expressible in the schema.** It goes in
+a Python check, or it goes unenforced. Hierarchy
+relationships are the exception; if the pairing is
+really containment, model it as a hierarchy.
+
+### 2. A Dropdown's choice list, but only loudly in one direction
+
+| Override on the concrete kind | Result |
+| ----------------------------- | ------ |
+| restates `kind` + full `choices` + `default_value` | loads, works |
+| omits `choices` | **rejected at load**: `The property 'choices' is required for kind=Dropdown` |
+| omits `kind` | bare `KeyError: 'kind'` |
+| declares a different `kind` | `must be the same kind ["Dropdown", "Text"]` |
+| restates a **shorter** list | **loads silently**, then rejects the new value at object-write time |
+| restates a **longer** list | **loads silently**, that kind accepts a value the generic never declared |
+
+Adding a choice to the generic therefore looks like a
+one-line change and is not. Guard it with a test that
+compares each restated list against the generic's, or
+put `allow_override: none` on the generic's attribute
+and give up per-kind defaults.
+
+### 3. Where `order_by` resolves
+
+`order_by` on a generic resolves against that generic's
+**own** declarations only. That is why `DcimDevice` above
+orders by metadata: it declares no `name`, so
+`order_by: [name__value]` on it would be rejected. Swap
+the metadata entry for `name__value` and the load fails:
+
+```text
+DcimSwitch.order_by: attribute 'name' not defined on this schema (entry: 'name__value').
+```
+
+Note the message names an implementer, `DcimSwitch`
+here, whose file contains no `order_by` at all. The
+generic's value was copied down to it, and `DcimSwitch`
+declares no `name` either. Which implementer gets named
+is not fixed: whichever failing schema is validated
+first is the one in the message, so on your load it may
+be a sibling kind. When the named kind has no
+`order_by`, look at its generics.
+`DcimPort` gets away with `name__value` only because it
+declares `name` itself.
+
+## Uniqueness Scope: Generic vs Concrete Kind
+
+The layer a `uniqueness_constraints` entry sits on
+changes what it means, and the schema loads either way.
+Verified against Infrahub `1.10.8+19` (the 1.11.0 development
+line) using the in-memory schema validator.
+
+### On a generic: enforced across every implementer
+
+```yaml
+---
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+version: "1.0"
+
+generics:
+  - name: Endpoint
+    namespace: Net
+    human_friendly_id:
+      - parent__name__value
+      - name__value
+      - media__value
+    uniqueness_constraints:
+      # Spans ALL implementers, not each one separately.
+      - ["parent", "name__value"]
+    attributes:
+      - name: name
+        kind: Text
+      - name: media
+        kind: Text
+    relationships:
+      - name: parent
+        peer: LocRack
+        kind: Parent
+        cardinality: one
+        optional: false        # required: a constrained rel must be mandatory
+        identifier: rack__endpoints
+
+nodes:
+  - name: Rack
+    namespace: Loc
+    human_friendly_id:
+      - name__value
+    attributes:
+      - name: name
+        kind: Text
+
+  - name: OpticalEndpoint
+    namespace: Net
+    inherit_from:
+      - NetEndpoint
+
+  - name: EthernetEndpoint
+    namespace: Net
+    inherit_from:
+      - NetEndpoint
+```
+
+Loading these two objects in order:
+
+```yaml
+# 1. Succeeds
+- kind: NetOpticalEndpoint
+  data:
+    - name: e1
+      media: fibre
+      parent: rack-a
+
+# 2. REJECTED, even though the kind differs
+- kind: NetEthernetEndpoint
+  data:
+    - name: e1
+      media: copper
+      parent: rack-a
+```
+
+```text
+Violates uniqueness constraint 'parent-name'
+```
+
+The two objects differ in kind and differ in `media`,
+so their `human_friendly_id` values differ too. They
+collide only on the constrained pair, which is declared
+in exactly one place.
+
+**Declaring `uniqueness_constraints` on
+`NetEthernetEndpoint` does not fix this.** A concrete
+kind cannot narrow what it inherits; its own constraints
+are checked *in addition to* the generic's.
+
+### On each concrete kind: scoped per kind
+
+Move the constraint down when the implementers are
+allowed to overlap. `human_friendly_id` moves with it:
+an HFID left on the generic compiles back into a
+generic-scoped constraint and undoes the fix.
+
+```yaml
+---
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/schema/latest.json
+version: "1.0"
+
+generics:
+  - name: Endpoint
+    namespace: Net
+    # No uniqueness_constraints, no human_friendly_id, and no
+    # attribute with `unique: true`. All three would be enforced
+    # across every implementer from here, so all three go on the
+    # concrete kinds below instead.
+    attributes:
+      - name: name
+        kind: Text
+      - name: media
+        kind: Text
+    relationships:
+      - name: parent
+        peer: LocRack
+        kind: Parent
+        cardinality: one
+        optional: false
+        identifier: rack__endpoints
+
+nodes:
+  - name: Rack
+    namespace: Loc
+    human_friendly_id:
+      - name__value
+    attributes:
+      - name: name
+        kind: Text
+
+  - name: OpticalEndpoint
+    namespace: Net
+    inherit_from:
+      - NetEndpoint
+    human_friendly_id:
+      - parent__name__value
+      - name__value
+    uniqueness_constraints:
+      - ["parent", "name__value"]
+
+  - name: EthernetEndpoint
+    namespace: Net
+    inherit_from:
+      - NetEndpoint
+    human_friendly_id:
+      - parent__name__value
+      - name__value
+    uniqueness_constraints:
+      - ["parent", "name__value"]
+```
+
+Now `e1` may exist once per kind per rack.
+
+### Why this decides a migration's load order
+
+Splitting one kind into several that share a generic:
+
+| Constraint lives on | Old and new instances | Consequence |
+| ------------------- | --------------------- | ----------- |
+| the generic | collide | old rows must be deleted **before** the new ones load; a half-finished migration leaves neither set complete |
+| each concrete kind | coexist | both sets can run side by side while the change is verified, old rows removed last |
+
+Where both would work, putting the constraint on the
+concrete kinds buys a reversible migration.
+
+### The same trap through `human_friendly_id`
+
+A `human_friendly_id` is compiled into a
+`uniqueness_constraints` group on whatever declares it,
+with relationship paths collapsed to the bare
+relationship. The first generic above therefore carries
+two generic-scoped groups: the one it declares, plus
+`["parent", "name__value", "media__value"]` from its
+HFID. Adding `media` is what keeps them apart, so the
+two objects have *different* human-friendly IDs while
+still colliding on the constrained pair.
+
+Without that separation the HFID fires first, and it
+fails with a message about rebasing:
+
+```text
+Node <id> / NetOpticalEndpoint uses this human-friendly ID, but does not
+exist on this branch. Please rebase this branch to access <id> / NetOpticalEndpoint
+```
+
+That is not a branch problem. The upsert of the
+Ethernet kind matched the Optical object, then failed
+to load it under the kind it asked for. See
+[rules/display-human-friendly-id.md](./rules/display-human-friendly-id.md).
 
 ## Component Pattern (Modules/Slots)
 
