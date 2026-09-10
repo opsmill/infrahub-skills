@@ -1,0 +1,32 @@
+skills/infrahub-managing-checks/SKILL.md
+  s_fe99a41d5e7f9e::t_4ea9c2606a6ca9 60
+tests/graders/test_checks_error_surfaces.py
+  s_fe99a41d5e7f9e::t_96a3d687c325d1 112-131,136
+  s_fe99a41d5e7f9e::t_0daa46037adfbf 215-225
+skills/infrahub-managing-generators/rules/patterns-common.md
+  s_fe99a41d5e7f9e::t_f42c079bc5ffde 125-127
+skills/infrahub-managing-checks/rules/api-error-surfaces.md
+  s_fe99a41d5e7f9e::t_d512b496381e19 52
+graders/managing-checks/lib.py
+  s_fe99a41d5e7f9e::t_c53d6ea96a82e1 389-392
+  s_fe99a41d5e7f9e::t_354c21331c8a01 361-362,365-369,375
+  s_fe99a41d5e7f9e::t_f5327457ea7333 578-595
+skills/infrahub-managing-transforms/rules/patterns-common.md
+  s_fe99a41d5e7f9e::t_31d2e38184dc9a 109-111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "1318a6b55ec29bc10abaa185db1c714192b5a4f1",
+  "prompts": {},
+  "sessions": {
+    "s_fe99a41d5e7f9e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f610d975-3725-4fda-8281-a3570da3554a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
