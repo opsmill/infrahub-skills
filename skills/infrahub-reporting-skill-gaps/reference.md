@@ -11,39 +11,56 @@ gives enough evidence to describe the friction.
 | Priority | Source | When to use |
 | -------- | ------ | ----------- |
 | 1 | Current conversation | Always the first source. Most friction reports come from the session already in progress |
-| 2 | `~/.claude/projects/*/*.jsonl` | Optional. Only when the user points at a past session. See Transcript discovery below |
+| 2 | A past session log | Optional. Only when the user points at one. See Transcript discovery below |
 
 There is no third source, and no local record of past
 reports. The shared record is the issue tracker, read
 in step 2; see
 [rules/workflow-tracker-first.md](rules/workflow-tracker-first.md).
 
-The transcript format under `~/.claude/projects/` is
-not a public API. It can change without notice between
-Claude Code releases. If a transcript file cannot be
-parsed, skip it, fall back to the current conversation,
-and say so to the user plainly. Do not guess at a
-schema that may no longer apply, and do not treat a
-missing transcript as a reason to stop.
+Two things are **not** evidence sources. An assistant's
+own memory or context files (`MEMORY.md`, `CLAUDE.md`,
+`AGENTS.md`, and their equivalents) are self-authored
+notes, so citing them proves only that the model wrote
+something down, not that a rule failed. And a local
+draft of an earlier report is not corroboration of
+itself. Evidence comes from the ladder in
+[rules/evidence-detection-ladder.md](rules/evidence-detection-ladder.md),
+and the tracker is what carries a report across
+sessions.
 
 ## Transcript discovery
 
-Transcripts are grouped by working directory, which
-does not correspond to anything meaningful here: one
-repo spread across worktrees or clones produces many
-directories, and a skill's users share none of them.
-So search across all of them rather than deriving one
-path:
+Where session logs live is specific to the assistant
+running this skill, and no format among them is a public
+API. So do not derive a path from an assumed layout.
+Instead, in this order:
 
-```bash
-grep -rl "<term from the friction>" ~/.claude/projects/*/*.jsonl 2>/dev/null | head
-```
+1. Use the current conversation. It needs no discovery
+   and is the source for nearly every report.
+2. If the user points at a past session, ask them for
+   the file or directory unless you already know where
+   your own runtime writes session logs.
+3. If you do know, search across all of that
+   directory's project folders rather than one derived
+   path: a single repo spread over worktrees or clones
+   produces many folders, and a term from the friction
+   is the cheaper key. On Claude Code, for example, the
+   logs are line-delimited JSON under
+   `~/.claude/projects/`:
 
-This is a convenience for finding a session the user
-already remembers. It is never required, and its
-absence never blocks a report.
+   ```bash
+   grep -rl "<term from the friction>" ~/.claude/projects/*/*.jsonl 2>/dev/null | head
+   ```
 
-Friction shows up in a transcript as:
+If a log cannot be found or parsed, skip it, fall back
+to the current conversation, and say so to the user
+plainly. Do not guess at a schema that may no longer
+apply. A missing transcript is never a reason to stop:
+this step is a convenience for finding a session the
+user already remembers.
+
+Friction shows up in a session log as:
 
 - a verifier that failed and later passed on the same
   target: `infrahubctl schema load`, `schema validate`,

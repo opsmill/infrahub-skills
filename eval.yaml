@@ -4967,8 +4967,10 @@ tasks:
     expected_output: >-
       A response that drafts a complete report (type feature, a title
       starting with `feat:`, a filled-in body, `searched` naming the
-      tracker already checked, and a Skills version header read from the
-      implicated skill's own frontmatter), then hands the payload to
+      tracker already checked, a Skills version header read from the
+      implicated skill's own frontmatter, and Infrahub SDK version and
+      Infrahub version headers read from `infrahubctl info`), then hands
+      the payload to
       infrahub-reporting-issues instead of running `gh issue create` or
       claiming an issue was filed itself. It names no target repository:
       routing belongs to the receiver, which resolves it from the type.
@@ -4977,6 +4979,8 @@ tasks:
       - Runs no `gh` write commands itself and claims no issue was filed
       - Carries a complete payload (type, title, body, searched)
       - Records the skills-plugin version whose guidance failed
+      - Records the infrahub-sdk version the session ran against
+      - Records the Infrahub version the session talked to
       - Names no repository as the filing destination
       - Uses a title starting with `feat:`
     assertions:
@@ -4994,6 +4998,14 @@ tasks:
         check: >-
           Response's header records the skills-plugin version whose
           guidance failed, or `unknown`
+      - name: states-sdk-version
+        check: >-
+          Response's header records the infrahub-sdk version the session
+          ran against, or `unknown`
+      - name: states-infrahub-version
+        check: >-
+          Response's header records the Infrahub version the session
+          talked to, or `unknown`
       - name: leaves-routing-to-reporter
         check: >-
           Response names no repository as the filing destination, leaving
