@@ -1,0 +1,24 @@
+tests/graders/test_generic_inheritance.py
+  s_fe99a41d5e7f9e::t_94b0cff696eb01 139-153
+  s_fe99a41d5e7f9e::t_b65a973b1df80b 75-92
+graders/auditing-repo/lib.py
+  s_fe99a41d5e7f9e::t_d67a1ded6dcd4a 399-400
+  s_fe99a41d5e7f9e::t_ba2846305a8378 292-296,298,303-304,306
+  s_fe99a41d5e7f9e::t_935ba4d5cbc5f7 325-339
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "17cb1122fd973809e5b9142cf5457598a39de2c3",
+  "prompts": {},
+  "sessions": {
+    "s_fe99a41d5e7f9e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f610d975-3725-4fda-8281-a3570da3554a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
