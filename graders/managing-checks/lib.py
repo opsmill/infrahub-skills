@@ -358,17 +358,21 @@ def check_separate_local_bounds_branch(
         for call in ast.walk(handler)
         if isinstance(call, ast.Call)
     }
-    # The log_error has to sit on a comparison the check made itself, not
-    # merely outside an except handler. Without that, the prompt's own
+    # The log_error has to sit on a test the check made itself, not merely
+    # outside an except handler. Without that, the prompt's own
     # `if resp.status_code == 200: ... else: log_error(...)` antipattern
     # scored this, the task's most distinctive assertion.
+    #
+    # "A test the check made itself" is a comparison OR a predicate it calls:
+    # api-error-surfaces.md writes the bound test as `if not _in_bounds(value)`,
+    # which carries no ast.Compare at all, so requiring one failed the rule's
+    # own example.
     guarded: list[str] = []
     for branch in ast.walk(tree):
         if not isinstance(branch, ast.If):
             continue
         test = branch.test
-        comparisons = [n for n in ast.walk(test) if isinstance(n, ast.Compare)]
-        if not comparisons:
+        if not any(isinstance(n, (ast.Compare, ast.Call)) for n in ast.walk(test)):
             continue
         if _branches_on_status_code(branch):
             continue  # a status code is not a locally-detectable bad value
@@ -382,9 +386,10 @@ def check_separate_local_bounds_branch(
                 break
     if not guarded:
         return False, (
-            "no log_error sits on a comparison the check made itself; the "
-            "locally-detectable out-of-range value needs its own branch, "
-            "not an except handler and not a status-code test"
+            "no log_error sits on a test the check made itself (a comparison "
+            "or its own predicate); the locally-detectable out-of-range value "
+            "needs its own branch, not an except handler and not a "
+            "status-code test"
         )
     return True, f"reports the locally-detectable value on its own test: {guarded[:2]}"
 
@@ -570,7 +575,24 @@ def check_watch_declares_shared_package(config: dict, **_: Any) -> tuple[bool, s
     ]
     if malformed:
         return False, f"`watch:` on {malformed} is not a mapping with only a `files` key"
-    return True, f"all {len(present)} watchable entries declare `watch:`"
+
+    # `watch: {}` and `watch: {files: []}` are valid YAML and a legitimate
+    # answer in general -- they record that the author checked -- but they
+    # declare no dependency, which is the failure this check exists to catch.
+    # They also erase the anchor `_declared_package` derives, so accepting
+    # them let `import netdomain` plus an empty `watch:` score 4/4.
+    empty = [
+        f"{section}:{entry.get('name', '?')}"
+        for section, entry in present
+        if not entry["watch"].get("files")
+    ]
+    if empty:
+        return False, (
+            f"`watch:` on {empty} lists no files; an empty `files` declares no "
+            "dependency, so the artifact still will not regenerate when the "
+            "shared package changes"
+        )
+    return True, f"all {len(present)} watchable entries declare `watch:` with files"
 
 
 def check_check_definitions_present(config: dict, **_: Any) -> tuple[bool, str]:

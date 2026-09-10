@@ -106,8 +106,9 @@ three `uv` flags whose absence each fails differently,
 installed package is invisible to Infrahub's dependency
 detection, so without `watch:` the artifact does not
 regenerate when the shared logic changes. `watch:` is
-accepted on this section and on `python_transforms`
-only, and requires SDK 1.23.0 or later.
+accepted on `python_transforms`, `jinja2_transforms` and
+`generator_definitions` — but **not** on
+`check_definitions` — and requires SDK 1.23.0 or later.
 
 Reach for it on the **second** consumer of the logic,
 not in anticipation of one.

@@ -109,10 +109,31 @@ def test_a_bare_log_error_is_not_a_local_bounds_branch():
     assert not ok
 
 
+# api-error-surfaces.md writes the bound test as a predicate the check calls,
+# not as an inline comparison. Every fixture above uses `if not 1 <= v <= 4094`,
+# so nothing exercised the form the rule actually documents.
+RULE_PREDICATE_FORM = '''
+from infrahub_sdk.checks import InfrahubCheck
+from infrahub_sdk.exceptions import GraphQLError
+
+class C(InfrahubCheck):
+    async def validate(self, data):
+        value = data["vlan"]
+        if not _in_bounds(value):
+            self.log_error(message=f"{value} outside the allowed range")
+            return
+        try:
+            await self.client.execute_graphql(query=q)
+        except GraphQLError as exc:
+            self.log_error(message=f"server refused: {exc}")
+'''
+
+
 CORRECT = [
     pytest.param(COMPLIANT_SDK, id="sdk-plus-an-unrelated-except-Exception"),
     pytest.param(URLLIB_FOR_A_URL, id="urllib-parse-to-build-a-url"),
     pytest.param(SANCTIONED_RAW_HTTP, id="the-rules-own-raw-http-fallback"),
+    pytest.param(RULE_PREDICATE_FORM, id="the-rules-own-predicate-bound-test"),
 ]
 
 
@@ -189,6 +210,17 @@ def test_the_import_has_to_name_the_package_the_layout_declares():
         dockerfile_raw=GOOD_DOCKERFILE,
     )
     assert not ok and "mydomain" in msg
+
+
+def test_an_empty_watch_files_list_declares_nothing():
+    """`watch: {files: []}` records a decision but declares no dependency."""
+    ok, msg = _mod.check_watch_declares_shared_package(STUB_CONFIG)
+    assert not ok and "no files" in msg
+
+
+def test_an_empty_watch_does_not_carry_a_stub_to_full_marks():
+    """An empty `files` also erases the package anchor the import check uses."""
+    assert _shared_score("import netdomain\n", GOOD_DOCKERFILE, STUB_CONFIG) < 1.0
 
 
 def test_a_dockerfile_comment_is_not_an_instruction():

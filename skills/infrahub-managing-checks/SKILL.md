@@ -57,7 +57,7 @@ Existing queries:
 | CRITICAL | Python Class | `python-` | InfrahubCheck base class, validate(), log_error/log_info |
 | HIGH | API Reference | `api-` | Class attributes, instance properties, methods, lifecycle, and which API surfaces a rejection (a GraphQL error is a 200) |
 | HIGH | Registration | `registration-` | .infrahub.yml config, query name matching, parameters |
-| HIGH | Patterns | `patterns-` | Error collection, shared utilities, scoped validation, relationship-traversal validation, sharing a module across artifact types |
+| MEDIUM (HIGH for `patterns-shared-module`) | Patterns | `patterns-` | Error collection, shared utilities, scoped validation, relationship-traversal validation, sharing a module across artifact types |
 | HIGH | Testing | `testing-` | Resources Testing Framework (YAML-driven tests), infrahubctl check commands |
 
 <!-- markdownlint-enable MD013 -->

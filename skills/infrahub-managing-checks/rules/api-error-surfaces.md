@@ -49,6 +49,7 @@ So a check making a follow-up call gets an **exception**,
 not a silent pass:
 
 ```python
+from infrahub_sdk.checks import InfrahubCheck
 from infrahub_sdk.exceptions import GraphQLError
 
 
