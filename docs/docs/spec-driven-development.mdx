@@ -49,6 +49,67 @@ Simple builds execute sequentially: schema first, then objects, then checks. Com
 
 SDD works with any framework that supports a spec, plan, task, and implement workflow. The [infrahub-template](https://github.com/opsmill/infrahub-template) repository includes a pre-configured SDD setup using Spec Kit as a starting point.
 
+## Infrahub routing for Spec Kit
+
+The [infrahub-speckit](https://github.com/opsmill/infrahub-speckit) extension wires the Infrahub skills into Spec Kit's own commands. It needs Spec Kit 0.8.0 or newer:
+
+```bash
+specify extension add infrahub-speckit --from https://github.com/opsmill/infrahub-speckit/archive/refs/heads/main.zip
+```
+
+The extension registers four hooks against the core Spec Kit skills. All four fire whether the skill was invoked by a slash command, by another skill, or by an autonomous agent, and all four no-op in a project with no `.infrahub.yml`:
+
+| Hook | When it fires | What it does |
+| ------ | --------------- | -------------- |
+| `before_specify` | Before `/speckit.specify` writes anything | Classifies the requested artifact type, verifies the Infrahub skills are installed and the instance is reachable, then selects the matching Infrahub spec template |
+| `before_plan` | Before `/speckit.plan` starts research | Re-invokes the skill that matches the artifact |
+| `before_implement` | Before `/speckit.implement` runs its tasks | Re-invokes the matching skill for each artifact type in `tasks.md` |
+| `after_implement` | After `/speckit.implement` finishes | Checks the finished cycle for evidence that a skill's own guidance had a gap, and offers to report it |
+
+All three `before_*` hooks halt with install guidance when the Infrahub skills are not present, and `before_specify` also halts when the instance is unreachable. The `after_implement` hook never halts: implementation is already done, so a missing skill, an error, or an ambiguous read all degrade to a no-op line rather than disrupting finished work.
+
+### Skill-gap detection after implement
+
+Infrahub skills fail quietly. A missing or unclear rule does not crash the run, it produces extra round trips and repeated nudges until the model works the answer out anyway. By the time the cycle ends, that friction is invisible. The `after_implement` hook looks for it while the session still holds the evidence.
+
+Detection is automatic; drafting and filing are not. On most cycles the whole hook is one line:
+
+```text
+[infrahub-speckit] No skill-guidance friction detected this cycle.
+```
+
+When the evidence gate opens, you get an offer and nothing else:
+
+```text
+[infrahub-speckit — friction offer, /speckit.implement]
+
+Skill:        infrahub-managing-schemas
+Evidence:     schema load failed on relationship cardinality, passed after correction
+Rule coverage: no rule file covers this topic
+
+An Infrahub skill's guidance may have a gap here. Reply "report it" to draft a
+skill-friction report for review. Nothing is filed without your approval.
+```
+
+Ignoring it costs nothing. Replying routes the session into the [Skill Gap Reporter](./skills-reference/reporting-skill-gaps.mdx), which searches the tracker, decides whether the skill or Infrahub itself is at fault, and drafts a redacted report. That skill cannot file: it hands the draft to the [Issue Reporter](./skills-reference/reporting-issues.mdx), which shows you the target repository and the full body, then asks how to submit it. You can stop at either gate, and the manual submission method sends nothing from your machine.
+
+Two probes open the gate:
+
+- **A verifier verdict**: a verifier rejected an artifact and later accepted it, red to green on the same target
+- **A correction delta**: you rewrote something the agent authored, in a way a rule could have prevented
+
+Nothing else does:
+
+- **A missing rule file on its own**: the rule-coverage read names the file that should have covered the topic, which is attribution for a finding rather than a trigger for one, and plenty of topics on a healthy cycle have no rule file
+- **Failures the skills do not own**: authentication, connectivity, a container that never started, or a product-side 5xx
+- **Session-shape counters**: retry counts, edit churn, repeated asks, and docs escapes rise for reasons unrelated to a skill's guidance, such as an unclear request
+
+The hook also stays quiet unless the skill guided the authoring inside that same implement run, and unless both the Skill Gap Reporter and the Issue Reporter are installed, since the accept path needs both.
+
+:::note
+Two per-project escape hatches live on the hook's entry in `.specify/extensions.yml`: `optional: true` turns the check into an opt-in offer, and `enabled: false` disables it.
+:::
+
 ## Example walkthrough: VLAN management domain
 
 This example uses [Spec Kit](https://github.com/github/spec-kit) to design a VLAN management domain from scratch — schema, object data, and a validation check. Any SDD framework that follows a spec, plan, task, and implement workflow produces a similar result.
@@ -60,7 +121,7 @@ This example uses [Spec Kit](https://github.com/github/spec-kit) to design a VLA
 specify init . --ai claude
 ```
 
-This creates `.speckit/` config and installs slash commands into `.claude/commands/`.
+This creates the `.specify/` project configuration and installs slash commands into `.claude/commands/`.
 
 ### Step 1: Specify
 
@@ -109,7 +170,7 @@ Run `/speckit.tasks`. The AI breaks the plan into discrete steps in `tasks.md`:
 
 ### Step 5: Implement
 
-Run `/speckit.implement`. The AI executes each task using the appropriate Infrahub skill.
+Run `/speckit.implement`. The AI executes each task using the appropriate Infrahub skill. With the routing extension installed, the cycle closes with the friction check described in [Skill-gap detection after implement](#skill-gap-detection-after-implement).
 
 **Task 1 output** — `schemas/vlan_management.yml` (via Schema Manager):
 
