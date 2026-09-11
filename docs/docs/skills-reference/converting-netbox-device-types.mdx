@@ -32,9 +32,10 @@ The files are numbered in dependency order, so loading them in sequence satisfie
 - `03_device_templates.yml`
 - `04_module_types.yml`
 - `05_module_templates.yml`
-- a Markdown coverage report naming everything the profile could not map
 
-Empty files are not written, so a device-types-only run produces the first three plus the report.
+Empty files are not written, so a device-types-only run produces just the first three.
+
+A Markdown coverage report names everything the profile could not map. It is written to the `--report` path, which is resolved on its own rather than inside the output directory, and defaults to `coverage-report.md` in the current directory.
 
 ## Example prompts
 
@@ -56,6 +57,8 @@ Empty files are not written, so a device-types-only run produces the first three
 - **The skill offers schema changes; it does not make them** — enabling `generate_template` is a migration against your source of truth, so it is proposed for you to apply
 
 ## Running the converter
+
+The skill normally runs the converter for you. To run it by hand, resolve the two `skills/...` paths against wherever your installation put the skill directory. The command below assumes the [manual copy](../installation-setup.mdx), which puts it under your project root; the `npx` installer and the Claude Code plugin place it elsewhere.
 
 ```bash
 python skills/infrahub-converting-netbox-device-types/scripts/netbox_to_infrahub_templates.py \
