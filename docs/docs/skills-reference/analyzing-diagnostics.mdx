@@ -37,9 +37,9 @@ A findings report grounded in bundle evidence:
 - **Every service, not just the server** — the sweep covers each directory under `bundle/logs/` for tracebacks, ERROR and CRITICAL lines, panics, OOM kills, and connection failures, and treats any `*.previous.log` as restart evidence whose tail usually holds the crash cause
 - **Incidents, not error lists** — signals are grouped by timestamp and causal chain, so a database OOM followed by server connection errors is reported as one incident with a named root rather than two problems
 - **Stable search keys** — a key is built from the exception class, the normalized message, and the innermost Infrahub frame, with branch names, UUIDs, and hostnames stripped, so a known issue actually matches
-- **Both halves of the tracker** — the issue search covers open and closed issues, because a closed match is the one that tells you which version carries the fix
-- **Evidence per finding** — every claim cites a bundle path and a quoted excerpt, and what the bundle cannot answer is stated as an open question rather than papered over
-- **Read-only** — the analysis reads an already-collected bundle and runs issue searches; it never touches the running instance, restarts nothing, edits no config, and creates no issue
+- **Both halves of the tracker** — the issue search covers open and closed issues, because a closed match is the one that tells you which version includes the fix
+- **Evidence per finding** — every claim cites a bundle path and a quoted excerpt, and what the bundle cannot answer is stated as an open question rather than left out
+- **Read-only** — the analysis reads an already-collected bundle and runs issue searches; it never touches the running instance, restarts nothing, edits no configuration, and creates no issue
 
 ## Diagnostics Collector vs. Diagnostics Analyzer
 
@@ -55,7 +55,7 @@ A findings report grounded in bundle evidence:
 | Mistake | What the skill does instead |
 | --------- | --------------------------- |
 | Reading only the server's logs | Sweeps every service directory under `bundle/logs/` |
-| Treating an uncollectable log as a gap in the bundle | Reports it as a finding — that service is often the one that failed |
+| Treating a log that could not be collected as a gap in the bundle | Reports it as a finding — that service is often the one that failed |
 | Reporting every error line as its own problem | Correlates signals into incidents and names the root |
 | Searching a traceback verbatim | Strips branch names, UUIDs, and hostnames first, so the search matches |
 | Limiting the issue search to open issues | Searches open and closed, since a closed match names the fixing version |
@@ -63,7 +63,7 @@ A findings report grounded in bundle evidence:
 | Filing the bug from here | Hands off to the [Issue Reporter](./reporting-issues.mdx) |
 
 :::tip
-Benchmark data exists only if the bundle was created with `infrahub-collect create --benchmark`. For a performance symptom without it, the report asks for a new bundle carrying that flag rather than guessing from logs alone — the single-CPU score and the storage IOPS of the Neo4j and PostgreSQL volumes are often what decide whether the cause is software or an undersized host.
+Benchmark data exists only if the bundle was created with `infrahub-collect create --benchmark`. For a performance symptom without it, the report asks for a new bundle created with that flag rather than guessing from logs alone — the single-CPU score and the storage IOPS of the Neo4j and PostgreSQL volumes are often what decide whether the cause is software or an undersized host.
 :::
 
 :::note
