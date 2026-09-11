@@ -1,0 +1,71 @@
+---
+title: Diagnostics Analyzer
+sidebar_position: 14
+---
+
+The Diagnostics Analyzer reads a bundle the [Diagnostics Collector](./collecting-diagnostics.mdx) already produced and turns its logs into a triage report. It reads the manifest before any log, sweeps every service for tracebacks and other error signals, correlates related errors into incidents with root causes separated from cascades, and searches existing `opsmill/infrahub` issues so you learn whether your crash is already known — without touching the running deployment, applying a fix, or filing anything on your behalf.
+
+## When to use
+
+- You have a bundle in hand and want to know what it says before involving support
+- Tracebacks in the logs need interpreting
+- Deciding whether a crash is a known Infrahub issue, and whether a newer version already fixes it
+- A container or worker keeps restarting and you need the pre-restart cause
+- A performance symptom, where a `--benchmark` collection needs reading alongside the logs
+
+## What it produces
+
+A findings report grounded in bundle evidence:
+
+- A deployment-context header — running Infrahub version, topology (Docker Compose or Kubernetes), replica counts — because the version is what turns a matched issue into a conclusion rather than a coincidence
+- One section per incident, with severity, the evidence as bundle file paths plus quoted excerpts, and the reasoning that grouped those signals into one incident
+- Matching `opsmill/infrahub` issues with title, state, and URL, searched across open and closed
+- Open questions, including whether the symptom reproduces on demand, each mapped to the `infrahub-collect create` flags a next bundle would need to answer it
+
+## Example prompts
+
+- "I collected a bundle — can you tell me what's wrong?"
+- "Analyze these Infrahub logs"
+- "What do the tracebacks in the bundle mean?"
+- "Is this crash a known Infrahub issue?"
+- "Why did the task-worker keep restarting?"
+
+## Key rules enforced
+
+- **You name the bundle** — the skill asks for the path instead of scanning for one, because a machine often holds several bundles and picking the wrong one produces a confident report about the wrong incident
+- **Manifest before any log** — `bundle_information.json` records what was collected and what failed, and a service whose logs could not be collected is often the service that is down, so collection failures are findings rather than gaps in the evidence
+- **Every service, not just the server** — the sweep covers each directory under `bundle/logs/` for tracebacks, ERROR and CRITICAL lines, panics, OOM kills, and connection failures, and treats any `*.previous.log` as restart evidence whose tail usually holds the crash cause
+- **Incidents, not error lists** — signals are grouped by timestamp and causal chain, so a database OOM followed by server connection errors is reported as one incident with a named root rather than two problems
+- **Stable search keys** — a key is built from the exception class, the normalized message, and the innermost Infrahub frame, with branch names, UUIDs, and hostnames stripped, so a known issue actually matches
+- **Both halves of the tracker** — the issue search covers open and closed issues, because a closed match is the one that tells you which version includes the fix
+- **Evidence per finding** — every claim cites a bundle path and a quoted excerpt, and what the bundle cannot answer is stated as an open question rather than left out
+- **Read-only** — the analysis reads an already-collected bundle and runs issue searches; it never touches the running instance, restarts nothing, edits no configuration, and creates no issue
+
+## Diagnostics Collector vs. Diagnostics Analyzer
+
+| Use the Diagnostics Collector when... | Use the Diagnostics Analyzer when... |
+| --------------------------------------- | -------------------------------------- |
+| Infrahub is misbehaving and no bundle exists yet | A bundle already exists, or you have its contents |
+| You need the right `infrahub-collect` command for your symptom | You need to know what the collected logs actually say |
+| Output is a support bundle on disk | Output is a findings report citing that bundle |
+| The next step is sharing it with OpsMill | The next step is an upgrade, a comment on an existing issue, or a new report |
+
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --------- | --------------------------- |
+| Reading only the server's logs | Sweeps every service directory under `bundle/logs/` |
+| Treating a log that could not be collected as a gap in the bundle | Reports it as a finding — that service is often the one that failed |
+| Reporting every error line as its own problem | Correlates signals into incidents and names the root |
+| Searching a traceback verbatim | Strips branch names, UUIDs, and hostnames first, so the search matches |
+| Limiting the issue search to open issues | Searches open and closed, since a closed match names the fixing version |
+| Restarting a container to test a theory | Recommends it in the report and applies nothing |
+| Filing the bug from here | Hands off to the [Issue Reporter](./reporting-issues.mdx) |
+
+:::tip
+Benchmark data exists only if the bundle was created with `infrahub-collect create --benchmark`. For a performance symptom without it, the report asks for a new bundle created with that flag rather than guessing from logs alone — the single-CPU score and the storage IOPS of the Neo4j and PostgreSQL volumes are often what decide whether the cause is software or an undersized host.
+:::
+
+:::note
+No bundle yet? Start with the [Diagnostics Collector](./collecting-diagnostics.mdx). This skill will not scrape `docker compose logs` or `kubectl logs` as a substitute, because a hand-scraped set of logs misses the replica coverage, the previous-container logs, and the manifest that the analysis depends on.
+:::

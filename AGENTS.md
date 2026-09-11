@@ -94,5 +94,21 @@ rule as covered forever.
 All skills share a unified version. When bumping, update together:
 
 1. `.claude-plugin/plugin.json`
-2. `.github/.release-manifest.json`
-3. Every `skills/*/SKILL.md` frontmatter
+2. `.github/.release-manifest.json` — also lists the
+   skills the published release claims to ship
+3. `pyproject.toml`
+4. Every `skills/*/SKILL.md` frontmatter
+5. `uv.lock` — any `uv run` rewrites it, so a stale
+   version reappears as a stray diff in later PRs
+
+`scripts/sync-versions.sh <version>` does 2-4;
+`auto-bump.yml` does 1 before calling it. `release.yml`
+validates 1-4 against the tag and fails the publish on
+a mismatch — nothing validates 5.
+
+Each release also gets a curated notes page under
+`docs/docs/release-notes/`, with `sidebar_position: 1`
+and every older page shifted down by one. Merging to
+`main` regenerates the GitHub draft release body, so
+paste the curated notes into the draft after the last
+PR lands and before publishing.

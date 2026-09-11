@@ -163,6 +163,8 @@ toml
 tomek
 towncrier
 Towncrier
+traceback
+tracebacks
 uncheck
 untrust
 uniqueness_constraints
@@ -173,6 +175,7 @@ userinfo
 uv
 uuid
 UUID
+UUIDs
 validator
 validators
 Version Control

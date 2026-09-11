@@ -1,0 +1,207 @@
+---
+title: Release 1.2.8
+sidebar_position: 1
+description: Four new skills — NetBox device-type conversion, concept tutoring, diagnostic-bundle triage, and skill-gap reporting — plus verified generic and cardinality semantics and a corrected infrahubctl command surface.
+---
+
+<table>
+  <tbody>
+    <tr>
+      <th>Release Number</th>
+      <td>1.2.8</td>
+    </tr>
+    <tr>
+      <th>Release Type</th>
+      <td>Feature</td>
+    </tr>
+    <tr>
+      <th>Release Date</th>
+      <td>September 10th, 2026</td>
+    </tr>
+    <tr>
+      <th>Tag</th>
+      <td>[v1.2.8](https://github.com/opsmill/infrahub-skills/releases/tag/v1.2.8)</td>
+    </tr>
+  </tbody>
+</table>
+
+## Release summary
+
+After upgrading, you can convert NetBox device-type definitions into Infrahub Object Templates, learn Infrahub concepts through your own repository and instance, triage a diagnostic bundle before escalating it, and report a skill's own missing guidance as a reviewed issue. The schema, check, transform, and generator guidance also changed: what a declaration on a generic imposes on every inheriting kind is now stated explicitly, and every `infrahubctl` command the skills print has been checked against the CLI.
+
+:::note What to expect after upgrading
+
+Most of what changed is what the skills know rather than how you invoke them, so existing schema, object, check, transform, and generator work continues unchanged. One item needs an edit on your side.
+
+- Refresh any vendored copy of these skills; a stale copy may still print `infrahubctl` commands that do not exist.
+
+See [Upgrade notes](#upgrade-notes) for full details.
+
+:::
+
+### Convert NetBox device-type definitions into Infrahub Object Templates
+
+Turn NetBox device-type and module-type files — the [netbox-community/devicetype-library](https://github.com/netbox-community/devicetype-library) format — into Infrahub Object Templates with the new [converting-netbox-device-types](../skills-reference/converting-netbox-device-types.mdx) skill. A bundled Python converter reads a mapping profile describing your target schema and writes manufacturers, device types, module types, and component templates as object YAML, alongside a coverage report naming everything it could not map ([#80](https://github.com/opsmill/infrahub-skills/pull/80)).
+
+* Convert a single file, a folder, or a mixed tree of device types and module types in one pass. The two families are told apart by `slug`, which every device type carries and no module type does, so a mixed tree does not have to be split up first. Output files are numbered `01_manufacturers` through `05_module_templates` so `infrahubctl object load` runs them in dependency order.
+* Point the converter at your own schema with a mapping profile rather than editing the script. Every Infrahub kind, attribute, and relationship name is read from a YAML profile, so a custom schema needs a new profile instead of a forked converter. Three profiles ship: `schema-library.yml`, `schema-library-modules.yml`, and an annotated `_template.yml`.
+* Read the Markdown coverage report before loading anything. Anything the profile cannot map is skipped and named rather than dropped silently, and against the stock `schema-library.yml` profile no published device type converts losslessly, because schema-library models no equivalent node for most NetBox component lists. Turn each report line into a schema change with the worked YAML in `extending-your-schema.md` — the skill offers the change rather than making it, since enabling `generate_template` is a migration against your source of truth.
+* Create the real interfaces behind a `{module}` token with the bundled module-port generator. The token cannot be resolved at conversion time, so a template carries it and the generator resolves it per installed module after the templates are loaded.
+
+### Learn Infrahub concepts through your own repository and instance
+
+Work through Infrahub concepts — foundations, schema, objects, GraphQL, branches, repository integration, proposed changes, checks, transforms, generators, and menus — with the new [teaching-concepts](../skills-reference/teaching-concepts.mdx) skill. It asks what you already know before it explains anything, and teaches from your own repository files and read-only instance queries rather than from generic examples ([#118](https://github.com/opsmill/infrahub-skills/pull/118)).
+
+* Resume a session instead of restarting it. Progress, lessons, and exercises are recorded in a `.infrahub-learning/` workspace, and each lesson is written to `lessons/<concept>.md` in a fixed Probe, Explain, Exercise, Check shape that doubles as the durable learning record.
+* Follow a dependency-ordered map of eleven concepts. Each carries its own probe questions, exercise specification, verification method, documentation anchors, and a graduation pointer to the skill that does the same work for real.
+* Attempt an exercise knowing it is solvable. The reference solution is written and verified — through offline schema validation, a read-only query, or an `infrahubctl` run — before the exercise is shown, and a hint ladder runs before any solution is revealed.
+* Keep your instance safe while learning. Read-only access is the default, authoring exercises are done in local files, and instance writes need an explicit opt-in, run only in a `learning-*` branch, are never merged, and are always deleted. Nothing writes to the default branch.
+
+### Triage a diagnostic bundle before escalating it
+
+Read a bundle collected by [collecting-diagnostics](../skills-reference/collecting-diagnostics.mdx) yourself with the new [analyzing-diagnostics](../skills-reference/analyzing-diagnostics.mdx) skill. It reads the manifest first, sweeps every service's logs for tracebacks, ERROR and CRITICAL lines, OOM kills, and `*.previous.log` restart evidence, then reports correlated incidents with root causes separated from cascades rather than a flat list of errors ([#76](https://github.com/opsmill/infrahub-skills/pull/76)).
+
+* Find out whether your crash is already known, and possibly already fixed, before anyone files an issue or waits on support. Findings are matched against existing `opsmill/infrahub` issues using stable search keys — exception class plus normalized message — with volatile tokens such as branch names, UUIDs, and hostnames stripped so a known issue actually matches. A match then resolves against the version the bundle reports running: a newer fix version means upgrade, and already running the fix means an unconfirmed match or a possible regression.
+* Read every finding against evidence you can check. Each claim cites a bundle path with a quoted excerpt, the report opens with the deployment context — running version, topology, replica counts — and what the bundle cannot answer is reported as an open question mapped to the `infrahub-collect create` flags a next bundle would need.
+* Search targeted failure patterns instead of generic ones. A known-failure-patterns reference covers Prefect background services disabled by edited Helm values, lock deadlocks after crashed merges, stale RUNNING tasks, and storage-persistence and multi-replica shared-storage misconfigurations, each mapped to where its evidence sits in the bundle.
+* Keep the analysis read-only toward your deployment. It never files anything: filing hands off to reporting-issues, a second collection hands back to collecting-diagnostics, and both diagnostics skills now frame `--include-backup` as a last resort, with a caution about restored backups carrying live git repository connections.
+
+### Report a skill's missing or wrong guidance as a reviewed issue
+
+When an Infrahub skill's guidance is missing or wrong, the failure is quiet — extra requests and repeated corrections, never a crash. Diagnose it with the new [reporting-skill-gaps](../skills-reference/reporting-skill-gaps.mdx) skill, which works out which rule file is at fault and what it should say instead, then hands the draft to [reporting-issues](../skills-reference/reporting-issues.mdx) for everything GitHub-facing ([#83](https://github.com/opsmill/infrahub-skills/pull/83), [#119](https://github.com/opsmill/infrahub-skills/pull/119)).
+
+* Rest a report on evidence rather than an impression. Four probes run strongest first: a verifier that failed and later passed, a coverage read of the skill's `rules/` naming the file or its absence, the difference between the rejected and the accepted artifact, and retry counts. A draft resting only on retry counters is refused, and the refusal names the probe that came up empty.
+* See the report classified before it is filed. A case a rule covers where the guidance still produced the wrong answer is a bug; a case no rule covers where the documentation supplied the answer is a feature request; a case no rule covers where the documentation did not is a documentation gap. The discriminator is what happened after the escape to documentation, not whether documentation existed.
+* Read which revision of the guidance failed from the report header, which records the skills-plugin version alongside the Infrahub SDK and Infrahub versions. All three come from one `infrahubctl info` call, and `unknown` and `n/a` are accepted because offline work never reaches a server.
+* Keep diagnosis and filing separate. This skill never files and never names a target repository — reporting-issues resolves that from the report type against the registry it already owns — and the tracker search it ran is passed across, so the search is not repeated and answered differently.
+
+### Know what a generic imposes on every kind that inherits it
+
+Declaring something on a generic behaves differently from declaring it on a kind, and until now [managing-schemas](../skills-reference/managing-schemas.mdx) described the syntax without the semantics. Model with generics knowing what each declaration imposes on every inheriting kind: every rule below quotes the load-time error its violation produces, proven against Infrahub's in-memory schema validator rather than inferred from reading code ([#85](https://github.com/opsmill/infrahub-skills/pull/85), [#111](https://github.com/opsmill/infrahub-skills/pull/111), [#112](https://github.com/opsmill/infrahub-skills/pull/112), [#113](https://github.com/opsmill/infrahub-skills/pull/113)).
+
+* Scope a `uniqueness_constraints` entry before you declare it. A constraint on a generic is enforced across every kind that inherits it, and a concrete kind cannot narrow what it inherits — declaring its own constraints only adds a kind-scoped check while the generic's still runs. That decides a migration: on the generic, old and new instances collide and deletion becomes an ordering precondition; on the concrete kinds they coexist and the migration stays reversible.
+* Meet the three preconditions a relationship named in a `uniqueness_constraints` entry has to satisfy — `optional: false`, `cardinality: one`, and the bare relationship name with no peer-attribute path — each with its verbatim error string and a loadable example. A `human_friendly_id` is compiled into a uniqueness constraint too, so an optional relationship reached by an HFID path fails schema load with a `uniqueness_constraints:` error that names a field you never wrote.
+* Override a `Dropdown` attribute on an implementer without widening it by accident. A shorter `choices` list loads cleanly, and so does a longer one carrying an invented choice, so a concrete kind can hold a value the generic says is impossible and a query over the generic can return it. Guard it with a test comparing each restated list against the generic's, or with `allow_override: none` on the generic's attribute, which rejects any override and trades away per-kind defaults.
+* Treat a generic's implementer set as an interface its consumers already read. A brand-new kind inheriting a generic produces no migration and no constraint validation, so every offline gate stays green while queries, groups, menus, and constraints declared on the generic include the new kind. An offline test over the schema YAML asserting the expected implementer set is the gate a contributor can break, and it runs in under a second.
+* Order results within what a generic can resolve. `order_by` on a generic resolves against that generic's own declarations only, and `node_metadata__created_at` and `node_metadata__updated_at` stay valid even on a generic that declares no attributes at all. The error may name an implementer rather than the generic, because the value is copied down to every kind that declares none of its own — so when a kind whose file contains no `order_by` is named, look at its generics.
+
+### Change a relationship's cardinality without breaking the queries that read it
+
+Setting `cardinality: one`, hitting a write-time failure on the second object, and widening the relationship is a common sequence, and its second half breaks every stored query that selects that relationship. Both halves are now documented across the schema and query rules, read from Infrahub v1.10.8 source with every schema outcome reproduced by running that checkout's validator ([#114](https://github.com/opsmill/infrahub-skills/pull/114)).
+
+* Widen the side that actually holds the cap. Your own `cardinality: one` limits what you hold; how many objects may point at a peer is set by that peer's reciprocal declaration on the same identifier, and where the peer declares nothing there is no inbound cap at all. Widening only your own side loads cleanly and leaves the write-time failure exactly where it was.
+* Rewrite the query the change invalidates. `one` generates `NestedEdged<Kind>`, selected as `{ node { … } }`; `many` generates `NestedPaginated<Kind>`, selected as `{ edges { node { … } } }` with `count`. Widening leaves a stored query selecting `{ node … }` against a now-paginated field, which returns `Cannot query field 'node' on type 'NestedPaginated<Kind>'` — and that type name appears in no schema file, `.gql` file, or documentation page, so the error is hard to connect to the cardinality edit that caused it.
+* Express a genuine cap of one with `cardinality: one`. `max_count: 1` on a cardinality-many relationship is rejected outright. A hierarchical kind is the exception to all of this: its generated fields ignore what you declared, with `parent` always node-shaped and `children`, `ancestors`, and `descendants` always edges-shaped.
+
+### Reuse a schema the marketplace already publishes
+
+Check whether the Infrahub marketplace already publishes a domain before modelling it. A workflow step in managing-schemas checks the catalog first, a shared reference in `infrahub-common` gives every skill the same view of it, and an audit rule in [auditing-repo](../skills-reference/auditing-repo.mdx) flags a whole domain hand-rolled from scratch when the marketplace publishes it ([#69](https://github.com/opsmill/infrahub-skills/pull/69), [#113](https://github.com/opsmill/infrahub-skills/pull/113)).
+
+* Search the whole catalog for any domain with `infrahubctl marketplace list`, `search`, and `show`, and fetch with `infrahubctl marketplace get`, including collections with `-c`. The catalog API covers the discovery the CLI does not expose, and `--marketplace-url` points at an internal mirror; reachability never blocks schema work, since the guidance falls back to a custom schema built on built-in primitives.
+* Tell the three kinds of availability apart before building on one. Platform core kinds (`Core*`, `Builtin*`, `Ipam*`) exist on a clean instance; marketplace-published kinds do not, and become a dependency your repository carries, loads first, and records a version for; locally defined kinds are yours. Check with `infrahubctl schema list` on the cleanest instance you have rather than the development machine that has accumulated whatever was loaded during experiments — a kind appearing in an example is evidence of a sensible shape, not evidence it exists on your instance.
+* Evaluate a published file per generic rather than per file. The cost of a candidate is its transitive peer set, so a sibling with expensive peers is no reason to reject a cheap candidate in the same file, and rejecting per file is how a published shape gets reinvented. Taking a subset also loses the `marketplace get` update path, so the rule prefers the whole file when the cost is comparable, and asks for a provenance comment recording the identifier, the version, what was taken, and why the rest was excluded. Before adopting a generic from a published file, read what its implementer set imposes on you in [Know what a generic imposes on every kind that inherits it](#know-what-a-generic-imposes-on-every-kind-that-inherits-it).
+
+### Write checks, transforms, and generators against verified behavior
+
+Field reports kept describing one class of problem: a mechanism described correctly in one place and contradicted everywhere an example appeared. The checks, transforms, and generators skills now carry the behavior each pattern depends on, verified against Infrahub source, the SDK, and the runtime image ([#81](https://github.com/opsmill/infrahub-skills/pull/81), [#89](https://github.com/opsmill/infrahub-skills/pull/89), [#115](https://github.com/opsmill/infrahub-skills/pull/115), [#116](https://github.com/opsmill/infrahub-skills/pull/116), [#117](https://github.com/opsmill/infrahub-skills/pull/117)).
+
+* Declare a `watch` block on every `python_transforms` and `generator_definitions` entry, including `files: []` when there is nothing beyond the entry point. Infrahub never scans the imports, so with no key it folds the commit id into the definition's fingerprint and the definition re-renders or re-runs on every commit; a present key is your assertion that the list is complete. `jinja2_transforms` are the exception, because their closure comes from parsing the template. No `watch` is noisy but safe, and a wrong `watch` is silent — declaring anything switches off the conservative fallback, and an incomplete list then under-regenerates with no error anywhere.
+* Validate a node against a related node's state in a [check](../skills-reference/managing-checks.mdx) by traversing the relationship in the query itself. A check runs its query once and `validate()` receives that single payload with no lazy fetch, so a query selecting only the child has no parent state left to test. The rule covers unwrapping each hop null-safely, surfacing an unresolvable related node as a violation rather than a silent skip, and exempting the root of a containment chain, which has no parent.
+* Read GraphQL failures from the response body, not the status code. The server hard-codes `status_code=200` on every response whose document executed and puts constraint violations, unknown fields, and permission denials in the body's `errors` array. `self.client.execute_graphql` raises `GraphQLError` on those, so a check using the SDK client is not exposed; the trap is raw `httpx` against `/graphql` branching on the status code. Test the failing path — a check that fails open cannot be told apart from a passing check by observation.
+* Constrain a path traversal in a [generator](../skills-reference/managing-generators.mdx) with `relationship_filter`, which takes schema relationship identifiers such as `device__interface` rather than the per-side names that appear in the result. `kind_filter` is a whitelist of node kinds and still lets a shared catalog node of an allowed kind bridge unrelated subgraphs; `included_kinds` re-includes kinds excluded by default and is not a whitelist. Check `truncated_at_depth` in the result, since a non-null value means the search ran out of budget and the answer is incomplete, and note that `shortest_paths_only` defaults to `true` and drops longer routes through the same intermediate objects.
+* Write a group membership from the side whose peer can be resolved by name. `CoreGroup.members` peers `CoreNode`, which has no attributes, no `default_filter`, and no `human_friendly_id`, so a member name has nothing to resolve against; `member_of_groups` peers `CoreGroup`, which does have `default_filter: name__value`. The general rule: a relationship whose peer is a bare generic cannot be resolved by name in object data. A generator's target group must also exist and be non-empty, because an existing but empty group dispatches nothing and reports no error.
+* Emit a non-text artifact from a [transform](../skills-reference/managing-transforms.mdx). A complete `image/svg+xml` example now sits alongside the content-type table — query, transform, `python_transforms` registration, `artifact_definitions` entry with its target group, and the `CoreArtifactTarget` requirement — and the serialization rule is stated as a matrix rather than a return-type column: only `application/json` and `application/yaml` special-case a returned dict, so returning a dict for `text/csv` or `image/svg+xml` writes a Python repr into the artifact body with no error and no warning. Returning nothing is the one case that fails loudly.
+
+### Audit a repository without changing your working tree
+
+An audit is most useful on a tree holding uncommitted work, which is exactly the tree where a write cannot be undone. Run an audit with auditing-repo and it now reads without writing: a CRITICAL conduct rule constrains the auditor rather than the repository, and Phase 0 of the audit procedure states it before the first check runs ([#109](https://github.com/opsmill/infrahub-skills/pull/109)).
+
+* Get your uncommitted work back unchanged. In a reported failure, an audit had stashed the tree, run a generator with `--check`, popped the stash, and then run `git checkout -- objects/`, destroying another agent's regenerated files while reporting its findings correctly and never mentioning that it had modified anything. The rule names cleanup itself as the hazard, including cleanup that undoes the auditor's own side effect.
+* Read the audit's own account of what it did. The report format now carries the tree's condition at audit time and whether the audit modified it, and an honest "check not performed" finding is available for a check that cannot be run without a write — the compliance checks read the list of commands the audit ran rather than its prose, so disclosing what you did not run counts as compliance.
+* Compare against committed state with read-only git: `git show <ref>:<path>`, `git diff <ref> -- <path>`, `git cat-file`, and `git ls-tree` answer every "what does this look like as committed?" question without touching the tree.
+* See where a bare-string `kind` could be a typed protocol class. A new LOW-severity rule at step 7 of the cost-to-fix ladder flags non-trivial schema-coupled Python that passes `client.create` or `client.get` a `kind="Foo"` string, or hand-builds dict payloads, when a generated protocol class exists for that kind. Generate the classes with `infrahubctl protocols`, and a schema change becomes a type error on the exact line instead of a runtime failure in the pipeline. The rule carries its own limits: protocols type attributes, not relationship peers, and trivial one-off scripts are not flagged. It sits at the far end of the same cost-to-fix ladder whose first step is [Reuse a schema the marketplace already publishes](#reuse-a-schema-the-marketplace-already-publishes) ([#79](https://github.com/opsmill/infrahub-skills/pull/79)).
+
+## Bug fixes
+
+* Every `infrahubctl` command the skills print is now a real one. A sweep found 11 invalid invocations — `schema validate`, `check run <name>`, `transform run <name>`, `generator run <name>`, `generator list`, and `import load` — of which only two had been reported. The offline gate is `infrahubctl schema format --check`, now documented in managing-schemas ([#74](https://github.com/opsmill/infrahub-skills/pull/74)), and the server-side check is `infrahubctl schema check`. `check`, `generator`, and `transform` take their target as a positional argument, so `check run mycheck` had looked for a check literally named `run`, and there is no `import` or `export` command group, since the LDJSON tools are the top-level `load` and `dump`. Every form was verified against `infrahub-sdk` 1.23.1, and a continuous-integration check now gates every invocation the repository prints, including the ones in graders and eval rubrics ([#110](https://github.com/opsmill/infrahub-skills/pull/110)).
+* `infrahubctl render` cannot serve a Python transform, and the message it returns for one — *"Unable to find \<name\> in repository config file"* — reads like an unregistered transform rather than the wrong command, so a reader concludes the dry-run gate is unavailable and skips it. `render` resolves Jinja2 transforms and `transform` resolves Python ones; the rule now gives both and says which serves which section, plus the two details that each cost a failed run: a required query variable must be typed manually when run locally, because the artifact definition binds it from the target in the pipeline, and neither command reaches a check or a generator ([#110](https://github.com/opsmill/infrahub-skills/pull/110)).
+* `infrahubctl info` reports a green status with no token, because the user lookup is skipped entirely when neither a token nor a username is set while the server information call succeeds anonymously. A green result therefore does not prove write authorization. The connectivity rule now carries that three-way asymmetry and gives a create-and-delete branch write probe rather than a branch listing, which is a read ([#110](https://github.com/opsmill/infrahub-skills/pull/110)).
+* The `infrahubctl --version` flag does not exist and errors with "No such option". `infrahubctl info` prints `SDK Version` and `Infrahub Version` together. Three places were wrong, including the shared connectivity rule every skill inherits, which showed output labels that appear nowhere in the real output — so grepping for them found nothing ([#119](https://github.com/opsmill/infrahub-skills/pull/119)).
+* Retrofitting or changing a relationship `identifier` on a relationship that already exists in an instance produces `'not_supported': <Kind> <rel> None` from `infrahubctl schema check`, and nothing explained it. It is a schema-update immutability error, not an invalid `kind`/`cardinality` pairing: `identifier`, `direction`, `branch`, and `hierarchical` are the relationship fields that cannot be updated, while `kind`, `cardinality`, and `optional` can. Any `kind`/`cardinality` pairing is valid given a shared identifier and a fresh kind. Both the error and its fix are now in the relationship rules and the common-errors lookup table ([#75](https://github.com/opsmill/infrahub-skills/pull/75)).
+
+## Minor changes
+
+**Developer experience**
+
+* `AGENTS.md` links the `dev/` guides instead of `@`-importing them, so each guide loads only when a task needs it; always-loaded project memory drops from about 50 KB to about 4.5 KB per session ([#77](https://github.com/opsmill/infrahub-skills/pull/77)).
+* `eval.yaml` loads in `skillgrade` again. Seven grader-less `csv-import-*` tasks had failed configuration validation before any task could run, which blocked all of them for every skill ([#126](https://github.com/opsmill/infrahub-skills/pull/126)).
+
+## Upgrade notes
+
+### Vendored copies of the skills
+
+If: you copied these skills into a repository rather than installing the plugin.
+
+Then: refresh the copy. The invalid command forms corrected here — among them `infrahubctl protocols generate --async`, which is really `infrahubctl protocols` — had already propagated into vendored copies, so a stale copy keeps printing commands that do not exist.
+
+Notes: no action is needed if you install the plugin.
+
+## Full changelog
+
+### Added
+
+* `infrahub-converting-netbox-device-types` skill, with a bundled converter, three mapping profiles, and a module-port generator ([#80](https://github.com/opsmill/infrahub-skills/pull/80)).
+* `infrahub-teaching-concepts` skill: twelve tutor rules, a dependency-ordered concept map, and a lesson protocol ([#118](https://github.com/opsmill/infrahub-skills/pull/118)).
+* `infrahub-analyzing-diagnostics` skill for diagnostic-bundle triage ([#76](https://github.com/opsmill/infrahub-skills/pull/76)).
+* `infrahub-reporting-skill-gaps` skill, filing through `infrahub-reporting-issues` ([#83](https://github.com/opsmill/infrahub-skills/pull/83)).
+* Marketplace visibility across the schema, objects, generators, and audit skills, plus the `yagni-reuse-existing-marketplace-schema` audit rule ([#69](https://github.com/opsmill/infrahub-skills/pull/69)).
+* `yagni-untyped-python-vs-generated-protocols` audit rule and generated-protocol adoption guidance ([#79](https://github.com/opsmill/infrahub-skills/pull/79)).
+* `watch` dependency declarations in `infrahub-common`, managing-transforms, and managing-generators ([#89](https://github.com/opsmill/infrahub-skills/pull/89)).
+* Read-only audit conduct rule and Phase 0 of the audit procedure ([#109](https://github.com/opsmill/infrahub-skills/pull/109)).
+* `uniqueness_constraints` semantics, including inheritance scope, the null-collision case, and the relationship preconditions ([#111](https://github.com/opsmill/infrahub-skills/pull/111), [#85](https://github.com/opsmill/infrahub-skills/pull/85)).
+* Generic inheritance rules for `order_by` scope, `Dropdown` overrides, and relationship peer kinds ([#112](https://github.com/opsmill/infrahub-skills/pull/112)).
+* Schema reuse rules and the generic-membership interface rule ([#113](https://github.com/opsmill/infrahub-skills/pull/113)).
+* Cardinality consequences across the schema and GraphQL query rules ([#114](https://github.com/opsmill/infrahub-skills/pull/114)).
+* `image/svg+xml` artifact example and the artifact serialization matrix ([#115](https://github.com/opsmill/infrahub-skills/pull/115)).
+* GraphQL error-surface and shared-module rules for managing-checks ([#116](https://github.com/opsmill/infrahub-skills/pull/116)).
+* Relationship-traversal validation rule for managing-checks ([#81](https://github.com/opsmill/infrahub-skills/pull/81)).
+* Path traversal, group membership, and shared-object ownership rules for managing-generators ([#117](https://github.com/opsmill/infrahub-skills/pull/117)).
+* `infrahubctl schema format` documented in managing-schemas ([#74](https://github.com/opsmill/infrahub-skills/pull/74)).
+* Infrahub SDK and Infrahub versions in the skill-gap report header ([#119](https://github.com/opsmill/infrahub-skills/pull/119)).
+* `python-lint` job with a pinned ruff rule set ([#128](https://github.com/opsmill/infrahub-skills/pull/128)).
+* Python test suite in continuous integration ([#80](https://github.com/opsmill/infrahub-skills/pull/80)).
+
+### Changed
+
+* `AGENTS.md` links the `dev/` guides instead of `@`-importing them ([#77](https://github.com/opsmill/infrahub-skills/pull/77)).
+* Review lessons from pull requests #85 through #117 routed into the `dev/` guides ([#120](https://github.com/opsmill/infrahub-skills/pull/120)).
+* Evidence discovery in reporting-skill-gaps made assistant-agnostic, and the docs-site listing extended to the Issue Reporter and Skill Gap Reporter ([#119](https://github.com/opsmill/infrahub-skills/pull/119)).
+
+### Fixed
+
+* 11 invalid `infrahubctl` invocations, with a continuous-integration gate on every printed invocation ([#110](https://github.com/opsmill/infrahub-skills/pull/110)).
+* `infrahubctl --version` references replaced with `infrahubctl info` ([#119](https://github.com/opsmill/infrahub-skills/pull/119)).
+* Shared-identifier relationship rules and the `not_supported` schema-check error explained ([#75](https://github.com/opsmill/infrahub-skills/pull/75)).
+* Seven grader-less eval tasks that stopped `skillgrade` loading `eval.yaml` ([#126](https://github.com/opsmill/infrahub-skills/pull/126)).
+* 14 ruff findings on `main` ([#128](https://github.com/opsmill/infrahub-skills/pull/128)).
+* A fenced-block marker in an eval prompt that desynchronized the CLI invocation sweep ([#130](https://github.com/opsmill/infrahub-skills/pull/130)).
+* `uv.lock` synced to the project version, removing a stray diff from unrelated pull requests ([#121](https://github.com/opsmill/infrahub-skills/pull/121)).
+* direnv files ignored ([#82](https://github.com/opsmill/infrahub-skills/pull/82)).
+
+## Skills included
+
+* infrahub-managing-schemas
+* infrahub-managing-objects
+* infrahub-managing-checks
+* infrahub-managing-generators
+* infrahub-managing-transforms
+* infrahub-managing-menus
+* infrahub-auditing-repo
+* infrahub-analyzing-data
+* infrahub-reporting-issues
+* infrahub-reporting-skill-gaps
+* infrahub-collecting-diagnostics
+* infrahub-analyzing-diagnostics
+* infrahub-importing-data
+* infrahub-teaching-concepts
+* infrahub-converting-netbox-device-types
