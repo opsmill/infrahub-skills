@@ -132,10 +132,23 @@ jobs:
           # A release must say what changed. Fail loudly rather than tag a
           # version whose notes are empty — the same rule the shared
           # changelog-towncrier composite enforces, with no opt-out.
+          #
+          # Count only what towncrier will actually render, using the same
+          # pattern changelog-check.yml applies to every pull request: a
+          # direct child of changelog/ named <id>.<type>.md, plus the
+          # optional counter towncrier appends when a name collides. A stray
+          # README.md is ignored at release time, so counting it here would
+          # let this guard pass on a release whose notes are empty.
+          TYPES="security|removed|deprecated|added|changed|fixed|housekeeping"
+          FRAGMENT="^changelog/[^/]+\.(${TYPES})(\.[0-9]+)?\.md$"
+
           shopt -s nullglob
           KEPT=()
           for f in changelog/*.md; do
-            [ "$f" = "changelog/towncrier.md.template" ] && continue
+            if ! [[ "$f" =~ $FRAGMENT ]]; then
+              echo "Ignoring ${f}: towncrier does not read it as a fragment."
+              continue
+            fi
             # An empty fragment still counts towards the total below, so the
             # release would proceed and towncrier would render the file as a
             # heading with nothing under it. Name the file and stop: only the
@@ -196,9 +209,13 @@ jobs:
           # so an earlier release PR can still be open. Merging that one after
           # this one would walk the version files back and let release-publish
           # tag a version older than the one already released — supersede it
-          # rather than let the two race.
+          # rather than let the two race. `gh pr list` returns only 30 rows
+          # unless asked otherwise, which would leave the oldest release pull
+          # requests open and racing — bound it high enough that the listing
+          # is the complete set.
           STALE=$(
-            gh pr list --state open --base main --json number,headRefName \
+            gh pr list --state open --base main --limit 200 \
+              --json number,headRefName \
               --jq '.[]
                     | select(.headRefName | startswith("release/v"))
                     | select(.headRefName != env.BRANCH)
