@@ -43,20 +43,36 @@ jobs:
               ;;
           esac
 
+          # towncrier only assembles direct children of changelog/ whose name
+          # is <id>.<type>.md, where <type> is one of the types configured in
+          # pyproject.toml. "+" marks an orphan fragment (no issue number) and
+          # the optional numeric segment is the counter towncrier appends when
+          # a name collides. Anything else — a nested path, a missing or
+          # unknown type — is ignored at release time, so it must fail here
+          # rather than silently vanish from the changelog.
+          TYPES="security|removed|deprecated|added|changed|fixed|housekeeping"
+          FRAGMENT="^changelog/[^/]+\.(${TYPES})(\.[0-9]+)?\.md$"
+
           # Ask the API which files the PR adds rather than diffing locally:
-          # no dependence on checkout depth or on which commit is HEAD.
-          ADDED=$(gh pr view "${PR}" --json files \
-            --jq '.files[] | select(.additions > 0) | .path' \
-            | { grep -E '^changelog/.+\.md$' || true; } \
+          # no dependence on checkout depth or on which commit is HEAD. The
+          # REST endpoint is the paginated one: `gh pr view --json files`
+          # returns only the first page, so a fragment in a large pull
+          # request would go unseen and the check would fail a PR that has
+          # one. Note the REST field is `.filename`, not `.path`.
+          ADDED=$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files?per_page=100" \
+            --jq '.[] | select(.additions > 0) | .filename' \
+            | { grep -E "${FRAGMENT}" || true; } \
             | { grep -v '^changelog/towncrier\.md\.template$' || true; })
 
           if [ -z "${ADDED}" ]; then
-            MSG="No news fragment found. Add one under changelog/ describing"
-            MSG="${MSG} this change, e.g. uv run towncrier create -c"
+            MSG="No news fragment found. Add one directly under changelog/,"
+            MSG="${MSG} named <id>.<type>.md, e.g. uv run towncrier create -c"
             MSG="${MSG} \"What changed\" ${PR}.fixed.md — types: security,"
             MSG="${MSG} removed, deprecated, added, changed, fixed,"
-            MSG="${MSG} housekeeping. Label the PR ci/skip-changelog if it"
-            MSG="${MSG} genuinely needs no entry."
+            MSG="${MSG} housekeeping. Nested paths and unknown types are not"
+            MSG="${MSG} read by towncrier. Label the PR ci/skip-changelog if"
+            MSG="${MSG} it genuinely needs no entry."
             echo "::error::${MSG}"
             exit 1
           fi
