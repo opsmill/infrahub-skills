@@ -1,0 +1,20 @@
+.github/workflows/changelog-check.yml
+  s_e814976895190a::t_9e435e1b884a61 47-59
+  s_e814976895190a::t_f1e1619d96639d 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c46ab8523c195239d7a1e6a0aaa4d574461146be",
+  "prompts": {},
+  "sessions": {
+    "s_e814976895190a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f38e30c4-8c78-42ea-9268-f3396fdc0b01",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
