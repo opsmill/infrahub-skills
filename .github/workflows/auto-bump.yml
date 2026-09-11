@@ -21,10 +21,33 @@ jobs:
       - name: Check commit author and message
         id: check
         env:
+          GH_TOKEN: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}
           MSG: ${{ github.event.head_commit.message }}
           AUTHOR: ${{ github.event.head_commit.author.username }}
         run: |
-          if [[ "$MSG" == chore\(release\):* ]] || [[ "$MSG" == "chore: sync version"* ]]; then
+          set -euo pipefail
+
+          # Skip the bot's own commits so preparing a release cannot trigger
+          # preparing another. The merge of a release pull request only says
+          # `chore(release):` when that pull request was squashed or rebased —
+          # a merge commit says `Merge pull request #...` and matches neither
+          # subject below. Merge commits are enabled on this repository, so
+          # ask the API which pull requests this commit belongs to instead:
+          # that holds for all three merge strategies.
+          RELEASE_PR=$(
+            gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
+              --jq '[.[]
+                     | select(.merged_at != null)
+                     | select(.head.ref | startswith("release/v"))
+                     | .number] | first // empty'
+          )
+
+          # The subject and author checks stay as a cheap fallback: they cost
+          # nothing and still recognise a direct push by the bot.
+          if [ -n "${RELEASE_PR}" ]; then
+            echo "Release PR #${RELEASE_PR} merged here — not preparing another."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          elif [[ "$MSG" == chore\(release\):* ]] || [[ "$MSG" == "chore: sync version"* ]]; then
             echo "Skipping: bot commit message detected"
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           elif [[ "$AUTHOR" == "opsmill-bot" ]]; then
@@ -113,6 +136,17 @@ jobs:
           KEPT=()
           for f in changelog/*.md; do
             [ "$f" = "changelog/towncrier.md.template" ] && continue
+            # An empty fragment still counts towards the total below, so the
+            # release would proceed and towncrier would render the file as a
+            # heading with nothing under it. Name the file and stop: only the
+            # author knows what it was meant to say.
+            if ! grep -q '[^[:space:]]' "$f"; then
+              MSG="News fragment ${f} has no content — it would render as an"
+              MSG="${MSG} empty entry. Describe the change in it, or delete"
+              MSG="${MSG} the file."
+              echo "::error::${MSG}"
+              exit 1
+            fi
             KEPT+=("$f")
           done
           if [ ${#KEPT[@]} -eq 0 ]; then
@@ -132,7 +166,7 @@ jobs:
           VERSION: ${{ steps.next.outputs.next-version }}
         run: |
           set -euo pipefail
-          BRANCH="release/v${VERSION}"
+          export BRANCH="release/v${VERSION}"
 
           git config user.name "opsmill-bot"
           git config user.email "opsmill-bot@users.noreply.github.com"
@@ -158,8 +192,35 @@ jobs:
           # against. The branch is bot-owned and regenerated every run.
           git push --force origin "${BRANCH}"
 
-          if gh pr view "${BRANCH}" --json number >/dev/null 2>&1; then
-            echo "Release PR for ${BRANCH} already open — updated in place."
+          # A run that computes a different version opens a different branch,
+          # so an earlier release PR can still be open. Merging that one after
+          # this one would walk the version files back and let release-publish
+          # tag a version older than the one already released — supersede it
+          # rather than let the two race.
+          STALE=$(
+            gh pr list --state open --base main --json number,headRefName \
+              --jq '.[]
+                    | select(.headRefName | startswith("release/v"))
+                    | select(.headRefName != env.BRANCH)
+                    | .number'
+          )
+          for PR in ${STALE}; do
+            echo "Closing release PR #${PR}, superseded by ${BRANCH}."
+            gh pr close "${PR}" \
+              --comment "Superseded by the release pull request for v${VERSION}."
+          done
+
+          # Only an *open* pull request counts as one already prepared:
+          # `gh pr view <branch>` resolves closed and merged ones too, so a
+          # release PR closed without merging would otherwise be mistaken for
+          # the current one and leave the version stranded on the branch with
+          # nothing to merge.
+          OPEN_PR=$(
+            gh pr list --head "${BRANCH}" --state open --json number \
+              --jq '.[0].number // empty'
+          )
+          if [ -n "${OPEN_PR}" ]; then
+            echo "Release PR #${OPEN_PR} for ${BRANCH} already open — updated in place."
             exit 0
           fi
 
