@@ -33,6 +33,8 @@ jobs:
 
       - name: Decide whether this push is a release
         id: decide
+        env:
+          GH_TOKEN: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}
         run: |
           set -euo pipefail
           # plugin.json is canonical here — release.yml validates every
@@ -45,11 +47,31 @@ jobs:
           if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
             echo "v${VERSION} is already tagged — nothing to publish."
             echo "publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "v${VERSION} has no tag yet — publishing."
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          # An untagged version is not on its own an authorisation to release:
+          # anything able to write to `main` — a hand-edited plugin.json, the
+          # version-sync safety net — would otherwise cut a tag and a GitHub
+          # Release of its own accord. Publishing also requires this commit to
+          # be the merge of a release pull request.
+          RELEASE_PR=$(
+            gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
+              --jq '[.[]
+                     | select(.merged_at != null)
+                     | select(.head.ref | startswith("release/v"))
+                     | .number] | first // empty'
+          )
+
+          if [ -z "${RELEASE_PR}" ]; then
+            echo "${GITHUB_SHA} is not the merge of a release/v* pull request — nothing to publish."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "v${VERSION} authorised by merged release PR #${RELEASE_PR} — publishing."
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Extract the changelog section
         if: steps.decide.outputs.publish == 'true'
