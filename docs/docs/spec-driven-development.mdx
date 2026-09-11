@@ -47,7 +47,7 @@ Simple builds execute sequentially: schema first, then objects, then checks. Com
 
 ## Compatible SDD frameworks
 
-SDD works with any framework that supports a spec, plan, task, and implement workflow. The [infrahub-template](https://github.com/opsmill/infrahub-template) repository includes a pre-configured SDD setup using Spec Kit as a starting point.
+SDD works with any framework that supports a spec, plan, task, and implement workflow. The [infrahub-template](https://github.com/opsmill/infrahub-template) repository scaffolds an Infrahub project and documents the Spec Kit setup it expects, which is the quickest starting point.
 
 ## Infrahub routing for Spec Kit
 
@@ -116,12 +116,25 @@ This example uses [Spec Kit](https://github.com/github/spec-kit) to design a VLA
 
 ### Setup
 
+Start from [infrahub-template](https://github.com/opsmill/infrahub-template), which scaffolds the repository layout the skills expect and ships `invoke` tasks for the instance:
+
 ```bash
-# Initialize Spec Kit in your Infrahub project
-specify init . --ai claude
+uv tool run --from 'copier' copier copy https://github.com/opsmill/infrahub-template.git vlan-demo
+cd vlan-demo
+uv sync --all-packages
+invoke start
 ```
 
-This creates the `.specify/` project configuration and installs slash commands into `.claude/commands/`.
+Then install the skills, Spec Kit, and the Infrahub routing extension:
+
+```bash
+npx skills add opsmill/infrahub-skills
+uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+specify init --here --integration claude
+specify extension add infrahub-speckit --from https://github.com/opsmill/infrahub-speckit/archive/refs/heads/main.zip
+```
+
+`specify init` creates the `.specify/` project configuration and installs slash commands into `.claude/commands/`. Having the instance up matters for more than the data: `before_specify` gates on `infrahubctl info`, so the cycle stops early rather than planning against an instance it cannot reach.
 
 ### Step 1: Specify
 
@@ -281,6 +294,49 @@ check_definitions:
     file_path: checks/check_vlan_id_uniqueness/check.py
     query: check_vlan_id_uniqueness
 ```
+
+### Step 6: Report the gap it exposed
+
+Task 6 is where the cycle hit friction. The first version of `schemas/vlan_management.yml` left `optional` off the `group` relationship, and relationships default to optional, so `infrahubctl schema check` rejected it:
+
+```text
+cannot use group relationship, relationship must be mandatory
+```
+
+The AI added `optional: false`, re-ran the check, and it passed. That is a verifier going red to green on the same target inside a single implement run, which is exactly what the `after_implement` hook looks for. When the cycle closes, it prints one offer:
+
+> **[infrahub-speckit — friction offer, /speckit.implement]**
+>
+> Skill: `infrahub-managing-schemas`
+> Evidence: `infrahubctl schema check` rejected the VLAN node, then passed once `optional: false` was added to the constrained relationship
+> Rule coverage: `rules/uniqueness-constraints.md`
+>
+> An Infrahub skill's guidance may have a gap here. Reply "report it" to draft a skill-friction report for review. Nothing is filed without your approval.
+
+Ignoring it ends the cycle there. Replying hands the session to the [Skill Gap Reporter](./skills-reference/reporting-skill-gaps.mdx), which searches the tracker, classifies the finding, and drafts:
+
+> **bug: infrahub-managing-schemas: state the mandatory requirement where the constraint is written**
+>
+> **Skill**: infrahub-managing-schemas
+> **Type**: bug
+> **Confidence**: unconfirmed single observation
+> **Tracker search**: `repo:opsmill/infrahub-skills uniqueness constraint mandatory relationship` returned no existing report
+>
+> **What was being attempted**: scoping a uniqueness constraint by the parent relationship of a child node.
+>
+> **Rules consulted**: `uniqueness-constraints.md`, which does state that a relationship in a constraint must be mandatory, cardinality one, and referenced bare.
+>
+> **Where it went wrong**: the constraint was written correctly but the relationship was left at its default, so the check failed on the mandatory requirement. One failed verifier run and one correction.
+>
+> **What finally worked**: `optional: false` on the constrained relationship.
+>
+> **Proposed rule change**: in `uniqueness-constraints.md`, put the three requirements next to the constraint example rather than in a later section, so the relationship and the constraint that binds it are authored together.
+
+It is a **bug** rather than a feature because a rule already claimed the ground and the model still got it wrong. Had no rule covered relationships in constraints, the same friction would have drafted as a `feat:` instead, and the offer would have read `Rule coverage: no rule file covers this topic`. That classification decides the title prefix and the target repository, which is why the coverage read runs before the draft.
+
+The draft carries the version lines the template requires, read from `infrahubctl info`, and nothing that identifies your infrastructure. The Skill Gap Reporter cannot file it: it hands the draft to the [Issue Reporter](./skills-reference/reporting-issues.mdx), which shows you the target repository and the full body, then asks whether to submit through `gh`, a GitHub MCP server, or copy-paste. You can stop at either gate.
+
+Asking for the same thing without the extension installed works too: "report skill friction" reaches the Skill Gap Reporter directly. The hook only removes the need to notice the friction yourself.
 
 ### Result
 
