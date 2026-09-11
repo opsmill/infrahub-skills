@@ -47,7 +47,68 @@ Simple builds execute sequentially: schema first, then objects, then checks. Com
 
 ## Compatible SDD frameworks
 
-SDD works with any framework that supports a spec, plan, task, and implement workflow. The [infrahub-template](https://github.com/opsmill/infrahub-template) repository includes a pre-configured SDD setup using Spec Kit as a starting point.
+SDD works with any framework that supports a spec, plan, task, and implement workflow. The [infrahub-template](https://github.com/opsmill/infrahub-template) repository scaffolds an Infrahub project and documents the Spec Kit setup it expects, which is the quickest starting point.
+
+## Infrahub routing for Spec Kit
+
+The [infrahub-speckit](https://github.com/opsmill/infrahub-speckit) extension wires the Infrahub skills into Spec Kit's own commands. It needs Spec Kit 0.8.0 or newer:
+
+```bash
+specify extension add infrahub-speckit --from https://github.com/opsmill/infrahub-speckit/archive/refs/heads/main.zip
+```
+
+The extension registers four hooks against the core Spec Kit skills. All four fire whether the skill was invoked by a slash command, by another skill, or by an autonomous agent, and all four no-op in a project with no `.infrahub.yml`:
+
+| Hook | When it fires | What it does |
+| ------ | --------------- | -------------- |
+| `before_specify` | Before `/speckit.specify` writes anything | Classifies the requested artifact type, verifies the Infrahub skills are installed and the instance is reachable, then selects the matching Infrahub spec template |
+| `before_plan` | Before `/speckit.plan` starts research | Re-invokes the skill that matches the artifact |
+| `before_implement` | Before `/speckit.implement` runs its tasks | Re-invokes the matching skill for each artifact type in `tasks.md` |
+| `after_implement` | After `/speckit.implement` finishes | Checks the finished cycle for evidence that a skill's own guidance had a gap, and offers to report it |
+
+All three `before_*` hooks halt with install guidance when the Infrahub skills are not present, and `before_specify` also halts when the instance is unreachable. The `after_implement` hook never halts: implementation is already done, so a missing skill, an error, or an ambiguous read all degrade to a no-op line rather than disrupting finished work.
+
+### Skill-gap detection after implement
+
+Infrahub skills fail quietly. A missing or unclear rule does not crash the run, it produces extra round trips and repeated nudges until the model works the answer out anyway. By the time the cycle ends, that friction is invisible. The `after_implement` hook looks for it while the session still holds the evidence.
+
+Detection is automatic; drafting and filing are not. On most cycles the whole hook is one line:
+
+```text
+[infrahub-speckit] No skill-guidance friction detected this cycle.
+```
+
+When the evidence gate opens, you get an offer and nothing else:
+
+```text
+[infrahub-speckit — friction offer, /speckit.implement]
+
+Skill:        infrahub-managing-schemas
+Evidence:     schema load failed on relationship cardinality, passed after correction
+Rule coverage: no rule file covers this topic
+
+An Infrahub skill's guidance may have a gap here. Reply "report it" to draft a
+skill-friction report for review. Nothing is filed without your approval.
+```
+
+Ignoring it costs nothing. Replying routes the session into the [Skill Gap Reporter](./skills-reference/reporting-skill-gaps.mdx), which searches the tracker, decides whether the skill or Infrahub itself is at fault, and drafts a redacted report. That skill cannot file: it hands the draft to the [Issue Reporter](./skills-reference/reporting-issues.mdx), which shows you the target repository and the full body, then asks how to submit it. You can stop at either gate, and the manual submission method sends nothing from your machine.
+
+Two probes open the gate:
+
+- **A verifier verdict**: a verifier rejected an artifact and later accepted it, red to green on the same target
+- **A correction delta**: you rewrote something the agent authored, in a way a rule could have prevented
+
+Nothing else does:
+
+- **A missing rule file on its own**: the rule-coverage read names the file that should have covered the topic, which is attribution for a finding rather than a trigger for one, and plenty of topics on a healthy cycle have no rule file
+- **Failures the skills do not own**: authentication, connectivity, a container that never started, or a product-side 5xx
+- **Session-shape counters**: retry counts, edit churn, repeated asks, and docs escapes rise for reasons unrelated to a skill's guidance, such as an unclear request
+
+The hook also stays quiet unless the skill guided the authoring inside that same implement run, and unless both the Skill Gap Reporter and the Issue Reporter are installed, since the accept path needs both.
+
+:::note
+Two per-project escape hatches live on the hook's entry in `.specify/extensions.yml`: `optional: true` turns the check into an opt-in offer, and `enabled: false` disables it.
+:::
 
 ## Example walkthrough: VLAN management domain
 
@@ -55,12 +116,25 @@ This example uses [Spec Kit](https://github.com/github/spec-kit) to design a VLA
 
 ### Setup
 
+Start from [infrahub-template](https://github.com/opsmill/infrahub-template), which scaffolds the repository layout the skills expect and ships `invoke` tasks for the instance:
+
 ```bash
-# Initialize Spec Kit in your Infrahub project
-specify init . --ai claude
+uv tool run --from 'copier' copier copy https://github.com/opsmill/infrahub-template.git vlan-demo
+cd vlan-demo
+uv sync --all-packages
+invoke start
 ```
 
-This creates `.speckit/` config and installs slash commands into `.claude/commands/`.
+Then install the skills, Spec Kit, and the Infrahub routing extension:
+
+```bash
+npx skills add opsmill/infrahub-skills
+uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+specify init --here --integration claude
+specify extension add infrahub-speckit --from https://github.com/opsmill/infrahub-speckit/archive/refs/heads/main.zip
+```
+
+`specify init` creates the `.specify/` project configuration and installs slash commands into `.claude/commands/`. Having the instance up matters for more than the data: `before_specify` gates on `infrahubctl info`, so the cycle stops early rather than planning against an instance it cannot reach.
 
 ### Step 1: Specify
 
@@ -109,7 +183,7 @@ Run `/speckit.tasks`. The AI breaks the plan into discrete steps in `tasks.md`:
 
 ### Step 5: Implement
 
-Run `/speckit.implement`. The AI executes each task using the appropriate Infrahub skill.
+Run `/speckit.implement`. The AI executes each task using the appropriate Infrahub skill. With the routing extension installed, the cycle closes with the friction check described in [Skill-gap detection after implement](#skill-gap-detection-after-implement).
 
 **Task 1 output** — `schemas/vlan_management.yml` (via Schema Manager):
 
@@ -220,6 +294,49 @@ check_definitions:
     file_path: checks/check_vlan_id_uniqueness/check.py
     query: check_vlan_id_uniqueness
 ```
+
+### Step 6: Report the gap it exposed
+
+Task 6 is where the cycle hit friction. The first version of `schemas/vlan_management.yml` left `optional` off the `group` relationship, and relationships default to optional, so `infrahubctl schema check` rejected it:
+
+```text
+cannot use group relationship, relationship must be mandatory
+```
+
+The AI added `optional: false`, re-ran the check, and it passed. That is a verifier going red to green on the same target inside a single implement run, which is exactly what the `after_implement` hook looks for. When the cycle closes, it prints one offer:
+
+> **[infrahub-speckit — friction offer, /speckit.implement]**
+>
+> Skill: `infrahub-managing-schemas`
+> Evidence: `infrahubctl schema check` rejected the VLAN node, then passed once `optional: false` was added to the constrained relationship
+> Rule coverage: `rules/uniqueness-constraints.md`
+>
+> An Infrahub skill's guidance may have a gap here. Reply "report it" to draft a skill-friction report for review. Nothing is filed without your approval.
+
+Ignoring it ends the cycle there. Replying hands the session to the [Skill Gap Reporter](./skills-reference/reporting-skill-gaps.mdx), which searches the tracker, classifies the finding, and drafts:
+
+> **bug: infrahub-managing-schemas: state the mandatory requirement where the constraint is written**
+>
+> **Skill**: infrahub-managing-schemas
+> **Type**: bug
+> **Confidence**: unconfirmed single observation
+> **Tracker search**: `repo:opsmill/infrahub-skills uniqueness constraint mandatory relationship` returned no existing report
+>
+> **What was being attempted**: scoping a uniqueness constraint by the parent relationship of a child node.
+>
+> **Rules consulted**: `uniqueness-constraints.md`, which does state that a relationship in a constraint must be mandatory, cardinality one, and referenced bare.
+>
+> **Where it went wrong**: the constraint was written correctly but the relationship was left at its default, so the check failed on the mandatory requirement. One failed verifier run and one correction.
+>
+> **What finally worked**: `optional: false` on the constrained relationship.
+>
+> **Proposed rule change**: in `uniqueness-constraints.md`, put the three requirements next to the constraint example rather than in a later section, so the relationship and the constraint that binds it are authored together.
+
+It is a **bug** rather than a feature because a rule already claimed the ground and the model still got it wrong. Had no rule covered relationships in constraints, the same friction would have drafted as a `feat:` instead, and the offer would have read `Rule coverage: no rule file covers this topic`. That classification decides the title prefix and the target repository, which is why the coverage read runs before the draft.
+
+The draft carries the version lines the template requires, read from `infrahubctl info`, and nothing that identifies your infrastructure. The Skill Gap Reporter cannot file it: it hands the draft to the [Issue Reporter](./skills-reference/reporting-issues.mdx), which shows you the target repository and the full body, then asks whether to submit through `gh`, a GitHub MCP server, or copy-paste. You can stop at either gate.
+
+Asking for the same thing without the extension installed works too: "report skill friction" reaches the Skill Gap Reporter directly. The hook only removes the need to notice the friction yourself.
 
 ### Result
 

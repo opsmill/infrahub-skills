@@ -14,6 +14,8 @@ The Skill Gap Reporter turns friction with an Infrahub skill into a reviewed Git
 
 Do not use it for a bug in Infrahub itself, the SDK, or any other `opsmill/infrahub-*` product. That belongs to the Issue Reporter. It is also not for ordinary work that finished without friction.
 
+That offer can also arrive on its own. With the [infrahub-speckit](https://github.com/opsmill/infrahub-speckit) extension installed, Spec Kit's `after_implement` hook checks every finished `/speckit.implement` cycle and prints a one-line offer when it finds evidence of a gap; replying routes into this skill. The hook detects, it never drafts or files. See [Skill-gap detection after implement](../spec-driven-development.mdx#skill-gap-detection-after-implement).
+
 ## What it produces
 
 - A named artifact: the rule file that should have prevented the friction, or a plain statement that no rule covers the topic
