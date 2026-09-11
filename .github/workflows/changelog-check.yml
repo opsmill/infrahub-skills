@@ -64,6 +64,13 @@ jobs:
           # a name collides. Anything else — a nested path, a missing or
           # unknown type — is ignored at release time, so it must fail here
           # rather than silently vanish from the changelog.
+          #
+          # `[^/]+` is deliberately permissive. towncrier scans the
+          # dot-separated parts of the name from the right and takes the last
+          # one that is a configured type as the category, folding everything
+          # before it into the issue id. `123.unknown.fixed.md` is therefore a
+          # real `fixed` fragment whose id is `123.unknown`, so narrowing this
+          # would reject a file that does reach the changelog.
           TYPES="security|removed|deprecated|added|changed|fixed|housekeeping"
           FRAGMENT="^changelog/[^/]+\.(${TYPES})(\.[0-9]+)?\.md$"
 
