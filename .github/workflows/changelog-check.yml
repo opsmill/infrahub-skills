@@ -30,6 +30,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           set -euo pipefail
 
@@ -42,6 +43,19 @@ jobs:
               exit 0
               ;;
           esac
+
+          # This repo has no .github/dependabot.yml to label bumps at source,
+          # and Dependabot security updates open their pull requests with no
+          # label at all — so the moment they are switched on (alerts are
+          # already enabled here) this required check would block every one of
+          # them forever. Its PRs are dependency bumps by construction; exempt
+          # the author. Only this one bot is exempt — humans still need a
+          # fragment. A string equality, not a `case` glob: `[bot]` in a glob
+          # pattern is a character class and would match far more than this.
+          if [ "${AUTHOR}" = "dependabot[bot]" ]; then
+            echo "Opened by ${AUTHOR} — dependency update, no fragment required."
+            exit 0
+          fi
 
           # towncrier only assembles direct children of changelog/ whose name
           # is <id>.<type>.md, where <type> is one of the types configured in
