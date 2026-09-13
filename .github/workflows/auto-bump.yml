@@ -2,61 +2,25 @@
 name: Auto bump version
 
 on:
-  push:
-    branches: [main]
+  # Preparing a release is a decision, not a consequence of merging. This ran
+  # on every push to `main` before, which re-opened or force-updated the
+  # release pull request under whoever was reviewing it — the same churn the
+  # draft release had, moved into a pull request. A human dispatches it when
+  # the branch is ready to ship.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          Version to release, e.g. 1.4.0. Leave empty to calculate it from the
+          labels on the pull requests merged since the last release.
+        required: false
+        type: string
 
 concurrency:
   group: auto-bump
   cancel-in-progress: false
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # Guard: skip bot commits to prevent infinite loops
-  # ---------------------------------------------------------------------------
-  guard:
-    runs-on: ubuntu-latest
-    outputs:
-      should_run: ${{ steps.check.outputs.should_run }}
-    steps:
-      - name: Check commit author and message
-        id: check
-        env:
-          GH_TOKEN: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}
-          MSG: ${{ github.event.head_commit.message }}
-          AUTHOR: ${{ github.event.head_commit.author.username }}
-        run: |
-          set -euo pipefail
-
-          # Skip the bot's own commits so preparing a release cannot trigger
-          # preparing another. The merge of a release pull request only says
-          # `chore(release):` when that pull request was squashed or rebased —
-          # a merge commit says `Merge pull request #...` and matches neither
-          # subject below. Merge commits are enabled on this repository, so
-          # ask the API which pull requests this commit belongs to instead:
-          # that holds for all three merge strategies.
-          RELEASE_PR=$(
-            gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
-              --jq '[.[]
-                     | select(.merged_at != null)
-                     | select(.head.ref | startswith("release/v"))
-                     | .number] | first // empty'
-          )
-
-          # The subject and author checks stay as a cheap fallback: they cost
-          # nothing and still recognise a direct push by the bot.
-          if [ -n "${RELEASE_PR}" ]; then
-            echo "Release PR #${RELEASE_PR} merged here — not preparing another."
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-          elif [[ "$MSG" == chore\(release\):* ]] || [[ "$MSG" == "chore: sync version"* ]]; then
-            echo "Skipping: bot commit message detected"
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-          elif [[ "$AUTHOR" == "opsmill-bot" ]]; then
-            echo "Skipping: opsmill-bot author detected"
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-          fi
-
   # ---------------------------------------------------------------------------
   # Bump: calculate the next version, assemble the changelog, open a release PR
   #
@@ -72,13 +36,27 @@ jobs:
   # `bump-strategy: manual` + `version:`.
   # ---------------------------------------------------------------------------
   bump:
-    needs: guard
-    if: needs.guard.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.next.outputs.next-version }}
-      changed: ${{ steps.compare.outputs.changed }}
+      version: ${{ steps.resolved.outputs.version }}
     steps:
+      # `workflow_dispatch` runs against whichever ref the dispatcher picks,
+      # and the Actions UI offers this repository's default branch first.
+      # Under the old `push` trigger the branch was implied; now it has to
+      # be checked, before anything is checked out or bumped.
+      - name: Check the branch
+        env:
+          RELEASE_BRANCH: main
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_NAME}" != "${RELEASE_BRANCH}" ]; then
+            MSG="Releases are prepared from '${RELEASE_BRANCH}', not"
+            MSG="${MSG} '${GITHUB_REF_NAME}'. Re-run this workflow with"
+            MSG="${MSG} '${RELEASE_BRANCH}' selected as the branch."
+            echo "::error::${MSG}"
+            exit 1
+          fi
+
       - uses: actions/checkout@v6
         with:
           token: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}
@@ -89,43 +67,77 @@ jobs:
         with:
           python-version: "3.13"
 
+      # One version string, from one of two sources. Empty input means the
+      # labels on the merged pull requests decide it, which is the default and
+      # the usual case; a value means whoever dispatched the run decided it,
+      # the way infrahub and infrahub-sdk-python decide every release. Both
+      # converge here, so everything downstream — and a later move onto the
+      # shared `release-prepare` workflow, whose `bump-strategy: manual`
+      # accepts exactly this — is identical either way.
       - name: Calculate next version from PR labels
-        uses: patrickjahns/version-drafter-action@v1.3.1
         id: next
+        if: inputs.version == ''
+        uses: patrickjahns/version-drafter-action@v1.3.1
         env:
           GITHUB_TOKEN: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}
 
-      - name: Compare with current version
-        id: compare
+      - name: Resolve the version
+        id: resolved
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          DRAFTED_VERSION: ${{ steps.next.outputs.next-version }}
         run: |
-          CURRENT=$(jq -r .version .claude-plugin/plugin.json)
-          NEXT="${{ steps.next.outputs.next-version }}"
-          echo "Current: $CURRENT"
-          echo "Next:    $NEXT"
+          set -euo pipefail
 
-          if [ "$CURRENT" = "$NEXT" ]; then
-            echo "No version change needed"
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "Version bump: $CURRENT -> $NEXT"
-            echo "changed=true" >> "$GITHUB_OUTPUT"
+          # Read through the environment rather than interpolated into the
+          # script body: the input is free text typed into the Actions UI.
+          VERSION="${INPUT_VERSION:-${DRAFTED_VERSION}}"
+          VERSION="${VERSION#v}"
+
+          if ! printf '%s' "${VERSION}" \
+              | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
+            MSG="'${VERSION}' is not a usable version string — refusing to"
+            MSG="${MSG} prepare a release from it."
+            echo "::error::${MSG}"
+            exit 1
           fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse a version that is already released
+        env:
+          VERSION: ${{ steps.resolved.outputs.version }}
+        run: |
+          set -euo pipefail
+          CURRENT=$(jq -r .version .claude-plugin/plugin.json)
+          echo "Current: ${CURRENT}"
+          echo "Next:    ${VERSION}"
+
+          # Under the old push trigger this was a silent skip, because most
+          # pushes are not releases. A dispatch is someone asking for a
+          # release, so having nothing to cut is a mistake worth reporting
+          # rather than a no-op run that looks green.
+          if [ "${CURRENT}" = "${VERSION}" ]; then
+            MSG="${VERSION} is already the current version — there is nothing"
+            MSG="${MSG} new to release. Merge the pull requests you want in"
+            MSG="${MSG} this release first, or dispatch again with an"
+            MSG="${MSG} explicit version."
+            echo "::error::${MSG}"
+            exit 1
+          fi
+          echo "Version bump: ${CURRENT} -> ${VERSION}"
 
       - name: Update plugin.json
-        if: steps.compare.outputs.changed == 'true'
         run: |
-          jq --arg v "${{ steps.next.outputs.next-version }}" \
+          jq --arg v "${{ steps.resolved.outputs.version }}" \
             '.version = $v' .claude-plugin/plugin.json > /tmp/plugin.json \
             && mv /tmp/plugin.json .claude-plugin/plugin.json
 
       - name: Sync versions to all files
-        if: steps.compare.outputs.changed == 'true'
-        run: bash scripts/sync-versions.sh "${{ steps.next.outputs.next-version }}"
+        run: bash scripts/sync-versions.sh "${{ steps.resolved.outputs.version }}"
 
       - name: Assemble the changelog
-        if: steps.compare.outputs.changed == 'true'
         env:
-          VERSION: ${{ steps.next.outputs.next-version }}
+          VERSION: ${{ steps.resolved.outputs.version }}
         run: |
           set -euo pipefail
 
@@ -173,10 +185,9 @@ jobs:
           uv run towncrier build --version "${VERSION}" --yes
 
       - name: Open the release pull request
-        if: steps.compare.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_INFRAHUB_BOT_TOKEN }}
-          VERSION: ${{ steps.next.outputs.next-version }}
+          VERSION: ${{ steps.resolved.outputs.version }}
         run: |
           set -euo pipefail
           export BRANCH="release/v${VERSION}"
@@ -198,8 +209,8 @@ jobs:
                   changelog/
           git commit -m "chore(release): v${VERSION}"
 
-          # Re-running on a later push to main refreshes the same branch
-          # rather than opening a second PR for the same version. Plain
+          # Dispatching again for the same version refreshes the same
+          # branch rather than opening a second PR for it. Plain
           # --force rather than --force-with-lease: checkout does not fetch
           # this branch's remote ref, so a lease has nothing to compare
           # against. The branch is bot-owned and regenerated every run.
@@ -247,7 +258,7 @@ jobs:
             --title "chore(release): v${VERSION}" \
             --label "ci/skip-changelog" \
             --body "$(cat <<EOF
-          Prepared automatically. Merging this pull request authorises the release:
+          Prepared on request. Merging this pull request authorises the release:
           \`release-publish.yml\` then tags \`v${VERSION}\` and publishes the GitHub
           Release using the assembled changelog as its body.
 
