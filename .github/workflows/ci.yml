@@ -157,10 +157,31 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
-  # Run skill evaluations (reusable workflow)
+  # Skill evaluations — tiered, because the suite bills a real API key.
+  #
+  # `smoke` on any PR touching skills/: cheap, catches obvious breakage while
+  # the author still has the context. The full `regression` suite runs on a
+  # schedule (skill-evals-scheduled.yml) and as the gate on the release PR
+  # below, so quality is checked continuously without paying for it per PR.
   # ---------------------------------------------------------------------------
-  # skill-evals:
-  #   needs: files-changed
-  #   if: needs.files-changed.outputs.skills == 'true'
-  #   uses: ./.github/workflows/skill-evals.yml
-  #   secrets: inherit
+  skill-evals-smoke:
+    needs: files-changed
+    if: >-
+      needs.files-changed.outputs.skills == 'true' &&
+      !startsWith(github.head_ref, 'release/')
+    uses: ./.github/workflows/skill-evals.yml
+    secrets: inherit
+    with:
+      preset: smoke
+
+  # ---------------------------------------------------------------------------
+  # Release gate: the full suite must pass before a release can be merged.
+  # This is the quality checkpoint for the release — an admin reviews these
+  # results alongside the assembled changelog.
+  # ---------------------------------------------------------------------------
+  skill-evals-regression:
+    if: startsWith(github.head_ref, 'release/')
+    uses: ./.github/workflows/skill-evals.yml
+    secrets: inherit
+    with:
+      preset: regression

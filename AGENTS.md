@@ -89,6 +89,33 @@ loses the constraint with no failing test to flag it.
 A grader that cannot fail is worse: it reports the
 rule as covered forever.
 
+### Changelog
+
+The changelog is assembled by [towncrier](https://towncrier.readthedocs.io/) from news fragments in
+`changelog/`, so every change carries its own entry instead of everyone editing `CHANGELOG.md`.
+Skill and tooling work goes under `housekeeping`. Add a fragment in the same PR as the change:
+
+- `uv run towncrier create -c "Added the thing" 42.added.md` — one fragment per change, named
+  `<issue>.<type>.md`. Without an issue or PR number, use a descriptive slug prefixed with `+`,
+  e.g. `+netbox-device-types.added.md`.
+- Types: `security`, `removed`, `deprecated`, `added`, `changed`, `fixed`, `housekeeping`.
+- `uv run towncrier build --draft --version X.Y.Z` — preview the rendered changelog.
+- Label a PR `ci/skip-changelog` when it genuinely needs no entry (dependency bumps, typo fixes).
+  CI fails a PR that adds neither a fragment nor that label.
+
+Do not run `towncrier build` or bump versions by hand. Merging to `main` does not prepare a
+release: dispatch the **Auto bump version** workflow from Actions with `main` selected, which
+opens a `chore(release): vX.Y.Z` pull request carrying the bump and the assembled changelog; the
+`regression` eval suite runs on it as the release gate, and merging it tags and publishes the
+release with that changelog as the body. The version is always passed explicitly because it lives
+in `plugin.json`, not in an importable package towncrier could read.
+
+This accumulates the raw entries per PR; the curated `docs/docs/release-notes/release-X_Y_Z.mdx`
+page stays a separate, hand-written narrative for each release.
+
+Evals are tiered by cost: `smoke` on any PR touching `skills/`, the full `regression` suite weekly
+against `main` and as a blocking check on the release PR.
+
 ### Versioning
 
 All skills share a unified version. When bumping, update together:

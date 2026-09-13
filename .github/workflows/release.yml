@@ -47,6 +47,26 @@ jobs:
             exit 1
           fi
 
+      - name: Validate uv.lock version matches tag
+        run: |
+          # uv.lock records the project's own version alongside its deps, and
+          # any `uv run` rewrites it. Nothing validated it before, so a stale
+          # version shipped silently and resurfaced as a stray diff in the
+          # next unrelated PR.
+          TAG_VERSION="${{ steps.tag.outputs.version }}"
+          LOCK_VERSION=$(awk '
+            /^name = "infrahub-skills"$/ { found = 1; next }
+            found && /^version = / { gsub(/^version = "|"$/, ""); print; exit }
+          ' uv.lock)
+          if [ -z "$LOCK_VERSION" ]; then
+            echo "::error::Could not find the infrahub-skills version in uv.lock"
+            exit 1
+          fi
+          if [ "$LOCK_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Version mismatch: uv.lock=$LOCK_VERSION, tag=v$TAG_VERSION"
+            exit 1
+          fi
+
       - name: Validate SKILL.md versions match tag
         run: |
           TAG_VERSION="${{ steps.tag.outputs.version }}"
