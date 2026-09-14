@@ -76,7 +76,12 @@ docs/build/
 *.key
 credentials.json
 secrets.yaml
-.claude/
+
+# Local Claude Code state, except the tracked rules symlink.
+# `.claude/*` rather than `.claude/` so the negation below works —
+# git cannot re-include anything under an excluded directory.
+.claude/*
+!.claude/rules
 
 # Superpowers workspaces (never commit)
 .superpowers/

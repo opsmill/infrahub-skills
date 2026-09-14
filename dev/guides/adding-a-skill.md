@@ -173,13 +173,17 @@ should have:
 
 ### 5. Update Version Tracking
 
-The skill's `metadata.version` in SKILL.md must match:
-
-1. `.claude-plugin/plugin.json` (`version` field)
-2. `.github/.release-manifest.json` (`version` field)
+The skill's `metadata.version` in SKILL.md must match
+the current release version, which lives in five files
+— see [../../.agents/rules/versioning.md](../../.agents/rules/versioning.md).
+For a new skill, copy the version already in
+`.claude-plugin/plugin.json` rather than bumping
+anything.
 
 Add the skill name to the `skills` array in
-`.github/.release-manifest.json`.
+`.github/.release-manifest.json`. That array is what the
+published release claims to ship; a skill missing from
+it is not in the release.
 
 ### 6. Write Evaluations
 
@@ -198,7 +202,7 @@ tasks:
       namespaces, and field types.
     expected_output: >-
       What correct output looks like.
-    grader: graders/my-skill/basic-scenario.sh
+    grader: python graders/my-skill/check_basic_scenario.py
 
   - id: advanced-scenario
     prompt: >-
@@ -206,12 +210,14 @@ tasks:
       or edge cases.
     expected_output: >-
       What correct output looks like.
-    grader: graders/my-skill/advanced-scenario.sh
+    grader: python graders/my-skill/check_advanced_scenario.py
 ```
 
-Each grader script in `graders/my-skill/` reads the model
-output on stdin and prints `{"pass": true}` or
-`{"pass": false, "reason": "..."}` to stdout.
+Each grader script in `graders/my-skill/` calls the
+shared `run_checks` library and prints the result as
+JSON to stdout. See
+[adding-a-rule.md](./adding-a-rule.md#4-add-a-task-grader-script)
+for the script shape.
 
 **Writing good eval prompts**: Make them realistic —
 the kind of thing an actual user would type, with
@@ -223,7 +229,7 @@ VLAN management system with...".
 **Writing good assertions**: Each grader should be
 objectively deterministic. Use descriptive file names
 that explain what's being tested at a glance (e.g.,
-`dropdown-for-status.sh` not `check-1.sh`).
+`check_dropdown_for_status.py` not `check_1.py`).
 
 Run evals with skillgrade to iterate on quality:
 
@@ -248,10 +254,15 @@ case once a skill exists), see
 
 ### 7. Register in Documentation
 
-- Add the skill to the table in `CLAUDE.md`
-- Add the skill to `README.md`
-  (skills section + project structure)
-- Update `AGENTS.md` quick reference table
+Five places, none of them checked by CI:
+
+| Surface | What to add |
+| ------- | ----------- |
+| `AGENTS.md` | Row in the Quick Reference → Skills table |
+| `README.md` | Row in the `## Skills` table **and** an entry in the Project Structure tree |
+| `docs/docs/readme.mdx` | Row in the skills table, linking `./skills-reference/<name>.mdx` |
+| `docs/docs/skills-reference/<name>.mdx` | New page (drop the `infrahub-` prefix in the filename) |
+| `.github/.release-manifest.json` | Name appended to the `skills` array (step 5) |
 
 Release notes are generated automatically by
 [release-drafter](../../.github/release-drafter.yml)

@@ -1,12 +1,25 @@
 # AGENTS.md
 
-This file provides guidance to AI coding assistants working with this repository.
+This file is a router for AI coding assistants working with this repository: it carries the repo-wide facts and points at [`dev/`](dev/README.md) for depth.
 
 ## Repository Overview
 
 This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub), the infrastructure data management platform by OpsMill. The plugin provides skills covering the full Infrahub development lifecycle: schema design, data population, validation checks, generators, transforms, menu customization, and live data analysis.
 
 The repository is a pure Markdown-based skills project (no Python code). Each skill is defined in its own directory under `skills/` with rules, examples, and reference documentation. Skills follow the [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) format.
+
+## Navigation
+
+| Question | Location |
+| -------- | -------- |
+| How does the plugin work? | [dev/knowledges/](dev/knowledges/) |
+| How do I do X? | [dev/guides/](dev/guides/) |
+| How should I write skill prose? | [dev/knowledges/skill-writing-guide.md](dev/knowledges/skill-writing-guide.md) |
+| What was this change meant to do? | [dev/specs/](dev/specs/) |
+| What rules apply to the file I am editing? | [.agents/rules/](.agents/rules/) |
+| What commands are available? | [dev/commands/](dev/commands/) |
+
+Index of the whole tree: [dev/README.md](dev/README.md).
 
 ## Project Structure
 
@@ -32,6 +45,20 @@ Read the guide that matches the task before starting work:
 ## Custom Commands
 
 AI command definitions live in [dev/commands/](dev/commands/).
+
+## Rules
+
+Path-scoped rules live in [.agents/rules/](.agents/rules/) (symlinked as `.claude/rules/`). Each declares the globs it applies to in frontmatter, so it loads when a matching file is in play rather than waiting for someone to go looking for it.
+
+| Rule | Fires on |
+| ---- | -------- |
+| [rule-equals-test.md](.agents/rules/rule-equals-test.md) | `skills/*/rules/`, `graders/`, `eval.yaml` |
+| [graders.md](.agents/rules/graders.md) | `graders/` |
+| [skill-authoring.md](.agents/rules/skill-authoring.md) | `skills/**/*.md` |
+| [skill-registration.md](.agents/rules/skill-registration.md) | `SKILL.md`, `docs/`, `README.md` |
+| [versioning.md](.agents/rules/versioning.md) | version files |
+
+The rules are triggers, not the reference — they state the constraint and link back into `dev/`. Before changing a skill, a grader, or an eval, read the `dev/` page the matching rule names. The architectural intent is usually the answer.
 
 ## Quick Reference
 
