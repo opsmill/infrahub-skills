@@ -13,7 +13,7 @@ allowed-tools:
   - Write
 argument-hint: "[focus-area]"
 metadata:
-  version: 1.2.8
+  version: 1.2.9
   author: OpsMill
 ---
 

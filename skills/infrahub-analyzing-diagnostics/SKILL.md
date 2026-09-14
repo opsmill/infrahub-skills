@@ -21,7 +21,7 @@ allowed-tools:
   - Write
   - WebFetch
 metadata:
-  version: 1.2.8
+  version: 1.2.9
   author: OpsMill
 ---
 

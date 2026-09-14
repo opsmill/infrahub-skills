@@ -23,7 +23,7 @@ allowed-tools:
   - Grep
 argument-hint: "[netbox-device-type-path...]"
 metadata:
-  version: 1.2.8
+  version: 1.2.9
   author: OpsMill
 ---
 

@@ -19,7 +19,7 @@ allowed-tools:
   - Bash
 argument-hint: "[concept-or-question]"
 metadata:
-  version: 1.2.8
+  version: 1.2.9
   author: OpsMill
 ---
 
