@@ -103,7 +103,7 @@ dataset could have caught it.
 ```json
 {
   "rule": "yagni-redundant-check-that-graphql-can-answer",
-  "severity": "MEDIUM",
+  "severity": "LOW",
   "ladder_step": 6,
   "file": "checks/check_interface_count.py",
   "line": "18",

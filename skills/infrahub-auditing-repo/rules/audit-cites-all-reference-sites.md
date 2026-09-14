@@ -76,8 +76,8 @@ A finding proposing to drop a denormalized
 ```json
 {
   "rule": "yagni-denormalized-vs-indirect-relationship",
-  "severity": "MEDIUM",
-  "ladder_step": 2,
+  "severity": "LOW",
+  "ladder_step": 4,
   "file": "schemas/dcim.yml",
   "line": "42",
   "sites": [

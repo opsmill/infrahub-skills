@@ -430,3 +430,65 @@ def _ordered(*steps):
 ])
 def test_ladder_ordering_normalises_step_types(tmp_path, steps, expected):
     assert _score(tmp_path, ["yagni-findings-sorted"], _ordered(*steps)) == expected
+
+
+# ---------------------------------------------------------------------------
+# Both directions of the two evidence gates.
+#
+# A gate zeroes the task, so a gate that grades the wrong thing is expensive in
+# both directions: it fails an answer that did the work, and it passes one that
+# did not.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("verdict,expected", [
+    pytest.param("blocked-differing-identifiers", 1.0, id="blocker-identifiers"),
+    pytest.param("blocked-differing-peers", 1.0, id="blocker-peers"),
+    pytest.param(
+        "blocked-differing-peers: CircuitEndpoint peers LocationBuilding where "
+        "Device and Rack peer LocationSite",
+        1.0, id="blocker-peers-with-prose"),
+    pytest.param("clear", 0.0, id="unchecked-clear-still-fails"),
+    pytest.param("clear (unverified)", 0.0, id="default-still-fails"),
+])
+def test_feasibility_accepts_either_true_blocker(tmp_path, verdict, expected):
+    """The fixture trips two blockers, so either verdict is a correct read.
+
+    Three identifiers (`device__location`, `rack__location`, `circuit__site`)
+    and two peer kinds (`LocationSite` twice, `LocationBuilding` once). The
+    rule states the two as equal blockers and gives no precedence. Pinning one
+    zeroed an audit that named the other.
+    """
+    finding = {
+        "rule": GENERIC_RULE,
+        "severity": "MEDIUM",
+        "ladder_step": 2,
+        "file": "schemas/dcim.yml",
+        "sites": ["schemas/dcim.yml", "schemas/rack.yml", "schemas/circuit.yml"],
+        "feasibility": verdict,
+    }
+    assert _task_score(tmp_path, FEASIBILITY_GRADER, [finding]) == expected
+
+
+def test_replacement_omits_inspects_every_finding_for_the_rule(tmp_path):
+    """A clean leading finding must not launder a later one.
+
+    An audit may emit one finding per offending file. Grading only the first
+    match let a second finding carry `__gte` — the syntax the audited version
+    does not implement — through a gate check at a full 1.0.
+    """
+    def _f(path, replacement):
+        return {
+            "rule": SYNTAX_RULE,
+            "severity": "LOW",
+            "ladder_step": 6,
+            "file": path,
+            "verified_against": "attribute filter generator, infrahub 1.11.1",
+            "replacement": replacement,
+        }
+
+    clean = _f("checks/a.py", "Keep the Python check.")
+    dirty = _f("checks/b.py", "DcimInterface(count__gte: 48) { count }")
+
+    assert _task_score(tmp_path, PROPOSED_SYNTAX_GRADER, [clean, dirty]) == 0.0
+    assert _task_score(tmp_path, PROPOSED_SYNTAX_GRADER, [dirty, clean]) == 0.0
+    assert _task_score(tmp_path, PROPOSED_SYNTAX_GRADER, [clean, clean]) == 1.0

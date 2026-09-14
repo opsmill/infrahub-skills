@@ -1404,17 +1404,26 @@ def check_audit_replacement_omits(
     unverified proposal reads exactly like a verified one.
 
     A finding that was not emitted recommends nothing, so it passes.
+
+    Every finding for the rule is inspected, not just the first. An audit may
+    legitimately emit one finding per offending file, and grading only
+    ``matches[0]`` lets a clean leading finding launder a later one carrying
+    the syntax this check exists to reject. On a gate check that is the
+    difference between a zeroed task and a passing one.
     """
-    f = _find(findings, rule)
-    if f is None:
+    matches = _find_all(findings, rule)
+    if not matches:
         return True, f"{rule} not emitted, so it recommends no {token!r}"
-    text = _recommendation_text(f)
-    if token.lower() in text.lower():
+    offenders = [
+        f for f in matches if token.lower() in _recommendation_text(f).lower()
+    ]
+    if offenders:
+        where = ", ".join(str(f.get("file", "?")) for f in offenders)
         return False, (
             f"{rule} recommends {token!r}, which the audited version does not "
-            f"implement"
+            f"implement ({len(offenders)} of {len(matches)} finding(s): {where})"
         )
-    return True, f"{rule} recommends no {token!r}"
+    return True, f"{rule} recommends no {token!r} in {len(matches)} finding(s)"
 
 
 def _verdict(value: Any) -> str:
@@ -1435,6 +1444,13 @@ def check_audit_extraction_feasibility(
     whose relationship identifiers, peer kinds and hoisted node-level settings
     were all checked; the honest default reads ``clear (unverified)`` and does
     not satisfy a blocked verdict.
+
+    ``expected`` may name several verdicts separated by ``|``. A schema set can
+    trip more than one blocker at once — differing identifiers *and* differing
+    peers — and the rule states them as equal blockers with no precedence, so
+    each is a correct read. Pinning one would fail an audit that named the
+    other, which is the false-fail direction ``dev/guides/adding-a-rule.md``
+    §5 warns about.
     """
     f = _find(findings, rule)
     if f is None:
@@ -1442,9 +1458,13 @@ def check_audit_extraction_feasibility(
     actual = _verdict(f.get("feasibility"))
     if not actual:
         return False, f"{rule} proposes an extraction with no `feasibility` verdict"
-    if actual == expected.strip().lower():
+    accepted = [v.strip().lower() for v in expected.split("|") if v.strip()]
+    if actual in accepted:
         return True, f"{rule} feasibility={actual}"
-    return False, f"{rule} feasibility={actual!r}, expected {expected!r}"
+    return False, (
+        f"{rule} feasibility={actual!r}, expected "
+        f"{' or '.join(repr(v) for v in accepted)}"
+    )
 
 
 _CHECKS: dict[str, tuple[Any, list[str]]] = {

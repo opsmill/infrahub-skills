@@ -23,18 +23,26 @@ from lib import run_checks  # noqa: E402
 RULE = "yagni-duplicate-shape-not-extracted-to-generic"
 SITES = "schemas/dcim.yml,schemas/circuit.yml,schemas/rack.yml"
 
+# This fixture trips two blockers at once: the three kinds declare the parent
+# edge under three identifiers, and CircuitEndpoint peers LocationBuilding
+# where the other two peer LocationSite. The rule states the two as equal
+# blockers and gives no precedence, so either verdict is a correct read and
+# pinning one fails an audit that named the other.
+BLOCKED = "blocked-differing-identifiers|blocked-differing-peers"
+
 CHECKS = [
     f"yagni-finding-present:{RULE}",
-    f"audit-extraction-feasibility:{RULE}:blocked-differing-identifiers",
+    f"audit-extraction-feasibility:{RULE}:{BLOCKED}",
     f"audit-sites-complete:{RULE}:{SITES}",
     f"yagni-finding-severity:{RULE}:MEDIUM",
+    f"yagni-finding-ladder-step:{RULE}:2",
     "yagni-no-above-medium",
 ]
 
 # `clear` on an extraction that would collapse three identifiers into one is
-# the finding that has to fail. Ungated it scores 4/5 and banks the task.
+# the finding that has to fail. Ungated it scores 5/6 and banks the task.
 GATE_CHECKS = (
-    f"audit-extraction-feasibility:{RULE}:blocked-differing-identifiers",
+    f"audit-extraction-feasibility:{RULE}:{BLOCKED}",
 )
 
 if __name__ == "__main__":
