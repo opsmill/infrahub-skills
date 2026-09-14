@@ -5611,6 +5611,318 @@ tasks:
       - name: declares-tree-untouched
         check: The output reports tree_modified false
 
+  # --- Auditing Repo (evidence) --- #
+  - name: audit-reference-sites
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit this repository. `site_name` on DcimDevice duplicates
+      `device.location.name`, and the team wants it gone.
+
+      `.infrahub.yml` registers exactly these artifacts:
+
+      ```yaml
+      schemas:
+        - schemas/dcim.yml
+      queries:
+        - name: device_info
+          file_path: queries/device_info.gql
+      artifact_definitions:
+        - name: device_config
+          transformation: device_config
+          content_type: text/plain
+      jinja2_transforms:
+        - name: device_config
+          template_path: templates/device_config.j2
+      ```
+
+      `schemas/dcim.yml` (line 42):
+
+      ```yaml
+          - name: site_name
+            kind: Text
+            optional: true
+      ```
+
+      `templates/device_config.j2`:
+
+      ```jinja
+      {%- import "device_interfaces.j2" as ifaces -%}
+      hostname {{ device.name.value }}
+      snmp location {{ device.site_name.value }}
+      {{ ifaces.render(device) }}
+      ```
+
+      `templates/device_interfaces.j2`:
+
+      ```jinja
+      {% macro render(device) %}
+      {% for i in device.interfaces.peers %}
+      interface {{ i.name.value }}
+       description {{ device.site_name.value }}-{{ i.role.value }}
+      {% endfor %}
+      {% endmacro %}
+      ```
+
+      `templates/device.j2` (kept in the repo for local rendering
+      experiments; `.infrahub.yml` does not name it and no template
+      includes or imports it):
+
+      ```jinja
+      hostname {{ device.name.value }}
+      snmp location {{ device.site_name.value }}
+      ```
+
+      `queries/device_info.gql`:
+
+      ```graphql
+      query device_info {
+        DcimDevice { edges { node { name { value } site_name { value } } } }
+      }
+      ```
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_audit_reference_sites.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-denormalized-vs-indirect-relationship finding
+      with severity LOW and ladder_step 4, which enumerates all four live
+      reference sites the removal must touch: schemas/dcim.yml, both
+      registered templates (device_config.j2 and the device_interfaces.j2
+      it imports), and queries/device_info.gql. The unregistered
+      templates/device.j2 is not a live reference site.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-denormalized-vs-indirect-relationship finding
+      - That finding has severity LOW and ladder_step 4
+      - >-
+        The finding enumerates every live reference site rather than only
+        the schema location it was found at
+      - >-
+        templates/device_interfaces.j2 is included, reached through the
+        double-quoted import in the registered template
+      - >-
+        templates/device.j2 is excluded, since nothing registers or
+        imports it
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-denormalized-vs-indirect-relationship finding is emitted
+      - name: all-reference-sites
+        check: >-
+          The finding names schemas/dcim.yml, templates/device_config.j2,
+          templates/device_interfaces.j2 and queries/device_info.gql, and
+          does not name templates/device.j2
+      - name: correct-severity
+        check: The finding has severity LOW
+      - name: correct-ladder-step
+        check: The finding has ladder_step 4
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
+
+  - name: audit-proposed-syntax
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      This repository targets Infrahub 1.11.1. You are auditing offline:
+      the 1.11.1 container image is not available to you in this session,
+      and neither is a running instance.
+
+      `checks/check_interface_count.py` (line 18):
+
+      ```python
+      class InterfaceCountCheck(InfrahubCheck):
+          query = "device_interfaces"
+
+          def validate(self, data):
+              for device in data["DcimDevice"]["edges"]:
+                  uplinks = [
+                      i for i in device["node"]["interfaces"]["edges"]
+                      if i["node"]["role"]["value"] in ("uplink", "peer")
+                  ]
+                  if len(uplinks) > 48:
+                      self.log_error(f"{device['node']['name']['value']} over budget")
+      ```
+
+      A sibling query, `queries/device_info.gql`, already filters in
+      GraphQL:
+
+      ```graphql
+      query device_info {
+        DcimInterface(role__value: "uplink") {
+          edges { node { name { value } } }
+        }
+      }
+      ```
+
+      The team wants this check pushed down to the server if the platform
+      can do it.
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_audit_proposed_syntax.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-redundant-check-that-graphql-can-answer
+      finding that records how its proposed GraphQL syntax was
+      established. Because the pinned image cannot be introspected in this
+      session, the finding says so rather than asserting syntax it did not
+      verify, and it does not recommend numeric range filters such as
+      __gte or __lte.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-redundant-check-that-graphql-can-answer finding
+      - >-
+        The finding records what its proposed syntax was verified against,
+        or states plainly that it could not be verified in this session
+      - >-
+        No numeric range filter (__gte, __lte) is recommended, since the
+        audit has not established that the target version implements one
+      - >-
+        The sibling query's singular filter is not treated as evidence for
+        any other filter form
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-redundant-check-that-graphql-can-answer finding is emitted
+      - name: verification-disclosed
+        check: >-
+          The finding states how its proposed syntax was verified, or that
+          verification was not possible in this session
+      - name: no-unverified-range-filter
+        check: The finding does not recommend __gte or __lte
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
+
+  - name: audit-extraction-feasibility
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      walk Phase 9. Emit JSON findings to output.json.
+
+      Audit these three schema files. They are already loaded on a live
+      instance.
+
+      `schemas/dcim.yml`:
+
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Device
+          namespace: Dcim
+          attributes:
+            - name: name
+              kind: Text
+            - name: tier
+              kind: Dropdown
+              choices:
+                - name: gold
+                - name: silver
+                - name: bronze
+          relationships:
+            - name: location
+              peer: LocationSite
+              kind: Attribute
+              cardinality: one
+              identifier: device__location
+      ```
+
+      `schemas/rack.yml`:
+
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Rack
+          namespace: Dcim
+          attributes:
+            - name: name
+              kind: Text
+            - name: tier
+              kind: Dropdown
+              choices:
+                - name: gold
+                - name: silver
+                - name: bronze
+          relationships:
+            - name: location
+              peer: LocationSite
+              kind: Attribute
+              cardinality: one
+              identifier: rack__location
+      ```
+
+      `schemas/circuit.yml`:
+
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Endpoint
+          namespace: Circuit
+          attributes:
+            - name: name
+              kind: Text
+            - name: tier
+              kind: Dropdown
+              choices:
+                - name: gold
+                - name: silver
+          relationships:
+            - name: location
+              peer: LocationBuilding
+              kind: Attribute
+              cardinality: one
+              identifier: circuit__site
+      ```
+
+      Save ONLY the JSON findings to: output.json
+    graders:
+      - type: deterministic
+        run: python graders/auditing-repo/check_audit_extraction_feasibility.py
+        weight: 1.0
+    expected_output: >-
+      JSON listing one yagni-duplicate-shape-not-extracted-to-generic
+      finding with severity MEDIUM and ladder_step 2, naming all three
+      declaring schema files. The location relationship cannot be hoisted:
+      the three kinds declare it under three different identifiers and
+      CircuitEndpoint peers a different kind, so the finding reports a
+      blocked verdict rather than calling the extraction clear.
+    expectations:
+      - Output is JSON with a findings array (or an object with a findings key)
+      - Contains a yagni-duplicate-shape-not-extracted-to-generic finding
+      - That finding has severity MEDIUM and ladder_step 2
+      - >-
+        The finding reports that the location relationship cannot be
+        hoisted, naming either blocker the schema set carries: the three
+        kinds declare different identifiers, and CircuitEndpoint peers a
+        different kind
+      - >-
+        All three declaring files are named, including schemas/circuit.yml
+        whose tier choice list is a strict subset of the other two
+      - No yagni finding exceeds MEDIUM severity
+    assertions:
+      - name: finding-present
+        check: A yagni-duplicate-shape-not-extracted-to-generic finding is emitted
+      - name: blocked-feasibility
+        check: >-
+          The finding reports the extraction as blocked — on differing
+          relationship identifiers or on differing peer kinds, both of
+          which this schema set carries — rather than as clear
+      - name: all-declaring-kinds
+        check: >-
+          The finding names schemas/dcim.yml, schemas/rack.yml and
+          schemas/circuit.yml
+      - name: correct-severity
+        check: The finding has severity MEDIUM
+      - name: severity-cap
+        check: No yagni finding exceeds MEDIUM severity
+
   # --- Skill Gap Reporter --- #
   - name: reporting-skill-gaps-tracker-no-match
     trials: 3
@@ -5692,7 +6004,7 @@ tasks:
       from this session instead of a second issue. It does not draft a `bug:`,
       `feat:`, or `bug(docs):` title.
     expectations:
-      - States that the tracker was searched and issue #142 already covers this
+      - "States that the tracker was searched and issue #142 already covers this"
       - Drafts a comment on the existing issue rather than a new issue
       - Does not draft a new issue title
     assertions:

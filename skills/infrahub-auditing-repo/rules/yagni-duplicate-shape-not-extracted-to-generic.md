@@ -78,6 +78,84 @@ relationships to hoist, and should leave a precisely
 paired relationship on the concrete kinds rather than
 sweeping it up with the rest.
 
+## Feasibility gate
+
+`feasibility` is the finding's verdict on whether the
+extraction it proposes can actually be performed. It
+defaults to `clear (unverified)`. A finding may only
+label itself `clear` once it has checked, and reported,
+all three of:
+
+1. **Every member's `identifier`** for each relationship
+   proposed for hoisting.
+2. **Every member's `peer` kind** for those same
+   relationships.
+3. **Whether any node-level setting being hoisted**
+   (`human_friendly_id`, `uniqueness_constraints`,
+   `display_label`, `order_by`) **traverses a
+   relationship that is staying put.** If it does, it
+   cannot move either.
+
+**Differing identifiers or differing peers make the
+relationship non-hoistable.** One generic edge means one
+identifier, so hoisting collapses several distinct
+parent edges into one and collides the reverse
+relationships on the other side. It does this silently,
+per
+[relationship-identifiers](../../infrahub-managing-schemas/rules/relationship-identifiers.md),
+which is CRITICAL for exactly this reason. Identifiers
+are also immutable once loaded, so the mistake is
+expensive to retrofit on a live instance.
+
+When the relationship is blocked, **reduce the finding
+to the attributes rather than dropping it.** The
+duplication the rule exists to remove is still there,
+and the attributes still share a definition.
+
+**Enumerate every member that declares a field before
+proposing to hoist it**, including members whose
+declaration differs. A third kind carrying a narrower
+choice list is a blocker, not a detail: hoisting the
+wider list silently widens what that kind accepts. List
+each declaring kind's file in `sites`, per
+[audit-cites-all-reference-sites](./audit-cites-all-reference-sites.md).
+
+Verdicts:
+
+| `feasibility` | Meaning |
+| ------------- | ------- |
+| `clear (unverified)` | Default. The three checks above were not run, so the reader must re-derive the finding before acting on it |
+| `clear` | All three ran and the extraction is performable as described |
+| `blocked-differing-identifiers` | Members declare the relationship under different identifiers |
+| `blocked-differing-peers` | Members point the relationship at different peer kinds |
+| `blocked-setting-traverses-unhoisted-rel` | A hoisted node-level setting traverses a relationship that is staying on the concrete kinds |
+
+**More than one blocker can apply at once, and any of
+them is a correct verdict.** A member set that declares
+three identifiers often also peers two different kinds,
+because both follow from the same modelling choice. The
+blockers carry no precedence: report the one you would
+have to undo first, and name the others in the finding
+rather than picking silently. A reader needs to know the
+extraction is blocked and why; which blocker was written
+in the field does not change what they do next.
+
+**The verdict names the blocker, not the outcome.** When
+the relationship is blocked and the finding is reduced
+to attributes, the verdict is still the `blocked-` reason
+that caused the reduction, and the reduction itself is
+described in the replacement. An implementer reading
+"reduced to attributes" learns what to do; only the
+blocker tells them why, and whether it also applies to
+the next extraction they attempt.
+
+The distinction is what lets an implementer know which
+findings to re-derive. Two extraction findings in one
+audit, one respecting identifiers and one not, had
+completely different outcomes: the first was
+implementable nearly in full, the second had to be cut
+to a fraction.
+
 ## What NOT to flag
 
 - Two nodes sharing one or two trivial attributes (`name`,

@@ -281,12 +281,20 @@ attributes, 2000-2999 for secondary)
 
 ### MEDIUM: Potential generic candidate
 
-**Files**: `schemas/device.yml`, `schemas/firewall.yml`, `schemas/switch.yml`
+**Sites**: `schemas/device.yml:12`, `schemas/firewall.yml:9`,
+`schemas/switch.yml:14`
 **Finding**: 3 nodes share identical attributes: `name`,
 `description`, `status`, `role` — consider a shared
 generic
+**Feasibility**: blocked-differing-identifiers, because
+the three kinds declare `location` under `device__location`,
+`firewall__location` and `switch__site`, and an identifier
+cannot change once loaded
 **Fix**: Create a generic (e.g., `InfraNetworkDevice`)
-with shared attributes
+carrying the four shared attributes. Leave `location` on
+the concrete kinds: one generic edge means one identifier,
+which would collapse three distinct edges and collide
+their reverse relationships without reporting anything.
 
 ### LOW: Object file naming
 
@@ -311,10 +319,11 @@ with shared attributes
 **File**: `generators/build_racks.py`
 **Finding**: Whether the committed files under
 `objects/` are still reproducible from the committed
-generator could not be established. The generator's
-`--check` flag writes to `objects/` (confirmed by
-reading the script), and the tree holds uncommitted
-work, so running it would have destroyed that work.
+generator could not be established.
+**Verified against**: not verified: the generator's
+`--check` flag writes to `objects/`, confirmed by reading
+the script, and the tree holds uncommitted work, so
+running it would have destroyed that work
 **Fix**: Run the generator's check on a clean clone or
 in CI, not against a working tree.
 

@@ -32,7 +32,7 @@
       "expected_output": "An answer that searched the tracker, found issue #142 already covers the friction, and therefore drafts a comment carrying only the new evidence from this session instead of a second issue. It does not draft a `bug:`, `feat:`, or `bug(docs):` title.",
       "files": [],
       "expectations": [
-        "States that the tracker was searched and issue",
+        "States that the tracker was searched and issue #142 already covers this",
         "Drafts a comment on the existing issue rather than a new issue",
         "Does not draft a new issue title"
       ],

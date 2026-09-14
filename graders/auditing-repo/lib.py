@@ -220,6 +220,18 @@ def check_yagni_finding_ladder_step(
     return False, f"{rule} ladder_step={actual}, expected {expected}"
 
 
+def _step_order(value: Any) -> int:
+    """A ladder_step as an int for ordering, whatever type it arrived as.
+
+    An unparseable or absent step sorts first, which keeps it visible at the
+    top of the report rather than silently landing wherever its text falls.
+    """
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return -1
+
+
 def check_yagni_findings_sorted_by_ladder(findings: list[dict]) -> tuple[bool, str]:
     """Assert yagni-* findings are ordered by ladder_step, then by file path.
 
@@ -234,10 +246,17 @@ def check_yagni_findings_sorted_by_ladder(findings: list[dict]) -> tuple[bool, s
     ]
     if not yagni:
         return False, "no yagni-* findings emitted"
-    pairs = [(f.get("ladder_step", -1), str(f.get("file", ""))) for f in yagni]
+    # Normalise the step before ordering. Models emit it as an int or as a
+    # string interchangeably, and check_yagni_finding_ladder_step already
+    # allows for that. Comparing the raw values instead raises TypeError on
+    # a mixed set, which run_checks reports as "Error running check" on a
+    # report that was correctly ordered. Sorting the strings would be just
+    # as wrong: "10" sorts before "2".
+    pairs = [(_step_order(f.get("ladder_step")), str(f.get("file", ""))) for f in yagni]
+    shown = [(f.get("ladder_step"), str(f.get("file", ""))) for f in yagni]
     if pairs != sorted(pairs):
-        return False, f"yagni findings out of (ladder_step, file) order: {pairs}"
-    return True, f"yagni findings sorted by (ladder_step, file): {pairs}"
+        return False, f"yagni findings out of (ladder_step, file) order: {shown}"
+    return True, f"yagni findings sorted by (ladder_step, file): {shown}"
 
 
 def check_yagni_no_finding_above_medium(findings: list[dict]) -> tuple[bool, str]:
@@ -249,8 +268,14 @@ def check_yagni_no_finding_above_medium(findings: list[dict]) -> tuple[bool, str
     check enforces the cap across the whole finding set so a new yagni
     rule added without updating its per-rule grader can't silently
     introduce a HIGH-severity finding.
+
+    INFO is admitted because it sits *below* MEDIUM in the skill's own
+    severity legend, which is what a cap on the upper bound means. Rules
+    set their own severity through `impact`, so this only ever needs to
+    reject CRITICAL and HIGH; failing an informational finding was the cap
+    misreading its own name.
     """
-    ALLOWED = {"MEDIUM", "LOW"}
+    ALLOWED = {"MEDIUM", "LOW", "INFO"}
     yagni = [
         f for f in findings
         if isinstance(f, dict) and str(f.get("rule", "")).startswith("yagni-")
@@ -1298,6 +1323,233 @@ def check_yagni_finding_names_cardinality(
     )
 
 
+# ---------------------------------------------------------------------------
+# Evidence checks: what a finding must have established before it asserts
+# ---------------------------------------------------------------------------
+
+
+def _normalise_site(entry: str) -> str:
+    """One reference site reduced to a comparable repo-relative path.
+
+    Accepts the ``path:line`` form the report renders and the bare path, so a
+    finding is not failed for carrying line numbers this check does not grade.
+    """
+    text = str(entry).strip().strip("`\"'")
+    text = re.sub(r":\d+(?:-\d+)?$", "", text)
+    if text.startswith("./"):
+        text = text[2:]
+    return text.lstrip("/")
+
+
+def check_audit_sites_complete(
+    findings: list[dict], rule: str, expected_csv: str
+) -> tuple[bool, str]:
+    """Assert the finding enumerates exactly the reference sites that exist.
+
+    A removal or rename proposal is actionable only if it names every site
+    that has to change. ``file``/``line`` locates the finding; it is not the
+    answer. Set equality is deliberate, because both directions are defects: a
+    short list means the repo-wide sweep was never run, and an entry that is
+    not a live reference means an unregistered lookalike was mistaken for the
+    render path. Either one leaves the repository broken once the finding is
+    acted on.
+    """
+    f = _find(findings, rule)
+    if f is None:
+        return False, f"{rule} missing, so it cannot check reference sites"
+    expected = {_normalise_site(p) for p in expected_csv.split(",") if p.strip()}
+    raw_sites = f.get("sites")
+    if not raw_sites:
+        return False, (
+            f"{rule} names no `sites`, so file={f.get('file')!r} stands in for "
+            f"the sweep. Expected {sorted(expected)}"
+        )
+    actual = {_normalise_site(s) for s in _flatten_strings(raw_sites)}
+    if actual == expected:
+        return True, f"{rule} enumerates all {len(expected)} reference sites"
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    return False, (
+        f"{rule} reference sites wrong. Missing: {missing or 'none'}. "
+        f"Not a live reference: {extra or 'none'}"
+    )
+
+
+# What Check 3 asks is whether the audit went and looked. These three
+# patterns answer it in order of strength, and the order is the point: a
+# blacklist of phrasings alone was wrong in both directions, missing the
+# defect the rule quotes ("the same form the sibling query uses", one word off
+# the pattern) while failing answers that introspected the image and then
+# named the analogy they had ruled out.
+
+# An explicit statement that the proposal could not be verified. Check 6 asks
+# for exactly this, so it outranks everything below.
+_DECLARED_UNVERIFIED = re.compile(
+    r"\bnot\s+verified\b|\bcould\s+not\s+verify\b|\bunverified\b"
+    r"|\bunable\s+to\s+verify\b|\bnot\s+confirmed\b",
+    re.IGNORECASE,
+)
+
+# Something that was actually introspected, or the version it was read at. An
+# answer naming one of these has done the work, and may then discuss an
+# analogy freely: that is reasoning about evidence, not evidence by analogy.
+_EVIDENCE_SOURCE = re.compile(
+    r"\bv?\d+\.\d+(?:\.\d+)?\b"
+    r"|\bintrospect\w*\b"
+    r"|\bfilter\s+generator\b"
+    r"|\b(?:pinned|container|docker)\s+image\b"
+    r"|\brunning\s+instance\b"
+    r"|\bschema\s+models?\b"
+    r"|\brepository\s+config\s+model\b"
+    r"|\bgraphql\s+schema\b"
+    r"|\bvendored\b"
+    r"|\bread\s+the\s+source\b|\bsource\s+(?:code|of)\b",
+    re.IGNORECASE,
+)
+
+# An appeal to something else in the same repository, reached only when
+# nothing above matched, so this fires on an answer whose entire evidence is
+# the analogy. A sibling query demonstrates the filter it uses and nothing
+# else. Deliberately broad, because the escapes above carry the answers that
+# mention an analogy while resting on something real.
+_INFERENCE_MARKERS = re.compile(
+    r"\bsame\s+(?:form|shape|way|filter|syntax)\b"
+    r"|\b(?:sibling|another|other|existing)\s+quer(?:y|ies)\b"
+    r"|\bby\s+analogy\b"
+    r"|\banalogous\b"
+    r"|\bmirrors?\s+the\b"
+    r"|\belsewhere\s+in\s+the\s+repo\b",
+    re.IGNORECASE,
+)
+
+
+def check_audit_verified_against(findings: list[dict], rule: str) -> tuple[bool, str]:
+    """Assert the finding states how its proposed syntax was verified.
+
+    Presence only. What the statement is worth is graded by the companion
+    ``audit-replacement-omits`` check, which fails a proposal that uses syntax
+    the audited version does not implement however confidently it is sourced.
+    Answering "not verified" passes here: the rule asks a finding to disclose
+    its evidence, not to always have some.
+    """
+    f = _find(findings, rule)
+    if f is None:
+        return False, f"{rule} missing, so it cannot check verification"
+    stated = " ".join(_flatten_strings(f.get("verified_against"))).strip()
+    if not stated:
+        return False, f"{rule} proposes syntax with no `verified_against`"
+    if _DECLARED_UNVERIFIED.search(stated):
+        return True, f"{rule} declares it could not verify: {stated[:60]!r}"
+    source = _EVIDENCE_SOURCE.search(stated)
+    if source:
+        return True, f"{rule} verified against {source.group(0)!r}: {stated[:60]!r}"
+    marker = _INFERENCE_MARKERS.search(stated)
+    if marker:
+        return False, (
+            f"{rule} rests its syntax on an in-repo analogy "
+            f"({marker.group(0)!r}) and names nothing it introspected. A "
+            f"sibling query is evidence for the form that query uses and "
+            f"nothing else"
+        )
+    return True, f"{rule} verified_against={stated[:60]!r}"
+
+
+def check_audit_replacement_omits(
+    findings: list[dict], rule: str, token: str
+) -> tuple[bool, str]:
+    """Assert the finding's recommended fix does not use ``token``.
+
+    For syntax the version under audit does not implement. The inverse of
+    ``check_yagni_replacement_mentions``: a presence check cannot fail a
+    finding that recommends a filter the server rejects at runtime, and an
+    unverified proposal reads exactly like a verified one.
+
+    A finding that was not emitted recommends nothing, so it passes.
+
+    Every finding for the rule is inspected, not just the first. An audit may
+    legitimately emit one finding per offending file, and grading only
+    ``matches[0]`` lets a clean leading finding launder a later one carrying
+    the syntax this check exists to reject. On a gate check that is the
+    difference between a zeroed task and a passing one.
+    """
+    matches = _find_all(findings, rule)
+    if not matches:
+        return True, f"{rule} not emitted, so it recommends no {token!r}"
+    offenders = [
+        f for f in matches if token.lower() in _recommendation_text(f).lower()
+    ]
+    if offenders:
+        where = ", ".join(str(f.get("file", "?")) for f in offenders)
+        return False, (
+            f"{rule} recommends {token!r}, which the audited version does not "
+            f"implement ({len(offenders)} of {len(matches)} finding(s): {where})"
+        )
+    return True, f"{rule} recommends no {token!r} in {len(matches)} finding(s)"
+
+
+# The honest default, in the spellings a model actually writes it: "clear
+# (unverified)", "clear(unverified)", "clear - unverified". Anchored to the
+# verdict token, because the label is allowed to explain itself afterwards and
+# the strongest justification an auditor can write ("clear: no unverified
+# assumption remains") uses the same word.
+_UNVERIFIED = re.compile(r"clear\b[\s(:,\-]*unverified", re.IGNORECASE)
+
+
+def _verdict(value: Any) -> str:
+    """A feasibility label reduced to its verdict token, lowercased.
+
+    Normally that is the leading token, so a finding may explain itself after
+    the label. The exception is the unverified default: taking the head of
+    "clear (unverified)" yields "clear", which is the one distinction the
+    whole gate rests on. `clear` is the promise that someone checked the
+    identifiers, peer kinds and hoisted settings; the default is the
+    admission that nobody did, and an implementer reads it to decide which
+    findings to re-derive. Collapsing the two hands them the promise.
+    """
+    text = " ".join(_flatten_strings(value)).strip().strip("`\"'")
+    if not text:
+        return ""
+    head = re.split(r"[\s:,.]+", text, maxsplit=1)[0].lower()
+    if head.startswith("clear") and _UNVERIFIED.match(text):
+        return "clear-unverified"
+    return head
+
+
+def check_audit_extraction_feasibility(
+    findings: list[dict], rule: str, expected: str
+) -> tuple[bool, str]:
+    """Assert the extraction finding's feasibility verdict is the true one.
+
+    Only the leading verdict token is compared, so a finding is free to
+    explain itself after the label. ``clear`` is reserved for an extraction
+    whose relationship identifiers, peer kinds and hoisted node-level settings
+    were all checked; the honest default reads ``clear (unverified)`` and does
+    not satisfy a blocked verdict.
+
+    ``expected`` may name several verdicts separated by ``|``. A schema set can
+    trip more than one blocker at once — differing identifiers *and* differing
+    peers — and the rule states them as equal blockers with no precedence, so
+    each is a correct read. Pinning one would fail an audit that named the
+    other, which is the false-fail direction ``dev/guides/adding-a-rule.md``
+    §5 warns about.
+    """
+    f = _find(findings, rule)
+    if f is None:
+        return False, f"{rule} missing, so it cannot check feasibility"
+    actual = _verdict(f.get("feasibility"))
+    if not actual:
+        return False, f"{rule} proposes an extraction with no `feasibility` verdict"
+    # Expected verdicts go through _verdict too, so "clear (unverified)"
+    # written on either side compares equal and never collapses to "clear".
+    accepted = [_verdict(v) for v in expected.split("|") if v.strip()]
+    if actual in accepted:
+        return True, f"{rule} feasibility={actual}"
+    return False, (
+        f"{rule} feasibility={actual!r}, expected "
+        f"{' or '.join(repr(v) for v in accepted)}"
+    )
+
+
 _CHECKS: dict[str, tuple[Any, list[str]]] = {
     "yagni-finding-present": (check_yagni_finding_present, ["str"]),
     "yagni-finding-absent": (check_yagni_finding_absent, ["str"]),
@@ -1318,6 +1570,12 @@ _CHECKS: dict[str, tuple[Any, list[str]]] = {
     "watch-not-on-forbidden-section": (check_watch_not_on_forbidden_section, []),
     "watch-no-third-party-in-fix": (check_watch_no_third_party_in_fix, ["str"]),
     "yagni-finding-names-cardinality": (check_yagni_finding_names_cardinality, ["str"]),
+    "audit-sites-complete": (check_audit_sites_complete, ["str", "str"]),
+    "audit-verified-against": (check_audit_verified_against, ["str"]),
+    "audit-replacement-omits": (check_audit_replacement_omits, ["str", "str"]),
+    "audit-extraction-feasibility": (
+        check_audit_extraction_feasibility, ["str", "str"]
+    ),
 }
 
 # Checks that inspect the raw emitted document rather than the findings list.
