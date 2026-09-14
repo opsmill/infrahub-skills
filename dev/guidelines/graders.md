@@ -59,6 +59,15 @@ than hoisted to a shared module — the skills are
 deliberately independently owned. Rules belonging to
 `infrahub-common` grade from `graders/common/`.
 
+`graders/auditing-repo/lib.py` is the one exception, and
+this rule loads when you open it: its registry is
+`_CHECKS`, private, keyed by colon-encoded
+`<check>[:<arg>...]` names resolved through `_dispatch`,
+and its check functions take `(findings, ...)` rather
+than a parsed artifact. Read that file's own docstring
+before adding to it; the shape above describes the other
+fourteen.
+
 ## Verify both directions
 
 The obvious compliant/violating pair catches neither

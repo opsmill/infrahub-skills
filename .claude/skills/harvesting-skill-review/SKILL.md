@@ -1,15 +1,12 @@
 ---
 name: harvesting-skill-review
 description: >-
-  Derived from the `harvesting-review` skill in opsmill/infrahub and rewritten
-  for this repository; renamed because the two are not interchangeable.
   Mines a pull request's review threads on opsmill/infrahub-skills for lessons
-  that generalize beyond that PR, reconstructs each against the actual code
-  before deciding, checks whether it is already codified in prose *or* in a
-  grader, and routes the genuinely-new ones either into a shipped skill's rules
-  (with the grader and eval that rule requires) or into the contributor layer —
-  `dev/guidelines/`, `dev/`, `AGENTS.md`. Proposes edits first, applies only with
-  the user's approval. TRIGGER when: the user wants to turn PR review feedback
+  that generalize beyond that PR, checks each against the code and against
+  whether it is already codified in prose *or* in a grader, and routes the
+  genuinely-new ones into a shipped skill's rules (with the grader and eval
+  that rule requires) or into `dev/guidelines/`. Proposes edits first, applies
+  only with approval. TRIGGER when: the user wants to turn PR review feedback
   on this repository into durable rules; capture recurring reviewer comments as
   contributor documentation; or check whether review lessons are reflected in
   the rules, guides, and graders. DO NOT TRIGGER when: the lesson is about
@@ -48,12 +45,6 @@ metadata:
 >   summaries and PR discussion; inline comment volume is routinely zero.
 > - **Different destinations.** `dev/guidelines/`, `dev/guides/`,
 >   `dev/knowledges/`, `AGENTS.md`, `skills/*/rules/`, `graders/`, `eval.yaml`.
-
-## User Input
-
-```text
-$ARGUMENTS
-```
 
 ## What this does
 
@@ -132,8 +123,9 @@ and the *trigger* in the router; never move a rule into `AGENTS.md` because
 
 ### 1. Gather scope
 
-Resolve `$ARGUMENTS` to a PR: a number, a branch name (`gh pr view <branch>`),
-or empty for the current branch's PR. If none exists, ask.
+Resolve the argument to a PR: a number, a branch name
+(`gh pr view <branch>`), or nothing, in which case use the current branch's
+PR. If none exists, ask.
 
 Three endpoints, not one. `/comments` returns only
 diff-anchored comments, so a reviewer who writes the lesson
@@ -272,17 +264,27 @@ Confirm the target file exists before routing a lesson to it.
 Cheap, and it is what keeps "harvested" from meaning "bloated". Run it every
 time.
 
-**a. Staleness grep.** Across `dev/guidelines/`, `dev/`, `AGENTS.md`,
-`skills/*/rules/`:
+**a. Staleness grep.** Scope it to the prose that states rules, and match the
+shape a citation actually takes — a bare `#\d+` also matches hex colours and
+legitimate upstream issue references, and this repository's own PR numbers are
+three digits, not five:
 
 ```bash
-grep -rnoE '(PR #[0-9]+|#[0-9]{4,6}\b)' dev/guidelines dev AGENTS.md skills
+grep -rnoE '\(#[0-9]{2,4}\)|PR #[0-9]+' \
+  dev/guidelines dev/guides dev/knowledges AGENTS.md skills/*/rules/
 grep -rniE '(currently (broken|unfixed)|not yet fixed|known gap|for now)' \
-  dev/guidelines dev AGENTS.md skills
+  dev/guidelines dev/guides dev/knowledges AGENTS.md skills/*/rules/
 ```
 
-A hit outside this run's own edits is debt from an earlier run. Drop a stale
-citation and keep the behaviour description. Check a defect note against the
+`examples.md` and `*reference.md` stay out of scope: they carry literals —
+colours, IDs, sample payloads — that look like citations and are not.
+
+**A hit is a candidate, not a defect.** Read it before touching it. A reference
+to an `opsmill/infrahub` issue is documenting upstream behaviour and stays; a
+reference to a merged PR in *this* repository, made to justify a rule that now
+stands on its own, is the rot. If the grep returns only the first kind, the
+sweep is clean — say so and move on. Drop a stale citation and keep the
+behaviour description it was attached to. Check a defect note against the
 current code: delete it if fixed, reframe it as a convention if not.
 
 **b. Broken-route check.** This repository routes by file path, so a moved file

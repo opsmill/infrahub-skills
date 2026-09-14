@@ -3,6 +3,7 @@ paths:
   - ".claude-plugin/plugin.json"
   - ".github/.release-manifest.json"
   - "pyproject.toml"
+  - "skills/*/SKILL.md"
   - "uv.lock"
   - "scripts/sync-versions.sh"
 ---

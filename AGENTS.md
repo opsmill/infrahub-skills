@@ -18,6 +18,7 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 | What was this change meant to do? | [dev/specs/](dev/specs/) |
 | What rules apply to the file I am editing? | [dev/guidelines/](dev/guidelines/) |
 | What commands are available? | [dev/commands/](dev/commands/) |
+| How do I turn PR review feedback into rules? | [.claude/skills/harvesting-skill-review/](.claude/skills/harvesting-skill-review/) |
 
 Index of the whole tree: [dev/README.md](dev/README.md).
 

@@ -31,6 +31,12 @@ skills themselves. For user-facing docs, see
 - **commands/** — project-specific AI command
   definitions.
 
+Contributor skills live outside `dev/`, in
+[`../.claude/skills/`](../.claude/skills/), because that
+is where an agent discovers them:
+[`harvesting-skill-review`](../.claude/skills/harvesting-skill-review/SKILL.md)
+turns a PR's review threads into rules.
+
 ## Rules
 
 `guidelines/` is the canonical home for path-scoped
@@ -41,17 +47,11 @@ matching file rather than when someone remembers to go
 looking. The rules are triggers; the depth stays in
 `guides/` and `knowledges/`.
 
-| Rule | What it constrains |
-| ---- | ------------------ |
-| [`guidelines/rule-equals-test.md`](guidelines/rule-equals-test.md) | A new skill rule ships with its grader and eval in the same change |
-| [`guidelines/graders.md`](guidelines/graders.md) | Parse the answer, never substring-match it; verify both directions |
-| [`guidelines/skill-authoring.md`](guidelines/skill-authoring.md) | Description, body, examples, and how to verify an edit |
-| [`guidelines/skill-registration.md`](guidelines/skill-registration.md) | The five surfaces a new skill has to appear in |
-| [`guidelines/versioning.md`](guidelines/versioning.md) | The five files a version bump touches |
-
-Each rule's `paths:` frontmatter is the authority on when it
-loads. This table does not restate the globs — a second copy
-drifts, which is what `guidelines/skill-authoring.md`
+The rules and what each constrains are listed once, in
+[`AGENTS.md` § Rules](../AGENTS.md#rules). Each rule's
+`paths:` frontmatter is the authority on when it loads.
+Neither place restates the globs: a second copy drifts,
+which is what `guidelines/skill-authoring.md`
 § "One fact, one home" is about.
 
 Another agent is one symlink away: point its rules

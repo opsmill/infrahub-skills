@@ -11,6 +11,7 @@ Exit 0 when they match or the plugin is not installed, 1 when they differ.
 from __future__ import annotations
 
 import filecmp
+import subprocess
 import sys
 from pathlib import Path
 
@@ -54,22 +55,15 @@ def compare(installed: Path) -> tuple[int, int]:
 
 
 def check_rules_symlink() -> bool:
-    """`.claude/rules` must resolve to the canonical rules directory.
-
-    git materializes a symlink as a plain text file when core.symlinks is
-    false, and every agent then silently loads no rules at all.
-    """
-    link = REPO_SKILLS.parent / ".claude" / "rules"
-    target = REPO_SKILLS.parent / "dev" / "guidelines"
-    if link.is_dir() and link.resolve() == target.resolve():
-        return True
-    print(
-        "BROKEN: .claude/rules does not resolve to dev/guidelines.\n"
-        "  No rules will load. If git wrote it as a regular file, set\n"
-        "  core.symlinks=true and re-checkout, or recreate it with\n"
-        "  ln -s ../dev/guidelines .claude/rules"
+    """Delegate to the standalone guard so CI and this share one implementation."""
+    result = subprocess.run(
+        [sys.executable, str(Path(__file__).resolve().parent / "check-rules-symlink.py")],
+        capture_output=True,
+        text=True,
     )
-    return False
+    if result.returncode != 0:
+        print(result.stdout.strip())
+    return result.returncode == 0
 
 
 def main() -> int:

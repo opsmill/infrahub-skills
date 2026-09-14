@@ -280,22 +280,17 @@ case once a skill exists), see
 
 ### 7. Register in Documentation
 
-Five places, none of them checked by CI:
+Five surfaces, none of them checked by CI. The list and
+what to add to each is in
+[../guidelines/skill-registration.md](../guidelines/skill-registration.md),
+which loads on its own when you edit a `SKILL.md`.
 
-| Surface | What to add |
-| ------- | ----------- |
-| `AGENTS.md` | Row in the Quick Reference → Skills table |
-| `README.md` | Row in the `## Skills` table **and** an entry in the Project Structure tree |
-| `docs/docs/readme.mdx` | Row in the skills table, linking `./skills-reference/<name>.mdx` |
-| `docs/docs/skills-reference/<name>.mdx` | New page (drop the `infrahub-` prefix in the filename) |
-| `.github/.release-manifest.json` | Name appended to the `skills` array (step 5) |
-
-Release notes are generated automatically by
-[release-drafter](../../.github/release-drafter.yml)
-from PR labels — no manual changelog edit is needed.
-Apply the appropriate `type/*` and `changes/*` labels
-to your PR so it lands in the right release-notes
-category.
+Apply the appropriate `type/*` and `changes/*` labels to
+your PR so [release-drafter](../../.github/release-drafter.yml)
+files it in the right category. The drafted body is a
+starting point, not the release notes: each release also
+gets a curated page under `docs/docs/release-notes/`,
+per the same rule.
 
 ### 8. Verification
 
