@@ -1,0 +1,31 @@
+---
+# yamllint disable rule:truthy
+name: Scheduled skill evaluations
+
+# The full regression suite, run on a cadence against main rather than only
+# when a release is being cut.
+#
+# Without this, the first signal that a skill regressed would arrive on the
+# release PR, under release pressure, with no clue which of the merged
+# changes caused it. A weekly run keeps the blast radius to a week of
+# commits and takes the discovery off the release path.
+on:
+  schedule:
+    # Mondays 06:00 UTC — results are waiting at the start of the week.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      preset:
+        description: "Skillgrade preset (smoke, reliable, regression)"
+        required: false
+        default: "regression"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    uses: ./.github/workflows/skill-evals.yml
+    secrets: inherit
+    with:
+      preset: ${{ inputs.preset || 'regression' }}
