@@ -402,3 +402,31 @@ def test_feasibility_rejects_the_outcome_used_as_a_verdict(tmp_path):
     """
     assert _score(tmp_path, GENERIC_CHECKS, _generic_finding(
         "attributes-only")) == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Ladder ordering across mixed ladder_step types.
+#
+# Models emit the step as an int or as a string interchangeably.
+# check_yagni_finding_ladder_step already normalises with str() for that
+# reason; the ordering check did not, so a correctly sorted report died in
+# the comparison and surfaced as "Error running check".
+# ---------------------------------------------------------------------------
+
+def _ordered(*steps):
+    return [
+        {"rule": f"yagni-r{i}", "severity": "LOW", "ladder_step": s,
+         "file": f"{i}.yml"}
+        for i, s in enumerate(steps)
+    ]
+
+
+@pytest.mark.parametrize("steps,expected", [
+    pytest.param((1, 2, 3), 1.0, id="ints-ascending"),
+    pytest.param(("1", "2", "3"), 1.0, id="strings-ascending"),
+    pytest.param((1, "2", 3), 1.0, id="mixed-types-ascending"),
+    pytest.param((2, "10"), 1.0, id="mixed-types-not-sorted-lexically"),
+    pytest.param((3, "2", 1), 0.0, id="mixed-types-descending-still-fails"),
+])
+def test_ladder_ordering_normalises_step_types(tmp_path, steps, expected):
+    assert _score(tmp_path, ["yagni-findings-sorted"], _ordered(*steps)) == expected

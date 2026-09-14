@@ -220,6 +220,18 @@ def check_yagni_finding_ladder_step(
     return False, f"{rule} ladder_step={actual}, expected {expected}"
 
 
+def _step_order(value: Any) -> int:
+    """A ladder_step as an int for ordering, whatever type it arrived as.
+
+    An unparseable or absent step sorts first, which keeps it visible at the
+    top of the report rather than silently landing wherever its text falls.
+    """
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return -1
+
+
 def check_yagni_findings_sorted_by_ladder(findings: list[dict]) -> tuple[bool, str]:
     """Assert yagni-* findings are ordered by ladder_step, then by file path.
 
@@ -234,10 +246,17 @@ def check_yagni_findings_sorted_by_ladder(findings: list[dict]) -> tuple[bool, s
     ]
     if not yagni:
         return False, "no yagni-* findings emitted"
-    pairs = [(f.get("ladder_step", -1), str(f.get("file", ""))) for f in yagni]
+    # Normalise the step before ordering. Models emit it as an int or as a
+    # string interchangeably, and check_yagni_finding_ladder_step already
+    # allows for that. Comparing the raw values instead raises TypeError on
+    # a mixed set, which run_checks reports as "Error running check" on a
+    # report that was correctly ordered. Sorting the strings would be just
+    # as wrong: "10" sorts before "2".
+    pairs = [(_step_order(f.get("ladder_step")), str(f.get("file", ""))) for f in yagni]
+    shown = [(f.get("ladder_step"), str(f.get("file", ""))) for f in yagni]
     if pairs != sorted(pairs):
-        return False, f"yagni findings out of (ladder_step, file) order: {pairs}"
-    return True, f"yagni findings sorted by (ladder_step, file): {pairs}"
+        return False, f"yagni findings out of (ladder_step, file) order: {shown}"
+    return True, f"yagni findings sorted by (ladder_step, file): {shown}"
 
 
 def check_yagni_no_finding_above_medium(findings: list[dict]) -> tuple[bool, str]:
