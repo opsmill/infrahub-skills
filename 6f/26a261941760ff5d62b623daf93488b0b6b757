@@ -1,0 +1,26 @@
+skills/infrahub-auditing-repo/rules/audit-verifies-proposed-syntax.md
+  s_0a0cb8ae491bbc::t_585d738a7deec0 159-162
+tests/graders/test_auditing_repo_evidence.py
+  s_0a0cb8ae491bbc::t_dadc48250d204f 372,374-382
+  s_0a0cb8ae491bbc::t_7490cd86619d84 393
+skills/infrahub-auditing-repo/SKILL.md
+  s_0a0cb8ae491bbc::t_56957d0637663a 91-98
+skills/infrahub-auditing-repo/audit-procedure.md
+  s_0a0cb8ae491bbc::t_f89ff63e373e7a 31-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6f26a261941760ff5d62b623daf93488b0b6b757",
+  "prompts": {},
+  "sessions": {
+    "s_0a0cb8ae491bbc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "449d8aad-03ea-4de8-bbc3-d95a17df34e0",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
