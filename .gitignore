@@ -82,6 +82,7 @@ secrets.yaml
 # git cannot re-include anything under an excluded directory.
 .claude/*
 !.claude/rules
+!.claude/skills
 
 # Superpowers workspaces (never commit)
 .superpowers/
