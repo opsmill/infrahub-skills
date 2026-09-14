@@ -32,10 +32,13 @@ to ship — a skill absent from it is not in the release.
 
 ## Release notes
 
-PR labels drive the auto-generated draft, but each
-release also gets a curated page under
+Towncrier assembles `CHANGELOG.md` from the news
+fragments in `changelog/`, and that assembled section
+becomes the GitHub Release body — so a new skill ships a
+fragment rather than a hand-edited changelog.
+
+Each release also gets a curated page under
 `docs/docs/release-notes/`. The new page takes
 `sidebar_position: 1` and **every older page shifts down
-by one**. Merging to `main` regenerates the GitHub draft
-body, so paste the curated notes into the draft after
-the last PR lands and before publishing.
+by one**. Write it before the release pull request
+merges, since merging is what tags and publishes.
