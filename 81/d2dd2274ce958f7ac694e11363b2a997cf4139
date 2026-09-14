@@ -1,0 +1,28 @@
+graders/auditing-repo/lib.py
+  s_0a0cb8ae491bbc::t_103e69d41e5929 1447-1453,1461-1462,1464-1467
+  s_0a0cb8ae491bbc::t_7ab3e0894c4809 1407-1412,1414-1415,1417-1421,1424,1426
+tests/graders/test_auditing_repo_evidence.py
+  s_0a0cb8ae491bbc::t_ac56c9f91ca785 433-494
+graders/auditing-repo/check_audit_extraction_feasibility.py
+  s_0a0cb8ae491bbc::t_5698d075f3069b 26-32,35,38,43,45
+skills/infrahub-auditing-repo/rules/audit-cites-all-reference-sites.md
+  s_0a0cb8ae491bbc::t_06c7fbe65596d8 79-80
+skills/infrahub-auditing-repo/rules/audit-verifies-proposed-syntax.md
+  s_0a0cb8ae491bbc::t_8e7eacc9ca2b55 106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "81d2dd2274ce958f7ac694e11363b2a997cf4139",
+  "prompts": {},
+  "sessions": {
+    "s_0a0cb8ae491bbc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "449d8aad-03ea-4de8-bbc3-d95a17df34e0",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
