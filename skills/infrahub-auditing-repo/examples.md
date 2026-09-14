@@ -281,12 +281,28 @@ attributes, 2000-2999 for secondary)
 
 ### MEDIUM: Potential generic candidate
 
-**Files**: `schemas/device.yml`, `schemas/firewall.yml`, `schemas/switch.yml`
+**Sites**: `schemas/device.yml:12`, `schemas/firewall.yml:9`,
+`schemas/switch.yml:14`
 **Finding**: 3 nodes share identical attributes: `name`,
 `description`, `status`, `role` — consider a shared
 generic
+**Feasibility**: blocked-differing-identifiers, because
+the three kinds declare `location` under `device__location`,
+`firewall__location` and `switch__site`, and an identifier
+cannot change once loaded
 **Fix**: Create a generic (e.g., `InfraNetworkDevice`)
-with shared attributes
+carrying the four shared attributes. Leave `location` on
+the concrete kinds: one generic edge means one identifier,
+which would collapse three distinct edges and collide
+their reverse relationships without reporting anything.
+
+**Sites** replaces the older **Files** line on a finding
+that proposes removing or renaming something: it is the
+set of places the fix has to touch, from a repo-wide
+sweep, not the one place the finding was spotted. A
+finding whose proposal had to be checked against the
+running version carries **Verified against** as well, and
+says there when it could not be checked.
 
 ### LOW: Object file naming
 

@@ -593,7 +593,7 @@ ones that apply to it:
 | Field | Type | Carried by |
 | ----- | ---- | ---------- |
 | `sites` | list of `path` or `path:line` | Any finding proposing a removal or rename. Every reference site, from a repo-wide search. `file` locates the finding; `sites` is the set to change |
-| `verified_against` | string | Any finding proposing a filter, schema field or config key. Names the artifact introspected and its version, or states plainly that verification was not possible |
+| `verified_against` | string | Any finding whose claim rests on something it had to go and check. Names the artifact introspected and its version for a proposed filter, schema field or config key, and records an incomplete or unrun reference sweep for `sites`. States plainly when verification was not possible; an in-repo analogy is not verification |
 | `feasibility` | verdict token | Any generic-extraction finding. Defaults to `clear (unverified)`; see the rule's feasibility gate for the full verdict list |
 
 In the markdown report the same three appear as a

@@ -46,9 +46,16 @@ why a filename is not evidence.
    across schemas, object files, queries, templates,
    transforms, generators and checks. Not the first
    site found.
-2. **`sites` is complete or declared incomplete**: if
-   the sweep was not run, the finding says so rather
-   than presenting a partial list as the set.
+2. **`sites` is complete, or `verified_against` says it
+   is not.** A partial list presented as the set is the
+   defect; a partial list that declares itself is a
+   finding an implementer can still act on. Put the
+   statement in `verified_against`, the same field that
+   carries how a proposed syntax was established: it
+   answers "how do you know", and the sweep is one of the
+   things it has to answer for. "not swept: the search
+   covered schemas and templates only" is a complete
+   answer to Check 2.
 3. **Render and execution sites come from the
    registration graph**: read `.infrahub.yml` for what
    is registered, then walk the include and import

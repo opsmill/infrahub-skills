@@ -270,10 +270,10 @@ def check_yagni_no_finding_above_medium(findings: list[dict]) -> tuple[bool, str
     introduce a HIGH-severity finding.
 
     INFO is admitted because it sits *below* MEDIUM in the skill's own
-    severity legend. ``audit-verifies-proposed-syntax`` tells a finding
-    that cannot verify its own proposal to downgrade rather than assert,
-    and INFO is where such a finding lands. A cap that rejects it fails the
-    finding for following the rule.
+    severity legend, which is what a cap on the upper bound means. Rules
+    set their own severity through `impact`, so this only ever needs to
+    reject CRITICAL and HIGH; failing an informational finding was the cap
+    misreading its own name.
     """
     ALLOWED = {"MEDIUM", "LOW", "INFO"}
     yagni = [
@@ -1375,6 +1375,35 @@ def check_audit_sites_complete(
     )
 
 
+# An appeal to something else in the same repository, used as the evidence.
+# A sibling query demonstrates the filter it uses and nothing else, so these
+# phrases mark the inference the rule's Check 3 names rather than the
+# introspection it asks for.
+#
+# Deliberately does not match the bare word "sibling". An audit that names the
+# sibling in order to say it proves nothing is doing what Check 3 asks, and
+# failing it for using the word punishes the correct answer.
+_INFERENCE_MARKERS = re.compile(
+    r"\bsame\s+(?:form|shape|way)\s+as\b"
+    r"|\bsame\s+as\s+the\s+(?:sibling|other|existing)\b"
+    r"|\banother\s+quer(?:y|ies)\s+(?:\w+\s+){0,2}(?:uses|does|has|did)\b"
+    r"|\bby\s+analogy\b"
+    r"|\banalogous\b"
+    r"|\bmirrors?\s+the\b"
+    r"|\belsewhere\s+in\s+the\s+repo\b",
+    re.IGNORECASE,
+)
+
+# An explicit statement that the proposal was not verified. This outranks a
+# marker: a finding disclosing that it could not check is exactly what Check 6
+# asks for, and it often names the analogy it declined to rely on.
+_DECLARED_UNVERIFIED = re.compile(
+    r"\bnot\s+verified\b|\bcould\s+not\s+verify\b|\bunverified\b"
+    r"|\bunable\s+to\s+verify\b|\bnot\s+confirmed\b",
+    re.IGNORECASE,
+)
+
+
 def check_audit_verified_against(findings: list[dict], rule: str) -> tuple[bool, str]:
     """Assert the finding states how its proposed syntax was verified.
 
@@ -1388,9 +1417,16 @@ def check_audit_verified_against(findings: list[dict], rule: str) -> tuple[bool,
     if f is None:
         return False, f"{rule} missing, so it cannot check verification"
     stated = " ".join(_flatten_strings(f.get("verified_against"))).strip()
-    if stated:
-        return True, f"{rule} verified_against={stated[:60]!r}"
-    return False, f"{rule} proposes syntax with no `verified_against`"
+    if not stated:
+        return False, f"{rule} proposes syntax with no `verified_against`"
+    marker = _INFERENCE_MARKERS.search(stated)
+    if marker and not _DECLARED_UNVERIFIED.search(stated):
+        return False, (
+            f"{rule} rests its syntax on an in-repo analogy "
+            f"({marker.group(0)!r}), which is evidence for the form the other "
+            f"query uses and nothing else"
+        )
+    return True, f"{rule} verified_against={stated[:60]!r}"
 
 
 def check_audit_replacement_omits(
@@ -1426,12 +1462,29 @@ def check_audit_replacement_omits(
     return True, f"{rule} recommends no {token!r} in {len(matches)} finding(s)"
 
 
+# The honest default, in the spellings a model actually writes it: "clear
+# (unverified)", "clear(unverified)", "clear - unverified".
+_UNVERIFIED = re.compile(r"unverified", re.IGNORECASE)
+
+
 def _verdict(value: Any) -> str:
-    """The leading verdict token of a feasibility label, lowercased."""
+    """A feasibility label reduced to its verdict token, lowercased.
+
+    Normally that is the leading token, so a finding may explain itself after
+    the label. The exception is the unverified default: taking the head of
+    "clear (unverified)" yields "clear", which is the one distinction the
+    whole gate rests on. `clear` is the promise that someone checked the
+    identifiers, peer kinds and hoisted settings; the default is the
+    admission that nobody did, and an implementer reads it to decide which
+    findings to re-derive. Collapsing the two hands them the promise.
+    """
     text = " ".join(_flatten_strings(value)).strip().strip("`\"'")
     if not text:
         return ""
-    return re.split(r"[\s:,.]+", text, maxsplit=1)[0].lower()
+    head = re.split(r"[\s:,.]+", text, maxsplit=1)[0].lower()
+    if head.startswith("clear") and _UNVERIFIED.search(text):
+        return "clear-unverified"
+    return head
 
 
 def check_audit_extraction_feasibility(
@@ -1458,7 +1511,9 @@ def check_audit_extraction_feasibility(
     actual = _verdict(f.get("feasibility"))
     if not actual:
         return False, f"{rule} proposes an extraction with no `feasibility` verdict"
-    accepted = [v.strip().lower() for v in expected.split("|") if v.strip()]
+    # Expected verdicts go through _verdict too, so "clear (unverified)"
+    # written on either side compares equal and never collapses to "clear".
+    accepted = [_verdict(v) for v in expected.split("|") if v.strip()]
     if actual in accepted:
         return True, f"{rule} feasibility={actual}"
     return False, (

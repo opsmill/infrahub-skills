@@ -83,10 +83,19 @@ dataset could have caught it.
    data satisfies a narrowed pattern that imported data
    does not.
 6. **A finding that cannot verify its own proposal says
-   so and downgrades**, rather than presenting an
-   unverified fix in a verified voice. `verified_against`
-   records the failure to verify; it is not a field to
-   fill with a guess.
+   so**, rather than presenting an unverified fix in a
+   verified voice. `verified_against` records the failure
+   to verify; it is not a field to fill with a guess.
+
+   **Do not lower `severity` to express that.** Severity
+   is a property of the rule, declared in its `impact`
+   frontmatter, and per-rule graders assert it across the
+   whole corpus, so an auditor that downgrades on
+   confidence fails tasks that have nothing to do with
+   this rule. What weakens is the claim, not the finding:
+   say so in `verified_against` and keep the unverified
+   syntax out of the replacement, per Check 7. The finding
+   keeps the severity its rule declares.
 7. **Unverified syntax stays out of the replacement
    entirely, hedged or not.** Saying so in
    `verified_against` and then putting the unconfirmed

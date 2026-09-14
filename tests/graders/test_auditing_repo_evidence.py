@@ -172,14 +172,17 @@ def test_verified_syntax_fails_a_proposal_with_no_statement_of_verification(tmp_
 def test_verified_syntax_fails_the_same_form_as_the_sibling_near_miss(tmp_path):
     """Near-miss: `verified_against` is populated, with an inference in it.
 
-    A sibling query demonstrating one filter is evidence for that filter. This
-    finding satisfies a presence-only check and still ships `__gte`.
+    A sibling query demonstrating one filter is evidence for that filter. Both
+    checks now catch this: the syntax check rejects the `__gte` it ships, and
+    the verification check rejects the analogy it rests on. It scored 0.5 while
+    the second was presence-only, which left the rule's "same form as the
+    sibling is not verification" sentence resting on a fixture-specific token.
     """
     payload = _syntax_finding(
         "DcimInterface(count__gte: 48) { count }",
         "same form as the sibling query in queries/device_info.gql",
     )
-    assert _score(tmp_path, SYNTAX_CHECKS, payload) == 0.5
+    assert _score(tmp_path, SYNTAX_CHECKS, payload) == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -492,3 +495,94 @@ def test_replacement_omits_inspects_every_finding_for_the_rule(tmp_path):
     assert _task_score(tmp_path, PROPOSED_SYNTAX_GRADER, [clean, dirty]) == 0.0
     assert _task_score(tmp_path, PROPOSED_SYNTAX_GRADER, [dirty, clean]) == 0.0
     assert _task_score(tmp_path, PROPOSED_SYNTAX_GRADER, [clean, clean]) == 1.0
+
+
+# ---------------------------------------------------------------------------
+# The unverified default must not satisfy the verified verdict.
+#
+# `_verdict` took the leading token, so "clear (unverified)" reduced to
+# "clear". The whole feasibility gate is built on that distinction: the
+# default is what an implementer must re-derive, and `clear` is the promise
+# that someone already did.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("feasibility,expected_verdict,should_pass", [
+    pytest.param("clear", "clear", True, id="verified-clear-matches-clear"),
+    pytest.param("clear (unverified)", "clear", False, id="default-is-not-clear"),
+    pytest.param("clear(unverified)", "clear", False, id="default-without-space"),
+    pytest.param("clear - unverified", "clear", False, id="default-with-dash"),
+    pytest.param("clear (unverified)", "clear (unverified)", True, id="default-matches-itself"),
+    pytest.param(
+        "clear: identifiers, peers and hoisted settings all checked",
+        "clear", True, id="verified-clear-may-explain-itself"),
+])
+def test_feasibility_separates_clear_from_the_unverified_default(
+    tmp_path, feasibility, expected_verdict, should_pass
+):
+    checks = [f"audit-extraction-feasibility:{GENERIC_RULE}:{expected_verdict}"]
+    scored = _score(tmp_path, checks, _generic_finding(feasibility)) == 1.0
+    assert scored is should_pass
+
+
+# ---------------------------------------------------------------------------
+# "Same form as the sibling" is not verification.
+#
+# The rule says so in Check 3, but the check only asserted the field was
+# non-empty, so the sentence had no test that could fail. The near-miss
+# fixture scored 0.5 purely on the companion __gte check, which is specific
+# to that fixture and would not carry to any other task.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("stated,should_pass", [
+    pytest.param(
+        "attribute filter generator, infrahub 1.11.1 pinned image",
+        True, id="names-the-artifact-and-version"),
+    pytest.param(
+        "read the filter generator off the pinned image; it emits no range filter",
+        True, id="names-what-was-read"),
+    pytest.param(
+        "not verified: the pinned image was unavailable",
+        True, id="declares-non-verification"),
+    pytest.param(
+        "same form as the sibling query in queries/device_info.gql",
+        False, id="sibling-analogy-is-not-evidence"),
+    pytest.param(
+        "the same form another query already uses",
+        False, id="another-query-analogy"),
+    pytest.param(
+        "by analogy with the existing dropdown filter",
+        False, id="explicit-analogy"),
+])
+def test_verified_against_rejects_an_in_repo_analogy(tmp_path, stated, should_pass):
+    checks = [f"audit-verified-against:{SYNTAX_RULE}"]
+    payload = _syntax_finding("DcimInterface(role__values: [\"uplink\"]) { count }", stated)
+    scored = _score(tmp_path, checks, payload) == 1.0
+    assert scored is should_pass
+
+
+@pytest.mark.parametrize("stated,should_pass", [
+    pytest.param(
+        "the sibling query demonstrates only the singular filter, so it is not "
+        "evidence; not verified against the pinned image",
+        True, id="naming-the-sibling-to-reject-it-is-not-relying-on-it"),
+    pytest.param(
+        "could not verify: the image was unavailable, and the same form as the "
+        "sibling query is not evidence",
+        True, id="explicit-non-verification-outranks-a-quoted-marker"),
+    pytest.param(
+        "same form as the sibling query in queries/device_info.gql",
+        False, id="still-fails-when-the-analogy-is-the-whole-evidence"),
+])
+def test_verified_against_allows_naming_an_analogy_in_order_to_reject_it(
+    tmp_path, stated, should_pass
+):
+    """Matching the bare word `sibling` failed a correct answer.
+
+    An audit that explains why the sibling proves nothing is doing exactly
+    what Check 3 asks. Only a statement that *rests* on the analogy should
+    fail, and an explicit declaration of non-verification outranks the
+    marker entirely.
+    """
+    checks = [f"audit-verified-against:{SYNTAX_RULE}"]
+    payload = _syntax_finding("Keep the Python check.", stated)
+    assert (_score(tmp_path, checks, payload) == 1.0) is should_pass

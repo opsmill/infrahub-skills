@@ -130,6 +130,16 @@ Verdicts:
 | `blocked-differing-peers` | Members point the relationship at different peer kinds |
 | `blocked-setting-traverses-unhoisted-rel` | A hoisted node-level setting traverses a relationship that is staying on the concrete kinds |
 
+**More than one blocker can apply at once, and any of
+them is a correct verdict.** A member set that declares
+three identifiers often also peers two different kinds,
+because both follow from the same modelling choice. The
+blockers carry no precedence: report the one you would
+have to undo first, and name the others in the finding
+rather than picking silently. A reader needs to know the
+extraction is blocked and why; which blocker was written
+in the field does not change what they do next.
+
 **The verdict names the blocker, not the outcome.** When
 the relationship is blocked and the finding is reduced
 to attributes, the verdict is still the `blocked-` reason
