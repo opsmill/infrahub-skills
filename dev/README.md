@@ -41,13 +41,18 @@ matching file rather than when someone remembers to go
 looking. The rules are triggers; the depth stays in
 `guides/` and `knowledges/`.
 
-| Rule | Fires on |
-| ---- | -------- |
-| [`guidelines/rule-equals-test.md`](guidelines/rule-equals-test.md) | `skills/*/rules/`, `graders/`, `eval.yaml` |
-| [`guidelines/graders.md`](guidelines/graders.md) | `graders/` |
-| [`guidelines/skill-authoring.md`](guidelines/skill-authoring.md) | `skills/**/*.md` |
-| [`guidelines/skill-registration.md`](guidelines/skill-registration.md) | `SKILL.md`, `docs/`, `README.md` |
-| [`guidelines/versioning.md`](guidelines/versioning.md) | version files |
+| Rule | What it constrains |
+| ---- | ------------------ |
+| [`guidelines/rule-equals-test.md`](guidelines/rule-equals-test.md) | A new skill rule ships with its grader and eval in the same change |
+| [`guidelines/graders.md`](guidelines/graders.md) | Parse the answer, never substring-match it; verify both directions |
+| [`guidelines/skill-authoring.md`](guidelines/skill-authoring.md) | Description, body, examples, and how to verify an edit |
+| [`guidelines/skill-registration.md`](guidelines/skill-registration.md) | The five surfaces a new skill has to appear in |
+| [`guidelines/versioning.md`](guidelines/versioning.md) | The five files a version bump touches |
+
+Each rule's `paths:` frontmatter is the authority on when it
+loads. This table does not restate the globs — a second copy
+drifts, which is what `guidelines/skill-authoring.md`
+§ "One fact, one home" is about.
 
 Another agent is one symlink away: point its rules
 directory here too, and check its frontmatter keys — the

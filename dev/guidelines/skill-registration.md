@@ -2,7 +2,6 @@
 paths:
   - "skills/*/SKILL.md"
   - "docs/docs/**/*.mdx"
-  - "README.md"
   - "AGENTS.md"
   - ".github/.release-manifest.json"
 ---
@@ -14,6 +13,11 @@ Full reference: `dev/guides/adding-a-skill.md` §7
 A new skill has to be listed in **five** places. CI
 checks none of them, so a skill missing from one ships
 invisible to whichever audience reads that surface.
+
+`README.md` is one of those surfaces but not a trigger:
+a bare `README.md` glob would match every nested README
+in the tree, and the work always starts at the skill's
+own `SKILL.md`, which is a trigger.
 
 | Surface | What to add |
 | ------- | ----------- |

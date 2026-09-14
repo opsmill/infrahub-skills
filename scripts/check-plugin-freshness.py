@@ -22,11 +22,30 @@ def installed_skill_dirs() -> list[Path]:
     return sorted(p for p in Path.home().joinpath(".claude").glob(CACHE_GLOB) if p.is_dir())
 
 
+def _tracked(root: Path) -> set[Path]:
+    """Skill files, minus what a test run or the OS leaves behind.
+
+    `invoke test` writes __pycache__ under skills/; counting those as drift
+    tells a contributor their edit is untested when it is not.
+    """
+    out = set()
+    for p in root.rglob("*"):
+        if not p.is_file():
+            continue
+        rel = p.relative_to(root)
+        if any(part.startswith(".") or part == "__pycache__" for part in rel.parts):
+            continue
+        if rel.suffix in {".pyc", ".pyo"}:
+            continue
+        out.add(rel)
+    return out
+
+
 def compare(installed: Path) -> tuple[int, int]:
     """Return (differing files, files present in only one tree)."""
-    differing = only = 0
-    repo_files = {p.relative_to(REPO_SKILLS) for p in REPO_SKILLS.rglob("*") if p.is_file()}
-    cache_files = {p.relative_to(installed) for p in installed.rglob("*") if p.is_file()}
+    differing = 0
+    repo_files = _tracked(REPO_SKILLS)
+    cache_files = _tracked(installed)
     only = len(repo_files ^ cache_files)
     for rel in sorted(repo_files & cache_files):
         if not filecmp.cmp(REPO_SKILLS / rel, installed / rel, shallow=False):

@@ -111,10 +111,25 @@ and the *trigger* in the router; never move a rule into `AGENTS.md` because
 Resolve `$ARGUMENTS` to a PR: a number, a branch name (`gh pr view <branch>`),
 or empty for the current branch's PR. If none exists, ask.
 
+Three endpoints, not one. `/comments` returns only
+diff-anchored comments, so a reviewer who writes the lesson
+in a "Request changes" summary — or in plain PR discussion —
+is invisible to a run that reads that endpoint alone.
+
 ```bash
 gh pr view <n> --json title,body,headRefName,commits
+
+# inline, diff-anchored
 gh api repos/opsmill/infrahub-skills/pulls/<n>/comments --paginate \
   -q '.[] | "--- \(.user.login) on \(.path):\(.line // .original_line)\n\(.body)\n"'
+
+# review summaries (approve / request-changes bodies)
+gh api repos/opsmill/infrahub-skills/pulls/<n>/reviews --paginate \
+  -q '.[] | select(.body != "") | "--- \(.user.login) [\(.state)]\n\(.body)\n"'
+
+# general PR discussion
+gh api repos/opsmill/infrahub-skills/issues/<n>/comments --paginate \
+  -q '.[] | "--- \(.user.login)\n\(.body)\n"'
 ```
 
 Read **resolved and unresolved** threads. A resolved thread whose lesson never

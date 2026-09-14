@@ -50,13 +50,16 @@ AI command definitions live in [dev/commands/](dev/commands/).
 
 Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rules` symlinks to. Each declares the globs it applies to in frontmatter, so it loads when a matching file is in play rather than waiting for someone to go looking for it. Another agent is one symlink away, though its frontmatter key differs — `paths:` for Claude, `globs:` for Cursor, `applyTo:` for Copilot.
 
-| Rule | Fires on |
-| ---- | -------- |
-| [rule-equals-test.md](dev/guidelines/rule-equals-test.md) | `skills/*/rules/`, `graders/`, `eval.yaml` |
-| [graders.md](dev/guidelines/graders.md) | `graders/` |
-| [skill-authoring.md](dev/guidelines/skill-authoring.md) | `skills/**/*.md` |
-| [skill-registration.md](dev/guidelines/skill-registration.md) | `SKILL.md`, `docs/`, `README.md` |
-| [versioning.md](dev/guidelines/versioning.md) | version files |
+| Rule | What it constrains |
+| ---- | ------------------ |
+| [rule-equals-test.md](dev/guidelines/rule-equals-test.md) | A new skill rule ships with its grader and eval in the same change |
+| [graders.md](dev/guidelines/graders.md) | Parse the answer, never substring-match it; verify both directions |
+| [skill-authoring.md](dev/guidelines/skill-authoring.md) | Description, body, examples, and how to verify an edit |
+| [skill-registration.md](dev/guidelines/skill-registration.md) | The five surfaces a new skill has to appear in |
+| [versioning.md](dev/guidelines/versioning.md) | The five files a version bump touches |
+
+Each rule's `paths:` frontmatter is the authority on when
+it loads; this table deliberately does not restate it.
 
 The rules are triggers, not the reference — they state the constraint and link back into `dev/`. Before changing a skill, a grader, or an eval, read the `dev/` page the matching rule names. The architectural intent is usually the answer.
 
