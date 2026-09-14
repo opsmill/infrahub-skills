@@ -343,8 +343,9 @@ Review results with `skillgrade preview`.
   structure)
 - [ ] `AGENTS.md` quick reference table updated
   (see [Step 7](#7-register-in-documentation))
-- [ ] PR labeled with `type/*` and `changes/*` so
-  release-drafter categorizes it correctly
+- [ ] News fragment added under `changelog/`
+- [ ] PR labeled with `changes/*` so the version bump
+  is calculated correctly
 
 **Validate version consistency:**
 
