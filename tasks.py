@@ -19,3 +19,9 @@ def lint(ctx):
 def test(ctx):
     """Run the test suite (grader libraries and bundled skill scripts)."""
     ctx.run("uv run --group test pytest", pty=True)
+
+
+@task
+def freshness(ctx):
+    """Check the installed plugin against this working tree."""
+    ctx.run("uv run python scripts/check-plugin-freshness.py", pty=True, warn=True)

@@ -36,8 +36,12 @@ cli_invocations_all:
   - "dev/guides/**"
   - "dev/knowledges/**"
   - "dev/commands/**"
+  - "dev/guidelines/**"
+  - "dev/README.md"
+  - ".claude/**"
   - "eval.yaml"
   - "scripts/check-cli-invocations.py"
+  - "scripts/check-rules-symlink.py"
 
 documentation_all:
   - *doc_files

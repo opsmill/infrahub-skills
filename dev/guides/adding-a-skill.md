@@ -173,13 +173,17 @@ should have:
 
 ### 5. Update Version Tracking
 
-The skill's `metadata.version` in SKILL.md must match:
-
-1. `.claude-plugin/plugin.json` (`version` field)
-2. `.github/.release-manifest.json` (`version` field)
+The skill's `metadata.version` in SKILL.md must match
+the current release version, which lives in five files
+— see [../guidelines/versioning.md](../guidelines/versioning.md).
+For a new skill, copy the version already in
+`.claude-plugin/plugin.json` rather than bumping
+anything.
 
 Add the skill name to the `skills` array in
-`.github/.release-manifest.json`.
+`.github/.release-manifest.json`. That array is what the
+published release claims to ship; a skill missing from
+it is not in the release.
 
 ### 6. Write Evaluations
 
@@ -188,30 +192,58 @@ create deterministic grader scripts in
 `graders/my-skill/` to test the skill produces
 correct output.
 
-```yaml
-skill_name: infrahub-my-skill
+Each task names the skill to load in its own
+`instruction`, which is how tasks for different skills
+coexist in one file:
 
+```yaml
 tasks:
-  - id: basic-scenario
-    prompt: >-
+  - name: basic-scenario
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-my-skill/SKILL.md
+      and follow its workflow and rules.
+
       A realistic user request with specific names,
       namespaces, and field types.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/my-skill/check_basic_scenario.py
+        weight: 1.0
     expected_output: >-
       What correct output looks like.
-    grader: graders/my-skill/basic-scenario.sh
 
-  - id: advanced-scenario
-    prompt: >-
+  - name: advanced-scenario
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-my-skill/SKILL.md
+      and follow its workflow and rules.
+
       A more complex request covering relationships
       or edge cases.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/my-skill/check_advanced_scenario.py
+        weight: 1.0
     expected_output: >-
       What correct output looks like.
-    grader: graders/my-skill/advanced-scenario.sh
 ```
 
-Each grader script in `graders/my-skill/` reads the model
-output on stdin and prints `{"pass": true}` or
-`{"pass": false, "reason": "..."}` to stdout.
+`graders` is what skillgrade scores, by weight. The
+full task shape, including the `expectations` and
+`assertions` blocks that document a task without
+failing a run, is in
+[running-evals.md](./running-evals.md#evalyaml-format).
+
+Each grader script in `graders/my-skill/` calls the
+shared `run_checks` library and prints the result as
+JSON to stdout. See
+[adding-a-rule.md](./adding-a-rule.md#4-add-a-task-grader-script)
+for the script shape.
 
 **Writing good eval prompts**: Make them realistic —
 the kind of thing an actual user would type, with
@@ -223,7 +255,7 @@ VLAN management system with...".
 **Writing good assertions**: Each grader should be
 objectively deterministic. Use descriptive file names
 that explain what's being tested at a glance (e.g.,
-`dropdown-for-status.sh` not `check-1.sh`).
+`check_dropdown_for_status.py` not `check_1.py`).
 
 Run evals with skillgrade to iterate on quality:
 
@@ -248,17 +280,16 @@ case once a skill exists), see
 
 ### 7. Register in Documentation
 
-- Add the skill to the table in `CLAUDE.md`
-- Add the skill to `README.md`
-  (skills section + project structure)
-- Update `AGENTS.md` quick reference table
+Five surfaces, none of them checked by CI. The list and
+what to add to each is in
+[../guidelines/skill-registration.md](../guidelines/skill-registration.md),
+which loads on its own when you edit a `SKILL.md`.
 
-Release notes are generated automatically by
-[release-drafter](../../.github/release-drafter.yml)
-from PR labels — no manual changelog edit is needed.
-Apply the appropriate `type/*` and `changes/*` labels
-to your PR so it lands in the right release-notes
-category.
+Apply the appropriate `type/*` and `changes/*` labels to
+your PR so [release-drafter](../../.github/release-drafter.yml)
+files it in the right category. The drafted body is a
+starting point, not the release notes: each release also
+gets a curated page, per the same rule.
 
 ### 8. Verification
 
