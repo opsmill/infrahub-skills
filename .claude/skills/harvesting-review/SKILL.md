@@ -6,7 +6,7 @@ description: >-
   before deciding, checks whether it is already codified in prose *or* in a
   grader, and routes the genuinely-new ones either into a shipped skill's rules
   (with the grader and eval that rule requires) or into the contributor layer —
-  `.agents/rules/`, `dev/`, `AGENTS.md`. Proposes edits first, applies only with
+  `dev/guidelines/`, `dev/`, `AGENTS.md`. Proposes edits first, applies only with
   the user's approval. TRIGGER when: the user wants to turn PR review feedback
   on this repository into durable rules; capture recurring reviewer comments as
   contributor documentation; or check whether review lessons are reflected in
@@ -48,7 +48,7 @@ knows how to name, and folds the fix into the same PR.
 
 **A harvest that only adds has made the repo worse, however good each
 individual rule is.** `AGENTS.md` is loaded into every session in this
-repository, and `.agents/rules/` loads on every matching file. Both are a tax
+repository, and `dev/guidelines/` loads on every matching file. Both are a tax
 every contributor's agent pays. Nothing else in this skill removes a line, so
 it has to be you, on every lesson you apply:
 
@@ -79,7 +79,7 @@ The lesson is something an *Infrahub user's* agent should do differently. It
 belongs in `skills/<skill>/rules/`, and prose alone is not a landing:
 
 > A new rule ships with its eval coverage in the same change.
-> — `.agents/rules/rule-equals-test.md`
+> — `dev/guidelines/rule-equals-test.md`
 
 That means a check function in `graders/<skill>/lib.py` registered in `CHECKS`,
 an `eval.yaml` task that fails with the instruction's `Read the skill at ...`
@@ -94,7 +94,7 @@ The lesson is about working *on* this repository. Cheap by comparison.
 
 | Destination | What lives there | Bar |
 | ----------- | ---------------- | --- |
-| `.agents/rules/*.md` | Terse constraints, loaded automatically when a matching file is touched | Highest. Edit an existing rule before adding a file; a new file means a new `paths:` glob that fires for every future edit under it. |
+| `dev/guidelines/*.md` | Terse constraints, loaded automatically when a matching file is touched | Highest. Edit an existing rule before adding a file; a new file means a new `paths:` glob that fires for every future edit under it. |
 | `dev/guides/**` | How to do X — task procedures and their checklists | When the lesson belongs in a step of a recurring task. |
 | `dev/knowledges/**` | How the repo works and why — reference, not do/don't | When the lesson is an explanation a future contributor needs. |
 | `AGENTS.md` | Repo-wide facts, navigation, boundaries | For *what to do / where things live*, not craft detail. It loads every session, so the bar is high and the entry is short. |
@@ -181,7 +181,7 @@ Grep both layers. In this repository a rule can be codified in prose, in a
 test, or in neither, and the three need different fixes:
 
 ```bash
-grep -rin "<keyword>" .agents/rules/ dev/ AGENTS.md skills/*/rules/
+grep -rin "<keyword>" dev/guidelines/ dev/ AGENTS.md skills/*/rules/
 grep -rin "<keyword>" graders/ eval.yaml
 ```
 
@@ -225,7 +225,7 @@ Verdicts:
 
 Routing rule of thumb: most-specific existing home wins; edit before create;
 strengthen before duplicate; fix the load-trigger before relocating;
-`.agents/rules/` only for a constraint worth loading on every matching file.
+`dev/guidelines/` only for a constraint worth loading on every matching file.
 Confirm the target file exists before routing a lesson to it.
 
 ### 5. Sweep for rot
@@ -233,13 +233,13 @@ Confirm the target file exists before routing a lesson to it.
 Cheap, and it is what keeps "harvested" from meaning "bloated". Run it every
 time.
 
-**a. Staleness grep.** Across `.agents/rules/`, `dev/`, `AGENTS.md`,
+**a. Staleness grep.** Across `dev/guidelines/`, `dev/`, `AGENTS.md`,
 `skills/*/rules/`:
 
 ```bash
-grep -rnoE '(PR #[0-9]+|#[0-9]{4,6}\b)' .agents/rules dev AGENTS.md skills
+grep -rnoE '(PR #[0-9]+|#[0-9]{4,6}\b)' dev/guidelines dev AGENTS.md skills
 grep -rniE '(currently (broken|unfixed)|not yet fixed|known gap|for now)' \
-  .agents/rules dev AGENTS.md skills
+  dev/guidelines dev AGENTS.md skills
 ```
 
 A hit outside this run's own edits is debt from an earlier run. Drop a stale

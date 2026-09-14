@@ -16,7 +16,7 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 | How do I do X? | [dev/guides/](dev/guides/) |
 | How should I write skill prose? | [dev/knowledges/skill-writing-guide.md](dev/knowledges/skill-writing-guide.md) |
 | What was this change meant to do? | [dev/specs/](dev/specs/) |
-| What rules apply to the file I am editing? | [.agents/rules/](.agents/rules/) |
+| What rules apply to the file I am editing? | [dev/guidelines/](dev/guidelines/) |
 | What commands are available? | [dev/commands/](dev/commands/) |
 
 Index of the whole tree: [dev/README.md](dev/README.md).
@@ -48,15 +48,15 @@ AI command definitions live in [dev/commands/](dev/commands/).
 
 ## Rules
 
-Path-scoped rules live in [.agents/rules/](.agents/rules/) (symlinked as `.claude/rules/`). Each declares the globs it applies to in frontmatter, so it loads when a matching file is in play rather than waiting for someone to go looking for it.
+Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rules` symlinks to. Each declares the globs it applies to in frontmatter, so it loads when a matching file is in play rather than waiting for someone to go looking for it. Another agent is one symlink away, though its frontmatter key differs — `paths:` for Claude, `globs:` for Cursor, `applyTo:` for Copilot.
 
 | Rule | Fires on |
 | ---- | -------- |
-| [rule-equals-test.md](.agents/rules/rule-equals-test.md) | `skills/*/rules/`, `graders/`, `eval.yaml` |
-| [graders.md](.agents/rules/graders.md) | `graders/` |
-| [skill-authoring.md](.agents/rules/skill-authoring.md) | `skills/**/*.md` |
-| [skill-registration.md](.agents/rules/skill-registration.md) | `SKILL.md`, `docs/`, `README.md` |
-| [versioning.md](.agents/rules/versioning.md) | version files |
+| [rule-equals-test.md](dev/guidelines/rule-equals-test.md) | `skills/*/rules/`, `graders/`, `eval.yaml` |
+| [graders.md](dev/guidelines/graders.md) | `graders/` |
+| [skill-authoring.md](dev/guidelines/skill-authoring.md) | `skills/**/*.md` |
+| [skill-registration.md](dev/guidelines/skill-registration.md) | `SKILL.md`, `docs/`, `README.md` |
+| [versioning.md](dev/guidelines/versioning.md) | version files |
 
 The rules are triggers, not the reference — they state the constraint and link back into `dev/`. Before changing a skill, a grader, or an eval, read the `dev/` page the matching rule names. The architectural intent is usually the answer.
 
@@ -123,7 +123,7 @@ fixtures, contradicted claims swept, and
 `evaluations/*.json` regenerated.
 
 The seven steps and what each one guards against live in
-[.agents/rules/rule-equals-test.md](.agents/rules/rule-equals-test.md),
+[dev/guidelines/rule-equals-test.md](dev/guidelines/rule-equals-test.md),
 which loads automatically when you touch a rule, a
 grader, or `eval.yaml`. Full walkthrough in
 [dev/guides/adding-a-rule.md](dev/guides/adding-a-rule.md).
@@ -139,8 +139,8 @@ covered forever.
 All skills share a unified version, spread across five
 files. The list, which script covers which, and what
 `release.yml` does and does not validate are in
-[.agents/rules/versioning.md](.agents/rules/versioning.md).
+[dev/guidelines/versioning.md](dev/guidelines/versioning.md).
 
 Each release also gets a curated notes page under
 `docs/docs/release-notes/` — see
-[.agents/rules/skill-registration.md](.agents/rules/skill-registration.md).
+[dev/guidelines/skill-registration.md](dev/guidelines/skill-registration.md).

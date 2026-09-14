@@ -23,8 +23,9 @@ skills themselves. For user-facing docs, see
   specific task.
 - **knowledges/** — descriptive reference. How the
   system works and why it is shaped that way.
-- **guidelines/** — prescriptive standards per tool or
-  technology.
+- **guidelines/** — prescriptive rules, each scoped by a
+  `paths:` glob. `.claude/rules` symlinks here, so a rule
+  loads when a matching file is in play.
 - **specs/** — designs for changes, kept after the work
   lands as a record of intent.
 - **commands/** — project-specific AI command
@@ -32,20 +33,28 @@ skills themselves. For user-facing docs, see
 
 ## Rules
 
-Path-scoped rules live in [`../.agents/rules/`](../.agents/rules/)
-and load automatically when a matching file is in play.
-They are short triggers that point back into `dev/`;
-the depth stays here.
+`guidelines/` is the canonical home for path-scoped
+rules. Each file declares in frontmatter the globs it
+applies to, and `.claude/rules` symlinks to the
+directory, so an agent loads a rule when it touches a
+matching file rather than when someone remembers to go
+looking. The rules are triggers; the depth stays in
+`guides/` and `knowledges/`.
 
 | Rule | Fires on |
 | ---- | -------- |
-| `rule-equals-test.md` | `skills/*/rules/`, `graders/`, `eval.yaml` |
-| `graders.md` | `graders/` |
-| `skill-authoring.md` | `skills/**/*.md` |
-| `skill-registration.md` | `SKILL.md`, `docs/`, `README.md` |
-| `versioning.md` | version files |
+| [`guidelines/rule-equals-test.md`](guidelines/rule-equals-test.md) | `skills/*/rules/`, `graders/`, `eval.yaml` |
+| [`guidelines/graders.md`](guidelines/graders.md) | `graders/` |
+| [`guidelines/skill-authoring.md`](guidelines/skill-authoring.md) | `skills/**/*.md` |
+| [`guidelines/skill-registration.md`](guidelines/skill-registration.md) | `SKILL.md`, `docs/`, `README.md` |
+| [`guidelines/versioning.md`](guidelines/versioning.md) | version files |
 
-Adding a rule file here is not the same as adding a
-*skill* rule under `skills/<skill>/rules/` — the latter
-ships with grader and eval coverage
+Another agent is one symlink away: point its rules
+directory here too, and check its frontmatter keys — the
+`paths:` Claude reads is `globs:` in Cursor and
+`applyTo:` in Copilot.
+
+Adding a file here is not the same as adding a *skill*
+rule under `skills/<skill>/rules/` — the latter ships
+with grader and eval coverage
 (see [`guides/adding-a-rule.md`](guides/adding-a-rule.md)).

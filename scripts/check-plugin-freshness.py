@@ -34,10 +34,31 @@ def compare(installed: Path) -> tuple[int, int]:
     return differing, only
 
 
+def check_rules_symlink() -> bool:
+    """`.claude/rules` must resolve to the canonical rules directory.
+
+    git materializes a symlink as a plain text file when core.symlinks is
+    false, and every agent then silently loads no rules at all.
+    """
+    link = REPO_SKILLS.parent / ".claude" / "rules"
+    target = REPO_SKILLS.parent / "dev" / "guidelines"
+    if link.is_dir() and link.resolve() == target.resolve():
+        return True
+    print(
+        "BROKEN: .claude/rules does not resolve to dev/guidelines.\n"
+        "  No rules will load. If git wrote it as a regular file, set\n"
+        "  core.symlinks=true and re-checkout, or recreate it with\n"
+        "  ln -s ../dev/guidelines .claude/rules"
+    )
+    return False
+
+
 def main() -> int:
     if not REPO_SKILLS.is_dir():
         print("No skills/ directory — run this from the repository root.")
         return 0
+
+    broken = not check_rules_symlink()
 
     dirs = installed_skill_dirs()
     if not dirs:
@@ -45,7 +66,7 @@ def main() -> int:
             "Infrahub plugin not installed. Skills invoked here resolve to "
             "nothing, so read skills/<name>/SKILL.md directly or run evals."
         )
-        return 0
+        return 1 if broken else 0
 
     stale = False
     for installed in dirs:
@@ -63,7 +84,7 @@ def main() -> int:
             )
         else:
             print(f"OK: installed plugin {version} matches this tree.")
-    return 1 if stale else 0
+    return 1 if (stale or broken) else 0
 
 
 if __name__ == "__main__":

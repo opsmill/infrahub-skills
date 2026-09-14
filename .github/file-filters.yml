@@ -38,7 +38,6 @@ cli_invocations_all:
   - "dev/commands/**"
   - "dev/guidelines/**"
   - "dev/README.md"
-  - ".agents/rules/**"
   - ".claude/skills/**"
   - "eval.yaml"
   - "scripts/check-cli-invocations.py"

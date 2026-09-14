@@ -175,7 +175,7 @@ should have:
 
 The skill's `metadata.version` in SKILL.md must match
 the current release version, which lives in five files
-— see [../../.agents/rules/versioning.md](../../.agents/rules/versioning.md).
+— see [../guidelines/versioning.md](../guidelines/versioning.md).
 For a new skill, copy the version already in
 `.claude-plugin/plugin.json` rather than bumping
 anything.
