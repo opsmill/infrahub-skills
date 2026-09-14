@@ -1,6 +1,8 @@
 ---
 name: harvesting-review
 description: >-
+  Repo-local variant of `harvesting-review`, rewritten for this repository and
+  not interchangeable with the upstream skill of the same name.
   Mines a pull request's review threads on opsmill/infrahub-skills for lessons
   that generalize beyond that PR, reconstructs each against the actual code
   before deciding, checks whether it is already codified in prose *or* in a
@@ -21,9 +23,31 @@ metadata:
   internal: true
   version: 0.1.0
   author: OpsMill
+  variant-of: harvesting-review v0.8.0, opsmill/infrahub `.agents/skills/`
+  variant-scope: opsmill/infrahub-skills only
 ---
 
-# Harvest Review Lessons
+# Harvest Review Lessons (infrahub-skills variant)
+
+> **Not the upstream skill.** This shares a name and a shape with
+> `harvesting-review` in `opsmill/infrahub`, and diverges in ways that make the
+> two non-interchangeable. Do not sync edits between them in either direction;
+> apply a change to whichever repository it was reasoned about.
+>
+> What differs here:
+>
+> - **Two routing tracks, not one.** A lesson about a shipped skill lands in
+>   `skills/<skill>/rules/` and cannot land as prose alone — it pulls in a
+>   grader check, an `eval.yaml` task, four fixtures, and `sync-evals.py`. A
+>   lesson about contributing lands in `dev/guidelines/` or `dev/` and is cheap.
+>   Upstream has only the cheap track.
+> - **An extra verdict: covered in prose but nothing can fail.** This
+>   repository's characteristic gap, and the fix is a test rather than better
+>   wording.
+> - **Three GitHub endpoints, not one.** Review feedback here lives in review
+>   summaries and PR discussion; inline comment volume is routinely zero.
+> - **Different destinations.** `dev/guidelines/`, `dev/guides/`,
+>   `dev/knowledges/`, `AGENTS.md`, `skills/*/rules/`, `graders/`, `eval.yaml`.
 
 ## User Input
 
