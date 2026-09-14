@@ -565,6 +565,111 @@
     },
     {
       "id": 21,
+      "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this repository. `site_name` on DcimDevice duplicates\n`device.location.name`, and the team wants it gone.\n\n`.infrahub.yml` registers exactly these artifacts:\n\n```yaml\nschemas:\n  - schemas/dcim.yml\nqueries:\n  - name: device_info\n    file_path: queries/device_info.gql\nartifact_definitions:\n  - name: device_config\n    transformation: device_config\n    content_type: text/plain\njinja2_transforms:\n  - name: device_config\n    template_path: templates/device_config.j2\n```\n\n`schemas/dcim.yml` (line 42):\n\n```yaml\n    - name: site_name\n      kind: Text\n      optional: true\n```\n\n`templates/device_config.j2`:\n\n```jinja\n{%- import \"device_interfaces.j2\" as ifaces -%}\nhostname {{ device.name.value }}\nsnmp location {{ device.site_name.value }}\n{{ ifaces.render(device) }}\n```\n\n`templates/device_interfaces.j2`:\n\n```jinja\n{% macro render(device) %}\n{% for i in device.interfaces.peers %}\ninterface {{ i.name.value }}\n description {{ device.site_name.value }}-{{ i.role.value }}\n{% endfor %}\n{% endmacro %}\n```\n\n`templates/device.j2` (kept in the repo for local rendering\nexperiments; `.infrahub.yml` does not name it and no template\nincludes or imports it):\n\n```jinja\nhostname {{ device.name.value }}\nsnmp location {{ device.site_name.value }}\n```\n\n`queries/device_info.gql`:\n\n```graphql\nquery device_info {\n  DcimDevice { edges { node { name { value } site_name { value } } } }\n}\n```\n\nSave ONLY the JSON findings to: output.json",
+      "expected_output": "JSON listing one yagni-denormalized-vs-indirect-relationship finding with severity LOW and ladder_step 4, which enumerates all four live reference sites the removal must touch: schemas/dcim.yml, both registered templates (device_config.j2 and the device_interfaces.j2 it imports), and queries/device_info.gql. The unregistered templates/device.j2 is not a live reference site.",
+      "files": [],
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-denormalized-vs-indirect-relationship finding",
+        "That finding has severity LOW and ladder_step 4",
+        "The finding enumerates every live reference site rather than only the schema location it was found at",
+        "templates/device_interfaces.j2 is included, reached through the double-quoted import in the registered template",
+        "templates/device.j2 is excluded, since nothing registers or imports it",
+        "No yagni finding exceeds MEDIUM severity"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-denormalized-vs-indirect-relationship finding is emitted"
+        },
+        {
+          "name": "all-reference-sites",
+          "check": "The finding names schemas/dcim.yml, templates/device_config.j2, templates/device_interfaces.j2 and queries/device_info.gql, and does not name templates/device.j2"
+        },
+        {
+          "name": "correct-severity",
+          "check": "The finding has severity LOW"
+        },
+        {
+          "name": "correct-ladder-step",
+          "check": "The finding has ladder_step 4"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nThis repository targets Infrahub 1.11.1. You are auditing offline:\nthe 1.11.1 container image is not available to you in this session,\nand neither is a running instance.\n\n`checks/check_interface_count.py` (line 18):\n\n```python\nclass InterfaceCountCheck(InfrahubCheck):\n    query = \"device_interfaces\"\n\n    def validate(self, data):\n        for device in data[\"DcimDevice\"][\"edges\"]:\n            uplinks = [\n                i for i in device[\"node\"][\"interfaces\"][\"edges\"]\n                if i[\"node\"][\"role\"][\"value\"] in (\"uplink\", \"peer\")\n            ]\n            if len(uplinks) > 48:\n                self.log_error(f\"{device['node']['name']['value']} over budget\")\n```\n\nA sibling query, `queries/device_info.gql`, already filters in\nGraphQL:\n\n```graphql\nquery device_info {\n  DcimInterface(role__value: \"uplink\") {\n    edges { node { name { value } } }\n  }\n}\n```\n\nThe team wants this check pushed down to the server if the platform\ncan do it.\n\nSave ONLY the JSON findings to: output.json",
+      "expected_output": "JSON listing one yagni-redundant-check-that-graphql-can-answer finding that records how its proposed GraphQL syntax was established. Because the pinned image cannot be introspected in this session, the finding says so rather than asserting syntax it did not verify, and it does not recommend numeric range filters such as __gte or __lte.",
+      "files": [],
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-redundant-check-that-graphql-can-answer finding",
+        "The finding records what its proposed syntax was verified against, or states plainly that it could not be verified in this session",
+        "No numeric range filter (__gte, __lte) is recommended, since the audit has not established that the target version implements one",
+        "The sibling query's singular filter is not treated as evidence for any other filter form",
+        "No yagni finding exceeds MEDIUM severity"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-redundant-check-that-graphql-can-answer finding is emitted"
+        },
+        {
+          "name": "verification-disclosed",
+          "check": "The finding states how its proposed syntax was verified, or that verification was not possible in this session"
+        },
+        {
+          "name": "no-unverified-range-filter",
+          "check": "The finding does not recommend __gte or __lte"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit these three schema files. They are already loaded on a live\ninstance.\n\n`schemas/dcim.yml`:\n\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: Device\n    namespace: Dcim\n    attributes:\n      - name: name\n        kind: Text\n      - name: tier\n        kind: Dropdown\n        choices:\n          - name: gold\n          - name: silver\n          - name: bronze\n    relationships:\n      - name: location\n        peer: LocationSite\n        kind: Attribute\n        cardinality: one\n        identifier: device__location\n```\n\n`schemas/rack.yml`:\n\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: Rack\n    namespace: Dcim\n    attributes:\n      - name: name\n        kind: Text\n      - name: tier\n        kind: Dropdown\n        choices:\n          - name: gold\n          - name: silver\n          - name: bronze\n    relationships:\n      - name: location\n        peer: LocationSite\n        kind: Attribute\n        cardinality: one\n        identifier: rack__location\n```\n\n`schemas/circuit.yml`:\n\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: Endpoint\n    namespace: Circuit\n    attributes:\n      - name: name\n        kind: Text\n      - name: tier\n        kind: Dropdown\n        choices:\n          - name: gold\n          - name: silver\n    relationships:\n      - name: location\n        peer: LocationBuilding\n        kind: Attribute\n        cardinality: one\n        identifier: circuit__site\n```\n\nSave ONLY the JSON findings to: output.json",
+      "expected_output": "JSON listing one yagni-duplicate-shape-not-extracted-to-generic finding with severity MEDIUM and ladder_step 2, naming all three declaring schema files. The location relationship cannot be hoisted: the three kinds declare it under three different identifiers and CircuitEndpoint peers a different kind, so the finding reports a blocked verdict rather than calling the extraction clear.",
+      "files": [],
+      "expectations": [
+        "Output is JSON with a findings array (or an object with a findings key)",
+        "Contains a yagni-duplicate-shape-not-extracted-to-generic finding",
+        "That finding has severity MEDIUM and ladder_step 2",
+        "The finding reports that the location relationship cannot be hoisted because the three kinds declare different identifiers",
+        "All three declaring files are named, including schemas/circuit.yml whose tier choice list is a strict subset of the other two",
+        "No yagni finding exceeds MEDIUM severity"
+      ],
+      "assertions": [
+        {
+          "name": "finding-present",
+          "check": "A yagni-duplicate-shape-not-extracted-to-generic finding is emitted"
+        },
+        {
+          "name": "blocked-feasibility",
+          "check": "The finding reports the extraction as blocked on differing relationship identifiers rather than as clear"
+        },
+        {
+          "name": "all-declaring-kinds",
+          "check": "The finding names schemas/dcim.yml, schemas/rack.yml and schemas/circuit.yml"
+        },
+        {
+          "name": "correct-severity",
+          "check": "The finding has severity MEDIUM"
+        },
+        {
+          "name": "severity-cap",
+          "check": "No yagni finding exceeds MEDIUM severity"
+        }
+      ]
+    },
+    {
+      "id": 24,
       "prompt": "Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and\nwalk Phase 9. Emit JSON findings to output.json.\n\nAudit this schema (schemas/ports.yml) \u2014 three port nodes each\nrepeating the same six attributes, and each with a `device`\nrelationship pointing at a different peer:\n\n```yaml\nversion: \"1.0\"\nnodes:\n  - name: OpticalPort\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: serial, kind: Text}\n      - {name: connector, kind: Text}\n      - {name: vendor, kind: Text}\n      - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}\n      - {name: notes, kind: Text, optional: true}\n    relationships:\n      - name: device\n        peer: DcimOpticalDevice\n        cardinality: one\n        identifier: opticalport__device\n  - name: CopperPort\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: serial, kind: Text}\n      - {name: connector, kind: Text}\n      - {name: vendor, kind: Text}\n      - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}\n      - {name: notes, kind: Text, optional: true}\n    relationships:\n      - name: device\n        peer: DcimCopperDevice\n        cardinality: one\n        identifier: copperport__device\n  - name: VirtualPort\n    namespace: Dcim\n    attributes:\n      - {name: name, kind: Text}\n      - {name: serial, kind: Text}\n      - {name: connector, kind: Text}\n      - {name: vendor, kind: Text}\n      - {name: status, kind: Dropdown, choices: [{name: active}, {name: draft}]}\n      - {name: notes, kind: Text, optional: true}\n    relationships:\n      - name: device\n        peer: DcimVirtualDevice\n        cardinality: one\n        identifier: virtualport__device\n```\n\nEach port kind attaches to exactly one device kind, and the schema\nis currently enforcing that pairing.\n\nSave ONLY the JSON findings to: output.json",
       "expected_output": "JSON listing one yagni-duplicate-shape-not-extracted-to-generic finding with severity MEDIUM and ladder_step 2, covering the six duplicated attributes. Its replacement must leave the `device` relationship on the concrete kinds and say why: a relationship hoisted onto a generic has its peer frozen there, so the per-kind pairing would stop being expressible in the schema.",
       "files": [],

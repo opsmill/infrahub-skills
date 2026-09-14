@@ -249,8 +249,14 @@ def check_yagni_no_finding_above_medium(findings: list[dict]) -> tuple[bool, str
     check enforces the cap across the whole finding set so a new yagni
     rule added without updating its per-rule grader can't silently
     introduce a HIGH-severity finding.
+
+    INFO is admitted because it sits *below* MEDIUM in the skill's own
+    severity legend. ``audit-verifies-proposed-syntax`` tells a finding
+    that cannot verify its own proposal to downgrade rather than assert,
+    and INFO is where such a finding lands. A cap that rejects it fails the
+    finding for following the rule.
     """
-    ALLOWED = {"MEDIUM", "LOW"}
+    ALLOWED = {"MEDIUM", "LOW", "INFO"}
     yagni = [
         f for f in findings
         if isinstance(f, dict) and str(f.get("rule", "")).startswith("yagni-")
@@ -1298,6 +1304,130 @@ def check_yagni_finding_names_cardinality(
     )
 
 
+# ---------------------------------------------------------------------------
+# Evidence checks: what a finding must have established before it asserts
+# ---------------------------------------------------------------------------
+
+
+def _normalise_site(entry: str) -> str:
+    """One reference site reduced to a comparable repo-relative path.
+
+    Accepts the ``path:line`` form the report renders and the bare path, so a
+    finding is not failed for carrying line numbers this check does not grade.
+    """
+    text = str(entry).strip().strip("`\"'")
+    text = re.sub(r":\d+(?:-\d+)?$", "", text)
+    if text.startswith("./"):
+        text = text[2:]
+    return text.lstrip("/")
+
+
+def check_audit_sites_complete(
+    findings: list[dict], rule: str, expected_csv: str
+) -> tuple[bool, str]:
+    """Assert the finding enumerates exactly the reference sites that exist.
+
+    A removal or rename proposal is actionable only if it names every site
+    that has to change. ``file``/``line`` locates the finding; it is not the
+    answer. Set equality is deliberate, because both directions are defects: a
+    short list means the repo-wide sweep was never run, and an entry that is
+    not a live reference means an unregistered lookalike was mistaken for the
+    render path. Either one leaves the repository broken once the finding is
+    acted on.
+    """
+    f = _find(findings, rule)
+    if f is None:
+        return False, f"{rule} missing, so it cannot check reference sites"
+    expected = {_normalise_site(p) for p in expected_csv.split(",") if p.strip()}
+    raw_sites = f.get("sites")
+    if not raw_sites:
+        return False, (
+            f"{rule} names no `sites`, so file={f.get('file')!r} stands in for "
+            f"the sweep. Expected {sorted(expected)}"
+        )
+    actual = {_normalise_site(s) for s in _flatten_strings(raw_sites)}
+    if actual == expected:
+        return True, f"{rule} enumerates all {len(expected)} reference sites"
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    return False, (
+        f"{rule} reference sites wrong. Missing: {missing or 'none'}. "
+        f"Not a live reference: {extra or 'none'}"
+    )
+
+
+def check_audit_verified_against(findings: list[dict], rule: str) -> tuple[bool, str]:
+    """Assert the finding states how its proposed syntax was verified.
+
+    Presence only. What the statement is worth is graded by the companion
+    ``audit-replacement-omits`` check, which fails a proposal that uses syntax
+    the audited version does not implement however confidently it is sourced.
+    Answering "not verified" passes here: the rule asks a finding to disclose
+    its evidence, not to always have some.
+    """
+    f = _find(findings, rule)
+    if f is None:
+        return False, f"{rule} missing, so it cannot check verification"
+    stated = " ".join(_flatten_strings(f.get("verified_against"))).strip()
+    if stated:
+        return True, f"{rule} verified_against={stated[:60]!r}"
+    return False, f"{rule} proposes syntax with no `verified_against`"
+
+
+def check_audit_replacement_omits(
+    findings: list[dict], rule: str, token: str
+) -> tuple[bool, str]:
+    """Assert the finding's recommended fix does not use ``token``.
+
+    For syntax the version under audit does not implement. The inverse of
+    ``check_yagni_replacement_mentions``: a presence check cannot fail a
+    finding that recommends a filter the server rejects at runtime, and an
+    unverified proposal reads exactly like a verified one.
+
+    A finding that was not emitted recommends nothing, so it passes.
+    """
+    f = _find(findings, rule)
+    if f is None:
+        return True, f"{rule} not emitted, so it recommends no {token!r}"
+    text = _recommendation_text(f)
+    if token.lower() in text.lower():
+        return False, (
+            f"{rule} recommends {token!r}, which the audited version does not "
+            f"implement"
+        )
+    return True, f"{rule} recommends no {token!r}"
+
+
+def _verdict(value: Any) -> str:
+    """The leading verdict token of a feasibility label, lowercased."""
+    text = " ".join(_flatten_strings(value)).strip().strip("`\"'")
+    if not text:
+        return ""
+    return re.split(r"[\s:,.]+", text, maxsplit=1)[0].lower()
+
+
+def check_audit_extraction_feasibility(
+    findings: list[dict], rule: str, expected: str
+) -> tuple[bool, str]:
+    """Assert the extraction finding's feasibility verdict is the true one.
+
+    Only the leading verdict token is compared, so a finding is free to
+    explain itself after the label. ``clear`` is reserved for an extraction
+    whose relationship identifiers, peer kinds and hoisted node-level settings
+    were all checked; the honest default reads ``clear (unverified)`` and does
+    not satisfy a blocked verdict.
+    """
+    f = _find(findings, rule)
+    if f is None:
+        return False, f"{rule} missing, so it cannot check feasibility"
+    actual = _verdict(f.get("feasibility"))
+    if not actual:
+        return False, f"{rule} proposes an extraction with no `feasibility` verdict"
+    if actual == expected.strip().lower():
+        return True, f"{rule} feasibility={actual}"
+    return False, f"{rule} feasibility={actual!r}, expected {expected!r}"
+
+
 _CHECKS: dict[str, tuple[Any, list[str]]] = {
     "yagni-finding-present": (check_yagni_finding_present, ["str"]),
     "yagni-finding-absent": (check_yagni_finding_absent, ["str"]),
@@ -1318,6 +1448,12 @@ _CHECKS: dict[str, tuple[Any, list[str]]] = {
     "watch-not-on-forbidden-section": (check_watch_not_on_forbidden_section, []),
     "watch-no-third-party-in-fix": (check_watch_no_third_party_in_fix, ["str"]),
     "yagni-finding-names-cardinality": (check_yagni_finding_names_cardinality, ["str"]),
+    "audit-sites-complete": (check_audit_sites_complete, ["str", "str"]),
+    "audit-verified-against": (check_audit_verified_against, ["str"]),
+    "audit-replacement-omits": (check_audit_replacement_omits, ["str", "str"]),
+    "audit-extraction-feasibility": (
+        check_audit_extraction_feasibility, ["str", "str"]
+    ),
 }
 
 # Checks that inspect the raw emitted document rather than the findings list.

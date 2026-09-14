@@ -84,6 +84,17 @@ cross-references → registration → best practices →
 deployment → YAGNI / cost-to-fix) and the per-finding
 severity levels used in the final report.
 
+Before emitting the first finding, read
+[rules/audit-cites-all-reference-sites.md](./rules/audit-cites-all-reference-sites.md)
+and
+[rules/audit-verifies-proposed-syntax.md](./rules/audit-verifies-proposed-syntax.md).
+A finding states how it was verified or downgrades
+itself: it enumerates every reference site it wants
+changed, and it resolves any filter, field or config key
+it proposes against the version under audit rather than
+against the published docs. Both apply to every phase,
+and both add a field to the finding shape.
+
 When Phase 7 reaches `.infrahub.yml`, read
 [rules/practices-watch-dependencies.md](./rules/practices-watch-dependencies.md)
 before judging a `watch` block: a missing key, an
@@ -95,7 +106,7 @@ against the version under audit before it is proposed.
 
 | Priority | Category | What It Checks |
 | -------- | -------- | -------------- |
-| CRITICAL | Conduct | The audit writes nothing but its report; constrains the auditor, not the repo |
+| CRITICAL | Conduct | The audit writes nothing but its report, and every finding discloses the evidence behind it; constrains the auditor, not the repo |
 | CRITICAL | Project Structure | `.infrahub.yml` exists, paths valid |
 | CRITICAL | Schema Validation | Naming, relationships, deprecated fields |
 | CRITICAL | Object Validation | YAML structure, value types, refs |
@@ -176,6 +187,12 @@ rule, the ladder step, the file:line, and the
 suggested replacement (schema feature, GraphQL query,
 Jinja2 template, `Builtin*`/`Ipam*` inheritance, or
 inverse relationship declaration).
+
+A finding also renders the evidence it carries: a
+**Sites** line listing every reference the fix must
+touch, a **Verified against** line naming what the
+proposed syntax was resolved against, and, on a
+generic-extraction finding, a **Feasibility** verdict.
 
 ...
 ```

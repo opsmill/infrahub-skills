@@ -23,6 +23,36 @@ flag may write, and how to report a tree you have
 already dirtied are all in the rule, and none of them
 are restated here. Open it.
 
+## Phase 0.1: Evidence requirements for every finding
+
+Phase 0 constrains what the audit may write. This
+constrains what it may claim.
+
+**A finding states how it was verified, or it
+downgrades itself.** A proposed fix reads identically
+whether it was established or inferred, so a reader
+cannot tell the two apart and will not re-derive one
+that sounds confident. The cost lands on whoever
+implements it, in a component they did not touch.
+
+Two rules carry this, and both apply to every phase
+below, not only to Phase 9:
+
+- [rules/audit-cites-all-reference-sites.md](./rules/audit-cites-all-reference-sites.md).
+  A finding that proposes removing or renaming a symbol
+  enumerates every reference site in `sites`, from a
+  repo-wide search. Render and execution sites come from
+  the registration graph, not from the filename.
+- [rules/audit-verifies-proposed-syntax.md](./rules/audit-verifies-proposed-syntax.md).
+  A finding that proposes a filter, field or config key
+  resolves it against the version under audit and
+  records how in `verified_against`. The published docs
+  describe the current release, which may not be the one
+  being audited.
+
+Read both before emitting the first finding. They add
+three fields to the finding shape, described in 9.6.
+
 ## Phase 1: Project Structure (CRITICAL)
 
 ### 1.1 Check `.infrahub.yml` exists
@@ -446,6 +476,16 @@ numbers are cheaper fixes; sort findings by
 `ladder_step` ascending within this phase only (other
 phases keep their existing order).
 
+**Feasibility is not assumed.** An extraction finding
+proposes a schema change that may not be performable at
+all: hoisting a relationship whose members declare
+different identifiers collapses distinct edges silently,
+and identifiers are immutable once loaded. Before
+labelling any generic-extraction finding `clear`, walk
+the feasibility gate in
+[rules/yagni-duplicate-shape-not-extracted-to-generic.md](./rules/yagni-duplicate-shape-not-extracted-to-generic.md#feasibility-gate).
+The default verdict is `clear (unverified)`.
+
 ### 9.1 Schema rules
 
 - `yagni-reuse-existing-marketplace-schema` (step 1, MEDIUM)
@@ -545,6 +585,20 @@ form carries the same `rule`, `severity`,
 markdown report — the two are different
 serialisations of the same finding set, ordered the
 same way.
+
+Three further fields carry the finding's evidence. They
+are not YAGNI-specific; any phase's finding uses the
+ones that apply to it:
+
+| Field | Type | Carried by |
+| ----- | ---- | ---------- |
+| `sites` | list of `path` or `path:line` | Any finding proposing a removal or rename. Every reference site, from a repo-wide search. `file` locates the finding; `sites` is the set to change |
+| `verified_against` | string | Any finding proposing a filter, schema field or config key. Names the artifact introspected and its version, or states plainly that verification was not possible |
+| `feasibility` | verdict token | Any generic-extraction finding. Defaults to `clear (unverified)`; see the rule's feasibility gate for the full verdict list |
+
+In the markdown report the same three appear as a
+**Sites**, **Verified against**, and **Feasibility**
+line under the finding.
 
 ---
 
