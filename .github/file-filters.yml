@@ -41,6 +41,7 @@ cli_invocations_all:
   - ".claude/**"
   - "eval.yaml"
   - "scripts/check-cli-invocations.py"
+  - "scripts/check-rules-symlink.py"
 
 documentation_all:
   - *doc_files
