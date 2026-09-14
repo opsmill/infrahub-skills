@@ -8,7 +8,7 @@ paths:
 
 # Registering a Skill
 
-Full reference: `dev/guides/adding-a-skill.md` §7
+Creating the skill itself: `dev/guides/adding-a-skill.md` §§1-6 and §8
 
 A new skill has to be listed in **five** places. CI
 checks none of them, so a skill missing from one ships

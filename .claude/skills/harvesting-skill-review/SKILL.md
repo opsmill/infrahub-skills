@@ -1,12 +1,10 @@
 ---
 name: harvesting-skill-review
 description: >-
-  Mines a pull request's review threads on opsmill/infrahub-skills for lessons
-  that generalize beyond that PR, checks each against the code and against
-  whether it is already codified in prose *or* in a grader, and routes the
-  genuinely-new ones into a shipped skill's rules (with the grader and eval
-  that rule requires) or into `dev/guidelines/`. Proposes edits first, applies
-  only with approval. TRIGGER when: the user wants to turn PR review feedback
+  Turns review feedback on an opsmill/infrahub-skills pull request into durable
+  rules, in this repository's own guidance layer. Reports first; edits only
+  with approval. Follow the workflow in the body — the description does not
+  summarize it. TRIGGER when: the user wants to turn PR review feedback
   on this repository into durable rules; capture recurring reviewer comments as
   contributor documentation; or check whether review lessons are reflected in
   the rules, guides, and graders. DO NOT TRIGGER when: the lesson is about
@@ -14,7 +12,7 @@ description: >-
   `infrahub-reporting-issues`); the friction happened live in a session rather
   than in a review thread (use `infrahub-reporting-skill-gaps`); or you only
   need to reply to or resolve review threads (normal `gh` flow).
-argument-hint: <PR number (#138), branch name, or empty for the current branch's PR>
+argument-hint: <PR number, branch name, or empty for the current branch's PR>
 compatibility: Requires this repository checked out and the `gh` CLI authenticated for PR/review access.
 metadata:
   internal: true
@@ -270,14 +268,21 @@ legitimate upstream issue references, and this repository's own PR numbers are
 three digits, not five:
 
 ```bash
-grep -rnoE '\(#[0-9]{2,4}\)|PR #[0-9]+' \
-  dev/guidelines dev/guides dev/knowledges AGENTS.md skills/*/rules/
-grep -rniE '(currently (broken|unfixed)|not yet fixed|known gap|for now)' \
-  dev/guidelines dev/guides dev/knowledges AGENTS.md skills/*/rules/
+SCOPE=(dev/guidelines dev/guides dev/knowledges AGENTS.md
+       skills/*/*.md skills/*/rules/ .claude/skills/)
+EXCL=(--exclude=examples.md --exclude='*reference.md'
+      --exclude-dir=harvesting-skill-review)
+
+grep -rnoE "${EXCL[@]}" '\(#[0-9]{2,4}\)|PR #[0-9]+' "${SCOPE[@]}"
+grep -rniE "${EXCL[@]}" \
+  '(currently (broken|unfixed)|not yet fixed|known gap|for now)' "${SCOPE[@]}"
 ```
 
-`examples.md` and `*reference.md` stay out of scope: they carry literals —
-colours, IDs, sample payloads — that look like citations and are not.
+The exclusions are part of the command, not an instruction to remember:
+`examples.md` and `*reference.md` carry literals — colours, IDs, sample
+payloads — that look like citations and are not, and this skill's own
+directory is skipped because the patterns above appear in it verbatim. Everything else that states a
+rule is in scope, including each skill's `SKILL.md` and its prose files.
 
 **A hit is a candidate, not a defect.** Read it before touching it. A reference
 to an `opsmill/infrahub` issue is documenting upstream behaviour and stays; a
@@ -298,8 +303,10 @@ python scripts/check-cli-invocations.py
 **c. Supersession.** When this run's lesson generalizes something an earlier run
 wrote narrowly, broaden the earlier entry in place rather than leaving both.
 
-**d. Fix every hit now.** A punch list is not pruning. The only entries that may
-stay unresolved are genuine calls for the user.
+**d. Fix every confirmed defect now.** A punch list is not pruning. A hit you
+read and kept — an upstream reference doing real work — is resolved, not
+outstanding; say so and move on. The only entries that may stay genuinely
+unresolved are calls for the user.
 
 ### 6. Report
 

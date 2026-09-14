@@ -289,8 +289,7 @@ Apply the appropriate `type/*` and `changes/*` labels to
 your PR so [release-drafter](../../.github/release-drafter.yml)
 files it in the right category. The drafted body is a
 starting point, not the release notes: each release also
-gets a curated page under `docs/docs/release-notes/`,
-per the same rule.
+gets a curated page, per the same rule.
 
 ### 8. Verification
 

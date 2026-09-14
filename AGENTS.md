@@ -145,6 +145,6 @@ files. The list, which script covers which, and what
 `release.yml` does and does not validate are in
 [dev/guidelines/versioning.md](dev/guidelines/versioning.md).
 
-Each release also gets a curated notes page under
-`docs/docs/release-notes/` — see
-[dev/guidelines/skill-registration.md](dev/guidelines/skill-registration.md).
+Each release also gets a curated notes page — see
+[dev/guidelines/skill-registration.md](dev/guidelines/skill-registration.md)
+for where it goes and what shifts when it lands.
