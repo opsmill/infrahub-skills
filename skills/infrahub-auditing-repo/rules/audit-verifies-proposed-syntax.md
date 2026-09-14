@@ -35,7 +35,11 @@ that version at all: for every attribute type the
 filter generator emits only the singular value, the
 plural values, an isnull boolean, node-property ids and
 flag booleans. The recommended call would have failed at
-runtime.
+runtime. Range filtering does exist in that version, but
+only on node metadata timestamps and spelled `__before` /
+`__after`, which is a different surface and answers a
+different question, so finding it is not evidence that
+the proposed filter exists.
 
 The third is the dangerous one. A regex constraint was
 proposed to move an invariant out of a Python check,
