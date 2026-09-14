@@ -192,26 +192,52 @@ create deterministic grader scripts in
 `graders/my-skill/` to test the skill produces
 correct output.
 
-```yaml
-skill_name: infrahub-my-skill
+Each task names the skill to load in its own
+`instruction`, which is how tasks for different skills
+coexist in one file:
 
+```yaml
 tasks:
-  - id: basic-scenario
-    prompt: >-
+  - name: basic-scenario
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-my-skill/SKILL.md
+      and follow its workflow and rules.
+
       A realistic user request with specific names,
       namespaces, and field types.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/my-skill/check_basic_scenario.py
+        weight: 1.0
     expected_output: >-
       What correct output looks like.
-    grader: python graders/my-skill/check_basic_scenario.py
 
-  - id: advanced-scenario
-    prompt: >-
+  - name: advanced-scenario
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-my-skill/SKILL.md
+      and follow its workflow and rules.
+
       A more complex request covering relationships
       or edge cases.
+
+      Save ONLY the final YAML to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/my-skill/check_advanced_scenario.py
+        weight: 1.0
     expected_output: >-
       What correct output looks like.
-    grader: python graders/my-skill/check_advanced_scenario.py
 ```
+
+`graders` is what skillgrade scores, by weight. The
+full task shape, including the `expectations` and
+`assertions` blocks that document a task without
+failing a run, is in
+[running-evals.md](./running-evals.md#evalyaml-format).
 
 Each grader script in `graders/my-skill/` calls the
 shared `run_checks` library and prints the result as
