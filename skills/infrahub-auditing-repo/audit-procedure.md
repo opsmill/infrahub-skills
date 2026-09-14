@@ -28,12 +28,15 @@ are restated here. Open it.
 Phase 0 constrains what the audit may write. This
 constrains what it may claim.
 
-**A finding states how it was verified, or it
-downgrades itself.** A proposed fix reads identically
-whether it was established or inferred, so a reader
-cannot tell the two apart and will not re-derive one
-that sounds confident. The cost lands on whoever
-implements it, in a component they did not touch.
+**A finding states how it was verified, or says in
+`verified_against` that it could not be.** A proposed
+fix reads identically whether it was established or
+inferred, so a reader cannot tell the two apart and will
+not re-derive one that sounds confident. The cost lands
+on whoever implements it, in a component they did not
+touch. What weakens is the claim, never the severity:
+that belongs to the rule, and per-rule graders assert it
+across the corpus.
 
 Two rules carry this, and both apply to every phase
 below, not only to Phase 9:

@@ -156,5 +156,7 @@ query.
   audited version is older
 - Config keys confirmed against the local SDK rather
   than the server's vendored copy
-- An unverified proposal carrying the same severity and
-  the same tone as a verified one
+- An unverified proposal carrying the same tone as a
+  verified one, with nothing in `verified_against` to
+  say otherwise (the severity is the rule's and stays
+  put — see Check 6)

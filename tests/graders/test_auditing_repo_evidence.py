@@ -369,12 +369,17 @@ def test_extraction_feasibility_task_grader(tmp_path, feasibility, sites, expect
 
 
 # ---------------------------------------------------------------------------
-# The severity cap and a downgraded finding.
+# The severity cap and INFO.
 #
-# `audit-verifies-proposed-syntax` tells a finding that cannot verify its own
-# proposal to say so and downgrade. INFO is the skill's own legend entry for
-# an informational observation, and it sits below MEDIUM, so the cap must
-# admit it. Rejecting INFO punishes the finding for following the rule.
+# The cap bounds severity from above, so it only ever needs to reject CRITICAL
+# and HIGH. INFO is the skill's own legend entry for an informational
+# observation (`audit-procedure.md` severity legend), it sits below MEDIUM, and
+# `audit-procedure.md` directs an INFO finding in its own right, so the cap has
+# to admit it. Rejecting INFO was the cap misreading its own name.
+#
+# Note this is not about downgrading: `audit-verifies-proposed-syntax` Check 6
+# forbids lowering severity to express low confidence. Severity belongs to the
+# rule; what weakens is the claim.
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("severity,expected", [
@@ -385,7 +390,7 @@ def test_extraction_feasibility_task_grader(tmp_path, feasibility, sites, expect
     pytest.param("CRITICAL", False, id="critical-is-above-the-cap"),
     pytest.param("", False, id="missing-severity-still-fails"),
 ])
-def test_severity_cap_admits_a_downgraded_finding(tmp_path, severity, expected):
+def test_severity_cap_admits_info(tmp_path, severity, expected):
     payload = [{
         "rule": SYNTAX_RULE,
         "severity": severity,

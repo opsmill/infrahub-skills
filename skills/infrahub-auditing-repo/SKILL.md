@@ -88,12 +88,14 @@ Before emitting the first finding, read
 [rules/audit-cites-all-reference-sites.md](./rules/audit-cites-all-reference-sites.md)
 and
 [rules/audit-verifies-proposed-syntax.md](./rules/audit-verifies-proposed-syntax.md).
-A finding states how it was verified or downgrades
-itself: it enumerates every reference site it wants
-changed, and it resolves any filter, field or config key
-it proposes against the version under audit rather than
-against the published docs. Both apply to every phase,
-and both add a field to the finding shape.
+A finding states how it was verified, or says in
+`verified_against` that it could not be — never by
+lowering its severity, which belongs to the rule. It
+enumerates every reference site it wants changed, and it
+resolves any filter, field or config key it proposes
+against the version under audit rather than against the
+published docs. Both apply to every phase, and both add
+a field to the finding shape.
 
 When Phase 7 reaches `.infrahub.yml`, read
 [rules/practices-watch-dependencies.md](./rules/practices-watch-dependencies.md)
