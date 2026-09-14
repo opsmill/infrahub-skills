@@ -1375,31 +1375,50 @@ def check_audit_sites_complete(
     )
 
 
-# An appeal to something else in the same repository, used as the evidence.
-# A sibling query demonstrates the filter it uses and nothing else, so these
-# phrases mark the inference the rule's Check 3 names rather than the
-# introspection it asks for.
-#
-# Deliberately does not match the bare word "sibling". An audit that names the
-# sibling in order to say it proves nothing is doing what Check 3 asks, and
-# failing it for using the word punishes the correct answer.
+# What Check 3 asks is whether the audit went and looked. These three
+# patterns answer it in order of strength, and the order is the point: a
+# blacklist of phrasings alone was wrong in both directions, missing the
+# defect the rule quotes ("the same form the sibling query uses", one word off
+# the pattern) while failing answers that introspected the image and then
+# named the analogy they had ruled out.
+
+# An explicit statement that the proposal could not be verified. Check 6 asks
+# for exactly this, so it outranks everything below.
+_DECLARED_UNVERIFIED = re.compile(
+    r"\bnot\s+verified\b|\bcould\s+not\s+verify\b|\bunverified\b"
+    r"|\bunable\s+to\s+verify\b|\bnot\s+confirmed\b",
+    re.IGNORECASE,
+)
+
+# Something that was actually introspected, or the version it was read at. An
+# answer naming one of these has done the work, and may then discuss an
+# analogy freely: that is reasoning about evidence, not evidence by analogy.
+_EVIDENCE_SOURCE = re.compile(
+    r"\bv?\d+\.\d+(?:\.\d+)?\b"
+    r"|\bintrospect\w*\b"
+    r"|\bfilter\s+generator\b"
+    r"|\b(?:pinned|container|docker)\s+image\b"
+    r"|\brunning\s+instance\b"
+    r"|\bschema\s+models?\b"
+    r"|\brepository\s+config\s+model\b"
+    r"|\bgraphql\s+schema\b"
+    r"|\bvendored\b"
+    r"|\bread\s+the\s+source\b|\bsource\s+(?:code|of)\b",
+    re.IGNORECASE,
+)
+
+# An appeal to something else in the same repository, reached only when
+# nothing above matched, so this fires on an answer whose entire evidence is
+# the analogy. A sibling query demonstrates the filter it uses and nothing
+# else. Deliberately broad, because the escapes above carry the answers that
+# mention an analogy while resting on something real.
 _INFERENCE_MARKERS = re.compile(
-    r"\bsame\s+(?:form|shape|way)\s+as\b"
-    r"|\bsame\s+as\s+the\s+(?:sibling|other|existing)\b"
-    r"|\banother\s+quer(?:y|ies)\s+(?:\w+\s+){0,2}(?:uses|does|has|did)\b"
+    r"\bsame\s+(?:form|shape|way|filter|syntax)\b"
+    r"|\b(?:sibling|another|other|existing)\s+quer(?:y|ies)\b"
     r"|\bby\s+analogy\b"
     r"|\banalogous\b"
     r"|\bmirrors?\s+the\b"
     r"|\belsewhere\s+in\s+the\s+repo\b",
-    re.IGNORECASE,
-)
-
-# An explicit statement that the proposal was not verified. This outranks a
-# marker: a finding disclosing that it could not check is exactly what Check 6
-# asks for, and it often names the analogy it declined to rely on.
-_DECLARED_UNVERIFIED = re.compile(
-    r"\bnot\s+verified\b|\bcould\s+not\s+verify\b|\bunverified\b"
-    r"|\bunable\s+to\s+verify\b|\bnot\s+confirmed\b",
     re.IGNORECASE,
 )
 
@@ -1419,12 +1438,18 @@ def check_audit_verified_against(findings: list[dict], rule: str) -> tuple[bool,
     stated = " ".join(_flatten_strings(f.get("verified_against"))).strip()
     if not stated:
         return False, f"{rule} proposes syntax with no `verified_against`"
+    if _DECLARED_UNVERIFIED.search(stated):
+        return True, f"{rule} declares it could not verify: {stated[:60]!r}"
+    source = _EVIDENCE_SOURCE.search(stated)
+    if source:
+        return True, f"{rule} verified against {source.group(0)!r}: {stated[:60]!r}"
     marker = _INFERENCE_MARKERS.search(stated)
-    if marker and not _DECLARED_UNVERIFIED.search(stated):
+    if marker:
         return False, (
             f"{rule} rests its syntax on an in-repo analogy "
-            f"({marker.group(0)!r}), which is evidence for the form the other "
-            f"query uses and nothing else"
+            f"({marker.group(0)!r}) and names nothing it introspected. A "
+            f"sibling query is evidence for the form that query uses and "
+            f"nothing else"
         )
     return True, f"{rule} verified_against={stated[:60]!r}"
 
@@ -1463,8 +1488,11 @@ def check_audit_replacement_omits(
 
 
 # The honest default, in the spellings a model actually writes it: "clear
-# (unverified)", "clear(unverified)", "clear - unverified".
-_UNVERIFIED = re.compile(r"unverified", re.IGNORECASE)
+# (unverified)", "clear(unverified)", "clear - unverified". Anchored to the
+# verdict token, because the label is allowed to explain itself afterwards and
+# the strongest justification an auditor can write ("clear: no unverified
+# assumption remains") uses the same word.
+_UNVERIFIED = re.compile(r"clear\b[\s(:,\-]*unverified", re.IGNORECASE)
 
 
 def _verdict(value: Any) -> str:
@@ -1482,7 +1510,7 @@ def _verdict(value: Any) -> str:
     if not text:
         return ""
     head = re.split(r"[\s:,.]+", text, maxsplit=1)[0].lower()
-    if head.startswith("clear") and _UNVERIFIED.search(text):
+    if head.startswith("clear") and _UNVERIFIED.match(text):
         return "clear-unverified"
     return head
 

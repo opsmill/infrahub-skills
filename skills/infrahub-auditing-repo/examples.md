@@ -296,14 +296,6 @@ the concrete kinds: one generic edge means one identifier,
 which would collapse three distinct edges and collide
 their reverse relationships without reporting anything.
 
-**Sites** replaces the older **Files** line on a finding
-that proposes removing or renaming something: it is the
-set of places the fix has to touch, from a repo-wide
-sweep, not the one place the finding was spotted. A
-finding whose proposal had to be checked against the
-running version carries **Verified against** as well, and
-says there when it could not be checked.
-
 ### LOW: Object file naming
 
 **File**: `objects/vlans.yml`
@@ -327,10 +319,11 @@ says there when it could not be checked.
 **File**: `generators/build_racks.py`
 **Finding**: Whether the committed files under
 `objects/` are still reproducible from the committed
-generator could not be established. The generator's
-`--check` flag writes to `objects/` (confirmed by
-reading the script), and the tree holds uncommitted
-work, so running it would have destroyed that work.
+generator could not be established.
+**Verified against**: not verified: the generator's
+`--check` flag writes to `objects/`, confirmed by reading
+the script, and the tree holds uncommitted work, so
+running it would have destroyed that work
 **Fix**: Run the generator's check on a clean clone or
 in CI, not against a working tree.
 

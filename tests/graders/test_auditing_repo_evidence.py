@@ -591,3 +591,89 @@ def test_verified_against_allows_naming_an_analogy_in_order_to_reject_it(
     checks = [f"audit-verified-against:{SYNTAX_RULE}"]
     payload = _syntax_finding("Keep the Python check.", stated)
     assert (_score(tmp_path, checks, payload) == 1.0) is should_pass
+
+
+# ---------------------------------------------------------------------------
+# verified_against: what it asks is "did you go and look", not "which words
+# did you avoid".
+#
+# The first implementation was a phrase blacklist and was wrong in both
+# directions: it missed the defect the rule itself quotes ("the same form the
+# sibling query uses", which differs from the pattern by the word "as"), and
+# it failed thorough answers that named an artifact and a version *and* the
+# analogy they had ruled out. The eval was teaching the model to strip
+# reasoning out of the field.
+#
+# So the order is structural. A disclosure of non-verification passes, a named
+# artifact or version passes, and only then does an analogy fail.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("stated", [
+    pytest.param("the same form the sibling query uses", id="no-as-still-caught"),
+    pytest.param("same form as the sibling query in queries/device_info.gql", id="with-as"),
+    pytest.param("the sibling query uses this form", id="sibling-uses-this-form"),
+    pytest.param("copied from the sibling query", id="copied-from"),
+    pytest.param("consistent with the sibling query", id="consistent-with"),
+    pytest.param("the existing query uses the same filter", id="existing-query"),
+    pytest.param("another query in the repo uses this filter", id="another-query-in-the-repo"),
+    pytest.param("by analogy with the existing dropdown filter", id="explicit-analogy"),
+])
+def test_verified_against_fails_an_analogy_however_it_is_phrased(tmp_path, stated):
+    """None of these went and looked at anything."""
+    payload = _syntax_finding("DcimInterface(count__values: [48]) { count }", stated)
+    assert _score(tmp_path, [f"audit-verified-against:{SYNTAX_RULE}"], payload) == 0.0
+
+
+@pytest.mark.parametrize("stated", [
+    pytest.param("attribute filter generator, infrahub 1.11.1 pinned image",
+                 id="artifact-and-version"),
+    pytest.param("read the filter generator off the pinned image; it emits no range filter",
+                 id="names-what-was-read"),
+    pytest.param(
+        "introspected the filter generator in the pinned image (1.11.1); the same "
+        "form as the sibling query was not used as evidence",
+        id="introspected-and-ruled-the-analogy-out"),
+    pytest.param(
+        "Verified against the 1.11.1 filter generator; the proposed form mirrors "
+        "the documented __values filter",
+        id="version-named-and-mirrors-the"),
+    pytest.param(
+        "Introspected the running instance's schema; no such filter exists "
+        "elsewhere in the repo either",
+        id="introspected-and-elsewhere-in-the-repo"),
+    pytest.param("not verified: the pinned image was unavailable",
+                 id="declares-non-verification"),
+    pytest.param(
+        "the sibling query demonstrates only the singular filter, so it is not "
+        "evidence; not verified against the pinned image",
+        id="names-the-analogy-to-reject-it"),
+])
+def test_verified_against_passes_an_answer_that_went_and_looked(tmp_path, stated):
+    """Naming an artifact, a version, or the absence of either is the answer.
+
+    Mentioning an analogy alongside that is reasoning, not evidence-by-analogy,
+    and the thorough answer must not score below the terse one.
+    """
+    payload = _syntax_finding("Keep the Python check.", stated)
+    assert _score(tmp_path, [f"audit-verified-against:{SYNTAX_RULE}"], payload) == 1.0
+
+
+# ---------------------------------------------------------------------------
+# `clear` may explain itself, including by using the word "unverified".
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("feasibility,should_pass", [
+    pytest.param("clear", True, id="bare"),
+    pytest.param("clear, because nothing was left unverified", True,
+                 id="explains-itself-using-the-qualifier"),
+    pytest.param("clear: no unverified assumption remains; all three checked", True,
+                 id="strongest-justification-is-not-the-default"),
+    pytest.param("clear (unverified)", False, id="the-default-itself"),
+    pytest.param("clear(unverified)", False, id="default-no-space"),
+    pytest.param("clear - unverified", False, id="default-dash"),
+])
+def test_unverified_is_anchored_to_the_qualifier_not_the_whole_label(
+    tmp_path, feasibility, should_pass
+):
+    checks = [f"audit-extraction-feasibility:{GENERIC_RULE}:clear"]
+    assert (_score(tmp_path, checks, _generic_finding(feasibility)) == 1.0) is should_pass
