@@ -1,0 +1,21 @@
+dev/guidelines/skill-registration.md
+  s_3a32799fb762a7::t_394a8812a71481 35-40,43-44
+dev/guides/adding-a-skill.md
+  s_3a32799fb762a7::t_394a8812a71481 346-348
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "eaeef884b90d9ec740302c51e224bb46b46550b2",
+  "prompts": {},
+  "sessions": {
+    "s_3a32799fb762a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2134bc8a-483e-454a-be35-f4967b16877d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
