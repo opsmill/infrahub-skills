@@ -86,7 +86,7 @@ secrets.yaml
 !.claude/rules
 !.claude/skills
 .claude/skills/*
-!.claude/skills/harvesting-review
+!.claude/skills/harvesting-skill-review
 
 # Superpowers workspaces (never commit)
 .superpowers/

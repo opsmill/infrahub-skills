@@ -1,8 +1,8 @@
 ---
-name: harvesting-review
+name: harvesting-skill-review
 description: >-
-  Repo-local variant of `harvesting-review`, rewritten for this repository and
-  not interchangeable with the upstream skill of the same name.
+  Derived from the `harvesting-review` skill in opsmill/infrahub and rewritten
+  for this repository; renamed because the two are not interchangeable.
   Mines a pull request's review threads on opsmill/infrahub-skills for lessons
   that generalize beyond that PR, reconstructs each against the actual code
   before deciding, checks whether it is already codified in prose *or* in a
@@ -29,10 +29,10 @@ metadata:
 
 # Harvest Review Lessons (infrahub-skills variant)
 
-> **Not the upstream skill.** This shares a name and a shape with
-> `harvesting-review` in `opsmill/infrahub`, and diverges in ways that make the
-> two non-interchangeable. Do not sync edits between them in either direction;
-> apply a change to whichever repository it was reasoned about.
+> **Not the upstream skill.** This started as `harvesting-review` in
+> `opsmill/infrahub` and diverged far enough to warrant its own name. Do not
+> sync edits between them in either direction; apply a change to whichever
+> repository it was reasoned about.
 >
 > What differs here:
 >
