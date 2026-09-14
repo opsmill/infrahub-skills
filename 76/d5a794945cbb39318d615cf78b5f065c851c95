@@ -1,0 +1,19 @@
+uv.lock
+  s_3a32799fb762a7::t_58d6f1bbdc618c 197
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "76d5a794945cbb39318d615cf78b5f065c851c95",
+  "prompts": {},
+  "sessions": {
+    "s_3a32799fb762a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2134bc8a-483e-454a-be35-f4967b16877d",
+        "model": "unknown"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
