@@ -45,8 +45,8 @@ IGNORE_MARKER = cli_tree.IGNORE_MARKER
 # and rewriting a record of what was proposed at the time is not a fix.
 SCAN_TARGETS = (
     "skills", "graders", "tests", "eval.yaml",
-    "dev/guides", "dev/knowledges", "dev/commands", "dev/README.md",
-    ".agents/rules",
+    "dev/guides", "dev/knowledges", "dev/commands", "dev/guidelines",
+    "dev/README.md", ".agents/rules",
 )
 SCAN_SUFFIXES = {".md", ".py", ".yaml", ".yml"}
 

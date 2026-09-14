@@ -25,11 +25,17 @@ files:
 bump has to set `plugin.json` itself:
 
 ```bash
+VERSION=1.2.9   # the version you are bumping to
 jq --arg v "$VERSION" '.version = $v' \
   .claude-plugin/plugin.json > /tmp/p.json \
   && mv /tmp/p.json .claude-plugin/plugin.json
 scripts/sync-versions.sh "$VERSION"
 ```
+
+Set `VERSION` first. With it unset, `jq` writes an empty
+`version` and `sync-versions.sh` then exits on its own
+`${1:?}` guard, leaving `plugin.json` blanked and nothing
+else bumped.
 
 `release.yml` validates 1-4 against the tag and fails
 the publish on a mismatch. **Nothing validates 5** —

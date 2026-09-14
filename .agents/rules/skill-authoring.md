@@ -67,6 +67,14 @@ of re-checking. Before encoding a customer or PoC lesson
 as a rule, verify it against current stable Infrahub —
 a lesson that upstream already fixed rots the skill.
 
+## Verifying an edit
+
+Invoking the skill in this repository runs the installed
+plugin, not the file you just changed. Check the gap with
+`uv run invoke freshness`, and verify an edit through
+`skillgrade` or by reading the working-tree `SKILL.md`.
+See AGENTS.md § "Using the Skills From This Repo".
+
 ## Examples must stand on their own
 
 An example is copied, not read. Each names only kinds,

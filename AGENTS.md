@@ -60,6 +60,37 @@ Path-scoped rules live in [.agents/rules/](.agents/rules/) (symlinked as `.claud
 
 The rules are triggers, not the reference — they state the constraint and link back into `dev/`. Before changing a skill, a grader, or an eval, read the `dev/` page the matching rule names. The architectural intent is usually the answer.
 
+## Using the Skills From This Repo
+
+Editing a skill here and then invoking it does not test
+your edit. Three ways to exercise a skill load three
+different copies:
+
+| How | Loads | What it tests |
+| --- | ----- | ------------- |
+| Invoking `infrahub-*` in a session | the installed plugin under `~/.claude/plugins/cache/` | the published skill, not your edit |
+| `skillgrade` | the working tree, copied into a `/tmp` sandbox | the prose, with triggering bypassed |
+| Reading `skills/<name>/SKILL.md` and following it | the working tree | the prose, by hand |
+
+Check how far apart the first two are:
+
+```bash
+uv run invoke freshness
+```
+
+To dogfood an edit through the real trigger path,
+install this checkout as the plugin
+(`/plugin install /path/to/infrahub-skills`, Option 3 in
+[dev/guides/getting-started.md](dev/guides/getting-started.md))
+and reinstall after each change — it is a copy, not a
+live mount.
+
+Note what none of the three covers: **triggering**. The
+eval prompts tell the model `Read the skill at ...`, so
+they exercise a skill's rules but never its
+`description`, which is the field that decides whether
+the skill fires at all.
+
 ## Quick Reference
 
 ### Skills
@@ -84,58 +115,32 @@ The rules are triggers, not the reference — they state the constraint and link
 
 ### Rule = Test (Required)
 
-Adding a new rule under `skills/<skill>/rules/` must
-ship with its eval coverage in the same change:
+A new rule under `skills/<skill>/rules/` ships with its
+eval coverage in the same change: the rule linked from
+`SKILL.md`, a check function in `graders/<skill>/lib.py`,
+an `eval.yaml` task, a task grader run against four
+fixtures, contradicted claims swept, and
+`evaluations/*.json` regenerated.
 
-1. The rule linked from `SKILL.md` at the workflow
-   step that needs it — `_sections.md` alone is read
-   after the mistake, not before it.
-2. New check function in `graders/<skill>/lib.py`
-   registered in `CHECKS`, parsing the answer
-   (`yaml`, `ast`, `shlex`) rather than
-   substring-matching it.
-3. New task block in `eval.yaml` whose prompt
-   naturally exercises the rule and fails with the
-   instruction's `Read the skill at ...` line
-   commented out (procedure in
-   [dev/guides/running-evals.md](dev/guides/running-evals.md#writing-good-eval-prompts)).
-4. Task grader script under `graders/<skill>/`, run
-   against four fixtures: compliant, compliant
-   phrased differently, violating, and a violating
-   near-miss that satisfies the check's keyword.
-5. Old claims the rule contradicts swept from
-   `skills/`, `graders/`, and `eval.yaml`.
-6. `python scripts/sync-evals.py` to regenerate
-   `evaluations/*.json` (commit alongside `eval.yaml`).
-
-Full walkthrough in
+The seven steps and what each one guards against live in
+[.agents/rules/rule-equals-test.md](.agents/rules/rule-equals-test.md),
+which loads automatically when you touch a rule, a
+grader, or `eval.yaml`. Full walkthrough in
 [dev/guides/adding-a-rule.md](dev/guides/adding-a-rule.md).
-A rule without a grader is a rule that can rot
-silently — the next refactor of the skill's prose
-loses the constraint with no failing test to flag it.
-A grader that cannot fail is worse: it reports the
-rule as covered forever.
+
+A rule without a grader is a rule that can rot silently
+— the next refactor of the skill's prose loses the
+constraint with no failing test to flag it. A grader
+that cannot fail is worse: it reports the rule as
+covered forever.
 
 ### Versioning
 
-All skills share a unified version. When bumping, update together:
-
-1. `.claude-plugin/plugin.json`
-2. `.github/.release-manifest.json` — also lists the
-   skills the published release claims to ship
-3. `pyproject.toml`
-4. Every `skills/*/SKILL.md` frontmatter
-5. `uv.lock` — any `uv run` rewrites it, so a stale
-   version reappears as a stray diff in later PRs
-
-`scripts/sync-versions.sh <version>` does 2-4;
-`auto-bump.yml` does 1 before calling it. `release.yml`
-validates 1-4 against the tag and fails the publish on
-a mismatch — nothing validates 5.
+All skills share a unified version, spread across five
+files. The list, which script covers which, and what
+`release.yml` does and does not validate are in
+[.agents/rules/versioning.md](.agents/rules/versioning.md).
 
 Each release also gets a curated notes page under
-`docs/docs/release-notes/`, with `sidebar_position: 1`
-and every older page shifted down by one. Merging to
-`main` regenerates the GitHub draft release body, so
-paste the curated notes into the draft after the last
-PR lands and before publishing.
+`docs/docs/release-notes/` — see
+[.agents/rules/skill-registration.md](.agents/rules/skill-registration.md).
