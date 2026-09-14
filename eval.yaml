@@ -5899,7 +5899,9 @@ tasks:
       - That finding has severity MEDIUM and ladder_step 2
       - >-
         The finding reports that the location relationship cannot be
-        hoisted because the three kinds declare different identifiers
+        hoisted, naming either blocker the schema set carries: the three
+        kinds declare different identifiers, and CircuitEndpoint peers a
+        different kind
       - >-
         All three declaring files are named, including schemas/circuit.yml
         whose tier choice list is a strict subset of the other two
@@ -5909,8 +5911,9 @@ tasks:
         check: A yagni-duplicate-shape-not-extracted-to-generic finding is emitted
       - name: blocked-feasibility
         check: >-
-          The finding reports the extraction as blocked on differing
-          relationship identifiers rather than as clear
+          The finding reports the extraction as blocked — on differing
+          relationship identifiers or on differing peer kinds, both of
+          which this schema set carries — rather than as clear
       - name: all-declaring-kinds
         check: >-
           The finding names schemas/dcim.yml, schemas/rack.yml and

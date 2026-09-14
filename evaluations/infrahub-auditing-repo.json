@@ -641,7 +641,7 @@
         "Output is JSON with a findings array (or an object with a findings key)",
         "Contains a yagni-duplicate-shape-not-extracted-to-generic finding",
         "That finding has severity MEDIUM and ladder_step 2",
-        "The finding reports that the location relationship cannot be hoisted because the three kinds declare different identifiers",
+        "The finding reports that the location relationship cannot be hoisted, naming either blocker the schema set carries: the three kinds declare different identifiers, and CircuitEndpoint peers a different kind",
         "All three declaring files are named, including schemas/circuit.yml whose tier choice list is a strict subset of the other two",
         "No yagni finding exceeds MEDIUM severity"
       ],
@@ -652,7 +652,7 @@
         },
         {
           "name": "blocked-feasibility",
-          "check": "The finding reports the extraction as blocked on differing relationship identifiers rather than as clear"
+          "check": "The finding reports the extraction as blocked \u2014 on differing relationship identifiers or on differing peer kinds, both of which this schema set carries \u2014 rather than as clear"
         },
         {
           "name": "all-declaring-kinds",
