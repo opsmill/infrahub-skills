@@ -1,0 +1,19 @@
+.github/file-filters.yml
+  s_0a0cb8ae491bbc::t_a604ba15d90b15 44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3047fd6cefe3fc2d291bcdbd9b3afb2bd0da3aae",
+  "prompts": {},
+  "sessions": {
+    "s_0a0cb8ae491bbc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "449d8aad-03ea-4de8-bbc3-d95a17df34e0",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
