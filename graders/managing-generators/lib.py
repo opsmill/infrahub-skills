@@ -997,21 +997,38 @@ def _relationship_attr_candidates(tree: ast.Module) -> set[tuple[str, str]]:
 def check_detach_before_peer_delete(
     tree: ast.Module | None, **_: Any
 ) -> tuple[bool, str]:
-    """Flag only the unambiguous case: N holds the deleted peers and is saved after.
+    """Flag a node that demonstrably holds a relationship and is saved unguarded.
 
-    Flags only when all four hold: (1) a .delete() call on a node this
-    module itself obtained (client.get/create, or a for-loop over a
-    client.* call), or a direct self.client.delete(kind=..., id=...) call;
-    (2) some node variable N has a relationship attribute
+    What it catches: some node variable N has a relationship attribute
     accessed as N.<rel> somewhere (evidenced by .add()/.extend()/.remove()
     on it, a .peers read, or direct iteration -- never a bare attribute
-    read like N.status); (3) N.save(...) runs after that .delete() in
-    source order; (4) no N.<rel>.remove(...) runs before that .delete().
+    read like N.status); a recognised .delete() call exists (either
+    node.delete() on a name this module obtained via client.get/create or
+    a for-loop over a client.* call, or a direct
+    self.client.delete(kind=..., id=...)); N.save(...) runs after that
+    delete in source order; and no N.<rel>.remove(...) runs before it.
 
-    Any shape that cannot be resolved this way is left alone. A grader
-    that misses a real violation is a better trade than one that fails
-    ordinary code: a false fail teaches a model to write worse code, a
-    false pass only fails to teach.
+    What it cannot do: it has no way to tell which object a recognised
+    delete actually removed, so it cannot confirm that delete's target was
+    ever a peer of N.<rel>. It only asks whether *some* recognised delete
+    and *some* demonstrated relationship co-occur with an unguarded save.
+    An unrelated delete (a different kind, an unconnected object) that
+    merely happens to run before a save on a node with relationships is
+    flagged the same as a real violation -- this is a known false
+    positive, reproducible with either delete shape, and there is no
+    static narrowing that fixes it without also missing the violation
+    case the check exists to catch (which deletes peers by id, not by
+    reading them off N.<rel>).
+
+    Two further bypasses are known and accepted: aliasing the save
+    receiver (`r = rack; await r.save()` evades condition 3, since the
+    alias is a different name from N) and a fetched node that only
+    implicitly holds peers with no code evidence at all (evades condition
+    2 -- nothing here reads the schema, so a relationship the code never
+    touches syntactically is invisible to this check).
+
+    No eval task in eval.yaml consumes this check today. Anyone wiring it
+    into one must design around these limits, not discover them.
     """
     if tree is None:
         return False, "No Python source to inspect"
