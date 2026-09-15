@@ -178,9 +178,9 @@ def find_relationship_add_calls(tree: ast.Module) -> list[ast.Call]:
 def find_add_relationships_calls(tree: ast.Module) -> list[ast.Call]:
     """Return all ``<expr>.add_relationships(...)`` call sites.
 
-    The SDK method (infrahub-sdk >= 1.23, ``infrahub_sdk/node/node.py:1544``)
-    issues a server-side RelationshipAdd naming only its own peers, so it does
-    not overwrite peers another writer added.
+    The SDK method (infrahub-sdk >= 1.13, ``infrahub_sdk/node/node.py:1544``
+    at v1.23.2) issues a server-side RelationshipAdd naming only its own
+    peers, so it does not overwrite peers another writer added.
     """
     if tree is None:
         return []
@@ -581,26 +581,146 @@ def check_members_add_iterates(
     return False, "Only a single .add() call and not in a for loop"
 
 
+def find_relationship_extend_calls(tree: ast.Module) -> list[ast.Call]:
+    """Return all ``<expr>.extend(...)`` call sites.
+
+    ``RelationshipManager.extend()`` is a convenience wrapper that calls
+    ``.add()`` for every item (``infrahub_sdk/node/relationship.py:306`` at
+    v1.23.2), so it is the same client-side read-modify-write as a for-loop
+    of ``.add()`` once followed by ``.save()``.
+    """
+    if tree is None:
+        return []
+    return [
+        c for c in _iter_calls(tree)
+        if isinstance(c.func, ast.Attribute) and c.func.attr == "extend"
+    ]
+
+
+def _attr_base_name(node: ast.AST) -> str | None:
+    """Walk a dotted attribute chain down to its root ``Name``, if any."""
+    while isinstance(node, ast.Attribute):
+        node = node.value
+    return node.id if isinstance(node, ast.Name) else None
+
+
+def _bound_value(name: str, tree: ast.Module) -> ast.AST | None:
+    """Return the value most recently assigned to local name ``name``.
+
+    Only plain ``Name`` targets are resolved (``Assign``/``AnnAssign``);
+    tuple-unpacking and attribute targets are left unresolved.
+    """
+    found: ast.AST | None = None
+    for node in ast.walk(tree):
+        target_names: list[str] = []
+        value: ast.AST | None = None
+        if isinstance(node, ast.Assign):
+            target_names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+            value = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            target_names = [node.target.id]
+            value = node.value
+        if name in target_names and value is not None:
+            found = value
+    return found
+
+
+def _is_bound_to_local_set(name: str, tree: ast.Module) -> bool:
+    """True when ``name = set()`` or ``name = {...}`` (a set literal)."""
+    value = _bound_value(name, tree)
+    if isinstance(value, ast.Set):
+        return True
+    return (
+        isinstance(value, ast.Call)
+        and isinstance(value.func, ast.Name)
+        and value.func.id == "set"
+    )
+
+
+def _is_run_private_receiver(name: str, tree: ast.Module) -> bool:
+    """True when ``name`` was bound to a node this run just created.
+
+    ``self.client.create(...)`` returns a node only this run holds a
+    reference to, so a relationship mutation on it cannot race another
+    run's write. ``self.client.get(...)`` fetches a node that may already
+    be shared with other runs, so it earns no such exemption -- nor does
+    anything this cannot resolve to a ``create`` call, since the burden is
+    on demonstrating the receiver is run-private, not the reverse.
+    """
+    value = _bound_value(name, tree)
+    if value is None:
+        return False
+    inner = value.value if isinstance(value, ast.Await) else value
+    return isinstance(inner, ast.Call) and _is_self_client_method(inner, "create")
+
+
+def _narrow_shared_relationship_calls(
+    tree: ast.Module, calls: list[ast.Call]
+) -> list[ast.Call]:
+    """Keep only calls that plausibly mutate a node another run could write.
+
+    Two narrowings, both required:
+
+    * A bare ``<name>.<method>(...)`` (single-level) is not a
+      RelationshipManager access at all -- most commonly a local ``set()``
+      dedup (``seen.add(x)``), which is also exempted explicitly by its
+      binding so the exemption does not depend on shape alone.
+    * A two-level ``<name>.<relationship>.<method>(...)`` is exempt when
+      ``<name>`` is run-private (see ``_is_run_private_receiver``): a node
+      this run just created cannot be the node two runs are racing to
+      write. This does not depend on which node any ``add_relationships``
+      call elsewhere in the file happens to target -- an ``extend()`` on a
+      *different*, fetched (shared) node is just as much the bug even when
+      an unrelated ``add_relationships()`` call is also present.
+    """
+    narrowed = []
+    for call in calls:
+        receiver = call.func.value
+        if isinstance(receiver, ast.Name) and _is_bound_to_local_set(receiver.id, tree):
+            continue
+        if not isinstance(receiver, ast.Attribute):
+            continue
+        base = _attr_base_name(receiver)
+        if base is None:
+            continue
+        if _is_run_private_receiver(base, tree):
+            continue
+        narrowed.append(call)
+    return narrowed
+
+
 def check_concurrent_writes_use_add_relationships(
     tree: ast.Module | None, **_: Any
 ) -> tuple[bool, str]:
     """Peers on a shared node go through add_relationships(), not .add()+.save().
 
-    ``.add()`` mutates the in-memory peer list and ``save()`` sends all of it
-    (``infrahub_sdk/node/relationship.py:116-117``), so a second concurrent
-    writer overwrites the first. RelationshipAdd names only its own peers.
+    ``.add()``/``.extend()`` mutate the in-memory peer list and ``save()``
+    sends all of it (``infrahub_sdk/node/relationship.py:116-117``), so a
+    second concurrent writer overwrites the first. RelationshipAdd names
+    only its own peers.
     """
     if tree is None:
         return False, "No Python source to inspect"
 
-    # Order matters: report the .add() calls first. An answer that kept the
-    # read-modify-write needs to be told which calls to replace, not that a
-    # method it never reached for is missing.
-    add_calls = find_relationship_add_calls(tree)
+    # Order matters: report concrete .add()/.extend() calls before the
+    # missing-method early return. An answer that kept the read-modify-write
+    # needs to be told which calls to replace, not that a method it never
+    # reached for is missing.
+    add_calls = _narrow_shared_relationship_calls(tree, find_relationship_add_calls(tree))
     if add_calls:
         return False, (
             f"{len(add_calls)} RelationshipManager .add() call(s) remain: a "
             "client-side read-modify-write drops peers written concurrently"
+        )
+
+    extend_calls = _narrow_shared_relationship_calls(
+        tree, find_relationship_extend_calls(tree)
+    )
+    if extend_calls:
+        return False, (
+            f"{len(extend_calls)} RelationshipManager .extend() call(s) "
+            "remain: extend() calls .add() per item, the same client-side "
+            "read-modify-write that drops peers written concurrently"
         )
 
     ar_calls = find_add_relationships_calls(tree)

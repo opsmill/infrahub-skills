@@ -55,7 +55,8 @@ await group.add_relationships(
 )
 ```
 
-`remove_relationships()` is the symmetric operation.
+`remove_relationships()` is the symmetric operation
+(`infrahub_sdk/node/node.py:1561`, sync form at `:2792`).
 
 ### `related_nodes` takes IDs, not nodes
 
@@ -85,7 +86,11 @@ relationship that already has a peer, the mutation raises
 `'<name>' is a cardinality-one relationship and already has
 a peer`. Use `.save()` there.
 
-**Requires `infrahub-sdk >= 1.23`.**
+**Requires `infrahub-sdk >= 1.13`.** That is the release
+that added `add_relationships()`/`remove_relationships()`
+(`infrahub-sdk-python` tag `v1.13.0`, absent in `v1.12.3`).
+The examples here are verified against 1.23.2; nothing
+newer than 1.13 is used.
 
 ### Tracking
 
