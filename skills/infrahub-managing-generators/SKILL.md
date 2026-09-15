@@ -71,6 +71,7 @@ delete data via the tracking cleanup.
 | Imports anything from the repository (a shared package, generated protocols, its own query model) | Carry a `watch:` block in `.infrahub.yml` naming every one of those paths — imports are never followed, so an undeclared helper means the Generator silently stops re-running when that helper changes | [rules/registration-watch-dependencies.md](./rules/registration-watch-dependencies.md) |
 | Adding several peers to a cardinality-many relationship | `.extend()` for a list, or a per-peer `.add()` loop — never `.add()` with a list | [rules/python-multi-peer-add.md](./rules/python-multi-peer-add.md) |
 | Adding peers to a relationship several runs can write at once | `node.add_relationships(relation_to_update=..., related_nodes=[ids])` | [rules/python-concurrent-relationship-writes.md](./rules/python-concurrent-relationship-writes.md) |
+| Deleting objects a generator previously created | Detach the relationships pointing at them before deleting the peers | [rules/python-delete-ordering.md](./rules/python-delete-ordering.md) |
 | Modifying a generator so it produces a different set of objects than last run | Audit every `save()` reachable from `generate()`, helpers included | [rules/tracking-idempotent.md](./rules/tracking-idempotent.md) |
 
 ## Before writing Python

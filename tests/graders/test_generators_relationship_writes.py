@@ -324,3 +324,88 @@ def test_grader_script_still_scores_for_loop_answer_full_marks(tmp_path):
     # is the textbook correct for-loop-of-.add() answer and must still
     # score full marks after the fix.
     assert data["score"] == 1.0, data["details"]
+
+
+DELETE_COMPLIANT = """
+async def generate(self, data):
+    rack = await self.client.get(kind="DcimRack", name__value="rack-1")
+    for iface in rack.interfaces.peers:
+        rack.interfaces.remove(iface.id)
+    await rack.save(allow_upsert=True)
+    for iface in data["stale"]:
+        node = await self.client.get(kind="DcimInterface", id=iface["id"])
+        await node.delete()
+"""
+
+DELETE_COMPLIANT_DIFFERENT = """
+async def _detach(rack, ids):
+    for peer_id in ids:
+        rack.interfaces.remove(peer_id)
+    await rack.save(allow_upsert=True)
+
+
+async def generate(self, data):
+    rack = await self.client.get(kind="DcimRack", name__value="rack-1")
+    await _detach(rack, [i["id"] for i in data["stale"]])
+    for iface in data["stale"]:
+        node = await self.client.get(kind="DcimInterface", id=iface["id"])
+        await node.delete()
+"""
+
+DELETE_VIOLATING = """
+async def generate(self, data):
+    rack = await self.client.get(kind="DcimRack", name__value="rack-1")
+    for iface in data["stale"]:
+        node = await self.client.get(kind="DcimInterface", id=iface["id"])
+        await node.delete()
+    await rack.save(allow_upsert=True)
+"""
+
+DELETE_NEAR_MISS = """
+async def generate(self, data):
+    rack = await self.client.get(kind="DcimRack", name__value="rack-1")
+    for iface in data["stale"]:
+        node = await self.client.get(kind="DcimInterface", id=iface["id"])
+        await node.delete()
+    for iface in data["stale"]:
+        rack.interfaces.remove(iface["id"])
+    await rack.save(allow_upsert=True)
+"""
+
+DELETE_COMMENT_ONLY = """
+async def generate(self, data):
+    rack = await self.client.get(kind="DcimRack", name__value="rack-1")
+    # Detach the interfaces before deleting the peers.
+    for iface in data["stale"]:
+        node = await self.client.get(kind="DcimInterface", id=iface["id"])
+        await node.delete()
+    await rack.save(allow_upsert=True)
+"""
+
+
+def test_delete_compliant_passes():
+    ok, msg = CHECKS["detach-before-peer-delete"](tree=ast.parse(DELETE_COMPLIANT))
+    assert ok, msg
+
+
+def test_delete_compliant_via_helper_passes():
+    ok, msg = CHECKS["detach-before-peer-delete"](
+        tree=ast.parse(DELETE_COMPLIANT_DIFFERENT)
+    )
+    assert ok, msg
+
+
+def test_delete_violating_fails():
+    ok, msg = CHECKS["detach-before-peer-delete"](tree=ast.parse(DELETE_VIOLATING))
+    assert not ok
+
+
+def test_delete_near_miss_remove_after_delete_fails():
+    ok, msg = CHECKS["detach-before-peer-delete"](tree=ast.parse(DELETE_NEAR_MISS))
+    assert not ok, "a .remove() placed after .delete() must not satisfy the check"
+    assert "after" in msg
+
+
+def test_delete_comment_only_fails():
+    ok, msg = CHECKS["detach-before-peer-delete"](tree=ast.parse(DELETE_COMMENT_ONLY))
+    assert not ok, "a comment saying 'detach' must not satisfy the check"
