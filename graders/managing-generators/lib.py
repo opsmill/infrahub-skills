@@ -1823,23 +1823,26 @@ def check_shared_save_opts_out_of_tracking(
     deletes it. The opt-out is bound to that one save: applying it to every
     save disables the per-target cleanup the tracking group exists for.
     Creating the shared object outside the generator is the other accepted
-    answer, so an answer that never writes it passes too.
+    answer, so an answer that never writes it passes too. So is writing it
+    with add_relationships(), which never enters the group at all.
     """
     tree = _answer_tree(output)
     if tree is None:
         return False, "no parseable Python block found"
 
     saves = _save_calls(tree)
-    if not saves:
-        return False, "no save() call found"
+    add_rel_calls = _calls_to(tree, {"add_relationships"})
+    if not saves and not add_rel_calls:
+        return False, "no save() or add_relationships() call found"
 
-    opted_out = [c for c in saves if _save_opts_out(c)]
-    if len(opted_out) == len(saves):
-        return False, (
-            f"every save() sets update_group_context=False, which opts the "
-            f"whole run out of tracking and disables the per-target cleanup. "
-            f"Only the shared {_SHARED_KIND} may opt out"
-        )
+    if saves:
+        opted_out = [c for c in saves if _save_opts_out(c)]
+        if opted_out and len(opted_out) == len(saves):
+            return False, (
+                f"every save() sets update_group_context=False, which opts the "
+                f"whole run out of tracking and disables the per-target cleanup. "
+                f"Only the shared {_SHARED_KIND} may opt out"
+            )
 
     # A `get` binds the object without claiming it, so the two are tracked
     # apart: created names decide whether an unaccounted-for save is the
@@ -1859,7 +1862,23 @@ def check_shared_save_opts_out_of_tracking(
         and isinstance(c.func.value, (ast.Name, ast.Attribute))
         and ast.unparse(c.func.value) in shared_vars
     ]
+    shared_add_rel = [
+        c for c in add_rel_calls
+        if isinstance(c.func, ast.Attribute)
+        and isinstance(c.func.value, (ast.Name, ast.Attribute))
+        and ast.unparse(c.func.value) in shared_vars
+    ]
     if not shared_saves:
+        # add_relationships() never touches group_context, so a shared
+        # object written only this way is never claimed -- no opt-out
+        # needed, and any unrelated save() elsewhere cannot secretly be
+        # this write, because we already know how this write happened.
+        if shared_add_rel:
+            return True, (
+                f"the shared {_SHARED_KIND} is written with "
+                "add_relationships(), which does not add it to the run's "
+                "group"
+            )
         if not created_vars:
             return True, (
                 f"the generator only reads the shared {_SHARED_KIND} and "
