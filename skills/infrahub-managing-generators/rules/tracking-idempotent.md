@@ -184,13 +184,10 @@ wrong. That is the quieter of the two possible failures.
    [python-concurrent-relationship-writes.md](python-concurrent-relationship-writes.md).
 
 `update_group_context=False` is checked before anything
-else, so it wins over the client's tracking mode
-(`infrahub_sdk/query_groups.py:131`, the `is not False`
-guard). `.save()` claims the node for the run's tracking
-group after create or update
-(`infrahub_sdk/node/node.py:1254-1303`);
-`add_relationships()` does not touch the group at all
-(`infrahub_sdk/node/node.py:1544` async, `:2771` sync).
+else, so it wins over the client's tracking mode (the
+`is not False` guard). `.save()` claims the node for the
+run's tracking group after create or update;
+`add_relationships()` does not touch the group at all.
 
 ### Audit the saves you can reach, not the ones you can see
 
@@ -227,6 +224,8 @@ to_delete = previous_group.members - nodes_saved_this_run
 A node that was never added to any group appears in
 neither set and cannot be reclaimed — which is precisely
 why the opt-out is safe for a genuinely shared object.
+
+Verified against Infrahub 1.11.2 and infrahub-sdk 1.23.2.
 
 Reference:
 [registration-config.md](registration-config.md),
