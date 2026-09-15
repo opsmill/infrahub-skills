@@ -73,6 +73,4 @@ second run writing the same node overwrites this one. When
 any other run can write the node, see
 [python-concurrent-relationship-writes.md](python-concurrent-relationship-writes.md).
 
-Verified against infrahub-sdk 1.23.2:
-`infrahub_sdk/node/relationship.py:279` (`add`), `:306`
-(`extend`), `:323` (`remove`).
+Verified against Infrahub 1.11.2 and infrahub-sdk 1.23.2.

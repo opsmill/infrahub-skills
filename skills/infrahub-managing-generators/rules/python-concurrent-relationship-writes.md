@@ -55,8 +55,7 @@ await group.add_relationships(
 )
 ```
 
-`remove_relationships()` is the symmetric operation
-(`infrahub_sdk/node/node.py:1561`, sync form at `:2792`).
+`remove_relationships()` is the symmetric operation.
 
 ### `related_nodes` takes IDs, not nodes
 
@@ -94,12 +93,11 @@ version floor applies within the 1.x line.
 
 The **server-side** `RelationshipAdd` behaviour this rule
 relies on (naming only its own peers) is verified against
-Infrahub **1.11.2** specifically
-(`backend/infrahub/graphql/mutations/relationship.py:214`
-and `:552-562`). That is a separate claim from the SDK
-method's availability above, about a different piece of
-software -- not a statement about which Infrahub server
-version first shipped `RelationshipAdd`.
+Infrahub **1.11.2** specifically. That is a separate claim
+from the SDK method's availability above, about a
+different piece of software -- not a statement about
+which Infrahub server version first shipped
+`RelationshipAdd`.
 
 ### Tracking
 
@@ -109,8 +107,4 @@ second reason to prefer it on a shared node, and it carries
 a trade. See
 [tracking-idempotent.md](tracking-idempotent.md#three-ways-to-honour-it).
 
-Verified against Infrahub 1.11.2 and infrahub-sdk 1.23.2:
-`infrahub_sdk/node/node.py:1544`,
-`infrahub_sdk/node/relationship.py:116-117`,
-`backend/infrahub/graphql/mutations/relationship.py:214` and
-`:552-562`.
+Verified against Infrahub 1.11.2 and infrahub-sdk 1.23.2.
