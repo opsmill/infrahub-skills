@@ -86,11 +86,20 @@ relationship that already has a peer, the mutation raises
 `'<name>' is a cardinality-one relationship and already has
 a peer`. Use `.save()` there.
 
-**Requires `infrahub-sdk >= 1.13`.** That is the release
-that added `add_relationships()`/`remove_relationships()`
-(`infrahub-sdk-python` tag `v1.13.0`, absent in `v1.12.3`).
-The examples here are verified against 1.23.2; nothing
-newer than 1.13 is used.
+`add_relationships()`/`remove_relationships()` have
+existed with this exact signature since `infrahub-sdk`
+v1.0.0 -- the body is byte-identical at v1.0.0, v1.13.0 and
+v1.23.2, only the docstring was added later. No meaningful
+version floor applies within the 1.x line.
+
+The **server-side** `RelationshipAdd` behaviour this rule
+relies on (naming only its own peers) is verified against
+Infrahub **1.11.2** specifically
+(`backend/infrahub/graphql/mutations/relationship.py:214`
+and `:552-562`). That is a separate claim from the SDK
+method's availability above, about a different piece of
+software -- not a statement about which Infrahub server
+version first shipped `RelationshipAdd`.
 
 ### Tracking
 

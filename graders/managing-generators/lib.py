@@ -178,9 +178,10 @@ def find_relationship_add_calls(tree: ast.Module) -> list[ast.Call]:
 def find_add_relationships_calls(tree: ast.Module) -> list[ast.Call]:
     """Return all ``<expr>.add_relationships(...)`` call sites.
 
-    The SDK method (infrahub-sdk >= 1.13, ``infrahub_sdk/node/node.py:1544``
-    at v1.23.2) issues a server-side RelationshipAdd naming only its own
-    peers, so it does not overwrite peers another writer added.
+    The SDK method (present since infrahub-sdk v1.0.0, unchanged in shape;
+    ``infrahub_sdk/node/node.py:1544`` at v1.23.2) issues a server-side
+    RelationshipAdd naming only its own peers, so it does not overwrite
+    peers another writer added.
     """
     if tree is None:
         return []
