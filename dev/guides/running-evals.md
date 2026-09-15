@@ -200,12 +200,14 @@ abstraction level a real user would type and let the
 skill supply the shape.
 
 **Don't reuse the skill's own worked example.**
-`examples.md` loads *with* the skill, so a task built on
-the scenario it already teaches measures retrieval, not
-transfer: the model copies the worked answer rather than
-applying the pattern to something new. Three tasks
+`examples.md` ships with the skill and the model reads
+it on demand, so a task built on the scenario it already
+teaches measures retrieval, not transfer: the model
+copies the worked answer rather than applying the
+pattern to something new. Three tasks
 shipped this way. One used a generator identical to
-`examples.md §5`; another shared nine domain identifiers
+`skills/infrahub-managing-generators/examples.md` §5;
+another shared nine domain identifiers
 with its rule's example and spelled out the relationship
 chain, so a model without the rule would very likely
 produce the same traversal.

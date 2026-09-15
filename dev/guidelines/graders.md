@@ -24,7 +24,7 @@ that words it differently. Parse the artifact instead:
 | Schema / object / menu YAML | `yaml.safe_load`, then walk the structure |
 | Python (checks, generators, transforms) | `ast` |
 | Shell commands | `shlex.split` — never split on `[;\|&]`, which fabricates segments inside quotes |
-| Prose reports | locate the section, then match inside it |
+| Prose reports | locate the section, then rank evidence — see "Grading prose" below |
 
 Three failure modes follow from matching raw text:
 

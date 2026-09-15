@@ -32,8 +32,9 @@ summary is also lossy in the worst direction, because
 what it drops is whatever did not fit. One skill's
 description omitted the step its own body flags as "the
 one most easily skipped", and the section carrying its
-top-priority rule, so that rule never fired at all. Put
-what the skill produces in the Overview.
+top-priority rule, so that rule never fired at all. Name
+the action and the triggers; put the ordered steps in
+the body.
 
 ## Body
 
@@ -94,11 +95,16 @@ outranks the docs, so they trust the broken instruction.
 One skill made an unreleased command step 6 of 7.
 
 Know what the gate covers.
-`scripts/check-cli-invocations.py` validates every
-`infrahubctl` invocation the repo prints against a
-pinned tree. It judges nothing else, so a `gh` flag, a
-`curl`, or a REST path is only as good as the author who
-ran it. Run it, and say which version you ran it on.
+`scripts/check-cli-invocations.py` validates the
+`infrahubctl` invocations printed under `skills/`,
+`graders/`, `tests/`, `eval.yaml`, `.claude/skills/` and
+most of `dev/`, against the tree pinned in
+`graders/common/cli_tree.py`. Its `SCAN_TARGETS` is the
+authority; `docs/`, `README.md` and `dev/specs/` are
+outside it. It judges nothing else either, so a `gh`
+flag, a `curl`, or a REST path is only as good as the
+author who ran it. Run it, and say which version you ran
+it on.
 
 ## Verifying an edit
 
