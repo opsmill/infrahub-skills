@@ -523,16 +523,41 @@ def _is_list_referenced(node: ast.AST, tree: ast.Module) -> bool:
     return False
 
 
+def _list_elements_if_resolvable(node: ast.AST, tree: ast.Module) -> list[ast.AST] | None:
+    """Return the element expressions of the list literal ``node`` denotes,
+    if that is statically resolvable; otherwise ``None`` (indeterminate).
+
+    Handles a literal list directly, or a bare Name bound to a list
+    literal. A ``ListComp``, a call result, or an unresolved Name returns
+    ``None`` -- per the house convention, an argument shape this cannot
+    resolve passes rather than fails.
+    """
+    if isinstance(node, ast.List):
+        return node.elts
+    if isinstance(node, ast.Name):
+        value = _bound_value(node.id, tree)
+        if isinstance(value, ast.List):
+            return value.elts
+    return None
+
+
 def check_no_list_passed_to_add(
     tree: ast.Module | None, **_: Any
 ) -> tuple[bool, str]:
-    """No .add(...) call may receive a list argument as its sole peer."""
+    """No .add(...) call may receive a list argument as its sole peer, and
+    no .extend(...) call may receive a list whose elements are themselves
+    lists -- the same composite-HFID bug, one level deeper. An answer with
+    no .add() calls at all is not a violation of either constraint as long
+    as it has at least one .extend() call: there is nothing for a list
+    passed to .add() to violate.
+    """
     if tree is None:
         return False, "No Python source to inspect"
 
     add_calls = find_relationship_add_calls(tree)
-    if not add_calls:
-        return False, "No .add(...) calls found"
+    extend_calls = find_relationship_extend_calls(tree)
+    if not add_calls and not extend_calls:
+        return False, "No .add(...) or .extend(...) calls found"
 
     bad: list[str] = []
     for call in add_calls:
@@ -544,7 +569,20 @@ def check_no_list_passed_to_add(
 
     if bad:
         return False, f".add() received a list: {', '.join(bad)}"
-    return True, "No .add() call received a list argument"
+
+    nested: list[str] = []
+    for call in extend_calls:
+        if len(call.args) != 1:
+            continue
+        elements = _list_elements_if_resolvable(call.args[0], tree)
+        if elements is None:
+            continue
+        if any(isinstance(el, ast.List) for el in elements):
+            nested.append(ast.unparse(call.func) if hasattr(ast, "unparse") else call.func.attr)
+
+    if nested:
+        return False, f".extend() received a list containing a nested list: {', '.join(nested)}"
+    return True, "No .add() call received a list argument, and no .extend() call received a nested list"
 
 
 def check_members_add_iterates(
@@ -558,7 +596,7 @@ def check_members_add_iterates(
 
     add_calls = find_relationship_add_calls(tree)
     extend_calls = find_relationship_extend_calls(tree)
-    if extend_calls and not add_calls:
+    if extend_calls:
         return True, ".extend() adds one peer per call internally"
     if not add_calls:
         return False, "No .add(...) or .extend(...) calls found"

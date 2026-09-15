@@ -2,6 +2,9 @@
 
 import ast
 import importlib.util
+import json
+import subprocess
+import sys
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -206,5 +209,118 @@ async def generate(self, data):
 
 
 def test_extend_counts_as_per_peer_iteration():
-    ok, msg = CHECKS["members-add-iterates"](tree=ast.parse(EXTEND_COMPLIANT))
+    ok, msg = CHECKS["members-add-iterates"](tree=_tree(EXTEND_COMPLIANT))
     assert ok, msg
+
+
+def test_extend_only_passes_no_list_passed_to_add():
+    """Fix round 1, finding 1: an .extend()-only answer has no .add() call
+    for "no list passed to .add()" to fail against, so it must pass.
+    """
+    ok, msg = CHECKS["no-list-passed-to-add"](tree=_tree(EXTEND_COMPLIANT))
+    assert ok, msg
+
+
+# Fix round 1, finding 2: a nested list inside .extend()'s argument
+# reproduces the exact composite-HFID bug the rule exists to prevent, one
+# level deeper. `[[d["id"]] for d in data["devices"]]` builds a list of
+# one-element lists, so each peer .extend() would hand to .add() is
+# itself a list, not a scalar id.
+EXTEND_NESTED_LIST_LITERAL = """
+async def generate(self, data):
+    group = await self.client.get(kind="CoreStandardGroup", name__value="sdwan-edges")
+    group.members.extend([["peer-a"], ["peer-b"]])
+    await group.save(allow_upsert=True)
+"""
+
+EXTEND_NESTED_LIST_VIA_NAME = """
+async def generate(self, data):
+    group = await self.client.get(kind="CoreStandardGroup", name__value="sdwan-edges")
+    grouped_ids = [["peer-a"], ["peer-b"]]
+    group.members.extend(grouped_ids)
+    await group.save(allow_upsert=True)
+"""
+
+
+def test_extend_nested_list_literal_fails():
+    ok, msg = CHECKS["no-list-passed-to-add"](tree=_tree(EXTEND_NESTED_LIST_LITERAL))
+    assert not ok
+    assert "nested list" in msg.lower()
+
+
+def test_extend_nested_list_via_name_fails():
+    ok, msg = CHECKS["no-list-passed-to-add"](tree=_tree(EXTEND_NESTED_LIST_VIA_NAME))
+    assert not ok
+    assert "nested list" in msg.lower()
+
+
+# Indeterminate arguments to .extend() (a ListComp, not a resolvable list
+# literal) pass, per the house indeterminate-passes convention -- this
+# check cannot tell whether `[d["id"] for d in data["devices"]]` produces
+# scalars or nested lists without running it.
+def test_extend_listcomp_argument_is_indeterminate_and_passes():
+    ok, msg = CHECKS["no-list-passed-to-add"](tree=_tree(EXTEND_COMPLIANT))
+    assert ok, msg
+
+
+# Fix round 1, finding 3: a valid generator can call both .extend() (for
+# the bulk of the peers) and a standalone .add() (for one more, added
+# outside the loop). Presence of .extend() must satisfy per-peer
+# iteration regardless of what else is in the file.
+EXTEND_PLUS_STANDALONE_ADD = """
+async def generate(self, data):
+    group = await self.client.get(kind="CoreStandardGroup", name__value="sdwan-edges")
+    group.members.extend([d["id"] for d in data["devices"]])
+    group.members.add("extra-peer-id")
+    await group.save(allow_upsert=True)
+"""
+
+
+def test_extend_plus_standalone_add_still_iterates():
+    ok, msg = CHECKS["members-add-iterates"](tree=_tree(EXTEND_PLUS_STANDALONE_ADD))
+    assert ok, msg
+
+
+# ---------------------------------------------------------------------------
+# End-to-end: drive the actual grader script, not CHECKS[...] in isolation.
+#
+# Fix round 1 was found by running check_multi_peer_iteration.py end to
+# end against a compliant .extend()-only answer and seeing it score 0.5,
+# not by calling CHECKS["no-list-passed-to-add"] directly -- that call in
+# isolation never exercises how the eval bundles two checks together at
+# weight 1.0. This test drives the script the same way skillgrade does,
+# so a regression in that bundling fails here again.
+# ---------------------------------------------------------------------------
+
+_GRADER_SCRIPT = _REPO_ROOT / "graders" / "managing-generators" / "check_multi_peer_iteration.py"
+
+
+def _run_multi_peer_iteration_grader(source: str, tmp_path: Path) -> dict:
+    (tmp_path / "output.py").write_text(source)
+    result = subprocess.run(
+        [sys.executable, str(_GRADER_SCRIPT)],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+    assert result.returncode == 0, (
+        f"check_multi_peer_iteration.py exited with code {result.returncode}\n"
+        f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+    return json.loads(result.stdout)
+
+
+def test_grader_script_scores_extend_only_answer_full_marks(tmp_path):
+    data = _run_multi_peer_iteration_grader(EXTEND_COMPLIANT, tmp_path)
+    assert data["score"] == 1.0, data["details"]
+    for check in data["checks"]:
+        assert check["passed"], check
+
+
+def test_grader_script_still_scores_for_loop_answer_full_marks(tmp_path):
+    data = _run_multi_peer_iteration_grader(VIOLATING, tmp_path)
+    # VIOLATING is named for the concurrent-writes check (a for-loop of
+    # .add() on a shared node is unsafe there); for this grader script it
+    # is the textbook correct for-loop-of-.add() answer and must still
+    # score full marks after the fix.
+    assert data["score"] == 1.0, data["details"]
