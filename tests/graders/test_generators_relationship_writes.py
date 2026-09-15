@@ -378,11 +378,15 @@ async def generate(self, data):
 
 # Case 2: the parent demonstrably holds the deleted peers (it reads
 # rack.interfaces.peers) and is saved after the delete, with no detach.
+# `kept` is load-bearing -- it drives the description set on rack -- so
+# this is a generator that genuinely reads its peers before deleting some
+# of them, not a line added only to satisfy the check.
 DELETE_VIOLATING = """
 async def generate(self, data):
     rack = await self.client.get(kind="DcimRack", name__value="rack-1")
     stale_ids = {i["id"] for i in data["stale"]}
     kept = [p.id for p in rack.interfaces.peers if p.id not in stale_ids]
+    rack.description.value = f"kept {len(kept)} interfaces"
     for iface in data["stale"]:
         node = await self.client.get(kind="DcimInterface", id=iface["id"])
         await node.delete()
@@ -457,6 +461,32 @@ async def generate(self, data):
     for iface in data["stale"]:
         node = await self.client.get(kind="DcimInterface", id=iface["id"])
         await node.delete()
+"""
+
+# Case 9: the same violation as case 2, but the delete is written as a
+# direct self.client.delete(kind=..., id=...) call -- dropping the
+# unnecessary fetch a model would naturally do -- rather than
+# node = await self.client.get(...); await node.delete().
+DELETE_CLIENT_DELETE_VIOLATING = """
+async def generate(self, data):
+    rack = await self.client.get(kind="DcimRack", name__value="rack-1")
+    stale_ids = {i["id"] for i in data["stale"]}
+    kept = [p.id for p in rack.interfaces.peers if p.id not in stale_ids]
+    rack.description.value = f"kept {len(kept)} interfaces"
+    for iface in data["stale"]:
+        await self.client.delete(kind="DcimInterface", id=iface["id"])
+    await rack.save(allow_upsert=True)
+"""
+
+# Case 10: same self.client.delete(...) shape as case 9, but nothing holds
+# the deleted peers -- the save is on an unrelated node.
+DELETE_CLIENT_DELETE_NO_RISK = """
+async def generate(self, data):
+    other = await self.client.get(kind="CoreStandardGroup", name__value="g")
+    other.name.value = "renamed"
+    for iface in data["stale"]:
+        await self.client.delete(kind="DcimInterface", id=iface["id"])
+    await other.save(allow_upsert=True)
 """
 
 
@@ -538,4 +568,24 @@ def test_delete_with_no_save_call_passes():
     assert ok, (
         "no save() call exists anywhere, so no RelationshipManager could "
         f"re-send a deleted peer: {msg}"
+    )
+
+
+def test_delete_via_client_delete_call_fails():
+    ok, msg = CHECKS["detach-before-peer-delete"](
+        tree=ast.parse(DELETE_CLIENT_DELETE_VIOLATING)
+    )
+    assert not ok, (
+        "self.client.delete(kind=..., id=...) is a real peer-delete site "
+        f"and must not bypass the check just by skipping the fetch: {msg}"
+    )
+
+
+def test_delete_via_client_delete_call_with_no_risk_passes():
+    ok, msg = CHECKS["detach-before-peer-delete"](
+        tree=ast.parse(DELETE_CLIENT_DELETE_NO_RISK)
+    )
+    assert ok, (
+        "self.client.delete(...) with nothing holding the deleted peers "
+        f"must still pass, same as the node.delete() shape: {msg}"
     )

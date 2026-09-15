@@ -1001,7 +1001,8 @@ def check_detach_before_peer_delete(
 
     Flags only when all four hold: (1) a .delete() call on a node this
     module itself obtained (client.get/create, or a for-loop over a
-    client.* call); (2) some node variable N has a relationship attribute
+    client.* call), or a direct self.client.delete(kind=..., id=...) call;
+    (2) some node variable N has a relationship attribute
     accessed as N.<rel> somewhere (evidenced by .add()/.extend()/.remove()
     on it, a .peers read, or direct iteration -- never a bare attribute
     read like N.status); (3) N.save(...) runs after that .delete() in
@@ -1021,8 +1022,10 @@ def check_detach_before_peer_delete(
         for c in _iter_calls(tree)
         if isinstance(c.func, ast.Attribute)
         and c.func.attr == "delete"
-        and isinstance(c.func.value, ast.Name)
-        and c.func.value.id in obtained
+        and (
+            (isinstance(c.func.value, ast.Name) and c.func.value.id in obtained)
+            or _is_self_client_call(c)
+        )
     ]
     if not delete_calls:
         return True, "no peer delete on a node obtained in this module to order"
