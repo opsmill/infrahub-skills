@@ -1,0 +1,1 @@
+Stopped running the `smoke` eval preset on every pull request touching `skills/`. The suite bills a real API key, so it is now dispatch-only; the weekly `regression` run and the release-PR gate are unchanged.

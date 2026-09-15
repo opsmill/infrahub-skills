@@ -162,8 +162,9 @@ in `plugin.json`, not in an importable package towncrier could read.
 This accumulates the raw entries per PR; the curated `docs/docs/release-notes/release-X_Y_Z.mdx`
 page stays a separate, hand-written narrative for each release.
 
-Evals are tiered by cost: `smoke` on any PR touching `skills/`, the full `regression` suite weekly
-against `main` and as a blocking check on the release PR.
+Evals are tiered by cost and none of them run per PR: dispatch `skill-evals.yml` manually with
+`preset: smoke` when a change needs it, and the full `regression` suite runs weekly against `main`
+and as a blocking check on the release PR.
 
 ### Versioning
 
