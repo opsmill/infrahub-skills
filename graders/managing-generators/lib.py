@@ -907,6 +907,47 @@ def check_add_relationships_passes_ids(
     return True, "related_nodes carries peer ids"
 
 
+def check_detach_before_peer_delete(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """A .remove()+save() must precede any .delete() of those peers.
+
+    A node holds its peers in memory, so a save() issued after the peers
+    were deleted re-sends them. Detaching with .remove() and saving first
+    avoids the resend.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    delete_calls = [
+        c
+        for c in _iter_calls(tree)
+        if isinstance(c.func, ast.Attribute) and c.func.attr == "delete"
+    ]
+    if not delete_calls:
+        return True, "no peer delete to order"
+
+    removes = [
+        c
+        for c in _iter_calls(tree)
+        if isinstance(c.func, ast.Attribute) and c.func.attr == "remove"
+    ]
+    if not removes:
+        return False, (
+            "peers are deleted with no .remove() detaching them first; "
+            "a later save() re-sends the deleted peers"
+        )
+
+    first_delete = min(c.lineno for c in delete_calls)
+    last_remove = max(c.lineno for c in removes)
+    if last_remove > first_delete:
+        return False, (
+            f".remove() at line {last_remove} runs after .delete() at line "
+            f"{first_delete}; detach before deleting the peers"
+        )
+    return True, "peers are detached before they are deleted"
+
+
 # ---------------------------------------------------------------------------
 # Natural-key preflight
 # ---------------------------------------------------------------------------
@@ -2005,6 +2046,7 @@ CHECKS: dict[str, Any] = {
     "members-add-iterates": check_members_add_iterates,
     "concurrent-writes-use-add-relationships": check_concurrent_writes_use_add_relationships,
     "add-relationships-passes-ids": check_add_relationships_passes_ids,
+    "detach-before-peer-delete": check_detach_before_peer_delete,
     "preflight-or-upsert": check_preflight_or_upsert,
     "no-raw-create-without-handler": check_no_raw_create_without_handler,
     # from_graphql hydration family (output.md)
