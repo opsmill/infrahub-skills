@@ -409,3 +409,56 @@ def test_delete_near_miss_remove_after_delete_fails():
 def test_delete_comment_only_fails():
     ok, msg = CHECKS["detach-before-peer-delete"](tree=ast.parse(DELETE_COMMENT_ONLY))
     assert not ok, "a comment saying 'detach' must not satisfy the check"
+
+
+DELETE_NO_SAVE_NO_RISK = """
+async def generate(self, data):
+    for iface in data["stale"]:
+        node = await self.client.get(kind="DcimInterface", id=iface["id"])
+        await node.delete()
+"""
+
+DELETE_SINGLE_NODE_NO_RISK = """
+async def generate(self, data):
+    node = await self.client.get(kind="DcimInterface", id=data["id"])
+    await node.delete()
+"""
+
+DELETE_LAUNDERED_WITH_UNRELATED_REMOVE = """
+async def generate(self, data):
+    seen = []
+    seen.remove(1)
+    rack = await self.client.get(kind="DcimRack", name__value="rack-1")
+    for iface in data["stale"]:
+        node = await self.client.get(kind="DcimInterface", id=iface["id"])
+        await node.delete()
+    await rack.save(allow_upsert=True)
+"""
+
+
+def test_delete_with_no_save_call_passes():
+    ok, msg = CHECKS["detach-before-peer-delete"](tree=ast.parse(DELETE_NO_SAVE_NO_RISK))
+    assert ok, (
+        "no save() call exists anywhere, so no RelationshipManager could "
+        f"re-send a deleted peer: {msg}"
+    )
+
+
+def test_delete_single_unrelated_node_with_no_save_passes():
+    ok, msg = CHECKS["detach-before-peer-delete"](
+        tree=ast.parse(DELETE_SINGLE_NODE_NO_RISK)
+    )
+    assert ok, (
+        "a lone node deleted with nothing saved afterwards has nothing at "
+        f"risk: {msg}"
+    )
+
+
+def test_delete_laundered_with_unrelated_remove_fails():
+    ok, msg = CHECKS["detach-before-peer-delete"](
+        tree=ast.parse(DELETE_LAUNDERED_WITH_UNRELATED_REMOVE)
+    )
+    assert not ok, (
+        "a .remove() on a bare local (seen.remove(1)) must not satisfy the "
+        "check just because a .remove() token appears before the .delete()"
+    )
