@@ -273,6 +273,41 @@
           "check": "A Markdown report names the NetBox component lists that did not convert"
         }
       ]
+    },
+    {
+      "id": 10,
+      "prompt": "Convert this NetBox device type into Infrahub object templates\nfor the OpsMill schema-library DCIM schema, which has\n`generate_template: true` on `DcimDevice`.\n\n    ---\n    manufacturer: Cisco\n    model: Catalyst 9300-24P\n    slug: cisco-c9300-24p\n    part_number: C9300-24P\n    u_height: 1\n    is_full_depth: true\n    weight: 7.59\n    weight_unit: kg\n    airflow: front-to-rear\n    console-ports:\n      - name: con 0\n        type: rj-45\n    interfaces:\n      - name: GigabitEthernet1/0/1\n        type: 1000base-t\n        poe_mode: pse\n      - name: GigabitEthernet1/0/2\n        type: 1000base-t\n        poe_mode: pse\n\nWrite the emitted files under `./output_dir/` (create the directory),\nand tell me what did not convert.",
+      "expected_output": "A ./output_dir/ produced by the bundled converter: numeric attributes are whole numbers (the 7.59 kg weight rounds rather than being written as a float, which Infrahub's integer-backed Number attributes cannot hold), no NetBox choice wrapper objects appear in the YAML, component children nest under a kind + data wrapper, and a coverage report names the console-ports and the dropped interface fields.",
+      "files": [],
+      "expectations": [
+        "The device type weight is a whole number, not 7.59",
+        "No emitted value is a NetBox choice object such as {value, label}",
+        "Component children nest under a kind + data wrapper",
+        "A coverage report is written naming what did not convert",
+        "The console-ports list and the interface type/poe_mode fields are accounted for"
+      ],
+      "assertions": [
+        {
+          "name": "envelope",
+          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+        },
+        {
+          "name": "template-kind",
+          "check": "Templates are authored under a Template<Kind> and every row has a template_name"
+        },
+        {
+          "name": "bundled-script-output",
+          "check": "Numerics are integers, choice values are unwrapped, and a coverage report exists \u2014 the guarantees a hand-rolled conversion loses"
+        },
+        {
+          "name": "component-kind-wrapper",
+          "check": "Component children nest under a kind + data wrapper naming a Template* kind"
+        },
+        {
+          "name": "coverage-report",
+          "check": "A Markdown report names the NetBox component lists that did not convert"
+        }
+      ]
     }
   ]
 }
