@@ -79,6 +79,24 @@ async def generate(self, data):
     await group.save(allow_upsert=True)
 """
 
+# Near-miss for "concurrent-writes-use-add-relationships": a bare-name
+# alias for a relationship access (`members = group.members`) is the same
+# RelationshipManager as `group.members` written through a rename. Without
+# resolving the alias, `members.add(...)` hits the single-level "not a
+# RelationshipManager access" branch and is silently exempted, laundered by
+# the unrelated `other.add_relationships(...)` call elsewhere in the file.
+ALIAS_NEAR_MISS = """
+async def generate(self, data):
+    group = await self.client.get(kind="CoreStandardGroup", name__value="sdwan-edges")
+    other = await self.client.get(kind="CoreStandardGroup", name__value="other-edges")
+    peer_ids = [d["id"] for d in data["devices"]]
+    await other.add_relationships(relation_to_update="members", related_nodes=peer_ids)
+    members = group.members
+    for device in data["devices"]:
+        members.add(device["id"])
+    await group.save(allow_upsert=True)
+"""
+
 NEAR_MISS = """
 async def generate(self, data):
     group = await self.client.get(kind="CoreStandardGroup", name__value="sdwan-edges")
@@ -146,6 +164,15 @@ def test_near_miss_extend_on_different_shared_node_fails():
     )
     assert not ok
     assert ".extend()" in msg
+
+
+def test_near_miss_alias_bypasses_narrowing_fails():
+    ok, msg = CHECKS["concurrent-writes-use-add-relationships"](
+        tree=_tree(ALIAS_NEAR_MISS)
+    )
+    assert not ok
+    assert ".add()" in msg
+    assert "members.add" in msg
 
 
 def test_ids_check_accepts_name_bound_to_comprehension():
