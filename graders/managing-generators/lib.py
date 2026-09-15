@@ -655,30 +655,52 @@ def _is_run_private_receiver(name: str, tree: ast.Module) -> bool:
     return isinstance(inner, ast.Call) and _is_self_client_method(inner, "create")
 
 
+def _resolve_alias_to_attribute(name: str, tree: ast.Module) -> ast.Attribute | None:
+    """If ``name`` is a bare alias for an attribute chain, return that chain.
+
+    ``members = group.members`` followed by ``members.add(x)`` is the same
+    RelationshipManager access as ``group.members.add(x)`` written through
+    a rename -- the narrowing below must not be bypassable by assigning a
+    shorter local name to a relationship first. Only one hop is resolved;
+    an alias of an alias falls through to "cannot resolve" like any other
+    unresolvable shape.
+    """
+    bound = _bound_value(name, tree)
+    return bound if isinstance(bound, ast.Attribute) else None
+
+
 def _narrow_shared_relationship_calls(
     tree: ast.Module, calls: list[ast.Call]
 ) -> list[ast.Call]:
     """Keep only calls that plausibly mutate a node another run could write.
 
-    Two narrowings, both required:
-
-    * A bare ``<name>.<method>(...)`` (single-level) is not a
-      RelationshipManager access at all -- most commonly a local ``set()``
-      dedup (``seen.add(x)``), which is also exempted explicitly by its
-      binding so the exemption does not depend on shape alone.
-    * A two-level ``<name>.<relationship>.<method>(...)`` is exempt when
-      ``<name>`` is run-private (see ``_is_run_private_receiver``): a node
-      this run just created cannot be the node two runs are racing to
-      write. This does not depend on which node any ``add_relationships``
-      call elsewhere in the file happens to target -- an ``extend()`` on a
-      *different*, fetched (shared) node is just as much the bug even when
-      an unrelated ``add_relationships()`` call is also present.
+    * A bare ``<name>.<method>(...)`` (single-level) is resolved one hop:
+      if ``<name>`` is a local ``set()`` (a dedup, not a RelationshipManager
+      at all) it is exempt by that binding; if it is an alias for an
+      attribute chain (``members = group.members``) the call is narrowed as
+      if it had been written through that chain, so a rename cannot launder
+      the same read-modify-write; anything else this cannot resolve to
+      either shape falls back to "indeterminate passes" per this module's
+      convention, rather than guessing.
+    * A two-level ``<name>.<relationship>.<method>(...)`` (written directly
+      or reached via the alias hop above) is exempt when ``<name>`` is
+      run-private (see ``_is_run_private_receiver``): a node this run just
+      created cannot be the node two runs are racing to write. This does
+      not depend on which node any ``add_relationships`` call elsewhere in
+      the file happens to target -- an ``extend()`` on a *different*,
+      fetched (shared) node is just as much the bug even when an unrelated
+      ``add_relationships()`` call is also present.
     """
     narrowed = []
     for call in calls:
         receiver = call.func.value
-        if isinstance(receiver, ast.Name) and _is_bound_to_local_set(receiver.id, tree):
-            continue
+        if isinstance(receiver, ast.Name):
+            if _is_bound_to_local_set(receiver.id, tree):
+                continue
+            alias_target = _resolve_alias_to_attribute(receiver.id, tree)
+            if alias_target is None:
+                continue  # single-level and unresolvable: indeterminate passes
+            receiver = alias_target
         if not isinstance(receiver, ast.Attribute):
             continue
         base = _attr_base_name(receiver)
@@ -688,6 +710,17 @@ def _narrow_shared_relationship_calls(
             continue
         narrowed.append(call)
     return narrowed
+
+
+def _unparse_calls(calls: list[ast.Call]) -> str:
+    """Best-effort source text for each call's receiver+method, for messages."""
+    texts = []
+    for call in calls:
+        try:
+            texts.append(ast.unparse(call.func))
+        except Exception:
+            continue
+    return ", ".join(f"`{t}`" for t in texts) if texts else ""
 
 
 def check_concurrent_writes_use_add_relationships(
@@ -709,19 +742,25 @@ def check_concurrent_writes_use_add_relationships(
     # reached for is missing.
     add_calls = _narrow_shared_relationship_calls(tree, find_relationship_add_calls(tree))
     if add_calls:
+        calls_text = _unparse_calls(add_calls)
+        suffix = f" ({calls_text})" if calls_text else ""
         return False, (
-            f"{len(add_calls)} RelationshipManager .add() call(s) remain: a "
-            "client-side read-modify-write drops peers written concurrently"
+            f"{len(add_calls)} RelationshipManager .add() call(s) remain"
+            f"{suffix}: a client-side read-modify-write drops peers "
+            "written concurrently"
         )
 
     extend_calls = _narrow_shared_relationship_calls(
         tree, find_relationship_extend_calls(tree)
     )
     if extend_calls:
+        calls_text = _unparse_calls(extend_calls)
+        suffix = f" ({calls_text})" if calls_text else ""
         return False, (
             f"{len(extend_calls)} RelationshipManager .extend() call(s) "
-            "remain: extend() calls .add() per item, the same client-side "
-            "read-modify-write that drops peers written concurrently"
+            f"remain{suffix}: extend() calls .add() per item, the same "
+            "client-side read-modify-write that drops peers written "
+            "concurrently"
         )
 
     ar_calls = find_add_relationships_calls(tree)
