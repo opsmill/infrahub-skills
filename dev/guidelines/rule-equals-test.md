@@ -52,6 +52,31 @@ rule as covered forever.
    `evaluations/*.json` committed alongside `eval.yaml`.
    CI fails when the two diverge.
 
+## When the grader and the rule disagree, the rule wins
+
+A check that encodes a stricter contract than the rule
+it tests does not read as a conflict. It reads as a
+passing suite, because the fixtures were written from
+the check. At eval time the grader is what scores, so
+the rule is the side that rots.
+
+Four shipped in one skill, each rejecting something the
+rule itself sanctioned: its canonical example, its
+opt-in default, its documented carve-out, its own
+non-compliant example.
+
+Before adding a check, write out the answer the rule's
+example shows, plus the answer its carve-outs allow, and
+run the check on both. When they disagree, decide which
+side moves and move it. Usually it is the check.
+
+**Never let an assertion pin a defect in place.** An
+invalid flag taught in eight places was also asserted by
+a grader in three tasks, so a *correct* answer scored
+below the CI gate. Whoever fixes the defect sees CI go
+red and reverts. If a check asserts something you have
+not run, it is a ratchet, not a test.
+
 ## New category prefixes
 
 A new prefix must be registered everywhere the skill
@@ -72,3 +97,10 @@ skill never emits, while its eval still passes.
 are for real failures, not advisory cost-to-fix
 findings. An impact or severity label changed in a rule
 has to move in the skill's index too.
+
+The rule's `impact:` frontmatter is the one that counts,
+and it is also part of the grader's contract. A rule
+whose prose said MEDIUM while its `impact:` said LOW
+scored every answer that trusted the prose at 0.75.
+Keep the level out of the prose entirely rather than
+stating it twice.
