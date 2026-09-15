@@ -2,7 +2,7 @@
 name: infrahub-managing-generators
 description: >-
   Creates, modifies and debugs Infrahub Generators — design-driven automation that builds infrastructure objects from templates and topology definitions.
-  TRIGGER when: building design-to-implementation workflows, auto-creating objects from templates, topology-driven generation, modifying or extending an existing generator, debugging why a generator produced or deleted the wrong objects, changing what a generator produces.
+  TRIGGER when: building design-to-implementation workflows, auto-creating objects from templates, topology-driven generation, modifying or extending an existing generator, debugging why a generator produced or deleted the wrong objects or left a field empty or wrong, changing what a generator produces.
   DO NOT TRIGGER when: designing schemas, writing data transforms, querying live data, populating static data files.
 allowed-tools:
   - Read
