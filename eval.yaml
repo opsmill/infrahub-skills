@@ -1512,17 +1512,17 @@ tasks:
         weight: 1.0
     expected_output: >-
       A Python generator that adds each peer to the group with one .add()
-      call per peer (typically inside a for loop), then a single .save().
-      No list is passed to .add() in a single call.
+      call per peer (a for loop or .extend(), which calls .add() internally),
+      then a single .save(). No list is passed to a single .add() call.
     expectations:
       - "Group is created or fetched via self.client.get / self.client.create"
-      - ".add() is called once per peer (inside a for loop or 5 explicit calls)"
+      - ".add() is called once per peer (a for loop, 5 explicit calls, or .extend())"
       - "No call passes a list of peers as a single .add() argument"
     assertions:
       - name: no-list-passed-to-add
         check: No .add() call receives a list as its argument
       - name: members-add-iterates
-        check: .add() is invoked inside a for loop or multiple times explicitly
+        check: .add() is invoked per peer via a loop, explicit calls, or .extend()
 
   - name: generator-concurrent-relationship-writes
     trials: 3

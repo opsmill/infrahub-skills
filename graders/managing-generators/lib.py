@@ -557,8 +557,11 @@ def check_members_add_iterates(
         return False, "No Python source to inspect"
 
     add_calls = find_relationship_add_calls(tree)
+    extend_calls = find_relationship_extend_calls(tree)
+    if extend_calls and not add_calls:
+        return True, ".extend() adds one peer per call internally"
     if not add_calls:
-        return False, "No .add(...) calls found"
+        return False, "No .add(...) or .extend(...) calls found"
 
     # Look for any For loop containing a .add() call
     for for_node in ast.walk(tree):

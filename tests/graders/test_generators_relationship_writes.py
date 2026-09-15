@@ -195,3 +195,16 @@ def test_near_miss_passing_node_objects_fails():
     ok, msg = CHECKS["add-relationships-passes-ids"](tree=_tree(NEAR_MISS))
     assert not ok
     assert "id" in msg.lower()
+
+
+EXTEND_COMPLIANT = """
+async def generate(self, data):
+    group = await self.client.get(kind="CoreStandardGroup", name__value="sdwan-edges")
+    group.members.extend([d["id"] for d in data["devices"]])
+    await group.save(allow_upsert=True)
+"""
+
+
+def test_extend_counts_as_per_peer_iteration():
+    ok, msg = CHECKS["members-add-iterates"](tree=ast.parse(EXTEND_COMPLIANT))
+    assert ok, msg
