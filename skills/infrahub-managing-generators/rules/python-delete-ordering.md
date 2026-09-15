@@ -57,4 +57,9 @@ Detaching costs nothing beyond the save the generator
 already needs, and it is the only ordering that avoids the
 resend outright.
 
+In testing, a capable model reasoned its way to this
+ordering unprompted, without having read this rule. Treat
+this page as a reminder of a real gotcha, not as guidance a
+model is otherwise likely to miss.
+
 Verified against Infrahub 1.11.2 and infrahub-sdk 1.23.2.
