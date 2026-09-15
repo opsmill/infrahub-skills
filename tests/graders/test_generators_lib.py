@@ -895,6 +895,60 @@ class G:
     assert "cannot be tied back" in msg
 
 
+# --- round 4: add_relationships() is a third accepted way to honour it ---
+#
+# tracking-idempotent.md now documents writing the shared object with
+# add_relationships() as a non-claiming write, alongside opt-out and
+# create-outside-the-generator. The check must accept it rather than
+# reading the absence of a claiming save() as a sign nothing was graded.
+
+
+def test_add_relationships_only_write_passes_with_no_save_anywhere():
+    """The whole answer has zero save() calls; only add_relationships() writes it."""
+    ok, msg = _run(
+        "shared-save-opts-out-of-tracking",
+        '''
+class G:
+    async def generate(self, data):
+        container = await self.client.create(kind="NetContainer", data={"name": "shared-trunk"})
+        await container.add_relationships(relation_to_update="children", related_nodes=[child.id])
+''',
+    )
+    assert ok, msg
+
+
+def test_add_relationships_only_write_passes_alongside_an_unrelated_save():
+    """An unrelated save() elsewhere must not be mistaken for the shared object's."""
+    ok, msg = _run(
+        "shared-save-opts-out-of-tracking",
+        '''
+class G:
+    async def generate(self, data):
+        device = await self.client.create(kind="DcimDevice", data={"name": "spine-01"})
+        await device.save(allow_upsert=True)
+        container = await self.client.create(kind="NetContainer", data={"name": "shared-trunk"})
+        await container.add_relationships(relation_to_update="children", related_nodes=[child.id])
+''',
+    )
+    assert ok, msg
+
+
+def test_add_relationships_does_not_launder_an_unopted_out_save():
+    """add_relationships() elsewhere cannot excuse a claiming save on the shared object."""
+    ok, msg = _run(
+        "shared-save-opts-out-of-tracking",
+        '''
+class G:
+    async def generate(self, data):
+        container = await self.client.create(kind="NetContainer", data={"name": "shared-trunk"})
+        await container.save(allow_upsert=True)
+        leg = await self.client.create(kind="NetLeg", data={"name": "l"})
+        await leg.add_relationships(relation_to_update="container", related_nodes=[container.id])
+''',
+    )
+    assert not ok, msg
+
+
 def test_truncation_check_follows_the_flag_hoisted_into_a_local():
     src = '''
 class G:
