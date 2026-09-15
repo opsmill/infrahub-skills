@@ -1524,6 +1524,36 @@ tasks:
       - name: members-add-iterates
         check: .add() is invoked inside a for loop or multiple times explicitly
 
+  - name: generator-concurrent-relationship-writes
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write an Infrahub Generator that runs once per created DcimDevice
+      (an on-create event trigger, so many runs execute concurrently during a
+      bulk load). Each run must add its own device to the members of the
+      shared CoreStandardGroup named 'all-edges', which every run writes.
+
+      Save ONLY the final Python generator class to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_concurrent_relationship_writes.py
+        weight: 1.0
+    expected_output: >-
+      A Python generator that adds its device to the shared group with
+      node.add_relationships(relation_to_update=..., related_nodes=[<peer ids>]),
+      not with a members.add() loop followed by save().
+    expectations:
+      - "The shared group's members are written with add_relationships()"
+      - "No RelationshipManager .add() call is used for the shared group"
+      - "related_nodes receives peer id strings, not node objects"
+    assertions:
+      - name: concurrent-writes-use-add-relationships
+        check: Peers are added via add_relationships(), with no .add() call remaining
+      - name: add-relationships-passes-ids
+        check: related_nodes carries peer id strings rather than node objects
+
   - name: generator-natural-key-preflight
     trials: 3
     instruction: |
