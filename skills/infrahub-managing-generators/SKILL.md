@@ -1,8 +1,8 @@
 ---
 name: infrahub-managing-generators
 description: >-
-  Creates Infrahub Generators — design-driven automation that builds infrastructure objects from templates and topology definitions.
-  TRIGGER when: building design-to-implementation workflows, auto-creating objects from templates, topology-driven generation.
+  Creates, modifies and debugs Infrahub Generators — design-driven automation that builds infrastructure objects from templates and topology definitions.
+  TRIGGER when: building design-to-implementation workflows, auto-creating objects from templates, topology-driven generation, modifying or extending an existing generator, debugging why a generator produced or deleted the wrong objects, changing what a generator produces.
   DO NOT TRIGGER when: designing schemas, writing data transforms, querying live data, populating static data files.
 allowed-tools:
   - Read
@@ -69,6 +69,8 @@ delete data via the tracking cleanup.
 | Is triggered by membership in a group | The target group must be a `CoreGeneratorGroup` (not `CoreStandardGroup`) — the dispatcher only recognizes the former | [rules/registration-config.md](./rules/registration-config.md) |
 | Should be idempotent on re-run | Every `save()` uses `allow_upsert=True`; the run's tracking context deletes objects from prior runs that aren't recreated | [rules/tracking-idempotent.md](./rules/tracking-idempotent.md) |
 | Imports anything from the repository (a shared package, generated protocols, its own query model) | Carry a `watch:` block in `.infrahub.yml` naming every one of those paths — imports are never followed, so an undeclared helper means the Generator silently stops re-running when that helper changes | [rules/registration-watch-dependencies.md](./rules/registration-watch-dependencies.md) |
+| Adding peers to a relationship several runs can write at once | `node.add_relationships(relation_to_update=..., related_nodes=[ids])` | [rules/python-concurrent-relationship-writes.md](./rules/python-concurrent-relationship-writes.md) |
+| Modifying a generator so it produces a different set of objects than last run | Audit every `save()` reachable from `generate()`, helpers included | [rules/tracking-idempotent.md](./rules/tracking-idempotent.md) |
 
 ## Before writing Python
 

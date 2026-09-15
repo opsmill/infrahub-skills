@@ -9,8 +9,10 @@
    InfrahubGenerator base class, async generate() method,
    object creation via self.client.create(), save with
    allow_upsert=True, relationship references via HFID dict /
-   ID dict / SDK object (never bare string), and multi-peer
-   add iteration on RelationshipManager.
+   ID dict / SDK object (never bare string), and
+   multi-peer add via `.extend()` or a per-peer `.add()` loop,
+   and `add_relationships()` when several runs can write the
+   same node at once.
 
 3. **Tracking (tracking-)** -- HIGH. Automatic cleanup of
    stale objects via delete_unused_nodes=True, idempotent
@@ -19,6 +21,8 @@
    `save()` (including an upsert) claims the node, so a
    shared object needs `update_group_context=False` or it
    gets deleted when one target stops writing it.
+   Tracking covers every `save()` reachable from `generate()`,
+   including saves inside imported helpers.
 
 4. **API Reference (api-)** -- HIGH. Constructor parameters,
    instance properties (client, nodes, store, branch), key
