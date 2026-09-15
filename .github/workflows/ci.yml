@@ -159,22 +159,13 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
-  # Skill evaluations — tiered, because the suite bills a real API key.
+  # Skill evaluations — not run per PR, because the suite bills a real API key.
   #
-  # `smoke` on any PR touching skills/: cheap, catches obvious breakage while
-  # the author still has the context. The full `regression` suite runs on a
-  # schedule (skill-evals-scheduled.yml) and as the gate on the release PR
-  # below, so quality is checked continuously without paying for it per PR.
+  # The `smoke` preset used to run on any PR touching skills/. It is now
+  # dispatch-only: run `skill-evals.yml` manually with `preset: smoke` when a
+  # change needs it. The full `regression` suite still runs on a schedule
+  # (skill-evals-scheduled.yml) and as the gate on the release PR below.
   # ---------------------------------------------------------------------------
-  skill-evals-smoke:
-    needs: files-changed
-    if: >-
-      needs.files-changed.outputs.skills == 'true' &&
-      !startsWith(github.head_ref, 'release/')
-    uses: ./.github/workflows/skill-evals.yml
-    secrets: inherit
-    with:
-      preset: smoke
 
   # ---------------------------------------------------------------------------
   # Release gate: the full suite must pass before a release can be merged.
