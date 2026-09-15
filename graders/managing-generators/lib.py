@@ -907,79 +907,170 @@ def check_add_relationships_passes_ids(
     return True, "related_nodes carries peer ids"
 
 
-def _has_any_save_call(tree: ast.Module) -> bool:
-    """True if any ``<expr>.save(...)`` call exists, regardless of args.
+def _is_self_client_call(call: ast.Call) -> bool:
+    """True if ``call.func`` is ``self.client.<anything>``.
 
-    A deleted peer can only be re-sent by a save() that transmits it. If
-    the module never calls save() at all, nothing can carry a stale peer
-    id anywhere, no matter what the module deletes or holds in memory.
+    Broader than ``_is_self_client_method``: it does not pin the method
+    name, so it covers ``get``, ``create``, and any bulk-fetch method
+    (``filters``, ``all``, ...) used as the source of a for-loop target.
     """
-    return any(
-        isinstance(c.func, ast.Attribute) and c.func.attr == "save"
-        for c in _iter_calls(tree)
-    )
+    func = call.func
+    if not isinstance(func, ast.Attribute):
+        return False
+    if not isinstance(func.value, ast.Attribute) or func.value.attr != "client":
+        return False
+    if not isinstance(func.value.value, ast.Name) or func.value.value.id != "self":
+        return False
+    return True
 
 
-def _is_plausible_relationship_receiver(node: ast.AST) -> bool:
-    """True if a ``.remove()`` receiver could plausibly be a RelationshipManager.
+def _client_obtained_names(tree: ast.Module) -> set[str]:
+    """Names bound from a ``self.client.*`` call, directly or via a for-loop.
 
-    A RelationshipManager is always reached through an attribute chain off
-    a node, e.g. ``rack.interfaces``. A bare local name (``seen.remove(1)``
-    on a plain list) can never be one, so excluding bare-name receivers
-    rules out laundering the check with an unrelated ``.remove()`` call.
-    An attribute chain is accepted even when it cannot be proven to be a
-    relationship manager (e.g. ``self.some_list``), per the house
-    convention of passing shapes that cannot be resolved statically.
+    Covers ``node = await self.client.get(...)`` and
+    ``for node in await self.client.filters(...):`` alike -- both bind a
+    name to a node this module itself obtained from the server.
     """
-    return isinstance(node, ast.Attribute)
+
+    def _unwrap(value: ast.AST) -> ast.AST:
+        return value.value if isinstance(value, ast.Await) else value
+
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+        ):
+            value = _unwrap(node.value)
+            if isinstance(value, ast.Call) and _is_self_client_call(value):
+                names.add(node.targets[0].id)
+        elif isinstance(node, ast.For) and isinstance(node.target, ast.Name):
+            it = _unwrap(node.iter)
+            if isinstance(it, ast.Call) and _is_self_client_call(it):
+                names.add(node.target.id)
+    return names
+
+
+def _rel_chain_of(receiver: ast.AST) -> tuple[str, str] | None:
+    """If ``receiver`` is ``<Name>.<attr>``, return ``(name, attr)``."""
+    if isinstance(receiver, ast.Attribute) and isinstance(receiver.value, ast.Name):
+        return receiver.value.id, receiver.attr
+    return None
+
+
+def _relationship_attr_candidates(tree: ast.Module) -> set[tuple[str, str]]:
+    """Collect ``(N, rel)`` pairs where ``N.rel`` is used like a RelationshipManager.
+
+    A plain attribute (``rack.status``) is not a relationship; nothing
+    ever calls ``.add()``/``.extend()``/``.remove()`` on it, reads
+    ``.peers`` off it, or iterates it directly. Requiring one of those
+    signals is what keeps an unrelated attribute access (``other.name``)
+    from being mistaken for a relationship manager.
+    """
+    candidates: set[tuple[str, str]] = set()
+    for call in _iter_calls(tree):
+        if isinstance(call.func, ast.Attribute) and call.func.attr in {
+            "add",
+            "extend",
+            "remove",
+        }:
+            chain = _rel_chain_of(call.func.value)
+            if chain:
+                candidates.add(chain)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr == "peers":
+            chain = _rel_chain_of(node.value)
+            if chain:
+                candidates.add(chain)
+        elif isinstance(node, ast.For):
+            it = node.iter
+            if isinstance(it, ast.Attribute) and it.attr == "peers":
+                chain = _rel_chain_of(it.value)
+            else:
+                chain = _rel_chain_of(it)
+            if chain:
+                candidates.add(chain)
+    return candidates
 
 
 def check_detach_before_peer_delete(
     tree: ast.Module | None, **_: Any
 ) -> tuple[bool, str]:
-    """A .remove()+save() on a relationship manager must precede any .delete().
+    """Flag only the unambiguous case: N holds the deleted peers and is saved after.
 
-    A node holds its peers in memory, so a save() issued after the peers
-    were deleted re-sends them. Detaching with .remove() and saving first
-    avoids the resend. With no save() call anywhere, nothing can re-send a
-    stale peer, so there is nothing to order.
+    Flags only when all four hold: (1) a .delete() call on a node this
+    module itself obtained (client.get/create, or a for-loop over a
+    client.* call); (2) some node variable N has a relationship attribute
+    accessed as N.<rel> somewhere (evidenced by .add()/.extend()/.remove()
+    on it, a .peers read, or direct iteration -- never a bare attribute
+    read like N.status); (3) N.save(...) runs after that .delete() in
+    source order; (4) no N.<rel>.remove(...) runs before that .delete().
+
+    Any shape that cannot be resolved this way is left alone. A grader
+    that misses a real violation is a better trade than one that fails
+    ordinary code: a false fail teaches a model to write worse code, a
+    false pass only fails to teach.
     """
     if tree is None:
         return False, "No Python source to inspect"
 
+    obtained = _client_obtained_names(tree)
     delete_calls = [
         c
         for c in _iter_calls(tree)
-        if isinstance(c.func, ast.Attribute) and c.func.attr == "delete"
+        if isinstance(c.func, ast.Attribute)
+        and c.func.attr == "delete"
+        and isinstance(c.func.value, ast.Name)
+        and c.func.value.id in obtained
     ]
     if not delete_calls:
-        return True, "no peer delete to order"
+        return True, "no peer delete on a node obtained in this module to order"
 
-    if not _has_any_save_call(tree):
-        return True, "no save() call exists that could re-send a deleted peer"
-
-    removes = [
-        c
-        for c in _iter_calls(tree)
-        if isinstance(c.func, ast.Attribute) and c.func.attr == "remove"
-    ]
-    relationship_removes = [
-        c for c in removes if _is_plausible_relationship_receiver(c.func.value)
-    ]
-    if not relationship_removes:
-        return False, (
-            "peers are deleted with no .remove() on a relationship manager "
-            "detaching them first; a later save() re-sends the deleted peers"
+    candidates = _relationship_attr_candidates(tree)
+    if not candidates:
+        return True, (
+            "no relationship attribute access found; nothing in this module "
+            "demonstrably holds the deleted peers"
         )
 
     first_delete = min(c.lineno for c in delete_calls)
-    last_remove = max(c.lineno for c in relationship_removes)
-    if last_remove > first_delete:
+
+    for n_name, rel in candidates:
+        save_calls = [
+            c
+            for c in _iter_calls(tree)
+            if isinstance(c.func, ast.Attribute)
+            and c.func.attr == "save"
+            and isinstance(c.func.value, ast.Name)
+            and c.func.value.id == n_name
+        ]
+        later_saves = [c for c in save_calls if c.lineno > first_delete]
+        if not later_saves:
+            continue
+
+        remove_calls = [
+            c
+            for c in _iter_calls(tree)
+            if isinstance(c.func, ast.Attribute)
+            and c.func.attr == "remove"
+            and _rel_chain_of(c.func.value) == (n_name, rel)
+        ]
+        earlier_removes = [c for c in remove_calls if c.lineno < first_delete]
+        if earlier_removes:
+            continue
+
         return False, (
-            f".remove() at line {last_remove} runs after .delete() at line "
-            f"{first_delete}; detach before deleting the peers"
+            f"{n_name}.{rel} is a relationship manager and {n_name} is saved "
+            f"(line {later_saves[0].lineno}) after .delete() at line "
+            f"{first_delete}, with no {n_name}.{rel}.remove() run first; "
+            "detach before deleting the peers"
         )
-    return True, "peers are detached before they are deleted"
+
+    return True, (
+        "no relationship manager both holds the deleted peers and is saved "
+        "unguarded afterward"
+    )
 
 
 # ---------------------------------------------------------------------------

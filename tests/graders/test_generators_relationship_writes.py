@@ -326,6 +326,17 @@ def test_grader_script_still_scores_for_loop_answer_full_marks(tmp_path):
     assert data["score"] == 1.0, data["details"]
 
 
+# --- detach-before-peer-delete: the exact four-condition matrix ---
+#
+# Flag only when all four hold: (1) a .delete() on a node this module
+# itself obtained; (2) some node variable N has a relationship attribute
+# accessed as N.<rel> somewhere (an .add()/.extend()/.remove() call on it,
+# a .peers read, or direct iteration -- never a bare attribute read); (3)
+# N.save(...) runs after that .delete() in source order; (4) no
+# N.<rel>.remove(...) runs before that .delete(). Any shape that cannot be
+# resolved this way is left alone -- a missed violation is the accepted
+# trade for never failing ordinary code.
+
 DELETE_COMPLIANT = """
 async def generate(self, data):
     rack = await self.client.get(kind="DcimRack", name__value="rack-1")
@@ -352,15 +363,76 @@ async def generate(self, data):
         await node.delete()
 """
 
+# Case 1: peers deleted, nothing holds them, an unrelated save() elsewhere.
+# `other.name` is a plain attribute, never touched with .add/.extend/.remove
+# or .peers, so it is never mistaken for a relationship manager.
+DELETE_UNRELATED_SAVE_NO_RISK = """
+async def generate(self, data):
+    other = await self.client.get(kind="CoreStandardGroup", name__value="g")
+    other.name.value = "renamed"
+    for iface in data["stale"]:
+        node = await self.client.get(kind="DcimInterface", id=iface["id"])
+        await node.delete()
+    await other.save(allow_upsert=True)
+"""
+
+# Case 2: the parent demonstrably holds the deleted peers (it reads
+# rack.interfaces.peers) and is saved after the delete, with no detach.
 DELETE_VIOLATING = """
 async def generate(self, data):
     rack = await self.client.get(kind="DcimRack", name__value="rack-1")
+    stale_ids = {i["id"] for i in data["stale"]}
+    kept = [p.id for p in rack.interfaces.peers if p.id not in stale_ids]
     for iface in data["stale"]:
         node = await self.client.get(kind="DcimInterface", id=iface["id"])
         await node.delete()
     await rack.save(allow_upsert=True)
 """
 
+# Case 3: a bare local's .remove() (seen.remove(1)) sits before the delete,
+# but it is not rack.interfaces.remove(...), so it must not launder this.
+DELETE_LAUNDERED_BARE_LOCAL = """
+async def generate(self, data):
+    rack = await self.client.get(kind="DcimRack", name__value="rack-1")
+    stale_ids = {i["id"] for i in data["stale"]}
+    kept = [p.id for p in rack.interfaces.peers if p.id not in stale_ids]
+    seen = []
+    seen.remove(1)
+    for iface in data["stale"]:
+        node = await self.client.get(kind="DcimInterface", id=iface["id"])
+        await node.delete()
+    await rack.save(allow_upsert=True)
+"""
+
+# Case 4: an attribute-chain .remove() on an unrelated receiver
+# (self.cache) sits before the delete; still not rack.interfaces.remove().
+DELETE_LAUNDERED_UNRELATED_ATTR_CACHE = """
+async def generate(self, data):
+    rack = await self.client.get(kind="DcimRack", name__value="rack-1")
+    stale_ids = {i["id"] for i in data["stale"]}
+    kept = [p.id for p in rack.interfaces.peers if p.id not in stale_ids]
+    self.cache.remove(0)
+    for iface in data["stale"]:
+        node = await self.client.get(kind="DcimInterface", id=iface["id"])
+        await node.delete()
+    await rack.save(allow_upsert=True)
+"""
+
+# Case 5: same shape, the smallest-edit laundering the reviewer proposed --
+# a plausible bookkeeping list (self.processed) instead of self.cache.
+DELETE_LAUNDERED_UNRELATED_ATTR_PROCESSED = """
+async def generate(self, data):
+    rack = await self.client.get(kind="DcimRack", name__value="rack-1")
+    stale_ids = {i["id"] for i in data["stale"]}
+    kept = [p.id for p in rack.interfaces.peers if p.id not in stale_ids]
+    self.processed.remove(0)
+    for iface in data["stale"]:
+        node = await self.client.get(kind="DcimInterface", id=iface["id"])
+        await node.delete()
+    await rack.save(allow_upsert=True)
+"""
+
+# Case 7: .remove() on the real relationship, but placed after .delete().
 DELETE_NEAR_MISS = """
 async def generate(self, data):
     rack = await self.client.get(kind="DcimRack", name__value="rack-1")
@@ -372,14 +444,19 @@ async def generate(self, data):
     await rack.save(allow_upsert=True)
 """
 
-DELETE_COMMENT_ONLY = """
+# Case 8: a node with no relationships, deleted alone, no saves.
+DELETE_SINGLE_NODE_NO_RISK = """
 async def generate(self, data):
-    rack = await self.client.get(kind="DcimRack", name__value="rack-1")
-    # Detach the interfaces before deleting the peers.
+    node = await self.client.get(kind="DcimInterface", id=data["id"])
+    await node.delete()
+"""
+
+# Extra no-risk case: same shape as case 8 but a loop, still no save.
+DELETE_NO_SAVE_NO_RISK = """
+async def generate(self, data):
     for iface in data["stale"]:
         node = await self.client.get(kind="DcimInterface", id=iface["id"])
         await node.delete()
-    await rack.save(allow_upsert=True)
 """
 
 
@@ -395,53 +472,55 @@ def test_delete_compliant_via_helper_passes():
     assert ok, msg
 
 
+def test_delete_unrelated_save_no_risk_passes():
+    ok, msg = CHECKS["detach-before-peer-delete"](
+        tree=ast.parse(DELETE_UNRELATED_SAVE_NO_RISK)
+    )
+    assert ok, (
+        "a save() on a node that never touches a relationship manager must "
+        f"not be mistaken for the one holding the deleted peers: {msg}"
+    )
+
+
 def test_delete_violating_fails():
     ok, msg = CHECKS["detach-before-peer-delete"](tree=ast.parse(DELETE_VIOLATING))
-    assert not ok
+    assert not ok, msg
+
+
+def test_delete_laundered_bare_local_fails():
+    ok, msg = CHECKS["detach-before-peer-delete"](
+        tree=ast.parse(DELETE_LAUNDERED_BARE_LOCAL)
+    )
+    assert not ok, (
+        "a .remove() on a bare local (seen.remove(1)) must not satisfy the "
+        "check just because a .remove() token appears before the .delete()"
+    )
+
+
+def test_delete_laundered_unrelated_attr_cache_fails():
+    ok, msg = CHECKS["detach-before-peer-delete"](
+        tree=ast.parse(DELETE_LAUNDERED_UNRELATED_ATTR_CACHE)
+    )
+    assert not ok, (
+        "a .remove() on an unrelated attribute chain (self.cache) must not "
+        "satisfy the check; only rack.interfaces.remove() detaches rack"
+    )
+
+
+def test_delete_laundered_unrelated_attr_processed_fails():
+    ok, msg = CHECKS["detach-before-peer-delete"](
+        tree=ast.parse(DELETE_LAUNDERED_UNRELATED_ATTR_PROCESSED)
+    )
+    assert not ok, (
+        "self.processed.remove(0) is bookkeeping, not a detach of "
+        "rack.interfaces, and must not launder the check"
+    )
 
 
 def test_delete_near_miss_remove_after_delete_fails():
     ok, msg = CHECKS["detach-before-peer-delete"](tree=ast.parse(DELETE_NEAR_MISS))
     assert not ok, "a .remove() placed after .delete() must not satisfy the check"
-    assert "after" in msg
-
-
-def test_delete_comment_only_fails():
-    ok, msg = CHECKS["detach-before-peer-delete"](tree=ast.parse(DELETE_COMMENT_ONLY))
-    assert not ok, "a comment saying 'detach' must not satisfy the check"
-
-
-DELETE_NO_SAVE_NO_RISK = """
-async def generate(self, data):
-    for iface in data["stale"]:
-        node = await self.client.get(kind="DcimInterface", id=iface["id"])
-        await node.delete()
-"""
-
-DELETE_SINGLE_NODE_NO_RISK = """
-async def generate(self, data):
-    node = await self.client.get(kind="DcimInterface", id=data["id"])
-    await node.delete()
-"""
-
-DELETE_LAUNDERED_WITH_UNRELATED_REMOVE = """
-async def generate(self, data):
-    seen = []
-    seen.remove(1)
-    rack = await self.client.get(kind="DcimRack", name__value="rack-1")
-    for iface in data["stale"]:
-        node = await self.client.get(kind="DcimInterface", id=iface["id"])
-        await node.delete()
-    await rack.save(allow_upsert=True)
-"""
-
-
-def test_delete_with_no_save_call_passes():
-    ok, msg = CHECKS["detach-before-peer-delete"](tree=ast.parse(DELETE_NO_SAVE_NO_RISK))
-    assert ok, (
-        "no save() call exists anywhere, so no RelationshipManager could "
-        f"re-send a deleted peer: {msg}"
-    )
+    assert "after" in msg or "rack.interfaces" in msg
 
 
 def test_delete_single_unrelated_node_with_no_save_passes():
@@ -454,11 +533,9 @@ def test_delete_single_unrelated_node_with_no_save_passes():
     )
 
 
-def test_delete_laundered_with_unrelated_remove_fails():
-    ok, msg = CHECKS["detach-before-peer-delete"](
-        tree=ast.parse(DELETE_LAUNDERED_WITH_UNRELATED_REMOVE)
-    )
-    assert not ok, (
-        "a .remove() on a bare local (seen.remove(1)) must not satisfy the "
-        "check just because a .remove() token appears before the .delete()"
+def test_delete_with_no_save_call_passes():
+    ok, msg = CHECKS["detach-before-peer-delete"](tree=ast.parse(DELETE_NO_SAVE_NO_RISK))
+    assert ok, (
+        "no save() call exists anywhere, so no RelationshipManager could "
+        f"re-send a deleted peer: {msg}"
     )
