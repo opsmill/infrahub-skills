@@ -1,0 +1,25 @@
+dev/guidelines/graders.md
+  s_f37e18ac0def2f::t_7a7727c08668e6 27
+dev/guides/running-evals.md
+  s_f37e18ac0def2f::t_2df8dac0c639b0 209-210
+  s_f37e18ac0def2f::t_a04c907ef3e0cc 203-207
+dev/guidelines/skill-authoring.md
+  s_f37e18ac0def2f::t_4b075c6edddeaa 98-107
+  s_f37e18ac0def2f::t_cdd9355f980b75 35-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6da5a1c8904055e3f7b4e4613731a8ae058b93cb",
+  "prompts": {},
+  "sessions": {
+    "s_f37e18ac0def2f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "81dcd4b5-9bd3-43a8-a986-58be472f3871",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
