@@ -175,6 +175,21 @@ def find_relationship_add_calls(tree: ast.Module) -> list[ast.Call]:
     ]
 
 
+def find_add_relationships_calls(tree: ast.Module) -> list[ast.Call]:
+    """Return all ``<expr>.add_relationships(...)`` call sites.
+
+    The SDK method (infrahub-sdk >= 1.23, ``infrahub_sdk/node/node.py:1544``)
+    issues a server-side RelationshipAdd naming only its own peers, so it does
+    not overwrite peers another writer added.
+    """
+    if tree is None:
+        return []
+    return [
+        c for c in _iter_calls(tree)
+        if isinstance(c.func, ast.Attribute) and c.func.attr == "add_relationships"
+    ]
+
+
 def get_kwarg(call: ast.Call, name: str) -> ast.AST | None:
     """Return the value node for keyword argument ``name``, or None."""
     for kw in call.keywords:
@@ -564,6 +579,131 @@ def check_members_add_iterates(
         return True, f".add() called multiple times: {len(add_calls)} calls"
 
     return False, "Only a single .add() call and not in a for loop"
+
+
+def check_concurrent_writes_use_add_relationships(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """Peers on a shared node go through add_relationships(), not .add()+.save().
+
+    ``.add()`` mutates the in-memory peer list and ``save()`` sends all of it
+    (``infrahub_sdk/node/relationship.py:116-117``), so a second concurrent
+    writer overwrites the first. RelationshipAdd names only its own peers.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    # Order matters: report the .add() calls first. An answer that kept the
+    # read-modify-write needs to be told which calls to replace, not that a
+    # method it never reached for is missing.
+    add_calls = find_relationship_add_calls(tree)
+    if add_calls:
+        return False, (
+            f"{len(add_calls)} RelationshipManager .add() call(s) remain: a "
+            "client-side read-modify-write drops peers written concurrently"
+        )
+
+    ar_calls = find_add_relationships_calls(tree)
+    if not ar_calls:
+        return False, "No add_relationships(...) call found"
+
+    return True, "peers added via add_relationships()"
+
+
+def _is_peer_id_expr(node: ast.AST) -> bool:
+    """True when the expression is demonstrably a peer ID rather than a node."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return True
+    if isinstance(node, ast.Attribute) and node.attr == "id":
+        return True
+    if isinstance(node, ast.Subscript):
+        key = node.slice
+        return isinstance(key, ast.Constant) and key.value == "id"
+    return False
+
+
+def _is_node_object_expr(node: ast.AST, tree: ast.Module) -> bool:
+    """True when the name was bound from a client.create/get call."""
+    if not isinstance(node, ast.Name):
+        return False
+    for assign in ast.walk(tree):
+        target_names: list[str] = []
+        value: ast.AST | None = None
+        if isinstance(assign, ast.Assign):
+            target_names = [t.id for t in assign.targets if isinstance(t, ast.Name)]
+            value = assign.value
+        elif isinstance(assign, ast.AugAssign) and isinstance(assign.target, ast.Name):
+            target_names = [assign.target.id]
+            value = assign.value
+        if node.id not in target_names or value is None:
+            continue
+        inner = value.value if isinstance(value, ast.Await) else value
+        if (
+            isinstance(inner, ast.Call)
+            and isinstance(inner.func, ast.Attribute)
+            and inner.func.attr in {"create", "get"}
+        ):
+            return True
+    # A list built by .append(node) where node came from create/get
+    for call in _iter_calls(tree):
+        if (
+            isinstance(call.func, ast.Attribute)
+            and call.func.attr == "append"
+            and isinstance(call.func.value, ast.Name)
+            and call.func.value.id == node.id
+            and call.args
+            and _is_node_object_expr(call.args[0], tree)
+        ):
+            return True
+    return False
+
+
+def check_add_relationships_passes_ids(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """``related_nodes`` carries peer ID strings, never node objects.
+
+    The signature is ``related_nodes: list[str]``
+    (``infrahub_sdk/node/node.py:1544``) and the mutation is built by string
+    interpolation, so a node object is rendered as its display form inside the
+    ``id`` field and shipped without error.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    ar_calls = find_add_relationships_calls(tree)
+    if not ar_calls:
+        return False, "No add_relationships(...) call found"
+
+    for call in ar_calls:
+        arg = get_kwarg(call, "related_nodes")
+        if arg is None and call.args:
+            arg = call.args[-1]
+        if arg is None:
+            continue
+        if isinstance(arg, ast.ListComp):
+            if _is_peer_id_expr(arg.elt):
+                continue
+            if _is_node_object_expr(arg.elt, tree):
+                return False, (
+                    "related_nodes comprehension yields node objects; "
+                    "related_nodes takes peer id strings"
+                )
+            continue
+        if isinstance(arg, (ast.List, ast.Tuple)):
+            for elt in arg.elts:
+                if _is_node_object_expr(elt, tree):
+                    return False, (
+                        "related_nodes contains a node object; "
+                        "related_nodes takes peer id strings"
+                    )
+            continue
+        if isinstance(arg, ast.Name) and _is_node_object_expr(arg, tree):
+            return False, (
+                f"related_nodes={arg.id} holds node objects; "
+                "related_nodes takes peer id strings"
+            )
+    return True, "related_nodes carries peer ids"
 
 
 # ---------------------------------------------------------------------------
@@ -1643,6 +1783,8 @@ CHECKS: dict[str, Any] = {
     "sdk-object-reference-used": check_sdk_object_reference_used,
     "no-list-passed-to-add": check_no_list_passed_to_add,
     "members-add-iterates": check_members_add_iterates,
+    "concurrent-writes-use-add-relationships": check_concurrent_writes_use_add_relationships,
+    "add-relationships-passes-ids": check_add_relationships_passes_ids,
     "preflight-or-upsert": check_preflight_or_upsert,
     "no-raw-create-without-handler": check_no_raw_create_without_handler,
     # from_graphql hydration family (output.md)
