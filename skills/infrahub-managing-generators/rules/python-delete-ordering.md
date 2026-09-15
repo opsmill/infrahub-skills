@@ -44,17 +44,29 @@ await rack.save(allow_upsert=True)
 
 ```python
 # RIGHT. Detach and save first, then delete the peers.
-for iface in rack.interfaces.peers:
-    rack.interfaces.remove(iface.id)
+stale_ids = [iface["id"] for iface in data["stale"]]
+
+for peer_id in stale_ids:
+    rack.interfaces.remove(peer_id)
 await rack.save(allow_upsert=True)
 
-for iface in data["stale"]:
-    node = await self.client.get(kind="DcimInterface", id=iface["id"])
+for peer_id in stale_ids:
+    node = await self.client.get(kind="DcimInterface", id=peer_id)
     await node.delete()
 ```
 
 Detaching costs nothing beyond the save the generator
 already needs, and it is the only ordering that avoids the
 resend outright.
+
+### Build the id list first
+
+Do not drive the detach loop off `rack.interfaces.peers`.
+`remove()` pops from the same list `.peers` hands back, so
+iterating it while removing skips every other element:
+four peers leave two behind, and the next `save()` re-sends
+exactly the ids this rule exists to drop. Iterating a
+separate list also keeps you from detaching the peers you
+still want.
 
 Verified against Infrahub 1.11.2 and infrahub-sdk 1.23.2.
