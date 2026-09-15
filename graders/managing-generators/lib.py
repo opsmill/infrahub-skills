@@ -907,14 +907,42 @@ def check_add_relationships_passes_ids(
     return True, "related_nodes carries peer ids"
 
 
+def _has_any_save_call(tree: ast.Module) -> bool:
+    """True if any ``<expr>.save(...)`` call exists, regardless of args.
+
+    A deleted peer can only be re-sent by a save() that transmits it. If
+    the module never calls save() at all, nothing can carry a stale peer
+    id anywhere, no matter what the module deletes or holds in memory.
+    """
+    return any(
+        isinstance(c.func, ast.Attribute) and c.func.attr == "save"
+        for c in _iter_calls(tree)
+    )
+
+
+def _is_plausible_relationship_receiver(node: ast.AST) -> bool:
+    """True if a ``.remove()`` receiver could plausibly be a RelationshipManager.
+
+    A RelationshipManager is always reached through an attribute chain off
+    a node, e.g. ``rack.interfaces``. A bare local name (``seen.remove(1)``
+    on a plain list) can never be one, so excluding bare-name receivers
+    rules out laundering the check with an unrelated ``.remove()`` call.
+    An attribute chain is accepted even when it cannot be proven to be a
+    relationship manager (e.g. ``self.some_list``), per the house
+    convention of passing shapes that cannot be resolved statically.
+    """
+    return isinstance(node, ast.Attribute)
+
+
 def check_detach_before_peer_delete(
     tree: ast.Module | None, **_: Any
 ) -> tuple[bool, str]:
-    """A .remove()+save() must precede any .delete() of those peers.
+    """A .remove()+save() on a relationship manager must precede any .delete().
 
     A node holds its peers in memory, so a save() issued after the peers
     were deleted re-sends them. Detaching with .remove() and saving first
-    avoids the resend.
+    avoids the resend. With no save() call anywhere, nothing can re-send a
+    stale peer, so there is nothing to order.
     """
     if tree is None:
         return False, "No Python source to inspect"
@@ -927,19 +955,25 @@ def check_detach_before_peer_delete(
     if not delete_calls:
         return True, "no peer delete to order"
 
+    if not _has_any_save_call(tree):
+        return True, "no save() call exists that could re-send a deleted peer"
+
     removes = [
         c
         for c in _iter_calls(tree)
         if isinstance(c.func, ast.Attribute) and c.func.attr == "remove"
     ]
-    if not removes:
+    relationship_removes = [
+        c for c in removes if _is_plausible_relationship_receiver(c.func.value)
+    ]
+    if not relationship_removes:
         return False, (
-            "peers are deleted with no .remove() detaching them first; "
-            "a later save() re-sends the deleted peers"
+            "peers are deleted with no .remove() on a relationship manager "
+            "detaching them first; a later save() re-sends the deleted peers"
         )
 
     first_delete = min(c.lineno for c in delete_calls)
-    last_remove = max(c.lineno for c in removes)
+    last_remove = max(c.lineno for c in relationship_removes)
     if last_remove > first_delete:
         return False, (
             f".remove() at line {last_remove} runs after .delete() at line "

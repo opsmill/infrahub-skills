@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Grader for the generator-delete-ordering eval."""
+"""Grader script for the detach-before-peer-delete check."""
 
 from __future__ import annotations
 
