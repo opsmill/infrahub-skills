@@ -37,6 +37,49 @@ Three failure modes follow from matching raw text:
 - **Adjacency is not structure.** A verb next to a path
   does not mean the command ran against that path.
 
+## Grading prose: rank evidence, don't list phrasings
+
+Some answers have no structure to parse: a
+`verified_against` field, a `## Verification` section, a
+justification sentence. The reflexive draft enumerates
+the phrasings a bad answer might use and matches them.
+That check is wrong in both directions at once, and the
+two are the same bug: it grades wording, and wording is
+unbounded.
+
+Measured on a shipped check, one word apart:
+
+```text
+"the same form the sibling query uses"   -> 1.0, passed
+"same form as the sibling query"         -> 0.8, FAILED
+```
+
+Meanwhile three answers that named an introspected
+artifact and its version failed, on `mirrors the` and
+`elsewhere in the repo`. The terse answer that explains
+nothing scored 1.0 and the thorough one scored 0, so the
+eval taught the model to strip its reasoning out.
+
+Ask what the check is really for, then test for that
+directly, strongest evidence first:
+
+1. An explicitly declared non-verification passes. The
+   rule asks for exactly that honesty.
+2. A named artifact or version passes, and may then
+   discuss an analogy freely. Reasoning about evidence
+   is not evidence by analogy.
+3. Only then does a bare analogy fail.
+
+Ordering it this way lets step 3 be broad without
+punishing an answer resting on something real. The same
+move works outside prose: for "does this code flag an
+unresolvable parent", walk the `ast` for a `log_error`
+on that path rather than matching `if` forms. Any regex
+over guard syntax keeps losing to idioms nobody
+enumerated, and each miss teaches the next author to
+write code that satisfies the regex instead of code that
+is correct.
+
 ## Check function shape
 
 `graders/<skill>/lib.py` exposes a `CHECKS` registry

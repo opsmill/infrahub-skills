@@ -25,6 +25,16 @@ users might say, and use TRIGGER / DO NOT TRIGGER to
 disambiguate against neighbouring skills. Lean slightly
 pushy — agents under-trigger skills.
 
+State triggers, never a workflow summary. A description
+that narrates the steps gives the agent a shortcut: it
+follows the summary instead of reading the body. The
+summary is also lossy in the worst direction, because
+what it drops is whatever did not fit. One skill's
+description omitted the step its own body flags as "the
+one most easily skipped", and the section carrying its
+top-priority rule, so that rule never fired at all. Put
+what the skill produces in the Overview.
+
 ## Body
 
 Structure: Overview (what and when) → Workflow
@@ -67,6 +77,28 @@ than no claim, because the next author trusts it instead
 of re-checking. Before encoding a customer or PoC lesson
 as a rule, verify it against current stable Infrahub —
 a lesson that upstream already fixed rots the skill.
+
+A command is only teachable once it is released. Name
+the minimum version and give an observable fallback, so
+a reader on an older install has somewhere to go:
+
+```markdown
+Requires infrahub-sdk >= 1.22.2. On `No such command`,
+upgrade, or browse the web catalog instead.
+```
+
+Without it the reader hits `No such command` on the
+documented happy path, and `infrahub-common`'s
+information-priority rule tells agents this plugin
+outranks the docs, so they trust the broken instruction.
+One skill made an unreleased command step 6 of 7.
+
+Know what the gate covers.
+`scripts/check-cli-invocations.py` validates every
+`infrahubctl` invocation the repo prints against a
+pinned tree. It judges nothing else, so a `gh` flag, a
+`curl`, or a REST path is only as good as the author who
+ran it. Run it, and say which version you ran it on.
 
 ## Verifying an edit
 

@@ -1,0 +1,1 @@
+Harvested five recurring review lessons into the contributor guidance: rank evidence instead of listing phrasings when grading prose, move the rule (not the grader) when the two disagree, keep the skill's worked example out of its eval prompt, state triggers rather than a workflow summary in a description, and gate an unreleased command on a minimum version.

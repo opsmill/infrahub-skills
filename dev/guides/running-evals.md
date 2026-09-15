@@ -199,6 +199,25 @@ answerable without the skill. Keep the prompt at the
 abstraction level a real user would type and let the
 skill supply the shape.
 
+**Don't reuse the skill's own worked example.**
+`examples.md` loads *with* the skill, so a task built on
+the scenario it already teaches measures retrieval, not
+transfer: the model copies the worked answer rather than
+applying the pattern to something new. Three tasks
+shipped this way. One used a generator identical to
+`examples.md §5`; another shared nine domain identifiers
+with its rule's example and spelled out the relationship
+chain, so a model without the rule would very likely
+produce the same traversal.
+
+Pick a different domain and keep the taught example as
+the teaching example. The tell that you did not is the
+grader: a check hard-coded to the example's literals
+(one kind name, one relationship, one concept slug) only
+works for that one prompt, and re-wording the task
+scores a compliant answer 0. See "Don't hold a second
+copy of the prose" in `dev/guidelines/graders.md`.
+
 **Prove the task discriminates.** Every task's
 `instruction` opens with a `Read the skill at
 .agents/skills/<skill>/SKILL.md` line, and that line

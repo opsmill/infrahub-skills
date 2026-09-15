@@ -52,6 +52,37 @@ rule as covered forever.
    `evaluations/*.json` committed alongside `eval.yaml`.
    CI fails when the two diverge.
 
+## When the grader and the rule disagree, the rule wins
+
+A check that encodes a stricter contract than the rule
+it tests does not read as a conflict. It reads as a
+passing suite, because the fixtures were written from
+the check. At eval time the grader is what scores, so
+the rule is the side that rots.
+
+Four of these shipped in one skill: a check rejecting
+the rule's own canonical example, a check requiring a
+write gate on every lesson where the rule made writes
+opt-in, a check demanding a pointer the rule explicitly
+excused, and a check flagging the rule's own
+non-compliant example as a violation.
+
+Before adding a check, write out the answer the rule's
+example shows, plus the answer its carve-outs allow, and
+run the check on both. When they disagree, decide which
+side moves and move it. Usually it is the check.
+
+Severity is part of the contract. A rule whose prose
+said MEDIUM while its frontmatter said LOW made every
+answer that trusted the prose score 0.75.
+
+**Never let an assertion pin a defect in place.** An
+invalid flag taught in eight places was also asserted by
+a grader in three tasks, so a *correct* answer scored
+below the CI gate. Whoever fixes the defect sees CI go
+red and reverts. If a check asserts something you have
+not run, it is a ratchet, not a test.
+
 ## New category prefixes
 
 A new prefix must be registered everywhere the skill
