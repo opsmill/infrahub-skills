@@ -79,13 +79,15 @@ of re-checking. Before encoding a customer or PoC lesson
 as a rule, verify it against current stable Infrahub —
 a lesson that upstream already fixed rots the skill.
 
+## Release-gate a command you teach
+
 A command is only teachable once it is released. Name
 the minimum version and give an observable fallback, so
 a reader on an older install has somewhere to go:
 
 ```markdown
-Requires infrahub-sdk >= 1.22.2. On `No such command`,
-upgrade, or browse the web catalog instead.
+Requires infrahub-sdk >= <min version>. On
+`No such command`, upgrade, or <what to do instead>.
 ```
 
 Without it the reader hits `No such command` on the
@@ -94,7 +96,13 @@ information-priority rule tells agents this plugin
 outranks the docs, so they trust the broken instruction.
 One skill made an unreleased command step 6 of 7.
 
-Know what the gate covers.
+One home per pin, as above:
+`skills/infrahub-common/marketplace-reference.md` owns
+the `infrahubctl marketplace` floor, so a second skill
+needing it links there rather than restating the number.
+
+## Know what the CLI gate covers
+
 `scripts/check-cli-invocations.py` validates the
 `infrahubctl` invocations printed under `skills/`,
 `graders/`, `tests/`, `eval.yaml`, `.claude/skills/` and

@@ -217,8 +217,9 @@ the teaching example. The tell that you did not is the
 grader: a check hard-coded to the example's literals
 (one kind name, one relationship, one concept slug) only
 works for that one prompt, and re-wording the task
-scores a compliant answer 0. See "Don't hold a second
-copy of the prose" in `dev/guidelines/graders.md`.
+scores a compliant answer 0. That is
+[Overfitting to specific examples](../knowledges/skill-writing-guide.md#overfitting-to-specific-examples)
+reaching the grader.
 
 **Prove the task discriminates.** Every task's
 `instruction` opens with a `Read the skill at

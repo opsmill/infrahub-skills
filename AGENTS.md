@@ -53,7 +53,7 @@ Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rul
 
 | Rule | What it constrains |
 | ---- | ------------------ |
-| [rule-equals-test.md](dev/guidelines/rule-equals-test.md) | A new skill rule ships with its grader and eval in the same change |
+| [rule-equals-test.md](dev/guidelines/rule-equals-test.md) | A new skill rule ships with its grader and eval in the same change; when the two disagree, the rule wins |
 | [graders.md](dev/guidelines/graders.md) | Parse the answer, never substring-match it; verify both directions |
 | [skill-authoring.md](dev/guidelines/skill-authoring.md) | Description, body, examples, and how to verify an edit |
 | [skill-registration.md](dev/guidelines/skill-registration.md) | The five surfaces a new skill has to appear in |

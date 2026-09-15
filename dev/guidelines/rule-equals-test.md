@@ -60,21 +60,15 @@ passing suite, because the fixtures were written from
 the check. At eval time the grader is what scores, so
 the rule is the side that rots.
 
-Four of these shipped in one skill: a check rejecting
-the rule's own canonical example, a check requiring a
-write gate on every lesson where the rule made writes
-opt-in, a check demanding a pointer the rule explicitly
-excused, and a check flagging the rule's own
-non-compliant example as a violation.
+Four shipped in one skill, each rejecting something the
+rule itself sanctioned: its canonical example, its
+opt-in default, its documented carve-out, its own
+non-compliant example.
 
 Before adding a check, write out the answer the rule's
 example shows, plus the answer its carve-outs allow, and
 run the check on both. When they disagree, decide which
 side moves and move it. Usually it is the check.
-
-Severity is part of the contract. A rule whose prose
-said MEDIUM while its frontmatter said LOW made every
-answer that trusted the prose score 0.75.
 
 **Never let an assertion pin a defect in place.** An
 invalid flag taught in eight places was also asserted by
@@ -103,3 +97,10 @@ skill never emits, while its eval still passes.
 are for real failures, not advisory cost-to-fix
 findings. An impact or severity label changed in a rule
 has to move in the skill's index too.
+
+The rule's `impact:` frontmatter is the one that counts,
+and it is also part of the grader's contract. A rule
+whose prose said MEDIUM while its `impact:` said LOW
+scored every answer that trusted the prose at 0.75.
+Keep the level out of the prose entirely rather than
+stating it twice.
