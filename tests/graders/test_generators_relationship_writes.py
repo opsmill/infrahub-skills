@@ -589,3 +589,34 @@ def test_delete_via_client_delete_call_with_no_risk_passes():
         "self.client.delete(...) with nothing holding the deleted peers "
         f"must still pass, same as the node.delete() shape: {msg}"
     )
+
+
+# KNOWN LIMITATION, not endorsed: the check cannot correlate which object
+# a recognised delete actually removed with which relationship's peers.
+# It only asks whether *some* recognised delete and *some* node with a
+# demonstrated relationship co-occur with an unguarded save. Here the
+# deleted CoreStandardGroup has nothing to do with rack.interfaces, and
+# this is otherwise compliant code, but the check still flags it -- see
+# the docstring of check_detach_before_peer_delete for why no static
+# narrowing closes this gap without also losing the real violation case.
+# If this test starts failing because someone closed the correlation gap,
+# update it to assert `ok` instead of deleting it.
+DELETE_KNOWN_FALSE_POSITIVE_UNRELATED_DELETE = """
+async def generate(self, data):
+    rack = await self.client.get(kind="DcimRack", name__value="rack-1")
+    kept = [p.id for p in rack.interfaces.peers]
+    rack.description.value = f"kept {len(kept)} interfaces"
+    await self.client.delete(kind="CoreStandardGroup", id=data["unrelated_group_id"])
+    await rack.save(allow_upsert=True)
+"""
+
+
+def test_known_false_positive_unrelated_delete_is_flagged():
+    ok, msg = CHECKS["detach-before-peer-delete"](
+        tree=ast.parse(DELETE_KNOWN_FALSE_POSITIVE_UNRELATED_DELETE)
+    )
+    assert not ok, (
+        "documents a known limitation, not a goal: the check cannot tell "
+        "that the deleted CoreStandardGroup has no relation to "
+        f"rack.interfaces, so this ordinary code is (wrongly) flagged: {msg}"
+    )
