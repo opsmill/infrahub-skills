@@ -340,11 +340,12 @@ def test_grader_script_still_scores_for_loop_answer_full_marks(tmp_path):
 DELETE_COMPLIANT = """
 async def generate(self, data):
     rack = await self.client.get(kind="DcimRack", name__value="rack-1")
-    for iface in rack.interfaces.peers:
-        rack.interfaces.remove(iface.id)
+    stale_ids = [iface["id"] for iface in data["stale"]]
+    for peer_id in stale_ids:
+        rack.interfaces.remove(peer_id)
     await rack.save(allow_upsert=True)
-    for iface in data["stale"]:
-        node = await self.client.get(kind="DcimInterface", id=iface["id"])
+    for peer_id in stale_ids:
+        node = await self.client.get(kind="DcimInterface", id=peer_id)
         await node.delete()
 """
 
