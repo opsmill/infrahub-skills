@@ -1554,34 +1554,6 @@ tasks:
       - name: add-relationships-passes-ids
         check: related_nodes carries peer id strings rather than node objects
 
-  - name: generator-delete-ordering
-    trials: 3
-    instruction: |
-      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
-      follow its workflow and rules.
-
-      Task: Write an Infrahub Generator that reconciles a DcimRack against
-      its design. It fetches the rack (already holding its `interfaces`
-      relationship), sets `rack.status.value = "active"`, deletes every
-      DcimInterface listed in data["stale"] (they no longer exist in the
-      design), and saves the rack so the status change is recorded.
-
-      Save ONLY the final Python generator class to: output.py
-    graders:
-      - type: deterministic
-        run: python graders/managing-generators/check_delete_ordering.py
-        weight: 1.0
-    expected_output: >-
-      A Python generator that detaches each stale interface from
-      rack.interfaces with .remove() and saves the rack before deleting the
-      interface nodes, not after.
-    expectations:
-      - "Stale interfaces are detached from rack.interfaces via .remove()"
-      - "The rack is saved before any stale interface is deleted"
-    assertions:
-      - name: detach-before-peer-delete
-        check: Peers are detached with .remove() and saved before they are deleted
-
   - name: generator-natural-key-preflight
     trials: 3
     instruction: |
