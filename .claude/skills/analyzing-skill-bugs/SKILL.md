@@ -118,7 +118,7 @@ Registration drift (a skill missing from one of its five surfaces) and
 category-prefix drift (a rule file named outside its registered prefixes) are
 `script`, not a fourth class: both are detectable by comparing the tree
 against the five registration surfaces, and `check-cli-invocations.py`,
-`check-plugin-freshness.py`, and `check-rules-symlink.py` already do exactly
+`check-plugin-freshness.py`, and `check-symlinks.py` already do exactly
 this kind of comparison. There is no defect class with no test surface.
 
 ## Coverage check

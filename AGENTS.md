@@ -62,7 +62,7 @@ AI command definitions live in [dev/commands/](dev/commands/).
 
 `uv run invoke lint` runs rumdl, yamllint, and
 `scripts/check-cli-invocations.py`. CI runs those three plus `ruff`,
-`pytest`, and `scripts/check-rules-symlink.py`.
+`pytest`, and `scripts/check-symlinks.py`.
 
 The single-eval line is the one that matters for cost. A full
 `skillgrade --smoke` run is the expensive default people reach for out of
@@ -83,7 +83,7 @@ fraction of it, and that is the question nearly every change asks.
 
 ## Rules
 
-Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rules` symlinks to. Each declares the globs it applies to in frontmatter, so it loads when a matching file is in play rather than waiting for someone to go looking for it. Another agent is one symlink away, though its frontmatter key differs — `paths:` for Claude, `globs:` for Cursor, `applyTo:` for Copilot.
+Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rules` symlinks to. Each declares the globs it applies to in frontmatter, so it loads when a matching file is in play rather than waiting for someone to go looking for it. Another agent is one symlink away, though its frontmatter key differs — `paths:` for Claude, `globs:` for Cursor, `applyTo:` for Copilot. Two routing directories carry that idea further: `.agents/` and `.codex/` each hold three relative symlinks — `skills` to [`skills/`](skills/), `contributor-skills` to [`.claude/skills/`](.claude/skills/), and `rules` to [`dev/guidelines/`](dev/guidelines/) — so any agent that looks in its own conventional directory finds the same shipped skills, contributor skills, and rules without a second copy of any of them.
 
 | Rule | What it constrains |
 | ---- | ------------------ |

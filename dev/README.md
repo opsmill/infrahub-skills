@@ -44,6 +44,11 @@ skill-change pipeline
 takes a bug or an idea
 through a failing test to a pull request.
 
+Agents other than Claude Code do not look in `.claude/` or `dev/` by
+default, so `.agents/` and `.codex/` each symlink `skills`, the contributor
+skills, and the rules into the directory that agent expects. See
+[`../AGENTS.md`](../AGENTS.md#rules) for what each link points at.
+
 ## Rules
 
 `guidelines/` is the canonical home for path-scoped
