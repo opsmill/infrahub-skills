@@ -41,6 +41,7 @@ await group.save()
 ```python
 # RIGHT. .extend() calls .add() once per item.
 peer_ids = ["peer-a", "peer-b", "peer-c"]
+await group.members.fetch()
 group.members.extend(peer_ids)
 await group.save()
 ```
@@ -48,6 +49,7 @@ await group.save()
 An explicit loop is equivalent and equally correct:
 
 ```python
+await group.members.fetch()
 for peer_id in peer_ids:
     group.members.add(peer_id)
 await group.save()
@@ -55,9 +57,13 @@ await group.save()
 
 ### Two things that will catch you
 
-**`.add()` needs a fetched manager.** Calling it before
-`fetch()` raises `UninitializedError: Must call fetch() on
-RelationshipManager before editing members`.
+**The manager has to be fetched first.** `.add()` *and*
+`.extend()` both raise `UninitializedError: Must call
+fetch() on RelationshipManager before editing members`.
+A node whose payload already carried the relationship
+arrives initialized, so the `fetch()` is a no-op there and
+harmless; a node from a `get()` that did not include it
+raises without one.
 
 **`.add()` is already duplicate-safe.** A peer whose id or
 HFID is already present is silently ignored, so no
