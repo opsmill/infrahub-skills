@@ -1,0 +1,21 @@
+tests/graders/test_generators_relationship_writes.py
+  s_746863b8957185::t_627dbc80d41db6 624-694
+graders/managing-generators/lib.py
+  s_746863b8957185::t_e4ed2e4ab98e94 558-560,600-602,717-739
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "254d770ec24db5977f65d9c6fff09f96e7b5f042",
+  "prompts": {},
+  "sessions": {
+    "s_746863b8957185": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "59084e37-c81b-4173-8cad-96d6b446d58f",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
