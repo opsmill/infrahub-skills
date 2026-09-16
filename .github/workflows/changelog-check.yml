@@ -6,9 +6,14 @@ name: Changelog
 # changes behaviour must carry one. Failing here — rather than at release
 # time, the way the shared platform does — puts the cost on the author while
 # they still have the context, instead of on whoever cuts the release.
+# ROLLBACK 2026-09-16: the news-fragment gate is disabled while the towncrier
+# rollout is reconsidered. The check below is left intact — only its trigger is
+# commented out. To restore: uncomment the `pull_request:` block and drop
+# `workflow_dispatch:`.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch:
+  # pull_request:
+  #   types: [opened, synchronize, reopened, labeled, unlabeled]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
