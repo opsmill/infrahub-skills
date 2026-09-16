@@ -148,13 +148,21 @@ pass; an interruption is not evidence of anything.
 For every term in the handoff's `Sweep terms`:
 
 ```bash
-grep -rn "<sweep term>" skills/ graders/ eval.yaml dev/
+grep -rn "<sweep term>" skills/ graders/ eval.yaml dev/ README.md AGENTS.md docs/
 ```
 
 Skip `evaluations/`, which `sync-evals.py` regenerates from `eval.yaml`. Fix
 every hit, and delete what the change makes wrong. An impact or severity label
 bumped in a rule has to move in the skill's index too, or the index now
 disagrees with the rule it indexes.
+
+Then update every surface the handoff's `Docs impact` field names. Those pages
+describe behavior this change just altered, so leaving them is worse than
+having written nothing: a reader trusts a stale page and search finds it.
+[`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md)
+§ "When behavior changes" lists what goes stale and when. A `Docs impact` of
+`none` needs no edit, and the report says so rather than passing over it in
+silence.
 
 ## Registration
 

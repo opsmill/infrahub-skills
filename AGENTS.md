@@ -83,7 +83,7 @@ fraction of it, and that is the question nearly every change asks.
 
 ## Rules
 
-Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rules` symlinks to. Each declares the globs it applies to in frontmatter, so it loads when a matching file is in play rather than waiting for someone to go looking for it. Another agent is one symlink away, though its frontmatter key differs — `paths:` for Claude, `globs:` for Cursor, `applyTo:` for Copilot. Two routing directories carry that idea further: `.agents/` and `.codex/` each hold three relative symlinks — `skills` to [`skills/`](skills/), `contributor-skills` to [`.claude/skills/`](.claude/skills/), and `rules` to [`dev/guidelines/`](dev/guidelines/) — so any agent that looks in its own conventional directory finds the same shipped skills, contributor skills, and rules without a second copy of any of them.
+Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rules` symlinks to. Each declares the globs it applies to in frontmatter, so it loads when a matching file is in play rather than waiting for someone to go looking for it. Another agent is one symlink away, though its frontmatter key differs — `paths:` for Claude, `globs:` for Cursor, `applyTo:` for Copilot. Two routing directories carry that idea further. `.agents/` and `.codex/` each hold three relative symlinks: `skills` to [`skills/`](skills/), `contributor-skills` to [`.claude/skills/`](.claude/skills/), and `rules` to [`dev/guidelines/`](dev/guidelines/). Any agent that looks in its own conventional directory finds the same shipped skills, contributor skills, and rules, with no second copy of any of them.
 
 | Rule | What it constrains |
 | ---- | ------------------ |
@@ -91,7 +91,7 @@ Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rul
 | [graders.md](dev/guidelines/graders.md) | Parse the answer, never substring-match it; verify both directions |
 | [minimum-change.md](dev/guidelines/minimum-change.md) | The smallest artifact that closes the gap, and what to delete |
 | [skill-authoring.md](dev/guidelines/skill-authoring.md) | Description, body, examples, and how to verify an edit |
-| [skill-registration.md](dev/guidelines/skill-registration.md) | The five surfaces a new skill has to appear in |
+| [skill-registration.md](dev/guidelines/skill-registration.md) | The five surfaces a new skill has to appear in, and which of them go stale when behavior changes |
 | [versioning.md](dev/guidelines/versioning.md) | The five files a version bump touches |
 
 Each rule's `paths:` frontmatter is the authority on when

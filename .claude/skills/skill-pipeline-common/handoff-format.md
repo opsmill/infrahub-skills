@@ -26,6 +26,7 @@ re-deriving a slug that would drift from the original.
 **Ground truth:** <rung used> | infrahub `<tag>` `<sha>` | sdk `<version>` | UNVERIFIED
 **Defect class:** guidance | grader | script
 **Minimum change rung:** <1-6, and one line saying why it stopped there>
+**Docs impact:** <surfaces this change leaves stale, or: none>
 
 **Target:** skills/<skill>/ | graders/<skill>/ | scripts/
 **Rule path:** `skills/<skill>/rules/<category>-<concern>.md` (or: none, edits <existing file>)
@@ -62,8 +63,13 @@ re-deriving a slug that would drift from the original.
 ## Required fields
 
 A stage may not proceed past a handoff file missing any of: `Key`, `Branch`,
-`Defect class`, `Minimum change rung`, or a non-empty `Test plan`. Find one
-missing, name it, and stop there rather than guessing a value forward.
+`Defect class`, `Minimum change rung`, `Docs impact`, or a non-empty
+`Test plan`. Find one missing, name it, and stop there rather than guessing a
+value forward.
+
+`Docs impact` is satisfied by `none`. An entrance that looked and found nothing
+stale has answered it; an entrance that never looked has not, and the two are
+indistinguishable once the field is blank.
 
 ## Deriving the default branch
 

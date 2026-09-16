@@ -145,6 +145,15 @@ untouched, and a `Do NOT` list of the artifacts the minimum-change rung rules
 out. This is the strategy the next stages execute, not the patch itself: no
 diff, no fix code, no test code belongs here.
 
+Then work out what the fix leaves stale. A skill whose behavior changes keeps
+every documentation surface it already had, and those surfaces go on
+describing behavior it no longer has. Read
+[`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md)
+§ "When behavior changes" now, while the scope is in front of you, and run the
+grep it gives. Record the answer in the handoff's `Docs impact` field. `none`
+is a complete answer; a blank field is not, because it cannot be told apart
+from never having looked.
+
 ## Output
 
 1. Derive the default branch and fetch it, using the snippet in

@@ -8,7 +8,7 @@ Claude Code: three relative symlinks each, pointing at `skills/`,
 skills, the contributor skills, and the rules without a second copy of
 either. git materializes a symlink as a regular text file when
 `core.symlinks` is false, and every agent then silently loads nothing from
-that path — no error, no failing job, just guidance that stops arriving.
+that path: no error, no failing job, just guidance that stops arriving.
 This is the check that turns that into a red build.
 """
 

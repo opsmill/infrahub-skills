@@ -160,6 +160,14 @@ violating, and violating near miss), because `test-driving-skill-changes`
 writes them from exactly this section and nothing else. A brief that skips
 any of the four hands the next stage nothing to build.
 
+The `Docs impact` field records what the new behavior leaves stale. New
+guidance changes what a skill does, and the pages describing that skill go on
+describing what it did before. Read
+[`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md)
+§ "When behavior changes" and run the grep it gives. A new skill is the
+expensive case: it needs all five registration surfaces, and Lens 2 already
+made you argue for it. `none` is a complete answer; a blank field is not.
+
 ## Approval gate
 
 Show the brief in full, then stop and wait for an explicit yes. Do not
