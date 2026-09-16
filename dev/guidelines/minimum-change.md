@@ -26,15 +26,16 @@ Stop at the first rung that holds. Record the rung in the handoff file.
    (schema validator, `infrahubctl schema check`, a uniqueness constraint, an API error),
    point the agent at the error. Guidance that restates a validator rots when the validator
    changes.
-5. **Can an existing grader check assert it?** Reuse the function in
-   `graders/<skill>/lib.py` and add its name to an existing task's `CHECKS` list. A new
-   check function is warranted only when no existing one parses the right artifact.
-6. **Can it ride an existing eval task?** Add the assertion to a task whose prompt already
-   produces the scenario. A new task costs trials times model runs on every regression
-   sweep, forever.
-7. **Can it be one line in `SKILL.md`?** One line, at the workflow step that needs it.
-8. **Only then:** the minimum new artifact. One rule file, one check function, one task.
+5. **Can it be one line in `SKILL.md`?** One line, at the workflow step that needs it.
+6. **Only then:** the minimum new artifact. One rule file, one check function, one task.
    Not a set.
+
+Every rung is an exit: answer yes and you write nothing new, or you edit something that
+already exists. Two coverage questions used to sit here, asking whether an existing grader
+check or an existing eval task could carry the assertion. Neither is an exit, since a
+grader check with no rule attached is not a change anyone can ship, so they now live in
+`test-driving-skill-changes`, asked at the point where a new check or task is about to be
+written.
 
 ## A new skill sits above all of these
 

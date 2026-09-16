@@ -15,7 +15,7 @@ argument-hint: <key> [pr]
 compatibility: >-
   Requires this repository checked out with a clean working tree. `gh` and a
   GitHub remote are needed only for the `pr` path. `skillgrade` is needed for
-  the red run and the discrimination proof on guidance-class changes.
+  the red run on guidance-class changes.
 user-invocable: true
 metadata:
   internal: true
@@ -102,9 +102,15 @@ Read `Defect class` from the handoff file: `guidance` follows
    §§2 to 5 and [`../../../dev/guidelines/graders.md`](../../../dev/guidelines/graders.md).
    Both describe the shape a guidance-class test has to take.
 2. Read [`../../../dev/guidelines/minimum-change.md`](../../../dev/guidelines/minimum-change.md)
-   and check rungs 5 and 6 before writing anything new: an existing check
-   function in `graders/<skill>/lib.py` or an existing `eval.yaml` task may
-   already carry the assertion.
+   for the ladder, then answer two coverage questions before writing anything
+   new:
+   - **Can an existing grader check assert it?** Reuse the function in
+     `graders/<skill>/lib.py` and add its name to an existing task's `CHECKS`
+     list. A new check function is only warranted when no existing one parses
+     the right artifact.
+   - **Can it ride an existing eval task?** Add the assertion to a task whose
+     prompt already produces the scenario. A new task costs trials times model
+     runs on every regression sweep, forever.
 3. Write the check in `graders/<skill>/lib.py` and register it in `CHECKS`.
    Parse the artifact, never substring-match it. Strip comments and
    docstrings before asserting, or a contrast block in the answer satisfies a
@@ -121,21 +127,21 @@ Read `Defect class` from the handoff file: `guidance` follows
    rate. The file value and the local flag are different on purpose.
 6. Build and run the four fixtures. See
    [## Four fixtures](#four-fixtures) below.
-7. Run the discrimination proof. See
-   [## Discrimination proof](#discrimination-proof) below.
-8. Run the red run: `skillgrade --eval=<task> --trials=1` against the branch
+7. Run the red run: `skillgrade --eval=<task> --trials=1` against the branch
    with the skill read normally and the new rule still absent. This is the
    failing test, and nothing before it is one. The fixtures prove the grader
-   discriminates across four files you wrote by hand, and the discrimination
-   proof only shows the task needs the skill at all; neither one is the
+   discriminates across four files you wrote by hand, which is not the
    repository as it stands scoring below 1.0. Require a score below 1.0 here.
    A score of 1.0 means the model already produces the wanted behavior
    without the rule, so the rule may be redundant: escalate, do not record it
-   as a pass.
-9. Run `uv run python scripts/sync-evals.py` and commit `eval.yaml`, the
+   as a pass. The discrimination proof, the same task run with the skill
+   unread, belongs to `implementing-skill-changes`: while the rule is absent
+   the task scores below 1.0 whether the skill is read or not, so running it
+   here proves nothing.
+8. Run `uv run python scripts/sync-evals.py` and commit `eval.yaml`, the
    regenerated `evaluations/*.json`, and the grader files together. A stale
    JSON silently diverges from the YAML.
-10. Lint and run `uv run invoke test`.
+9. Lint and run `uv run invoke test`.
 
 ## Four fixtures
 
@@ -161,20 +167,6 @@ rewrite it before continuing. Check the failure message too, and confirm it
 names the assertion that actually broke. A check that cannot fail is worse
 than no check, because it reports the rule as covered forever.
 
-## Discrimination proof
-
-Comment out the task's `Read the skill at ...` line, then run:
-
-```bash
-skillgrade --eval=<task> --trials=1
-# then restore the line
-```
-
-Require a score below 1.0. A task that still scores 1.0 measures the model
-rather than the skill: harden the prompt, or grade something only the rule
-produces, then re-run with the line commented out to confirm the score still
-drops.
-
 ## Grader and script classes
 
 Write a failing pytest under `tests/graders/` or `tests/scripts/`. For drift
@@ -192,20 +184,21 @@ On the `grader` class the four fixtures in
 [## Four fixtures](#four-fixtures) are the pytest's parameter cases: the same
 compliant, compliant variant, violating, and near-miss artifacts, asserted
 directly against the check function instead of through a `skillgrade` run.
-Neither the four-fixture run nor the discrimination proof applies on its own
-here; the pytest is the whole test.
+The separate four-fixture run and the red run do not apply here; the pytest is
+the whole test.
 
 ## Close out
 
-Close out only once the red run, the fixture run, the discrimination proof, or
-the pytest, whichever the defect class produced, has actually confirmed the
-failure. See `## Hard gate` below before pushing anything.
+Close out only once the red run, the fixture run, or the pytest, whichever the
+defect class produced, has actually confirmed the failure. See `## Hard gate`
+below before pushing anything.
 
 With `OPEN_PR`, push and open a draft PR whose body carries
 `AGENT_EVAL_COMPLETE`, reusing an existing PR for the branch rather than
 opening a duplicate:
 
 ```bash
+BRANCH=<the Branch field from .skill-change-<key>.md>
 git push -u origin "$BRANCH"
 gh pr list --head "$BRANCH" --json number --jq '.[0].number' | grep -q . \
   || gh pr create --draft --title "<type>(<scope>): <title>" --body "$(cat <<'EOF'
@@ -222,13 +215,12 @@ Without `OPEN_PR`, push the branch and report its name.
 
 Never hand off if the test does not fail. A test that passes on broken code
 is not a test. State plainly what you ran and what it printed, for the
-fixture run, the discrimination proof, or the pytest, whichever the defect
-class produced.
+fixture run or the pytest, whichever the defect class produced.
 
-The required evidence differs by class. Guidance: the red run of step 8,
+The required evidence differs by class. Guidance: the red run of step 7,
 scoring below 1.0 with the skill read and the rule absent, quoted with its
-score, alongside the fixture run and the discrimination proof. Grader and
-script: the failing pytest, quoted with its failure message.
+score, alongside the fixture run. Grader and script: the failing pytest,
+quoted with its failure message.
 
 ## Escalation
 
@@ -239,7 +231,6 @@ Stop and report rather than guessing forward, when:
 - the test cannot be made to fail against the current code
 - the red run scores 1.0, meaning the model already produces the wanted
   behavior without the rule and the rule may be redundant
-- the discrimination run scores 1.0 and the prompt cannot be hardened further
 
 ## Common mistakes
 
@@ -248,7 +239,7 @@ Stop and report rather than guessing forward, when:
 | Writing the fix in this stage | The next stage has nothing left to implement, and no failing test proves it needed to |
 | Substring matching in the check | Passes an answer that mentions the trap and fails one worded differently |
 | Skipping the near-miss fixture | The check ships grading vocabulary instead of substance, and nobody notices |
-| Skipping the discrimination proof | A task that scores 1.0 with the skill unread measures the model, not the rule |
+| Treating the fixture run as the failing test | Four files you wrote by hand are not the repository scoring below 1.0 |
 | Committing `eval.yaml` without the regenerated `evaluations/*.json` | The two projections diverge silently, since CI does not run sync-evals |
 | Adding a new task where an existing one would carry the assertion | Every task costs trials times model runs on every regression sweep, forever |
 

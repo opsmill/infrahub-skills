@@ -2,8 +2,8 @@
 name: implementing-skill-changes
 description: >-
   Implements the fix for a skill change whose failing test already exists, runs
-  the repository's gates, sweeps the layers the change contradicts, and carries
-  it to a pull request. TRIGGER when: a .skill-change-<key>.md handoff file and
+  the repository's gates, sweeps the layers the change contradicts, and pushes
+  the branch, updating the pull request when one exists. TRIGGER when: a .skill-change-<key>.md handoff file and
   a failing test both exist and you are ready to make the test pass; you are at
   the final step of the skill-change pipeline. DO NOT TRIGGER when: no failing
   test exists yet, use test-driving-skill-changes; no analysis or design brief
@@ -13,7 +13,7 @@ argument-hint: <key>
 compatibility: >-
   Requires this repository checked out on the pipeline branch. `gh` and a GitHub
   remote are needed only for the PR path. `skillgrade` is needed for the
-  targeted eval run on guidance-class changes.
+  targeted eval run and the discrimination proof on guidance-class changes.
 user-invocable: true
 metadata:
   internal: true
@@ -123,6 +123,22 @@ uv run invoke lint
 uv run python scripts/sync-evals.py && git diff --quiet -- evaluations/ && echo "evals in sync"
 ```
 
+Then, guidance class only, prove the task measures the skill rather than the
+model. The green run above scored 1.0 with the skill read. Comment out the
+task's `Read the skill at ...` line and run the same task again:
+
+```bash
+skillgrade --eval=<task> --trials=1     # skill unread, must score below 1.0
+# then restore the line
+```
+
+A task that still scores 1.0 with the skill unread is graded by the model, not
+by the rule you just wrote: harden the prompt, or grade something only the rule
+produces, then re-run with the line commented out to confirm the score drops.
+This proof only carries signal now that the rule exists, which is why
+`test-driving-skill-changes` leaves it to this stage: with the rule absent the
+task scores below 1.0 either way.
+
 Escalate to `--trials=3` only when a single run is ambiguous, and say why in
 the report. Never report an interrupted or timed-out `skillgrade` run as a
 pass; an interruption is not evidence of anything.
@@ -204,6 +220,8 @@ Stop and report rather than guessing forward, when:
 - local mode, and the failing test already passes before any fix is applied
 - the fix the diagnosis calls for needs an artifact the recorded rung forbids
 - the targeted eval will not reach 1.0 after reasonable rewording
+- the discrimination run scores 1.0 with the skill unread and the prompt
+  cannot be hardened further
 - a gate fails for a reason outside the handoff's scope
 
 ## Common mistakes
@@ -213,6 +231,7 @@ Stop and report rather than guessing forward, when:
 | Weakening the grader instead of fixing the cause | The test passes, but the defect the handoff diagnosed is still there |
 | Adding a rule file when the rung said edit an existing one | Splits one concern across two files and pays a second grader and eval forever |
 | Linking the rule only from `_sections.md` | The rule is read after the mistake, which is the same as not writing it down |
+| Skipping the discrimination proof | A task that scores 1.0 with the skill unread measures the model, not the rule |
 | Skipping the sweep | An old claim the change makes wrong survives next to the new one |
 | Committing `eval.yaml` without the regenerated JSON | `evaluations/*.json` silently diverges from the source it was built from |
 | Editing `CHANGELOG.md` by hand | Bypasses the fragment system that assembles the release notes |

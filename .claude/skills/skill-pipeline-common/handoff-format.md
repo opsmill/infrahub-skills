@@ -25,7 +25,7 @@ re-deriving a slug that would drift from the original.
 
 **Ground truth:** <rung used> | infrahub `<tag>` `<sha>` | sdk `<version>` | UNVERIFIED
 **Defect class:** guidance | grader | script
-**Minimum change rung:** <1-8, and one line saying why it stopped there>
+**Minimum change rung:** <1-6, and one line saying why it stopped there>
 
 **Target:** skills/<skill>/ | graders/<skill>/ | scripts/
 **Rule path:** `skills/<skill>/rules/<category>-<concern>.md` (or: none, edits <existing file>)
