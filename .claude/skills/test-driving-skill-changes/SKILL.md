@@ -168,6 +168,9 @@ rather than on an import error or a typo in the test itself. Commit the test.
 
 ## Close out
 
+Close out only once the fixture run or the discrimination proof has actually
+confirmed the failure. See `## Hard gate` below before pushing anything.
+
 With `OPEN_PR`, push and open a draft PR whose body carries
 `AGENT_EVAL_COMPLETE`, reusing an existing PR for the branch rather than
 opening a duplicate:
