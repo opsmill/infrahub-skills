@@ -53,7 +53,7 @@ Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rul
 
 | Rule | What it constrains |
 | ---- | ------------------ |
-| [rule-equals-test.md](dev/guidelines/rule-equals-test.md) | A new skill rule ships with its grader and eval in the same change; when the two disagree, the rule wins |
+| [rule-equals-test.md](dev/guidelines/rule-equals-test.md) | A new skill rule ships with its grader and eval in the same change; when the two disagree, decide which side moves |
 | [graders.md](dev/guidelines/graders.md) | Parse the answer, never substring-match it; verify both directions |
 | [skill-authoring.md](dev/guidelines/skill-authoring.md) | Description, body, examples, and how to verify an edit |
 | [skill-registration.md](dev/guidelines/skill-registration.md) | The five surfaces a new skill has to appear in |
@@ -137,6 +137,11 @@ A rule without a grader is a rule that can rot silently
 constraint with no failing test to flag it. A grader
 that cannot fail is worse: it reports the rule as
 covered forever.
+
+A grader that contradicts its rule is the third case.
+The check is what scores, so it wins by default and the
+rule rots unnoticed. Which side moves is a decision to
+take when you add either one.
 
 ### Changelog
 

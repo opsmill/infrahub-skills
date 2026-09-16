@@ -45,19 +45,6 @@ justification sentence. Enumerating the phrasings a bad
 answer might use is wrong in both directions at once,
 and both are the same bug. Wording is unbounded.
 
-Measured on a shipped check, one word apart:
-
-```text
-"the same form the sibling query uses"   -> 1.0, passed
-"same form as the sibling query"         -> 0.8, FAILED
-```
-
-Three answers naming an introspected artifact and its
-version failed too, on `mirrors the` and `elsewhere in
-the repo`. The terse answer explaining nothing scored
-1.0 and the thorough one scored 0, so the eval taught
-the model to strip its reasoning out.
-
 Ask what the check is really for, then test for that
 directly, strongest evidence first:
 
@@ -72,7 +59,9 @@ Ordering it this way lets step 3 be broad without
 punishing an answer resting on something real. Getting
 it wrong compounds: a check that grades wording teaches
 the next author to write what satisfies the regex rather
-than what is correct.
+than what is correct. The measurement behind this, on a
+check that shipped, is in
+[adding-a-rule.md](../guides/adding-a-rule.md#why-ranking-evidence-beats-listing-phrasings).
 
 ## Check function shape
 

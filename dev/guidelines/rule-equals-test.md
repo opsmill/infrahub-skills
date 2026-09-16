@@ -52,7 +52,7 @@ rule as covered forever.
    `evaluations/*.json` committed alongside `eval.yaml`.
    CI fails when the two diverge.
 
-## When the grader and the rule disagree, the rule wins
+## When the grader and the rule disagree, decide which side moves
 
 A check that encodes a stricter contract than the rule
 it tests does not read as a conflict. It reads as a
