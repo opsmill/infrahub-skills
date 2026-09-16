@@ -57,7 +57,7 @@ def compare(installed: Path) -> tuple[int, int]:
 def check_rules_symlink() -> bool:
     """Delegate to the standalone guard so CI and this share one implementation."""
     result = subprocess.run(
-        [sys.executable, str(Path(__file__).resolve().parent / "check-rules-symlink.py")],
+        [sys.executable, str(Path(__file__).resolve().parent / "check-symlinks.py")],
         capture_output=True,
         text=True,
     )

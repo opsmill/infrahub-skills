@@ -111,8 +111,8 @@ jobs:
         with:
           python-version: "3.13"
       - run: python scripts/check-cli-invocations.py
-      - name: Verify .claude/rules resolves to dev/guidelines
-        run: python scripts/check-rules-symlink.py
+      - name: Verify routing symlinks resolve
+        run: python scripts/check-symlinks.py
 
   # ---------------------------------------------------------------------------
   # Build documentation (Docusaurus)

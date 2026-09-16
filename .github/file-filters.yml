@@ -41,7 +41,7 @@ cli_invocations_all:
   - ".claude/**"
   - "eval.yaml"
   - "scripts/check-cli-invocations.py"
-  - "scripts/check-rules-symlink.py"
+  - "scripts/check-symlinks.py"
 
 documentation_all:
   - *doc_files
@@ -57,3 +57,11 @@ tests_all:
   - "tests/**"
   - "graders/**"
   - "skills/**/scripts/**"
+  # tests/test_skill_frontmatter.py parses every SKILL.md and compares the
+  # blocks duplicated across the skill-change pipeline. A markdown-only change
+  # is exactly what broke the frontmatter, so it has to run the test job.
+  - "skills/**/*.md"
+  - ".claude/**"
+  # tests/graders/test_teaching_graders.py and test_generic_inheritance.py
+  # read eval.yaml, so an eval.yaml-only change has to run them too.
+  - "eval.yaml"

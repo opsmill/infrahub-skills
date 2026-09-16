@@ -17,8 +17,10 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 | How should I write skill prose? | [dev/knowledges/skill-writing-guide.md](dev/knowledges/skill-writing-guide.md) |
 | What was this change meant to do? | [dev/specs/](dev/specs/) |
 | What rules apply to the file I am editing? | [dev/guidelines/](dev/guidelines/) |
-| What commands are available? | [dev/commands/](dev/commands/) |
+| What commands are available? | [§ Commands](#commands) |
+| Where do AI command definitions live? | [dev/commands/](dev/commands/) |
 | How do I turn PR review feedback into rules? | [.claude/skills/harvesting-skill-review/](.claude/skills/harvesting-skill-review/) |
+| How do I fix a bug or add a rule in this repo? | [.claude/skills/](.claude/skills/) — `analyzing-skill-bugs` or `grilling-skill-features`, then `test-driving-skill-changes` and `implementing-skill-changes` |
 
 Index of the whole tree: [dev/README.md](dev/README.md).
 
@@ -43,20 +45,55 @@ Read the guide that matches the task before starting work:
 - [dev/knowledges/skill-writing-guide.md](dev/knowledges/skill-writing-guide.md) — how to write effective skills: descriptions, rule structure, examples, common pitfalls
 - [dev/knowledges/infrahub-concepts.md](dev/knowledges/infrahub-concepts.md) — Infrahub concepts skill authors need: schema, relationships, metadata, proposed changes
 
-## Custom Commands
+## AI Command Definitions
 
 AI command definitions live in [dev/commands/](dev/commands/).
 
+## Commands
+
+| Task | Command |
+| ---- | ------- |
+| One eval | `skillgrade --eval=<task-name> --trials=1` |
+| Whole eval suite | `skillgrade --smoke` (expensive, opt in) |
+| Full test suite | `uv run invoke test` |
+| One test | `uv run --group test pytest tests/graders/test_common_lib.py -v` |
+| Lint everything | `uv run invoke lint` |
+| Fix markdown formatting | `uv run invoke format` |
+| Regenerate the JSON evals | `uv run python scripts/sync-evals.py` |
+| Check the installed plugin against this tree | `uv run invoke freshness` |
+
+`uv run invoke lint` runs rumdl, yamllint, and
+`scripts/check-cli-invocations.py`. CI runs those three plus `ruff`,
+`pytest`, and `scripts/check-symlinks.py`.
+
+The single-eval line is the one that matters for cost. A full
+`skillgrade --smoke` run is the expensive default people reach for out of
+habit; `--eval=<task> --trials=1` answers "does this one rule work" for a
+fraction of it, and that is the question nearly every change asks.
+
+## Boundaries
+
+- Never weaken a grader check, drop a fixture, or loosen an eval prompt to
+  make a change pass. That is the local form of rewriting a test to go
+  green, and it is worse here because it looks like progress.
+- Never report an interrupted or timed-out `skillgrade` run as a pass.
+- If a command fails, report the failure. Do not present an assumption as a
+  confirmed result.
+- Do not widen scope beyond what the task asked for.
+- Never commit a `.skill-change-*.md` handoff file or a `*-workspace/`
+  eval directory.
+
 ## Rules
 
-Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rules` symlinks to. Each declares the globs it applies to in frontmatter, so it loads when a matching file is in play rather than waiting for someone to go looking for it. Another agent is one symlink away, though its frontmatter key differs — `paths:` for Claude, `globs:` for Cursor, `applyTo:` for Copilot.
+Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rules` symlinks to. Each declares the globs it applies to in frontmatter, so it loads when a matching file is in play rather than waiting for someone to go looking for it. Another agent is one symlink away, though its frontmatter key differs — `paths:` for Claude, `globs:` for Cursor, `applyTo:` for Copilot. Two routing directories carry that idea further. `.agents/` and `.codex/` each hold three relative symlinks: `skills` to [`skills/`](skills/), `contributor-skills` to [`.claude/skills/`](.claude/skills/), and `rules` to [`dev/guidelines/`](dev/guidelines/). Any agent that looks in its own conventional directory finds the same shipped skills, contributor skills, and rules, with no second copy of any of them.
 
 | Rule | What it constrains |
 | ---- | ------------------ |
 | [rule-equals-test.md](dev/guidelines/rule-equals-test.md) | A new skill rule ships with its grader and eval in the same change |
 | [graders.md](dev/guidelines/graders.md) | Parse the answer, never substring-match it; verify both directions |
+| [minimum-change.md](dev/guidelines/minimum-change.md) | The smallest artifact that closes the gap, and what to delete |
 | [skill-authoring.md](dev/guidelines/skill-authoring.md) | Description, body, examples, and how to verify an edit |
-| [skill-registration.md](dev/guidelines/skill-registration.md) | The five surfaces a new skill has to appear in |
+| [skill-registration.md](dev/guidelines/skill-registration.md) | The five surfaces a new skill has to appear in, and which of them go stale when behavior changes |
 | [versioning.md](dev/guidelines/versioning.md) | The five files a version bump touches |
 
 Each rule's `paths:` frontmatter is the authority on when
