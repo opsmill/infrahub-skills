@@ -148,12 +148,19 @@ event loop until a watchdog timeout.
 | Knob | Required? | What it does |
 | ---- | --------- | ------------ |
 | `await obj.save(allow_upsert=True)` | Yes, on every save | Without it, the second run errors out the first time it sees an object that already exists, and the rest of `generate()` never runs. |
-| `self.client` (the tagged client) | Yes | Writes via the raw client bypass the tracking group; the cleanup pass can't see those objects on the next run, so they accumulate as orphans. |
+| `self.client` (the tagged client) | Yes | Writes via the bare client bypass the tracking group *by accident*; the cleanup pass can't see those objects on the next run, so they accumulate as orphans. Leaving the group on purpose is the next row, not this one. |
+| `update_group_context=False` on a save | Only for an object the run does not own | The deliberate opt-out, per save. Every `save()` claims the node for the run's tracking group — an upsert just as much as a create — so an object two targets can both reach gets deleted when one of them stops writing it. Opting out is the correct fix there, not a bypass. See [rules/tracking-idempotent.md](./rules/tracking-idempotent.md#the-ownership-test). |
 | Stable resource identifiers | Strongly recommended | When allocating from pools (IPs, prefixes), pass a stable `identifier=` so re-runs reuse the same allocation instead of grabbing a new one each time. |
 
 Bare client (`self._init_client`) and sync wrappers
 are escape hatches that exist for testing — production
 generator code uses `self.client` and `await`.
+
+The two rows differ in intent, and the distinction is the
+one this table used to blur: reaching for the bare client
+drops a node out of tracking as a side effect of using the
+wrong client, while `update_group_context=False` is the
+supported way to say the run does not own that node.
 
 ---
 
