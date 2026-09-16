@@ -15,7 +15,13 @@ Every rule carries a grader, an eval task, four fixtures, and a regression cost 
 Stop at the first rung that holds. Record the rung in the handoff file.
 
 1. **Does this guidance need to exist at all?** A rule for a mistake no agent has actually
-   made is speculative. Skip it, say so in one line.
+   made is speculative. Skip it, say so in one line. Ask how many times the mistake was
+   seen, not just whether it was seen: one occurrence can be model variance rather than a
+   gap in the guidance, and a rule written from a single anomaly encodes that session
+   instead of an invariant. A single occurrence is not disqualifying, but it argues for an
+   advisory rule, or for waiting until it recurs. `harvesting-skill-review` is built on the
+   same observation: what makes a review comment worth codifying is that reviewers repeat
+   it.
 2. **Does the repo already say it?** An existing rule, an `examples.md` pattern, a
    `reference.md` row, a `dev/guidelines/` rule, or `infrahub-common/`. Link or tighten
    what is there. Restating a constraint in a second place is the most common slop here,

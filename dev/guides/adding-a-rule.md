@@ -161,6 +161,17 @@ exercise the rule*, and it must not carry the answer:
   rule has a tempting wrong shape, put the temptation
   in the prompt instead of hoping the AI stumbles
   into it.
+- **Do not replay the incident that motivated the
+  rule.** Write a different scenario that exercises
+  the same rule. A rule drafted from one failure and
+  then validated on that same failure is measured
+  only where it was fitted, and a rule that works on
+  exactly one prompt is indistinguishable from one
+  that generalizes. The fixture table in
+  [Step 5](#5-verify-the-grader-both-ways) already
+  applies this idea to the grader, through the
+  compliant-variant row; this is the same test one
+  layer up.
 
 Set `trials: 3` for new tasks unless the rule is
 particularly noisy (in which case 5 may help). The

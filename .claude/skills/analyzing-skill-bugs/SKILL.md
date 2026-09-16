@@ -86,6 +86,13 @@ UNCLEAR means say exactly which requirement is missing and stop. Guessing a
 root cause for an ambiguous report wastes the ground-truth and classification
 work that follows it, and hands the next stage a diagnosis built on a guess.
 
+Ask how many times it was seen. A defect reproduced twice is a defect; one
+that appeared in a single session may be model variance wearing the costume
+of a guidance gap, and a rule written from it encodes that session rather
+than an invariant. This does not block the analysis. Record the count in the
+handoff so the later stages know how much weight the evidence carries, and
+prefer an advisory outcome over a hard rule when the count is one.
+
 ## Locate the defect
 
 Grep `skills/`, `graders/`, `eval.yaml`, `scripts/`, and `dev/` for the

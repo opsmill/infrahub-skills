@@ -78,6 +78,13 @@ observed: a real session, a review comment, a pattern seen more than once.
 An idea with no observed failure is speculative and stops at rung 1 of the
 ladder. Skip it, and say so in one line.
 
+Then ask how many times, not just whether. One occurrence can be model
+variance rather than a gap in the guidance, and a rule written from a single
+anomaly encodes that session instead of an invariant. A single occurrence
+does not disqualify the idea, but it argues for an advisory rule, or for
+waiting until it recurs. Record the count in the brief so a reviewer can
+weigh it.
+
 ## Lens 2: New rule or new skill
 
 Default to a rule inside an existing skill. Before proposing a new skill,
@@ -119,6 +126,14 @@ scenario. Not a meta-prompt that asks the model to "follow the rule", and
 not one that dictates the output schema back to it. Put the antipattern
 conditions in the prompt itself, so the model is tempted into the wrong
 shape rather than hoped to stumble into it on its own.
+
+Do not replay the failure from Lens 1. Pick a different scenario that
+exercises the same rule. A rule drafted from one incident and then measured
+on that same incident is only ever tested where it was fitted, and a rule
+that works on exactly one prompt looks identical to one that generalizes.
+The full prompt rules are in
+[`../../../dev/guides/adding-a-rule.md`](../../../dev/guides/adding-a-rule.md)
+§ "Add an Eval Task".
 
 ## Lens 7: What does it contradict
 
