@@ -55,6 +55,9 @@ htmlcov/
 .env.local
 *.local
 
+# Skill-change pipeline handoff files (local working-tree artifacts)
+.skill-change-*.md
+
 # Direnv files (https://direnv.net/)
 .direnv/
 .envrc
@@ -87,6 +90,11 @@ secrets.yaml
 !.claude/skills
 .claude/skills/*
 !.claude/skills/harvesting-skill-review
+!.claude/skills/skill-pipeline-common
+!.claude/skills/analyzing-skill-bugs
+!.claude/skills/grilling-skill-features
+!.claude/skills/test-driving-skill-changes
+!.claude/skills/implementing-skill-changes
 
 # Superpowers workspaces (never commit)
 .superpowers/
