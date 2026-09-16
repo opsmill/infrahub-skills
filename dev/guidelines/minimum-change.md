@@ -15,8 +15,7 @@ Every rule carries a grader, an eval task, four fixtures, and a regression cost 
 Stop at the first rung that holds. Record the rung in the handoff file.
 
 1. **Does this guidance need to exist at all?** A rule for a mistake no agent has actually
-   made is speculative. Skip it, say so in one line. Every rule carries a grader, an eval
-   task, four fixtures, and a regression cost for the life of the repository.
+   made is speculative. Skip it, say so in one line.
 2. **Does the repo already say it?** An existing rule, an `examples.md` pattern, a
    `reference.md` row, a `dev/guidelines/` rule, or `infrahub-common/`. Link or tighten
    what is there. Restating a constraint in a second place is the most common slop here,

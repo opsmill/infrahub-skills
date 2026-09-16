@@ -17,7 +17,7 @@ compatibility: >-
 user-invocable: true
 metadata:
   internal: true
-  pipeline: skill-change (4 of 4 - analyze or grill, then test-drive, then implement)
+  pipeline: skill-change (stage 3 of 3: analyze or grill, then test-drive, then implement)
   version: 0.1.0
   author: OpsMill
 ---
@@ -51,10 +51,12 @@ happens to touch, is the failure this stage exists to prevent.
 
 ## Input and setup
 
-Parse `$ARGUMENTS` for `<key>`.
+Parse `$ARGUMENTS` for `<key>`, then read `.skill-change-<key>.md` and take
+`BRANCH` from its `Branch` field. Re-deriving the branch name here drifts from
+the name the entrance stage recorded, which is why the handoff carries it.
 
 ```bash
-BRANCH=ai-skill-pipeline-<key>
+BRANCH=<the Branch field from .skill-change-<key>.md>
 gh pr list --head "$BRANCH" --json number,body,headRefName --jq '.[0]'
 ```
 
@@ -77,8 +79,8 @@ as its idempotency guard against a second run; local mode has no PR body to
 check, so a test that is already green is the only equivalent signal
 available, and it means the same thing.
 
-Read `.skill-change-<key>.md`. Missing file: stop and say so, since this stage
-has nothing to implement without it. Pull `Minimum change rung`, `Rule path`,
+Back to the handoff file. Missing file: stop and say so, since this stage has
+nothing to implement without it. Pull `Minimum change rung`, `Rule path`,
 `Eval task`, `Sweep terms`, `Do NOT`, and `Defect class`; the rest of this
 skill acts on exactly those fields. Also read the failing test the prior stage
 committed.
@@ -167,11 +169,17 @@ handoff's `Target` needs a fresh diagnosis, not a bigger commit.
 
 ## Close out
 
-Close out only once Verify, Sweep, and Scope check have all passed. Push, then
-update the PR body by appending `AGENT_IMPL_COMPLETE`:
+Close out only once Verify, Sweep, and Scope check have all passed.
+
+In local mode there is no PR body to update, so push the branch, report its
+name, and say plainly that the change still needs a pull request opened. Do
+not run `gh pr edit`: `PR_NUMBER` is empty by construction on this path, and
+this skill never opens the PR itself.
+
+With a PR, push, then update the PR body by appending `AGENT_IMPL_COMPLETE`:
 
 ```bash
-BRANCH=ai-skill-pipeline-<key>
+BRANCH=<the Branch field from .skill-change-<key>.md>
 PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number')
 git push -u origin "$BRANCH"
 gh pr edit "$PR_NUMBER" --body "$(cat <<'EOF'

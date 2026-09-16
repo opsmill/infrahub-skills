@@ -18,7 +18,7 @@ compatibility: >-
 user-invocable: true
 metadata:
   internal: true
-  pipeline: skill-change (1 of 4 - analyze or grill, then test-drive, then implement)
+  pipeline: skill-change (stage 1 of 3: analyze or grill, then test-drive, then implement)
   version: 0.1.0
   author: OpsMill
 ---
@@ -75,16 +75,18 @@ rung of the minimum change ladder ended the interview and why.
 
 Name what an agent does wrong today, in concrete terms, and how that was
 observed: a real session, a review comment, a pattern seen more than once.
-An idea with no observed failure is speculative and stops at ladder rung
-one. Skip it, and say so in one line.
+An idea with no observed failure is speculative and stops at rung 1 of the
+ladder. Skip it, and say so in one line.
 
 ## Lens 2: New rule or new skill
 
-Default to a rule inside an existing skill. A new skill costs five
-registration surfaces, a docs page, a manifest entry, and a version bump,
-and none of that is checked by CI. Propose a new skill only when the
-domain genuinely has no existing home, and name those surfaces in the
-same breath.
+Default to a rule inside an existing skill. Before proposing a new skill,
+read
+[`../../../dev/guidelines/minimum-change.md`](../../../dev/guidelines/minimum-change.md)
+§ "A new skill sits above all of these", which counts what a new skill costs
+and names the surfaces it has to be wired into. Propose one only when the
+domain genuinely has no existing home, and name those surfaces in the same
+breath.
 
 ## Lens 3: Which skill, which category prefix
 
@@ -142,15 +144,21 @@ needs a new file. Record the rung the idea stops at.
 
 ## Output
 
-Write the design brief to `.skill-change-<key>.md`, following the template
-in [`../skill-pipeline-common/handoff-format.md`](../skill-pipeline-common/handoff-format.md),
-with `Track: feature` and `Defect class` set to exactly one of `guidance`
-(a new rule) or `script` (a new consistency check). The `Test plan`
-section must name the eval task, the grader check and the artifact it
-parses, and all four fixtures (compliant, compliant variant, violating,
-and violating near miss), because `test-driving-skill-changes` writes
-them from exactly this section and nothing else. A brief that skips any
-of the four hands the next stage nothing to build.
+1. Derive the default branch and fetch it, using the snippet in
+   [`../skill-pipeline-common/handoff-format.md`](../skill-pipeline-common/handoff-format.md).
+   Record the SHA as `Based on`. If the fetch fails, stop and report the
+   failure rather than writing a brief with a guessed baseline.
+2. Write the design brief to `.skill-change-<key>.md`, following the template
+   in the same file, with `Track: feature` and `Defect class` set to exactly
+   one of `guidance` (a new rule) or `script` (a new consistency check).
+3. Confirm `.skill-change-*.md` is covered by `.gitignore`. It is a working
+   file for this pipeline, not a repository artifact.
+
+The `Test plan` section must name the eval task, the grader check and the
+artifact it parses, and all four fixtures (compliant, compliant variant,
+violating, and violating near miss), because `test-driving-skill-changes`
+writes them from exactly this section and nothing else. A brief that skips
+any of the four hands the next stage nothing to build.
 
 ## Approval gate
 

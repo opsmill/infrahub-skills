@@ -1,8 +1,12 @@
 # Ground truth ladder
 
-Run this before writing any root cause, and against any Infrahub behavior
-claim in a feature idea. It answers two questions, not one: is the claim true,
-and true at which version.
+Run this against any claim about how Infrahub behaves, whether that claim sits
+in a root cause or in a feature idea. It answers two questions, not one: is
+the claim true, and true at which version.
+
+A defect that lives entirely inside this repository, a grader, a script, or a
+registration surface, makes no claim about Infrahub, so there is nothing here
+to verify: record `Ground truth: n/a` in the handoff and move on.
 
 ## Is the claim true at version V?
 
@@ -35,7 +39,6 @@ If none match, ask the user for the path once, then fall back to rung 2.
 ```bash
 REPO=<path from above>
 TAG=$(git -C "$REPO" tag --list 'infrahub-v*' --sort=-v:refname | head -1)   # or the pinned --infrahub value
-git -C "$REPO" fetch --tags --quiet
 git -C "$REPO" show "$TAG:backend/infrahub/<path>" | head -200
 git -C "$REPO" rev-parse "$TAG"
 ```

@@ -20,7 +20,7 @@ compatibility: >-
 user-invocable: true
 metadata:
   internal: true
-  pipeline: skill-change (1 of 4 - analyze or grill, then test-drive, then implement)
+  pipeline: skill-change (stage 1 of 3: analyze or grill, then test-drive, then implement)
   version: 0.1.0
   author: OpsMill
 ---

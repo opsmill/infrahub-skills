@@ -15,11 +15,11 @@ argument-hint: <key> [pr]
 compatibility: >-
   Requires this repository checked out with a clean working tree. `gh` and a
   GitHub remote are needed only for the `pr` path. `skillgrade` is needed for
-  the discrimination proof on guidance-class changes.
+  the red run and the discrimination proof on guidance-class changes.
 user-invocable: true
 metadata:
   internal: true
-  pipeline: skill-change (3 of 4 - analyze or grill, then test-drive, then implement)
+  pipeline: skill-change (stage 2 of 3: analyze or grill, then test-drive, then implement)
   version: 0.1.0
   author: OpsMill
 ---
@@ -63,20 +63,32 @@ diagnosis nobody confirmed.
 
 ## Step 0: Branch
 
+Take `BRANCH` from the handoff's `Branch` field. Re-deriving a slug here
+drifts from the name the entrance stage recorded, and the later stages would
+then be working on a different branch.
+
 ```bash
 git status --porcelain | grep -q . && { echo "Working tree is dirty. Commit or stash first."; exit 1; }
 DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
 [ -z "$DEFAULT_BRANCH" ] && DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')
 [ "$DEFAULT_BRANCH" = "(unknown)" ] && DEFAULT_BRANCH=""
 DEFAULT_BRANCH=${DEFAULT_BRANCH:-main}
-BRANCH=ai-skill-pipeline-<key>
+BRANCH=<the Branch field from .skill-change-<key>.md>
 git fetch origin "$DEFAULT_BRANCH"
-git checkout "$BRANCH" 2>/dev/null || git checkout -b "$BRANCH" "origin/$DEFAULT_BRANCH"
+git fetch origin "$BRANCH" 2>/dev/null || true
+git checkout "$BRANCH" || git checkout -b "$BRANCH" "origin/$DEFAULT_BRANCH"
 ```
 
-This works from a git worktree, which is how the repository is routinely
-checked out. No refspec reconciliation: this repository is small and is not
-shallow cloned.
+Fetching `$BRANCH` first is what lets a re-run pick up work pushed from
+another machine or another worktree, instead of quietly branching off the
+default branch and losing the failing test already committed there.
+
+The first `git checkout` keeps its error visible on purpose. This repository
+is routinely checked out as a git worktree, and a branch already checked out
+elsewhere fails with "already used by worktree at ...", which is the message
+you need rather than the misleading "already exists" from the fallback.
+
+No refspec reconciliation: this repository is small and is not shallow cloned.
 
 ## Route on defect class
 
@@ -111,10 +123,19 @@ Read `Defect class` from the handoff file: `guidance` follows
    [## Four fixtures](#four-fixtures) below.
 7. Run the discrimination proof. See
    [## Discrimination proof](#discrimination-proof) below.
-8. Run `uv run python scripts/sync-evals.py` and commit `eval.yaml`, the
+8. Run the red run: `skillgrade --eval=<task> --trials=1` against the branch
+   with the skill read normally and the new rule still absent. This is the
+   failing test, and nothing before it is one. The fixtures prove the grader
+   discriminates across four files you wrote by hand, and the discrimination
+   proof only shows the task needs the skill at all; neither one is the
+   repository as it stands scoring below 1.0. Require a score below 1.0 here.
+   A score of 1.0 means the model already produces the wanted behavior
+   without the rule, so the rule may be redundant: escalate, do not record it
+   as a pass.
+9. Run `uv run python scripts/sync-evals.py` and commit `eval.yaml`, the
    regenerated `evaluations/*.json`, and the grader files together. A stale
    JSON silently diverges from the YAML.
-9. Lint and run `uv run invoke test`.
+10. Lint and run `uv run invoke test`.
 
 ## Four fixtures
 
@@ -151,7 +172,8 @@ skillgrade --eval=<task> --trials=1
 
 Require a score below 1.0. A task that still scores 1.0 measures the model
 rather than the skill: harden the prompt, or grade something only the rule
-produces, then re-run to confirm the score drops once the line is restored.
+produces, then re-run with the line commented out to confirm the score still
+drops.
 
 ## Grader and script classes
 
@@ -166,10 +188,18 @@ uv run --group test pytest tests/<path> -k <name> -v
 It must fail, and fail for the reason the handoff's `Test plan` states,
 rather than on an import error or a typo in the test itself. Commit the test.
 
+On the `grader` class the four fixtures in
+[## Four fixtures](#four-fixtures) are the pytest's parameter cases: the same
+compliant, compliant variant, violating, and near-miss artifacts, asserted
+directly against the check function instead of through a `skillgrade` run.
+Neither the four-fixture run nor the discrimination proof applies on its own
+here; the pytest is the whole test.
+
 ## Close out
 
-Close out only once the fixture run or the discrimination proof has actually
-confirmed the failure. See `## Hard gate` below before pushing anything.
+Close out only once the red run, the fixture run, the discrimination proof, or
+the pytest, whichever the defect class produced, has actually confirmed the
+failure. See `## Hard gate` below before pushing anything.
 
 With `OPEN_PR`, push and open a draft PR whose body carries
 `AGENT_EVAL_COMPLETE`, reusing an existing PR for the branch rather than
@@ -191,8 +221,14 @@ Without `OPEN_PR`, push the branch and report its name.
 ## Hard gate
 
 Never hand off if the test does not fail. A test that passes on broken code
-is not a test. State plainly what you ran and what it printed, for both the
-fixture run and, for guidance-class changes, the discrimination proof.
+is not a test. State plainly what you ran and what it printed, for the
+fixture run, the discrimination proof, or the pytest, whichever the defect
+class produced.
+
+The required evidence differs by class. Guidance: the red run of step 8,
+scoring below 1.0 with the skill read and the rule absent, quoted with its
+score, alongside the fixture run and the discrimination proof. Grader and
+script: the failing pytest, quoted with its failure message.
 
 ## Escalation
 
@@ -201,6 +237,8 @@ Stop and report rather than guessing forward, when:
 - the handoff file is missing or is missing a required field
 - the working tree is dirty and cannot be cleaned safely
 - the test cannot be made to fail against the current code
+- the red run scores 1.0, meaning the model already produces the wanted
+  behavior without the rule and the rule may be redundant
 - the discrimination run scores 1.0 and the prompt cannot be hardened further
 
 ## Common mistakes
