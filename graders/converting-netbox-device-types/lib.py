@@ -495,6 +495,105 @@ def check_coverage_report(
     return True, f"Coverage report names {len(mentioned)} component list(s) as lost"
 
 
+def _every_row(parsed: dict[Path, list[dict]]) -> list[tuple[str, dict]]:
+    """Return ``(label, row)`` for every object row and component child.
+
+    Component children are rows too. Anything that inspects only one level
+    misses half the traps it is looking for.
+    """
+    rows: list[tuple[str, dict]] = []
+    for doc in _object_docs(parsed):
+        kind = doc["spec"].get("kind")
+        for row in _rows(doc):
+            name = row.get("name") or row.get("template_name")
+            rows.append((f"{kind} row {name!r}", row))
+            for relationship, child in component_children(row):
+                child_name = child.get("template_name") or child.get("name")
+                rows.append((f"{kind} {relationship} child {child_name!r}", child))
+    return rows
+
+
+#: Infrahub's own attribute-metadata form is a mapping carrying ``value``
+#: alongside lineage keys — see skills/infrahub-managing-objects/reference.md
+#: § Value Metadata. Stamping ``source: netbox-sync`` on an imported template
+#: is the most natural thing a correct answer to this skill does.
+_ATTRIBUTE_METADATA_KEYS = frozenset({"value", "source", "owner", "is_protected"})
+
+
+def _is_netbox_choice(value: Any) -> bool:
+    """Whether a value is a NetBox choice wrapper rather than Infrahub metadata.
+
+    Both are mappings carrying ``value``, so that key cannot tell them apart.
+    NetBox serializes a choice as ``{"value": ..., "label": ...}`` and a
+    related object with a ``display``; Infrahub's metadata form pairs ``value``
+    with ``source``, ``owner``, or ``is_protected``. Keying on ``value`` alone
+    failed a correct answer that recorded where its data came from.
+
+    ``{"value": "pse"}`` on its own is deliberately allowed: it is the
+    metadata form with no metadata, and it loads as the bare value.
+
+    Args:
+        value: Any value read from an emitted row.
+
+    Returns:
+        ``True`` only for the NetBox wrapper shape.
+    """
+    if not isinstance(value, dict) or "value" not in value:
+        return False
+    if set(value) <= _ATTRIBUTE_METADATA_KEYS:
+        return False
+    return "label" in value or "display" in value
+
+
+def check_bundled_script_output(
+    parsed: dict[Path, list[dict]], output_dir: Path | None = None, **_: Any
+) -> tuple[bool, str]:
+    """The output carries the guarantees only the bundled converter makes.
+
+    Deliberately checks properties, not provenance: what matters is not that
+    a particular command ran but that the output has the correctness a
+    hand-rolled conversion loses. Each assertion below is a trap that cost a
+    real bug to find.
+
+    Three properties, and no more: every number is whole, no NetBox choice
+    wrapper survived into the YAML, and a coverage report exists. It does not
+    assert that the values are *right*, that every component list converted,
+    or that the mapping profile was the correct one — other checks cover
+    those, and a docstring claiming them here would be the same kind of
+    overreach as grading a metadata mapping as a choice wrapper.
+    """
+    docs = _object_docs(parsed)
+    if not docs:
+        return False, "No Infrahub object documents found"
+
+    # Both predicates run over both levels. Checking floats only on top-level
+    # rows and choice wrappers only on children left each trap invisible at
+    # the other level — a nested maximum_draw: 7.5, or a top-level
+    # weight_unit: {value: kg}, both slipped through.
+    for label, row in _every_row(parsed):
+        floats = [k for k, v in row.items() if isinstance(v, float)]
+        if floats:
+            return False, (
+                f"{label} has non-integer {floats}; Infrahub Number attributes hold "
+                "integers, so this cannot load. The bundled converter rounds these."
+            )
+        wrapped = [k for k, v in row.items() if _is_netbox_choice(v)]
+        if wrapped:
+            return False, (
+                f"{label} carries an unwrapped NetBox choice object in {wrapped}; "
+                "expected the bare value"
+            )
+
+    # 3. The coverage report is the mechanism for making loss visible.
+    text = _report_text(output_dir or Path("."))
+    if not text.strip():
+        return False, (
+            "No coverage report. The bundled converter always writes one; without it "
+            "any loss is unstated as well as unfixed."
+        )
+    return True, f"Output carries the bundled converter's guarantees across {len(docs)} document(s)"
+
+
 def check_shared_relationship_blocks(parsed: dict[Path, list[dict]], **_: Any) -> tuple[bool, str]:
     """Component lists sharing one relationship keep every child, in a loadable shape.
 
@@ -672,6 +771,7 @@ CHECKS: dict[str, Callable[..., tuple[bool, str]]] = {
     "load-order-numbering": check_load_order_numbering,
     "coverage-report": check_coverage_report,
     "shared-relationship-blocks": check_shared_relationship_blocks,
+    "bundled-script-output": check_bundled_script_output,
     "fallback-precedence": check_fallback_precedence,
     "generate-template-prerequisite": check_generate_template_prerequisite,
 }
