@@ -621,3 +621,74 @@ def test_known_false_positive_unrelated_delete_is_flagged():
         "that the deleted CoreStandardGroup has no relation to "
         f"rack.interfaces, so this ordinary code is (wrongly) flagged: {msg}"
     )
+
+
+# `.extend()` is only a RelationshipManager write when it is reached
+# through an attribute chain. A bare `names.extend([...])` on a local list
+# shares the method name and nothing else -- without receiver narrowing it
+# is the smallest edit that launders a non-answer into a pass on both
+# `.add()` assertions, which is exactly the laundering graders.md forbids.
+PLAIN_LIST_EXTEND_NO_PEER_WRITES = """
+async def generate(self, data):
+    group = await self.client.get(kind="CoreStandardGroup", name__value="sdwan-edges")
+    names = []
+    names.extend([d["name"] for d in data["devices"]])
+    await group.save()
+"""
+
+PLAIN_LIST_EXTEND_WITH_SINGLE_ADD = """
+async def generate(self, data):
+    group = await self.client.get(kind="CoreStandardGroup", name__value="sdwan-edges")
+    names = []
+    names.extend([d["name"] for d in data["devices"]])
+    group.members.add(data["devices"][0]["id"])
+    await group.save()
+"""
+
+RELATIONSHIP_EXTEND_VIA_ALIAS = """
+async def generate(self, data):
+    group = await self.client.get(kind="CoreStandardGroup", name__value="sdwan-edges")
+    members = group.members
+    members.extend([d["id"] for d in data["devices"]])
+    await group.save()
+"""
+
+
+def test_plain_list_extend_does_not_satisfy_members_add_iterates():
+    ok, msg = CHECKS["members-add-iterates"](
+        tree=_tree(PLAIN_LIST_EXTEND_NO_PEER_WRITES)
+    )
+    assert not ok, (
+        "an answer that adds no group member at all must not pass just "
+        f"because an unrelated local list was extended: {msg}"
+    )
+
+
+def test_plain_list_extend_does_not_satisfy_no_list_passed_to_add():
+    ok, msg = CHECKS["no-list-passed-to-add"](
+        tree=_tree(PLAIN_LIST_EXTEND_NO_PEER_WRITES)
+    )
+    assert not ok, (
+        "with no RelationshipManager call in the answer there is nothing "
+        f"to grade, so the 'nothing to grade' branch must fire: {msg}"
+    )
+
+
+def test_plain_list_extend_does_not_excuse_a_single_non_iterating_add():
+    ok, msg = CHECKS["members-add-iterates"](
+        tree=_tree(PLAIN_LIST_EXTEND_WITH_SINGLE_ADD)
+    )
+    assert not ok, (
+        "one .add() outside a loop is still not per-peer iteration; an "
+        f"unrelated list .extend() must not flip it to a pass: {msg}"
+    )
+
+
+def test_relationship_extend_through_an_alias_still_passes():
+    ok, msg = CHECKS["members-add-iterates"](
+        tree=_tree(RELATIONSHIP_EXTEND_VIA_ALIAS)
+    )
+    assert ok, (
+        "`members = group.members` then `members.extend(...)` is a real "
+        f"RelationshipManager write and must keep passing: {msg}"
+    )

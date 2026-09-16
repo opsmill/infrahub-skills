@@ -555,7 +555,9 @@ def check_no_list_passed_to_add(
         return False, "No Python source to inspect"
 
     add_calls = find_relationship_add_calls(tree)
-    extend_calls = find_relationship_extend_calls(tree)
+    extend_calls = _relationship_shaped_extend_calls(
+        tree, find_relationship_extend_calls(tree)
+    )
     if not add_calls and not extend_calls:
         return False, "No .add(...) or .extend(...) calls found"
 
@@ -595,7 +597,9 @@ def check_members_add_iterates(
         return False, "No Python source to inspect"
 
     add_calls = find_relationship_add_calls(tree)
-    extend_calls = find_relationship_extend_calls(tree)
+    extend_calls = _relationship_shaped_extend_calls(
+        tree, find_relationship_extend_calls(tree)
+    )
     if extend_calls:
         return True, ".extend() adds one peer per call internally"
     if not add_calls:
@@ -708,6 +712,29 @@ def _resolve_alias_to_attribute(name: str, tree: ast.Module) -> ast.Attribute | 
     """
     bound = _bound_value(name, tree)
     return bound if isinstance(bound, ast.Attribute) else None
+
+
+def _relationship_shaped_extend_calls(
+    tree: ast.Module, calls: list[ast.Call]
+) -> list[ast.Call]:
+    """Keep only ``.extend()`` calls whose receiver is a relationship access.
+
+    ``RelationshipManager.extend()`` is always reached through an attribute
+    chain -- ``group.members.extend(...)`` written directly, or the one-hop
+    alias ``members = group.members`` that ``_resolve_alias_to_attribute``
+    resolves, so a rename cannot launder it. A bare ``names.extend([...])``
+    on a local list shares the method name and nothing else; counting it as
+    a peer write lets one unrelated line flip an answer that never adds a
+    member to a pass on both of this module's ``.add()`` assertions.
+    """
+    shaped: list[ast.Call] = []
+    for call in calls:
+        receiver = call.func.value
+        if isinstance(receiver, ast.Name):
+            receiver = _resolve_alias_to_attribute(receiver.id, tree)
+        if isinstance(receiver, ast.Attribute):
+            shaped.append(call)
+    return shaped
 
 
 def _narrow_shared_relationship_calls(
