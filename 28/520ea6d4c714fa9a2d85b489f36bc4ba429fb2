@@ -1,0 +1,19 @@
+.claude/skills/implementing-skill-changes/SKILL.md
+  s_746863b8957185::t_4d0b371ef7be11 209-211,214-218
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "28520ea6d4c714fa9a2d85b489f36bc4ba429fb2",
+  "prompts": {},
+  "sessions": {
+    "s_746863b8957185": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "59084e37-c81b-4173-8cad-96d6b446d58f",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
