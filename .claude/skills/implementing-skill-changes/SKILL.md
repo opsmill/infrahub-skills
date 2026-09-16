@@ -68,8 +68,14 @@ Two guards, both hard stops, checked in this order before anything else runs:
 
 No PR found for `$BRANCH`: proceed in local mode instead of failing closed.
 Skip the two body guards, since there is no PR body to read; verify instead
-that the failing test the prior stage wrote still exists and still fails, and
-say plainly that no PR was found.
+that the failing test the prior stage wrote still exists, and run it before
+touching anything else. Say plainly that no PR was found.
+
+If that test already passes, stop: say the fix appears to have already been
+applied on this branch, and do not proceed. A PR carries `AGENT_IMPL_COMPLETE`
+as its idempotency guard against a second run; local mode has no PR body to
+check, so a test that is already green is the only equivalent signal
+available, and it means the same thing.
 
 Read `.skill-change-<key>.md`. Missing file: stop and say so, since this stage
 has nothing to implement without it. Pull `Minimum change rung`, `Rule path`,
@@ -165,6 +171,8 @@ Close out only once Verify, Sweep, and Scope check have all passed. Push, then
 update the PR body by appending `AGENT_IMPL_COMPLETE`:
 
 ```bash
+BRANCH=ai-skill-pipeline-<key>
+PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number')
 git push -u origin "$BRANCH"
 gh pr edit "$PR_NUMBER" --body "$(cat <<'EOF'
 <existing PR body, unchanged>
@@ -185,6 +193,7 @@ Stop and report rather than guessing forward, when:
 - the handoff file is missing or missing a required field
 - the PR body is missing `AGENT_EVAL_COMPLETE`
 - the PR body already contains `AGENT_IMPL_COMPLETE`
+- local mode, and the failing test already passes before any fix is applied
 - the fix the diagnosis calls for needs an artifact the recorded rung forbids
 - the targeted eval will not reach 1.0 after reasonable rewording
 - a gate fails for a reason outside the handoff's scope
