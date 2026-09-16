@@ -43,9 +43,43 @@ Read the guide that matches the task before starting work:
 - [dev/knowledges/skill-writing-guide.md](dev/knowledges/skill-writing-guide.md) — how to write effective skills: descriptions, rule structure, examples, common pitfalls
 - [dev/knowledges/infrahub-concepts.md](dev/knowledges/infrahub-concepts.md) — Infrahub concepts skill authors need: schema, relationships, metadata, proposed changes
 
-## Custom Commands
+## AI Command Definitions
 
 AI command definitions live in [dev/commands/](dev/commands/).
+
+## Commands
+
+| Task | Command |
+| ---- | ------- |
+| One eval | `skillgrade --eval=<task-name> --trials=1` |
+| Whole eval suite | `skillgrade --smoke` (expensive, opt in) |
+| Full test suite | `uv run invoke test` |
+| One test | `uv run --group test pytest tests/graders/test_common_lib.py -v` |
+| Lint everything | `uv run invoke lint` |
+| Fix markdown formatting | `uv run invoke format` |
+| Regenerate the JSON evals | `uv run python scripts/sync-evals.py` |
+| Check the installed plugin against this tree | `uv run invoke freshness` |
+
+`uv run invoke lint` runs rumdl, yamllint, and
+`scripts/check-cli-invocations.py`. CI runs those three plus `ruff`,
+`pytest`, and `scripts/check-rules-symlink.py`.
+
+The single-eval line is the one that matters for cost. A full
+`skillgrade --smoke` run is the expensive default people reach for out of
+habit; `--eval=<task> --trials=1` answers "does this one rule work" for a
+fraction of it, and that is the question nearly every change asks.
+
+## Boundaries
+
+- Never weaken a grader check, drop a fixture, or loosen an eval prompt to
+  make a change pass. That is the local form of rewriting a test to go
+  green, and it is worse here because it looks like progress.
+- Never report an interrupted or timed-out `skillgrade` run as a pass.
+- If a command fails, report the failure. Do not present an assumption as a
+  confirmed result.
+- Do not widen scope beyond what the task asked for.
+- Never commit a `.skill-change-*.md` handoff file or a `*-workspace/`
+  eval directory.
 
 ## Rules
 
