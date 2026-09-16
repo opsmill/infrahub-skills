@@ -36,9 +36,12 @@ Contributor skills live outside `dev/`, in
 is where an agent discovers them:
 [`harvesting-skill-review`](../.claude/skills/harvesting-skill-review/SKILL.md)
 turns a PR's review threads into rules, and the
-skill-change pipeline (`analyzing-skill-bugs`,
-`grilling-skill-features`, `test-driving-skill-changes`,
-`implementing-skill-changes`) takes a bug or an idea
+skill-change pipeline
+([`analyzing-skill-bugs`](../.claude/skills/analyzing-skill-bugs/SKILL.md),
+[`grilling-skill-features`](../.claude/skills/grilling-skill-features/SKILL.md),
+[`test-driving-skill-changes`](../.claude/skills/test-driving-skill-changes/SKILL.md),
+[`implementing-skill-changes`](../.claude/skills/implementing-skill-changes/SKILL.md))
+takes a bug or an idea
 through a failing test to a pull request.
 
 ## Rules

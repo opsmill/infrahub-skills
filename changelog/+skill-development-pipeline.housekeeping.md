@@ -1,0 +1,1 @@
+Added a four-stage contributor pipeline for skill changes: analyze a bug or grill an idea, write the failing eval or pytest, then implement and ship it, with a minimum-change ladder that keeps the repository from accreting.
