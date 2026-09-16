@@ -42,10 +42,14 @@ happens to touch, is the failure this stage exists to prevent.
 
 ## Tool usage
 
-- Use the `Read` tool to read files. Do not use `cat`, `head`, or `tail` in Bash.
-- Use the `Glob` tool to find files. Do not use `find` or `ls -R` in Bash.
-- Use the `Grep` tool to search file contents. Do not use `grep` or `rg` in Bash.
-- Reserve Bash for git, `gh`, and commands that need a shell.
+- Use the `Read` tool to read files and the `Glob` tool to find them, rather
+  than `cat`, `find`, or `ls -R`.
+- Use the `Grep` tool when you are searching the tree yourself. That covers
+  exploration, not the commands this pipeline prints: where this skill or a
+  file it links gives a literal `grep`, `head`, or `tail`, run it as given.
+  The sweep and the ground-truth reads are those commands.
+- Reserve Bash for git, `gh`, the snippets this skill gives you, and anything
+  else that needs a shell.
 - Shell state does not persist across separate Bash calls. Variables and `cd`
   are gone by the next call, so re-derive or restate anything a later snippet
   needs.
@@ -57,7 +61,7 @@ Parse `$ARGUMENTS` for `<key>`, then read `.skill-change-<key>.md` and take
 the name the entrance stage recorded, which is why the handoff carries it.
 
 ```bash
-BRANCH=<the Branch field from .skill-change-<key>.md>
+BRANCH="<the Branch field from .skill-change-<key>.md>"
 gh pr list --head "$BRANCH" --json number,body,headRefName --jq '.[0]'
 ```
 
@@ -121,7 +125,9 @@ Run every gate, each with its command:
 skillgrade --eval=<task> --trials=1     # guidance class only, must score 1.0
 uv run invoke test
 uv run invoke lint
-uv run python scripts/sync-evals.py && git diff --quiet -- evaluations/ && echo "evals in sync"
+uv run python scripts/sync-evals.py
+git diff --quiet -- evaluations/ && echo "evals in sync" \
+  || { echo "STALE: evaluations/ regenerated, commit the result"; git diff --stat -- evaluations/; }
 ```
 
 Then, guidance class only, prove the task measures the skill rather than the
@@ -149,7 +155,7 @@ pass; an interruption is not evidence of anything.
 For every term in the handoff's `Sweep terms`:
 
 ```bash
-grep -rn "<sweep term>" skills/ graders/ eval.yaml dev/ README.md AGENTS.md docs/
+grep -rn "<sweep term>" skills/ graders/ eval.yaml dev/ README.md AGENTS.md docs/ .claude/
 ```
 
 Skip `evaluations/`, which `sync-evals.py` regenerates from `eval.yaml`. Fix
@@ -167,11 +173,11 @@ silence.
 
 ## Registration
 
-Only when the change adds a new skill: wire the five surfaces named in
+Only when the change adds a new skill: wire the five surfaces listed in
 [`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md),
-plus the docs page and the manifest entry the same guideline names. Link it
-rather than restating the table here; a second copy of that list is the exact
-kind of drift the guideline warns about.
+Its five rows already include the per-skill docs page and the manifest entry,
+so there is nothing to add beyond them. Link the table rather than restating
+it here; a second copy is the exact drift the guideline warns about.
 
 ## Changelog
 
@@ -204,7 +210,7 @@ this skill never opens the PR itself.
 With a PR, push, then update the PR body by appending `AGENT_IMPL_COMPLETE`:
 
 ```bash
-BRANCH=<the Branch field from .skill-change-<key>.md>
+BRANCH="<the Branch field from .skill-change-<key>.md>"
 PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number')
 git push -u origin "$BRANCH"
 gh pr view "$PR_NUMBER" --json body --jq .body > /tmp/pr-body-"$PR_NUMBER".md

@@ -57,3 +57,8 @@ tests_all:
   - "tests/**"
   - "graders/**"
   - "skills/**/scripts/**"
+  # tests/test_skill_frontmatter.py parses every SKILL.md and compares the
+  # blocks duplicated across the skill-change pipeline. A markdown-only change
+  # is exactly what broke the frontmatter, so it has to run the test job.
+  - "skills/**/*.md"
+  - ".claude/**"

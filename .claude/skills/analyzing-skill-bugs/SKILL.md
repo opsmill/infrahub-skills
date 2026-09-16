@@ -12,7 +12,9 @@ description: >-
   test-driving-skill-changes or implementing-skill-changes; the input is a raw
   feature idea rather than a defect, use grilling-skill-features; the bug is in
   Infrahub the product rather than in this repository, use
-  infrahub-reporting-issues.
+  infrahub-reporting-issues; the friction happened live in a session with a
+  shipped Infrahub skill and you want it filed as an issue rather than fixed
+  here, use infrahub-reporting-skill-gaps.
 argument-hint: <issue number or URL, or a free-text description> [--infrahub <version>] [--sdk <version>] [--fetch]
 compatibility: >-
   Requires this repository checked out. `gh` is optional and used only for issue
@@ -45,10 +47,14 @@ and precise enough to act on directly.
 
 ## Tool usage
 
-- Use the `Read` tool to read files. Do not use `cat`, `head`, or `tail` in Bash.
-- Use the `Glob` tool to find files. Do not use `find` or `ls -R` in Bash.
-- Use the `Grep` tool to search file contents. Do not use `grep` or `rg` in Bash.
-- Reserve Bash for git, `gh`, and commands that need a shell.
+- Use the `Read` tool to read files and the `Glob` tool to find them, rather
+  than `cat`, `find`, or `ls -R`.
+- Use the `Grep` tool when you are searching the tree yourself. That covers
+  exploration, not the commands this pipeline prints: where this skill or a
+  file it links gives a literal `grep`, `head`, or `tail`, run it as given.
+  The sweep and the ground-truth reads are those commands.
+- Reserve Bash for git, `gh`, the snippets this skill gives you, and anything
+  else that needs a shell.
 - Shell state does not persist across separate Bash calls. Variables and `cd`
   are gone by the next call, so re-derive or restate anything a later snippet
   needs.
@@ -152,6 +158,15 @@ State the approach and its scope: which file or files change, what stays
 untouched, and a `Do NOT` list of the artifacts the minimum-change rung rules
 out. This is the strategy the next stages execute, not the patch itself: no
 diff, no fix code, no test code belongs here.
+
+Name what this fix contradicts. Every existing rule, example, claim, or
+command elsewhere in the repo that the fix corrects or supersedes goes in the
+handoff's `Sweep terms` as a literal string to grep for.
+`implementing-skill-changes` iterates that field and fixes every hit, so an
+empty one turns its sweep into a no-op and leaves the old claim sitting next
+to the new rule. `none` is a complete answer when the fix genuinely
+contradicts nothing; blank is not, because it cannot be told apart from never
+having looked.
 
 Then work out what the fix leaves stale. A skill whose behavior changes keeps
 every documentation surface it already had, and those surfaces go on

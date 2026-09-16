@@ -37,7 +37,7 @@ If none match, ask the user for the path once, then fall back to rung 2.
 ## Reading at a version
 
 ```bash
-REPO=<path from above>
+REPO="<path from above>"
 TAG=$(git -C "$REPO" tag --list 'infrahub-v*' --sort=-v:refname | head -1)   # or the pinned --infrahub value
 git -C "$REPO" show "$TAG:backend/infrahub/<path>" | head -200
 git -C "$REPO" rev-parse "$TAG"

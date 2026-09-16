@@ -42,10 +42,14 @@ skill's prose, stop: that work belongs to `implementing-skill-changes`.
 
 ## Tool usage
 
-- Use the `Read` tool to read files. Do not use `cat`, `head`, or `tail` in Bash.
-- Use the `Glob` tool to find files. Do not use `find` or `ls -R` in Bash.
-- Use the `Grep` tool to search file contents. Do not use `grep` or `rg` in Bash.
-- Reserve Bash for git, `gh`, and commands that need a shell.
+- Use the `Read` tool to read files and the `Glob` tool to find them, rather
+  than `cat`, `find`, or `ls -R`.
+- Use the `Grep` tool when you are searching the tree yourself. That covers
+  exploration, not the commands this pipeline prints: where this skill or a
+  file it links gives a literal `grep`, `head`, or `tail`, run it as given.
+  The sweep and the ground-truth reads are those commands.
+- Reserve Bash for git, `gh`, the snippets this skill gives you, and anything
+  else that needs a shell.
 - Shell state does not persist across separate Bash calls. Variables and `cd`
   are gone by the next call, so re-derive or restate anything a later snippet
   needs.
@@ -74,7 +78,7 @@ DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@
 [ -z "$DEFAULT_BRANCH" ] && DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')
 [ "$DEFAULT_BRANCH" = "(unknown)" ] && DEFAULT_BRANCH=""
 DEFAULT_BRANCH=${DEFAULT_BRANCH:-main}
-BRANCH=<the Branch field from .skill-change-<key>.md>
+BRANCH="<the Branch field from .skill-change-<key>.md>"
 git fetch origin "$DEFAULT_BRANCH"
 git fetch origin "$BRANCH" 2>/dev/null || true
 git checkout "$BRANCH" || git checkout -b "$BRANCH" "origin/$DEFAULT_BRANCH"
@@ -200,16 +204,25 @@ With `OPEN_PR`, push and open a draft PR whose body carries
 opening a duplicate:
 
 ```bash
-BRANCH=<the Branch field from .skill-change-<key>.md>
+BRANCH="<the Branch field from .skill-change-<key>.md>"
 git push -u origin "$BRANCH"
-gh pr list --head "$BRANCH" --json number --jq '.[0].number' | grep -q . \
-  || gh pr create --draft --title "<type>(<scope>): <title>" --body "$(cat <<'EOF'
-<one paragraph on the defect or design, linking the issue>
-
-AGENT_EVAL_COMPLETE
-EOF
-)"
+PR=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number')
+if [ -z "$PR" ]; then
+  gh pr create --draft --title "<type>(<scope>): <title>" \
+    --body "$(printf '%s\n\n%s\n' '<one paragraph on the defect or design, linking the issue>' 'AGENT_EVAL_COMPLETE')"
+else
+  BODY=$(gh pr view "$PR" --json body --jq .body)
+  printf '%s' "$BODY" | grep -q 'AGENT_EVAL_COMPLETE' \
+    || gh pr edit "$PR" --body "$(printf '%s\n\n%s\n' "$BODY" 'AGENT_EVAL_COMPLETE')"
+fi
 ```
+
+Both halves stamp the marker. An earlier version only stamped it on the create
+path, so a branch that already had a pull request, from a re-run or one opened
+by hand, reached `implementing-skill-changes` with no marker and hit its hard
+stop with no way out: re-running this stage took the same reuse path and still
+did not stamp it. The `grep -q` guard keeps a second run from appending it
+twice.
 
 Without `OPEN_PR`, push the branch and report its name.
 

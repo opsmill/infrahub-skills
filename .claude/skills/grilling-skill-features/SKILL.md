@@ -42,10 +42,14 @@ outcome, not an incomplete one.
 
 ## Tool usage
 
-- Use the `Read` tool to read files. Do not use `cat`, `head`, or `tail` in Bash.
-- Use the `Glob` tool to find files. Do not use `find` or `ls -R` in Bash.
-- Use the `Grep` tool to search file contents. Do not use `grep` or `rg` in Bash.
-- Reserve Bash for git, `gh`, and commands that need a shell.
+- Use the `Read` tool to read files and the `Glob` tool to find them, rather
+  than `cat`, `find`, or `ls -R`.
+- Use the `Grep` tool when you are searching the tree yourself. That covers
+  exploration, not the commands this pipeline prints: where this skill or a
+  file it links gives a literal `grep`, `head`, or `tail`, run it as given.
+  The sweep and the ground-truth reads are those commands.
+- Reserve Bash for git, `gh`, the snippets this skill gives you, and anything
+  else that needs a shell.
 - Shell state does not persist across separate Bash calls. Variables and `cd`
   are gone by the next call, so re-derive or restate anything a later snippet
   needs.
