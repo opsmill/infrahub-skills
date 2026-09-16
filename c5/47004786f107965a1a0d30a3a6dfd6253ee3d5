@@ -1,0 +1,19 @@
+skills/infrahub-converting-netbox-device-types/rules/workflow-use-the-bundled-scripts.md
+  s_746863b8957185::t_500554ec77a26a 52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c547004786f107965a1a0d30a3a6dfd6253ee3d5",
+  "prompts": {},
+  "sessions": {
+    "s_746863b8957185": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "59084e37-c81b-4173-8cad-96d6b446d58f",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
