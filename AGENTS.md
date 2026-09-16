@@ -55,6 +55,7 @@ Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rul
 | ---- | ------------------ |
 | [rule-equals-test.md](dev/guidelines/rule-equals-test.md) | A new skill rule ships with its grader and eval in the same change |
 | [graders.md](dev/guidelines/graders.md) | Parse the answer, never substring-match it; verify both directions |
+| [minimum-change.md](dev/guidelines/minimum-change.md) | The smallest artifact that closes the gap, and what to delete |
 | [skill-authoring.md](dev/guidelines/skill-authoring.md) | Description, body, examples, and how to verify an edit |
 | [skill-registration.md](dev/guidelines/skill-registration.md) | The five surfaces a new skill has to appear in |
 | [versioning.md](dev/guidelines/versioning.md) | The five files a version bump touches |
