@@ -345,15 +345,31 @@ class NetBoxSource:
         self._reached = True
 
     @staticmethod
-    def _is_missing_endpoint(exc: Exception) -> bool:
+    def _status(exc: Exception) -> int | None:
+        """The HTTP status behind a pynetbox error, when there is one.
+
+        pynetbox's ``RequestError`` keeps the response on ``.req``, so the
+        status is available as a number. Reading it from the message text
+        instead means matching a three-digit string against a line that also
+        contains the URL, and a NetBox on port 8403 or an id of 404 then gets
+        diagnosed as something it is not.
+        """
+        return getattr(getattr(exc, "req", None), "status_code", None)
+
+    @classmethod
+    def _is_missing_endpoint(cls, exc: Exception) -> bool:
         """True when the failure is 'this NetBox has no such endpoint'."""
-        text = str(exc)
-        return "could not be found" in text or "404" in text
+        status = cls._status(exc)
+        if status is not None:
+            return status == 404
+        return "could not be found" in str(exc)
 
     def _explain(self, exc: Exception, endpoint: str) -> str:
         """Turn a client or transport error into something actionable."""
         text = str(exc)
-        if "403" in text or "401" in text or "Invalid token" in text:
+        status = self._status(exc)
+        rejected = status in (401, 403) if status is not None else "Invalid token" in text
+        if rejected:
             return (
                 f"NetBox rejected the token. Check --token / NETBOX_TOKEN, and that "
                 f"it grants read access to {endpoint.split('.', 1)[0]}."

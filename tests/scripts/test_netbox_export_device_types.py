@@ -877,6 +877,51 @@ def test_a_manufacturer_with_a_slash_stays_one_directory(tmp_path):
 # ---------------------------------------------------------------------------
 
 
+def _request_error(status: int, url: str, reason: str):
+    """Build the pynetbox error a real response of this shape would raise."""
+    from pynetbox.core.query import RequestError
+
+    class Response:
+        status_code, text = status, "{}"
+
+        class request:
+            body = None
+
+        def json(self):
+            return {"detail": reason}
+
+    Response.url, Response.reason = url, reason
+    return RequestError(Response())
+
+
+@pytest.mark.parametrize(
+    ("status", "port", "expected"),
+    [
+        (404, 40312, "returned 404"),
+        (403, 8000, "rejected the token"),
+        (401, 8000, "rejected the token"),
+        (500, 8401, "failed:"),
+    ],
+)
+def test_http_failures_are_classified_by_status_not_by_digits_in_the_url(
+    status, port, expected
+):
+    """A port of 40312 contains '403'; a port of 8401 contains '401'.
+
+    pynetbox embeds the URL in its message for a 404, so matching '403' and
+    '401' as substrings of that message diagnosed a 404 at port 40312 as a
+    rejected token — telling the user to check their credentials when the
+    real answer was their `--url`. CI found it the honest way: the test
+    server binds an ephemeral port, and the run that happened to draw one
+    containing 403 failed while every earlier run passed.
+    """
+    source = NetBoxSource(f"http://127.0.0.1:{port}", "t")
+    exc = _request_error(status, f"http://127.0.0.1:{port}/api/dcim/device-types/", "x")
+
+    assert expected in source._explain(exc, "dcim.device_types")
+    assert source._is_missing_endpoint(exc) is (status == 404)
+
+
 def test_a_wrong_url_fails_loudly_rather_than_exporting_nothing(tmp_path):
     """pynetbox reports a bad base URL as a 404 on every endpoint.
 
