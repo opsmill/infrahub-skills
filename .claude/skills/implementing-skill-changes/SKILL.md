@@ -206,13 +206,15 @@ With a PR, push, then update the PR body by appending `AGENT_IMPL_COMPLETE`:
 BRANCH=<the Branch field from .skill-change-<key>.md>
 PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number')
 git push -u origin "$BRANCH"
-gh pr edit "$PR_NUMBER" --body "$(cat <<'EOF'
-<existing PR body, unchanged>
-
-AGENT_IMPL_COMPLETE
-EOF
-)"
+gh pr view "$PR_NUMBER" --json body --jq .body > /tmp/pr-body-"$PR_NUMBER".md
+printf '\n\nAGENT_IMPL_COMPLETE\n' >> /tmp/pr-body-"$PR_NUMBER".md
+gh pr edit "$PR_NUMBER" --body-file /tmp/pr-body-"$PR_NUMBER".md
 ```
+
+`--body` replaces the whole body, so the marker has to be appended to the
+body that is already there. Reading it back first is what keeps the stage's
+own `AGENT_EVAL_COMPLETE` gate — and the description — from being
+overwritten.
 
 Report what ran and what it printed for every gate in Verify. Then offer a
 full `skillgrade --smoke` run as an opt-in the user can decline; never run it
