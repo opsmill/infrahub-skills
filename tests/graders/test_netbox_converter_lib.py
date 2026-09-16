@@ -802,6 +802,57 @@ def test_bundled_output_passes_on_converter_output(tmp_path):
     assert ok, message
 
 
+def test_bundled_output_passes_when_values_carry_infrahub_metadata(tmp_path):
+    """The same output, written the other correct way: values stamped with lineage.
+
+    ``{value, source}`` is Infrahub's attribute-metadata form, and recording
+    where an imported template came from is the most natural thing a correct
+    answer here does. It is also a mapping carrying ``value``, so a check
+    keyed on that alone scores it 0.0.
+    """
+    device_type = {
+        **COMPLIANT_DEVICE_TYPE,
+        "manufacturer": {"value": "Cisco", "source": "netbox-sync"},
+    }
+    template = {
+        **COMPLIANT_TEMPLATE,
+        "status": {"value": "active", "owner": "network-team", "is_protected": True},
+    }
+    out = _bundled_dir(tmp_path, device_type=device_type, template=template)
+    ok, message = CHECKS["bundled-script-output"](load_output_dir(out), output_dir=out)
+    assert ok, message
+
+
+def test_a_related_object_wrapper_without_a_label_is_still_rejected(tmp_path):
+    """Near-miss: the NetBox shape that carries ``display`` rather than ``label``.
+
+    Passes any check that allows everything without a ``label``, while still
+    writing a NetBox wrapper object into the YAML.
+    """
+    device_type = {
+        **COMPLIANT_DEVICE_TYPE,
+        "manufacturer": {"value": "cisco", "display": "Cisco"},
+    }
+    out = _bundled_dir(tmp_path, device_type=device_type)
+    ok, message = CHECKS["bundled-script-output"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "choice object" in message
+
+
+def test_a_present_but_empty_coverage_report_is_rejected(tmp_path):
+    """Near-miss: the file exists, so its presence satisfies the keyword."""
+    out = _write_dir(
+        tmp_path,
+        {
+            "03_device_templates.yml": _object_doc("TemplateDcimDevice", [COMPLIANT_TEMPLATE]),
+            "coverage-report.md": "   \n\n",
+        },
+    )
+    ok, message = CHECKS["bundled-script-output"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "coverage report" in message
+
+
 def test_a_float_numeric_is_rejected(tmp_path):
     """Infrahub Number attributes are integer-backed; 7.59 cannot load."""
     out = _bundled_dir(tmp_path, device_type={**COMPLIANT_DEVICE_TYPE, "weight": 7.59})

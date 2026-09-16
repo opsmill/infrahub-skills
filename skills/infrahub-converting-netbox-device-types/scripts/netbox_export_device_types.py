@@ -40,7 +40,11 @@ The REST API is not the library format, and four differences matter:
 * Related objects are nested documents. ``manufacturer`` becomes its name.
 * Front/rear port mappings are a many-to-many carrying positions on both
   ends, keyed by primary key. They are resolved back to port *names* and
-  emitted as the library's ``port-mappings`` list.
+  emitted as the library's ``port-mappings`` list. That many-to-many is
+  NetBox 4.5; before it a front port carried a single ``rear_port`` and no
+  ``positions`` of its own. Both shapes are read, and the report says which
+  one was found, because reading only the newer one drops every mapping on
+  an older instance without saying so.
 
 Anything the API reports that has no place in the library format is counted
 and named at the end, on the same principle as the converter's coverage
@@ -95,6 +99,13 @@ except ImportError:  # pragma: no cover - environment guard
 
 DEVICE_TYPES = "dcim.device_types"
 MODULE_TYPES = "dcim.module_types"
+
+#: The release that reshaped front ports. 4.5 replaced the singular
+#: ``rear_port`` / ``rear_port_position`` fields with a ``rear_ports`` list of
+#: mappings and gave front ports their own ``positions`` count. Both shapes
+#: are read, so this works either side of it; the export report names which
+#: one the instance spoke.
+NETBOX_PORT_MAPPING_VERSION = "4.5"
 
 #: NetBox component-template endpoints, paired with the devicetype-library
 #: list each one becomes. Order matches the library's own field order so the
@@ -475,6 +486,58 @@ def carry_fields(source: dict[str, Any], fields: tuple[str, ...]) -> dict[str, A
     return carried
 
 
+def rear_port_links(front: Any) -> list[Any]:
+    """Return one front port's rear-port links, whichever shape NetBox used.
+
+    NetBox 4.5 replaced ``FrontPortTemplate.rear_port`` and
+    ``rear_port_position`` with a ``rear_ports`` list of mappings, so a front
+    port can now serve several rear-port positions. Reading only the new
+    shape loses every mapping on 4.4 and earlier, silently: the field is
+    simply absent, so the export would claim nothing was mapped.
+
+    Args:
+        front: A raw front-port template object.
+
+    Returns:
+        Mapping objects in the 4.5 shape. The pre-4.5 fields are normalised
+        into that shape, which is exact rather than assumed: a front port
+        held one rear-port link, at position 1, by construction.
+    """
+    modern = field(front, "rear_ports")
+    if modern is not None:
+        return list(modern)
+    legacy = field(front, "rear_port")
+    if legacy is None:
+        return []
+    return [
+        {
+            "position": 1,
+            "rear_port": legacy,
+            "rear_port_position": field(front, "rear_port_position"),
+        }
+    ]
+
+
+def uses_legacy_port_shape(front_ports: list[Any]) -> bool:
+    """Whether these front ports came from a NetBox older than 4.5.
+
+    Told apart by shape rather than by asking the server its version: the
+    field that moved is the one being read, so its absence is the direct
+    evidence, and an instance mid-upgrade cannot report one thing and
+    serialize another.
+
+    Args:
+        front_ports: Raw front-port template objects.
+
+    Returns:
+        ``True`` when any front port carries the pre-4.5 singular field.
+    """
+    return any(
+        field(front, "rear_ports") is None and field(front, "rear_port") is not None
+        for front in front_ports
+    )
+
+
 def port_mappings(
     front_ports: list[dict[str, Any]], rear_ports: list[dict[str, Any]]
 ) -> list[dict]:
@@ -495,7 +558,7 @@ def port_mappings(
     by_id = {field(rear, "id"): field(rear, "name") for rear in rear_ports}
     mappings: list[dict[str, Any]] = []
     for front in front_ports:
-        for mapping in field(front, "rear_ports") or []:
+        for mapping in rear_port_links(front):
             rear_ref = field(mapping, "rear_port")
             rear_name = by_id.get(field(rear_ref, "id") if not isinstance(rear_ref, int) else rear_ref)
             if rear_name is None:
@@ -514,6 +577,42 @@ def port_mappings(
 # --------------------------------------------------------------------------
 # Document assembly
 # --------------------------------------------------------------------------
+
+
+def carry_components(
+    document: dict[str, Any],
+    components: dict[str, list[dict[str, Any]]],
+    *,
+    is_module: bool,
+) -> list[str]:
+    """Add each component list to the document, in the library's own order.
+
+    Args:
+        document: The document being assembled, modified in place.
+        components: Component-template objects, keyed by library list name.
+        is_module: Whether this is a module type, which allows fewer lists.
+
+    Returns:
+        Notes for lists the target format cannot hold and entries missing a
+        field its schema requires.
+    """
+    allowed = (
+        MODULE_COMPONENT_LISTS if is_module else {name for _, name in DEVICE_COMPONENTS}
+    )
+    notes: list[str] = []
+    for _, list_name in DEVICE_COMPONENTS:
+        entries = components.get(list_name) or []
+        if not entries:
+            continue
+        if list_name not in allowed:
+            notes.append(f"{list_name} ({len(entries)}) — not valid on a module type")
+            continue
+        carried = [carry_fields(e, COMPONENT_FIELDS[list_name]) for e in entries]
+        if list_name == "front-ports":
+            notes.extend(back_fill_legacy_front_ports(entries, carried))
+        document[list_name] = carried
+        notes.extend(missing_required(carried, list_name))
+    return notes
 
 
 def build_document(
@@ -535,21 +634,7 @@ def build_document(
     """
     fields = MODULE_TYPE_FIELDS if is_module else DEVICE_TYPE_FIELDS
     document = carry_fields(source, fields)
-    notes: list[str] = []
-
-    allowed = (
-        MODULE_COMPONENT_LISTS if is_module else {name for _, name in DEVICE_COMPONENTS}
-    )
-    for _, list_name in DEVICE_COMPONENTS:
-        entries = components.get(list_name) or []
-        if not entries:
-            continue
-        if list_name not in allowed:
-            notes.append(f"{list_name} ({len(entries)}) — not valid on a module type")
-            continue
-        carried = [carry_fields(e, COMPONENT_FIELDS[list_name]) for e in entries]
-        document[list_name] = carried
-        notes.extend(missing_required(carried, list_name))
+    notes = carry_components(document, components, is_module=is_module)
 
     mappings = port_mappings(
         components.get("front-ports") or [], components.get("rear-ports") or []
@@ -568,6 +653,38 @@ def build_document(
             f"unset in NetBox but required by the library schema: {', '.join(absent)}"
         )
     return document, notes
+
+
+def back_fill_legacy_front_ports(
+    raw: list[Any], carried: list[dict[str, Any]]
+) -> list[str]:
+    """Give pre-4.5 front ports the ``positions`` the library schema requires.
+
+    ``positions`` arrived on ``FrontPortTemplate`` in NetBox 4.5 alongside the
+    many-to-many rear-port mapping. Before that a front port occupied exactly
+    one rear-port position, so ``1`` is what the older model means rather than
+    a value invented to satisfy the schema — the distinction the rest of this
+    module keeps by reporting unset fields instead of filling them.
+
+    The note is still emitted, because the export report is where a reader
+    finds out which shape their NetBox spoke.
+
+    Args:
+        raw: The raw front-port template objects, before carrying.
+        carried: The carried entries, modified in place.
+
+    Returns:
+        One note when the pre-4.5 shape was seen, otherwise nothing.
+    """
+    if not uses_legacy_port_shape(raw):
+        return []
+    for entry in carried:
+        entry.setdefault("positions", 1)
+    return [
+        f"front-ports: NetBox older than {NETBOX_PORT_MAPPING_VERSION}, which has no "
+        "front-port 'positions' and one rear port per front port; read the older "
+        "shape and set positions to 1"
+    ]
 
 
 def missing_required(entries: list[dict[str, Any]], list_name: str) -> list[str]:

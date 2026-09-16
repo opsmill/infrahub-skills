@@ -78,6 +78,13 @@ related object to its primary key — an outlet's
 `power_port` would become `16` where the library needs
 the port's name.
 
+NetBox 4.5 reshaped front ports: the singular
+`rear_port` / `rear_port_position` fields became a
+`rear_ports` list of mappings, and front ports gained
+their own `positions`. Both shapes are read, told apart
+by the shape itself rather than by asking the server its
+version, and the export names which one it found.
+
 | Option | Meaning |
 | ------ | ------- |
 | `--url` | Base URL of the instance, without `/api` |
@@ -105,13 +112,14 @@ the port's name.
 | `weight: "13.40"` (decimal as string) | `weight: 13.4` |
 | `airflow: null`, `description: ""` | field omitted |
 | `rear_ports: [{position, rear_port: <pk>}]` | `port-mappings` naming both ports |
+| `rear_port: <pk>` + `rear_port_position` (pre-4.5) | the same `port-mappings`, read from the older shape |
 
 `is_full_depth: false` and `u_height: 0` are kept:
 absent and false are different things.
 
 ### What it reports
 
-Four classes of note, on the same principle as the
+Five classes of note, on the same principle as the
 converter's coverage report:
 
 - **NetBox holds it, the library format has no field**
@@ -127,6 +135,11 @@ converter's coverage report:
   can collapse names NetBox considers distinct, so the
   second is written alongside the first with a numeric
   suffix rather than over it.
+- **This NetBox predates the 4.5 front-port shape** — the
+  older singular mapping is read instead, and front-port
+  `positions` is set to 1, which is what that model
+  means rather than a guess. Named so the difference is
+  visible in the output rather than inferred later.
 
 ## Infrahub object templates
 
