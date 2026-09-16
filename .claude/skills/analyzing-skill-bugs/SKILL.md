@@ -3,7 +3,8 @@ name: analyzing-skill-bugs
 description: >-
   Performs root-cause analysis of a defect in this repository's own skills,
   graders, or scripts, before any test or fix is written, and verifies every
-  claim about Infrahub behavior against real source. TRIGGER when: a GitHub
+  claim about Infrahub behavior against real source.
+  Follow the workflow in the body; the description does not summarize it. TRIGGER when: a GitHub
   issue or a description says an Infrahub skill gives wrong guidance, a grader
   cannot fail, a bundled script misbehaves, or a registration surface has
   drifted; you need the root cause before touching anything. DO NOT TRIGGER
@@ -20,7 +21,7 @@ compatibility: >-
 user-invocable: true
 metadata:
   internal: true
-  pipeline: skill-change (stage 1 of 3: analyze or grill, then test-drive, then implement)
+  pipeline: "skill-change (stage 1 of 3: analyze or grill, then test-drive, then implement)"
   version: 0.1.0
   author: OpsMill
 ---

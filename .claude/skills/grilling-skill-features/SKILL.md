@@ -3,7 +3,7 @@ name: grilling-skill-features
 description: >-
   Stress-tests a raw idea for this repository's skills until it is a design a
   grader can actually test, before any rule, eval, or skill is written.
-  TRIGGER when: someone has a fuzzy idea for new guidance in an Infrahub skill,
+  Follow the workflow in the body; the description does not summarize it. TRIGGER when: someone has a fuzzy idea for new guidance in an Infrahub skill,
   wants to add a rule and is not sure where it belongs, asks to grill or
   pressure-test an idea for this repo, or proposes a new skill. DO NOT TRIGGER
   when: the input is a defect with known wrong behavior, use
@@ -18,7 +18,7 @@ compatibility: >-
 user-invocable: true
 metadata:
   internal: true
-  pipeline: skill-change (stage 1 of 3: analyze or grill, then test-drive, then implement)
+  pipeline: "skill-change (stage 1 of 3: analyze or grill, then test-drive, then implement)"
   version: 0.1.0
   author: OpsMill
 ---

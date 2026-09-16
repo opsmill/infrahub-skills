@@ -17,8 +17,10 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 | How should I write skill prose? | [dev/knowledges/skill-writing-guide.md](dev/knowledges/skill-writing-guide.md) |
 | What was this change meant to do? | [dev/specs/](dev/specs/) |
 | What rules apply to the file I am editing? | [dev/guidelines/](dev/guidelines/) |
-| What commands are available? | [dev/commands/](dev/commands/) |
+| What commands are available? | [§ Commands](#commands) |
+| Where do AI command definitions live? | [dev/commands/](dev/commands/) |
 | How do I turn PR review feedback into rules? | [.claude/skills/harvesting-skill-review/](.claude/skills/harvesting-skill-review/) |
+| How do I fix a bug or add a rule in this repo? | [.claude/skills/](.claude/skills/) — `analyzing-skill-bugs` or `grilling-skill-features`, then `test-driving-skill-changes` and `implementing-skill-changes` |
 
 Index of the whole tree: [dev/README.md](dev/README.md).
 

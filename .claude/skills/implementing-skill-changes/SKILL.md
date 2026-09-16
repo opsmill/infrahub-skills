@@ -3,7 +3,8 @@ name: implementing-skill-changes
 description: >-
   Implements the fix for a skill change whose failing test already exists, runs
   the repository's gates, sweeps the layers the change contradicts, and pushes
-  the branch, updating the pull request when one exists. TRIGGER when: a .skill-change-<key>.md handoff file and
+  the branch, updating the pull request when one exists.
+  Follow the workflow in the body; the description does not summarize it. TRIGGER when: a .skill-change-<key>.md handoff file and
   a failing test both exist and you are ready to make the test pass; you are at
   the final step of the skill-change pipeline. DO NOT TRIGGER when: no failing
   test exists yet, use test-driving-skill-changes; no analysis or design brief
@@ -17,7 +18,7 @@ compatibility: >-
 user-invocable: true
 metadata:
   internal: true
-  pipeline: skill-change (stage 3 of 3: analyze or grill, then test-drive, then implement)
+  pipeline: "skill-change (stage 3 of 3: analyze or grill, then test-drive, then implement)"
   version: 0.1.0
   author: OpsMill
 ---

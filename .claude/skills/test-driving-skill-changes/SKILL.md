@@ -4,7 +4,8 @@ description: >-
   Writes the failing test for an analysed or grilled skill change, and proves it
   fails, before any fix is written. Chooses the test surface from the defect
   class: an eval.yaml task plus a grader check for guidance, a pytest for
-  grader and script defects. TRIGGER when: a .skill-change-<key>.md handoff
+  grader and script defects.
+  Follow the workflow in the body; the description does not summarize it. TRIGGER when: a .skill-change-<key>.md handoff
   file exists and the failing test has not been written yet; you are at the
   second step of the skill-change pipeline. DO NOT TRIGGER when: no handoff
   file exists, use analyzing-skill-bugs or grilling-skill-features first; the
@@ -19,7 +20,7 @@ compatibility: >-
 user-invocable: true
 metadata:
   internal: true
-  pipeline: skill-change (stage 2 of 3: analyze or grill, then test-drive, then implement)
+  pipeline: "skill-change (stage 2 of 3: analyze or grill, then test-drive, then implement)"
   version: 0.1.0
   author: OpsMill
 ---
@@ -139,18 +140,19 @@ Read `Defect class` from the handoff file: `guidance` follows
    the task scores below 1.0 whether the skill is read or not, so running it
    here proves nothing.
 8. Run `uv run python scripts/sync-evals.py` and commit `eval.yaml`, the
-   regenerated `evaluations/*.json`, and the grader files together. A stale
-   JSON silently diverges from the YAML.
+   regenerated `evaluations/*.json`, and the grader files together. The
+   `evals-sync` job in CI regenerates them and fails the pull request on any
+   diff, so skipping this turns into a red build rather than silent drift.
 9. Lint and run `uv run invoke test`.
 
 ## Four fixtures
 
-| Fixture | Expected score |
-| --- | --- |
-| Compliant, written the way the rule shows | 1.0 |
-| Compliant, written differently (other field order, a helper, a synonym) | 1.0 |
-| Violating, obviously | < 1.0 |
-| Violating near miss (satisfies the check's keyword while breaking the rule) | < 1.0 |
+Hand-craft four fixtures and run the grader on each. What each fixture is, and
+why the second and fourth are the ones that find bugs, is written once in
+[`../../../dev/guides/adding-a-rule.md`](../../../dev/guides/adding-a-rule.md)
+§ "Verify the Grader Both Ways". Read it there rather than working from memory.
+
+The scores this stage requires, in fixture order: `1.0 / 1.0 / <1.0 / <1.0`.
 
 ```bash
 REPO=$(git rev-parse --show-toplevel)
@@ -240,7 +242,7 @@ Stop and report rather than guessing forward, when:
 | Substring matching in the check | Passes an answer that mentions the trap and fails one worded differently |
 | Skipping the near-miss fixture | The check ships grading vocabulary instead of substance, and nobody notices |
 | Treating the fixture run as the failing test | Four files you wrote by hand are not the repository scoring below 1.0 |
-| Committing `eval.yaml` without the regenerated `evaluations/*.json` | The two projections diverge silently, since CI does not run sync-evals |
+| Committing `eval.yaml` without the regenerated `evaluations/*.json` | The `evals-sync` job regenerates them and fails the pull request on any diff |
 | Adding a new task where an existing one would carry the assertion | Every task costs trials times model runs on every regression sweep, forever |
 
 ## Boundaries

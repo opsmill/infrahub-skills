@@ -293,9 +293,10 @@ python scripts/sync-evals.py
 ```
 
 Commit both `eval.yaml` and the regenerated
-`evaluations/*.json` files together. CI does not
-auto-run sync-evals, so a stale JSON will diverge
-from the YAML over time.
+`evaluations/*.json` files together. The `evals-sync`
+job runs `sync-evals.py` and fails the pull request on
+any diff under `evaluations/`, so a stale JSON is a red
+build rather than silent drift.
 
 ### 8. Run a Smoke Pass
 
