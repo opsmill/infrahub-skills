@@ -49,7 +49,7 @@ python scripts/netbox_to_infrahub_templates.py ./netbox-export/device-types \
   --mapping scripts/mappings/<profile>.yml --output-dir ./generated
 
 # resolve {module} once modules are installed in bays
-infrahubctl generator module_ports --branch <branch>
+infrahubctl generator materialize_module_ports --branch <branch>
 ```
 
 When a schema does not fit, the answer is a **mapping
