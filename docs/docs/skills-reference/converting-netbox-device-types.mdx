@@ -3,16 +3,17 @@ title: NetBox Device Type Converter
 sidebar_position: 15
 ---
 
-The NetBox Device Type Converter turns NetBox device-type and module-type YAML into Infrahub Object Templates, so you create a device with its ports already in place from one reusable definition. The input format is [netbox-community/devicetype-library](https://github.com/netbox-community/devicetype-library), which you can browse at the [NetBox Data Exchange](https://netboxlabs.com/ndx/). A bundled Python script does the conversion, driven by a mapping profile that describes your target schema. Point it at the right schema and read what it reports back — without editing your schema for you or guessing a field name the profile does not define.
+The NetBox Device Type Converter turns NetBox device-type and module-type YAML into Infrahub Object Templates, so you create a device with its ports already in place from one reusable definition. The input format is [netbox-community/devicetype-library](https://github.com/netbox-community/devicetype-library), which you can browse at the [NetBox Data Exchange](https://netboxlabs.com/ndx/), and a second bundled script produces that same format from a running NetBox instance, so the catalogue you already maintain is a valid input too. A bundled Python script does the conversion, driven by a mapping profile that describes your target schema. Point it at the right schema and read what it reports back — without editing your schema for you or guessing a field name the profile does not define.
 
 ## When to use
 
 - Seeding a new Infrahub instance with vendor device models from the NetBox library
+- Exporting the device types someone actually runs, out of their own NetBox instance, and converting those
 - Converting a handful of device types for a specific project or lab topology
 - Re-running a conversion after the upstream library or your local schema changed
 - Building the mapping profile that binds NetBox fields to a custom Infrahub schema
 
-Not for syncing a **live** NetBox instance into Infrahub — that is [infrahub-sync](https://docs.infrahub.app/sync/), a separate product. This skill converts the static YAML definitions.
+A one-off export from a running NetBox is in scope: a bundled script reads the instance over its REST API and writes the library file format, which the converter then takes unchanged. What is out of scope is continuous two-way replication between the two systems — that is [infrahub-sync](https://docs.infrahub.app/sync/), a separate product. The export here is a snapshot into files, not a sync.
 
 ## What it produces
 
@@ -40,6 +41,7 @@ A Markdown coverage report names everything the profile could not map. It is wri
 ## Example prompts
 
 - "Convert these Cisco device types into Infrahub object templates"
+- "Pull the device types out of our NetBox and turn them into object templates"
 - "Seed my instance with device models from the NetBox devicetype-library"
 - "Build a mapping profile for my custom DCIM schema"
 - "Re-run the device-type conversion — we upgraded schema-library"
@@ -69,6 +71,26 @@ python skills/infrahub-converting-netbox-device-types/scripts/netbox_to_infrahub
 ```
 
 Point it at a single file, a folder, or a mixed tree of device types and module types — the two families are told apart automatically, so a mixed tree converts in one pass. The skill includes three mapping profiles: `schema-library.yml`, `schema-library-modules.yml`, and an annotated `_template.yml` to copy for a custom schema.
+
+## Exporting from a running NetBox
+
+When the device types live in your own instance rather than in the published library, a second bundled script fetches them and writes the same file format, so the two steps chain without a conversion in between. It needs [pynetbox](https://github.com/netbox-community/pynetbox) 7.0 or later and a read-only API token.
+
+```bash
+pip install 'pynetbox>=7.0'
+export NETBOX_TOKEN=...
+python skills/infrahub-converting-netbox-device-types/scripts/netbox_export_device_types.py \
+  --url https://netbox.example.com \
+  --in-use \
+  --module-types \
+  --output-dir ./netbox-export
+```
+
+`--in-use` keeps only device types with at least one device racked against them, which on a real instance is a much smaller and more relevant set than the whole catalogue. `--manufacturer` and `--slug` narrow it further.
+
+The export closes with its own report, in the same spirit as the coverage report: fields NetBox holds that the library format cannot carry, fields NetBox left unset that the library format requires, component endpoints absent from that NetBox version, file names that collided after sanitising, and whether the instance predates NetBox 4.5, whose front-port mapping shape differs. Read it before converting.
+
+This is a one-way snapshot into files. Continuous replication in both directions is [infrahub-sync](https://docs.infrahub.app/sync/).
 
 ## Common mistakes it catches
 

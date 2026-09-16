@@ -39,8 +39,10 @@ main = _mod.main
 missing_required = _mod.missing_required
 output_path = _mod.output_path
 port_mappings = _mod.port_mappings
+rear_port_links = _mod.rear_port_links
 render_document = _mod.render_document
 unwrap = _mod.unwrap
+uses_legacy_port_shape = _mod.uses_legacy_port_shape
 
 
 # ---------------------------------------------------------------------------
@@ -269,6 +271,50 @@ def test_no_mappings_when_nothing_is_wired():
     assert port_mappings([{**FRONT_PORT, "rear_ports": []}], [REAR_PORT]) == []
 
 
+# NetBox 4.5 replaced FrontPortTemplate.rear_port / rear_port_position with a
+# rear_ports list of mappings, and gave front ports their own `positions`.
+# Reading only the newer shape drops every mapping on 4.4 and earlier in
+# silence: the field is absent, so the export claims nothing was wired.
+LEGACY_FRONT_PORT = {
+    "id": 90,
+    "device_type": {"id": 3},
+    "name": "Port 1",
+    "label": "",
+    "type": {"value": "sc", "label": "SC"},
+    "color": "",
+    "rear_port": 70,
+    "rear_port_position": 2,
+    "description": "",
+}
+
+
+def test_port_mappings_read_the_pre_4_5_singular_shape():
+    mappings = port_mappings([LEGACY_FRONT_PORT], [REAR_PORT])
+
+    assert mappings == [
+        {
+            "front_port": "Port 1",
+            "front_port_position": 1,
+            "rear_port": "Port 1",
+            "rear_port_position": 2,
+        }
+    ]
+
+
+def test_the_two_front_port_shapes_are_told_apart_by_shape_not_by_version():
+    assert uses_legacy_port_shape([LEGACY_FRONT_PORT])
+    assert not uses_legacy_port_shape([FRONT_PORT])
+    assert not uses_legacy_port_shape([{**FRONT_PORT, "rear_ports": []}])
+
+
+def test_a_legacy_front_port_maps_one_rear_port_at_position_one():
+    """The pre-4.5 model held exactly one link, so the shape is exact."""
+    assert rear_port_links(LEGACY_FRONT_PORT) == [
+        {"position": 1, "rear_port": 70, "rear_port_position": 2}
+    ]
+    assert rear_port_links({**FRONT_PORT, "rear_ports": []}) == []
+
+
 # ---------------------------------------------------------------------------
 # Document assembly
 # ---------------------------------------------------------------------------
@@ -297,6 +343,34 @@ def test_a_component_missing_a_schema_required_field_is_reported():
 
     assert any("unset 'type'" in note for note in notes)
     assert any("library schema requires" in note for note in notes)
+
+
+def test_a_pre_4_5_front_port_gets_the_positions_the_library_requires():
+    """`positions` arrived on front ports in 4.5; before it the value is 1.
+
+    Without this the export both drops the mapping and reports every front
+    port as missing a field its NetBox never had.
+    """
+    document, notes = build_document(
+        DEVICE_TYPE,
+        {"front-ports": [LEGACY_FRONT_PORT], "rear-ports": [REAR_PORT]},
+        is_module=False,
+    )
+
+    assert document["front-ports"][0]["positions"] == 1
+    assert document["port-mappings"][0]["rear_port"] == "Port 1"
+    assert not any("unset 'positions'" in note for note in notes)
+    assert any("older than 4.5" in note for note in notes)
+
+
+def test_the_current_front_port_shape_is_reported_as_nothing_unusual():
+    _, notes = build_document(
+        DEVICE_TYPE,
+        {"front-ports": [FRONT_PORT], "rear-ports": [REAR_PORT]},
+        is_module=False,
+    )
+
+    assert not any("older than" in note for note in notes)
 
 
 def test_a_complete_component_produces_no_note():

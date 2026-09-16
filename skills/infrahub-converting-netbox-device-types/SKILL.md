@@ -216,7 +216,7 @@ a live instance over its REST API and writes the
 library file format:
 
 ```bash
-pip install pynetbox            # the official NetBox client
+pip install 'pynetbox>=7.0'     # the official NetBox client
 export NETBOX_TOKEN=...
 python scripts/netbox_export_device_types.py \
   --url https://netbox.example.com \
@@ -225,6 +225,11 @@ python scripts/netbox_export_device_types.py \
   --output-dir ./netbox-export
 ```
 
+Every command in this skill names its script relative to
+this skill's directory, so run them from there. Inputs
+and outputs (`./netbox-export`, `./generated`) are then
+relative to the same place.
+
 `--in-use` keeps only device types with at least one
 device, which on a real instance is a much smaller and
 more relevant set than the whole catalogue.
@@ -232,10 +237,11 @@ more relevant set than the whole catalogue.
 It reports anything that did not come across cleanly:
 fields NetBox holds that the library format cannot
 carry, fields NetBox left unset that the library format
-requires, endpoints absent from that NetBox version, and
-file names that collided after sanitising. Read that
-list before converting, the same way you read the
-conversion coverage report before loading.
+requires, endpoints absent from that NetBox version,
+file names that collided after sanitising, and a NetBox
+older than the 4.5 front-port shape. Read that list
+before converting, the same way you read the conversion
+coverage report before loading.
 
 This is a one-way snapshot into files, not a sync.
 Continuous replication is
@@ -252,8 +258,7 @@ same 5,900+ definitions in 29 MB:
 ```bash
 git clone --depth 1 --filter=blob:none --sparse \
   https://github.com/netbox-community/devicetype-library.git
-cd devicetype-library
-git sparse-checkout set device-types module-types
+git -C devicetype-library sparse-checkout set device-types module-types
 ```
 
 Drop `module-types` from that list if you only want
@@ -273,9 +278,9 @@ When a schema does not fit, the answer is a mapping
 profile, not a different script.
 
 ```bash
-python skills/infrahub-converting-netbox-device-types/scripts/netbox_to_infrahub_templates.py \
+python scripts/netbox_to_infrahub_templates.py \
   devicetype-library/device-types/Cisco/ \
-  --mapping skills/infrahub-converting-netbox-device-types/scripts/mappings/schema-library.yml \
+  --mapping scripts/mappings/schema-library.yml \
   --output-dir ./generated \
   --report ./generated/coverage-report.md
 ```
@@ -374,7 +379,7 @@ uv run invoke test
 | File | Read it when |
 | ---- | ------------ |
 | [concepts.md](./concepts.md) | The Infrahub model is unfamiliar, or you need to explain it |
-| [scripts/netbox_export_device_types.py](./scripts/netbox_export_device_types.py) | The device types are in a running NetBox rather than in files |
+| [reference.md](./reference.md) § Exporting from a live NetBox | The device types are in a running NetBox: the flags, the auth, and what the export reports |
 | [extending-your-schema.md](./extending-your-schema.md) | Turning a reported gap into a schema change |
 | [generators-module-ports.md](./generators-module-ports.md) | Module ports imported as declarations and the `{module}` token needs resolving into real device interfaces |
 | [reference.md](./reference.md) | Looking up a NetBox field or its Infrahub counterpart |

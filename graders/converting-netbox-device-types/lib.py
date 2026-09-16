@@ -513,6 +513,38 @@ def _every_row(parsed: dict[Path, list[dict]]) -> list[tuple[str, dict]]:
     return rows
 
 
+#: Infrahub's own attribute-metadata form is a mapping carrying ``value``
+#: alongside lineage keys — see skills/infrahub-managing-objects/reference.md
+#: § Value Metadata. Stamping ``source: netbox-sync`` on an imported template
+#: is the most natural thing a correct answer to this skill does.
+_ATTRIBUTE_METADATA_KEYS = frozenset({"value", "source", "owner", "is_protected"})
+
+
+def _is_netbox_choice(value: Any) -> bool:
+    """Whether a value is a NetBox choice wrapper rather than Infrahub metadata.
+
+    Both are mappings carrying ``value``, so that key cannot tell them apart.
+    NetBox serializes a choice as ``{"value": ..., "label": ...}`` and a
+    related object with a ``display``; Infrahub's metadata form pairs ``value``
+    with ``source``, ``owner``, or ``is_protected``. Keying on ``value`` alone
+    failed a correct answer that recorded where its data came from.
+
+    ``{"value": "pse"}`` on its own is deliberately allowed: it is the
+    metadata form with no metadata, and it loads as the bare value.
+
+    Args:
+        value: Any value read from an emitted row.
+
+    Returns:
+        ``True`` only for the NetBox wrapper shape.
+    """
+    if not isinstance(value, dict) or "value" not in value:
+        return False
+    if set(value) <= _ATTRIBUTE_METADATA_KEYS:
+        return False
+    return "label" in value or "display" in value
+
+
 def check_bundled_script_output(
     parsed: dict[Path, list[dict]], output_dir: Path | None = None, **_: Any
 ) -> tuple[bool, str]:
@@ -522,6 +554,13 @@ def check_bundled_script_output(
     a particular command ran but that the output has the correctness a
     hand-rolled conversion loses. Each assertion below is a trap that cost a
     real bug to find.
+
+    Three properties, and no more: every number is whole, no NetBox choice
+    wrapper survived into the YAML, and a coverage report exists. It does not
+    assert that the values are *right*, that every component list converted,
+    or that the mapping profile was the correct one — other checks cover
+    those, and a docstring claiming them here would be the same kind of
+    overreach as grading a metadata mapping as a choice wrapper.
     """
     docs = _object_docs(parsed)
     if not docs:
@@ -538,7 +577,7 @@ def check_bundled_script_output(
                 f"{label} has non-integer {floats}; Infrahub Number attributes hold "
                 "integers, so this cannot load. The bundled converter rounds these."
             )
-        wrapped = [k for k, v in row.items() if isinstance(v, dict) and "value" in v]
+        wrapped = [k for k, v in row.items() if _is_netbox_choice(v)]
         if wrapped:
             return False, (
                 f"{label} carries an unwrapped NetBox choice object in {wrapped}; "
