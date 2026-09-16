@@ -125,9 +125,14 @@ Run every gate, each with its command:
 skillgrade --eval=<task> --trials=1     # guidance class only, must score 1.0
 uv run invoke test
 uv run invoke lint
-uv run python scripts/sync-evals.py
-git diff --quiet -- evaluations/ && echo "evals in sync" \
-  || { echo "STALE: evaluations/ regenerated, commit the result"; git diff --stat -- evaluations/; }
+if ! uv run python scripts/sync-evals.py; then
+  echo "GATE FAILED: sync-evals.py exited non-zero; the diff below means nothing"
+elif git diff --quiet -- evaluations/; then
+  echo "evals in sync"
+else
+  echo "STALE: evaluations/ regenerated, commit the result"
+  git diff --stat -- evaluations/
+fi
 ```
 
 Then, guidance class only, prove the task measures the skill rather than the
@@ -174,7 +179,7 @@ silence.
 ## Registration
 
 Only when the change adds a new skill: wire the five surfaces listed in
-[`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md),
+[`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md).
 Its five rows already include the per-skill docs page and the manifest entry,
 so there is nothing to add beyond them. Link the table rather than restating
 it here; a second copy is the exact drift the guideline warns about.

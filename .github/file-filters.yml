@@ -62,3 +62,6 @@ tests_all:
   # is exactly what broke the frontmatter, so it has to run the test job.
   - "skills/**/*.md"
   - ".claude/**"
+  # tests/graders/test_teaching_graders.py and test_generic_inheritance.py
+  # read eval.yaml, so an eval.yaml-only change has to run them too.
+  - "eval.yaml"
