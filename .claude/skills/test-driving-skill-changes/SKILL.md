@@ -126,11 +126,12 @@ Read `Defect class` from the handoff file: `guidance` follows
 | Violating near miss (satisfies the check's keyword while breaking the rule) | < 1.0 |
 
 ```bash
+REPO=$(git rev-parse --show-toplevel)
 mkdir -p /tmp/skill-fixtures/{pass,pass-variant,fail,fail-nearmiss}
 # write the artifact under test (output.yml, or the file the grader reads) in each
 for d in pass pass-variant fail fail-nearmiss; do
   echo "--- $d"
-  (cd /tmp/skill-fixtures/$d && python "$OLDPWD/graders/<skill>/check_<task>.py")
+  (cd /tmp/skill-fixtures/$d && uv run --project "$REPO" python "$REPO/graders/<skill>/check_<task>.py")
 done
 ```
 
