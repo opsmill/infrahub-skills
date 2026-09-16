@@ -56,8 +56,7 @@ for peer_id in stale_ids:
 ```
 
 Detaching costs nothing beyond the save the generator
-already needs, and it is the only ordering that avoids the
-resend outright.
+already needs, and it avoids the resend outright.
 
 ### Build the id list first
 
@@ -68,5 +67,31 @@ four peers leave two behind, and the next `save()` re-sends
 exactly the ids this rule exists to drop. Iterating a
 separate list also keeps you from detaching the peers you
 still want.
+
+### If several runs write this node
+
+`.remove()` plus `save(allow_upsert=True)` sends the whole
+peer list, which is the read-modify-write
+[python-concurrent-relationship-writes.md](python-concurrent-relationship-writes.md)
+calls CRITICAL. On a rack and its own interfaces that is
+fine, because one run owns the node. On a node several runs
+write it is not: a peer another run attached between this
+fetch and this save is dropped.
+
+There, detach server-side instead, naming only these peers:
+
+```python
+await rack.remove_relationships(
+    relation_to_update="interfaces", related_nodes=stale_ids
+)
+```
+
+That call does **not** touch the in-memory manager.
+`rack.interfaces.peers` still holds the detached ids, so it
+solves the ordering only while nothing saves that node
+afterwards; a later `save(allow_upsert=True)` re-sends them
+exactly as before. If the run must also save the node, do
+both: `remove_relationships()` for the server, `.remove()`
+to keep the local list honest.
 
 Verified against Infrahub 1.11.2 and infrahub-sdk 1.23.2.

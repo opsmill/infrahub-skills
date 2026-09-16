@@ -71,12 +71,19 @@ nodes: [{ id: "TestGroup (PEER-OBJ-ID) " }]
 The failure surfaces later as an unresolvable id. Pass
 `peer.id`, not `peer`.
 
-### No pre-read guard is needed
+### Do not add a pre-read guard
 
-The server saves a peer only if it is not already attached,
-so re-running is safe and a redundant run leaves the branch
-diff unchanged. Drop the fetch-diff guard rather than
-porting it.
+A fetch-diff guard in front of `add_relationships()` does
+not make the write safe, for the same reason it does not
+help `.add()`: the read and the write are separate round
+trips, so the guard sits inside the race window. Adding one
+buys nothing.
+
+Whether the server treats a re-attached peer as a no-op was
+**not measured here**, and no rule in this skill depends on
+it. If you already have a guard that exists for a reason
+other than this race, keep it until you have checked that
+reason still holds.
 
 ### Scope
 
