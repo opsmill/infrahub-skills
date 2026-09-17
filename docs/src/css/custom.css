@@ -204,3 +204,22 @@ body {
     font-size: 1.25rem;
   }
 }
+
+/*
+ * Center mermaid diagrams between the paragraphs around them.
+ *
+ * @docusaurus/theme-mermaid's own styles only cap the width
+ * (`.container`, `.container > svg` are both `max-width: 100%`), so the
+ * rendered SVG sits flush against the left edge of the content column. Next
+ * to full-width prose that reads as a diagram drifting off to one side
+ * rather than sitting between two blocks of text.
+ *
+ * `text-align` rather than flex centering on purpose: the SVG is an inline
+ * element, so this centers it without making the container a flex box. A
+ * flex container would center a diagram wider than the column by overflowing
+ * it equally on both sides, which pushes the left edge out of reach. Here an
+ * over-wide diagram still starts at the left and stays reachable.
+ */
+.docusaurus-mermaid-container {
+  text-align: center;
+}
