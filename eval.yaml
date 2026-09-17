@@ -1554,6 +1554,47 @@ tasks:
       - name: add-relationships-passes-ids
         check: related_nodes carries peer id strings rather than node objects
 
+  - name: generator-delete-ordering
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write an Infrahub Generator that reconciles a LocationSite's
+      management addresses against its design. The design object carries the
+      site's new description and the full list of management addresses the site
+      should end up with. Any IpamIPAddress currently in the site's
+      management_addresses relationship that the design no longer lists must be
+      removed from Infrahub entirely, not just unlinked from the site. The
+      site's description must also be updated from the design in the same run.
+
+      Save ONLY the final Python generator class to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_delete_ordering.py
+        weight: 1.0
+    expected_output: >-
+      A Python generator that detaches the stale IpamIPAddress peers from
+      site.management_addresses and saves the site before deleting those
+      peers, driving the detach loop off a separately built id list.
+    expectations:
+      - "The stale addresses are deleted from Infrahub, not only unlinked"
+      - "The site is detached from the stale peers and saved before they are deleted"
+      - "The detach loop iterates a separate id list, not the live peer list"
+    assertions:
+      - name: peer-delete-present
+        check: The stale peers are deleted from Infrahub rather than only unlinked
+      - name: detach-precedes-peer-delete
+        check: >-
+          A .remove() on the relationship and a save() of the site both run
+          before the first peer delete
+      - name: detach-iterates-id-list
+        check: >-
+          The detach loop does not iterate the live .peers list while removing
+          from it
+      - name: preflight-or-upsert
+        check: The site is saved with allow_upsert=True
+
   - name: generator-natural-key-preflight
     trials: 3
     instruction: |

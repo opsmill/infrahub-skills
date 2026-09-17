@@ -478,3 +478,227 @@ def test_name_still_bound_to_node_object_at_use_fails():
         tree=ast.parse(STILL_A_NODE_OBJECT_AT_USE)
     )
     assert not ok, f"device is still a node object at the call site: {msg}"
+
+
+# --- delete ordering: detach peers before deleting them ---
+#
+# The four fixtures the eval task is graded on, asserted directly against the
+# check functions. DELETE_ANTIPATTERN is the regression guard: it is the shape
+# `rules/python-delete-ordering.md` shows under "Anti-pattern", and the check
+# this replaced passed it, which is why the rule shipped uncovered (#147).
+
+DELETE_COMPLIANT = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    stale_ids = [p.id for p in site.management_addresses.peers if p.id not in data["keep"]]
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    site.description.value = data["description"]
+    await site.save(allow_upsert=True)
+    for peer_id in stale_ids:
+        address = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        await address.delete()
+"""
+
+DELETE_COMPLIANT_VARIANT = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    doomed = self._stale(site, data)
+    await site.remove_relationships(
+        relation_to_update="management_addresses", related_nodes=doomed
+    )
+    for identifier in doomed:
+        site.management_addresses.remove(identifier)
+    site.description.value = data["description"]
+    await site.save(allow_upsert=True)
+    for identifier in doomed:
+        await self.client.delete(kind="IpamIPAddress", id=identifier)
+"""
+
+DELETE_VIOLATING = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    for peer in site.management_addresses.peers:
+        if peer.id not in data["keep"]:
+            address = await self.client.get(kind="IpamIPAddress", id=peer.id)
+            await address.delete()
+    site.description.value = data["description"]
+    await site.save(allow_upsert=True)
+"""
+
+DELETE_NEAR_MISS_ITERATES_PEERS = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    doomed = []
+    for peer in site.management_addresses.peers:
+        if peer.id not in data["keep"]:
+            doomed.append(peer.id)
+            site.management_addresses.remove(peer.id)
+    site.description.value = data["description"]
+    await site.save(allow_upsert=True)
+    for peer_id in doomed:
+        address = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        await address.delete()
+"""
+
+DELETE_ANTIPATTERN = """
+async def generate(self, data):
+    rack = await self.client.get(kind="DcimRack", id=data["rack"]["id"])
+    for iface in data["stale"]:
+        node = await self.client.get(kind="DcimInterface", id=iface["id"])
+        await node.delete()
+    await rack.save(allow_upsert=True)
+"""
+
+DELETE_LAUNDERED = '''
+async def generate(self, data):
+    """site.management_addresses.remove(peer_id) detaches before deleting."""
+    # Detach first: site.management_addresses.remove(peer_id)
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    detach = "site.management_addresses.remove"
+    for peer in site.management_addresses.peers:
+        address = await self.client.get(kind="IpamIPAddress", id=peer.id)
+        await address.delete()
+    await site.save(allow_upsert=True)
+'''
+
+DELETE_ONLY_UNLINKS = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    stale_ids = [p.id for p in site.management_addresses.peers if p.id not in data["keep"]]
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+"""
+
+DELETE_SERVER_SIDE_ONLY = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    doomed = [p.id for p in site.management_addresses.peers if p.id not in data["keep"]]
+    await site.remove_relationships(
+        relation_to_update="management_addresses", related_nodes=doomed
+    )
+    site.description.value = data["description"]
+    await site.save(allow_upsert=True)
+    for identifier in doomed:
+        await self.client.delete(kind="IpamIPAddress", id=identifier)
+"""
+
+DELETE_UNRELATED_CONTAINER_REMOVE = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    seen = [1, 2]
+    seen.remove(1)
+    self.cache.remove("x")
+    for peer in site.management_addresses.peers:
+        address = await self.client.get(kind="IpamIPAddress", id=peer.id)
+        await address.delete()
+    await site.save(allow_upsert=True)
+"""
+
+
+def test_delete_compliant_passes():
+    for name in ("peer-delete-present", "detach-precedes-peer-delete", "detach-iterates-id-list"):
+        ok, msg = CHECKS[name](tree=_tree(DELETE_COMPLIANT))
+        assert ok, f"{name} failed the rule's own correct pattern: {msg}"
+
+
+def test_delete_compliant_variant_passes():
+    for name in ("peer-delete-present", "detach-precedes-peer-delete", "detach-iterates-id-list"):
+        ok, msg = CHECKS[name](tree=_tree(DELETE_COMPLIANT_VARIANT))
+        assert ok, f"{name} failed a helper/server-side phrasing of the same order: {msg}"
+
+
+def test_delete_violating_fails_on_ordering():
+    ok, msg = CHECKS["detach-precedes-peer-delete"](tree=_tree(DELETE_VIOLATING))
+    assert not ok, "peers deleted while the site still holds them should fail"
+    assert "remove" in msg
+
+
+def test_delete_near_miss_iterating_peers_fails():
+    ordering_ok, _ = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_NEAR_MISS_ITERATES_PEERS)
+    )
+    assert ordering_ok, "the near miss orders detach/save/delete correctly on purpose"
+    ok, msg = CHECKS["detach-iterates-id-list"](
+        tree=_tree(DELETE_NEAR_MISS_ITERATES_PEERS)
+    )
+    assert not ok, "iterating .peers while removing from it should fail"
+    assert "skipped" in msg
+
+
+def test_rule_antipattern_is_caught():
+    """The shape the replaced check passed. This is why #147 existed."""
+    ok, msg = CHECKS["detach-precedes-peer-delete"](tree=_tree(DELETE_ANTIPATTERN))
+    assert not ok, f"the rule's own anti-pattern must fail: {msg}"
+
+
+def test_delete_vocabulary_does_not_launder():
+    ok, _ = CHECKS["detach-precedes-peer-delete"](tree=_tree(DELETE_LAUNDERED))
+    assert not ok, "a docstring, a comment and a bare string must not satisfy the check"
+
+
+def test_delete_unlink_without_delete_is_not_a_peer_delete():
+    ok, msg = CHECKS["peer-delete-present"](tree=_tree(DELETE_ONLY_UNLINKS))
+    assert not ok, f"unlinking without deleting leaves the peers in Infrahub: {msg}"
+
+
+def test_server_side_detach_alone_fails_when_the_node_is_saved():
+    """remove_relationships() never touches the in-memory manager."""
+    ok, msg = CHECKS["detach-precedes-peer-delete"](tree=_tree(DELETE_SERVER_SIDE_ONLY))
+    assert not ok, f"the save re-sends the ids remove_relationships() dropped: {msg}"
+
+
+def test_unrelated_container_remove_is_not_a_detach():
+    ok, _ = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_UNRELATED_CONTAINER_REMOVE)
+    )
+    assert not ok, "list.remove() and self.cache.remove() are not relationship detaches"
+
+
+# Hydrated peers: the skill's own hydration rule (and check_no_client_get_in_loop)
+# push generators to build peers with from_graphql off the query payload rather
+# than re-fetching each one. A red run produced exactly this shape and an earlier
+# draft of _peer_delete_calls reported it as "never deleted".
+
+DELETE_COMPLIANT_HYDRATED = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    stale_ids = [e["node"]["id"] for e in data["stale"]["edges"]]
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    site.description.value = data["description"]
+    await site.save(allow_upsert=True)
+    for edge in data["stale"]["edges"]:
+        node = InfrahubNode.from_graphql(self.client, self.branch, edge["node"])
+        await node.delete()
+"""
+
+DELETE_VIOLATING_HYDRATED = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    for edge in data["stale"]["edges"]:
+        node = InfrahubNode.from_graphql(self.client, self.branch, edge["node"])
+        await node.delete()
+    site.description.value = data["description"]
+    await site.save(allow_upsert=True)
+"""
+
+
+def test_hydrated_peer_delete_is_recognised():
+    ok, msg = CHECKS["peer-delete-present"](tree=_tree(DELETE_COMPLIANT_HYDRATED))
+    assert ok, f"a from_graphql-hydrated node's .delete() is still a delete: {msg}"
+
+
+def test_hydrated_compliant_passes_ordering():
+    ok, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_COMPLIANT_HYDRATED)
+    )
+    assert ok, f"detach, save, then delete is correct however the peer was built: {msg}"
+
+
+def test_hydrated_violating_fails_ordering():
+    ok, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_VIOLATING_HYDRATED)
+    )
+    assert not ok, f"deleting before the save is wrong however the peer was built: {msg}"
