@@ -26,6 +26,11 @@ queries:
   - name: my_query              # Unique query identifier
     file_path: "queries/my_query.gql"
 
+# Reusable GraphQL fragments (spread into queries by name)
+graphql_fragments:
+  - name: interface_fields      # Unique identifier
+    file_path: "fragments/interfaces.gql"   # File or directory
+
 # Check definitions (validation logic)
 check_definitions:
   - name: my_check              # Unique identifier
@@ -115,6 +120,54 @@ recursively, sorted by filename.
 Each query needs a `name` (used to reference it from
 checks/transforms/generators) and a `file_path` to the
 `.gql` file.
+
+### `graphql_fragments`
+
+| Field | Required | Description |
+| ----- | -------- | ----------- |
+| `name` | Yes | Unique identifier |
+| `file_path` | Yes | A `.gql` fragment file, or a directory of them |
+
+Declares fragment files that queries can share, so one
+selection shape lives in one place. Requires Infrahub
+1.10.0 with infrahub-sdk 1.20.0. The config model
+forbids unknown keys, so an older version rejects the
+file rather than ignoring the section.
+
+A fragment reaches a query only when that query spreads
+it by name:
+
+```graphql
+query device_interfaces {
+  InfraInterface { edges { node { ...interfaceFields } } }
+}
+```
+
+Registering a file does nothing on its own. A query with
+no `...FragmentName` in it is stored exactly as written.
+
+Definitions are inlined when the repository syncs, and
+only the fragments a query actually spreads are included,
+so the stored query is self-contained. This deduplicates
+the source you maintain, not the document sent to the
+server. Reach for it to stop two copies drifting, not to
+make a query smaller. One fragment file per shared shape
+pays off when the shape is large or spread by several
+queries; factoring out three fields across two queries
+costs more structure than it saves.
+
+Problems surface when the repository imports, not when a
+generator or transform later runs. A missing file, a
+spread naming a fragment no declared file defines, the
+same fragment name defined twice, and a cycle each fail
+the import and name the fragment. Entry names here and
+`fragment` names inside the `.gql` files are separate
+namespaces, and both have to be unique.
+
+This is not an inline fragment (`... on SomeKind`), which
+narrows a selection to one type of a generic or union and
+shares nothing between files. That one is covered in
+[queries-union-fragments.md](../infrahub-managing-transforms/rules/queries-union-fragments.md).
 
 ### `check_definitions`
 
