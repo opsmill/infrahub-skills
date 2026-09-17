@@ -1560,13 +1560,14 @@ tasks:
       Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
       follow its workflow and rules.
 
-      Task: Write an Infrahub Generator that reconciles a LocationSite's
-      management addresses against its design. The design object carries the
-      site's new description and the full list of management addresses the site
-      should end up with. Any IpamIPAddress currently in the site's
-      management_addresses relationship that the design no longer lists must be
-      removed from Infrahub entirely, not just unlinked from the site. The
-      site's description must also be updated from the design in the same run.
+      Task: Write an Infrahub Generator that runs once per created
+      IpamIPAddress (an on-create event trigger, so many runs execute
+      concurrently during a bulk load). Each run reconciles the
+      management_addresses of the LocationSite that address belongs to: the
+      site's design lists the addresses the site should end up with, and any
+      IpamIPAddress the design no longer lists must be deleted from Infrahub.
+      Each run also stamps the site's description with the design revision it
+      reconciled against.
 
       Save ONLY the final Python generator class to: output.py
     graders:
@@ -1574,12 +1575,15 @@ tasks:
         run: python graders/managing-generators/check_delete_ordering.py
         weight: 1.0
     expected_output: >-
-      A Python generator that detaches the stale IpamIPAddress peers from
-      site.management_addresses and saves the site before deleting those
-      peers, driving the detach loop off a separately built id list.
+      A Python generator that clears the stale peers from the site's in-memory
+      relationship manager and saves the site before deleting those peers.
+      Detaching server-side with remove_relationships() alone is not enough
+      here: it never touches the in-memory manager, so the description save
+      re-sends the ids it just dropped.
     expectations:
       - "The stale addresses are deleted from Infrahub, not only unlinked"
       - "The site is detached from the stale peers and saved before they are deleted"
+      - "A server-side detach is paired with a local .remove() because the run also saves the site"
       - "The detach loop iterates a separate id list, not the live peer list"
     assertions:
       - name: peer-delete-present
