@@ -55,7 +55,14 @@ await group.add_relationships(
 )
 ```
 
-`remove_relationships()` is the symmetric operation.
+`remove_relationships()` is the symmetric operation **on
+the wire**. It is not symmetric in memory: like
+`add_relationships()` it never touches the node's own
+relationship manager, and on removal that matters,
+because a later `save(allow_upsert=True)` re-sends the
+peer you just detached server-side. If the run also saves
+that node, pair it with `.remove()` --
+[python-delete-ordering.md](python-delete-ordering.md).
 
 ### `related_nodes` takes IDs, not nodes
 

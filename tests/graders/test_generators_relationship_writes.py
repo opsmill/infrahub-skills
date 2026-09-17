@@ -482,10 +482,21 @@ def test_name_still_bound_to_node_object_at_use_fails():
 
 # --- delete ordering: detach peers before deleting them ---
 #
-# The four fixtures the eval task is graded on, asserted directly against the
-# check functions. DELETE_ANTIPATTERN is the regression guard: it is the shape
+# No eval task consumes these checks. That is deliberate and measured, not the
+# oversight #147 was opened about; the PR for #147 carries the trial data and
+# the reasoning, and `rules/python-delete-ordering.md` is the rule they encode.
+#
+# Be clear about what these fixtures do and do not guard. They pin the check
+# functions' contract: that the ordering the rule prescribes passes, that the
+# rule's own anti-pattern fails, and that vocabulary alone cannot launder a
+# violation. They do NOT guard the rule's prose, because nothing grades an
+# answer against it. If the prose is refactored away, these still pass.
+#
+# They are kept so the graded contract already exists, and is already proven to
+# discriminate at fixture level, if a future model regresses far enough to make
+# a task viable. DELETE_ANTIPATTERN is the sharpest of them: it is the shape
 # `rules/python-delete-ordering.md` shows under "Anti-pattern", and the check
-# this replaced passed it, which is why the rule shipped uncovered (#147).
+# removed in 814ffb7 passed it.
 
 DELETE_COMPLIANT = """
 async def generate(self, data):

@@ -2139,6 +2139,19 @@ def check_detach_precedes_peer_delete(
     ``remove_relationships()`` alone does not satisfy this. It never touches
     the in-memory manager, so a later ``save(allow_upsert=True)`` re-sends
     the very ids it detached server-side.
+
+    Precondition. The rule sanctions a second correct shape: never hydrating
+    the relationship on the node you save. An uninitialized manager is left
+    out of the payload entirely, so nothing is re-sent, and ``.remove()``
+    would raise ``UninitializedError`` there anyway. This check fails that
+    shape, so any task wiring it must make hydration unavoidable -- by also
+    requiring peers to be attached, since ``.add()`` and ``.extend()`` need a
+    hydrated manager. Wiring it to a task without that property would fail
+    correct answers.
+
+    No task wires it today; ``tests/graders/`` holds its fixtures and the
+    reasoning. See the pull request for #147 for why, which is measurement
+    rather than oversight.
     """
     if tree is None:
         return False, "No Python source to inspect"
