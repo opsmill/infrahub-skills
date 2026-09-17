@@ -42,11 +42,6 @@ A findings report based on bundle evidence:
 - **Evidence per finding**: every claim cites a bundle path and a quoted excerpt, and what the bundle cannot answer is stated as an open question rather than left out
 - **Read-only**: the analysis reads an already-collected bundle and runs issue searches; it never touches the running instance, restarts nothing, edits no configuration, and creates no issue
 
-## Not sure this is the right skill?
-
-See [Which skill do I use?](../choosing-a-skill.mdx) for how this skill
-differs from the Diagnostics Collector, which runs first.
-
 ## Common mistakes it catches
 
 | Mistake | What the skill does instead |
@@ -58,6 +53,11 @@ differs from the Diagnostics Collector, which runs first.
 | Limiting the issue search to open issues | Searches open and closed, since a closed match names the fixing version |
 | Restarting a container to test a theory | Recommends it in the report and applies nothing |
 | Filing the bug from here | Hands off to the [Issue Reporter](./reporting-issues.mdx) |
+
+## Not sure this is the right skill?
+
+See [Which skill do I use?](../choosing-a-skill.mdx) for how this skill
+differs from the Diagnostics Collector, which runs first.
 
 :::tip
 Benchmark data exists only if the bundle was created with `infrahub-collect create --benchmark`. For a performance symptom without it, the report asks for a new bundle created with that flag rather than guessing from logs alone: the single-CPU score and the storage IOPS of the Neo4j and PostgreSQL volumes are often what decide whether the cause is software or an undersized host.

@@ -32,6 +32,26 @@ That offer can also arrive on its own. With the [infrahub-speckit](https://githu
 - "Why did the schema skill keep getting relationship cardinality wrong?"
 - "We hit this same gap last week too, please file it."
 
+## Key rules enforced
+
+- **Tracker first**: a skill's users share no repo, directory, or laptop, so local session history cannot answer "has anyone seen this before"
+- **Comment, don't duplicate**: a second issue splits the evidence across two threads
+- **Never suppress a first sighting**: the report is always produced, with a confidence label rather than silence
+- **Cite the artifact**: the draft names a file under `skills/<skill>/rules/`, or states plainly that no rule covers the topic; "the schema skill" gives a maintainer a search, not a starting point
+- **Redact before drafting**: error messages include file paths, hostnames, and node kinds; issue bodies are public and cannot be retracted
+- **Never file directly**: this skill has no consent gate and no submission method of its own
+
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --------- | --------------------------- |
+| Drafting without checking the tracker | Searches first, so the draft is a comment when an issue already exists |
+| Staying silent because it only happened once | Files it, labelled an unconfirmed single observation |
+| Filing a symptom with no proposed fix | Names the rule file to create or edit, and what it should say |
+| Filing an Infrahub server bug against the skills repo | Routes it to the Issue Reporter for the correct product repo |
+| Calling it a skill gap when the docs are what's missing | Files `bug(docs):` against `opsmill/infrahub` instead |
+| Pasting raw error text | Paraphrases, so hostnames and node kinds do not reach a public issue |
+
 ## How it spots the friction
 
 The current conversation is always the first and usually the only source. A past session's transcript under `~/.claude/projects/` is read only when you point at one, and its absence never blocks a report.
@@ -85,26 +105,6 @@ A single observation is weak evidence, not zero evidence. It gets labelled hones
 7. **Draft and redact**, removing anything identifying your infrastructure
 8. **Hand off** the payload for review and submission
 9. **Report the outcome** back to you, with the URL when there is one
-
-## Key rules enforced
-
-- **Tracker first**: a skill's users share no repo, directory, or laptop, so local session history cannot answer "has anyone seen this before"
-- **Comment, don't duplicate**: a second issue splits the evidence across two threads
-- **Never suppress a first sighting**: the report is always produced, with a confidence label rather than silence
-- **Cite the artifact**: the draft names a file under `skills/<skill>/rules/`, or states plainly that no rule covers the topic; "the schema skill" gives a maintainer a search, not a starting point
-- **Redact before drafting**: error messages include file paths, hostnames, and node kinds; issue bodies are public and cannot be retracted
-- **Never file directly**: this skill has no consent gate and no submission method of its own
-
-## Common mistakes it catches
-
-| Mistake | What the skill does instead |
-| --------- | --------------------------- |
-| Drafting without checking the tracker | Searches first, so the draft is a comment when an issue already exists |
-| Staying silent because it only happened once | Files it, labelled an unconfirmed single observation |
-| Filing a symptom with no proposed fix | Names the rule file to create or edit, and what it should say |
-| Filing an Infrahub server bug against the skills repo | Routes it to the Issue Reporter for the correct product repo |
-| Calling it a skill gap when the docs are what's missing | Files `bug(docs):` against `opsmill/infrahub` instead |
-| Pasting raw error text | Paraphrases, so hostnames and node kinds do not reach a public issue |
 
 ## What it needs
 

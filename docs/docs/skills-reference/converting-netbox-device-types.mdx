@@ -57,7 +57,19 @@ A Markdown coverage report names everything the profile could not map. It is wri
 - **Template names are slug-based and parent-namespaced**: names stay unique across the whole library rather than colliding between vendors
 - **The skill offers schema changes; it does not make them**: enabling `generate_template` is a migration against your source of truth, so it is proposed for you to apply
 
-## Running the converter
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --------- | --------------------------- |
+| Assuming `Template*` kinds already exist | Checks the target schema for `generate_template: true` before converting |
+| Hand-transcribing a 48-port switch | Runs the script, which is exact and repeatable across thousands of device types |
+| Editing the script for a custom schema | Writes a new mapping profile, leaving the script untouched |
+| Reading a clean run as a lossless one | Points you at the coverage report, which names what did not convert |
+| Loading the output files in arbitrary order | Numbers them `01`–`05` in dependency order |
+| Expecting `{module}` port names to resolve | Explains that the bay position is known only once a module is installed |
+| Reaching for this to sync a live NetBox | Sends you to infrahub-sync, which is a different product |
+
+## Running it
 
 The skill normally runs the converter for you. To run it manually, resolve the two `skills/...` paths against wherever your installation put the skill directory. The command below assumes the [manual copy](../installation-setup.mdx), which puts it under your project root; the `npx` installer and the Claude Code plugin place it elsewhere.
 
@@ -70,18 +82,6 @@ python skills/infrahub-converting-netbox-device-types/scripts/netbox_to_infrahub
 ```
 
 Point it at a single file, a folder, or a mixed tree of device types and module types; the two families are told apart automatically, so a mixed tree converts in one pass. The skill includes three mapping profiles: `schema-library.yml`, `schema-library-modules.yml`, and an annotated `_template.yml` to copy for a custom schema.
-
-## Common mistakes it catches
-
-| Mistake | What the skill does instead |
-| --------- | --------------------------- |
-| Assuming `Template*` kinds already exist | Checks the target schema for `generate_template: true` before converting |
-| Hand-transcribing a 48-port switch | Runs the script, which is exact and repeatable across thousands of device types |
-| Editing the script for a custom schema | Writes a new mapping profile, leaving the script untouched |
-| Reading a clean run as a lossless one | Points you at the coverage report, which names what did not convert |
-| Loading the output files in arbitrary order | Numbers them `01`–`05` in dependency order |
-| Expecting `{module}` port names to resolve | Explains that the bay position is known only once a module is installed |
-| Reaching for this to sync a live NetBox | Sends you to infrahub-sync, which is a different product |
 
 :::warning
 Read the coverage report before loading anything. Against the stock `schema-library.yml` profile most NetBox component lists have no equivalent node, so a report full of unmapped entries is the normal path rather than an error: it is the list of schema changes a lossless conversion would need.

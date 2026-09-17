@@ -33,7 +33,17 @@ The Menu Manager produces YAML menu definition files that customize the Infrahub
 - **Icon format**: icons use the Material Design Icons format with `mdi:` prefix (e.g., `mdi:server`, `mdi:ip-network`)
 - **`order_weight`**: integer controlling item display order; lower numbers appear first
 
-## Loading
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --------- | --------------------------- |
+| Registering the menu under `menu:` (singular) in `.infrahub.yml` | Uses `menus:` (plural), matching every other registration key; the singular form is rejected as `extra_forbidden` |
+| Nesting children directly under `children:` | Wraps nested items in `children.data`, the same shape every paginated Infrahub response uses |
+| Setting both `kind` and `path` on one item | Uses exactly one; Infrahub treats a branch with both as invalid and drops it from the sidebar |
+| Leaving the menu unregistered in `.infrahub.yml` | Includes the registration comment in the output file so it isn't missed |
+| Deviating from the fixed envelope | Always emits `apiVersion`, `kind: Menu`, and `spec.data`; a deviation fails to load and falls back to the auto-generated menu |
+
+## Loading it
 
 Load a menu file into a running Infrahub instance:
 

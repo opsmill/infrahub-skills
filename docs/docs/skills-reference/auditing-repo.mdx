@@ -14,6 +14,44 @@ The Repo Auditor performs a full audit of an Infrahub repository against all Inf
 - As a periodic quality check on an active repository
 - Before opening a pull request that touches schema or automation files
 
+## What it produces
+
+A structured audit report listing:
+
+- **Issue**: what was found
+- **Severity**: error, warning, or info
+- **Location**: file and line where possible
+- **Recommended fix**: what to change and why
+
+Issues are grouped by category so the most critical problems are addressed first.
+
+## Example prompts
+
+- "Audit this repo before we deploy it"
+- "I just inherited this Infrahub project — does it follow conventions?"
+- "Review this repo for issues before I open a pull request"
+- "Run a full audit and tell me what's wrong"
+
+## Key rules enforced
+
+- **Read-only**: the audit never writes to the tree or the index; its only output is `AUDIT_REPORT.md`, and no destructive git command runs, even to undo the audit's own side effect
+- **Every reference site, not just one**: a finding names the complete set of places to change, not a partial list presented as if it were complete
+- **Proposed syntax is verified, not inferred**: a suggested filter or fix is checked against the actual schema and the audited version, not assumed from a sibling query or the latest docs
+- **Registration is checked, not assumed**: every Python component, query, and template is cross-referenced against `.infrahub.yml`; an unregistered file is dead code the platform never imports
+- **`watch` dependencies are checked**: a missing or incomplete `watch` list on a transform or generator is flagged, since it re-fingerprints on every commit or silently stops re-running
+- **Tree condition is stated in the report**: if the audited tree had uncommitted changes, that's recorded, because it bounds what the findings are worth
+
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --------- | --------------------------- |
+| A check, generator, or transform file with no `.infrahub.yml` registration | Flags it: the platform never imports an unregistered file, so it silently never runs |
+| A query name typo between the `.gql` file and the Python class | Cross-references the names and flags the mismatch before it fails at proposed-change time |
+| Uncommitted Python or query changes | Flags them, since Infrahub syncs from the git ref, not the working tree |
+| Bootstrap data placed under `objects/` | Flags it, since every sync re-imports and overwrites edits made through the UI |
+| A Python transform or generator with no `watch` dependency declaration | Flags the missing key, which otherwise re-fingerprints the definition on every commit |
+| A proposed fix based on a sibling query rather than the schema itself | Verifies the filter or syntax against the actual schema and version before proposing it |
+
 ## What it checks
 
 ### Project structure
@@ -71,17 +109,6 @@ Beyond correctness, the auditor flags places where a from-scratch schema, Python
 - A generator that stamps a fixed structure an Object Template could clone, or an Object Template used to push shared values (or a Profile used to clone structure), the wrong tool for the job in each case
 
 These findings are advisory: the code works as-is, but the cheaper option is less to maintain and stays aligned with the platform. Each one names the specific layer to move to, and they are ranked by how cheap the fix is: reusing a published marketplace schema is the cheapest win of all and ranks first, above a one-line schema change, which ranks above a full rewrite.
-
-## What it produces
-
-A structured audit report listing:
-
-- **Issue**: what was found
-- **Severity**: error, warning, or info
-- **Location**: file and line where possible
-- **Recommended fix**: what to change and why
-
-Issues are grouped by category so the most critical problems are addressed first.
 
 ## Acting on the results
 

@@ -63,7 +63,7 @@ infrahubctl marketplace get <namespace>/<name>
 
 Discovery is CLI-first: `infrahubctl marketplace list`, `search <term>`, and `show <namespace>/<name>` browse the whole published catalog (paging through every result by default), and `infrahubctl marketplace get` fetches the match. Reuse only from the marketplace, not from GitHub. In airgapped environments this is a fallback chain, not a blocker: point `--marketplace-url` (or `INFRAHUB_MARKETPLACE_URL`) at an internal mirror, and if none is reachable the skill proceeds with a custom schema (still preferring built-in primitives).
 
-## Validating and loading
+## Loading it
 
 Validate a generated schema before loading it into Infrahub:
 
