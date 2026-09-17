@@ -28,6 +28,33 @@ except ImportError as exc:  # pragma: no cover
 
 
 # ---------------------------------------------------------------------------
+# Infrahub's built-in menu tree
+#
+# Source of truth is Infrahub itself: ``default_menu`` in
+# ``backend/infrahub/menu/menu.py``, verified at tag ``infrahub-v1.11.2``
+# (ee269fe2e64cf511d77c431fc6eb58a870d794d7). Every entry there is namespace
+# ``Builtin`` and ``protected=True``. The identifier shape is
+# ``f"{namespace}{name}"`` (``menu/models.py``), which is also the value
+# ``parent:`` takes in a menu file (``docs/docs/reference/menu.mdx``).
+#
+# Both this mapping and the skill's rule are copies of that upstream list, not
+# of each other. Re-read menu.py at the current tag before editing either.
+# ---------------------------------------------------------------------------
+
+BUILTIN_MENU_SECTIONS: dict[str, str] = {
+    "BuiltinOther": "Other",
+    "BuiltinIPAM": "IPAM",
+    "BuiltinProposedChanges": "Proposed Changes",
+    "BuiltinBranches": "Branches",
+    "BuiltinObjectManagement": "Object Management",
+    "BuiltinActions": "Actions",
+    "BuiltinIntegration": "Integrations",
+    "BuiltinActivity": "Activity",
+    "BuiltinAdmin": "Admin",
+}
+
+
+# ---------------------------------------------------------------------------
 # Low-level menu traversal helpers
 # ---------------------------------------------------------------------------
 
@@ -70,6 +97,47 @@ def _all_menu_items_recursive(doc: dict) -> list[dict]:
 
     _walk(_menu_items(doc))
     return items
+
+
+def _child_items(item: dict) -> list[dict]:
+    """Return an item's direct children, tolerating both children shapes."""
+    children = item.get("children", {})
+    if isinstance(children, dict):
+        return children.get("data", []) or []
+    if isinstance(children, list):
+        return children
+    return []
+
+
+def _subtree(item: dict) -> list[dict]:
+    """Return an item plus every descendant beneath it."""
+    collected = [item]
+    for child in _child_items(item):
+        collected.extend(_subtree(child))
+    return collected
+
+
+def _identifier(item: dict) -> str:
+    """Return the menu item's identifier: namespace concatenated with name."""
+    return f"{item.get('namespace') or ''}{item.get('name') or ''}"
+
+
+def _parent_ref(item: dict) -> str:
+    """Return the item's declared parent identifier, or an empty string."""
+    parent = item.get("parent")
+    return parent.strip() if isinstance(parent, str) else ""
+
+
+def _normalized(value: Any) -> str:
+    """Lowercase and strip non-alphanumerics, for comparing display labels."""
+    if not isinstance(value, str):
+        return ""
+    return "".join(ch for ch in value.lower() if ch.isalnum())
+
+
+_BUILTIN_LABELS: dict[str, str] = {
+    _normalized(label): label for label in BUILTIN_MENU_SECTIONS.values()
+}
 
 
 # ---------------------------------------------------------------------------
@@ -368,6 +436,74 @@ def check_schema_comment(doc: dict, raw_text: str = "", **_: Any) -> tuple[bool,
     return False, "No $schema or yaml-language-server comment found"
 
 
+def check_no_builtin_section_recreated(doc: dict, **_: Any) -> tuple[bool, str]:
+    """No menu item duplicates a section Infrahub already ships."""
+    all_items = _all_menu_items_recursive(doc)
+    if not all_items:
+        return False, "No menu items found"
+
+    collisions: list[str] = []
+
+    for item in all_items:
+        identifier = _identifier(item)
+        if identifier in BUILTIN_MENU_SECTIONS:
+            collisions.append(
+                f"item '{identifier}' reuses the identifier of the built-in "
+                f"{BUILTIN_MENU_SECTIONS[identifier]} section"
+            )
+
+    # A top-level entry that declares a parent is not top level in the rendered
+    # sidebar — it attaches under that parent, so it cannot collide.
+    for item in _menu_items(doc):
+        if _parent_ref(item):
+            continue
+        for field in ("label", "name"):
+            match = _BUILTIN_LABELS.get(_normalized(item.get(field)))
+            if match:
+                collisions.append(
+                    f"top-level {field} '{item.get(field)}' recreates the "
+                    f"built-in {match} section"
+                )
+                break
+
+    if collisions:
+        return False, "Duplicates Infrahub's built-in menu: " + "; ".join(
+            sorted(set(collisions))
+        )
+    return True, f"None of the {len(all_items)} items duplicate a built-in section"
+
+
+def check_parent_attaches_to_builtin(doc: dict, **_: Any) -> tuple[bool, str]:
+    """IPAM-domain items reach the built-in IPAM section via parent:."""
+    expected_kinds = {"ipamvlan", "ipamvrf"}
+
+    all_items = _all_menu_items_recursive(doc)
+    if not all_items:
+        return False, "No menu items found"
+
+    attached: list[dict] = []
+    for item in all_items:
+        if _parent_ref(item) in BUILTIN_MENU_SECTIONS:
+            attached.extend(_subtree(item))
+
+    if not attached:
+        declared = sorted({_parent_ref(i) for i in all_items if _parent_ref(i)})
+        detail = f"found parent values: {', '.join(declared)}" if declared else "no item declares a parent"
+        return False, (
+            "No item attaches to a built-in section via parent: <Namespace><Name> "
+            f"(expected parent: BuiltinIPAM) — {detail}"
+        )
+
+    reached = {_normalized(item.get("kind")) for item in attached}
+    missing = sorted(expected_kinds - reached)
+    if missing:
+        return False, (
+            "Not reachable from a built-in section: "
+            f"{', '.join(missing)} (attached kinds: {', '.join(sorted(k for k in reached if k)) or 'none'})"
+        )
+    return True, f"{len(expected_kinds)} IPAM-domain kinds attach under a built-in section"
+
+
 # ---------------------------------------------------------------------------
 # Check registry
 # ---------------------------------------------------------------------------
@@ -391,6 +527,8 @@ CHECKS: dict[str, Any] = {
     "include-in-menu-false": check_include_in_menu_false,
     "infrahub-yml-registration": check_infrahub_yml_registration,
     "schema-comment": check_schema_comment,
+    "no-builtin-section-recreated": check_no_builtin_section_recreated,
+    "parent-attaches-to-builtin": check_parent_attaches_to_builtin,
 }
 
 
