@@ -14,6 +14,28 @@ Infrahub Skills can be installed into any AI tool that supports skills or custom
 - **infrahubctl** — required for loading generated schemas, objects, and running generators. See the [infrahubctl docs](https://docs.infrahub.app/infrahubctl)
 - **Infrahub MCP server** (optional) — required only for the [Data Analyzer](./skills-reference/analyzing-data.mdx) skill, beneficial but not required for other skills. See the [MCP server docs](https://docs.infrahub.app/mcp)
 
+## Supported AI tools
+
+| AI Tool | Installation Method | Auto-detection | Direct Skill Invocation |
+| --------- | ------------------- | ---------------- | ------------------------ |
+| Claude Code (plugin) | `/plugin install infrahub@opsmill` | Yes (session hook) | Yes (`/infrahub:managing-schemas`, etc.) |
+| Claude Code (npx) | `npx skills add` | No | Yes |
+| GitHub Copilot | `npx skills add` | No | No, passive only |
+| Cursor | `npx skills add` | No | No, passive only |
+| Windsurf | `npx skills add` | No | No, passive only |
+| Amp | `npx skills add` | No | No, passive only |
+| Cline | `npx skills add` | No | No, passive only |
+| Codex | `npx skills add` | No | No, passive only |
+
+**Auto-detection** means the tool recognizes an Infrahub project and
+activates skills without you asking. It is a Claude Code plugin feature,
+via the session start hook.
+
+**Direct skill invocation** means calling a skill by name, for example
+`/infrahub:managing-schemas`. Also Claude Code only. Every other tool is
+passive: it reads skill content as context when the request is relevant.
+For those, describe what you want and the AI applies the right skill.
+
 ## Installation
 
 <Tabs>
