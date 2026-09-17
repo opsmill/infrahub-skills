@@ -25,6 +25,17 @@ users might say, and use TRIGGER / DO NOT TRIGGER to
 disambiguate against neighbouring skills. Lean slightly
 pushy — agents under-trigger skills.
 
+State triggers, never a workflow summary. A description
+that narrates the steps gives the agent a shortcut: it
+follows the summary instead of reading the body. The
+summary is also lossy in the worst direction, because
+what it drops is whatever did not fit. One skill's
+description omitted the step its own body flags as "the
+one most easily skipped", and the section carrying its
+top-priority rule, so that rule never fired at all. Name
+the action and the triggers; put the ordered steps in
+the body.
+
 ## Body
 
 Structure: Overview (what and when) → Workflow
@@ -67,6 +78,41 @@ than no claim, because the next author trusts it instead
 of re-checking. Before encoding a customer or PoC lesson
 as a rule, verify it against current stable Infrahub —
 a lesson that upstream already fixed rots the skill.
+
+## Release-gate a command you teach
+
+A command is only teachable once it is released. Name
+the minimum version and give an observable fallback, so
+a reader on an older install has somewhere to go:
+
+```markdown
+Requires infrahub-sdk >= <min version>. On
+`No such command`, upgrade, or <what to do instead>.
+```
+
+Without it the reader hits `No such command` on the
+documented happy path, and `infrahub-common`'s
+information-priority rule tells agents this plugin
+outranks the docs, so they trust the broken instruction.
+One skill made an unreleased command step 6 of 7.
+
+One home per pin, as above:
+`skills/infrahub-common/marketplace-reference.md` owns
+the `infrahubctl marketplace` floor, so a second skill
+needing it links there rather than restating the number.
+
+## Know what the CLI gate covers
+
+`scripts/check-cli-invocations.py` validates the
+`infrahubctl` invocations printed under `skills/`,
+`graders/`, `tests/`, `eval.yaml`, `.claude/skills/` and
+most of `dev/`, against the tree pinned in
+`graders/common/cli_tree.py`. Its `SCAN_TARGETS` is the
+authority; `docs/`, `README.md` and `dev/specs/` are
+outside it. It judges nothing else either, so a `gh`
+flag, a `curl`, or a REST path is only as good as the
+author who ran it. Run it, and say which version you ran
+it on.
 
 ## Verifying an edit
 

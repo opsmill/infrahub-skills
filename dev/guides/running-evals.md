@@ -199,6 +199,28 @@ answerable without the skill. Keep the prompt at the
 abstraction level a real user would type and let the
 skill supply the shape.
 
+**Don't reuse the skill's own worked example.**
+`examples.md` ships with the skill and the model reads
+it on demand, so a task built on the scenario it already
+teaches measures retrieval, not transfer: the model
+copies the worked answer rather than applying the
+pattern to something new. Three tasks
+shipped this way. One used a generator identical to
+`skills/infrahub-managing-generators/examples.md` §5;
+another shared nine domain identifiers
+with its rule's example and spelled out the relationship
+chain, so a model without the rule would very likely
+produce the same traversal.
+
+Pick a different domain and keep the taught example as
+the teaching example. The tell that you did not is the
+grader: a check hard-coded to the example's literals
+(one kind name, one relationship, one concept slug) only
+works for that one prompt, and re-wording the task
+scores a compliant answer 0. That is
+[Overfitting to specific examples](../knowledges/skill-writing-guide.md#overfitting-to-specific-examples)
+reaching the grader.
+
 **Prove the task discriminates.** Every task's
 `instruction` opens with a `Read the skill at
 .agents/skills/<skill>/SKILL.md` line, and that line

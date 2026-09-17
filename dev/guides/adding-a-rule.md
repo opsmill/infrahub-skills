@@ -121,7 +121,7 @@ artifact instead:
 | Schema / object / menu YAML | `yaml.safe_load`, then walk the structure |
 | Python (checks, generators, transforms) | `ast` — see `graders/managing-generators/lib.py` |
 | Shell commands | `shlex.split`; never split on `[;\|&]`, which fabricates segments inside quotes |
-| Prose reports | locate the section, then match inside it |
+| Prose reports | locate the section, then rank evidence — see below |
 
 Three failure modes follow from matching raw text:
 
@@ -135,6 +135,46 @@ Three failure modes follow from matching raw text:
 - **Adjacency is not structure.** A verb next to a
   path does not mean the command ran against that
   path.
+
+#### Why ranking evidence beats listing phrasings
+
+The constraint and the ranked ladder are in
+[graders.md](../guidelines/graders.md#grading-prose-rank-evidence-dont-list-phrasings).
+This is the measurement behind it, from a check that
+shipped.
+
+Some answers have nothing to parse: a
+`verified_against` field, a `## Verification` section, a
+justification sentence. The reflexive draft enumerates
+the phrasings a bad answer might use. Two answers of
+identical substance, one word apart:
+
+```text
+"the same form the sibling query uses"   -> 1.0, passed
+"same form as the sibling query"         -> 0.8, FAILED
+```
+
+The miss direction was as bad. Three answers naming an
+introspected artifact *and* its pinned version were
+rejected for a turn of phrase — `mirrors the`,
+`elsewhere in the repo` — while `"copied from the
+sibling query"` and `"consistent with the sibling
+query"` sailed through, because neither carried the verb
+the pattern anchored on.
+
+So the terse answer that named an artifact and explained
+nothing scored 1.0, and the thorough one that
+introspected the image *and* named the analogy it had
+ruled out scored 0. The eval was teaching the model to
+strip its reasoning out of the field.
+
+Widening the pattern does not fix this; it was narrowed
+twice against live trials already, and each widening
+re-broke a trial the narrowing had fixed. What fixed it
+was asking what the check was really for — *did you go
+and look* — and testing that directly, strongest
+evidence first. Re-ran against the trial loop: 3/3 at
+1.00, from 0.80.
 
 ### 3. Add an Eval Task
 

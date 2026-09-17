@@ -24,7 +24,7 @@ that words it differently. Parse the artifact instead:
 | Schema / object / menu YAML | `yaml.safe_load`, then walk the structure |
 | Python (checks, generators, transforms) | `ast` |
 | Shell commands | `shlex.split` — never split on `[;\|&]`, which fabricates segments inside quotes |
-| Prose reports | locate the section, then match inside it |
+| Prose reports | locate the section, then rank evidence — see "Grading prose" below |
 
 Three failure modes follow from matching raw text:
 
@@ -36,6 +36,32 @@ Three failure modes follow from matching raw text:
   is fenced.
 - **Adjacency is not structure.** A verb next to a path
   does not mean the command ran against that path.
+
+## Grading prose: rank evidence, don't list phrasings
+
+Some answers have nothing to parse: a
+`verified_against` field, a `## Verification` section, a
+justification sentence. Enumerating the phrasings a bad
+answer might use is wrong in both directions at once,
+and both are the same bug. Wording is unbounded.
+
+Ask what the check is really for, then test for that
+directly, strongest evidence first:
+
+1. An explicitly declared non-verification passes. The
+   rule asks for exactly that honesty.
+2. A named artifact or version passes, and may then
+   discuss an analogy freely. Reasoning about evidence
+   is not evidence by analogy.
+3. Only then does a bare analogy fail.
+
+Ordering it this way lets step 3 be broad without
+punishing an answer resting on something real. Getting
+it wrong compounds: a check that grades wording teaches
+the next author to write what satisfies the regex rather
+than what is correct. The measurement behind this, on a
+check that shipped, is in
+[adding-a-rule.md](../guides/adding-a-rule.md#why-ranking-evidence-beats-listing-phrasings).
 
 ## Check function shape
 
