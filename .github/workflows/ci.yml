@@ -111,7 +111,6 @@ jobs:
         with:
           python-version: "3.13"
       - run: python scripts/check-cli-invocations.py
-      - run: python scripts/check-docs-sidebar.py
       - name: Verify routing symlinks resolve
         run: python scripts/check-symlinks.py
 
@@ -129,6 +128,10 @@ jobs:
           node-version: "20"
           cache: npm
           cache-dependency-path: docs/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python scripts/check-docs-sidebar.py
       - run: npm ci
         working-directory: docs
       - run: npm run build
