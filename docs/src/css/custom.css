@@ -144,3 +144,63 @@ body {
   border-radius: 0 var(--ifm-breadcrumb-border-radius) var(--ifm-breadcrumb-border-radius) 0;
   border-left: 1px solid var(--ifm-breadcrumb-color-active);
 }
+
+/* Sidebar / menu tweaking
+ *
+ * This repo has no sidebar type scale of its own: the only rule is the flat
+ * `.menu { font-size: 0.875rem }` above, so every category and every page
+ * link renders identically. The structure below, styling the sidebar by
+ * level instead of one flat rule, follows opsmill/infrahub-docs, which is
+ * what actually serves the published site. The two L1 values do not match
+ * it, though: infrahub-docs uses `1.1rem` / `1.5rem` margin-bottom, and we
+ * use `1rem` / `0.75rem` here. Both were dialed back from the published
+ * numbers for reading comfort on a large local display without the vertical
+ * bulk nine categories' worth of 1.5rem gaps added.
+ *
+ * This file (docs/src/css/custom.css) is not synced anywhere: sync-docs.yml
+ * copies only docs/docs/* and docs/sidebars.ts into infrahub-docs. So this
+ * block changes the local `npm run build` / `npm start` preview only, and
+ * can never reach the published site either way.
+ *
+ * infrahub-docs also has L3 and L4 rules (nested categories, spoke links).
+ * Those are omitted here on purpose: our sidebar is only two levels deep,
+ * categories and page links, so L3/L4 selectors would never match anything.
+ */
+
+/* L1 — top-level category headers and standalone links. Bold and a step up
+   in size so a category reads as a heading rather than another link. */
+.theme-doc-sidebar-item-link-level-1>.menu__link,
+.theme-doc-sidebar-item-category-level-1>.menu__list-item-collapsible>.menu__link {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.theme-doc-sidebar-item-category-level-1,
+.theme-doc-sidebar-item-link-level-1 {
+  margin-bottom: 0.75rem;
+}
+
+/* L2 — page links under a category. Regular weight with a touch less
+   vertical padding than the default, so they read as lighter than the L1
+   header above them instead of competing with it. */
+.theme-doc-sidebar-item-category-level-2>.menu__list-item-collapsible>.menu__link,
+.theme-doc-sidebar-item-link-level-2>.menu__link {
+  font-weight: 400;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+/* A high-resolution display running at or near native scaling. CSS pixels are
+   already scaling-independent, so a 4K screen at 200% reports about 1920 CSS
+   px and needs nothing. One at 100% reports 3840, where the base scale reads
+   small. Hence a high breakpoint rather than the usual 1440. */
+@media (min-width: 2560px) {
+  .menu {
+    font-size: 1rem;
+  }
+
+  .theme-doc-sidebar-item-link-level-1>.menu__link,
+  .theme-doc-sidebar-item-category-level-1>.menu__list-item-collapsible>.menu__link {
+    font-size: 1.25rem;
+  }
+}
