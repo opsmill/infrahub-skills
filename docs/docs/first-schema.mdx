@@ -1,0 +1,141 @@
+---
+title: Your first schema
+---
+
+Ten minutes, one schema, loaded onto a branch you can throw away. This
+assumes you have finished [Installation & Setup](./installation-setup.mdx)
+and have `infrahubctl` pointed at a running Infrahub instance.
+
+## What you are building
+
+A small circuit inventory: a provider, and the circuits it supplies. Two
+node types and one relationship. Small enough to read in one screen, big
+enough that the schema rules actually apply.
+
+## 1. Ask for it in plain language
+
+Open your Infrahub project in your AI tool and ask:
+
+> Create an Infrahub schema for circuit inventory. A Provider has a name
+> and an account number. A Circuit has a circuit ID, a bandwidth in Mbps,
+> an operational status, and belongs to exactly one Provider. A Provider
+> can have many Circuits.
+
+The Schema Manager skill picks this up. You do not invoke it by name.
+
+## 2. Read what came back
+
+You should get a file under `schemas/`, something close to this:
+
+```yaml
+---
+version: "1.0"
+nodes:
+  - name: Provider
+    namespace: Circuit
+    label: Provider
+    human_friendly_id:
+      - name__value
+    display_labels:
+      - name__value
+    attributes:
+      - name: name
+        kind: Text
+        unique: true
+      - name: account_number
+        kind: Text
+        optional: true
+    relationships:
+      - name: circuits
+        peer: CircuitCircuit
+        optional: true
+        cardinality: many
+        identifier: circuit__provider
+
+  - name: Circuit
+    namespace: Circuit
+    label: Circuit
+    human_friendly_id:
+      - circuit_id__value
+    display_labels:
+      - circuit_id__value
+    attributes:
+      - name: circuit_id
+        kind: Text
+        unique: true
+      - name: bandwidth
+        kind: Number
+        optional: true
+      - name: status
+        kind: Dropdown
+        choices:
+          - name: active
+            label: Active
+          - name: provisioning
+            label: Provisioning
+          - name: decommissioned
+            label: Decommissioned
+    relationships:
+      - name: provider
+        peer: CircuitProvider
+        optional: false
+        cardinality: one
+        identifier: circuit__provider
+```
+
+Four things there are the skill doing its job, and they are the four
+things a generic AI answer usually gets wrong:
+
+- **`human_friendly_id`** on both nodes. Without it, other files cannot
+  reference these objects by name.
+- **`identifier: circuit__provider`** on both sides of the relationship.
+  The two ends must share it, or Infrahub reads them as two unrelated
+  relationships.
+- **`kind: Dropdown` with choice objects**, not bare strings. A list of
+  plain strings is rejected at load.
+- **`optional: false`** on the Circuit side. That is what makes the
+  relationship mandatory rather than merely present.
+
+## 3. Check it before loading
+
+```bash
+infrahubctl schema check schemas/circuit.yml
+```
+
+This validates the file against the running instance without changing
+anything. Fix anything it reports before continuing.
+
+## 4. Load it onto a branch
+
+Never load onto the default branch first. A bad load on `main` is a
+per-object cleanup; on a branch it is one discard.
+
+```bash
+infrahubctl branch create circuit-inventory
+infrahubctl schema load schemas/circuit.yml --branch circuit-inventory
+```
+
+## 5. Look at it
+
+Open the Infrahub web UI, switch to the `circuit-inventory` branch, and
+you should see Provider and Circuit in the object list.
+
+If you want to keep it, merge the branch. If this was a trial run:
+
+```bash
+infrahubctl branch delete circuit-inventory
+```
+
+Nothing reached the default branch either way.
+
+## What to do next
+
+- **Put data in it.** Ask for a few providers and circuits, and the
+  [Object Manager](./skills-reference/managing-objects.mdx) produces the
+  object YAML.
+- **Load real data.** If you have this in a spreadsheet already, the
+  [Data Importer](./skills-reference/importing-data.mdx) takes CSV or TSV.
+- **Something bigger.** For a build spanning several skills, plan it
+  first with [Spec-Driven Development](./spec-driven-development.mdx).
+- **Not sure which skill owns a job?** See
+  [Which skill do I use?](./choosing-a-skill.mdx).
