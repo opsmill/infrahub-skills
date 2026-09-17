@@ -268,6 +268,94 @@ def references_core_artifact_in_call(tree: ast.Module | None) -> bool:
     return False
 
 
+_ARTIFACT_READY_STATUS = "Ready"
+
+
+def _attribute_chain(node: ast.AST) -> list[str]:
+    """Attribute names of ``a.b.c`` as ``["b", "c"]``, outermost last.
+
+    Returns ``[]`` for anything that is not an attribute access.
+    """
+    names: list[str] = []
+    while isinstance(node, ast.Attribute):
+        names.append(node.attr)
+        node = node.value
+    return list(reversed(names))
+
+
+def _mentions_attribute(node: ast.AST, attr: str) -> bool:
+    """True if ``attr`` appears anywhere in an attribute chain under ``node``."""
+    return any(
+        attr in _attribute_chain(sub)
+        for sub in ast.walk(node)
+        if isinstance(sub, ast.Attribute)
+    )
+
+
+def _is_ready_status_value(node: ast.AST) -> bool:
+    """True for the literal ``"Ready"`` or an ``ArtifactStatus.READY`` chain.
+
+    Deliberately narrow: ``"Error"`` and ``"Pending"`` are the other members of
+    Infrahub's ``ArtifactStatus`` enum, and comparing against either is error
+    handling, not a readiness gate.
+    """
+    if isinstance(node, ast.Constant) and node.value == _ARTIFACT_READY_STATUS:
+        return True
+    return any(name.upper() == "READY" for name in _attribute_chain(node))
+
+
+def _predicate_expressions(tree: ast.Module) -> list[ast.AST]:
+    """Every expression evaluated as a condition, not merely present.
+
+    Assignments, f-strings, and bare call arguments are excluded on purpose:
+    setting ``artifact.status.value`` or logging the word "Ready" is not a
+    gate, and a check that accepted either would grade vocabulary.
+    """
+    found: list[ast.AST] = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.If, ast.While, ast.IfExp, ast.Assert)):
+            found.append(node.test)
+        elif isinstance(node, ast.comprehension):
+            found.extend(node.ifs)
+        elif isinstance(node, ast.Lambda):
+            found.append(node.body)
+        elif isinstance(node, ast.Compare):
+            found.append(node)
+    return found
+
+
+def _predicate_gates_on_ready_status(expr: ast.AST) -> bool:
+    """True if ``expr`` compares an artifact's ``status`` against ``"Ready"``."""
+    for sub in ast.walk(expr):
+        if not isinstance(sub, ast.Compare):
+            continue
+        operands = [sub.left, *sub.comparators]
+        if not any(_mentions_attribute(o, "status") for o in operands):
+            continue
+        for operand in operands:
+            if any(_is_ready_status_value(inner) for inner in ast.walk(operand)):
+                return True
+    return False
+
+
+def _query_filters_on_readiness(tree: ast.Module) -> bool:
+    """True if a call pushes readiness into the query as a filter keyword.
+
+    Covers the Infrahub filter spellings ``status__value="Ready"``,
+    ``status__values=["Ready"]`` and ``storage_id__isnull=False``.
+    """
+    for call in _iter_calls(tree):
+        for kw in call.keywords:
+            if kw.arg is None:
+                continue
+            if kw.arg.startswith("storage_id"):
+                return True
+            if kw.arg.startswith("status"):
+                if any(_is_ready_status_value(v) for v in ast.walk(kw.value)):
+                    return True
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Union-fragments checks
 # ---------------------------------------------------------------------------
@@ -352,6 +440,35 @@ def check_polls_coreartifact_after_post(
     if references_core_artifact_in_call(tree):
         return True, "CoreArtifact read found after POST"
     return False, "No call references kind='CoreArtifact'"
+
+
+def check_artifact_poll_requires_body_ready(
+    tree: ast.Module | None = None, py_raw: str = "", **_: Any
+) -> tuple[bool, str]:
+    """The poll must accept only artifacts whose body is retrievable.
+
+    Infrahub creates the ``CoreArtifact`` node with ``status: "Pending"`` and
+    no ``storage_id``, then fills both in once the transform has rendered, so a
+    poll that counts nodes converges while a content fetch still 404s. The
+    acceptance decision has to gate on a readiness signal — ``status`` equal to
+    ``"Ready"``, or a present ``storage_id`` — either pushed into the
+    ``CoreArtifact`` query or applied to the fetched artifacts before counting.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+    if not has_post_to_artifact_generate(tree, py_raw):
+        return False, "No POST to /api/artifact/generate; nothing to poll"
+    if _query_filters_on_readiness(tree):
+        return True, "CoreArtifact query filters on artifact readiness"
+    for expr in _predicate_expressions(tree):
+        if _predicate_gates_on_ready_status(expr):
+            return True, "Acceptance predicate requires status == 'Ready'"
+        if _mentions_attribute(expr, "storage_id"):
+            return True, "Acceptance predicate requires a present storage_id"
+    return False, (
+        "Acceptance predicate counts CoreArtifact nodes without requiring a "
+        "retrievable body — no status == 'Ready' or storage_id gate"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1167,6 +1284,7 @@ CHECKS: dict[str, Any] = {
     "posts-artifact-generate-endpoint": check_posts_artifact_generate_endpoint,
     "has-polling-loop": check_has_polling_loop,
     "polls-coreartifact-after-post": check_polls_coreartifact_after_post,
+    "artifact-poll-requires-body-ready": check_artifact_poll_requires_body_ready,
     "dry-run-executes-query": check_dry_run_executes_query,
     "dry-run-before-merge": check_dry_run_before_merge,
     "watch-present-on-python-transforms": check_watch_present_on_python_transforms,
