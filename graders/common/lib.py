@@ -70,7 +70,7 @@ def check_docs_fallback(text: str) -> tuple[bool, str]:
 # question of the repository's own prose.
 # ---------------------------------------------------------------------------
 
-from cli_tree import invalid_invocations  # noqa: E402
+from cli_tree import code_regions, invalid_invocations  # noqa: E402
 
 
 def check_cli_commands_exist(text: str) -> tuple[bool, str]:
@@ -349,6 +349,131 @@ def check_generator_target_is_key_value(text: str) -> tuple[bool, str]:
     return True, "generator target is a key=value variable on a named branch"
 
 
+# ---------------------------------------------------------------------------
+# schema.graphql is generated output
+# ---------------------------------------------------------------------------
+
+_SCHEMA_FILE = r"(?:\./)?schema\.graphql"
+
+# The command that writes the file. Spelled out in full rather than matched
+# on the word `export`, so `infrahubctl schema export` — a different command
+# writing a different artifact — cannot satisfy it.
+_EXPORT_SCHEMA = re.compile(r"infrahubctl[^\S\n]+graphql[^\S\n]+export-schema\b")
+
+# A command whose target is the file: an editor, an in-place rewrite, a
+# patch, or a redirection onto it. Scanned inside code regions only, so the
+# prose *around* the fix is never read as the fix. That boundary is the
+# whole point: the task prompt hands the model a hand-edit to judge, so a
+# good answer discusses one at length, and every attempt here to tell a
+# discussion from an instruction by its wording failed a correct answer.
+# `export-schema --destination schema.graphql` names the file too and is
+# deliberately not matched — there the file is the command's output.
+_SCHEMA_WRITE_CMD = re.compile(
+    r"\b(?:vim?|nvim|nano|emacs|code|subl|open)\b[^\n`]{0,60}" + _SCHEMA_FILE
+    + r"|\bsed\b[^\n`]{0,80}-i\b[^\n`]{0,80}" + _SCHEMA_FILE
+    + r"|\bpatch\b[^\n`]{0,60}" + _SCHEMA_FILE
+    + r"|>>?[^\S\n]*" + _SCHEMA_FILE
+)
+
+# A clause saying what becomes *of* an edit — it is overwritten, discarded,
+# pointless — is warning against the edit rather than prescribing it, and so
+# is one that calls the file generated. Used to read a fenced block's
+# introduction, where "after the export the file contains:" and "add this
+# yourself:" are the two cases to tell apart.
+_EDIT_IS_WARNED_AGAINST = re.compile(
+    r"\b(?:overwrit\w+|overwrote|discard\w*|clobber\w*|lost|loses|lose|gone|"
+    r"wiped?|reverted|pointless|futile|generated|build artifact|"
+    r"source of truth)\b",
+    re.IGNORECASE,
+)
+
+
+# Naming the file is not the only way to say "type this in". An answer can
+# hand over the schema content itself and never mention where it goes, which
+# reads as helpful and is the same edit. Only a fence tagged as GraphQL is
+# considered, so a YAML block whose `class_name: CreateDc` happens to have
+# the shape of a field declaration is never mistaken for one.
+_FENCE = re.compile(r"```([^\n]*)\n(.*?)```", re.DOTALL)
+_GRAPHQL_FENCE_TAGS = {"graphql", "gql", "sdl"}
+
+# An operation — what a `.gql` file holds. A fence containing one is the
+# query being discussed, never schema content.
+_GQL_OPERATION = re.compile(r"\b(?:query|mutation|subscription|fragment)\b")
+
+# Schema content: a type definition, or a bare `field: Type` declaration.
+# A selection set writes bare field names, so neither shape appears in one.
+_SDL_DEFINITION = re.compile(
+    r"^\s*(?:extend\s+)?(?:type|interface|input|enum|union|scalar)\s+\w+",
+    re.MULTILINE,
+)
+_SDL_FIELD = re.compile(r"^\s*\w+\s*:\s*\[?\w+[\]!]*!?\s*$", re.MULTILINE)
+
+
+def _line_before(text: str, pos: int) -> str:
+    """The last non-empty line before ``pos`` — a fence's introduction."""
+    for line in reversed(text[:pos].splitlines()):
+        if line.strip():
+            return line
+    return ""
+
+
+def check_graphql_schema_regenerated(text: str) -> tuple[bool, str]:
+    """`schema.graphql` is export output, refreshed by command, never typed.
+
+    `infrahubctl graphql export-schema` fetches the schema from the server
+    and rewrites the whole file, so a field typed into it by hand is gone at
+    the next export and, until then, the local file disagrees with the
+    server every query is validated against. The check asks which mechanism
+    the answer puts the missing field there with: the export command, or an
+    editor.
+
+    Evidence is ranked, and only structural evidence counts. A command
+    aimed at the file decides first; hand-written schema content offered as
+    something to paste in decides next; the absence of the export command
+    decides last. Prose is read for neither, because the task prompt hands
+    the model a hand-edit to judge and a good answer therefore discusses
+    one at length — an earlier draft that matched "hand-edit
+    `schema.graphql`" failed a trial that rejected the hand-edit in its
+    opening sentence and ran the export three lines later.
+    """
+    if not text.strip():
+        return False, "no output to check"
+
+    offenders: list[str] = []
+    for region in code_regions(text):
+        for match in _SCHEMA_WRITE_CMD.finditer(region):
+            offenders.append(" ".join(match.group(0).split()))
+
+    for fence in _FENCE.finditer(text):
+        if fence.group(1).strip().lower() not in _GRAPHQL_FENCE_TAGS:
+            continue
+        body = fence.group(2)
+        if _GQL_OPERATION.search(body):
+            continue
+        if not (_SDL_DEFINITION.search(body) or _SDL_FIELD.search(body)):
+            continue
+        if _is_negated(text, fence.start()):
+            continue
+        intro = _line_before(text, fence.start())
+        if _EXPORT_SCHEMA.search(intro) or _EDIT_IS_WARNED_AGAINST.search(intro):
+            continue
+        offenders.append("hand-written schema SDL block")
+
+    if offenders:
+        return False, (
+            f"treats schema.graphql as a source file: {sorted(set(offenders))}; "
+            "it is `export-schema` output, and a hand-edit is overwritten"
+        )
+
+    for match in _EXPORT_SCHEMA.finditer(text):
+        if not _is_negated(text, match.start()):
+            return True, "refreshes schema.graphql with `infrahubctl graphql export-schema`"
+    return False, (
+        "answer never runs `infrahubctl graphql export-schema`, so nothing "
+        "refreshes schema.graphql from the server"
+    )
+
+
 # A name may carry colon-separated arguments, e.g.
 # `python-transform-dry-run:spine_config`, so a check that depends on a task
 # fixture is not pinned to one task by its registry entry.
@@ -359,6 +484,7 @@ CHECKS = {
     "preflight-write-probe": check_preflight_write_probe,
     "token-not-printed": check_token_not_printed,
     "generator-target-is-key-value": check_generator_target_is_key_value,
+    "graphql-schema-regenerated": check_graphql_schema_regenerated,
 }
 
 
