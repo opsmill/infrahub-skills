@@ -6,7 +6,7 @@ This file is a router for AI coding assistants working with this repository: it 
 
 This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub), the infrastructure data management platform by OpsMill. The plugin provides skills covering the full Infrahub development lifecycle: schema design, data population, validation checks, generators, transforms, menu customization, and live data analysis.
 
-The repository is a pure Markdown-based skills project (no Python code). Each skill is defined in its own directory under `skills/` with rules, examples, and reference documentation. Skills follow the [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) format.
+The skills themselves are Markdown: each one is a directory under `skills/` holding rules, examples, and reference documentation, in the [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) format. The machinery around them is Python — graders under `graders/`, the test suite under `tests/`, the gate scripts under `scripts/`, and a few bundled skill scripts — and CI runs `ruff` and `pytest` over all of it. Treat a change to that half as code, not documentation.
 
 ## Navigation
 

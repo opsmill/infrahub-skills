@@ -160,7 +160,7 @@ pass; an interruption is not evidence of anything.
 For every term in the handoff's `Sweep terms`:
 
 ```bash
-grep -rn "<sweep term>" skills/ graders/ eval.yaml dev/ README.md AGENTS.md docs/ contributor-skills/
+grep -rn "<sweep term>" skills/ graders/ eval.yaml dev/ README.md AGENTS.md docs/ .agents/skills/
 ```
 
 Skip `evaluations/`, which `sync-evals.py` regenerates from `eval.yaml`. Fix
