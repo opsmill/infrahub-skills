@@ -107,6 +107,7 @@ Below, `<name>` is the skill name without its `infrahub-` prefix, so for
 | `eval.yaml` | Every eval task, for every skill, in one root file |
 | `evaluations/infrahub-<name>.json` | Generated from `eval.yaml` by `scripts/sync-evals.py` |
 | `docs/docs/skills-reference/<name>.mdx` | The reference page on this site |
+| `docs/sidebars.ts` | The sidebar entry `scripts/check-docs-sidebar.py` enforces |
 
 A new skill also has to appear in the tables in `AGENTS.md` and in this
 site's landing page. The list, and which of them go stale on a behavior
@@ -137,6 +138,8 @@ fires at all.
 - [`dev/guides/adding-a-rule.md`](https://github.com/opsmill/infrahub-skills/blob/main/dev/guides/adding-a-rule.md)
 - [`dev/guides/running-evals.md`](https://github.com/opsmill/infrahub-skills/blob/main/dev/guides/running-evals.md)
 - [`dev/knowledges/skill-writing-guide.md`](https://github.com/opsmill/infrahub-skills/blob/main/dev/knowledges/skill-writing-guide.md)
+- [The skill-change pipeline](./skill-change-pipeline.mdx), for the skills
+  that walk a change from defect or idea through to a pull request
 
 For how skills load at runtime, from the reader's side, see
-[How It Works](../how-it-works.mdx).
+[How it works](../how-it-works.mdx).

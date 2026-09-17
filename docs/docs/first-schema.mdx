@@ -3,7 +3,7 @@ title: Your first schema
 ---
 
 Ten minutes, one schema, loaded onto a branch you can throw away. This
-assumes you have finished [Installation & Setup](./installation-setup.mdx)
+assumes you have finished [Installation and setup](./installation-setup.mdx)
 and have `infrahubctl` pointed at a running Infrahub instance.
 
 ## What you are building
@@ -83,7 +83,7 @@ nodes:
         identifier: circuit__provider
 ```
 
-Four things there are the skill doing its job, and they are the four
+Five things there are the skill doing its job, and they are the five
 things a generic AI answer usually gets wrong:
 
 - **`human_friendly_id`** on both nodes. Without it, other files cannot
@@ -121,8 +121,8 @@ infrahubctl schema load schemas/circuit.yml --branch circuit-inventory
 
 ```mermaid
 flowchart LR
-  create["infrahubctl branch create"] --> check["infrahubctl schema check"]
-  check --> load["infrahubctl schema load
+  check["infrahubctl schema check"] --> create["infrahubctl branch create"]
+  create --> load["infrahubctl schema load
 --branch"]
   load --> review["look at it in the web UI"]
   review -->|"keep it"| merge["merge the branch"]
