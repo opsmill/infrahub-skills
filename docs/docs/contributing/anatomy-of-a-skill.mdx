@@ -103,7 +103,7 @@ One skill is not one directory. A change to it usually touches several:
 | `skills/<name>/` | The skill itself |
 | `graders/<name>/` | Deterministic Python that scores model output (directory drops the `infrahub-` prefix) |
 | `eval.yaml` | Every eval task, for every skill, in one root file |
-| `evaluations/<name>.json` | Generated from `eval.yaml` by `scripts/sync-evals.py` |
+| `evaluations/infrahub-<name>.json` | Generated from `eval.yaml` by `scripts/sync-evals.py` |
 | `docs/docs/skills-reference/<name>.mdx` | The reference page on this site |
 
 A new skill also has to appear in the tables in `AGENTS.md` and in this

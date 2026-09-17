@@ -32,7 +32,7 @@ You should get a file under `schemas/`, something close to this:
 version: "1.0"
 nodes:
   - name: Provider
-    namespace: Circuit
+    namespace: Infra
     label: Provider
     human_friendly_id:
       - name__value
@@ -47,13 +47,13 @@ nodes:
         optional: true
     relationships:
       - name: circuits
-        peer: CircuitCircuit
+        peer: InfraCircuit
         optional: true
         cardinality: many
         identifier: circuit__provider
 
   - name: Circuit
-    namespace: Circuit
+    namespace: Infra
     label: Circuit
     human_friendly_id:
       - circuit_id__value
@@ -77,7 +77,7 @@ nodes:
             label: Decommissioned
     relationships:
       - name: provider
-        peer: CircuitProvider
+        peer: InfraProvider
         optional: false
         cardinality: one
         identifier: circuit__provider
@@ -95,6 +95,10 @@ things a generic AI answer usually gets wrong:
   plain strings is rejected at load.
 - **`optional: false`** on the Circuit side. That is what makes the
   relationship mandatory rather than merely present.
+- **No `kind:` on either relationship**, so both default to
+  `kind: Generic`. That is correct here: Provider and Circuit are
+  independent objects, so neither is a Component of the other, and
+  deleting a Provider should not cascade-delete its Circuits.
 
 ## 3. Check it before loading
 
