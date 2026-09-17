@@ -14,16 +14,20 @@ A skill is a directory containing a `SKILL.md` entry point, modular rule files, 
 
 ```mermaid
 flowchart TB
-  meta["Metadata
-always loaded (~100w)"]
-  body["SKILL.md body
-loaded on activation"]
-  files["Supporting files
-loaded on demand"]
-
-  meta -->|"description matches"| body
-  body -->|"pointers followed"| files
+  req["a request"] --> match{"description
+matches?"}
+  match -->|"no"| idle["skill never loads"]
+  match -->|"yes"| body["SKILL.md body
+about 500 to 1000 words"]
+  body --> pick["only the rule files
+this task needs"]
+  pick -.-> rest["the rest of rules/
+stays unread"]
 ```
+
+The dotted edge marks what does not happen: most of a skill's rule files
+are never read on a given task. The description match above is a real
+gate, not a formality; most requests never trigger the skill at all.
 
 ```text
 skills/infrahub-managing-schemas/

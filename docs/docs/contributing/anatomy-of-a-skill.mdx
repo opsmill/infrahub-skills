@@ -108,27 +108,6 @@ Below, `<name>` is the skill name without its `infrahub-` prefix, so for
 | `evaluations/infrahub-<name>.json` | Generated from `eval.yaml` by `scripts/sync-evals.py` |
 | `docs/docs/skills-reference/<name>.mdx` | The reference page on this site |
 
-```mermaid
-flowchart LR
-  skill["infrahub-managing-
-schemas"]
-  skill --> s["skills/infrahub-
-managing-schemas/
-the skill itself"]
-  skill --> g["graders/
-managing-schemas/
-scores model output"]
-  skill --> e["eval.yaml
-the task definitions"]
-  skill --> j["evaluations/infrahub-
-managing-schemas.json
-generated from eval.yaml"]
-  skill --> d["docs/docs/
-skills-reference/
-managing-schemas.mdx
-this site"]
-```
-
 A new skill also has to appear in the tables in `AGENTS.md` and in this
 site's landing page. The list, and which of them go stale on a behavior
 change, is in
