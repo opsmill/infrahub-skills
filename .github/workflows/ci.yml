@@ -111,6 +111,7 @@ jobs:
         with:
           python-version: "3.13"
       - run: python scripts/check-cli-invocations.py
+      - run: python scripts/check-docs-sidebar.py
       - name: Verify routing symlinks resolve
         run: python scripts/check-symlinks.py
 
