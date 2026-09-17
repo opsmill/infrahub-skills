@@ -21,7 +21,7 @@ Both files exist because more than one stage needs the same fact. The handoff
 format is written by the two entrances and read by the two stages after them;
 the ground truth ladder is run by both entrances. Four copies of either would
 drift, which is what
-[`../../dev/guidelines/minimum-change.md`](../../dev/guidelines/minimum-change.md)
+[`../../dev/guidelines/minimum-change.md`](../../../dev/guidelines/minimum-change.md)
 rung 2 is about.
 
 ## Contents

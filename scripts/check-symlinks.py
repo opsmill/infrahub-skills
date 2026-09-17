@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
 """Assert that this repo's routing symlinks resolve to their targets.
 
-Two directories at the repo root hold real files: `skills/` for the
-shipped skills and `contributor-skills/` for the contributor skills.
-`.claude/`, `.agents/` and `.codex/` hold nothing but relative symlinks
-into those two and into `dev/guidelines/`, so each agent finds the shipped
-skills, the contributor skills, and the rules under the path it already
-looks in, with no second copy of any of them and no routing directory
-owning the originals.
+`.agents/` is the source of truth for everything this repo authors for its
+own agents: `.agents/skills/` holds the contributor skills and
+`.agents/rules` points at `dev/guidelines/`. `.claude/` and `.codex/` are
+adapters — they hold nothing but relative symlinks into `.agents/`, so each
+agent finds the same content under the path it already looks in, with no
+second copy and no adapter owning the originals.
 
-Note that `skills` does not mean the same thing in every routing
-directory: `.claude/skills` is the contributor skills, because a Claude
-Code session gets the shipped ones from the installed plugin instead,
-while `.agents/skills` and `.codex/skills` are the shipped ones. That
-asymmetry is the reason these are seven separate links rather than one
-link per directory.
+`skills/` at the repo root is deliberately outside this scheme. It is the
+product: the skills the plugin ships, which `plugin.json` exposes and the
+eval suite reads directly. No agent working *on* this repo needs to invoke
+them, so nothing routes to them.
 
 git materializes a symlink as a regular text file when `core.symlinks` is
 false, and every agent then silently loads nothing from that path: no
@@ -32,19 +29,16 @@ ROOT = Path(__file__).resolve().parent.parent
 # (link, target) pairs, every one relative to ROOT.
 LINKS = (
     (ROOT / ".claude" / "rules", ROOT / "dev" / "guidelines"),
-    (ROOT / ".claude" / "skills", ROOT / "contributor-skills"),
-    (ROOT / ".agents" / "skills", ROOT / "skills"),
-    (ROOT / ".agents" / "contributor-skills", ROOT / "contributor-skills"),
+    (ROOT / ".claude" / "skills", ROOT / ".agents" / "skills"),
     (ROOT / ".agents" / "rules", ROOT / "dev" / "guidelines"),
-    (ROOT / ".codex" / "skills", ROOT / "skills"),
-    (ROOT / ".codex" / "contributor-skills", ROOT / "contributor-skills"),
+    (ROOT / ".codex" / "skills", ROOT / ".agents" / "skills"),
     (ROOT / ".codex" / "rules", ROOT / "dev" / "guidelines"),
 )
 
-# The link targets that must be real directories. Three of the links above
-# resolve through `contributor-skills/`; turning it into a link of its own
-# makes a cycle that resolves to nothing.
-REAL_DIRS = (ROOT / "skills", ROOT / "contributor-skills", ROOT / "dev" / "guidelines")
+# The link targets that must be real directories. Every link above resolves
+# through one of these; turning either into a link of its own makes a cycle
+# that resolves to nothing.
+REAL_DIRS = (ROOT / ".agents" / "skills", ROOT / "dev" / "guidelines")
 
 
 def _check(link: Path, target: Path) -> str | None:
@@ -108,12 +102,9 @@ def main() -> int:
         "    git config core.symlinks true && git checkout -- .claude .agents .codex\n"
         "  or recreate the missing ones:\n"
         "    rm -f .claude/rules && ln -s ../dev/guidelines .claude/rules\n"
-        "    rm -f .claude/skills && ln -s ../contributor-skills .claude/skills\n"
-        "    rm -f .agents/skills && ln -s ../skills .agents/skills\n"
-        "    rm -f .agents/contributor-skills && ln -s ../contributor-skills .agents/contributor-skills\n"
+        "    rm -f .claude/skills && ln -s ../.agents/skills .claude/skills\n"
         "    rm -f .agents/rules && ln -s ../dev/guidelines .agents/rules\n"
-        "    rm -f .codex/skills && ln -s ../skills .codex/skills\n"
-        "    rm -f .codex/contributor-skills && ln -s ../contributor-skills .codex/contributor-skills\n"
+        "    rm -f .codex/skills && ln -s ../.agents/skills .codex/skills\n"
         "    rm -f .codex/rules && ln -s ../dev/guidelines .codex/rules"
     )
     return 1

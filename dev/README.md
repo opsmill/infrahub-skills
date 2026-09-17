@@ -32,15 +32,15 @@ skills themselves. For user-facing docs, see
   definitions.
 
 Contributor skills live outside `dev/`, in
-[`../contributor-skills/`](../contributor-skills/), next
+[`../.agents/skills/`](../.agents/skills/), next
 to the shipped `../skills/`:
-[`harvesting-skill-review`](../contributor-skills/harvesting-skill-review/SKILL.md)
+[`harvesting-skill-review`](../.agents/skills/harvesting-skill-review/SKILL.md)
 turns a PR's review threads into rules, and the
 skill-change pipeline
-([`analyzing-skill-bugs`](../contributor-skills/analyzing-skill-bugs/SKILL.md),
-[`grilling-skill-features`](../contributor-skills/grilling-skill-features/SKILL.md),
-[`test-driving-skill-changes`](../contributor-skills/test-driving-skill-changes/SKILL.md),
-[`implementing-skill-changes`](../contributor-skills/implementing-skill-changes/SKILL.md))
+([`analyzing-skill-bugs`](../.agents/skills/analyzing-skill-bugs/SKILL.md),
+[`grilling-skill-features`](../.agents/skills/grilling-skill-features/SKILL.md),
+[`test-driving-skill-changes`](../.agents/skills/test-driving-skill-changes/SKILL.md),
+[`implementing-skill-changes`](../.agents/skills/implementing-skill-changes/SKILL.md))
 takes a bug or an idea
 through a failing test to a pull request.
 

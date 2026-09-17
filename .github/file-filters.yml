@@ -38,7 +38,7 @@ cli_invocations_all:
   - "dev/commands/**"
   - "dev/guidelines/**"
   - "dev/README.md"
-  - "contributor-skills/**"
+  - ".agents/skills/**"
   # The routing directories hold only symlinks, but this job is the one that
   # runs check-symlinks.py, so a relink has to be able to trigger it.
   - ".agents/**"
@@ -66,7 +66,7 @@ tests_all:
   # blocks duplicated across the skill-change pipeline. A markdown-only change
   # is exactly what broke the frontmatter, so it has to run the test job.
   - "skills/**/*.md"
-  - "contributor-skills/**"
+  - ".agents/skills/**"
   # tests/graders/test_teaching_graders.py and test_generic_inheritance.py
   # read eval.yaml, so an eval.yaml-only change has to run them too.
   - "eval.yaml"

@@ -19,8 +19,8 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 | What rules apply to the file I am editing? | [dev/guidelines/](dev/guidelines/) |
 | What commands are available? | [§ Commands](#commands) |
 | Where do AI command definitions live? | [dev/commands/](dev/commands/) |
-| How do I turn PR review feedback into rules? | [contributor-skills/harvesting-skill-review/](contributor-skills/harvesting-skill-review/) |
-| How do I fix a bug or add a rule in this repo? | [contributor-skills/](contributor-skills/) — `analyzing-skill-bugs` or `grilling-skill-features`, then `test-driving-skill-changes` and `implementing-skill-changes` |
+| How do I turn PR review feedback into rules? | [.agents/skills/harvesting-skill-review/](.agents/skills/harvesting-skill-review/) |
+| How do I fix a bug or add a rule in this repo? | [.agents/skills/](.agents/skills/) — `analyzing-skill-bugs` or `grilling-skill-features`, then `test-driving-skill-changes` and `implementing-skill-changes` |
 
 Index of the whole tree: [dev/README.md](dev/README.md).
 
@@ -85,7 +85,11 @@ fraction of it, and that is the question nearly every change asks.
 
 ## Rules
 
-Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rules` symlinks to. Each declares the globs it applies to in frontmatter, so it loads when a matching file is in play rather than waiting for someone to go looking for it. Another agent is one symlink away, though its frontmatter key differs — `paths:` for Claude, `globs:` for Cursor, `applyTo:` for Copilot. Three routing directories carry that idea further. Two directories at the root hold real files: [`skills/`](skills/) for the shipped skills and [`contributor-skills/`](contributor-skills/) for the contributor skills. `.claude/`, `.agents/` and `.codex/` hold nothing but relative symlinks into those two and into `dev/guidelines/`, so any agent that looks in its own conventional directory finds the same skills and rules, with no second copy of any of them and no routing directory owning the originals. Note that `skills` does not mean the same thing in each one: `.claude/skills` is the contributor skills, because a Claude Code session gets the shipped ones from the installed plugin instead, while `.agents/skills` and `.codex/skills` are the shipped ones. That asymmetry is why these are eight separate links rather than one link per directory, and `scripts/check-symlinks.py` is what keeps them true.
+Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rules` symlinks to. Each declares the globs it applies to in frontmatter, so it loads when a matching file is in play rather than waiting for someone to go looking for it. Another agent is one symlink away, though its frontmatter key differs — `paths:` for Claude, `globs:` for Cursor, `applyTo:` for Copilot.
+
+[`.agents/`](.agents/) is the source of truth for everything this repo authors for its own agents: [`.agents/skills/`](.agents/skills/) holds the contributor skills, and `.agents/rules` points at `dev/guidelines/`. `.claude/` and `.codex/` are adapters — they hold nothing but relative symlinks into `.agents/`, so any agent that looks in its own conventional directory finds the same skills and rules, with no second copy of any of them and no adapter owning the originals.
+
+[`skills/`](skills/) at the root is deliberately outside that scheme. It is the product: the skills the plugin ships, which `plugin.json` exposes and which `eval.yaml` reads directly. No agent working *on* this repo needs to invoke them — doing so loads the installed plugin, not your edit — so nothing routes to them. That leaves five links, and `scripts/check-symlinks.py` is what keeps them true.
 
 | Rule | What it constrains |
 | ---- | ------------------ |

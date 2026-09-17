@@ -1409,7 +1409,7 @@ _NO_RULE_COVERS_RE = re.compile(
 # This skill's own path never counts as the cited artifact: the friction
 # being reported is always about some other Infrahub skill's guidance, so a
 # model that merely echoes the "Read the skill at
-# .agents/skills/infrahub-reporting-skill-gaps/SKILL.md" preamble from its
+# skills/infrahub-reporting-skill-gaps/SKILL.md" preamble from its
 # own instructions has not cited anything.
 _SELF_SKILL_PATH_RE = re.compile(
     r"skills/infrahub-reporting-skill-gaps/", re.IGNORECASE

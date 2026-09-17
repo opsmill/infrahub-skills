@@ -83,11 +83,10 @@ secrets.yaml
 # Local Claude Code state, except the two routing symlinks. `.claude/*`
 # rather than `.claude/` so the negations work — git cannot re-include
 # anything under an excluded directory. The contributor skills are no
-# longer in here: they live in contributor-skills/ at the repo root and
-# are tracked there, which is why this block no longer names them one by
-# one. A personal skill dropped through the .claude/skills symlink lands
-# in that tracked directory and shows up in git status rather than being
-# ignored.
+# longer in here: they are authored in .agents/skills/ and are tracked
+# there, which is why this block no longer names them one by one. A
+# personal skill dropped through the .claude/skills symlink lands in that
+# tracked directory and shows up in git status rather than being ignored.
 .claude/*
 !.claude/rules
 !.claude/skills
