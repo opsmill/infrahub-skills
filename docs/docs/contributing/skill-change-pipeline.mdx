@@ -48,7 +48,28 @@ prefix. What a grader can check. What the violating near miss looks like.
 What eval prompt exercises it. What it contradicts. Ground truth. Scope.
 
 Pick by whether the behavior is known-wrong. A defect goes left, an idea
-goes right.
+goes right. Either way the next stop is the same: the failing test comes
+before the fix, and the dashed edge below marks the shortcut around it as
+barred rather than as a third route.
+
+```mermaid
+flowchart TB
+  start["a change to a skill"] --> q{"is the behavior
+known wrong?"}
+  q -->|"yes"| analyze["analyzing-skill-bugs
+find the root cause"]
+  q -->|"no, an idea"| grill["grilling-skill-features
+make it testable"]
+  analyze --> test["test-driving-skill-changes
+write the failing test"]
+  grill --> test
+  test --> impl["implementing-skill-changes"]
+  start -.->|"never"| impl
+
+  classDef banned stroke-dasharray: 4 4,stroke:#ea4335,color:#ea4335
+  class impl banned
+  linkStyle 6 stroke:#ea4335,stroke-width:2px
+```
 
 ## Writing the failing test
 
