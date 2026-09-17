@@ -2,6 +2,8 @@
 title: Skill Gap Reporter
 ---
 
+Skill: `infrahub-reporting-skill-gaps`
+
 The Skill Gap Reporter turns friction with an Infrahub skill into a reviewed GitHub issue against [`opsmill/infrahub-skills`](https://github.com/opsmill/infrahub-skills). Infrahub skills fail quietly: a missing or unclear rule does not crash, it produces extra round trips and repeated nudges from you until the model finds the answer on its own. This skill works out which rule was missing, wrong, or unclear, checks the tracker for an existing report, and drafts a proposed rule change. It never files anything itself: it hands the redacted draft to the [Issue Reporter](./reporting-issues.mdx), which shows it to you and gets explicit approval before any submission.
 
 ## When to use

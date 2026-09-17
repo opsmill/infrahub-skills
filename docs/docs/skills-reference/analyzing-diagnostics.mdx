@@ -2,6 +2,8 @@
 title: Diagnostics Analyzer
 ---
 
+Skill: `infrahub-analyzing-diagnostics`
+
 The Diagnostics Analyzer reads a bundle the [Diagnostics Collector](./collecting-diagnostics.mdx) already produced and turns its logs into a triage report. It reads the manifest before any log, sweeps every service for tracebacks and other error signals, correlates related errors into incidents with root causes separated from cascades, and searches existing `opsmill/infrahub` issues so you learn whether your crash is already known — without touching the running deployment, applying a fix, or filing anything on your behalf.
 
 ## When to use

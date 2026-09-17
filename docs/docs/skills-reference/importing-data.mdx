@@ -2,6 +2,8 @@
 title: Data Importer
 ---
 
+Skill: `infrahub-importing-data`
+
 The Data Importer turns CSV or TSV inputs into Infrahub object YAML and loads it onto a fresh branch. It introspects the live schema, maps columns to attributes by heuristic plus an up-front interview, splits denormalized inputs across the right kinds with the correct load order, and fails closed when a column has no schema home — without ever proposing a schema edit.
 
 ## When to use
