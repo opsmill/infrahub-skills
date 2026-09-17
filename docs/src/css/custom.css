@@ -214,11 +214,15 @@ body {
  * to full-width prose that reads as a diagram drifting off to one side
  * rather than sitting between two blocks of text.
  *
- * `text-align` rather than flex centering on purpose: the SVG is an inline
- * element, so this centers it without making the container a flex box. A
- * flex container would center a diagram wider than the column by overflowing
- * it equally on both sides, which pushes the left edge out of reach. Here an
- * over-wide diagram still starts at the left and stays reachable.
+ * `text-align` rather than flex centering because it adds no new formatting
+ * context, not because flex would behave differently. It would not: mermaid
+ * sets `width="100%"` as an attribute on every SVG it renders, so a diagram
+ * is always capped at the container width no matter how wide its viewBox is,
+ * and the two approaches lay out identically. That attribute, rather than the
+ * theme's CSS, is what actually prevents a diagram overflowing the column.
+ *
+ * Mermaid centers its own label text inside nodes, via rules it writes into
+ * each SVG, so this does not change alignment within a diagram.
  */
 .docusaurus-mermaid-container {
   text-align: center;
