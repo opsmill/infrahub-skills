@@ -1,5 +1,6 @@
-"""Assert every SKILL.md carries parseable frontmatter, and that the blocks
-deliberately duplicated across the skill-change pipeline stay identical.
+"""Assert every SKILL.md carries parseable frontmatter, that a create-shaped
+description also advertises modification work, and that the blocks deliberately
+duplicated across the skill-change pipeline stay identical.
 
 Both checks exist because a silent failure was shipped here. `metadata.pipeline`
 was rewritten to `skill-change (stage 1 of 3: analyze or grill, ...)`, and an
@@ -18,6 +19,7 @@ reviewer rightly objects to. This test is what makes the copies safe.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -31,6 +33,31 @@ PIPELINE_SKILLS = [
     "grilling-skill-features",
     "test-driving-skill-changes",
     "implementing-skill-changes",
+]
+
+# A description opening on one of these announces the skill as build-only.
+CREATION_OPENERS = re.compile(r"\s*(creates?|builds?|generates?|manages)\b", re.I)
+
+# Verb forms that name work on an artifact that already exists. Noun forms are
+# deliberately absent: "proposed changes" is a domain noun in the checks skill's
+# TRIGGER and names no modification work, while "changing" does.
+MODIFICATION_VERBS = [
+    "modifying",
+    "modify",
+    "modifies",
+    "modification",
+    "editing",
+    "updating",
+    "update",
+    "debugging",
+    "debug",
+    "extending",
+    "extend",
+    "changing",
+    "refactoring",
+    "troubleshooting",
+    "investigating",
+    "fixing",
 ]
 
 
@@ -66,6 +93,101 @@ def test_frontmatter_parses(path: Path) -> None:
     assert isinstance(fm, dict), f"{path} frontmatter is not a mapping"
     assert fm.get("name") == path.parent.name, f"{path} name does not match its directory"
     assert fm.get("description"), f"{path} has no description"
+
+
+def _shipped_skill_files() -> list[Path]:
+    return sorted(ROOT.glob("skills/*/SKILL.md"))
+
+
+def _trigger_scope(description: str) -> str:
+    """The description up to `DO NOT TRIGGER`.
+
+    Everything after that clause lists what must *not* fire the skill, so a
+    modification verb sitting there is an exclusion, not a trigger.
+    """
+    return re.split(r"DO NOT TRIGGER", " ".join(description.split()), flags=re.I)[0]
+
+
+def names_modification_intent(description: str) -> bool:
+    """True if the triggering half of the description names work on an existing artifact."""
+    scope = _trigger_scope(description)
+    return any(re.search(rf"\b{re.escape(verb)}", scope, re.I) for verb in MODIFICATION_VERBS)
+
+
+# compliant, compliant variant, violating, violating near miss.
+INTENT_FIXTURES = [
+    pytest.param(
+        "Creates, modifies and debugs Infrahub Generators. "
+        "TRIGGER when: building design-to-implementation workflows, "
+        "modifying or extending an existing generator, changing what a generator produces. "
+        "DO NOT TRIGGER when: designing schemas.",
+        True,
+        id="compliant",
+    ),
+    pytest.param(
+        "Creates Infrahub transforms. "
+        "TRIGGER when: debugging why an existing transform renders the wrong output, "
+        "updating a template, building config generation, data export. "
+        "DO NOT TRIGGER when: designing schemas.",
+        True,
+        id="compliant-variant",
+    ),
+    pytest.param(
+        "Creates Infrahub custom navigation menus for the web UI sidebar. "
+        "TRIGGER when: designing sidebar menus, grouping node types in UI, "
+        "customizing Infrahub web interface navigation. "
+        "DO NOT TRIGGER when: designing schemas, writing checks or transforms.",
+        False,
+        id="violating",
+    ),
+    pytest.param(
+        # Carries "changes" as a domain noun inside TRIGGER and a real
+        # modification verb inside DO NOT TRIGGER. A substring match over the
+        # whole description passes this; neither string triggers anything.
+        "Creates Infrahub check definitions. "
+        "TRIGGER when: writing validation checks, "
+        "building data quality guards for proposed changes. "
+        "DO NOT TRIGGER when: modifying schemas, editing data files.",
+        False,
+        id="violating-near-miss",
+    ),
+]
+
+
+@pytest.mark.parametrize(("description", "expected"), INTENT_FIXTURES)
+def test_modification_intent_detector_discriminates(description: str, expected: bool) -> None:
+    """The detector grades substance, not vocabulary.
+
+    The near miss is the case that matters: it contains both "changes" and
+    "modifying", and still names no modification trigger.
+    """
+    assert names_modification_intent(description) is expected
+
+
+@pytest.mark.parametrize("path", _shipped_skill_files(), ids=lambda p: p.parent.name)
+def test_creation_shaped_description_names_modification_triggers(path: Path) -> None:
+    """A skill that advertises creation also advertises changing what exists.
+
+    A create-shaped description does not merely omit modification work, it reads
+    as a positive signal that the skill does not apply to it. Issue #78 recorded
+    the cost: a session asked to investigate an existing generator never invoked
+    the skill, and shipped a change that deleted a live interface the generator
+    did not own. The skill's front page warned about that exact failure twice.
+
+    Descriptions have no eval coverage, because eval prompts say `Read the skill
+    at ...` and so bypass triggering entirely. This is the only surface that can
+    fail on one.
+    """
+    name = path.parent.name
+    description = " ".join((_frontmatter(path).get("description") or "").split())
+    if not CREATION_OPENERS.match(description):
+        pytest.skip(f"{name} does not open on a creation verb")
+    assert names_modification_intent(description), (
+        f"{name}: the description opens on a creation verb but its TRIGGER clauses "
+        f"name only building. Add modifying / debugging / extending an existing "
+        f"artifact, so the skill fires on day-two work. TRIGGER half was: "
+        f"{_trigger_scope(description)!r}"
+    )
 
 
 @pytest.mark.parametrize("name", PIPELINE_SKILLS)
