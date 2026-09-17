@@ -41,14 +41,10 @@ A findings report grounded in bundle evidence:
 - **Evidence per finding** — every claim cites a bundle path and a quoted excerpt, and what the bundle cannot answer is stated as an open question rather than left out
 - **Read-only** — the analysis reads an already-collected bundle and runs issue searches; it never touches the running instance, restarts nothing, edits no configuration, and creates no issue
 
-## Diagnostics Collector vs. Diagnostics Analyzer
+## Not sure this is the right skill?
 
-| Use the Diagnostics Collector when... | Use the Diagnostics Analyzer when... |
-| --------------------------------------- | -------------------------------------- |
-| Infrahub is misbehaving and no bundle exists yet | A bundle already exists, or you have its contents |
-| You need the right `infrahub-collect` command for your symptom | You need to know what the collected logs actually say |
-| Output is a support bundle on disk | Output is a findings report citing that bundle |
-| The next step is sharing it with OpsMill | The next step is an upgrade, a comment on an existing issue, or a new report |
+See [Which skill do I use?](../choosing-a-skill.mdx) for how this skill
+differs from the Diagnostics Collector, which runs first.
 
 ## Common mistakes it catches
 

@@ -38,10 +38,7 @@ Without MCP, the AI can still query Infrahub data by constructing GraphQL API ca
 
 The skill uses MCP tools (`infrahub_query`, `infrahub_list_schema`, `infrahub_get`) to fetch data from the running instance. For multi-step analysis, queries run sequentially or in combination — data is joined in the AI's context, not in the database. The skill reports findings with counts, lists of affected objects, and suggested next steps.
 
-## Data Analyzer vs. Check Manager vs. Transform Manager
+## Not sure this is the right skill?
 
-| Use Data Analyzer when... | Use Check Manager when... | Use Transform Manager when... |
-| ------------------- | ------------------------- | ------------------------------ |
-| Answering a one-time question | Enforcing a rule in the pipeline | Producing a repeatable scheduled report |
-| Interactive, exploratory analysis | Blocking changes that violate policy | Generating artifacts (configs, exports) |
-| No pipeline integration needed | Automated enforcement required | Output needs to be stored as a versioned artifact |
+See [Which skill do I use?](../choosing-a-skill.mdx) for how the Data
+Analyzer differs from the Check Manager and the Transform Manager.
