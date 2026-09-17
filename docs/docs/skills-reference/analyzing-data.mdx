@@ -4,7 +4,7 @@ title: Data Analyzer
 
 Skill: `infrahub-analyzing-data`
 
-The Data Analyzer skill queries and analyzes data from a live Infrahub instance using the Infrahub MCP server. It answers operational questions that span multiple node types — correlating data, detecting drift, tracing service impact, auditing data quality — without requiring the user to write GraphQL queries manually.
+The Data Analyzer skill queries and analyzes data from a live Infrahub instance using the Infrahub MCP server. It answers operational questions that span multiple node types: correlating data, detecting drift, tracing service impact, auditing data quality, without requiring you to write GraphQL queries manually.
 
 ## Requirements
 
@@ -37,7 +37,7 @@ Without MCP, the AI can still query Infrahub data by constructing GraphQL API ca
 
 ## How it works
 
-The skill uses MCP tools (`infrahub_query`, `infrahub_list_schema`, `infrahub_get`) to fetch data from the running instance. For multi-step analysis, queries run sequentially or in combination — data is joined in the AI's context, not in the database. The skill reports findings with counts, lists of affected objects, and suggested next steps.
+The skill uses MCP tools (`infrahub_query`, `infrahub_list_schema`, `infrahub_get`) to fetch data from the running instance. For multi-step analysis, queries run sequentially or in combination: data is joined in the AI's context, not in the database. The skill reports findings with counts, lists of affected objects, and suggested next steps.
 
 ## Not sure this is the right skill?
 

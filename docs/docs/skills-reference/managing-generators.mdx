@@ -17,11 +17,11 @@ The Generator Manager produces Python generators that query Infrahub for design 
 
 Three components:
 
-1. **Target group** — a `CoreGeneratorGroup` that defines which design objects trigger the generator
-2. **GraphQL query** (`.gql`) — fetches the design object(s) the generator will act on
-3. **Python class** (`InfrahubGenerator` subclass) — implements the `async generate()` method, uses `self.client.create()` with `allow_upsert=True`
+1. **Target group**: a `CoreGeneratorGroup` that defines which design objects trigger the generator
+2. **GraphQL query** (`.gql`): fetches the design object(s) the generator will act on
+3. **Python class** (`InfrahubGenerator` subclass): implements the `async generate()` method, uses `self.client.create()` with `allow_upsert=True`
 
-The `.infrahub.yml` entry tying them together carries a `watch` dependency declaration alongside them.
+The `.infrahub.yml` entry tying them together includes a `watch` dependency declaration.
 
 ## Example prompts
 
@@ -31,22 +31,22 @@ The `.infrahub.yml` entry tying them together carries a `watch` dependency decla
 
 ## Key rules enforced
 
-- **`allow_upsert=True`** — always set on `self.client.create()` calls; without it, re-running the generator creates duplicates instead of updating existing objects
-- **`delete_unused_nodes=True`** — enables automatic cleanup of objects that were created by the generator but are no longer in the design; prevents orphaned objects from accumulating over time
-- **Target group** — generator must reference a `CoreGeneratorGroup`; this is what connects design objects to the generator execution
-- **Async `generate()` method** — the method signature must be `async def generate(self, data):`
-- **GraphQL query naming** — query name must match the `query` class attribute
-- **`watch` dependencies** — the `generator_definitions` entry always carries a `watch` block naming every first-party module the generator imports, sibling query models included (`files: []` when there are none); imports are never analyzed, so without the key the generator re-runs on every commit, and with an incomplete list a change to a shared helper silently stops re-running it
+- **`allow_upsert=True`**: always set on `self.client.create()` calls; without it, re-running the generator creates duplicates instead of updating existing objects
+- **`delete_unused_nodes=True`**: enables automatic cleanup of objects that were created by the generator but are no longer in the design; prevents orphaned objects from accumulating over time
+- **Target group**: generator must reference a `CoreGeneratorGroup`; this is what connects design objects to the generator execution
+- **Async `generate()` method**: the method signature must be `async def generate(self, data):`
+- **GraphQL query naming**: query name must match the `query` class attribute
+- **`watch` dependencies**: the `generator_definitions` entry always includes a `watch` block naming every first-party module the generator imports, sibling query models included (`files: []` when there are none); imports are never analyzed, so without the key the generator re-runs on every commit, and with an incomplete list a change to a shared helper silently stops re-running it
 
 ## Common mistakes it catches
 
 | Mistake | What the skill does instead |
 | --------- | --------------------------- |
-| Missing `allow_upsert=True` | Always includes it — prevents duplicate creation on re-run |
-| Missing `delete_unused_nodes=True` | Always includes it — prevents orphaned objects |
+| Missing `allow_upsert=True` | Always includes it; prevents duplicate creation on re-run |
+| Missing `delete_unused_nodes=True` | Always includes it; prevents orphaned objects |
 | Sync `generate()` method | Uses `async def generate(self, data):` |
 | Missing target group configuration | Generates the `CoreGeneratorGroup` definition |
-| Generator that only stamps a fixed structure with constant values | Steers toward an Object Template (`generate_template`) to clone instead — the structure lives in data, not Python |
+| Generator that only stamps a fixed structure with constant values | Recommends an Object Template (`generate_template`) to clone instead; the structure is in data, not Python |
 
 ## Running generators
 

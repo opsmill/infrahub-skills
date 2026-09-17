@@ -4,7 +4,7 @@ title: Diagnostics Collector
 
 Skill: `infrahub-collecting-diagnostics`
 
-The Diagnostics Collector guides you through producing a support bundle with OpsMill's [`infrahub-collect`](https://docs.infrahub.app/backup/guides/install-collect) tool when Infrahub is misbehaving. It installs and verifies the binary, detects your Docker Compose or Kubernetes deployment, runs `infrahub-collect create` with the flags that match your symptom, walks you through reviewing the bundle before you share it, and hands off — without diagnosing root cause or filing anything on your behalf.
+The Diagnostics Collector guides you through producing a support bundle with OpsMill's [`infrahub-collect`](https://docs.infrahub.app/backup/guides/install-collect) tool when Infrahub is misbehaving. It installs and verifies the binary, detects your Docker Compose or Kubernetes deployment, runs `infrahub-collect create` with the flags that match your symptom, explains how to review the bundle before you share it, and hands off, without diagnosing root cause or filing anything on your behalf.
 
 ## When to use
 
@@ -31,38 +31,38 @@ infrahub-reporting-issues"]
 
 - The correct `infrahub-collect` command sequence for your deployment: install/verify → `environment detect` → `create`
 - Symptom-appropriate flags (e.g. `--benchmark` for performance, `--include-queries` for database issues, `--include-backup` for reproduction)
-- A review-before-sharing checklist — the tool masks only key names, so you scan the bundle for anything else sensitive before it leaves your machine
+- A review-before-sharing checklist: the tool masks only key names, so you scan the bundle for anything else sensitive before it leaves your machine
 - A hand-off to OpsMill support, cross-linking the Issue Reporter if you also want to file a public issue
 
 The bundle itself is written by `infrahub-collect` (by default under `./infrahub_bundles/`), with logs from every replica, container/service state, version and config, and a `bundle_information.json` manifest.
 
 ## Example prompts
 
-- "Infrahub is throwing 500s — help me collect logs to send to OpsMill"
+- "Infrahub is throwing 500s, help me collect logs to send to OpsMill"
 - "A task-worker keeps getting OOM-killed on our Kubernetes deployment; gather a diagnostic bundle"
-- "Database queries are slow on our Docker Compose setup — collect what support needs to diagnose it"
+- "Database queries are slow on our Docker Compose setup, collect what support needs to diagnose it"
 - "My proposed-change pipeline is stuck and the repo won't load schemas; put together a bundle for OpsMill"
-- "Something broke after the upgrade — collect diagnostics"
+- "Something broke after the upgrade, collect diagnostics"
 
 ## Key rules enforced
 
-- **The tool does the collecting** — deployment detection, every-replica logs, key-name redaction, the manifest, and the bundle layout are all `infrahub-collect`'s job; the skill never hand-rolls them
-- **Read-only** — collection runs against your existing Docker / kubectl access with no writes and no scale changes; on Kubernetes it needs only `pods/log` and `pods/exec`
-- **No API token** — `infrahub-collect` authenticates through your local Docker/kubectl access, not an Infrahub API token
-- **Review before sharing** — masking covers only keys named `password`/`secret`/`token`/`key`; the skill stops for you to scan `bundle/logs/` and `bundle/server/` for internal hostnames, customer data, and secrets stored under other key names
-- **Symptom-driven flags** — start with plain `infrahub-collect create` and add a flag only when the symptom calls for it, rather than piling on every flag
-- **Hints, not diagnoses** — the skill produces a bundle for an expert; it does not claim a root cause
-- **Cross-link, don't duplicate** — for filing a public GitHub issue it hands off to the Issue Reporter instead of reimplementing that routing
+- **The tool does the collecting**: deployment detection, every-replica logs, key-name redaction, the manifest, and the bundle layout are all `infrahub-collect`'s job; the skill never hand-rolls them
+- **Read-only**: collection runs against your existing Docker / kubectl access with no writes and no scale changes; on Kubernetes it needs only `pods/log` and `pods/exec`
+- **No API token**: `infrahub-collect` authenticates through your local Docker/kubectl access, not an Infrahub API token
+- **Review before sharing**: masking covers only keys named `password`/`secret`/`token`/`key`; the skill stops for you to scan `bundle/logs/` and `bundle/server/` for internal hostnames, customer data, and secrets stored under other key names
+- **Symptom-driven flags**: start with plain `infrahub-collect create` and add a flag only when the symptom calls for it, rather than piling on every flag
+- **Hints, not diagnoses**: the skill produces a bundle for an expert; it does not claim a root cause
+- **Cross-link, don't duplicate**: for filing a public GitHub issue it hands off to the Issue Reporter instead of reimplementing that routing
 
 ## Common mistakes it catches
 
 | Mistake | What the skill does instead |
 | --------- | --------------------------- |
-| Hand-collecting logs and config by hand | Runs `infrahub-collect`, which captures every replica and previous-container logs consistently |
+| Collecting logs and config manually | Runs `infrahub-collect`, which captures every replica and previous-container logs consistently |
 | Trusting the automatic masking as complete | Stops for a review-before-sharing pass, because masking is key-name-only |
 | Piling every flag onto `create` | Adds `--benchmark` / `--include-queries` / `--include-backup` only when the symptom matches |
 | Sending an Infrahub API token to collect state | Uses existing Docker/kubectl access; no token is involved |
-| Discarding a partial bundle on a degraded deployment | Sends the partial bundle as-is — `create` records collector failures in the manifest and still exits cleanly |
+| Discarding a partial bundle on a degraded deployment | Sends the partial bundle as-is; `create` records collector failures in the manifest and still exits cleanly |
 | Filing a GitHub issue from here | Hands off to the Issue Reporter for that |
 
 ## Installing and running
@@ -92,5 +92,5 @@ infrahub-collect create --include-queries    # slow/failing database queries
 :::
 
 :::tip
-Collector failures on a degraded deployment are expected — a stopped container can't answer status queries. `create` still exits successfully and records each failure in the manifest; send the partial bundle as-is. See the [troubleshooting-bundle guide](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle) for the full workflow.
+Collector failures on a degraded deployment are expected: a stopped container can't answer status queries. `create` still exits successfully and records each failure in the manifest; send the partial bundle as-is. See the [troubleshooting-bundle guide](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle) for the full workflow.
 :::

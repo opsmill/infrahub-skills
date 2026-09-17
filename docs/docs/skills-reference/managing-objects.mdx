@@ -4,7 +4,7 @@ title: Object Manager
 
 Skill: `infrahub-managing-objects`
 
-The Object Manager produces YAML data files for Infrahub infrastructure objects — devices, locations, organizations, interfaces, modules, and any custom node type. It applies the correct file structure, value mappings, and load order so files are ready to load into a running Infrahub instance.
+The Object Manager produces YAML data files for Infrahub infrastructure objects (devices, locations, organizations, interfaces, modules, and any custom node type). It applies the correct file structure, value mappings, and load order so files are ready to load into a running Infrahub instance.
 
 ## When to use
 
@@ -31,12 +31,12 @@ The Object Manager produces YAML data files for Infrahub infrastructure objects 
 
 ## Key rules enforced
 
-- **File structure** — `apiVersion`, `kind: Object`, `spec` with `nodes` list; missing any of these causes load failure
-- **Value mapping** — Text values wrapped in `value:` key; Dropdown fields use the choice name not the label; relationship references use the node's `human_friendly_id` value
-- **Children and hierarchy** — child objects (e.g., interfaces on a device) use the correct nesting structure with `kind:` specified
-- **Load order** — objects referencing other objects (e.g., interfaces referencing a device) must be in the right file or the right order within a multi-document file
-- **Numeric file prefixes** — files are named with numeric prefixes (e.g., `01_organizations.yml`, `02_locations.yml`) to enforce load order
-- **Profiles and templates** — assigns shared defaults via a `profiles:` list (explicit values override), creates objects from a template via `object_template`, and authors template objects under the generated `Template<Kind>` kind — with the referenced profile or template loaded first
+- **File structure**: `apiVersion`, `kind: Object`, `spec` with `nodes` list; missing any of these causes load failure
+- **Value mapping**: Text values wrapped in `value:` key; Dropdown fields use the choice name not the label; relationship references use the node's `human_friendly_id` value
+- **Children and hierarchy**: child objects (e.g., interfaces on a device) use the correct nesting structure with `kind:` specified
+- **Load order**: objects referencing other objects (e.g., interfaces referencing a device) must be in the right file or the right order within a multi-document file
+- **Numeric file prefixes**: files are named with numeric prefixes (e.g., `01_organizations.yml`, `02_locations.yml`) to enforce load order
+- **Profiles and templates**: assigns shared defaults via a `profiles:` list (explicit values override), creates objects from a template via `object_template`, and authors template objects under the generated `Template<Kind>` kind, with the referenced profile or template loaded first
 
 ## Common mistakes it catches
 

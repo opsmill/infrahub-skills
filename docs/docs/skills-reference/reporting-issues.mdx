@@ -11,7 +11,7 @@ The Issue Reporter files a bug report or feature request against the correct rep
 - You think you have found a bug in Infrahub or one of its components
 - You want to request a feature and do not know where it belongs
 - You are not sure which repo owns the problem you are seeing
-- You want an issue drafted properly before it goes on a public tracker
+- You want an issue reviewed before it goes on a public tracker
 
 Do not use it while you are still debugging locally with no intention of filing. Filing is what separates this skill from ordinary troubleshooting. For friction with an Infrahub *skill's* own guidance, use the [Skill Gap Reporter](./reporting-skill-gaps.mdx) instead, which drafts the report and hands it here.
 
@@ -52,13 +52,13 @@ Do not use it while you are still debugging locally with no intention of filing.
 
 ## Key rules enforced
 
-- **Never submit without approval** — the review gate shows you the target repo, the final title, the full body, and whether this is a new issue or a comment, before anything is posted
-- **Default to main when unsure** — ambiguous cues, equally matching repos, or your own uncertainty all route to `opsmill/infrahub`
-- **Search before filing** — open and closed issues both, with a second pass using synonyms when the first returns nothing
-- **Comment instead of duplicating** — when a match exists, the skill either complements the issue with genuinely new information or records a short "another hit" so maintainers can gauge frequency
-- **Minimal environment info** — versions, OS, and architecture only; no file paths, no project structure, no verbatim logs, no env dumps, no `docker compose ps` output
-- **Unknown beats guessed** — a version that cannot be determined cleanly is marked `unknown` rather than inferred by running broader discovery commands
-- **Support questions are not issues** — "how do I do X?" is routed to Discord or GitHub Discussions
+- **Never submit without approval**: the review gate shows you the target repo, the final title, the full body, and whether this is a new issue or a comment, before anything is posted
+- **Default to main when unsure**: ambiguous cues, equally matching repos, or your own uncertainty all route to `opsmill/infrahub`
+- **Search before filing**: open and closed issues both, with a second pass using synonyms when the first returns nothing
+- **Comment instead of duplicating**: when a match exists, the skill either complements the issue with genuinely new information or records a short "another hit" so maintainers can gauge frequency
+- **Minimal environment info**: versions, OS, and architecture only; no file paths, no project structure, no verbatim logs, no env dumps, no `docker compose ps` output
+- **Unknown beats guessed**: a version that cannot be determined cleanly is marked `unknown` rather than inferred by running broader discovery commands
+- **Support questions are not issues**: "how do I do X?" is routed to Discord or GitHub Discussions
 
 ## Common mistakes it catches
 
@@ -103,7 +103,7 @@ gh issue comment <number> --repo <owner/repo> --body "..."
 A GitHub MCP server is used instead when you have one, and manual mode prints copy-paste-ready markdown plus the right URL.
 
 :::warning
-Issue bodies are public and cannot be retracted. Error messages carry file paths, hostnames, and node kinds that identify your infrastructure, so the skill paraphrases rather than pasting. Read the draft at the review gate with that in mind.
+Issue bodies are public and cannot be retracted. Error messages include file paths, hostnames, and node kinds that identify your infrastructure, so the skill paraphrases rather than pasting. Read the draft at the review gate with that in mind.
 :::
 
 :::tip

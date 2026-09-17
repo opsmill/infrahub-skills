@@ -2,9 +2,9 @@
 title: Spec-Driven Development
 ---
 
-Spec-Driven Development (SDD) is a structured planning mode for complex or multi-part Infrahub builds. Instead of generating files immediately, the AI reasons through requirements with you first — capturing what needs to be built, validating the approach against Infrahub conventions, breaking the work into discrete tasks, and only generating once the plan is approved.
+Spec-Driven Development (SDD) is a structured planning mode for complex or multi-part Infrahub builds. Instead of generating files immediately, the AI reasons through requirements with you first: capturing what needs to be built, validating the approach against Infrahub conventions, breaking the work into discrete tasks, and only generating once the plan is approved.
 
-The key benefit: structural mistakes — wrong relationship cardinality, missing `allow_upsert`, incorrect generic usage — are caught before any file is produced.
+The key benefit: structural mistakes (wrong relationship cardinality, missing `allow_upsert`, incorrect generic usage) are caught before any file is produced.
 
 ## When to use SDD vs. direct mode
 
@@ -28,17 +28,17 @@ The AI produces an implementation plan. For each component to be built (schema n
 
 ### 3. Review
 
-You review the plan. This is the key checkpoint — adjust the approach, correct assumptions, or request changes before any file is generated. The AI explains its reasoning for each decision so you can evaluate whether the approach is correct.
+You review the plan. This is the key checkpoint: adjust the approach, correct assumptions, or request changes before any file is generated. The AI explains its reasoning for each decision so you can evaluate whether the approach is correct.
 
 ### 4. Implement
 
-Once approved, the AI executes each task using the correct Infrahub skill. Tasks run sequentially where dependencies exist, or in parallel where they don't — the AI manages the dependency tree.
+Once approved, the AI executes each task using the correct Infrahub skill. Tasks run sequentially where dependencies exist, or in parallel where they don't. The AI manages the dependency tree.
 
 ## Working with the plan
 
-- **Interrogate** — ask why a specific decision was made, request alternatives, or ask what would change if a requirement changed
-- **Adjust** — describe what's wrong or what you want differently; the AI updates the plan before proceeding
-- **Approve** — explicitly confirm the plan is correct. The AI does not proceed without confirmation
+- **Interrogate**: ask why a specific decision was made, request alternatives, or ask what would change if a requirement changed
+- **Adjust**: describe what's wrong or what you want differently; the AI updates the plan before proceeding
+- **Approve**: explicitly confirm the plan is correct. The AI does not proceed without confirmation
 
 ## Sequential vs. parallel execution
 
@@ -111,7 +111,7 @@ Two per-project escape hatches live on the hook's entry in `.specify/extensions.
 
 ## Example walkthrough: VLAN management domain
 
-This example uses [Spec Kit](https://github.com/github/spec-kit) to design a VLAN management domain from scratch — schema, object data, and a validation check. Any SDD framework that follows a spec, plan, task, and implement workflow produces a similar result.
+This example uses [Spec Kit](https://github.com/github/spec-kit) to design a VLAN management domain from scratch: schema, object data, and a validation check. Any SDD framework that follows a spec, plan, task, and implement workflow produces a similar result.
 
 ### Setup
 
@@ -141,7 +141,7 @@ Run `/speckit.specify` and describe the feature:
 
 > I need a VLAN management domain for our data center network. We need to track VLANs with their numeric ID, name, operational status, and role. VLANs should be grouped into VLAN Groups. We also need a validation check that ensures no two VLANs in the same group share the same VLAN ID.
 
-Spec Kit produces `spec.md` capturing the requirements — two schema nodes (VLAN, VLANGroup), a grouping relationship, a uniqueness check, and the attributes for each.
+Spec Kit produces `spec.md` capturing the requirements: two schema nodes (VLAN, VLANGroup), a grouping relationship, a uniqueness check, and the attributes for each.
 
 ### Step 2: Plan
 
@@ -149,17 +149,17 @@ Run `/speckit.plan`. The AI reads `spec.md` and the Infrahub skills to produce `
 
 > **Plan Summary**
 >
-> 1. **Schema** (Schema Manager) — Define `IpamVLAN` and `IpamVLANGroup` nodes in the `Ipam` namespace.
+> 1. **Schema** (Schema Manager): Define `IpamVLAN` and `IpamVLANGroup` nodes in the `Ipam` namespace.
 >    - `IpamVLAN`: attributes `name` (Text), `vlan_id` (Number), `status` (Dropdown), `role` (Text, optional). Relationship to `IpamVLANGroup` (many-to-one).
 >    - `IpamVLANGroup`: attribute `name` (Text). Relationship back to `IpamVLAN` (one-to-many).
 >    - Both nodes get `human_friendly_id` and `display_label`.
 >    - Uniqueness constraint on VLAN: `[vlan_id__value, group]`.
-> 2. **Object data** (Object Manager) — Seed two VLAN groups and sample VLANs.
-> 3. **Validation check** (Check Manager) — Python check querying VLANs per group, flagging duplicates. Register in `.infrahub.yml`.
+> 2. **Object data** (Object Manager): Seed two VLAN groups and sample VLANs.
+> 3. **Validation check** (Check Manager): Python check querying VLANs per group, flagging duplicates. Register in `.infrahub.yml`.
 >
 > **Dependencies:** Schema must be loaded before objects. Check depends on schema being present.
 
-The plan is validated against Infrahub skills — the AI catches that `status` should be `kind: Dropdown` (not Text), that `vlan_id` is used instead of `id` (attribute names must be 3+ characters), and that the relationship between VLAN and VLANGroup needs matching identifiers on both sides.
+The plan is validated against Infrahub skills: the AI catches that `status` should be `kind: Dropdown` (not Text), that `vlan_id` is used instead of `id` (attribute names must be 3+ characters), and that the relationship between VLAN and VLANGroup needs matching identifiers on both sides.
 
 ### Step 3: Review
 
@@ -184,7 +184,7 @@ Run `/speckit.tasks`. The AI breaks the plan into discrete steps in `tasks.md`:
 
 Run `/speckit.implement`. The AI executes each task using the appropriate Infrahub skill. With the routing extension installed, the cycle closes with the friction check described in [Skill-gap detection after implement](#skill-gap-detection-after-implement).
 
-**Task 1 output** — `schemas/vlan_management.yml` (via Schema Manager):
+**Task 1 output**: `schemas/vlan_management.yml` (via Schema Manager):
 
 ```yaml
 version: "1.0"
@@ -260,7 +260,7 @@ nodes:
         identifier: "group__vlans"
 ```
 
-**Task 4 output** — `checks/check_vlan_id_uniqueness/check.py` (via Check Manager):
+**Task 4 output**: `checks/check_vlan_id_uniqueness/check.py` (via Check Manager):
 
 ```python
 from infrahub_sdk.checks import InfrahubCheck
@@ -284,7 +284,7 @@ class CheckVlanIdUniqueness(InfrahubCheck):
             groups[key] = node["display_label"]
 ```
 
-**Task 5 output** — registration added to `.infrahub.yml`:
+**Task 5 output**: registration added to `.infrahub.yml`:
 
 ```yaml
 check_definitions:
@@ -342,7 +342,7 @@ Asking for the same thing without the extension installed works too: "report ski
 From a single natural-language description, the SDD workflow produced:
 
 - A schema with correct naming, Dropdown status, matching relationship identifiers, and uniqueness constraints
-- Seed data files with proper references
+- Seed data files with valid references
 - A working validation check registered in `.infrahub.yml`
 
-Each artifact follows Infrahub best practices because the AI applied the relevant skill at each step — not because the user knew the conventions upfront.
+Each artifact follows Infrahub best practices because the AI applied the relevant skill at each step, not because you knew the conventions upfront.

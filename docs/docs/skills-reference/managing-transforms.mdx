@@ -4,7 +4,7 @@ title: Transform Manager
 
 Skill: `infrahub-managing-transforms`
 
-The Transform Manager produces data transforms that convert Infrahub data into other formats — device configurations, JSON exports, CSV reports, and more. Transforms can be implemented as Python classes, Jinja2 templates, or a hybrid of both. The skill generates the transform code, GraphQL query, optional Jinja2 templates, and `.infrahub.yml` registration.
+The Transform Manager produces data transforms that convert Infrahub data into other formats (device configurations, JSON exports, CSV reports, and more). Transforms can be implemented as Python classes, Jinja2 templates, or a hybrid of both. The skill generates the transform code, GraphQL query, optional Jinja2 templates, and `.infrahub.yml` registration.
 
 ## When to use
 
@@ -38,7 +38,7 @@ Use when data needs preprocessing before rendering.
 
 ## What it produces
 
-- GraphQL query file (`.gql`) — fetches the data the transform needs
+- GraphQL query file (`.gql`): fetches the data the transform needs
 - Python transform class and/or Jinja2 template file(s)
 - `.infrahub.yml` entry under `python_transforms` or `jinja2_transforms`, including its `watch` dependency declaration
 - `artifact_definitions` entry if the transform produces versioned artifacts
@@ -47,15 +47,15 @@ Use when data needs preprocessing before rendering.
 
 - "Create a Jinja2 transform that produces Cisco IOS configuration for each device, pulling interface and BGP data from Infrahub"
 - "Write a Python transform that exports all IP addresses to a CSV file"
-- "Build a hybrid transform that generates vendor-specific configs — Cisco IOS for routers, Juniper JunOS for switches"
+- "Build a hybrid transform that generates vendor-specific configs, Cisco IOS for routers, Juniper JunOS for switches"
 
 ## Key rules enforced
 
-- **Return type** — Python transform must return `dict` for JSON output or `str` for text; wrong return type causes rendering failure
-- **`data` variable** — Jinja2 templates always receive the GraphQL response as `data`; accessing the wrong key is a common mistake
-- **Artifact definitions** — if the transform output should be stored as a versioned artifact in Infrahub, an `artifact_definitions` entry is required in `.infrahub.yml`; the skill generates this when appropriate
-- **`netutils` availability** — `netutils` filters are available in Jinja2 templates; the skill uses them where appropriate for IP and interface operations
-- **`watch` dependencies** — a Python transform always carries a `watch` block naming every first-party module it imports and every file it reads at runtime (`files: []` when there are none); Infrahub never analyzes imports, so without the key the artifacts re-render on every commit, and with an incomplete list they silently go stale. A Jinja2 transform needs one only for a reference its parser cannot follow, such as a computed `{% include %}`
+- **Return type**: Python transform must return `dict` for JSON output or `str` for text; wrong return type causes rendering failure
+- **`data` variable**: Jinja2 templates always receive the GraphQL response as `data`; accessing the wrong key is a common mistake
+- **Artifact definitions**: if the transform output should be stored as a versioned artifact in Infrahub, an `artifact_definitions` entry is required in `.infrahub.yml`; the skill generates this when appropriate
+- **`netutils` availability**: `netutils` filters are available in Jinja2 templates; the skill uses them where appropriate for IP and interface operations
+- **`watch` dependencies**: a Python transform always includes a `watch` block naming every first-party module it imports and every file it reads at runtime (`files: []` when there are none); Infrahub never analyzes imports, so without the key the artifacts re-render on every commit, and with an incomplete list they silently go stale. A Jinja2 transform needs one only for a reference its parser cannot follow, such as a computed `{% include %}`
 
 ## Running transforms
 

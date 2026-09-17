@@ -21,7 +21,7 @@ That offer can also arrive on its own. With the [infrahub-speckit](https://githu
 
 - A named artifact: the rule file that should have prevented the friction, or a plain statement that no rule covers the topic
 - A proposed rule change, so a maintainer does not have to reverse-engineer the fix from a symptom
-- A comment on the existing issue, or a new issue carrying an explicit confidence label
+- A comment on the existing issue, or a new issue with an explicit confidence label
 - A redacted body, with anything identifying your infrastructure removed before the draft leaves the skill
 - A hand-off to the Issue Reporter, which owns the review gate and submission
 
@@ -40,7 +40,7 @@ Three things count as friction:
 
 | Signal | What it looks like |
 | ------ | ------------------ |
-| Failed tool calls | `tool_result` blocks carrying `is_error` |
+| Failed tool calls | `tool_result` blocks with `is_error` |
 | Repeated nudges | You restating the same ask in different words |
 | A docs escape | A fetch of `docs.infrahub.app`, `llms.txt`, or `schema.infrahub.app` **after** the relevant skill file was already read |
 
@@ -60,7 +60,7 @@ Routing happens on two levels, and only skill defects reach a draft.
 | No rule covers it, and the escape found the answer (or never happened) | Feature | `feat:` | `opsmill/infrahub-skills` |
 | No rule covers it, the escape happened and still failed to answer | Docs gap | `bug(docs):` | `opsmill/infrahub` |
 
-A docs gap routes to `opsmill/infrahub` because Infrahub's own documentation lives there, not in the skills repo. It also has to clear a **settled-behavior gate**: if the workflow is still being designed or is deliberately undocumented, there is nothing to write down yet, so the skill stops and tells you which behavior is unsettled. That is the only point in the workflow that ends without a report.
+A docs gap routes to `opsmill/infrahub` because Infrahub's own documentation is there, not in the skills repo. It also has to clear a **settled-behavior gate**: if the workflow is still being designed or is deliberately undocumented, there is nothing to write down yet, so the skill stops and tells you which behavior is unsettled. That is the only point in the workflow that ends without a report.
 
 ## How the tracker check shapes the report
 
@@ -68,7 +68,7 @@ Before anything is drafted, `opsmill/infrahub-skills` is searched. The result de
 
 | Tracker result | What you get |
 | -------------- | ------------ |
-| An issue already covers it | A comment on that issue, carrying only what this session adds |
+| An issue already covers it | A comment on that issue, with only what this session adds |
 | No match, and you confirm it has happened before | A new issue labelled `recurring` |
 | No match, first time seeing it | A new issue labelled `unconfirmed single observation` |
 
@@ -88,12 +88,12 @@ A single observation is weak evidence, not zero evidence. It gets labelled hones
 
 ## Key rules enforced
 
-- **Tracker first** — a skill's users share no repo, directory, or laptop, so local session history cannot answer "has anyone seen this before"
-- **Comment, don't duplicate** — a second issue splits the evidence across two threads
-- **Never suppress a first sighting** — the report is always produced, with a confidence label rather than silence
-- **Cite the artifact** — the draft names a file under `skills/<skill>/rules/`, or states plainly that no rule covers the topic; "the schema skill" gives a maintainer a search, not a starting point
-- **Redact before drafting** — error messages carry file paths, hostnames, and node kinds; issue bodies are public and cannot be retracted
-- **Never file directly** — this skill has no consent gate and no submission method of its own
+- **Tracker first**: a skill's users share no repo, directory, or laptop, so local session history cannot answer "has anyone seen this before"
+- **Comment, don't duplicate**: a second issue splits the evidence across two threads
+- **Never suppress a first sighting**: the report is always produced, with a confidence label rather than silence
+- **Cite the artifact**: the draft names a file under `skills/<skill>/rules/`, or states plainly that no rule covers the topic; "the schema skill" gives a maintainer a search, not a starting point
+- **Redact before drafting**: error messages include file paths, hostnames, and node kinds; issue bodies are public and cannot be retracted
+- **Never file directly**: this skill has no consent gate and no submission method of its own
 
 ## Common mistakes it catches
 
