@@ -1,6 +1,5 @@
 ---
 title: NetBox Device Type Converter
-sidebar_position: 15
 ---
 
 The NetBox Device Type Converter turns NetBox device-type and module-type YAML into Infrahub Object Templates, so you create a device with its ports already in place from one reusable definition. The input format is [netbox-community/devicetype-library](https://github.com/netbox-community/devicetype-library), which you can browse at the [NetBox Data Exchange](https://netboxlabs.com/ndx/). A bundled Python script does the conversion, driven by a mapping profile that describes your target schema. Point it at the right schema and read what it reports back — without editing your schema for you or guessing a field name the profile does not define.

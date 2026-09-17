@@ -1,6 +1,5 @@
 ---
 title: Generator Manager
-sidebar_position: 4
 ---
 
 The Generator Manager produces Python generators that query Infrahub for design objects and automatically create or update the infrastructure objects derived from them. Generators are idempotent: re-running them updates existing objects rather than creating duplicates. The skill generates the Python class, GraphQL query, and `.infrahub.yml` registration.
