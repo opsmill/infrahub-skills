@@ -44,6 +44,9 @@ Infrahub skills. It is not meant to be invoked directly.
     does it for a transform, check or generator
   - Recovery from partial repository syncs
   - Generated file protocol conventions
+  - `schema.graphql` as `infrahubctl graphql
+    export-schema` output — re-exported, never
+    hand-edited
   - Adopting generated protocols for typed SDK calls
   - Information-source priority (skill content first,
     with a concrete last-resort procedure for consulting
