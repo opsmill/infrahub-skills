@@ -25,6 +25,23 @@ users might say, and use TRIGGER / DO NOT TRIGGER to
 disambiguate against neighbouring skills. Lean slightly
 pushy — agents under-trigger skills.
 
+A skill that creates an artifact also changes one. When
+the description opens on a creation verb, its TRIGGER
+clauses name modifying, debugging, and extending what
+already exists too. Otherwise day-two work does not
+merely fall outside the triggers, it reads as a positive
+signal that the skill does not apply. Issue #78 paid for
+that gap: a session asked to investigate an existing
+generator never invoked the skill, and deleted a live
+interface the generator did not own, while the skill's
+own front page warned about that failure twice.
+`tests/test_skill_frontmatter.py` fails a
+creation-shaped description that names no modification
+trigger, which is the only gate a description has.
+Descriptions have no eval coverage, because eval prompts
+say `Read the skill at ...` and bypass triggering
+altogether.
+
 State triggers, never a workflow summary. A description
 that narrates the steps gives the agent a shortcut: it
 follows the summary instead of reading the body. The
