@@ -1512,17 +1512,47 @@ tasks:
         weight: 1.0
     expected_output: >-
       A Python generator that adds each peer to the group with one .add()
-      call per peer (typically inside a for loop), then a single .save().
-      No list is passed to .add() in a single call.
+      call per peer (a for loop or .extend(), which calls .add() internally),
+      then a single .save(). No list is passed to a single .add() call.
     expectations:
       - "Group is created or fetched via self.client.get / self.client.create"
-      - ".add() is called once per peer (inside a for loop or 5 explicit calls)"
+      - ".add() is called once per peer (a for loop, 5 explicit calls, or .extend())"
       - "No call passes a list of peers as a single .add() argument"
     assertions:
       - name: no-list-passed-to-add
         check: No .add() call receives a list as its argument
       - name: members-add-iterates
-        check: .add() is invoked inside a for loop or multiple times explicitly
+        check: .add() is invoked per peer via a loop, explicit calls, or .extend()
+
+  - name: generator-concurrent-relationship-writes
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write an Infrahub Generator that runs once per created DcimDevice
+      (an on-create event trigger, so many runs execute concurrently during a
+      bulk load). Each run must add its own device to the members of the
+      shared CoreStandardGroup named 'all-edges', which every run writes.
+
+      Save ONLY the final Python generator class to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_concurrent_relationship_writes.py
+        weight: 1.0
+    expected_output: >-
+      A Python generator that adds its device to the shared group with
+      node.add_relationships(relation_to_update=..., related_nodes=[<peer ids>]),
+      not with a members.add() loop followed by save().
+    expectations:
+      - "The shared group's members are written with add_relationships()"
+      - "No RelationshipManager .add() call is used for the shared group"
+      - "related_nodes receives peer id strings, not node objects"
+    assertions:
+      - name: concurrent-writes-use-add-relationships
+        check: Peers are added via add_relationships(), with no .add() call remaining
+      - name: add-relationships-passes-ids
+        check: related_nodes carries peer id strings rather than node objects
 
   - name: generator-natural-key-preflight
     trials: 3

@@ -19,16 +19,20 @@ Generators are stateful: a re-run cleans up objects
 from the previous run that weren't recreated this
 time, which is what lets the generator "drive" the
 target instead of just accumulating data. That only
-works if every `save()` uses `allow_upsert=True` —
-without upsert the second run errors on the first
-existing object and aborts, leaving the tracking
-group half-updated. The flip side is that a buggy
-generator (one that skips objects it shouldn't, or
-narrows its target too far) can delete real data on
-the next run; the tracking group is the blast
-radius, so keeping `generate()` deterministic and
-defensive about empty input matters more here than
-in checks or transforms.
+works if **every `save()` reachable from
+`generate()`** uses `allow_upsert=True`, and the word
+reachable is load-bearing. A `save()` inside a shared
+helper, a `src/` utility, or anything the generator
+imports is a tracking decision too, made on that
+generator's behalf. Without upsert, the second run
+errors on the first existing object and aborts,
+leaving the tracking group half-updated. The flip
+side is that a buggy generator (one that skips
+objects it shouldn't, or narrows its target too far)
+can delete real data on the next run; the tracking
+group is the blast radius, so keeping `generate()`
+deterministic and defensive about empty input matters
+more here than in checks or transforms.
 
 ### How Tracking Works
 
@@ -116,9 +120,8 @@ await container.save(allow_upsert=True, update_group_context=False)
 ```
 
 The trade is in the second comment: nothing cleans it up
-either. [Two ways to honour it](#two-ways-to-honour-it)
-below covers the other option, which is to create the
-shared object outside the generator entirely.
+either. [Three ways to honour it](#three-ways-to-honour-it)
+below covers the other options.
 
 ### The failure is a refusal, not a changed output set
 
@@ -149,7 +152,7 @@ wrong. That is the quieter of the two possible failures.
 > can both reach an object, the object belongs to
 > neither.
 
-### Two ways to honour it
+### Three ways to honour it
 
 1. **Create the shared object outside the generator** —
    in an object data file, or a separate one-off
@@ -164,9 +167,50 @@ wrong. That is the quieter of the two possible failures.
    The node is written and **not** added to the run's
    group, so no run can reclaim it. Note this also means
    nothing cleans it up: that is the trade.
+3. **Write it with `add_relationships()`**, which does not
+   enter the group at all:
+
+   ```python
+   await container.add_relationships(
+       relation_to_update="children", related_nodes=[child.id]
+   )
+   ```
+
+   The method goes straight to a server-side RelationshipAdd
+   and never calls the group context, so no run claims the
+   node. It takes **no** `update_group_context` parameter:
+   passing one raises `TypeError`. Same trade as option 2,
+   nothing cleans the node up. See
+   [python-concurrent-relationship-writes.md](python-concurrent-relationship-writes.md).
 
 `update_group_context=False` is checked before anything
-else, so it wins over the client's tracking mode.
+else, so it wins over the client's tracking mode (the
+`is not False` guard). `.save()` claims the node for the
+run's tracking group after create or update;
+`add_relationships()` does not touch the group at all.
+
+### Audit the saves you can reach, not the ones you can see
+
+Auditing the `save()` calls in the generator file is not
+the audit. Every `save()` reachable from `generate()` is a
+tracking decision, and shared helpers are the dangerous
+case because the right answer differs per caller: a
+generator that owns the objects it addresses should track
+them, while one that merely addresses somebody else's
+should not.
+
+```bash
+# Every save reachable from the generator, not only its own file.
+grep -rn "\.save(" generators/ src/
+```
+
+A real incident: a generator's own file passed
+`update_group_context=False` on every `save()` and was
+still wrong, because the /31 addressing went through a
+shared helper that saved both ends with the default. The
+run that moved a server stopped producing one leaf port,
+and cleanup deleted it. That port belonged to the rack
+generator.
 
 ### What cleanup actually deletes
 
@@ -180,6 +224,8 @@ to_delete = previous_group.members - nodes_saved_this_run
 A node that was never added to any group appears in
 neither set and cannot be reclaimed — which is precisely
 why the opt-out is safe for a genuinely shared object.
+
+Verified against Infrahub 1.11.2 and infrahub-sdk 1.23.2.
 
 Reference:
 [registration-config.md](registration-config.md),

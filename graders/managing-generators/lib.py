@@ -175,6 +175,22 @@ def find_relationship_add_calls(tree: ast.Module) -> list[ast.Call]:
     ]
 
 
+def find_add_relationships_calls(tree: ast.Module) -> list[ast.Call]:
+    """Return all ``<expr>.add_relationships(...)`` call sites.
+
+    The SDK method (present since infrahub-sdk v1.0.0, unchanged in shape;
+    ``infrahub_sdk/node/node.py:1544`` at v1.23.2) issues a server-side
+    RelationshipAdd naming only its own peers, so it does not overwrite
+    peers another writer added.
+    """
+    if tree is None:
+        return []
+    return [
+        c for c in _iter_calls(tree)
+        if isinstance(c.func, ast.Attribute) and c.func.attr == "add_relationships"
+    ]
+
+
 def get_kwarg(call: ast.Call, name: str) -> ast.AST | None:
     """Return the value node for keyword argument ``name``, or None."""
     for kw in call.keywords:
@@ -507,16 +523,43 @@ def _is_list_referenced(node: ast.AST, tree: ast.Module) -> bool:
     return False
 
 
+def _list_elements_if_resolvable(node: ast.AST, tree: ast.Module) -> list[ast.AST] | None:
+    """Return the element expressions of the list literal ``node`` denotes,
+    if that is statically resolvable; otherwise ``None`` (indeterminate).
+
+    Handles a literal list directly, or a bare Name bound to a list
+    literal. A ``ListComp``, a call result, or an unresolved Name returns
+    ``None`` -- per the house convention, an argument shape this cannot
+    resolve passes rather than fails.
+    """
+    if isinstance(node, ast.List):
+        return node.elts
+    if isinstance(node, ast.Name):
+        value = _bound_value(node.id, tree)
+        if isinstance(value, ast.List):
+            return value.elts
+    return None
+
+
 def check_no_list_passed_to_add(
     tree: ast.Module | None, **_: Any
 ) -> tuple[bool, str]:
-    """No .add(...) call may receive a list argument as its sole peer."""
+    """No .add(...) call may receive a list argument as its sole peer, and
+    no .extend(...) call may receive a list whose elements are themselves
+    lists -- the same composite-HFID bug, one level deeper. An answer with
+    no .add() calls at all is not a violation of either constraint as long
+    as it has at least one .extend() call: there is nothing for a list
+    passed to .add() to violate.
+    """
     if tree is None:
         return False, "No Python source to inspect"
 
     add_calls = find_relationship_add_calls(tree)
-    if not add_calls:
-        return False, "No .add(...) calls found"
+    extend_calls = _relationship_shaped_extend_calls(
+        tree, find_relationship_extend_calls(tree)
+    )
+    if not add_calls and not extend_calls:
+        return False, "No .add(...) or .extend(...) calls found"
 
     bad: list[str] = []
     for call in add_calls:
@@ -528,7 +571,20 @@ def check_no_list_passed_to_add(
 
     if bad:
         return False, f".add() received a list: {', '.join(bad)}"
-    return True, "No .add() call received a list argument"
+
+    nested: list[str] = []
+    for call in extend_calls:
+        if len(call.args) != 1:
+            continue
+        elements = _list_elements_if_resolvable(call.args[0], tree)
+        if elements is None:
+            continue
+        if any(isinstance(el, ast.List) for el in elements):
+            nested.append(ast.unparse(call.func) if hasattr(ast, "unparse") else call.func.attr)
+
+    if nested:
+        return False, f".extend() received a list containing a nested list: {', '.join(nested)}"
+    return True, "No .add() call received a list argument, and no .extend() call received a nested list"
 
 
 def check_members_add_iterates(
@@ -541,8 +597,13 @@ def check_members_add_iterates(
         return False, "No Python source to inspect"
 
     add_calls = find_relationship_add_calls(tree)
+    extend_calls = _relationship_shaped_extend_calls(
+        tree, find_relationship_extend_calls(tree)
+    )
+    if extend_calls:
+        return True, ".extend() adds one peer per call internally"
     if not add_calls:
-        return False, "No .add(...) calls found"
+        return False, "No .add(...) or .extend(...) calls found"
 
     # Look for any For loop containing a .add() call
     for for_node in ast.walk(tree):
@@ -564,6 +625,346 @@ def check_members_add_iterates(
         return True, f".add() called multiple times: {len(add_calls)} calls"
 
     return False, "Only a single .add() call and not in a for loop"
+
+
+def find_relationship_extend_calls(tree: ast.Module) -> list[ast.Call]:
+    """Return all ``<expr>.extend(...)`` call sites.
+
+    ``RelationshipManager.extend()`` is a convenience wrapper that calls
+    ``.add()`` for every item (``infrahub_sdk/node/relationship.py:306`` at
+    v1.23.2), so it is the same client-side read-modify-write as a for-loop
+    of ``.add()`` once followed by ``.save()``.
+    """
+    if tree is None:
+        return []
+    return [
+        c for c in _iter_calls(tree)
+        if isinstance(c.func, ast.Attribute) and c.func.attr == "extend"
+    ]
+
+
+def _attr_base_name(node: ast.AST) -> str | None:
+    """Walk a dotted attribute chain down to its root ``Name``, if any."""
+    while isinstance(node, ast.Attribute):
+        node = node.value
+    return node.id if isinstance(node, ast.Name) else None
+
+
+def _bound_value(
+    name: str, tree: ast.Module, before: tuple[int, int] | None = None
+) -> ast.AST | None:
+    """Return the value last assigned to local name ``name`` in source order.
+
+    Only plain ``Name`` targets are resolved (``Assign``/``AnnAssign``);
+    tuple-unpacking and attribute targets are left unresolved.
+
+    ``before`` limits the search to assignments positioned before that
+    ``(lineno, col_offset)``, which is what a use site needs: the binding
+    live where the name is read, not whichever one happens to come last in
+    the file.
+
+    Ordering is by source position, never by ``ast.walk`` order.
+    ``ast.walk`` is breadth-first by depth, so an assignment nested inside
+    a loop is visited after every assignment at the outer level -- making
+    a rebinding that follows the loop look like it came first, and
+    resolving the name to the wrong value.
+    """
+    best: tuple[tuple[int, int], ast.AST] | None = None
+    for node in ast.walk(tree):
+        target_names: list[str] = []
+        value: ast.AST | None = None
+        if isinstance(node, ast.Assign):
+            target_names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+            value = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            target_names = [node.target.id]
+            value = node.value
+        if name not in target_names or value is None:
+            continue
+        pos = (node.lineno, node.col_offset)
+        if before is not None and pos >= before:
+            continue
+        if best is None or pos > best[0]:
+            best = (pos, value)
+    return best[1] if best else None
+
+
+def _is_bound_to_local_set(name: str, tree: ast.Module) -> bool:
+    """True when ``name = set()`` or ``name = {...}`` (a set literal)."""
+    value = _bound_value(name, tree)
+    if isinstance(value, ast.Set):
+        return True
+    return (
+        isinstance(value, ast.Call)
+        and isinstance(value.func, ast.Name)
+        and value.func.id == "set"
+    )
+
+
+def _is_run_private_receiver(
+    name: str, tree: ast.Module, before: tuple[int, int] | None = None
+) -> bool:
+    """True when ``name`` was bound to a node this run just created.
+
+    ``self.client.create(...)`` returns a node only this run holds a
+    reference to, so a relationship mutation on it cannot race another
+    run's write. ``self.client.get(...)`` fetches a node that may already
+    be shared with other runs, so it earns no such exemption -- nor does
+    anything this cannot resolve to a ``create`` call, since the burden is
+    on demonstrating the receiver is run-private, not the reverse.
+    """
+    value = _bound_value(name, tree, before=before)
+    if value is None:
+        return False
+    inner = value.value if isinstance(value, ast.Await) else value
+    return isinstance(inner, ast.Call) and _is_self_client_method(inner, "create")
+
+
+def _resolve_alias_to_attribute(name: str, tree: ast.Module) -> ast.Attribute | None:
+    """If ``name`` is a bare alias for an attribute chain, return that chain.
+
+    ``members = group.members`` followed by ``members.add(x)`` is the same
+    RelationshipManager access as ``group.members.add(x)`` written through
+    a rename -- the narrowing below must not be bypassable by assigning a
+    shorter local name to a relationship first. Only one hop is resolved;
+    an alias of an alias falls through to "cannot resolve" like any other
+    unresolvable shape.
+    """
+    bound = _bound_value(name, tree)
+    return bound if isinstance(bound, ast.Attribute) else None
+
+
+def _relationship_shaped_extend_calls(
+    tree: ast.Module, calls: list[ast.Call]
+) -> list[ast.Call]:
+    """Keep only ``.extend()`` calls whose receiver is a relationship access.
+
+    ``RelationshipManager.extend()`` is always reached through an attribute
+    chain -- ``group.members.extend(...)`` written directly, or the one-hop
+    alias ``members = group.members`` that ``_resolve_alias_to_attribute``
+    resolves, so a rename cannot launder it. A bare ``names.extend([...])``
+    on a local list shares the method name and nothing else; counting it as
+    a peer write lets one unrelated line flip an answer that never adds a
+    member to a pass on both of this module's ``.add()`` assertions.
+    """
+    shaped: list[ast.Call] = []
+    for call in calls:
+        receiver = call.func.value
+        if isinstance(receiver, ast.Name):
+            receiver = _resolve_alias_to_attribute(receiver.id, tree)
+        if isinstance(receiver, ast.Attribute):
+            shaped.append(call)
+    return shaped
+
+
+def _narrow_shared_relationship_calls(
+    tree: ast.Module, calls: list[ast.Call]
+) -> list[ast.Call]:
+    """Keep only calls that plausibly mutate a node another run could write.
+
+    * A bare ``<name>.<method>(...)`` (single-level) is resolved one hop:
+      if ``<name>`` is a local ``set()`` (a dedup, not a RelationshipManager
+      at all) it is exempt by that binding; if it is an alias for an
+      attribute chain (``members = group.members``) the call is narrowed as
+      if it had been written through that chain, so a rename cannot launder
+      the same read-modify-write; anything else this cannot resolve to
+      either shape falls back to "indeterminate passes" per this module's
+      convention, rather than guessing.
+    * A two-level ``<name>.<relationship>.<method>(...)`` (written directly
+      or reached via the alias hop above) is exempt when ``<name>`` is
+      run-private (see ``_is_run_private_receiver``): a node this run just
+      created cannot be the node two runs are racing to write. This does
+      not depend on which node any ``add_relationships`` call elsewhere in
+      the file happens to target -- an ``extend()`` on a *different*,
+      fetched (shared) node is just as much the bug even when an unrelated
+      ``add_relationships()`` call is also present.
+    """
+    narrowed = []
+    for call in calls:
+        receiver = call.func.value
+        if isinstance(receiver, ast.Name):
+            if _is_bound_to_local_set(receiver.id, tree):
+                continue
+            alias_target = _resolve_alias_to_attribute(receiver.id, tree)
+            if alias_target is None:
+                continue  # single-level and unresolvable: indeterminate passes
+            receiver = alias_target
+        if not isinstance(receiver, ast.Attribute):
+            continue
+        base = _attr_base_name(receiver)
+        if base is None:
+            continue
+        if _is_run_private_receiver(base, tree, before=(call.lineno, call.col_offset)):
+            continue
+        narrowed.append(call)
+    return narrowed
+
+
+def _unparse_calls(calls: list[ast.Call]) -> str:
+    """Best-effort source text for each call's receiver+method, for messages."""
+    texts = []
+    for call in calls:
+        try:
+            texts.append(ast.unparse(call.func))
+        except Exception:
+            continue
+    return ", ".join(f"`{t}`" for t in texts) if texts else ""
+
+
+def check_concurrent_writes_use_add_relationships(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """Peers on a shared node go through add_relationships(), not .add()+.save().
+
+    ``.add()``/``.extend()`` mutate the in-memory peer list and ``save()``
+    sends all of it (``infrahub_sdk/node/relationship.py:116-117``), so a
+    second concurrent writer overwrites the first. RelationshipAdd names
+    only its own peers.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    # Order matters: report concrete .add()/.extend() calls before the
+    # missing-method early return. An answer that kept the read-modify-write
+    # needs to be told which calls to replace, not that a method it never
+    # reached for is missing.
+    add_calls = _narrow_shared_relationship_calls(tree, find_relationship_add_calls(tree))
+    if add_calls:
+        calls_text = _unparse_calls(add_calls)
+        suffix = f" ({calls_text})" if calls_text else ""
+        return False, (
+            f"{len(add_calls)} RelationshipManager .add() call(s) remain"
+            f"{suffix}: a client-side read-modify-write drops peers "
+            "written concurrently"
+        )
+
+    extend_calls = _narrow_shared_relationship_calls(
+        tree, find_relationship_extend_calls(tree)
+    )
+    if extend_calls:
+        calls_text = _unparse_calls(extend_calls)
+        suffix = f" ({calls_text})" if calls_text else ""
+        return False, (
+            f"{len(extend_calls)} RelationshipManager .extend() call(s) "
+            f"remain{suffix}: extend() calls .add() per item, the same "
+            "client-side read-modify-write that drops peers written "
+            "concurrently"
+        )
+
+    ar_calls = find_add_relationships_calls(tree)
+    if not ar_calls:
+        return False, "No add_relationships(...) call found"
+
+    return True, "peers added via add_relationships()"
+
+
+def _is_peer_id_expr(node: ast.AST) -> bool:
+    """True when the expression is demonstrably a peer ID rather than a node."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return True
+    if isinstance(node, ast.Attribute) and node.attr == "id":
+        return True
+    if isinstance(node, ast.Subscript):
+        key = node.slice
+        return isinstance(key, ast.Constant) and key.value == "id"
+    return False
+
+
+def _is_node_object_expr(node: ast.AST, tree: ast.Module) -> bool:
+    """True when the name was bound from a client.create/get call."""
+    if not isinstance(node, ast.Name):
+        return False
+    # Only the binding live at this use site decides. Scanning every
+    # assignment in the function flags `device = device.id` written after a
+    # `create()`, which is a false positive on compliant code: by the time
+    # `related_nodes` reads the name it holds an id string.
+    use_site = (node.lineno, node.col_offset)
+    best: tuple[tuple[int, int], ast.AST] | None = None
+    for assign in ast.walk(tree):
+        target_names: list[str] = []
+        value: ast.AST | None = None
+        if isinstance(assign, ast.Assign):
+            target_names = [t.id for t in assign.targets if isinstance(t, ast.Name)]
+            value = assign.value
+        elif isinstance(assign, ast.AugAssign) and isinstance(assign.target, ast.Name):
+            target_names = [assign.target.id]
+            value = assign.value
+        if node.id not in target_names or value is None:
+            continue
+        pos = (assign.lineno, assign.col_offset)
+        if pos >= use_site:
+            continue
+        if best is None or pos > best[0]:
+            best = (pos, value)
+    if best is not None:
+        live = best[1]
+        inner = live.value if isinstance(live, ast.Await) else live
+        if (
+            isinstance(inner, ast.Call)
+            and isinstance(inner.func, ast.Attribute)
+            and inner.func.attr in {"create", "get"}
+        ):
+            return True
+    # A list built by .append(node) where node came from create/get
+    for call in _iter_calls(tree):
+        if (
+            isinstance(call.func, ast.Attribute)
+            and call.func.attr == "append"
+            and isinstance(call.func.value, ast.Name)
+            and call.func.value.id == node.id
+            and call.args
+            and _is_node_object_expr(call.args[0], tree)
+        ):
+            return True
+    return False
+
+
+def check_add_relationships_passes_ids(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """``related_nodes`` carries peer ID strings, never node objects.
+
+    The signature is ``related_nodes: list[str]``
+    (``infrahub_sdk/node/node.py:1544``) and the mutation is built by string
+    interpolation, so a node object is rendered as its display form inside the
+    ``id`` field and shipped without error.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    ar_calls = find_add_relationships_calls(tree)
+    if not ar_calls:
+        return False, "No add_relationships(...) call found"
+
+    for call in ar_calls:
+        arg = get_kwarg(call, "related_nodes")
+        if arg is None and call.args:
+            arg = call.args[-1]
+        if arg is None:
+            continue
+        if isinstance(arg, ast.ListComp):
+            if _is_peer_id_expr(arg.elt):
+                continue
+            if _is_node_object_expr(arg.elt, tree):
+                return False, (
+                    "related_nodes comprehension yields node objects; "
+                    "related_nodes takes peer id strings"
+                )
+            continue
+        if isinstance(arg, (ast.List, ast.Tuple)):
+            for elt in arg.elts:
+                if _is_node_object_expr(elt, tree):
+                    return False, (
+                        "related_nodes contains a node object; "
+                        "related_nodes takes peer id strings"
+                    )
+            continue
+        if isinstance(arg, ast.Name) and _is_node_object_expr(arg, tree):
+            return False, (
+                f"related_nodes={arg.id} holds node objects; "
+                "related_nodes takes peer id strings"
+            )
+    return True, "related_nodes carries peer ids"
 
 
 # ---------------------------------------------------------------------------
@@ -1482,23 +1883,26 @@ def check_shared_save_opts_out_of_tracking(
     deletes it. The opt-out is bound to that one save: applying it to every
     save disables the per-target cleanup the tracking group exists for.
     Creating the shared object outside the generator is the other accepted
-    answer, so an answer that never writes it passes too.
+    answer, so an answer that never writes it passes too. So is writing it
+    with add_relationships(), which never enters the group at all.
     """
     tree = _answer_tree(output)
     if tree is None:
         return False, "no parseable Python block found"
 
     saves = _save_calls(tree)
-    if not saves:
-        return False, "no save() call found"
+    add_rel_calls = _calls_to(tree, {"add_relationships"})
+    if not saves and not add_rel_calls:
+        return False, "no save() or add_relationships() call found"
 
-    opted_out = [c for c in saves if _save_opts_out(c)]
-    if len(opted_out) == len(saves):
-        return False, (
-            f"every save() sets update_group_context=False, which opts the "
-            f"whole run out of tracking and disables the per-target cleanup. "
-            f"Only the shared {_SHARED_KIND} may opt out"
-        )
+    if saves:
+        opted_out = [c for c in saves if _save_opts_out(c)]
+        if opted_out and len(opted_out) == len(saves):
+            return False, (
+                f"every save() sets update_group_context=False, which opts the "
+                f"whole run out of tracking and disables the per-target cleanup. "
+                f"Only the shared {_SHARED_KIND} may opt out"
+            )
 
     # A `get` binds the object without claiming it, so the two are tracked
     # apart: created names decide whether an unaccounted-for save is the
@@ -1518,7 +1922,23 @@ def check_shared_save_opts_out_of_tracking(
         and isinstance(c.func.value, (ast.Name, ast.Attribute))
         and ast.unparse(c.func.value) in shared_vars
     ]
+    shared_add_rel = [
+        c for c in add_rel_calls
+        if isinstance(c.func, ast.Attribute)
+        and isinstance(c.func.value, (ast.Name, ast.Attribute))
+        and ast.unparse(c.func.value) in shared_vars
+    ]
     if not shared_saves:
+        # add_relationships() never touches group_context, so a shared
+        # object written only this way is never claimed -- no opt-out
+        # needed, and any unrelated save() elsewhere cannot secretly be
+        # this write, because we already know how this write happened.
+        if shared_add_rel:
+            return True, (
+                f"the shared {_SHARED_KIND} is written with "
+                "add_relationships(), which does not add it to the run's "
+                "group"
+            )
         if not created_vars:
             return True, (
                 f"the generator only reads the shared {_SHARED_KIND} and "
@@ -1643,6 +2063,8 @@ CHECKS: dict[str, Any] = {
     "sdk-object-reference-used": check_sdk_object_reference_used,
     "no-list-passed-to-add": check_no_list_passed_to_add,
     "members-add-iterates": check_members_add_iterates,
+    "concurrent-writes-use-add-relationships": check_concurrent_writes_use_add_relationships,
+    "add-relationships-passes-ids": check_add_relationships_passes_ids,
     "preflight-or-upsert": check_preflight_or_upsert,
     "no-raw-create-without-handler": check_no_raw_create_without_handler,
     # from_graphql hydration family (output.md)
