@@ -3,6 +3,7 @@ paths:
   - "skills/**"
   - "graders/**"
   - "eval.yaml"
+  - "contributor-skills/**"
   - ".claude/skills/**"
 ---
 

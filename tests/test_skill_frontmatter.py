@@ -35,7 +35,7 @@ PIPELINE_SKILLS = [
 
 
 def _skill_files() -> list[Path]:
-    return sorted(ROOT.glob("skills/*/SKILL.md")) + sorted(ROOT.glob(".claude/skills/*/SKILL.md"))
+    return sorted(ROOT.glob("skills/*/SKILL.md")) + sorted(ROOT.glob("contributor-skills/*/SKILL.md"))
 
 
 def _frontmatter(path: Path) -> dict:
@@ -71,7 +71,7 @@ def test_frontmatter_parses(path: Path) -> None:
 @pytest.mark.parametrize("name", PIPELINE_SKILLS)
 def test_pipeline_skill_metadata(name: str) -> None:
     """The pipeline stage label survives YAML parsing with its colon intact."""
-    fm = _frontmatter(ROOT / ".claude/skills" / name / "SKILL.md")
+    fm = _frontmatter(ROOT / "contributor-skills" / name / "SKILL.md")
     pipeline = fm.get("metadata", {}).get("pipeline", "")
     assert pipeline.startswith("skill-change (stage "), (
         f"{name}: metadata.pipeline lost its stage label: {pipeline!r}"
@@ -80,7 +80,7 @@ def test_pipeline_skill_metadata(name: str) -> None:
 
 def test_tool_usage_blocks_are_identical() -> None:
     """The verbatim `## Tool usage` block does not drift between the four stages."""
-    blocks = {n: _section(ROOT / ".claude/skills" / n / "SKILL.md", "## Tool usage") for n in PIPELINE_SKILLS}
+    blocks = {n: _section(ROOT / "contributor-skills" / n / "SKILL.md", "## Tool usage") for n in PIPELINE_SKILLS}
     reference = blocks[PIPELINE_SKILLS[0]]
     for name, block in blocks.items():
         assert block == reference, (
@@ -92,7 +92,7 @@ def test_tool_usage_blocks_are_identical() -> None:
 def test_boundaries_pointer_stays_one_line() -> None:
     """`## Boundaries` links AGENTS.md rather than restating the list."""
     for name in PIPELINE_SKILLS:
-        body = _section(ROOT / ".claude/skills" / name / "SKILL.md", "## Boundaries")
+        body = _section(ROOT / "contributor-skills" / name / "SKILL.md", "## Boundaries")
         assert "AGENTS.md" in body, f"{name}: Boundaries does not point at AGENTS.md"
         assert len(body.splitlines()) <= 3, (
             f"{name}: Boundaries grew to {len(body.splitlines())} lines. "

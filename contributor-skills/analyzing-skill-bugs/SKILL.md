@@ -146,7 +146,7 @@ discover on its own.
 ## Minimum change rung
 
 Run the ladder in
-[`../../../dev/guidelines/minimum-change.md`](../../../dev/guidelines/minimum-change.md)
+[`../../dev/guidelines/minimum-change.md`](../../dev/guidelines/minimum-change.md)
 before proposing a fix shape. Read it now, at the point of decision, not
 after a strategy is already written around the wrong rung. Record which rung
 the fix stops at and one line of why it does not need to go further, in the
@@ -171,7 +171,7 @@ having looked.
 Then work out what the fix leaves stale. A skill whose behavior changes keeps
 every documentation surface it already had, and those surfaces go on
 describing behavior it no longer has. Read
-[`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md)
+[`../../dev/guidelines/skill-registration.md`](../../dev/guidelines/skill-registration.md)
 § "When behavior changes" now, while the scope is in front of you, and run the
 grep it gives. Record the answer in the handoff's `Docs impact` field. `none`
 is a complete answer; a blank field is not, because it cannot be told apart
@@ -216,4 +216,4 @@ Stop and report rather than guessing forward, when:
 ## Boundaries
 
 Follow the repository-wide boundaries in
-[`../../../AGENTS.md`](../../../AGENTS.md) § Boundaries.
+[`../../AGENTS.md`](../../AGENTS.md) § Boundaries.

@@ -32,21 +32,21 @@ skills themselves. For user-facing docs, see
   definitions.
 
 Contributor skills live outside `dev/`, in
-[`../.claude/skills/`](../.claude/skills/), because that
-is where an agent discovers them:
-[`harvesting-skill-review`](../.claude/skills/harvesting-skill-review/SKILL.md)
+[`../contributor-skills/`](../contributor-skills/), next
+to the shipped `../skills/`:
+[`harvesting-skill-review`](../contributor-skills/harvesting-skill-review/SKILL.md)
 turns a PR's review threads into rules, and the
 skill-change pipeline
-([`analyzing-skill-bugs`](../.claude/skills/analyzing-skill-bugs/SKILL.md),
-[`grilling-skill-features`](../.claude/skills/grilling-skill-features/SKILL.md),
-[`test-driving-skill-changes`](../.claude/skills/test-driving-skill-changes/SKILL.md),
-[`implementing-skill-changes`](../.claude/skills/implementing-skill-changes/SKILL.md))
+([`analyzing-skill-bugs`](../contributor-skills/analyzing-skill-bugs/SKILL.md),
+[`grilling-skill-features`](../contributor-skills/grilling-skill-features/SKILL.md),
+[`test-driving-skill-changes`](../contributor-skills/test-driving-skill-changes/SKILL.md),
+[`implementing-skill-changes`](../contributor-skills/implementing-skill-changes/SKILL.md))
 takes a bug or an idea
 through a failing test to a pull request.
 
-Agents other than Claude Code do not look in `.claude/` or `dev/` by
-default, so `.agents/` and `.codex/` each symlink `skills`, the contributor
-skills, and the rules into the directory that agent expects. See
+No agent looks there by default, and none has to: `.claude/`, `.agents/`
+and `.codex/` hold nothing but symlinks putting the shipped skills, the
+contributor skills, and the rules under the path that agent expects. See
 [`../AGENTS.md`](../AGENTS.md#rules) for what each link points at.
 
 ## Rules

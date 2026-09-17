@@ -160,7 +160,7 @@ pass; an interruption is not evidence of anything.
 For every term in the handoff's `Sweep terms`:
 
 ```bash
-grep -rn "<sweep term>" skills/ graders/ eval.yaml dev/ README.md AGENTS.md docs/ .claude/
+grep -rn "<sweep term>" skills/ graders/ eval.yaml dev/ README.md AGENTS.md docs/ contributor-skills/
 ```
 
 Skip `evaluations/`, which `sync-evals.py` regenerates from `eval.yaml`. Fix
@@ -171,7 +171,7 @@ disagrees with the rule it indexes.
 Then update every surface the handoff's `Docs impact` field names. Those pages
 describe behavior this change just altered, so leaving them is worse than
 having written nothing: a reader trusts a stale page and search finds it.
-[`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md)
+[`../../dev/guidelines/skill-registration.md`](../../dev/guidelines/skill-registration.md)
 § "When behavior changes" lists what goes stale and when. A `Docs impact` of
 `none` needs no edit, and the report says so rather than passing over it in
 silence.
@@ -179,7 +179,7 @@ silence.
 ## Registration
 
 Only when the change adds a new skill: wire the five surfaces listed in
-[`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md).
+[`../../dev/guidelines/skill-registration.md`](../../dev/guidelines/skill-registration.md).
 Its five rows already include the per-skill docs page and the manifest entry,
 so there is nothing to add beyond them. Link the table rather than restating
 it here; a second copy is the exact drift the guideline warns about.
@@ -261,4 +261,4 @@ Stop and report rather than guessing forward, when:
 
 ## Boundaries
 
-Follow the repository-wide boundaries in [`../../../AGENTS.md`](../../../AGENTS.md) § Boundaries.
+Follow the repository-wide boundaries in [`../../AGENTS.md`](../../AGENTS.md) § Boundaries.

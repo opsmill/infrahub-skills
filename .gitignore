@@ -80,21 +80,17 @@ docs/build/
 credentials.json
 secrets.yaml
 
-# Local Claude Code state, except the rules symlink and the one tracked
-# contributor skill. `.claude/*` rather than `.claude/` so the negations
-# work — git cannot re-include anything under an excluded directory, and
-# each level has to be re-included in turn. Personal skills dropped in
-# .claude/skills/ stay ignored.
+# Local Claude Code state, except the two routing symlinks. `.claude/*`
+# rather than `.claude/` so the negations work — git cannot re-include
+# anything under an excluded directory. The contributor skills are no
+# longer in here: they live in contributor-skills/ at the repo root and
+# are tracked there, which is why this block no longer names them one by
+# one. A personal skill dropped through the .claude/skills symlink lands
+# in that tracked directory and shows up in git status rather than being
+# ignored.
 .claude/*
 !.claude/rules
 !.claude/skills
-.claude/skills/*
-!.claude/skills/harvesting-skill-review
-!.claude/skills/skill-pipeline-common
-!.claude/skills/analyzing-skill-bugs
-!.claude/skills/grilling-skill-features
-!.claude/skills/test-driving-skill-changes
-!.claude/skills/implementing-skill-changes
 
 # Superpowers workspaces (never commit)
 .superpowers/
