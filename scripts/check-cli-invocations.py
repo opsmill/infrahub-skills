@@ -43,17 +43,35 @@ IGNORE_MARKER = cli_tree.IGNORE_MARKER
 # Every tree that can print or grade a command.
 # `dev/specs/` is deliberately absent: those are historical design records,
 # and rewriting a record of what was proposed at the time is not a fix.
+#
+# `docs/docs` is present on purpose: it is the published documentation site,
+# a reader copies commands straight out of it, and `first-schema.mdx` exists
+# specifically to be followed command by command. That includes
+# `docs/docs/release-notes/`, which documents what shipped in past versions
+# and is a historical record in the same sense as `dev/specs/`, since a later
+# SDK can remove a command a release note mentions. It is not excluded,
+# because unlike `dev/specs/` it is expected to keep passing: the fix for a
+# release note that no longer matches the current SDK is the `IGNORE_MARKER`
+# comment on that line (`<!-- cli-check: ignore -->`), not rewriting the note
+# or dropping the directory from the scan.
 SCAN_TARGETS = (
     "skills", "graders", "tests", "eval.yaml",
     "dev/guides", "dev/knowledges", "dev/commands", "dev/guidelines",
-    "dev/README.md", ".claude/skills",
+    "dev/README.md", ".claude/skills", "docs/docs",
 )
-SCAN_SUFFIXES = {".md", ".py", ".yaml", ".yml"}
+# `.mdx` is required for `docs/docs` to mean anything: every page in that
+# tree is `.mdx` (Docusaurus's Markdown-plus-JSX format), not `.md`. Without
+# it here, `docs/docs` in SCAN_TARGETS above scans zero files, so the checker
+# passes on an unscanned directory rather than a clean one. That silent gap
+# is exactly how four wrong `infrahubctl` commands reached the published
+# skills-reference pages unnoticed: nothing ever scanned the file type they
+# lived in.
+SCAN_SUFFIXES = {".md", ".mdx", ".py", ".yaml", ".yml"}
 
-# Files where a ``` fence opens a block of shell input. Markdown obviously;
-# eval.yaml because its instruction blocks are markdown inside a YAML block
-# scalar.
-FENCED_SUFFIXES = {".md", ".yaml", ".yml"}
+# Files where a ``` fence opens a block of shell input. Markdown obviously,
+# and `.mdx` is markdown for this purpose too; eval.yaml because its
+# instruction blocks are markdown inside a YAML block scalar.
+FENCED_SUFFIXES = {".md", ".mdx", ".yaml", ".yml"}
 SELF = Path(__file__).resolve()
 
 

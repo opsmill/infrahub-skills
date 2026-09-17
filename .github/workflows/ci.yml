@@ -133,6 +133,7 @@ jobs:
           python-version: "3.13"
       - run: python scripts/check-docs-sidebar.py
       - run: python scripts/check-docs-skill-names.py
+      - run: python scripts/check-cli-invocations.py
       - run: npm ci
         working-directory: docs
       - run: npm run build
