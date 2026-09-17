@@ -650,13 +650,26 @@ def _attr_base_name(node: ast.AST) -> str | None:
     return node.id if isinstance(node, ast.Name) else None
 
 
-def _bound_value(name: str, tree: ast.Module) -> ast.AST | None:
-    """Return the value most recently assigned to local name ``name``.
+def _bound_value(
+    name: str, tree: ast.Module, before: tuple[int, int] | None = None
+) -> ast.AST | None:
+    """Return the value last assigned to local name ``name`` in source order.
 
     Only plain ``Name`` targets are resolved (``Assign``/``AnnAssign``);
     tuple-unpacking and attribute targets are left unresolved.
+
+    ``before`` limits the search to assignments positioned before that
+    ``(lineno, col_offset)``, which is what a use site needs: the binding
+    live where the name is read, not whichever one happens to come last in
+    the file.
+
+    Ordering is by source position, never by ``ast.walk`` order.
+    ``ast.walk`` is breadth-first by depth, so an assignment nested inside
+    a loop is visited after every assignment at the outer level -- making
+    a rebinding that follows the loop look like it came first, and
+    resolving the name to the wrong value.
     """
-    found: ast.AST | None = None
+    best: tuple[tuple[int, int], ast.AST] | None = None
     for node in ast.walk(tree):
         target_names: list[str] = []
         value: ast.AST | None = None
@@ -666,9 +679,14 @@ def _bound_value(name: str, tree: ast.Module) -> ast.AST | None:
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
             target_names = [node.target.id]
             value = node.value
-        if name in target_names and value is not None:
-            found = value
-    return found
+        if name not in target_names or value is None:
+            continue
+        pos = (node.lineno, node.col_offset)
+        if before is not None and pos >= before:
+            continue
+        if best is None or pos > best[0]:
+            best = (pos, value)
+    return best[1] if best else None
 
 
 def _is_bound_to_local_set(name: str, tree: ast.Module) -> bool:
@@ -683,7 +701,9 @@ def _is_bound_to_local_set(name: str, tree: ast.Module) -> bool:
     )
 
 
-def _is_run_private_receiver(name: str, tree: ast.Module) -> bool:
+def _is_run_private_receiver(
+    name: str, tree: ast.Module, before: tuple[int, int] | None = None
+) -> bool:
     """True when ``name`` was bound to a node this run just created.
 
     ``self.client.create(...)`` returns a node only this run holds a
@@ -693,7 +713,7 @@ def _is_run_private_receiver(name: str, tree: ast.Module) -> bool:
     anything this cannot resolve to a ``create`` call, since the burden is
     on demonstrating the receiver is run-private, not the reverse.
     """
-    value = _bound_value(name, tree)
+    value = _bound_value(name, tree, before=before)
     if value is None:
         return False
     inner = value.value if isinstance(value, ast.Await) else value
@@ -774,7 +794,7 @@ def _narrow_shared_relationship_calls(
         base = _attr_base_name(receiver)
         if base is None:
             continue
-        if _is_run_private_receiver(base, tree):
+        if _is_run_private_receiver(base, tree, before=(call.lineno, call.col_offset)):
             continue
         narrowed.append(call)
     return narrowed
@@ -854,6 +874,12 @@ def _is_node_object_expr(node: ast.AST, tree: ast.Module) -> bool:
     """True when the name was bound from a client.create/get call."""
     if not isinstance(node, ast.Name):
         return False
+    # Only the binding live at this use site decides. Scanning every
+    # assignment in the function flags `device = device.id` written after a
+    # `create()`, which is a false positive on compliant code: by the time
+    # `related_nodes` reads the name it holds an id string.
+    use_site = (node.lineno, node.col_offset)
+    best: tuple[tuple[int, int], ast.AST] | None = None
     for assign in ast.walk(tree):
         target_names: list[str] = []
         value: ast.AST | None = None
@@ -865,7 +891,14 @@ def _is_node_object_expr(node: ast.AST, tree: ast.Module) -> bool:
             value = assign.value
         if node.id not in target_names or value is None:
             continue
-        inner = value.value if isinstance(value, ast.Await) else value
+        pos = (assign.lineno, assign.col_offset)
+        if pos >= use_site:
+            continue
+        if best is None or pos > best[0]:
+            best = (pos, value)
+    if best is not None:
+        live = best[1]
+        inner = live.value if isinstance(live, ast.Await) else live
         if (
             isinstance(inner, ast.Call)
             and isinstance(inner.func, ast.Attribute)

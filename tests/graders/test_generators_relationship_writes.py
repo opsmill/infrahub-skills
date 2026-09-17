@@ -395,3 +395,86 @@ def test_relationship_extend_through_an_alias_still_passes():
         "`members = group.members` then `members.extend(...)` is a real "
         f"RelationshipManager write and must keep passing: {msg}"
     )
+
+
+# `ast.walk` is breadth-first by depth, so an assignment nested in a loop is
+# visited after every assignment at the outer level. A name rebound *after*
+# the loop therefore resolved to the loop's value, and `_is_run_private_receiver`
+# reported a shared fetched node as run-private -- exempting a real race from
+# the concurrency check. Binding resolution is ordered by source position now.
+REBIND_AFTER_LOOP_IS_NOT_RUN_PRIVATE = """
+async def generate(self, data):
+    for spec in data["items"]:
+        device = await self.client.create(kind="DcimDevice", data=spec)
+        await device.save(allow_upsert=True)
+    device = await self.client.get(kind="DcimDevice", hfid="shared-tracker")
+    device.tags.add("x")
+    await device.save(allow_upsert=True)
+    other = await self.client.get(kind="CoreStandardGroup", name__value="g")
+    await other.add_relationships(
+        relation_to_update="members", related_nodes=[d["id"] for d in data["x"]]
+    )
+"""
+
+CREATED_IN_LOOP_STAYS_RUN_PRIVATE = """
+async def generate(self, data):
+    for spec in data["items"]:
+        device = await self.client.create(kind="DcimDevice", data=spec)
+        device.tags.add("x")
+        await device.save(allow_upsert=True)
+    group = await self.client.get(kind="CoreStandardGroup", name__value="g")
+    await group.add_relationships(
+        relation_to_update="members", related_nodes=[d["id"] for d in data["items"]]
+    )
+"""
+
+
+def test_rebind_after_loop_is_not_treated_as_run_private():
+    ok, msg = CHECKS["concurrent-writes-use-add-relationships"](
+        tree=ast.parse(REBIND_AFTER_LOOP_IS_NOT_RUN_PRIVATE)
+    )
+    assert not ok, (
+        "device's live binding at the .tags.add() is a client.get() on a "
+        f"fixed hfid, which is shared and races: {msg}"
+    )
+    assert "device.tags.add" in msg, msg
+
+
+def test_node_created_in_a_loop_is_still_exempt():
+    ok, msg = CHECKS["concurrent-writes-use-add-relationships"](
+        tree=ast.parse(CREATED_IN_LOOP_STAYS_RUN_PRIVATE)
+    )
+    assert ok, f"a node this run created is run-private, even inside a loop: {msg}"
+
+
+# `_is_node_object_expr` used to answer "was this name *ever* bound to a
+# create/get call", not "what is it bound to here". Reassign-then-reuse is an
+# ordinary way to write this and scored a false positive on compliant code.
+REASSIGNED_TO_ID_BEFORE_USE = """
+async def generate(self, data):
+    device = await self.client.create(kind="DcimDevice", data=data["device"])
+    await device.save(allow_upsert=True)
+    device = device.id
+    await group.add_relationships(relation_to_update="members", related_nodes=[device])
+"""
+
+STILL_A_NODE_OBJECT_AT_USE = """
+async def generate(self, data):
+    device = await self.client.create(kind="DcimDevice", data=data["device"])
+    await device.save(allow_upsert=True)
+    await group.add_relationships(relation_to_update="members", related_nodes=[device])
+"""
+
+
+def test_name_reassigned_to_id_before_use_passes():
+    ok, msg = CHECKS["add-relationships-passes-ids"](
+        tree=ast.parse(REASSIGNED_TO_ID_BEFORE_USE)
+    )
+    assert ok, f"device holds an id string by the time related_nodes reads it: {msg}"
+
+
+def test_name_still_bound_to_node_object_at_use_fails():
+    ok, msg = CHECKS["add-relationships-passes-ids"](
+        tree=ast.parse(STILL_A_NODE_OBJECT_AT_USE)
+    )
+    assert not ok, f"device is still a node object at the call site: {msg}"
