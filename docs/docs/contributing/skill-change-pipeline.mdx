@@ -7,11 +7,25 @@ order, each refusing to start until the previous one has produced its
 output, so a fix cannot land before somebody has found the root cause and
 written a test that fails.
 
-```text
-a defect   → analyzing-skill-bugs ──┐
-                                    ├→ test-driving-skill-changes → implementing-skill-changes
-a raw idea → grilling-skill-features ┘
+```mermaid
+flowchart LR
+  bug["a defect"] --> analyze["analyzing-skill-bugs"]
+  idea["a raw idea"] --> grill["grilling-skill-features"]
+  analyze --> test["test-driving-skill-changes"]
+  grill --> test
+  test --> implement["implementing-skill-changes"]
+  implement --> pr["pull request"]
+  pr -.-> harvest["harvesting-skill-review"]
+
+  classDef entrance fill:#e8f0fe,stroke:#4285f4
+  classDef stage fill:#e6f4ea,stroke:#34a853
+  class bug,idea entrance
+  class analyze,grill,test,implement stage
 ```
+
+The dotted edge marks `harvesting-skill-review` as outside the pipeline: it
+runs after the pull request, on review feedback, rather than as a stage
+the change has to pass through.
 
 These live in
 [`.claude/skills/`](https://github.com/opsmill/infrahub-skills/tree/main/.claude/skills),

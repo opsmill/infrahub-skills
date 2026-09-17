@@ -12,6 +12,19 @@ A skill is a directory containing a `SKILL.md` entry point, modular rule files, 
 - **SKILL.md body** (loaded on activation) — overview, workflow steps, and pointers to supporting files. Tells the AI what to do and where to look next.
 - **Supporting files** (loaded on demand) — individual rule files organized by category, `examples.md`, `reference.md`. The AI reads only the files relevant to the current task.
 
+```mermaid
+flowchart TB
+  meta["Metadata
+always loaded (~100w)"]
+  body["SKILL.md body
+loaded on activation"]
+  files["Supporting files
+loaded on demand"]
+
+  meta -->|"description matches"| body
+  body -->|"pointers followed"| files
+```
+
 ```text
 skills/infrahub-managing-schemas/
 ├── SKILL.md                      # Entry point: overview and workflow

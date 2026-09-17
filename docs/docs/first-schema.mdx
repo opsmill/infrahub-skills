@@ -119,6 +119,16 @@ infrahubctl branch create circuit-inventory
 infrahubctl schema load schemas/circuit.yml --branch circuit-inventory
 ```
 
+```mermaid
+flowchart LR
+  create["infrahubctl branch create"] --> check["infrahubctl schema check"]
+  check --> load["infrahubctl schema load
+--branch"]
+  load --> review["look at it in the web UI"]
+  review -->|"keep it"| merge["merge the branch"]
+  review -->|"trial run"| discard["infrahubctl branch delete"]
+```
+
 ## 5. Look at it
 
 Open the Infrahub web UI, switch to the `circuit-inventory` branch, and
