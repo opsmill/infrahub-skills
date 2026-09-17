@@ -96,12 +96,14 @@ That guideline loads automatically when you touch a rule, a grader, or
 
 ## The trees a skill spans
 
-One skill is not one directory. A change to it usually touches several:
+One skill is not one directory. A change to it usually touches several.
+Below, `<name>` is the skill name without its `infrahub-` prefix, so for
+`infrahub-managing-schemas` it is `managing-schemas`.
 
 | Tree | Holds |
 | --- | --- |
-| `skills/<name>/` | The skill itself |
-| `graders/<name>/` | Deterministic Python that scores model output (directory drops the `infrahub-` prefix) |
+| `skills/infrahub-<name>/` | The skill itself |
+| `graders/<name>/` | Deterministic Python that scores model output |
 | `eval.yaml` | Every eval task, for every skill, in one root file |
 | `evaluations/infrahub-<name>.json` | Generated from `eval.yaml` by `scripts/sync-evals.py` |
 | `docs/docs/skills-reference/<name>.mdx` | The reference page on this site |
