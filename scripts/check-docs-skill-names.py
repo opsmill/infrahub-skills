@@ -44,8 +44,12 @@ def check_skill_names(docs_dir: Path, skills_dir: Path) -> list[tuple[str, str]]
 
 
 def main() -> int:
-    bad = check_skill_names(DOCS, SKILLS)
     pages = len(list(DOCS.glob("*.mdx")))
+    if not pages:
+        print(f"FAIL: no docs pages found under {DOCS}.")
+        return 1
+
+    bad = check_skill_names(DOCS, SKILLS)
     if not bad:
         print(f"OK: all {pages} skills-reference pages name a skill that exists.")
         return 0

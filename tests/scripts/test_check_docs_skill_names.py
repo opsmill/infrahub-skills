@@ -59,3 +59,19 @@ def test_real_repo_pages_all_name_a_real_skill() -> None:
     """The live check, as CI runs it."""
     bad = check_skill_names(ROOT / "docs" / "docs" / "skills-reference", ROOT / "skills")
     assert bad == []
+
+
+def test_empty_docs_dir_fails(tmp_path: Path, capsys, monkeypatch) -> None:
+    """A check that finds nothing must not report success.
+
+    check_skill_names itself returns [] for an empty directory, which is
+    correct: there are no bad pages. main() is where that has to fail, or a
+    moved docs directory would report clean having checked nothing.
+    """
+    docs = tmp_path / "skills-reference"
+    docs.mkdir(parents=True)
+    (tmp_path / "skills").mkdir()
+    monkeypatch.setattr(mod, "DOCS", docs)
+    monkeypatch.setattr(mod, "SKILLS", tmp_path / "skills")
+    assert mod.main() == 1
+    assert "no" in capsys.readouterr().out.lower()
