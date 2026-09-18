@@ -130,9 +130,9 @@ checks/transforms/generators) and a `file_path` to the
 
 Declares fragment files that queries can share, so one
 selection shape lives in one place. Requires Infrahub
-1.10.0 with infrahub-sdk 1.20.0. The config model
-forbids unknown keys, so an older version rejects the
-file rather than ignoring the section.
+1.9.0, which itself requires infrahub-sdk 1.20.0. The
+config model forbids unknown keys, so an older version
+rejects the file rather than ignoring the section.
 
 A fragment reaches a query only when that query spreads
 it by name:
