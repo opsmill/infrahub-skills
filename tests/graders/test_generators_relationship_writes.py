@@ -756,3 +756,141 @@ def test_right_relationship_detached_alongside_another_passes():
         tree=_tree(DELETE_RIGHT_RELATIONSHIP_AMONG_TWO)
     )
     assert ok, f"a second relationship on the node must not break the check: {msg}"
+
+
+# Second review round on #148. Each of these reproduced against the shipped
+# checks; they are kept so the same evidence faults cannot come back.
+
+DELETE_VIOLATION_IN_HELPER_BELOW = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    stale_ids = [p.id for p in site.management_addresses.peers if p.id not in data["keep"]]
+    await self._purge(stale_ids)
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+
+async def _purge(self, ids):
+    for peer_id in ids:
+        address = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        await address.delete()
+"""
+
+DELETE_COMPLIANT_VIA_HELPER_BELOW = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    stale_ids = [p.id for p in site.management_addresses.peers if p.id not in data["keep"]]
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+    await self._purge(stale_ids)
+
+async def _purge(self, ids):
+    for peer_id in ids:
+        address = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        await address.delete()
+"""
+
+DELETE_COMPLIANT_UNRELATED_DELETE_FIRST = """
+async def generate(self, data):
+    old = await self.client.get(kind="CoreArtifact", id=data["old"]["id"])
+    await old.delete()
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    stale_ids = [p.id for p in site.management_addresses.peers if p.id not in data["keep"]]
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+    for peer_id in stale_ids:
+        address = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        await address.delete()
+"""
+
+DELETE_COMPLIANT_UNRELATED_ITERATION = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    for tag in site.tags:
+        print(tag)
+    stale_ids = [e["id"] for e in data["stale"]]
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+    for peer_id in stale_ids:
+        address = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        await address.delete()
+"""
+
+DELETE_WRONG_RELATIONSHIP_VIA_PEER_IDS = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    stale_ids = [i for i in site.management_addresses.peer_ids if i not in data["keep"]]
+    site.tags.remove("tag-1")
+    await site.save(allow_upsert=True)
+    for peer_id in stale_ids:
+        address = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        await address.delete()
+"""
+
+DELETE_COMPLIANT_VIA_MANAGER_ALIAS = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    mgmt = site.management_addresses
+    stale_ids = [p.id for p in mgmt.peers if p.id not in data["keep"]]
+    for peer_id in stale_ids:
+        mgmt.remove(peer_id)
+    await site.save(allow_upsert=True)
+    for peer_id in stale_ids:
+        address = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        await address.delete()
+"""
+
+DELETE_ONLY_THE_HOLDER = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    await site.delete()
+"""
+
+
+def test_ordering_is_execution_position_not_source_position():
+    """A delete in a helper runs at its call site, not where the def sits."""
+    bad, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_VIOLATION_IN_HELPER_BELOW)
+    )
+    assert not bad, f"purge called before the detach is a violation: {msg}"
+    good, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_COMPLIANT_VIA_HELPER_BELOW)
+    )
+    assert good, f"the same helper called after the save is correct: {msg}"
+
+
+def test_unrelated_delete_before_the_detach_does_not_fail_a_correct_answer():
+    ok, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_COMPLIANT_UNRELATED_DELETE_FIRST)
+    )
+    assert ok, f"a delete predating the peer read cannot be deleting those peers: {msg}"
+
+
+def test_iterating_an_unrelated_relationship_is_not_a_peer_source():
+    ok, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_COMPLIANT_UNRELATED_ITERATION)
+    )
+    assert ok, f"`for tag in site.tags` must not claim the deletes: {msg}"
+
+
+def test_peer_ids_spelling_does_not_bypass_the_narrowing():
+    ok, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_WRONG_RELATIONSHIP_VIA_PEER_IDS)
+    )
+    assert not ok, "peer_ids is the same list as peers"
+    assert "management_addresses" in msg
+
+
+def test_manager_alias_is_resolved():
+    ok, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_COMPLIANT_VIA_MANAGER_ALIAS)
+    )
+    assert ok, f"`mgmt = site.management_addresses` is the same manager: {msg}"
+
+
+def test_deleting_only_the_holder_is_not_a_peer_delete():
+    ok, msg = CHECKS["peer-delete-present"](tree=_tree(DELETE_ONLY_THE_HOLDER))
+    assert not ok, f"deleting the site is not deleting its peers: {msg}"

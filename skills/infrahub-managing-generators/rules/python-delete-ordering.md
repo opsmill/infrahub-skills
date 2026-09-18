@@ -11,23 +11,40 @@ Impact: MEDIUM
 A node keeps its peers in an in-memory relationship
 manager. Deleting a peer through its own `.delete()` call
 does not reach back into that manager to drop it there.
-A `save()` issued afterwards on a node that still holds
-the deleted peer re-sends its id, because the relationship
-manager only reads its own in-memory peer list, never
-server state.
+A `save(allow_upsert=True)` issued afterwards on a node
+that still holds the deleted peer re-sends its id, because
+the relationship manager only reads its own in-memory peer
+list, never server state.
+
+The upsert matters. A plain `save()` on an existing node
+takes the update path, which strips relationships you never
+touched, so the stale peer never reaches the payload.
+`allow_upsert=True` takes the create path, which strips
+nothing. Generators upsert, so this rule is about them, but
+do not carry the claim over to a bare `save()`.
 
 ### When this applies
 
 Only when the relationship is **hydrated** on the node you
 save. A manager starts uninitialized, and an uninitialized
-relationship is left out of the save payload altogether,
-so a node fetched with a plain `client.get()` sends nothing
-for it. Three things hydrate one:
+relationship is left out of the save payload altogether.
+Three things hydrate one:
 
-- `client.get(..., prefetch_relationships=True)`
+- `client.get(..., include=["<rel>"])`. Naming the
+  relationship is what fetches it. `prefetch_relationships=True`
+  on its own does **not**: a cardinality-many relationship is
+  dropped from the query before that flag is ever consulted,
+  and the flag then only controls how deep the peer fields go.
 - `InfrahubNode.from_graphql()` on a payload that includes
   the relationship
 - an explicit `await node.<rel>.fetch()`
+
+One carve-out, and it bites: a cardinality-many relationship
+whose **kind** is `Attribute` or `Parent` skips that drop and
+is fetched by a plain `client.get()`. Tag-style relationships
+are the common case. So "I did a plain get, nothing is
+hydrated" is not safe to assume per-node; it depends on the
+relationship's kind.
 
 If none of those ran there is nothing to re-send, and
 nothing to detach either: `.remove()` raises
@@ -79,6 +96,11 @@ await rack.save(allow_upsert=True)
 
 ```python
 # RIGHT. Detach and save first, then delete the peers.
+# The fetch names the relationship: without it the manager is
+# uninitialized and .remove() raises UninitializedError.
+rack = await self.client.get(
+    kind="DcimRack", id=data["rack"]["id"], include=["interfaces"]
+)
 stale_ids = [iface["id"] for iface in data["stale"]]
 
 for peer_id in stale_ids:
@@ -125,8 +147,21 @@ That call does **not** touch the in-memory manager.
 `rack.interfaces.peers` still holds the detached ids, so it
 solves the ordering only while nothing saves that node
 afterwards; a later `save(allow_upsert=True)` re-sends them
-exactly as before. If the run must also save the node, do
-both: `remove_relationships()` for the server, `.remove()`
-to keep the local list honest.
+exactly as before.
+
+If the run must also save that node, do **not** reach for
+`.remove()` to paper over it. `.remove()` plus
+`save(allow_upsert=True)` is the whole-list write this
+section just ruled out, and pairing it with
+`remove_relationships()` does not change that: the upsert
+still ships every peer, so a peer another run attached
+between your fetch and your save is still dropped.
+
+Keep the relationship off the handle you save instead. Fetch
+the node without naming the relationship, so its manager
+stays uninitialized and the save cannot touch it, and let
+`remove_relationships()` own the detach on the server. That
+is the only shape here that is both correctly ordered and
+safe under concurrent writers.
 
 Verified against Infrahub 1.11.2 and infrahub-sdk 1.23.2.
