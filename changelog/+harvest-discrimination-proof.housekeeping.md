@@ -1,0 +1,1 @@
+Correct the eval discrimination proof: commenting out the `Read the skill at ...` line removes the pointer, not the skill, so a 1.0 is not a verdict. Add the three readings of a 1.0 and the release-notes rung to the ground truth ladder.

@@ -194,9 +194,9 @@ exercise the rule*, and it must not carry the answer:
   instruction's `Read the skill at ...` line and run
   `skillgrade --eval=<task-name> --trials=1`
   ([procedure](./running-evals.md#writing-good-eval-prompts)).
-  If the grader still scores 1.0, the task measures
-  the model, not the skill; make the prompt harder,
-  or grade something only the rule produces.
+  Below 1.0 and the task discriminates. A 1.0 is not
+  a verdict: the linked procedure gives its three
+  readings.
 - **Reproduce the antipattern conditions.** Where the
   rule has a tempting wrong shape, put the temptation
   in the prompt instead of hoping the AI stumbles
@@ -368,9 +368,9 @@ prose. If smoke fails:
 - [ ] New check function added to
   `graders/<skill>/lib.py` and registered in
   `CHECKS`, parsing rather than substring-matching
-- [ ] New task block added to `eval.yaml`, verified
-  to fail with the skill's `Read the skill at ...`
-  line commented out
+- [ ] New task block added to `eval.yaml`, run with
+  the skill's `Read the skill at ...` line commented
+  out and the result read per running-evals.md
 - [ ] `graders/<skill>/check_<task>.py` task grader
   script
 - [ ] Grader run against all four fixtures, including

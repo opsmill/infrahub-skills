@@ -31,9 +31,11 @@ rule as covered forever.
    registered in `CHECKS`, parsing the answer rather
    than substring-matching it (see `graders.md`).
 4. A task block in `eval.yaml` whose prompt naturally
-   exercises the rule, verified to **fail** with the
-   instruction's `Read the skill at ...` line commented
-   out.
+   exercises the rule, run with the instruction's
+   `Read the skill at ...` line commented out. That
+   line is a pointer, not the loader: read a 1.0 per
+   `dev/guides/running-evals.md` before calling the
+   task broken.
 5. A task grader script at
    `graders/<skill>/check_<task>.py`, run against four
    fixtures: compliant, compliant phrased differently,

@@ -140,14 +140,15 @@ model. The green run above scored 1.0 with the skill read. Comment out the
 task's `Read the skill at ...` line and run the same task again:
 
 ```bash
-skillgrade --eval=<task> --trials=1     # skill unread, must score below 1.0
+skillgrade --eval=<task> --trials=1     # skill unread, expect below 1.0
 # then restore the line
 ```
 
-A task that still scores 1.0 with the skill unread is graded by the model, not
-by the rule you just wrote: harden the prompt, or grade something only the rule
-produces, then re-run with the line commented out to confirm the score drops.
-This proof only carries signal now that the rule exists, which is why
+Below 1.0 and the proof lands. A 1.0 does not mean the task is broken: the
+line is a pointer and the sandbox still ships the skill, so read the three
+cases in `dev/guides/running-evals.md` and report which one this is rather
+than hardening a prompt that was never the problem. This proof only carries
+signal now that the rule exists, which is why
 `test-driving-skill-changes` leaves it to this stage: with the rule absent the
 task scores below 1.0 either way.
 

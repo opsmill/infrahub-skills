@@ -10,15 +10,20 @@ to verify: record `Ground truth: n/a` in the handoff and move on.
 
 ## Is the claim true at version V?
 
-Work down the ladder and stop at the first rung that answers the claim.
+Work down the ladder and stop at the first rung that answers the claim. Only a
+hit answers it. A miss means you searched the wrong surface at least as often
+as it means the feature is absent, so carry on down rather than concluding.
 
 1. Local `opsmill/infrahub` checkout, read with `git show <tag>:<path>`.
    Never check out the tag, never touch the working tree, never assume the
    clone is sitting on the right branch.
 2. Installed `infrahub-sdk` in the project virtualenv, for SDK surface claims.
-3. Mark the claim `UNVERIFIED` and carry on. Do not stop the pipeline for it.
+3. Release notes at the tag, for a version floor. A `.infrahub.yml` key, a CLI
+   flag, or any config surface can be SDK-side, stated in the notes and named
+   nowhere under `backend/`, because the backend imports the renderer.
+4. Mark the claim `UNVERIFIED` and carry on. Do not stop the pipeline for it.
 
-GitHub at the tag is a fourth rung, run only when the user passes `--fetch`
+GitHub at the tag is a fifth rung, run only when the user passes `--fetch`
 or asks directly. `UNVERIFIED` is already an accepted outcome, so the network
 round trip, the auth, and the rate limit are not worth paying by default.
 
