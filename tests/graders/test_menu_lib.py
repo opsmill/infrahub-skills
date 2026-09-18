@@ -4,6 +4,7 @@ Covers >= 8 check functions against both good and bad menu YAML.
 """
 
 import importlib.util
+import re
 import json
 import subprocess
 import sys
@@ -971,11 +972,39 @@ class TestCheckNoBuiltinSectionRecreated:
         "Other" and "Actions" are plausible names for an unrelated custom group,
         but Infrahub renders its own sections under those exact labels, so a
         second top-level item with the same label is the defect from #24. The
-        rule says to rename it or attach with `parent:`.
+        rule's answer is to relabel the group.
         """
         doc = _menu({"namespace": "Custom", "name": "Group", "label": label, "children": _children()})
         ok, _ = check_no_builtin_section_recreated(doc)
         assert not ok
+
+    @pytest.mark.parametrize(
+        ("name", "label"),
+        [
+            ("Actions", "Device Actions"),
+            ("ObjectManagement", "Fleet Inventory"),
+            ("IPAM", "Customer Addressing"),
+        ],
+    )
+    def test_distinct_label_over_a_colliding_name_passes(self, name, label):
+        """The sidebar renders `label`, so a colliding `name` behind it is invisible.
+
+        Regression test for PR #153 review: `name` was checked independently of
+        `label`, so a "Device Actions" group whose name happened to be "Actions"
+        was reported as a duplicate of the shipped Actions section. Its
+        identifier is DcimActions and its heading is "Device Actions", so it
+        collides with nothing.
+        """
+        doc = _menu({"namespace": "Dcim", "name": name, "label": label, "children": _children()})
+        ok, msg = check_no_builtin_section_recreated(doc)
+        assert ok, msg
+
+    def test_colliding_name_without_label_is_flagged(self):
+        """With no label, `name` is what the sidebar falls back to."""
+        doc = _menu({"namespace": "Dcim", "name": "IPAM", "children": _children()})
+        ok, msg = check_no_builtin_section_recreated(doc)
+        assert not ok
+        assert "IPAM" in msg
 
     def test_parented_item_may_reuse_a_shipped_label(self):
         """An item with a parent is not top level, so it cannot collide."""
@@ -1050,6 +1079,54 @@ class TestCheckParentAttachesToBuiltin:
         assert not ok
         assert "ipamvrf" in msg
 
+    def test_hfid_pair_form_passes(self):
+        """`parent: [Builtin, IPAM]` matches CoreMenu's two-part human-friendly ID."""
+        doc = _menu(
+            {
+                "namespace": "Ipam",
+                "name": "Addressing",
+                "label": "Addressing",
+                "parent": ["Builtin", "IPAM"],
+                "children": _children(
+                    {"namespace": "Ipam", "name": "Vlan", "kind": "IpamVlan", "label": "VLANs"},
+                    {"namespace": "Ipam", "name": "Vrf", "kind": "IpamVrf", "label": "VRFs"},
+                ),
+            }
+        )
+        ok, msg = check_parent_attaches_to_builtin(doc)
+        assert ok, msg
+
+    def test_hfid_pair_form_for_wrong_section_fails(self):
+        doc = _menu(
+            {
+                "namespace": "Ipam",
+                "name": "Addressing",
+                "label": "Addressing",
+                "parent": ["Builtin", "Actions"],
+                "children": _children(
+                    {"namespace": "Ipam", "name": "Vlan", "kind": "IpamVlan", "label": "VLANs"},
+                    {"namespace": "Ipam", "name": "Vrf", "kind": "IpamVrf", "label": "VRFs"},
+                ),
+            }
+        )
+        ok, msg = check_parent_attaches_to_builtin(doc)
+        assert not ok
+        assert "BuiltinActions" in msg
+
+    def test_both_spellings_are_equivalent(self):
+        """Neither spelling is privileged: the check grades where the item lands."""
+        as_list = {"namespace": "Ipam", "name": "V", "label": "V", "parent": ["Builtin", "IPAM"]}
+        as_string = {"namespace": "Ipam", "name": "V", "label": "V", "parent": "BuiltinIPAM"}
+        kinds = _children(
+            {"namespace": "Ipam", "name": "Vlan", "kind": "IpamVlan", "label": "VLANs"},
+            {"namespace": "Ipam", "name": "Vrf", "kind": "IpamVrf", "label": "VRFs"},
+        )
+        results = [
+            check_parent_attaches_to_builtin(_menu({**item, "children": kinds}))[0]
+            for item in (as_list, as_string)
+        ]
+        assert results == [True, True]
+
     def test_parent_match_is_exact(self):
         """`BuiltinIpam` resolves to nothing in Infrahub, so it must not pass here."""
         doc = _menu(
@@ -1086,6 +1163,47 @@ class TestBuiltinMenuSectionsRegistry:
     def test_both_new_checks_are_registered(self):
         assert CHECKS["no-builtin-section-recreated"] is check_no_builtin_section_recreated
         assert CHECKS["parent-attaches-to-builtin"] is check_parent_attaches_to_builtin
+
+    def test_rule_tables_match_the_constant(self):
+        """The rule and the grader hold the same list, so pin them to each other.
+
+        Both are copies of `default_menu` in Infrahub's backend. Nothing failed
+        when they drifted, which is the objection raised on PR #153; this is the
+        failure. Update both together when Infrahub adds or renames a section.
+        """
+        rule = (
+            _REPO_ROOT / "skills" / "infrahub-managing-menus" / "rules" / "hierarchy-nesting.md"
+        ).read_text(encoding="utf-8")
+
+        documented = {
+            m.group(1): m.group(2).strip()
+            for m in re.finditer(r"^\|\s*`(Builtin\w+)`\s*\|\s*([^|]+?)\s*\|\s*$", rule, re.MULTILINE)
+        }
+
+        assert documented, "no built-in section table found in hierarchy-nesting.md"
+        assert documented == BUILTIN_MENU_SECTIONS, (
+            "hierarchy-nesting.md and BUILTIN_MENU_SECTIONS disagree; "
+            f"only in the rule: {sorted(set(documented) - set(BUILTIN_MENU_SECTIONS))}, "
+            f"only in the grader: {sorted(set(BUILTIN_MENU_SECTIONS) - set(documented))}"
+        )
+
+    def test_object_area_sections_are_the_attach_targets(self):
+        """Only Other and IPAM are section=object in Infrahub; the rest are internal.
+
+        The rule splits its tables on this, and the prose tells the agent to
+        attach only to the object ones. If Infrahub promotes another section,
+        this is the test that has to be revisited alongside the rule.
+        """
+        rule = (
+            _REPO_ROOT / "skills" / "infrahub-managing-menus" / "rules" / "hierarchy-nesting.md"
+        ).read_text(encoding="utf-8")
+        object_area, _, platform_area = rule.partition("Infrahub's own area")
+        object_ids = set(re.findall(r"`(Builtin\w+)`", object_area.split("Object area")[-1]))
+        platform_ids = set(re.findall(r"`(Builtin\w+)`", platform_area))
+
+        assert {"BuiltinOther", "BuiltinIPAM"} <= object_ids
+        assert "BuiltinBranches" in platform_ids
+        assert not object_ids & platform_ids
 
 
 class TestGraderScripts:

@@ -123,9 +123,20 @@ def _identifier(item: dict) -> str:
 
 
 def _parent_ref(item: dict) -> str:
-    """Return the item's declared parent identifier, or an empty string."""
+    """Return the item's parent as a canonical identifier, or an empty string.
+
+    A menu item names its parent by human-friendly ID. The two-element form
+    ``[Builtin, IPAM]`` matches CoreMenu's ``[namespace__value, name__value]``
+    directly; the concatenated string ``BuiltinIPAM`` is the form Infrahub's
+    menu reference documents. Both normalize to ``BuiltinIPAM`` here, so the
+    check grades where the item lands rather than which spelling was used.
+    """
     parent = item.get("parent")
-    return parent.strip() if isinstance(parent, str) else ""
+    if isinstance(parent, str):
+        return parent.strip()
+    if isinstance(parent, list) and all(isinstance(p, str) for p in parent):
+        return "".join(p.strip() for p in parent)
+    return ""
 
 
 def _normalized(value: Any) -> str:
@@ -457,14 +468,17 @@ def check_no_builtin_section_recreated(doc: dict, **_: Any) -> tuple[bool, str]:
     for item in _menu_items(doc):
         if _parent_ref(item):
             continue
-        for field in ("label", "name"):
-            match = _BUILTIN_LABELS.get(_normalized(item.get(field)))
-            if match:
-                collisions.append(
-                    f"top-level {field} '{item.get(field)}' recreates the "
-                    f"built-in {match} section"
-                )
-                break
+        # The sidebar renders `label`, so that is what can duplicate a shipped
+        # heading. `name` only matters when no label is there to override it:
+        # a "Device Actions" group whose name happens to be "Actions" shows no
+        # duplicate and must not be flagged.
+        field = "label" if item.get("label") else "name"
+        match = _BUILTIN_LABELS.get(_normalized(item.get(field)))
+        if match:
+            collisions.append(
+                f"top-level {field} '{item.get(field)}' recreates the "
+                f"built-in {match} section"
+            )
 
     if collisions:
         return False, "Duplicates Infrahub's built-in menu: " + "; ".join(

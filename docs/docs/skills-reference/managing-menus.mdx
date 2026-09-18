@@ -30,7 +30,7 @@ The Menu Manager produces YAML menu definition files that customize the Infrahub
 - **`spec.data` wrapping** — the top-level menu items must be in `spec.data`; a common mistake is writing `spec:` followed by a list directly
 - **`children.data` wrapping** — nested items must use `children.data:` not `children:` directly; this is the most common nesting mistake
 - **`kind` vs `path`** — each item uses either `kind:` (links to a schema node's list view) or `path:` (links to a custom URL), never both
-- **Built-in sections** — Infrahub ships its own top-level sections (IPAM, Object Management, Branches and others); the skill attaches to them with `parent: BuiltinIPAM` instead of declaring a second one
+- **Built-in sections** — Infrahub ships its own top-level sections; the skill attaches your nodes to the two that hold object data (`Other` and `IPAM`) with `parent: [Builtin, IPAM]` instead of declaring a second one, and keeps clear of the platform sections such as Branches and Object Management
 - **Group headers** — section headers with no link (no `kind` or `path`) are valid and used for visual grouping
 - **Icon format** — icons use the Material Design Icons format with `mdi:` prefix (e.g., `mdi:server`, `mdi:ip-network`)
 - **`order_weight`** — integer controlling item display order; lower numbers appear first

@@ -129,7 +129,7 @@
       "expectations": [
         "File starts with apiVersion: infrahub.app/v1 and kind: Menu",
         "No menu item recreates a section Infrahub already ships (IPAM, Other, Branches, Proposed Changes, Object Management, Actions, Integrations, Activity, Admin)",
-        "The VLAN and VRF entries reach the shipped IPAM section through parent: BuiltinIPAM, either directly or via a parented group",
+        "The VLAN and VRF entries reach the shipped IPAM section, and no other built-in section, either directly or via a parented group",
         "Device and interface entries are nested under a custom group header using the children.data wrapper",
         "Every menu item has both name and namespace properties"
       ],
@@ -152,7 +152,7 @@
         },
         {
           "name": "parent-attaches-to-builtin",
-          "check": "IpamVlan and IpamVrf are reachable from an item whose parent is a built-in section identifier (parent: BuiltinIPAM)"
+          "check": "IpamVlan and IpamVrf are reachable from an item whose parent is the shipped IPAM section specifically, written either as [Builtin, IPAM] or as BuiltinIPAM; another built-in section does not count"
         }
       ]
     }
