@@ -42,12 +42,18 @@ loaded but isn't".
    `InfrahubGenerator`, or `InfrahubTransform`
    subclasses are registered in the appropriate
    `.infrahub.yml` section
-2. All `.gql` files are referenced by a `queries` entry
+2. All `.gql` files are referenced by a `queries` entry,
+   or by a `graphql_fragments` entry (whose `file_path`
+   may name a directory, covering every `.gql` inside it)
 3. All Jinja2 templates (`.j2` files) are referenced by a `jinja2_transforms` entry
 4. Schema files are under a path listed in `schemas:`
 5. Object files are under a path listed in `objects:`
 6. Menu files are listed under `menus:`
-7. No orphan Python/query/template files that aren't registered
+7. No orphan Python/query/template files that aren't
+   registered. A `.gql` file holding only `fragment`
+   definitions is not an orphan when a
+   `graphql_fragments` entry covers it, by path or by
+   its parent directory
 
 ## Common Issues
 

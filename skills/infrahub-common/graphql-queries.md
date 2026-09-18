@@ -463,6 +463,12 @@ queries/
     segment.gql                 # Service queries
 ```
 
+A selection shape repeated across query files can live in
+one `.gql` fragment file instead, declared under
+`graphql_fragments` in `.infrahub.yml` and spread by name.
+See [infrahub-yml-reference.md](./infrahub-yml-reference.md)
+§ `graphql_fragments`.
+
 ## Best Practices
 
 1. **Query only what you need** -- don't fetch entire

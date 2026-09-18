@@ -135,9 +135,17 @@ config model forbids unknown keys, so an older version
 rejects the file rather than ignoring the section.
 
 A fragment reaches a query only when that query spreads
-it by name:
+it by name. The type after `on` must be a real schema
+kind:
 
 ```graphql
+# fragments/interfaces.gql
+fragment interfaceFields on InfraInterfaceL3 {
+  name { value }
+  speed { value }
+}
+
+# queries/device_interfaces.gql
 query device_interfaces {
   InfraInterface { edges { node { ...interfaceFields } } }
 }
@@ -150,19 +158,22 @@ Definitions are inlined when the repository syncs, and
 only the fragments a query actually spreads are included,
 so the stored query is self-contained. This deduplicates
 the source you maintain, not the document sent to the
-server. Reach for it to stop two copies drifting, not to
-make a query smaller. One fragment file per shared shape
-pays off when the shape is large or spread by several
-queries; factoring out three fields across two queries
-costs more structure than it saves.
+server.
 
-Problems surface when the repository imports, not when a
-generator or transform later runs. A missing file, a
-spread naming a fragment no declared file defines, the
-same fragment name defined twice, and a cycle each fail
-the import and name the fragment. Entry names here and
-`fragment` names inside the `.gql` files are separate
-namespaces, and both have to be unique.
+Entry names here and `fragment` names inside the `.gql`
+files are separate namespaces, and both have to be
+unique.
+
+Once at least one entry is declared, a missing file, a
+spread naming a fragment no declared file defines, a name
+defined twice, and a cycle each fail the repository
+import and name the fragment. The exception is a query
+that spreads a fragment while this section is absent or
+empty: rendering is skipped entirely, the unresolved
+spread is stored as written, and it fails when the query
+runs. A local `infrahubctl generator`, `check`,
+`transform` or `render` re-renders each time, so these
+errors do show up on a dry run.
 
 This is not an inline fragment (`... on SomeKind`), which
 narrows a selection to one type of a generic or union and
