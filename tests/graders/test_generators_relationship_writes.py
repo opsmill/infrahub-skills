@@ -713,3 +713,46 @@ def test_hydrated_violating_fails_ordering():
         tree=_tree(DELETE_VIOLATING_HYDRATED)
     )
     assert not ok, f"deleting before the save is wrong however the peer was built: {msg}"
+
+
+# Two relationships on one node. Review on #148: none of the fixtures above put
+# a second relationship on the saved node, so the ordering check could be
+# satisfied by detaching a relationship unrelated to the peers being deleted.
+
+DELETE_WRONG_RELATIONSHIP_DETACHED = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    site.tags.remove("tag-1")
+    await site.save(allow_upsert=True)
+    for peer in site.management_addresses.peers:
+        address = await self.client.get(kind="IpamIPAddress", id=peer.id)
+        await address.delete()
+"""
+
+DELETE_RIGHT_RELATIONSHIP_AMONG_TWO = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    site.tags.add("tag-1")
+    stale_ids = [p.id for p in site.management_addresses.peers if p.id not in data["keep"]]
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+    for peer_id in stale_ids:
+        address = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        await address.delete()
+"""
+
+
+def test_detaching_a_different_relationship_does_not_count():
+    ok, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_WRONG_RELATIONSHIP_DETACHED)
+    )
+    assert not ok, "site.tags.remove() must not license deleting management_addresses peers"
+    assert "management_addresses" in msg and "tags" in msg
+
+
+def test_right_relationship_detached_alongside_another_passes():
+    ok, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_RIGHT_RELATIONSHIP_AMONG_TWO)
+    )
+    assert ok, f"a second relationship on the node must not break the check: {msg}"

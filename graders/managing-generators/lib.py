@@ -2101,6 +2101,28 @@ def _manager_remove_calls(tree: ast.Module) -> list[tuple[ast.Call, tuple[str, s
     return out
 
 
+def _peer_source_relationships(tree: ast.Module) -> set[tuple[str, str]]:
+    """``(N, rel)`` pairs whose peers this module reads, so could then delete.
+
+    Reading ``N.<rel>.peers``, or iterating ``N.<rel>`` directly, is the code
+    putting that relationship's peers in its own hands. When any such pair
+    exists it is the only honest candidate for "the relationship whose peers
+    are being deleted", which is what lets the ordering check refuse a detach
+    of some unrelated relationship on the same node.
+    """
+    sources: set[tuple[str, str]] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr == "peers":
+            chain = _rel_chain_of(node.value)
+            if chain:
+                sources.add(chain)
+        elif isinstance(node, (ast.For, ast.AsyncFor)):
+            chain = _rel_chain_of(node.iter)
+            if chain:
+                sources.add(chain)
+    return sources
+
+
 def _save_calls_on(tree: ast.Module, name: str) -> list[ast.Call]:
     """Every ``<name>.save(...)`` call in the tree."""
     return [
@@ -2136,6 +2158,15 @@ def check_detach_precedes_peer_delete(
     follows it, and every recognised peer delete comes after that save. An
     answer that deletes first has no detach to find and fails here.
 
+    The detach must be on the relationship whose peers are in hand, not just
+    on the saved node. Where the module reads ``N.<rel>.peers`` (or iterates
+    ``N.<rel>``), only that relationship counts: detaching ``site.tags`` and
+    saving does not license deleting ``site.management_addresses`` peers.
+    Keying on the node alone accepted exactly that, which is the same
+    disjoint-evidence fault this check replaced, one level down. Where no
+    relationship's peers are read syntactically the ids came from the query
+    payload, nothing correlates them, and any detach on the saved node counts.
+
     ``remove_relationships()`` alone does not satisfy this. It never touches
     the in-memory manager, so a later ``save(allow_upsert=True)`` re-sends
     the very ids it detached server-side.
@@ -2170,7 +2201,22 @@ def check_detach_precedes_peer_delete(
 
     first_delete = min(c.lineno for c in deletes)
 
-    for call, (n_name, rel) in removes:
+    # Narrow to the relationship whose peers are actually in hand. Without
+    # this, a .remove() on any other relationship of the same node satisfies
+    # the ordering while the relationship being torn down is never detached.
+    sources = _peer_source_relationships(tree)
+    considered = [rc for rc in removes if rc[1] in sources] if sources else removes
+
+    if sources and not considered:
+        detached = ", ".join(sorted(f"{n}.{r}" for _, (n, r) in removes))
+        wanted = ", ".join(sorted(f"{n}.{r}" for n, r in sources))
+        return False, (
+            f"the detach is on {detached}, but the deleted peers come from "
+            f"{wanted}, which is never detached; a save re-sends that "
+            "relationship's stale ids"
+        )
+
+    for call, (n_name, rel) in considered:
         later_saves = [s for s in _save_calls_on(tree, n_name) if s.lineno > call.lineno]
         if not later_saves:
             continue
