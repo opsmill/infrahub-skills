@@ -487,3 +487,93 @@ def test_dry_run_before_merge_fails_without_timing():
 def test_dry_run_checks_empty_input_fails():
     assert _mod.CHECKS["dry-run-executes-query"](md_text="")[0] is False
     assert _mod.CHECKS["dry-run-before-merge"](md_text="")[0] is False
+
+
+# -- artifact-poll-requires-body-ready ------------------------------------
+#
+# Both laundering cases below were found in review on PR #154, after the
+# four hand-written fixtures missed them.
+
+
+def _body_ready(src: str):
+    return _mod.CHECKS["artifact-poll-requires-body-ready"](
+        tree=ast.parse(src), py_raw=src
+    )
+
+
+POST = (
+    "    await client._post(\n"
+    "        url=f'/api/artifact/generate/{def_id}', payload={}, "
+    "params={'branch': branch}\n"
+    "    )\n"
+)
+
+
+def _helper(fetch: str, gate: str, extra: str = "") -> str:
+    return (
+        "import asyncio\n\n\n"
+        "async def regenerate_and_wait(client, def_id, expected_count, branch):\n"
+        f"{POST}"
+        "    while True:\n"
+        f"        artifacts = await client.filters({fetch})\n"
+        f"{extra}"
+        f"        if {gate}:\n"
+        "            return artifacts\n"
+        "        await asyncio.sleep(2)\n"
+    )
+
+
+UNFILTERED = "kind='CoreArtifact', definition__ids=[def_id], branch=branch"
+
+
+def test_body_ready_accepts_status_query_filter():
+    src = _helper(UNFILTERED + ", status__value='Ready'", "len(artifacts) >= expected_count")
+    ok, msg = _body_ready(src)
+    assert ok, msg
+
+
+def test_body_ready_accepts_storage_id_comprehension():
+    src = _helper(
+        UNFILTERED,
+        "len(ready) >= expected_count",
+        "        ready = [a for a in artifacts if a.storage_id.value]\n",
+    )
+    ok, msg = _body_ready(src)
+    assert ok, msg
+
+
+def test_body_ready_rejects_bare_node_count():
+    ok, _ = _body_ready(_helper(UNFILTERED, "len(artifacts) >= expected_count"))
+    assert not ok
+
+
+def test_body_ready_rejects_unused_readiness_comparison():
+    """A Compare that nothing branches on is not a gate.
+
+    Computing `is_ready` and never reading it, or passing the comparison
+    straight to a logger, leaves the wait keyed on bare node count.
+    """
+    src = _helper(
+        UNFILTERED,
+        "len(artifacts) >= expected_count",
+        "        is_ready = artifacts[0].status.value == 'Ready'\n"
+        "        log.info(artifacts[0].status.value == 'Ready')\n",
+    )
+    ok, _ = _body_ready(src)
+    assert not ok
+
+
+def test_body_ready_rejects_storage_id_isnull_true():
+    """`storage_id__isnull=True` selects the not-ready artifacts."""
+    ok, _ = _body_ready(
+        _helper(UNFILTERED + ", storage_id__isnull=True", "len(artifacts) >= expected_count")
+    )
+    assert not ok
+
+
+def test_body_ready_accepts_storage_id_isnull_false():
+    src = _helper(
+        UNFILTERED + ", storage_id__isnull=False", "len(artifacts) >= expected_count"
+    )
+    ok, msg = _body_ready(src)
+    assert ok, msg

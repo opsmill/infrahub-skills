@@ -308,8 +308,15 @@ def _predicate_expressions(tree: ast.Module) -> list[ast.AST]:
     """Every expression evaluated as a condition, not merely present.
 
     Assignments, f-strings, and bare call arguments are excluded on purpose:
-    setting ``artifact.status.value`` or logging the word "Ready" is not a
-    gate, and a check that accepted either would grade vocabulary.
+    setting ``artifact.status.value``, logging the word "Ready", or computing
+    an unused ``is_ready = artifact.status.value == "Ready"`` is not a gate,
+    and a check that accepted any of them would grade vocabulary.
+
+    Only the positions below are collected, so a bare ``Compare`` sitting
+    anywhere in the tree does not qualify on its own. Nothing is lost by that:
+    a comparison that really gates the wait is the test of an ``if``/``while``,
+    a comprehension's ``if``, or a lambda body, and
+    ``_predicate_gates_on_ready_status`` walks inside each of those to find it.
     """
     found: list[ast.AST] = []
     for node in ast.walk(tree):
@@ -319,8 +326,6 @@ def _predicate_expressions(tree: ast.Module) -> list[ast.AST]:
             found.extend(node.ifs)
         elif isinstance(node, ast.Lambda):
             found.append(node.body)
-        elif isinstance(node, ast.Compare):
-            found.append(node)
     return found
 
 
@@ -343,12 +348,20 @@ def _query_filters_on_readiness(tree: ast.Module) -> bool:
 
     Covers the Infrahub filter spellings ``status__value="Ready"``,
     ``status__values=["Ready"]`` and ``storage_id__isnull=False``.
+
+    The value matters as much as the key, in both directions.
+    ``storage_id__isnull=True`` selects exactly the artifacts that have no
+    body yet, so it is the inverse of a readiness gate rather than one.
     """
     for call in _iter_calls(tree):
         for kw in call.keywords:
             if kw.arg is None:
                 continue
             if kw.arg.startswith("storage_id"):
+                if "isnull" in kw.arg or "is_null" in kw.arg:
+                    if isinstance(kw.value, ast.Constant) and kw.value.value is False:
+                        return True
+                    continue
                 return True
             if kw.arg.startswith("status"):
                 if any(_is_ready_status_value(v) for v in ast.walk(kw.value)):
