@@ -141,7 +141,7 @@ the skill fires at all.
 | `infrahub-managing-schemas` | `skills/infrahub-managing-schemas/` | Schema nodes, generics, attributes, relationships (create, modify, debug) |
 | `infrahub-managing-objects` | `skills/infrahub-managing-objects/` | YAML data files for infrastructure objects (create, modify, debug) |
 | `infrahub-managing-checks` | `skills/infrahub-managing-checks/` | Python validation checks for proposed changes (create, modify, debug) |
-| `infrahub-managing-generators` | `skills/infrahub-managing-generators/` | Design-driven automation |
+| `infrahub-managing-generators` | `skills/infrahub-managing-generators/` | Design-driven automation (create, modify, debug) |
 | `infrahub-managing-transforms` | `skills/infrahub-managing-transforms/` | Data transforms, Python/Jinja2 (create, modify, debug) |
 | `infrahub-managing-menus` | `skills/infrahub-managing-menus/` | Custom navigation menus (create, modify, debug) |
 | `infrahub-analyzing-data` | `skills/infrahub-analyzing-data/` | Live data analysis via MCP server |

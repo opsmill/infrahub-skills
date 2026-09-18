@@ -9,7 +9,8 @@ description: >-
   converting devicetype-library YAML, building object templates from vendor
   device models, seeding Infrahub with device types from NDX, converting line
   cards / PSUs / transceivers from NetBox module types, turning NetBox hardware
-  definitions into Template* objects.
+  definitions into Template* objects, re-running a conversion after changing the
+  mapping profile, debugging a wrong or failed conversion.
   DO NOT TRIGGER when: importing CSV/TSV data (use infrahub-importing-data),
   authoring schemas from scratch (use infrahub-managing-schemas), writing ordinary
   object data files (use infrahub-managing-objects), or syncing live NetBox

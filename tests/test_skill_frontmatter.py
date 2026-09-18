@@ -35,8 +35,20 @@ PIPELINE_SKILLS = [
     "implementing-skill-changes",
 ]
 
-# A description opening on one of these announces the skill as build-only.
-CREATION_OPENERS = re.compile(r"\s*(creates?|builds?|generates?|manages)\b", re.I)
+# A description opening on one of these announces the skill as build-only. The
+# guideline says a skill that creates an artifact also changes one, so this
+# covers every verb that produces something somebody later edits, not only the
+# four that happened to appear in the managing-* family.
+CREATION_OPENERS = re.compile(
+    r"\s*(creates?|builds?|generates?|manages?|converts?|produces?|writes?|defines?|authors?)\b",
+    re.I,
+)
+
+# Rendered length ceiling for a description. Nothing in the installed skill
+# ecosystem exceeds this, and the field is the skill's whole triggering surface,
+# so an outlier is a sign the TRIGGER clause has accreted rather than been
+# written. managing-schemas reached 1098 before this gate existed.
+MAX_DESCRIPTION_CHARS = 1024
 
 # Verb forms that name work on an artifact that already exists. Noun forms are
 # deliberately absent: "proposed changes" is a domain noun in the checks skill's
@@ -189,6 +201,23 @@ def test_modification_intent_detector_discriminates(description: str, expected: 
     "modifying", and still names no modification trigger.
     """
     assert names_modification_intent(description) is expected
+
+
+@pytest.mark.parametrize("path", _shipped_skill_files(), ids=lambda p: p.parent.name)
+def test_description_stays_within_the_length_cap(path: Path) -> None:
+    """A description is the whole triggering surface, so it cannot grow unbounded.
+
+    Nothing catches this otherwise, and the failure is silent: an over-long
+    description is not a parse error, the skill simply carries a field no
+    consumer promises to honour in full. Trim the TRIGGER clause rather than
+    raising the cap.
+    """
+    description = " ".join((_frontmatter(path).get("description") or "").split())
+    assert len(description) <= MAX_DESCRIPTION_CHARS, (
+        f"{path.parent.name}: description is {len(description)} characters, over the "
+        f"{MAX_DESCRIPTION_CHARS} cap. Drop redundant TRIGGER clauses rather than "
+        f"raising the cap."
+    )
 
 
 @pytest.mark.parametrize("path", _shipped_skill_files(), ids=lambda p: p.parent.name)

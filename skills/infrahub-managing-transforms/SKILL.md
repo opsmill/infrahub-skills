@@ -41,6 +41,8 @@ Existing transforms:
 - Rendering Jinja2 templates with query data
 - Combining Python logic with Jinja2 rendering
 - Connecting transforms to artifacts for automated output
+- Changing what an existing transform or template renders
+- Debugging wrong output, or an artifact that fails to generate
 
 ## Rule Categories
 

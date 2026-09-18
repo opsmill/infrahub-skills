@@ -100,10 +100,10 @@ A team already running Infrahub who needs to continue extending it — adding sc
 
 | Skill | What it does |
 | ----- | ------------ |
-| **managing-schemas** | Describe your use case and get best-practice schema design — nodes, generics, attributes, relationships, hierarchies, and migrations |
+| **managing-schemas** | Describe your use case and get best-practice schema design, then modify and debug it — nodes, generics, attributes, relationships, hierarchies, and migrations |
 | **managing-objects** | Create, modify, and debug YAML data files for infrastructure objects with correct references and load order |
 | **managing-checks** | Write, modify, and debug Python validation checks (`InfrahubCheck`) for proposed change pipelines |
-| **managing-generators** | Build design-driven generators with idempotent create-or-update patterns |
+| **managing-generators** | Build, modify, and debug design-driven generators with idempotent create-or-update patterns |
 | **managing-transforms** | Create, modify, and debug data transforms (Python, Jinja2, or hybrid) for configs, reports, and exports |
 | **managing-menus** | Define and restructure custom navigation menus for the Infrahub web UI |
 | **analyzing-data** | Query and correlate live Infrahub data via the MCP server (requires MCP connection) |
