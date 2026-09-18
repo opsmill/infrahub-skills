@@ -3,7 +3,9 @@ paths:
   - "skills/**"
   - "graders/**"
   - "eval.yaml"
+  - ".agents/skills/**"
   - ".claude/skills/**"
+  - ".codex/skills/**"
 ---
 
 # Minimum Change

@@ -1,7 +1,9 @@
 ---
 paths:
   - "skills/**/*.md"
+  - ".agents/skills/**/*.md"
   - ".claude/skills/**/*.md"
+  - ".codex/skills/**/*.md"
 ---
 
 # Skill Authoring
@@ -105,7 +107,8 @@ needing it links there rather than restating the number.
 
 `scripts/check-cli-invocations.py` validates the
 `infrahubctl` invocations printed under `skills/`,
-`graders/`, `tests/`, `eval.yaml`, `.claude/skills/` and
+`graders/`, `tests/`, `eval.yaml`,
+`.agents/skills/` and
 most of `dev/`, against the tree pinned in
 `graders/common/cli_tree.py`. Its `SCAN_TARGETS` is the
 authority; `docs/`, `README.md` and `dev/specs/` are
