@@ -474,7 +474,8 @@ def check_no_builtin_section_recreated(doc: dict, **_: Any) -> tuple[bool, str]:
 
 
 def check_parent_attaches_to_builtin(doc: dict, **_: Any) -> tuple[bool, str]:
-    """IPAM-domain items reach the built-in IPAM section via parent:."""
+    """IPAM-domain items reach the shipped IPAM section via parent: BuiltinIPAM."""
+    target = "BuiltinIPAM"
     expected_kinds = {"ipamvlan", "ipamvrf"}
 
     all_items = _all_menu_items_recursive(doc)
@@ -483,25 +484,34 @@ def check_parent_attaches_to_builtin(doc: dict, **_: Any) -> tuple[bool, str]:
 
     attached: list[dict] = []
     for item in all_items:
-        if _parent_ref(item) in BUILTIN_MENU_SECTIONS:
+        if _parent_ref(item) == target:
             attached.extend(_subtree(item))
 
     if not attached:
-        declared = sorted({_parent_ref(i) for i in all_items if _parent_ref(i)})
-        detail = f"found parent values: {', '.join(declared)}" if declared else "no item declares a parent"
-        return False, (
-            "No item attaches to a built-in section via parent: <Namespace><Name> "
-            f"(expected parent: BuiltinIPAM) — {detail}"
+        # Attaching to some other shipped section is not the same as reaching
+        # IPAM, so say which one was used rather than reporting "no parent".
+        elsewhere = sorted(
+            {p for p in (_parent_ref(i) for i in all_items) if p in BUILTIN_MENU_SECTIONS}
         )
+        if elsewhere:
+            detail = f"attaches to {', '.join(elsewhere)} instead"
+        else:
+            declared = sorted({p for p in (_parent_ref(i) for i in all_items) if p})
+            detail = (
+                f"found parent values: {', '.join(declared)}"
+                if declared
+                else "no item declares a parent"
+            )
+        return False, f"No item declares parent: {target} — {detail}"
 
     reached = {_normalized(item.get("kind")) for item in attached}
     missing = sorted(expected_kinds - reached)
     if missing:
         return False, (
-            "Not reachable from a built-in section: "
-            f"{', '.join(missing)} (attached kinds: {', '.join(sorted(k for k in reached if k)) or 'none'})"
+            f"Not reachable from {target}: {', '.join(missing)} "
+            f"(attached kinds: {', '.join(sorted(k for k in reached if k)) or 'none'})"
         )
-    return True, f"{len(expected_kinds)} IPAM-domain kinds attach under a built-in section"
+    return True, f"{len(expected_kinds)} IPAM-domain kinds attach under {target}"
 
 
 # ---------------------------------------------------------------------------

@@ -45,6 +45,9 @@ check_separate_devices_section = _mod.check_separate_devices_section
 check_include_in_menu_false = _mod.check_include_in_menu_false
 check_infrahub_yml_registration = _mod.check_infrahub_yml_registration
 check_schema_comment = _mod.check_schema_comment
+check_no_builtin_section_recreated = _mod.check_no_builtin_section_recreated
+check_parent_attaches_to_builtin = _mod.check_parent_attaches_to_builtin
+BUILTIN_MENU_SECTIONS = _mod.BUILTIN_MENU_SECTIONS
 load_output = _mod.load_output
 run_checks = _mod.run_checks
 
@@ -837,6 +840,254 @@ class TestRunChecks:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Built-in menu section collisions (issue #24)
+#
+# The four fixtures below are the compliant / compliant-variant / violating /
+# violating-near-miss set that rule-equals-test.md asks for, committed here so
+# they run under `uv run invoke test` rather than only inside a skillgrade run.
+# ---------------------------------------------------------------------------
+
+
+def _menu(*items: dict) -> dict:
+    """Wrap menu items in the apiVersion/kind/spec envelope."""
+    return {"apiVersion": "infrahub.app/v1", "kind": "Menu", "spec": {"data": list(items)}}
+
+
+def _children(*items: dict) -> dict:
+    return {"data": list(items)}
+
+
+# Compliant: each IPAM-domain item attaches to the shipped section directly.
+BUILTIN_PASS = _menu(
+    {
+        "namespace": "Ipam",
+        "name": "Vlans",
+        "label": "VLANs",
+        "kind": "IpamVlan",
+        "icon": "mdi:lan",
+        "parent": "BuiltinIPAM",
+    },
+    {
+        "namespace": "Ipam",
+        "name": "Vrfs",
+        "label": "VRFs",
+        "kind": "IpamVrf",
+        "icon": "mdi:router-network",
+        "parent": "BuiltinIPAM",
+    },
+    {
+        "namespace": "Dcim",
+        "name": "NetworkDevices",
+        "label": "Network Devices",
+        "icon": "mdi:server-network",
+        "children": _children(
+            {"namespace": "Dcim", "name": "Device", "label": "Devices", "kind": "DcimDevice"},
+        ),
+    },
+)
+
+# Compliant variant: one parented group carries both, fields in another order.
+BUILTIN_PASS_VARIANT = _menu(
+    {
+        "parent": "BuiltinIPAM",
+        "namespace": "Ipam",
+        "name": "Addressing",
+        "icon": "mdi:ip-network-outline",
+        "label": "Addressing",
+        "children": _children(
+            {"namespace": "Ipam", "name": "Vrf", "kind": "IpamVrf", "label": "VRFs"},
+            {"namespace": "Ipam", "name": "Vlan", "kind": "IpamVlan", "label": "VLANs"},
+        ),
+    },
+    {"namespace": "Organization", "name": "Customer", "label": "Customers", "kind": "OrganizationCustomer"},
+)
+
+# Violating: recreates BuiltinIPAM outright.
+BUILTIN_FAIL = _menu(
+    {
+        "namespace": "Builtin",
+        "name": "IPAM",
+        "label": "IPAM",
+        "icon": "mdi:ip-network",
+        "children": _children(
+            {"namespace": "Ipam", "name": "Vlan", "label": "VLANs", "kind": "IpamVlan"},
+            {"namespace": "Ipam", "name": "Vrf", "label": "VRFs", "kind": "IpamVrf"},
+        ),
+    },
+)
+
+# Violating near miss: a different identifier, but the sidebar still shows a
+# second "IPAM" heading, and the parent values point at the custom group rather
+# than the shipped section.
+BUILTIN_FAIL_NEARMISS = _menu(
+    {
+        "namespace": "Ipam",
+        "name": "Management",
+        "label": "IPAM",
+        "icon": "mdi:ip-network",
+        "children": _children(
+            {
+                "namespace": "Ipam",
+                "name": "Vlan",
+                "label": "VLANs",
+                "kind": "IpamVlan",
+                "parent": "IpamManagement",
+            },
+        ),
+    },
+)
+
+
+class TestCheckNoBuiltinSectionRecreated:
+    def test_compliant_passes(self):
+        ok, msg = check_no_builtin_section_recreated(BUILTIN_PASS)
+        assert ok, msg
+
+    def test_compliant_variant_passes(self):
+        ok, msg = check_no_builtin_section_recreated(BUILTIN_PASS_VARIANT)
+        assert ok, msg
+
+    def test_recreated_identifier_fails(self):
+        ok, msg = check_no_builtin_section_recreated(BUILTIN_FAIL)
+        assert not ok
+        assert "BuiltinIPAM" in msg
+
+    def test_near_miss_label_collision_fails(self):
+        """A fresh identifier does not help: the sidebar still shows two IPAM headings."""
+        ok, msg = check_no_builtin_section_recreated(BUILTIN_FAIL_NEARMISS)
+        assert not ok
+        assert "IPAM" in msg
+
+    def test_empty_doc_fails(self):
+        ok, msg = check_no_builtin_section_recreated({})
+        assert not ok
+        assert "No menu items" in msg
+
+    @pytest.mark.parametrize("label", ["Other", "Actions", "Object Management"])
+    def test_generic_label_matching_a_shipped_section_is_flagged(self, label):
+        """Deliberate: these read as duplicates in the sidebar whatever the namespace.
+
+        "Other" and "Actions" are plausible names for an unrelated custom group,
+        but Infrahub renders its own sections under those exact labels, so a
+        second top-level item with the same label is the defect from #24. The
+        rule says to rename it or attach with `parent:`.
+        """
+        doc = _menu({"namespace": "Custom", "name": "Group", "label": label, "children": _children()})
+        ok, _ = check_no_builtin_section_recreated(doc)
+        assert not ok
+
+    def test_parented_item_may_reuse_a_shipped_label(self):
+        """An item with a parent is not top level, so it cannot collide."""
+        doc = _menu(
+            {
+                "namespace": "Custom",
+                "name": "Group",
+                "label": "Actions",
+                "parent": "BuiltinIPAM",
+                "children": _children(),
+            }
+        )
+        ok, msg = check_no_builtin_section_recreated(doc)
+        assert ok, msg
+
+
+class TestCheckParentAttachesToBuiltin:
+    def test_compliant_passes(self):
+        ok, msg = check_parent_attaches_to_builtin(BUILTIN_PASS)
+        assert ok, msg
+
+    def test_compliant_variant_passes(self):
+        ok, msg = check_parent_attaches_to_builtin(BUILTIN_PASS_VARIANT)
+        assert ok, msg
+
+    def test_no_parent_fails(self):
+        ok, msg = check_parent_attaches_to_builtin(BUILTIN_FAIL)
+        assert not ok
+        assert "no item declares a parent" in msg
+
+    def test_near_miss_parent_to_custom_item_fails(self):
+        ok, msg = check_parent_attaches_to_builtin(BUILTIN_FAIL_NEARMISS)
+        assert not ok
+        assert "IpamManagement" in msg
+
+    def test_wrong_builtin_section_fails(self):
+        """Attaching under any shipped section is not the same as reaching IPAM.
+
+        Regression test for PR #153 review: membership in the built-in set let
+        `parent: BuiltinActions` score a pass even though the VLAN and VRF
+        entries never landed under IPAM.
+        """
+        doc = _menu(
+            {
+                "parent": "BuiltinActions",
+                "namespace": "Ipam",
+                "name": "Addressing",
+                "label": "Addressing",
+                "children": _children(
+                    {"namespace": "Ipam", "name": "Vlan", "kind": "IpamVlan", "label": "VLANs"},
+                    {"namespace": "Ipam", "name": "Vrf", "kind": "IpamVrf", "label": "VRFs"},
+                ),
+            }
+        )
+        ok, msg = check_parent_attaches_to_builtin(doc)
+        assert not ok
+        assert "BuiltinActions" in msg
+
+    def test_partial_coverage_fails(self):
+        """Only one of the two IPAM-domain kinds reaches the shipped section."""
+        doc = _menu(
+            {
+                "namespace": "Ipam",
+                "name": "Vlans",
+                "kind": "IpamVlan",
+                "label": "VLANs",
+                "parent": "BuiltinIPAM",
+            },
+            {"namespace": "Ipam", "name": "Vrfs", "kind": "IpamVrf", "label": "VRFs"},
+        )
+        ok, msg = check_parent_attaches_to_builtin(doc)
+        assert not ok
+        assert "ipamvrf" in msg
+
+    def test_parent_match_is_exact(self):
+        """`BuiltinIpam` resolves to nothing in Infrahub, so it must not pass here."""
+        doc = _menu(
+            {
+                "namespace": "Ipam",
+                "name": "Vlans",
+                "kind": "IpamVlan",
+                "label": "VLANs",
+                "parent": "BuiltinIpam",
+            },
+            {
+                "namespace": "Ipam",
+                "name": "Vrfs",
+                "kind": "IpamVrf",
+                "label": "VRFs",
+                "parent": "BuiltinIpam",
+            },
+        )
+        ok, _ = check_parent_attaches_to_builtin(doc)
+        assert not ok
+
+    def test_empty_doc_fails(self):
+        ok, msg = check_parent_attaches_to_builtin({})
+        assert not ok
+        assert "No menu items" in msg
+
+
+class TestBuiltinMenuSectionsRegistry:
+    def test_registry_is_keyed_by_identifier(self):
+        """Keys are <namespace><name>, the value `parent:` takes in a menu file."""
+        assert "BuiltinIPAM" in BUILTIN_MENU_SECTIONS
+        assert all(k.startswith("Builtin") for k in BUILTIN_MENU_SECTIONS)
+
+    def test_both_new_checks_are_registered(self):
+        assert CHECKS["no-builtin-section-recreated"] is check_no_builtin_section_recreated
+        assert CHECKS["parent-attaches-to-builtin"] is check_parent_attaches_to_builtin
+
+
 class TestGraderScripts:
     """Test that each grader script outputs valid JSON when no file exists (score 0.0)."""
 
@@ -886,8 +1137,38 @@ class TestGraderScripts:
         result = self._run_script("check_hierarchical.py", str(menu_file))
         assert result["score"] == 1.0
 
+    def test_check_builtin_sections_missing_file(self, tmp_path):
+        """Missing file produces valid JSON with score 0.0; all checks fail on empty doc."""
+        result = self._run_script("check_builtin_sections.py", str(tmp_path / "missing.yml"))
+        assert "score" in result
+        assert "details" in result
+        assert "checks" in result
+        assert result["score"] == 0.0
+
+    def test_check_builtin_sections_four_fixtures(self, tmp_path):
+        """The four fixtures score 1.0 / 1.0 / <1.0 / <1.0 end to end."""
+        expectations = [
+            ("pass", BUILTIN_PASS, True),
+            ("pass-variant", BUILTIN_PASS_VARIANT, True),
+            ("fail", BUILTIN_FAIL, False),
+            ("fail-nearmiss", BUILTIN_FAIL_NEARMISS, False),
+        ]
+        for name, doc, should_pass in expectations:
+            menu_file = tmp_path / f"{name}.yml"
+            menu_file.write_text(yaml.dump(doc))
+            result = self._run_script("check_builtin_sections.py", str(menu_file))
+            if should_pass:
+                assert result["score"] == 1.0, f"{name}: {result['details']}"
+            else:
+                assert result["score"] < 1.0, f"{name} scored 1.0: {result['details']}"
+
     def test_all_scripts_output_valid_json(self, tmp_path):
-        scripts = ["check_flat_menu.py", "check_hierarchical.py", "check_generic_kind.py"]
+        scripts = [
+            "check_flat_menu.py",
+            "check_hierarchical.py",
+            "check_generic_kind.py",
+            "check_builtin_sections.py",
+        ]
         for script in scripts:
             result = self._run_script(script, str(tmp_path / "missing.yml"))
             # Must be valid JSON with required keys
