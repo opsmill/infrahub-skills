@@ -99,22 +99,39 @@ def _shipped_skill_files() -> list[Path]:
     return sorted(ROOT.glob("skills/*/SKILL.md"))
 
 
-def _trigger_scope(description: str) -> str:
-    """The description up to `DO NOT TRIGGER`.
+# The real `TRIGGER when:`, not the one inside `DO NOT TRIGGER when:`.
+TRIGGER_CLAUSE = re.compile(r"(?<!DO NOT )TRIGGER when\s*:", re.I)
 
-    Everything after that clause lists what must *not* fire the skill, so a
-    modification verb sitting there is an exclusion, not a trigger.
+
+def _trigger_scope(description: str) -> str:
+    """The `TRIGGER when:` clauses alone.
+
+    Not the lead-in sentence, which says what the skill does rather than when it
+    fires, and not `DO NOT TRIGGER`, which lists what must not fire it. A
+    modification verb in either place still leaves day-two work with no TRIGGER
+    phrase to match against, which is precisely the gap #78 describes. Scoping
+    from the top of the description instead would pass "Creates and modifies
+    Foo. TRIGGER when: building new Foo." on the lead-in alone. That is not
+    hypothetical: managing-schemas passed exactly that way until this was
+    tightened.
+
+    An empty string when the description has no TRIGGER clause at all, which
+    fails the assertion rather than vacuously satisfying it.
     """
-    return re.split(r"DO NOT TRIGGER", " ".join(description.split()), flags=re.I)[0]
+    flat = " ".join(description.split())
+    match = TRIGGER_CLAUSE.search(flat)
+    if match is None:
+        return ""
+    return re.split(r"DO NOT TRIGGER", flat[match.end() :], flags=re.I)[0]
 
 
 def names_modification_intent(description: str) -> bool:
-    """True if the triggering half of the description names work on an existing artifact."""
+    """True if the `TRIGGER when:` clauses name work on an artifact that exists."""
     scope = _trigger_scope(description)
     return any(re.search(rf"\b{re.escape(verb)}", scope, re.I) for verb in MODIFICATION_VERBS)
 
 
-# compliant, compliant variant, violating, violating near miss.
+# compliant, compliant variant, violating, and two near misses.
 INTENT_FIXTURES = [
     pytest.param(
         "Creates, modifies and debugs Infrahub Generators. "
@@ -151,6 +168,16 @@ INTENT_FIXTURES = [
         False,
         id="violating-near-miss",
     ),
+    pytest.param(
+        # The lead-in sentence promises modification and the TRIGGER clauses
+        # deliver none of it, so day-two work still matches no trigger phrase.
+        # managing-schemas shipped in exactly this shape.
+        "Creates and modifies Foo. "
+        "TRIGGER when: building new Foo, creating Foo from templates. "
+        "DO NOT TRIGGER when: designing schemas.",
+        False,
+        id="violating-lead-in-only",
+    ),
 ]
 
 
@@ -183,9 +210,10 @@ def test_creation_shaped_description_names_modification_triggers(path: Path) -> 
     if not CREATION_OPENERS.match(description):
         pytest.skip(f"{name} does not open on a creation verb")
     assert names_modification_intent(description), (
-        f"{name}: the description opens on a creation verb but its TRIGGER clauses "
-        f"name only building. Add modifying / debugging / extending an existing "
-        f"artifact, so the skill fires on day-two work. TRIGGER half was: "
+        f"{name}: the description opens on a creation verb but its `TRIGGER when:` "
+        f"clauses name only building. Add modifying / debugging / extending an "
+        f"existing artifact to TRIGGER itself, not just to the lead-in sentence, "
+        f"so the skill fires on day-two work. TRIGGER clauses were: "
         f"{_trigger_scope(description)!r}"
     )
 

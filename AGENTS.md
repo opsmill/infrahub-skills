@@ -138,7 +138,7 @@ the skill fires at all.
 
 | Skill | Directory | Description |
 | ------- | ----------- | ------------- |
-| `infrahub-managing-schemas` | `skills/infrahub-managing-schemas/` | Schema nodes, generics, attributes, relationships |
+| `infrahub-managing-schemas` | `skills/infrahub-managing-schemas/` | Schema nodes, generics, attributes, relationships (create, modify, debug) |
 | `infrahub-managing-objects` | `skills/infrahub-managing-objects/` | YAML data files for infrastructure objects (create, modify, debug) |
 | `infrahub-managing-checks` | `skills/infrahub-managing-checks/` | Python validation checks for proposed changes (create, modify, debug) |
 | `infrahub-managing-generators` | `skills/infrahub-managing-generators/` | Design-driven automation |
