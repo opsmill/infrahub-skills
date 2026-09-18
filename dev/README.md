@@ -32,8 +32,9 @@ skills themselves. For user-facing docs, see
   definitions.
 
 Contributor skills live outside `dev/`, in
-[`../.agents/skills/`](../.agents/skills/), next
-to the shipped `../skills/`:
+[`../.agents/skills/`](../.agents/skills/), which is
+where this repo keeps the guidance it writes for its
+own agents:
 [`harvesting-skill-review`](../.agents/skills/harvesting-skill-review/SKILL.md)
 turns a PR's review threads into rules, and the
 skill-change pipeline
@@ -44,9 +45,11 @@ skill-change pipeline
 takes a bug or an idea
 through a failing test to a pull request.
 
-No agent looks there by default, and none has to: `.claude/`, `.agents/`
-and `.codex/` hold nothing but symlinks putting the shipped skills, the
-contributor skills, and the rules under the path that agent expects. See
+`.claude/` and `.codex/` hold nothing but symlinks, so each agent finds
+those skills and the rules under the path it already looks in. Nothing
+routes to the shipped `../skills/`: that is the product, and an agent
+working on this repo has no reason to invoke it — doing so loads the
+installed plugin, not the working tree. See
 [`../AGENTS.md`](../AGENTS.md#rules) for what each link points at.
 
 ## Rules

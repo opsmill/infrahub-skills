@@ -93,7 +93,7 @@ weigh it.
 
 Default to a rule inside an existing skill. Before proposing a new skill,
 read
-[`../../dev/guidelines/minimum-change.md`](../../../dev/guidelines/minimum-change.md)
+[`../../../dev/guidelines/minimum-change.md`](../../../dev/guidelines/minimum-change.md)
 § "A new skill sits above all of these", which counts what a new skill costs
 and names the surfaces it has to be wired into. Propose one only when the
 domain genuinely has no existing home, and name those surfaces in the same
@@ -136,7 +136,7 @@ exercises the same rule. A rule drafted from one incident and then measured
 on that same incident is only ever tested where it was fitted, and a rule
 that works on exactly one prompt looks identical to one that generalizes.
 The full prompt rules are in
-[`../../dev/guides/adding-a-rule.md`](../../../dev/guides/adding-a-rule.md)
+[`../../../dev/guides/adding-a-rule.md`](../../../dev/guides/adding-a-rule.md)
 § "Add an Eval Task".
 
 ## Lens 7: What does it contradict
@@ -156,7 +156,7 @@ not one.
 ## Lens 9: Scope and YAGNI
 
 State what is explicitly out of scope for this idea. Then read
-[`../../dev/guidelines/minimum-change.md`](../../../dev/guidelines/minimum-change.md)
+[`../../../dev/guidelines/minimum-change.md`](../../../dev/guidelines/minimum-change.md)
 at this exact point, before the brief commits to a shape: it decides
 whether the idea rides an existing rule or grader check, or genuinely
 needs a new file. Record the rung the idea stops at.
@@ -182,7 +182,7 @@ any of the four hands the next stage nothing to build.
 The `Docs impact` field records what the new behavior leaves stale. New
 guidance changes what a skill does, and the pages describing that skill go on
 describing what it did before. Read
-[`../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md)
+[`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md)
 § "When behavior changes" and run the grep it gives. A new skill is the
 expensive case: it needs all five registration surfaces, and Lens 2 already
 made you argue for it. `none` is a complete answer; a blank field is not.
@@ -208,4 +208,4 @@ approval.
 ## Boundaries
 
 Follow the repository-wide boundaries in
-[`../../AGENTS.md`](../../../AGENTS.md) § Boundaries.
+[`../../../AGENTS.md`](../../../AGENTS.md) § Boundaries.

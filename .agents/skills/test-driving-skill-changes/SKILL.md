@@ -103,10 +103,10 @@ Read `Defect class` from the handoff file: `guidance` follows
 
 ## Guidance class
 
-1. Read [`../../dev/guides/adding-a-rule.md`](../../../dev/guides/adding-a-rule.md)
-   §§2 to 5 and [`../../dev/guidelines/graders.md`](../../../dev/guidelines/graders.md).
+1. Read [`../../../dev/guides/adding-a-rule.md`](../../../dev/guides/adding-a-rule.md)
+   §§2 to 5 and [`../../../dev/guidelines/graders.md`](../../../dev/guidelines/graders.md).
    Both describe the shape a guidance-class test has to take.
-2. Read [`../../dev/guidelines/minimum-change.md`](../../../dev/guidelines/minimum-change.md)
+2. Read [`../../../dev/guidelines/minimum-change.md`](../../../dev/guidelines/minimum-change.md)
    for the ladder, then answer two coverage questions before writing anything
    new:
    - **Can an existing grader check assert it?** Reuse the function in
@@ -153,7 +153,7 @@ Read `Defect class` from the handoff file: `guidance` follows
 
 Hand-craft four fixtures and run the grader on each. What each fixture is, and
 why the second and fourth are the ones that find bugs, is written once in
-[`../../dev/guides/adding-a-rule.md`](../../../dev/guides/adding-a-rule.md)
+[`../../../dev/guides/adding-a-rule.md`](../../../dev/guides/adding-a-rule.md)
 § "Verify the Grader Both Ways". Read it there rather than working from memory.
 
 The scores this stage requires, in fixture order: `1.0 / 1.0 / <1.0 / <1.0`.
@@ -261,4 +261,4 @@ Stop and report rather than guessing forward, when:
 ## Boundaries
 
 Follow the repository-wide boundaries in
-[`../../AGENTS.md`](../../../AGENTS.md) § Boundaries.
+[`../../../AGENTS.md`](../../../AGENTS.md) § Boundaries.
