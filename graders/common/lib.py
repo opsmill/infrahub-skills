@@ -375,46 +375,35 @@ _SCHEMA_WRITE_CMD = re.compile(
     + r"|>>?[^\S\n]*" + _SCHEMA_FILE
 )
 
-# A clause saying what becomes *of* an edit — it is overwritten, discarded,
-# pointless — is warning against the edit rather than prescribing it, and so
-# is one that calls the file generated. Used to read a fenced block's
-# introduction, where "after the export the file contains:" and "add this
-# yourself:" are the two cases to tell apart.
-_EDIT_IS_WARNED_AGAINST = re.compile(
-    r"\b(?:overwrit\w+|overwrote|discard\w*|clobber\w*|lost|loses|lose|gone|"
-    r"wiped?|reverted|pointless|futile|generated|build artifact|"
-    r"source of truth)\b",
+# An instruction to write the file by hand. Told apart from a description of
+# one by mood, not by vocabulary: an authoring verb opening a sentence or a
+# list item, with the file as its object.
+#
+#   caught:  "... still missing. Edit `schema.graphql` and add the field."
+#   passes:  "hand-editing `schema.graphql` is the wrong fix"
+#   passes:  "After the export, `schema.graphql` will show the new field:"
+#   passes:  "Add the field to your schema YAML, then re-export `schema.graphql`."
+#
+# The last one is why the file has to sit within 25 characters of the verb:
+# it keeps the file as the verb's object instead of anything later in the
+# sentence. `open` is the one verb that needs a second look, because "Open
+# `schema.graphql` and confirm the field landed" is a verification step, so
+# it counts only when an authoring verb follows it.
+_HAND_EDIT_LEAD = (
+    r"(?:^|[.!?\n])[ \t]*(?:[*\-+]|\d+\.)?[ \t]*(?:\*\*)?"
+    r"(?:(?:just|simply|then|now|manually|instead)[ \t]+)*"
+)
+_HAND_EDIT_IMPERATIVE = re.compile(
+    _HAND_EDIT_LEAD
+    + r"(?:"
+    + r"(?:hand[- ]edit|edit|add|append|insert|paste|patch)\b[^.\n]{0,25}?"
+    + _SCHEMA_FILE
+    + r"|open\b[^.\n]{0,25}?"
+    + _SCHEMA_FILE
+    + r"[^.\n]{0,60}\b(?:add|append|insert|paste|type|write)\b"
+    + r")",
     re.IGNORECASE,
 )
-
-
-# Naming the file is not the only way to say "type this in". An answer can
-# hand over the schema content itself and never mention where it goes, which
-# reads as helpful and is the same edit. Only a fence tagged as GraphQL is
-# considered, so a YAML block whose `class_name: CreateDc` happens to have
-# the shape of a field declaration is never mistaken for one.
-_FENCE = re.compile(r"```([^\n]*)\n(.*?)```", re.DOTALL)
-_GRAPHQL_FENCE_TAGS = {"graphql", "gql", "sdl"}
-
-# An operation — what a `.gql` file holds. A fence containing one is the
-# query being discussed, never schema content.
-_GQL_OPERATION = re.compile(r"\b(?:query|mutation|subscription|fragment)\b")
-
-# Schema content: a type definition, or a bare `field: Type` declaration.
-# A selection set writes bare field names, so neither shape appears in one.
-_SDL_DEFINITION = re.compile(
-    r"^\s*(?:extend\s+)?(?:type|interface|input|enum|union|scalar)\s+\w+",
-    re.MULTILINE,
-)
-_SDL_FIELD = re.compile(r"^\s*\w+\s*:\s*\[?\w+[\]!]*!?\s*$", re.MULTILINE)
-
-
-def _line_before(text: str, pos: int) -> str:
-    """The last non-empty line before ``pos`` — a fence's introduction."""
-    for line in reversed(text[:pos].splitlines()):
-        if line.strip():
-            return line
-    return ""
 
 
 def check_graphql_schema_regenerated(text: str) -> tuple[bool, str]:
@@ -427,14 +416,25 @@ def check_graphql_schema_regenerated(text: str) -> tuple[bool, str]:
     the answer puts the missing field there with: the export command, or an
     editor.
 
-    Evidence is ranked, and only structural evidence counts. A command
-    aimed at the file decides first; hand-written schema content offered as
-    something to paste in decides next; the absence of the export command
-    decides last. Prose is read for neither, because the task prompt hands
-    the model a hand-edit to judge and a good answer therefore discusses
-    one at length — an earlier draft that matched "hand-edit
-    `schema.graphql`" failed a trial that rejected the hand-edit in its
-    opening sentence and ran the export three lines later.
+    Evidence is ranked, and only two things count: a command aimed at the
+    file, then an instruction to write it by hand, then the absence of the
+    export command. The task prompt hands the model a hand-edit to judge,
+    so a good answer discusses one at length, which is why the second
+    signal reads mood rather than vocabulary.
+
+    A third signal used to flag a GraphQL fence holding schema content, on
+    the theory that handing over the SDL is the same edit without naming
+    the file. It failed an answer that ran the export and then showed the
+    regenerated result so the reader could confirm the field landed — a
+    natural and fully compliant shape. Excusing a fence that any export
+    precedes, the obvious repair, leaves the signal catching only answers
+    that show SDL and never export at all, which the export check below
+    already fails. It was removed rather than patched.
+
+    Known gap, accepted: an answer that runs the export and then says
+    "paste this in" without naming the file passes. Missing a violation is
+    the safer direction than failing a correct answer, which this check has
+    now done twice in review.
     """
     if not text.strip():
         return False, "no output to check"
@@ -444,20 +444,10 @@ def check_graphql_schema_regenerated(text: str) -> tuple[bool, str]:
         for match in _SCHEMA_WRITE_CMD.finditer(region):
             offenders.append(" ".join(match.group(0).split()))
 
-    for fence in _FENCE.finditer(text):
-        if fence.group(1).strip().lower() not in _GRAPHQL_FENCE_TAGS:
+    for match in _HAND_EDIT_IMPERATIVE.finditer(text):
+        if _is_negated(text, match.start()):
             continue
-        body = fence.group(2)
-        if _GQL_OPERATION.search(body):
-            continue
-        if not (_SDL_DEFINITION.search(body) or _SDL_FIELD.search(body)):
-            continue
-        if _is_negated(text, fence.start()):
-            continue
-        intro = _line_before(text, fence.start())
-        if _EXPORT_SCHEMA.search(intro) or _EDIT_IS_WARNED_AGAINST.search(intro):
-            continue
-        offenders.append("hand-written schema SDL block")
+        offenders.append(" ".join(match.group(0).split()))
 
     if offenders:
         return False, (
