@@ -268,6 +268,166 @@ def references_core_artifact_in_call(tree: ast.Module | None) -> bool:
     return False
 
 
+_ARTIFACT_READY_STATUS = "Ready"
+
+
+def _attribute_chain(node: ast.AST) -> list[str]:
+    """Attribute names of ``a.b.c`` as ``["b", "c"]``, outermost last.
+
+    Returns ``[]`` for anything that is not an attribute access.
+    """
+    names: list[str] = []
+    while isinstance(node, ast.Attribute):
+        names.append(node.attr)
+        node = node.value
+    return list(reversed(names))
+
+
+def _mentions_attribute(node: ast.AST, attr: str) -> bool:
+    """True if ``attr`` appears anywhere in an attribute chain under ``node``."""
+    return any(
+        attr in _attribute_chain(sub)
+        for sub in ast.walk(node)
+        if isinstance(sub, ast.Attribute)
+    )
+
+
+def _is_ready_status_value(node: ast.AST) -> bool:
+    """True for the literal ``"Ready"`` or an ``ArtifactStatus.READY`` chain.
+
+    Deliberately narrow: ``"Error"`` and ``"Pending"`` are the other members of
+    Infrahub's ``ArtifactStatus`` enum, and comparing against either is error
+    handling, not a readiness gate.
+    """
+    if isinstance(node, ast.Constant) and node.value == _ARTIFACT_READY_STATUS:
+        return True
+    return any(name.upper() == "READY" for name in _attribute_chain(node))
+
+
+def _predicate_expressions(tree: ast.Module) -> list[ast.AST]:
+    """Every expression evaluated as a condition, not merely present.
+
+    Assignments, f-strings, and bare call arguments are excluded on purpose:
+    setting ``artifact.status.value``, logging the word "Ready", or computing
+    an unused ``is_ready = artifact.status.value == "Ready"`` is not a gate,
+    and a check that accepted any of them would grade vocabulary.
+
+    Only the positions below are collected, so a bare ``Compare`` sitting
+    anywhere in the tree does not qualify on its own. What a gate delegates to
+    is not lost, though: ``_assignment_sources`` follows a name the gate reads
+    back to what it was bound to, which is how the ordinary style of hoisting
+    a predicate into a variable still counts.
+
+    A lambda body is deliberately not collected here either. One that is
+    actually used is reached through the gate that calls it, inline or by
+    name; one that is defined and never called gates nothing.
+    """
+    found: list[ast.AST] = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.If, ast.While, ast.IfExp, ast.Assert)):
+            found.append(node.test)
+        elif isinstance(node, ast.comprehension):
+            found.extend(node.ifs)
+    return found
+
+
+def _assignment_sources(tree: ast.Module) -> dict[str, list[ast.AST]]:
+    """Map each assigned name to the expressions bound to it."""
+    bound: dict[str, list[ast.AST]] = {}
+    for node in ast.walk(tree):
+        targets: list[ast.AST] = []
+        value: ast.AST | None = None
+        if isinstance(node, ast.Assign):
+            targets, value = list(node.targets), node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets, value = [node.target], node.value
+        elif isinstance(node, ast.NamedExpr):
+            targets, value = [node.target], node.value
+        if value is None:
+            continue
+        for target in targets:
+            if isinstance(target, ast.Name):
+                bound.setdefault(target.id, []).append(value)
+    return bound
+
+
+def _expand_through_names(
+    expr: ast.AST, bound: dict[str, list[ast.AST]], depth: int = 1
+) -> list[ast.AST]:
+    """``expr``, plus what the names it reads were bound to, one hop deep.
+
+    ``all_ready = all(a.status.value == "Ready" for a in artifacts)`` followed
+    by ``if all_ready and len(artifacts) >= expected_count`` is ordinary
+    style, and the readiness test lives in the assignment rather than in the
+    ``if``. One hop reaches it. The depth bound keeps a self-referential
+    binding from recursing.
+    """
+    expanded = [expr]
+    if depth <= 0:
+        return expanded
+    for sub in ast.walk(expr):
+        if isinstance(sub, ast.Name):
+            for source in bound.get(sub.id, []):
+                expanded.extend(_expand_through_names(source, bound, depth - 1))
+    return expanded
+
+
+def _predicate_gates_on_ready_status(expr: ast.AST) -> bool:
+    """True if ``expr`` compares an artifact's ``status`` against ``"Ready"``."""
+    for sub in ast.walk(expr):
+        if not isinstance(sub, ast.Compare):
+            continue
+        operands = [sub.left, *sub.comparators]
+        if not any(_mentions_attribute(o, "status") for o in operands):
+            continue
+        for operand in operands:
+            if any(_is_ready_status_value(inner) for inner in ast.walk(operand)):
+                return True
+    return False
+
+
+def _selects_absent_storage(node: ast.AST) -> bool:
+    """True for a filter value that selects artifacts with *no* stored body.
+
+    ``None``, ``""`` and an empty container all mean "no storage id", and
+    ``True`` is how an ``isnull``-flavoured key spells the same thing.
+    """
+    if isinstance(node, ast.Constant):
+        return node.value is True or not node.value
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        return not node.elts or all(_selects_absent_storage(e) for e in node.elts)
+    return False
+
+
+def _query_filters_on_readiness(tree: ast.Module) -> bool:
+    """True if a call pushes readiness into the query as a filter keyword.
+
+    Covers the Infrahub filter spellings ``status__value="Ready"``,
+    ``status__values=["Ready"]`` and ``storage_id__isnull=False``.
+
+    The value matters as much as the key, in both directions, and on every
+    spelling. ``storage_id__isnull=True`` and ``storage_id__value=None`` both
+    select exactly the artifacts that have no body yet, so each is the inverse
+    of a readiness gate rather than one.
+    """
+    for call in _iter_calls(tree):
+        for kw in call.keywords:
+            if kw.arg is None:
+                continue
+            if kw.arg.startswith("storage_id"):
+                if "isnull" in kw.arg or "is_null" in kw.arg:
+                    if isinstance(kw.value, ast.Constant) and kw.value.value is False:
+                        return True
+                    continue
+                if _selects_absent_storage(kw.value):
+                    continue
+                return True
+            if kw.arg.startswith("status"):
+                if any(_is_ready_status_value(v) for v in ast.walk(kw.value)):
+                    return True
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Union-fragments checks
 # ---------------------------------------------------------------------------
@@ -352,6 +512,37 @@ def check_polls_coreartifact_after_post(
     if references_core_artifact_in_call(tree):
         return True, "CoreArtifact read found after POST"
     return False, "No call references kind='CoreArtifact'"
+
+
+def check_artifact_poll_requires_body_ready(
+    tree: ast.Module | None = None, py_raw: str = "", **_: Any
+) -> tuple[bool, str]:
+    """The poll must accept only artifacts whose body is retrievable.
+
+    Infrahub creates the ``CoreArtifact`` node with ``status: "Pending"`` and
+    no ``storage_id``, then fills both in once the transform has rendered, so a
+    poll that counts nodes converges while a content fetch still 404s. The
+    acceptance decision has to gate on a readiness signal — ``status`` equal to
+    ``"Ready"``, or a present ``storage_id`` — either pushed into the
+    ``CoreArtifact`` query or applied to the fetched artifacts before counting.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+    if not has_post_to_artifact_generate(tree, py_raw):
+        return False, "No POST to /api/artifact/generate; nothing to poll"
+    if _query_filters_on_readiness(tree):
+        return True, "CoreArtifact query filters on artifact readiness"
+    bound = _assignment_sources(tree)
+    for expr in _predicate_expressions(tree):
+        for candidate in _expand_through_names(expr, bound):
+            if _predicate_gates_on_ready_status(candidate):
+                return True, "Acceptance predicate requires status == 'Ready'"
+            if _mentions_attribute(candidate, "storage_id"):
+                return True, "Acceptance predicate requires a present storage_id"
+    return False, (
+        "Acceptance predicate counts CoreArtifact nodes without requiring a "
+        "retrievable body — no status == 'Ready' or storage_id gate"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1167,6 +1358,7 @@ CHECKS: dict[str, Any] = {
     "posts-artifact-generate-endpoint": check_posts_artifact_generate_endpoint,
     "has-polling-loop": check_has_polling_loop,
     "polls-coreartifact-after-post": check_polls_coreartifact_after_post,
+    "artifact-poll-requires-body-ready": check_artifact_poll_requires_body_ready,
     "dry-run-executes-query": check_dry_run_executes_query,
     "dry-run-before-merge": check_dry_run_before_merge,
     "watch-present-on-python-transforms": check_watch_present_on_python_transforms,
