@@ -60,8 +60,14 @@ the wire**. It is not symmetric in memory: like
 `add_relationships()` it never touches the node's own
 relationship manager, and on removal that matters,
 because a later `save(allow_upsert=True)` re-sends the
-peer you just detached server-side. If the run also saves
-that node, pair it with `.remove()` --
+peer you just detached server-side.
+
+Do not answer that by pairing it with `.remove()`. That is
+the whole-list write this rule exists to stop, and it
+drops whatever a concurrent run attached in between.
+Fetch the node without naming the relationship instead, so
+its manager stays uninitialized and the save cannot ship
+it --
 [python-delete-ordering.md](python-delete-ordering.md).
 
 ### `related_nodes` takes IDs, not nodes

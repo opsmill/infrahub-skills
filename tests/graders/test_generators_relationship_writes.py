@@ -894,3 +894,126 @@ def test_manager_alias_is_resolved():
 def test_deleting_only_the_holder_is_not_a_peer_delete():
     ok, msg = CHECKS["peer-delete-present"](tree=_tree(DELETE_ONLY_THE_HOLDER))
     assert not ok, f"deleting the site is not deleting its peers: {msg}"
+
+
+# Third review round on #148. All reproduced against the shipped checks.
+
+DELETE_HOLDER_VIA_CLIENT_DELETE = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    stale_ids = [p.id for p in site.management_addresses.peers]
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+    await self.client.delete(kind="LocationSite", id=site.id)
+"""
+
+DELETE_PEER_SAVED_BEFORE_DELETE = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    stale_ids = [p.id for p in site.management_addresses.peers]
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+    for peer_id in stale_ids:
+        addr = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        addr.description.value = "retired"
+        await addr.save()
+        await addr.delete()
+"""
+
+DELETE_PEER_ATTRIBUTE_READ = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    stale_ids = [p.id for p in site.management_addresses.peers]
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+    for peer_id in stale_ids:
+        addr = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        label = addr.display_label
+        await addr.delete()
+"""
+
+DELETE_WHOLE_SEQUENCE_IN_HELPER_OK = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    await self._reconcile(site, data)
+
+async def _reconcile(self, site, data):
+    stale_ids = [p.id for p in site.management_addresses.peers]
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+    for peer_id in stale_ids:
+        addr = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        await addr.delete()
+"""
+
+DELETE_WHOLE_SEQUENCE_IN_HELPER_BAD = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    await self._reconcile(site, data)
+
+async def _reconcile(self, site, data):
+    stale_ids = [p.id for p in site.management_addresses.peers]
+    for peer_id in stale_ids:
+        addr = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        await addr.delete()
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+"""
+
+DELETE_PEER_READ_IN_HELPER_BELOW = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    stale_ids = await self._stale(site)
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+    for peer_id in stale_ids:
+        addr = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        await addr.delete()
+
+async def _stale(self, site):
+    return [p.id for p in site.management_addresses.peers]
+"""
+
+
+def test_client_delete_of_the_holder_is_not_a_peer_delete():
+    ok, msg = CHECKS["peer-delete-present"](
+        tree=_tree(DELETE_HOLDER_VIA_CLIENT_DELETE)
+    )
+    assert not ok, f"self.client.delete(id=site.id) deletes the holder: {msg}"
+
+
+def test_saving_a_peer_before_deleting_it_is_still_a_peer_delete():
+    ok, msg = CHECKS["peer-delete-present"](
+        tree=_tree(DELETE_PEER_SAVED_BEFORE_DELETE)
+    )
+    assert ok, f"a peer may be updated before it is deleted: {msg}"
+
+
+def test_reading_an_attribute_off_a_peer_is_still_a_peer_delete():
+    ok, msg = CHECKS["peer-delete-present"](tree=_tree(DELETE_PEER_ATTRIBUTE_READ))
+    assert ok, f"reading display_label does not make the peer a holder: {msg}"
+
+
+def test_ordering_survives_the_whole_sequence_living_in_one_helper():
+    """Call-site ranking must not collapse ordering inside the helper."""
+    good, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_WHOLE_SEQUENCE_IN_HELPER_OK)
+    )
+    assert good, f"detach, save, delete inside one helper is correct: {msg}"
+    bad, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_WHOLE_SEQUENCE_IN_HELPER_BAD)
+    )
+    assert not bad, f"delete-first inside one helper is still a violation: {msg}"
+
+
+def test_peer_read_in_a_helper_does_not_filter_out_every_delete():
+    ok, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_PEER_READ_IN_HELPER_BELOW)
+    )
+    assert ok, f"the read and the deletes must use one coordinate system: {msg}"
