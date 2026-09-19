@@ -186,7 +186,7 @@ tasks:
         weight: 1.0
     expected_output: >-
       A menu YAML whose IpamVlan and IpamVrf entries attach to Infrahub's
-      shipped IPAM section with parent: BuiltinIPAM, rather than declaring
+      shipped IPAM section with parent: [Builtin, IPAM], rather than declaring
       a new top-level IPAM section. The device entries sit under a custom
       'Network Devices' group header using children.data, and customers
       are a separate top-level item.
@@ -222,8 +222,8 @@ tasks:
         check: >-
           IpamVlan and IpamVrf are reachable from an item whose parent
           is the shipped IPAM section specifically, written either as
-          [Builtin, IPAM] or as BuiltinIPAM; another built-in section
-          does not count
+          a two-element [Builtin, IPAM] list; another built-in section
+          does not count, and the concatenated string does not resolve
 
   # --- Schema Creator --- #
   - name: vlan-management

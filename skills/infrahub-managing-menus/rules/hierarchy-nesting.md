@@ -151,9 +151,18 @@ with it:
         icon: "mdi:router-network"
 ```
 
-Both elements are matched exactly, so `[Builtin, Ipam]`
-finds nothing and the load fails with a lookup error on
-that item.
+It has to be the two-element list. The concatenated
+string `parent: BuiltinIPAM` is read as a
+single-element ID, a menu item's is two, and the load
+fails on the length before anything is looked up. Note
+that Infrahub's own
+[menu reference](https://docs.infrahub.app/reference/menu)
+still types `parent` as a "concatenated namespace +
+name" string; that page is wrong on this point.
+
+Both elements are matched exactly too, so
+`[Builtin, Ipam]` finds nothing and the load fails with
+a lookup error on that item.
 
 #### Incorrect -- recreating a shipped section
 

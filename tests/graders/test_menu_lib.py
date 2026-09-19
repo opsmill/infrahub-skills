@@ -49,6 +49,7 @@ check_schema_comment = _mod.check_schema_comment
 check_no_builtin_section_recreated = _mod.check_no_builtin_section_recreated
 check_parent_attaches_to_builtin = _mod.check_parent_attaches_to_builtin
 BUILTIN_MENU_SECTIONS = _mod.BUILTIN_MENU_SECTIONS
+OBJECT_AREA_SECTIONS = _mod.OBJECT_AREA_SECTIONS
 load_output = _mod.load_output
 run_checks = _mod.run_checks
 
@@ -867,7 +868,7 @@ BUILTIN_PASS = _menu(
         "label": "VLANs",
         "kind": "IpamVlan",
         "icon": "mdi:lan",
-        "parent": "BuiltinIPAM",
+        "parent": ["Builtin", "IPAM"],
     },
     {
         "namespace": "Ipam",
@@ -875,7 +876,7 @@ BUILTIN_PASS = _menu(
         "label": "VRFs",
         "kind": "IpamVrf",
         "icon": "mdi:router-network",
-        "parent": "BuiltinIPAM",
+        "parent": ["Builtin", "IPAM"],
     },
     {
         "namespace": "Dcim",
@@ -891,7 +892,7 @@ BUILTIN_PASS = _menu(
 # Compliant variant: one parented group carries both, fields in another order.
 BUILTIN_PASS_VARIANT = _menu(
     {
-        "parent": "BuiltinIPAM",
+        "parent": ["Builtin", "IPAM"],
         "namespace": "Ipam",
         "name": "Addressing",
         "icon": "mdi:ip-network-outline",
@@ -999,6 +1000,61 @@ class TestCheckNoBuiltinSectionRecreated:
         ok, msg = check_no_builtin_section_recreated(doc)
         assert ok, msg
 
+    @pytest.mark.parametrize(
+        "section", ["Branches", "ObjectManagement", "Actions", "Admin", "Integration"]
+    )
+    def test_object_content_under_a_platform_section_is_flagged(self, section):
+        """Attaching user nodes to a platform section buries them in Infrahub's UI.
+
+        Regression test for PR #153 review: a "Network Devices" group carrying
+        DcimDevice on `parent: [Builtin, Branches]` passed both checks, so the
+        rule's object/platform split had nothing measuring it.
+        """
+        doc = _menu(
+            {
+                "namespace": "Dcim",
+                "name": "NetworkDevices",
+                "label": "Network Devices",
+                "parent": ["Builtin", section],
+                "children": _children(
+                    {"namespace": "Dcim", "name": "Device", "kind": "DcimDevice", "label": "Devices"},
+                ),
+            }
+        )
+        ok, msg = check_no_builtin_section_recreated(doc)
+        assert not ok
+        assert f"Builtin{section}" in msg
+
+    @pytest.mark.parametrize("section", ["Other", "IPAM"])
+    def test_object_content_under_an_object_section_passes(self, section):
+        doc = _menu(
+            {
+                "namespace": "Ipam",
+                "name": "Addressing",
+                "label": "Addressing",
+                "parent": ["Builtin", section],
+                "children": _children(
+                    {"namespace": "Ipam", "name": "Vlan", "kind": "IpamVlan", "label": "VLANs"},
+                ),
+            }
+        )
+        ok, msg = check_no_builtin_section_recreated(doc)
+        assert ok, msg
+
+    def test_headers_only_under_a_platform_section_are_left_alone(self):
+        """No `kind` anywhere in the subtree means no object content to misplace."""
+        doc = _menu(
+            {
+                "namespace": "Custom",
+                "name": "Notes",
+                "label": "Notes",
+                "parent": ["Builtin", "Admin"],
+                "children": _children(),
+            }
+        )
+        ok, msg = check_no_builtin_section_recreated(doc)
+        assert ok, msg
+
     def test_colliding_name_without_label_is_flagged(self):
         """With no label, `name` is what the sidebar falls back to."""
         doc = _menu({"namespace": "Dcim", "name": "IPAM", "children": _children()})
@@ -1013,7 +1069,7 @@ class TestCheckNoBuiltinSectionRecreated:
                 "namespace": "Custom",
                 "name": "Group",
                 "label": "Actions",
-                "parent": "BuiltinIPAM",
+                "parent": ["Builtin", "IPAM"],
                 "children": _children(),
             }
         )
@@ -1049,7 +1105,7 @@ class TestCheckParentAttachesToBuiltin:
         """
         doc = _menu(
             {
-                "parent": "BuiltinActions",
+                "parent": ["Builtin", "Actions"],
                 "namespace": "Ipam",
                 "name": "Addressing",
                 "label": "Addressing",
@@ -1071,7 +1127,7 @@ class TestCheckParentAttachesToBuiltin:
                 "name": "Vlans",
                 "kind": "IpamVlan",
                 "label": "VLANs",
-                "parent": "BuiltinIPAM",
+                "parent": ["Builtin", "IPAM"],
             },
             {"namespace": "Ipam", "name": "Vrfs", "kind": "IpamVrf", "label": "VRFs"},
         )
@@ -1113,19 +1169,38 @@ class TestCheckParentAttachesToBuiltin:
         assert not ok
         assert "BuiltinActions" in msg
 
-    def test_both_spellings_are_equivalent(self):
-        """Neither spelling is privileged: the check grades where the item lands."""
-        as_list = {"namespace": "Ipam", "name": "V", "label": "V", "parent": ["Builtin", "IPAM"]}
-        as_string = {"namespace": "Ipam", "name": "V", "label": "V", "parent": "BuiltinIPAM"}
+    @pytest.mark.parametrize(
+        "parent",
+        ["BuiltinIPAM", ["BuiltinIPAM"], ["Built", "in", "IPAM"], ["Builtin"]],
+    )
+    def test_only_the_two_element_list_resolves(self, parent):
+        """Anything but a two-element HFID fails to load, so it must not score.
+
+        Measured on infrahub-sdk 1.23.2: `normalize_hfid_reference` turns the
+        concatenated string into a one-element HFID and passes lists through at
+        whatever length they arrive. CoreMenu's HFID is two components and the
+        backend compares lengths before querying, so one- and three-element
+        forms raise NodeNotFoundError.
+
+        Earlier in PR #153 this check folded the string form in as an
+        equivalent spelling, which meant it scored a file that cannot load.
+        """
         kinds = _children(
             {"namespace": "Ipam", "name": "Vlan", "kind": "IpamVlan", "label": "VLANs"},
             {"namespace": "Ipam", "name": "Vrf", "kind": "IpamVrf", "label": "VRFs"},
         )
-        results = [
-            check_parent_attaches_to_builtin(_menu({**item, "children": kinds}))[0]
-            for item in (as_list, as_string)
-        ]
-        assert results == [True, True]
+        doc = _menu(
+            {
+                "namespace": "Ipam",
+                "name": "Addressing",
+                "label": "Addressing",
+                "parent": parent,
+                "children": kinds,
+            }
+        )
+        ok, msg = check_parent_attaches_to_builtin(doc)
+        assert not ok
+        assert "two-element" in msg or "no item declares a parent" in msg
 
     def test_parent_match_is_exact(self):
         """`BuiltinIpam` resolves to nothing in Infrahub, so it must not pass here."""
@@ -1135,14 +1210,14 @@ class TestCheckParentAttachesToBuiltin:
                 "name": "Vlans",
                 "kind": "IpamVlan",
                 "label": "VLANs",
-                "parent": "BuiltinIpam",
+                "parent": ["Builtin", "Ipam"],
             },
             {
                 "namespace": "Ipam",
                 "name": "Vrfs",
                 "kind": "IpamVrf",
                 "label": "VRFs",
-                "parent": "BuiltinIpam",
+                "parent": ["Builtin", "Ipam"],
             },
         )
         ok, _ = check_parent_attaches_to_builtin(doc)
@@ -1201,8 +1276,11 @@ class TestBuiltinMenuSectionsRegistry:
         object_ids = set(re.findall(r"`(Builtin\w+)`", object_area.split("Object area")[-1]))
         platform_ids = set(re.findall(r"`(Builtin\w+)`", platform_area))
 
-        assert {"BuiltinOther", "BuiltinIPAM"} <= object_ids
-        assert "BuiltinBranches" in platform_ids
+        assert object_ids == set(OBJECT_AREA_SECTIONS), (
+            "the rule's object table and OBJECT_AREA_SECTIONS disagree; "
+            f"rule: {sorted(object_ids)}, grader: {sorted(OBJECT_AREA_SECTIONS)}"
+        )
+        assert platform_ids == set(BUILTIN_MENU_SECTIONS) - set(OBJECT_AREA_SECTIONS)
         assert not object_ids & platform_ids
 
 
