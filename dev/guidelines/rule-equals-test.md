@@ -52,6 +52,43 @@ rule as covered forever.
    `evaluations/*.json` committed alongside `eval.yaml`.
    CI fails when the two diverge.
 
+## When no task can score the rule
+
+Rarely, step 4 cannot be met: the rule is correct and
+verified, and no prompt makes a current model break it.
+That is not licence to skip coverage. Establish it, and
+say so where the next reader will look.
+
+The bar is a measurement, not an opinion. Show the
+scenarios tried, the trial scores, and the mechanism that
+makes the task unbuildable rather than merely
+un-hardened. "The model got it right" is the weakest
+form; the useful form names why forcing the precondition
+for the bug also supplies its answer.
+
+When that bar is met:
+
+- Ship the rule. Prose that prevents a verified bug is
+  worth more than the coverage it is missing.
+- Ship no task grader script. One with no task behind it
+  is worse than nothing: it reads as coverage and runs
+  never. That specific defect is what #147 was opened on.
+- Record it here and in the pull request, not only in a
+  docstring. A carve-out that lives in a grader comment
+  is invisible to the next person writing a rule.
+- Keep the check functions and their fixtures if they are
+  sound. They pin a contract, and they are what a future
+  task would wire, but be explicit that they guard the
+  checks and not the prose.
+
+Taken once, for
+`skills/infrahub-managing-generators/rules/python-delete-ordering.md`
+(#147). Three scenarios, roughly a dozen trials. Forcing
+hydration is the only way to make the bug reachable, and
+forcing hydration requires `.add()` on the manager, at
+which point `.remove()` is the obvious partner and the
+model writes it unprompted.
+
 ## When the grader and the rule disagree, decide which side moves
 
 A check that encodes a stricter contract than the rule

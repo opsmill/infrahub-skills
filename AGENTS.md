@@ -163,6 +163,12 @@ an `eval.yaml` task, a task grader run against four
 fixtures, contradicted claims swept, and
 `evaluations/*.json` regenerated.
 
+The task is the one step with a carve-out, for a verified
+rule no prompt can make a current model break. It is a
+measured exception, not a judgement call, and
+[rule-equals-test.md](dev/guidelines/rule-equals-test.md)
+§ "When no task can score the rule" sets the bar.
+
 The seven steps and what each one guards against live in
 [dev/guidelines/rule-equals-test.md](dev/guidelines/rule-equals-test.md),
 which loads automatically when you touch a rule, a
