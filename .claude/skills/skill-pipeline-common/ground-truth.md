@@ -65,6 +65,14 @@ If the guidance was correct for an older release and Infrahub has since
 changed, the fix is a version scoped rule, not a correction. Compare the
 claim against the pinned version and against the latest tag when they differ.
 
+## When a doc page contradicts the source
+
+Upstream documentation is not a rung on this ladder. Where a docs page and the
+code disagree, the code wins and the page becomes part of the finding: say in
+the handoff that the page is wrong and on which point. Leave that out and the
+next reader consults the same page and re-derives the same wrong answer, which
+is what separates this from an ordinary correction.
+
 ## When ground truth contradicts the report
 
 If the current guidance is right, stop and report that. Do not invent a fix

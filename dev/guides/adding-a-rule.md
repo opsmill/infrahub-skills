@@ -268,15 +268,21 @@ compliant/violating pair catches neither. Hand-craft
 | Fixture | Expected |
 | ------- | -------- |
 | Compliant, written the way the rule shows | 1.0 |
-| Compliant, written differently — other field order, a helper, a synonym | 1.0 |
+| Compliant, refactored the way the check's traversal is vulnerable to | 1.0 |
 | Violating, obviously | < 1.0 |
 | Violating **near-miss** — satisfies the check's keyword while breaking the rule | < 1.0 |
 
 The last of each pair is the one that finds bugs:
 
-- **False fail.** A correct answer phrased differently
-  scores < 1.0. Write out the answer the rule's own
-  example shows and watch whether it passes.
+- **False fail.** A correct answer scores < 1.0. Vary
+  what the check actually reads, not the cosmetics. If
+  it walks the AST for call order, extract the calls
+  into a helper; if it reads a comparison in a test
+  position, hoist it into a variable; if it keys on a
+  node name, put two relationships on one node. Field
+  order and synonyms exercise nothing. Write out the
+  answer the rule's own example shows too, and watch
+  whether it passes.
 - **Laundering.** A violating answer scores 1.0
   because it mentions the right word, imports the
   right module, or names the right helper somewhere
@@ -312,7 +318,7 @@ hand edits:
 
 ```bash
 grep -rn "<old claim, command, or field>" \
-  skills/ graders/ eval.yaml evaluations/ dev/
+  skills/ graders/ eval.yaml dev/ .claude/skills/
 ```
 
 The hits that get missed are the ones outside
