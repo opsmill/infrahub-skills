@@ -377,32 +377,52 @@ _SCHEMA_WRITE_CMD = re.compile(
 
 # An instruction to write the file by hand. Told apart from a description of
 # one by mood, not by vocabulary: an authoring verb opening a sentence or a
-# list item, with the file as its object.
+# clause, with the file as its object.
 #
 #   caught:  "... still missing. Edit `schema.graphql` and add the field."
+#   caught:  "Add the `serial_number` field to `schema.graphql` by hand."
 #   passes:  "hand-editing `schema.graphql` is the wrong fix"
 #   passes:  "After the export, `schema.graphql` will show the new field:"
+#   passes:  "Add the field in YAML, not `schema.graphql`."
 #   passes:  "Add the field to your schema YAML, then re-export `schema.graphql`."
 #
-# The last one is why the file has to sit within 25 characters of the verb:
-# it keeps the file as the verb's object instead of anything later in the
-# sentence. `open` is the one verb that needs a second look, because "Open
-# `schema.graphql` and confirm the field landed" is a verification step, so
-# it counts only when an authoring verb follows it.
+# Only the base form counts, so the gerund in "hand-editing ... is the wrong
+# fix" is not an instruction. The last two cases are handled after the match
+# rather than inside it, by `_REGEN_CLAIMS_FILE` and the negation window
+# below: a gap wide enough for a real instruction is also wide enough to
+# reach past the verb's own object, and tightening it instead put an
+# explicit "add the field to `schema.graphql` by hand" outside the window.
 _HAND_EDIT_LEAD = (
-    r"(?:^|[.!?\n])[ \t]*(?:[*\-+]|\d+\.)?[ \t]*(?:\*\*)?"
+    r"(?:^|[.!?;,\n]|\b(?:and|so|then|but)\b)[ \t]*(?:[*\-+]|\d+\.)?[ \t]*(?:\*\*)?"
     r"(?:(?:just|simply|then|now|manually|instead)[ \t]+)*"
 )
 _HAND_EDIT_IMPERATIVE = re.compile(
     _HAND_EDIT_LEAD
-    + r"(?:"
-    + r"(?:hand[- ]edit|edit|add|append|insert|paste|patch)\b[^.\n]{0,25}?"
-    + _SCHEMA_FILE
-    + r"|open\b[^.\n]{0,25}?"
-    + _SCHEMA_FILE
-    + r"[^.\n]{0,60}\b(?:add|append|insert|paste|type|write)\b"
-    + r")",
+    + r"(?P<verb>hand[- ]edit|edit|add|append|insert|paste|patch|write)\b"
+    + r"(?P<gap>[^.\n]{0,80}?)"
+    + _SCHEMA_FILE,
     re.IGNORECASE,
+)
+
+# `open` is the one verb that needs a second look: "Open `schema.graphql`
+# and confirm the field landed" is a verification step, so it counts only
+# when an authoring verb follows. `type` is not one of those, however much
+# "type this in" sounds like it — it is SDL vocabulary, and "confirm the
+# `type DcimDevice` block lists serial_number" is a verification too.
+_OPEN_THEN_AUTHOR = re.compile(
+    _HAND_EDIT_LEAD
+    + r"(?P<verb>open)\b(?P<gap>[^.\n]{0,80}?)"
+    + _SCHEMA_FILE
+    + r"[^.\n]{0,60}\b(?:add|append|insert|paste|write)\b",
+    re.IGNORECASE,
+)
+
+# Between the verb and the filename, a word that hands the file to a
+# different verb. "Add the field to your schema YAML, then re-export
+# `schema.graphql`" instructs an edit of the YAML; the file belongs to the
+# re-export, not to the `Add`.
+_REGEN_CLAIMS_FILE = re.compile(
+    r"re-?export|re-?generat|refresh|re-?run|export-schema", re.IGNORECASE
 )
 
 
@@ -432,9 +452,14 @@ def check_graphql_schema_regenerated(text: str) -> tuple[bool, str]:
     already fails. It was removed rather than patched.
 
     Known gap, accepted: an answer that runs the export and then says
-    "paste this in" without naming the file passes. Missing a violation is
-    the safer direction than failing a correct answer, which this check has
-    now done twice in review.
+    "paste this in" without naming the file passes. Catching it needs the
+    fence signal back, and that one is removed for cause.
+
+    That gap is not evidence of a safe error direction. An earlier version
+    of this docstring claimed the only remaining direction was a missed
+    violation; review then found four phrasings wrong, two in each
+    direction, so the claim is gone rather than restated. Every one of the
+    four is a fixture below, which is where a claim like it belongs.
     """
     if not text.strip():
         return False, "no output to check"
@@ -444,10 +469,22 @@ def check_graphql_schema_regenerated(text: str) -> tuple[bool, str]:
         for match in _SCHEMA_WRITE_CMD.finditer(region):
             offenders.append(" ".join(match.group(0).split()))
 
-    for match in _HAND_EDIT_IMPERATIVE.finditer(text):
-        if _is_negated(text, match.start()):
-            continue
-        offenders.append(" ".join(match.group(0).split()))
+    for pattern in (_HAND_EDIT_IMPERATIVE, _OPEN_THEN_AUTHOR):
+        for match in pattern.finditer(text):
+            if _REGEN_CLAIMS_FILE.search(match.group("gap")):
+                continue
+            # Negation is read from the verb's own clause, never across the
+            # boundary the lead anchored on. Measuring from `match.start()`
+            # inspected the *previous* sentence, which both suppressed a
+            # real hand-edit after "... is not there yet." and rejected
+            # "Add the field in YAML, not `schema.graphql`." — the most
+            # natural way to state the rule.
+            clause = text[match.start("verb") : match.end("gap")]
+            if _NEGATED_BEFORE.search(clause.lower()):
+                continue
+            if _is_negated(text, match.start("verb")):
+                continue
+            offenders.append(" ".join(match.group(0).split()))
 
     if offenders:
         return False, (

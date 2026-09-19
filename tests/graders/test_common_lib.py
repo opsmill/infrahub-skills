@@ -396,6 +396,20 @@ SCHEMA_ACCEPTED = [
         "confirm the field landed.",
         id="opening-the-file-to-verify",
     ),
+    # `type` is SDL vocabulary before it is an authoring verb, so naming a
+    # type in a verification step must not read as "type this in".
+    pytest.param(
+        "Run `infrahubctl graphql export-schema`. Open `schema.graphql` and "
+        "confirm the `type DcimDevice` block now lists `serial_number`.",
+        id="verifying-a-named-type",
+    ),
+    # The contrastive form is the most natural way to state the rule, and
+    # its negation sits between the verb and the filename.
+    pytest.param(
+        "Add the field in YAML, not `schema.graphql`. Then run "
+        "`infrahubctl graphql export-schema`.",
+        id="contrastive-not-the-schema-file",
+    ),
     pytest.param(
         "Re-export with `infrahubctl graphql export-schema` rather than "
         "editing `schema.graphql` by hand.",
@@ -437,6 +451,26 @@ SCHEMA_REJECTED = [
         "The GraphQL schema is stale. Regenerate your protocols with "
         "`infrahubctl protocols --schemas schemas/` and re-run the codegen.",
         id="never-runs-the-export",
+    ),
+    # A negation in the *previous* sentence must not excuse the hand-edit
+    # in this one.
+    pytest.param(
+        "Run `infrahubctl graphql export-schema`. The export reads main, so "
+        "`serial_number` is not there yet. Edit `schema.graphql` and add the "
+        "attribute yourself.",
+        id="negation-belongs-to-the-previous-sentence",
+    ),
+    # An explicit hand-edit whose object sits further from the verb than a
+    # tight window allowed.
+    pytest.param(
+        "Add the `serial_number` field to `schema.graphql` by hand, then run "
+        "`infrahubctl graphql export-schema`.",
+        id="hand-edit-with-a-wide-gap",
+    ),
+    pytest.param(
+        "Write `serial_number: TextAttribute!` into `schema.graphql`, then "
+        "run `infrahubctl graphql export-schema`.",
+        id="writing-into-the-file",
     ),
 ]
 
