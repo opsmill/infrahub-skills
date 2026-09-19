@@ -70,7 +70,7 @@ def check_docs_fallback(text: str) -> tuple[bool, str]:
 # question of the repository's own prose.
 # ---------------------------------------------------------------------------
 
-from cli_tree import invalid_invocations  # noqa: E402
+from cli_tree import code_regions, invalid_invocations  # noqa: E402
 
 
 def check_cli_commands_exist(text: str) -> tuple[bool, str]:
@@ -349,6 +349,158 @@ def check_generator_target_is_key_value(text: str) -> tuple[bool, str]:
     return True, "generator target is a key=value variable on a named branch"
 
 
+# ---------------------------------------------------------------------------
+# schema.graphql is generated output
+# ---------------------------------------------------------------------------
+
+_SCHEMA_FILE = r"(?:\./)?schema\.graphql"
+
+# The command that writes the file. Spelled out in full rather than matched
+# on the word `export`, so `infrahubctl schema export` — a different command
+# writing a different artifact — cannot satisfy it.
+_EXPORT_SCHEMA = re.compile(r"infrahubctl[^\S\n]+graphql[^\S\n]+export-schema\b")
+
+# A command whose target is the file: an editor, an in-place rewrite, a
+# patch, or a redirection onto it. Scanned inside code regions only, so the
+# prose *around* the fix is never read as the fix. That boundary is the
+# whole point: the task prompt hands the model a hand-edit to judge, so a
+# good answer discusses one at length, and every attempt here to tell a
+# discussion from an instruction by its wording failed a correct answer.
+# `export-schema --destination schema.graphql` names the file too and is
+# deliberately not matched — there the file is the command's output.
+_SCHEMA_WRITE_CMD = re.compile(
+    r"\b(?:vim?|nvim|nano|emacs|code|subl|open)\b[^\n`]{0,60}" + _SCHEMA_FILE
+    + r"|\bsed\b[^\n`]{0,80}-i\b[^\n`]{0,80}" + _SCHEMA_FILE
+    + r"|\bpatch\b[^\n`]{0,60}" + _SCHEMA_FILE
+    + r"|>>?[^\S\n]*" + _SCHEMA_FILE
+)
+
+# An instruction to write the file by hand. Told apart from a description of
+# one by mood, not by vocabulary: an authoring verb opening a sentence or a
+# clause, with the file as its object.
+#
+#   caught:  "... still missing. Edit `schema.graphql` and add the field."
+#   caught:  "Add the `serial_number` field to `schema.graphql` by hand."
+#   passes:  "hand-editing `schema.graphql` is the wrong fix"
+#   passes:  "After the export, `schema.graphql` will show the new field:"
+#   passes:  "Add the field in YAML, not `schema.graphql`."
+#   passes:  "Add the field to your schema YAML, then re-export `schema.graphql`."
+#
+# Only the base form counts, so the gerund in "hand-editing ... is the wrong
+# fix" is not an instruction. The last two cases are handled after the match
+# rather than inside it, by `_REGEN_CLAIMS_FILE` and the negation window
+# below: a gap wide enough for a real instruction is also wide enough to
+# reach past the verb's own object, and tightening it instead put an
+# explicit "add the field to `schema.graphql` by hand" outside the window.
+_HAND_EDIT_LEAD = (
+    r"(?:^|[.!?;,\n]|\b(?:and|so|then|but)\b)[ \t]*(?:[*\-+]|\d+\.)?[ \t]*(?:\*\*)?"
+    r"(?:(?:just|simply|then|now|manually|instead)[ \t]+)*"
+)
+_HAND_EDIT_IMPERATIVE = re.compile(
+    _HAND_EDIT_LEAD
+    + r"(?P<verb>hand[- ]edit|edit|add|append|insert|paste|patch|write)\b"
+    + r"(?P<gap>[^.\n]{0,80}?)"
+    + _SCHEMA_FILE,
+    re.IGNORECASE,
+)
+
+# `open` is the one verb that needs a second look: "Open `schema.graphql`
+# and confirm the field landed" is a verification step, so it counts only
+# when an authoring verb follows. `type` is not one of those, however much
+# "type this in" sounds like it — it is SDL vocabulary, and "confirm the
+# `type DcimDevice` block lists serial_number" is a verification too.
+_OPEN_THEN_AUTHOR = re.compile(
+    _HAND_EDIT_LEAD
+    + r"(?P<verb>open)\b(?P<gap>[^.\n]{0,80}?)"
+    + _SCHEMA_FILE
+    + r"[^.\n]{0,60}\b(?:add|append|insert|paste|write)\b",
+    re.IGNORECASE,
+)
+
+# Between the verb and the filename, a word that hands the file to a
+# different verb. "Add the field to your schema YAML, then re-export
+# `schema.graphql`" instructs an edit of the YAML; the file belongs to the
+# re-export, not to the `Add`.
+_REGEN_CLAIMS_FILE = re.compile(
+    r"re-?export|re-?generat|refresh|re-?run|export-schema", re.IGNORECASE
+)
+
+
+def check_graphql_schema_regenerated(text: str) -> tuple[bool, str]:
+    """`schema.graphql` is export output, refreshed by command, never typed.
+
+    `infrahubctl graphql export-schema` fetches the schema from the server
+    and rewrites the whole file, so a field typed into it by hand is gone at
+    the next export and, until then, the local file disagrees with the
+    server every query is validated against. The check asks which mechanism
+    the answer puts the missing field there with: the export command, or an
+    editor.
+
+    Evidence is ranked, and only two things count: a command aimed at the
+    file, then an instruction to write it by hand, then the absence of the
+    export command. The task prompt hands the model a hand-edit to judge,
+    so a good answer discusses one at length, which is why the second
+    signal reads mood rather than vocabulary.
+
+    A third signal used to flag a GraphQL fence holding schema content, on
+    the theory that handing over the SDL is the same edit without naming
+    the file. It failed an answer that ran the export and then showed the
+    regenerated result so the reader could confirm the field landed — a
+    natural and fully compliant shape. Excusing a fence that any export
+    precedes, the obvious repair, leaves the signal catching only answers
+    that show SDL and never export at all, which the export check below
+    already fails. It was removed rather than patched.
+
+    Known gap, accepted: an answer that runs the export and then says
+    "paste this in" without naming the file passes. Catching it needs the
+    fence signal back, and that one is removed for cause.
+
+    That gap is not evidence of a safe error direction. An earlier version
+    of this docstring claimed the only remaining direction was a missed
+    violation; review then found four phrasings wrong, two in each
+    direction, so the claim is gone rather than restated. Every one of the
+    four is a fixture below, which is where a claim like it belongs.
+    """
+    if not text.strip():
+        return False, "no output to check"
+
+    offenders: list[str] = []
+    for region in code_regions(text):
+        for match in _SCHEMA_WRITE_CMD.finditer(region):
+            offenders.append(" ".join(match.group(0).split()))
+
+    for pattern in (_HAND_EDIT_IMPERATIVE, _OPEN_THEN_AUTHOR):
+        for match in pattern.finditer(text):
+            if _REGEN_CLAIMS_FILE.search(match.group("gap")):
+                continue
+            # Negation is read from the verb's own clause, never across the
+            # boundary the lead anchored on. Measuring from `match.start()`
+            # inspected the *previous* sentence, which both suppressed a
+            # real hand-edit after "... is not there yet." and rejected
+            # "Add the field in YAML, not `schema.graphql`." — the most
+            # natural way to state the rule.
+            clause = text[match.start("verb") : match.end("gap")]
+            if _NEGATED_BEFORE.search(clause.lower()):
+                continue
+            if _is_negated(text, match.start("verb")):
+                continue
+            offenders.append(" ".join(match.group(0).split()))
+
+    if offenders:
+        return False, (
+            f"treats schema.graphql as a source file: {sorted(set(offenders))}; "
+            "it is `export-schema` output, and a hand-edit is overwritten"
+        )
+
+    for match in _EXPORT_SCHEMA.finditer(text):
+        if not _is_negated(text, match.start()):
+            return True, "refreshes schema.graphql with `infrahubctl graphql export-schema`"
+    return False, (
+        "answer never runs `infrahubctl graphql export-schema`, so nothing "
+        "refreshes schema.graphql from the server"
+    )
+
+
 # A name may carry colon-separated arguments, e.g.
 # `python-transform-dry-run:spine_config`, so a check that depends on a task
 # fixture is not pinned to one task by its registry entry.
@@ -359,6 +511,7 @@ CHECKS = {
     "preflight-write-probe": check_preflight_write_probe,
     "token-not-printed": check_token_not_printed,
     "generator-target-is-key-value": check_generator_target_is_key_value,
+    "graphql-schema-regenerated": check_graphql_schema_regenerated,
 }
 
 

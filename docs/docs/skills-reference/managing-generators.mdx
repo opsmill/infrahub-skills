@@ -46,6 +46,7 @@ The `.infrahub.yml` entry tying them together carries a `watch` dependency decla
 | Sync `generate()` method | Uses `async def generate(self, data):` |
 | Missing target group configuration | Generates the `CoreGeneratorGroup` definition |
 | Generator that only stamps a fixed structure with constant values | Steers toward an Object Template (`generate_template`) to clone instead — the structure lives in data, not Python |
+| Hand-editing `schema.graphql` to add a field a query needs | Re-exports it with `infrahubctl graphql export-schema` — the file is generated, so a hand-edit is discarded on the next export |
 
 ## Running generators
 

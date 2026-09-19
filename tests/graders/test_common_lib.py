@@ -25,6 +25,7 @@ check_python_transform_dry_run = _mod.check_python_transform_dry_run
 check_preflight_write_probe = _mod.check_preflight_write_probe
 check_generator_target_is_key_value = _mod.check_generator_target_is_key_value
 check_token_not_printed = _mod.check_token_not_printed
+check_graphql_schema_regenerated = _mod.check_graphql_schema_regenerated
 invalid_invocations = _mod.invalid_invocations
 
 
@@ -355,6 +356,137 @@ def test_a_counter_example_alone_is_not_a_recommendation():
         "Never run `infrahubctl generator create_dc dc-01-uuid --branch dry-run`."
     )
     assert not ok
+
+
+# --- graphql-schema-regenerated ------------------------------------------
+
+# The shapes a correct answer takes. The second and third are the two this
+# check failed in review: both reject the hand-edit and run the export, and
+# an earlier draft scored them 0 — the first for naming the hand-edit it was
+# rejecting, the second for showing the regenerated file so the reader could
+# confirm the field landed.
+SCHEMA_ACCEPTED = [
+    pytest.param(
+        "`schema.graphql` is generated. Re-export it:\n\n"
+        "```bash\ninfrahubctl graphql export-schema\n```",
+        id="plain-re-export",
+    ),
+    pytest.param(
+        "**No, hand-editing `schema.graphql` is the wrong fix.** That file is "
+        "a build artifact of `infrahubctl graphql export-schema`, which "
+        "rewrites it whole.\n\n"
+        "```bash\ninfrahubctl graphql export-schema --destination schema.graphql\n```",
+        id="rejects-the-hand-edit-by-name",
+    ),
+    pytest.param(
+        "Don't hand-edit `schema.graphql`. Run "
+        "`infrahubctl graphql export-schema` on the `add-serial` branch "
+        "first.\n\nAfter running that, `schema.graphql` will show the new "
+        "field:\n\n```graphql\ntype DcimDevice {\n  name: Text\n  "
+        "serial_number: TextAttribute\n}\n```",
+        id="shows-the-regenerated-result",
+    ),
+    pytest.param(
+        "Add the `serial_number` field to your schema YAML, then re-export "
+        "`schema.graphql` with `infrahubctl graphql export-schema`.",
+        id="authoring-verb-aimed-at-another-file",
+    ),
+    pytest.param(
+        "Run `infrahubctl graphql export-schema`. Open `schema.graphql` and "
+        "confirm the field landed.",
+        id="opening-the-file-to-verify",
+    ),
+    # `type` is SDL vocabulary before it is an authoring verb, so naming a
+    # type in a verification step must not read as "type this in".
+    pytest.param(
+        "Run `infrahubctl graphql export-schema`. Open `schema.graphql` and "
+        "confirm the `type DcimDevice` block now lists `serial_number`.",
+        id="verifying-a-named-type",
+    ),
+    # The contrastive form is the most natural way to state the rule, and
+    # its negation sits between the verb and the filename.
+    pytest.param(
+        "Add the field in YAML, not `schema.graphql`. Then run "
+        "`infrahubctl graphql export-schema`.",
+        id="contrastive-not-the-schema-file",
+    ),
+    pytest.param(
+        "Re-export with `infrahubctl graphql export-schema` rather than "
+        "editing `schema.graphql` by hand.",
+        id="edit-named-as-the-rejected-option",
+    ),
+]
+
+
+@pytest.mark.parametrize("text", SCHEMA_ACCEPTED)
+def test_graphql_schema_regenerated_accepts(text):
+    ok, msg = check_graphql_schema_regenerated(text)
+    assert ok, msg
+
+
+SCHEMA_REJECTED = [
+    pytest.param("", id="empty-output"),
+    pytest.param(
+        "Find the `DcimDevice` type and add the field.\n\n"
+        "```bash\nvim schema.graphql\n```",
+        id="editor-aimed-at-the-file",
+    ),
+    pytest.param(
+        "```bash\ninfrahubctl graphql export-schema\n"
+        "echo '  serial_number: TextAttribute!' >> schema.graphql\n```",
+        id="near-miss-export-then-append",
+    ),
+    pytest.param(
+        "Run `infrahubctl graphql export-schema`. The export reads main, so "
+        "`serial_number` still comes back missing. Edit `schema.graphql` and "
+        "add the attribute yourself.",
+        id="near-miss-export-then-edit-by-hand",
+    ),
+    pytest.param(
+        "Open `schema.graphql` and add `serial_number: TextAttribute!` under "
+        "`type DcimDevice`, then run `infrahubctl graphql export-schema`.",
+        id="open-then-author",
+    ),
+    pytest.param(
+        "The GraphQL schema is stale. Regenerate your protocols with "
+        "`infrahubctl protocols --schemas schemas/` and re-run the codegen.",
+        id="never-runs-the-export",
+    ),
+    # A negation in the *previous* sentence must not excuse the hand-edit
+    # in this one.
+    pytest.param(
+        "Run `infrahubctl graphql export-schema`. The export reads main, so "
+        "`serial_number` is not there yet. Edit `schema.graphql` and add the "
+        "attribute yourself.",
+        id="negation-belongs-to-the-previous-sentence",
+    ),
+    # An explicit hand-edit whose object sits further from the verb than a
+    # tight window allowed.
+    pytest.param(
+        "Add the `serial_number` field to `schema.graphql` by hand, then run "
+        "`infrahubctl graphql export-schema`.",
+        id="hand-edit-with-a-wide-gap",
+    ),
+    pytest.param(
+        "Write `serial_number: TextAttribute!` into `schema.graphql`, then "
+        "run `infrahubctl graphql export-schema`.",
+        id="writing-into-the-file",
+    ),
+]
+
+
+@pytest.mark.parametrize("text", SCHEMA_REJECTED)
+def test_graphql_schema_regenerated_rejects(text):
+    ok, _ = check_graphql_schema_regenerated(text)
+    assert not ok
+
+
+def test_the_export_command_is_matched_in_full():
+    """`infrahubctl schema export` writes a different artifact entirely."""
+    ok, msg = check_graphql_schema_regenerated(
+        "Run `infrahubctl schema export --branch add-serial ./out`."
+    )
+    assert not ok, msg
 
 
 # --- one tree, two consumers ---------------------------------------------
