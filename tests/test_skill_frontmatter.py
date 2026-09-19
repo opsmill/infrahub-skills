@@ -35,14 +35,25 @@ PIPELINE_SKILLS = [
     "implementing-skill-changes",
 ]
 
-# A description opening on one of these announces the skill as build-only. The
-# guideline says a skill that creates an artifact also changes one, so this
-# covers every verb that produces something somebody later edits, not only the
-# four that happened to appear in the managing-* family.
-CREATION_OPENERS = re.compile(
-    r"\s*(creates?|builds?|generates?|manages?|converts?|produces?|writes?|defines?|authors?)\b",
-    re.I,
-)
+# Skills that leave behind nothing anyone later edits: an answer, a report, a
+# bundle, a GitHub issue. The modification rule has nothing to bite on, so they
+# sit outside its scope.
+#
+# This is a scope declaration, not an exemption. A skill that does produce an
+# editable artifact never belongs here, whatever shape its description takes;
+# it gets fixed instead. Matching on opening verbs was the earlier approach and
+# failed the other way: a create-shaped description opening on an unlisted verb
+# skipped the assertion silently, so the gap looked like compliance.
+NOT_ARTIFACT_PRODUCING = {
+    "infrahub-analyzing-data": "answers questions against a live instance, writes nothing",
+    "infrahub-analyzing-diagnostics": "reads a collected bundle, produces findings",
+    "infrahub-auditing-repo": "produces a compliance report, not a repository artifact",
+    "infrahub-collecting-diagnostics": "produces a hand-off bundle nobody edits",
+    "infrahub-common": "shared reference, never triggered directly",
+    "infrahub-reporting-issues": "files a GitHub issue",
+    "infrahub-reporting-skill-gaps": "drafts a GitHub issue, hands it to reporting-issues",
+    "infrahub-teaching-concepts": "teaches through existing material",
+}
 
 # Rendered length ceiling for a description. Nothing in the installed skill
 # ecosystem exceeds this, and the field is the skill's whole triggering surface,
@@ -138,9 +149,16 @@ def _trigger_scope(description: str) -> str:
 
 
 def names_modification_intent(description: str) -> bool:
-    """True if the `TRIGGER when:` clauses name work on an artifact that exists."""
+    """True if the `TRIGGER when:` clauses name work on an artifact that exists.
+
+    The lookbehind rejects a verb buried in a hyphenated compound. `\\b` alone
+    matches inside one, so "implementing idempotent create-or-update workflows"
+    satisfied a search for "update" while naming no day-two work at all. That
+    phrase is lifted from a skill body, so it is the likely shape rather than a
+    contrived one.
+    """
     scope = _trigger_scope(description)
-    return any(re.search(rf"\b{re.escape(verb)}", scope, re.I) for verb in MODIFICATION_VERBS)
+    return any(re.search(rf"(?<![-\w]){re.escape(verb)}", scope, re.I) for verb in MODIFICATION_VERBS)
 
 
 # compliant, compliant variant, violating, and two near misses.
@@ -190,6 +208,16 @@ INTENT_FIXTURES = [
         False,
         id="violating-lead-in-only",
     ),
+    pytest.param(
+        # "create-or-update" carries "update" inside a hyphenated compound. A
+        # \b search matches it; the description names no day-two work.
+        "Creates design-driven generators. "
+        "TRIGGER when: building design-to-implementation workflows, "
+        "implementing idempotent create-or-update workflows. "
+        "DO NOT TRIGGER when: designing schemas.",
+        False,
+        id="violating-hyphenated-compound",
+    ),
 ]
 
 
@@ -221,8 +249,8 @@ def test_description_stays_within_the_length_cap(path: Path) -> None:
 
 
 @pytest.mark.parametrize("path", _shipped_skill_files(), ids=lambda p: p.parent.name)
-def test_creation_shaped_description_names_modification_triggers(path: Path) -> None:
-    """A skill that advertises creation also advertises changing what exists.
+def test_artifact_skill_description_names_modification_triggers(path: Path) -> None:
+    """A skill that produces an artifact also advertises changing what exists.
 
     A create-shaped description does not merely omit modification work, it reads
     as a positive signal that the skill does not apply to it. Issue #78 recorded
@@ -230,21 +258,34 @@ def test_creation_shaped_description_names_modification_triggers(path: Path) -> 
     the skill, and shipped a change that deleted a live interface the generator
     did not own. The skill's front page warned about that exact failure twice.
 
+    Every shipped skill is held to this unless it is named in
+    NOT_ARTIFACT_PRODUCING, so a new skill is covered the day it lands rather
+    than whenever its opening verb happens to be recognised.
+
     Descriptions have no eval coverage, because eval prompts say `Read the skill
     at ...` and so bypass triggering entirely. This is the only surface that can
     fail on one.
     """
     name = path.parent.name
     description = " ".join((_frontmatter(path).get("description") or "").split())
-    if not CREATION_OPENERS.match(description):
-        pytest.skip(f"{name} does not open on a creation verb")
+    if name in NOT_ARTIFACT_PRODUCING:
+        pytest.skip(f"{name} produces no editable artifact: {NOT_ARTIFACT_PRODUCING[name]}")
     assert names_modification_intent(description), (
         f"{name}: the description opens on a creation verb but its `TRIGGER when:` "
         f"clauses name only building. Add modifying / debugging / extending an "
         f"existing artifact to TRIGGER itself, not just to the lead-in sentence, "
-        f"so the skill fires on day-two work. TRIGGER clauses were: "
-        f"{_trigger_scope(description)!r}"
+        f"so the skill fires on day-two work. If the skill genuinely leaves no "
+        f"artifact behind, add it to NOT_ARTIFACT_PRODUCING with the reason. "
+        f"TRIGGER clauses were: {_trigger_scope(description)!r}"
     )
+
+
+def test_not_artifact_producing_entries_still_exist() -> None:
+    """A scope declaration naming a skill that is gone is a stale claim."""
+    for name in NOT_ARTIFACT_PRODUCING:
+        assert (ROOT / "skills" / name / "SKILL.md").exists(), (
+            f"{name} is listed in NOT_ARTIFACT_PRODUCING but no longer exists; drop the entry"
+        )
 
 
 @pytest.mark.parametrize("name", PIPELINE_SKILLS)
