@@ -577,3 +577,72 @@ def test_body_ready_accepts_storage_id_isnull_false():
     )
     ok, msg = _body_ready(src)
     assert ok, msg
+
+
+# -- second review round on PR #154 ---------------------------------------
+#
+# One over-correction and two laundering shapes, all found by running the
+# check against candidate answers rather than reading it.
+
+
+def test_body_ready_accepts_predicate_hoisted_into_variable():
+    """Hoisting the predicate into a name is ordinary style, not a violation.
+
+    The readiness test lives in the assignment, not in the `if`, so the
+    check has to follow the name one hop to find it.
+    """
+    src = _helper(
+        UNFILTERED,
+        "all_ready and len(artifacts) >= expected_count",
+        "        all_ready = all(a.status.value == 'Ready' for a in artifacts)\n",
+    )
+    ok, msg = _body_ready(src)
+    assert ok, msg
+
+
+def test_body_ready_accepts_walrus_hoist():
+    src = _helper(
+        UNFILTERED,
+        "(ready := [a for a in artifacts if a.storage_id.value]) "
+        "and len(ready) >= expected_count",
+    )
+    ok, msg = _body_ready(src)
+    assert ok, msg
+
+
+def test_body_ready_accepts_lambda_called_by_name():
+    src = "is_ready = lambda a: a.storage_id.value\n" + _helper(
+        UNFILTERED, "len([a for a in artifacts if is_ready(a)]) >= expected_count"
+    )
+    ok, msg = _body_ready(src)
+    assert ok, msg
+
+
+def test_body_ready_rejects_uncalled_lambda():
+    """A lambda that is defined and never called gates nothing."""
+    src = "is_ready = lambda a: a.status.value == 'Ready'\n" + _helper(
+        UNFILTERED, "len(artifacts) >= expected_count"
+    )
+    ok, _ = _body_ready(src)
+    assert not ok
+
+
+def test_body_ready_rejects_storage_id_value_none():
+    """`storage_id__value=None` is the same inversion as isnull=True."""
+    ok, _ = _body_ready(
+        _helper(
+            UNFILTERED + ", storage_id__value=None",
+            "len(artifacts) >= expected_count",
+        )
+    )
+    assert not ok
+
+
+def test_body_ready_rejects_empty_storage_id_values():
+    ok, _ = _body_ready(
+        _helper(
+            UNFILTERED + ", storage_id__values=[]",
+            "len(artifacts) >= expected_count",
+        )
+    )
+    assert not ok
