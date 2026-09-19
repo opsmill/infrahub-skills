@@ -31,23 +31,43 @@ rule as covered forever.
    registered in `CHECKS`, parsing the answer rather
    than substring-matching it (see `graders.md`).
 4. A task block in `eval.yaml` whose prompt naturally
-   exercises the rule, verified to **fail** with the
-   instruction's `Read the skill at ...` line commented
-   out.
+   exercises the rule, run with the instruction's
+   `Read the skill at ...` line **deleted**, not
+   commented out, since `instruction:` is a block
+   scalar and a `#` leaves the pointer in the prompt.
+   It scores below 1.0, or you record the 1.0 against
+   one of the three readings in
+   `dev/guides/running-evals.md`. A tick with neither
+   is not a result.
+
+   Carve-out, for the third reading only: where the
+   rule corrects drift against an upstream surface,
+   the model answers the same either way and no
+   prompt changes that. Replace the eval task with a
+   pytest under `tests/` asserting our reference
+   against that surface in both directions, and say
+   in the PR which reading you are claiming.
 5. A task grader script at
    `graders/<skill>/check_<task>.py`, run against four
-   fixtures: compliant, compliant phrased differently,
+   fixtures: compliant, compliant refactored the way
+   the check's traversal is vulnerable to,
    violating, and a violating near-miss that satisfies
    the check's keyword.
-6. Old claims the rule contradicts swept from `skills/`,
-   `graders/`, and `eval.yaml`:
+6. Old claims the rule contradicts swept from every
+   surface that states one, the contributor skills
+   included:
 
    ```bash
    grep -rn "<old claim, command, or field>" \
-     skills/ graders/ eval.yaml dev/
+     skills/ graders/ eval.yaml dev/ .claude/skills/
    ```
 
-   Skip `evaluations/` — step 7 regenerates it.
+   Inside `eval.yaml`, sweep `expected_output` as well
+   as `expectations`: it states the answer as prose,
+   so a sweep aimed at the assertion list walks past
+   it. Skip `evaluations/`, which step 7 regenerates.
+   That regeneration is why a stale string left in
+   `eval.yaml` gets copied there rather than caught.
 7. `python scripts/sync-evals.py`, with the regenerated
    `evaluations/*.json` committed alongside `eval.yaml`.
    CI fails when the two diverge.
@@ -76,6 +96,13 @@ a grader in three tasks, so a *correct* answer scored
 below the CI gate. Whoever fixes the defect sees CI go
 red and reverts. If a check asserts something you have
 not run, it is a ratchet, not a test.
+
+The mirror case is worse, because the suite stays
+green. A test can pin a *permissive* check as
+intended: fold two spellings together, assert they are
+equivalent, and the check can no longer fail on the
+distinction the rule exists to draw. Say which
+direction a pinning test protects before writing it.
 
 ## New category prefixes
 

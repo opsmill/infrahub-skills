@@ -223,22 +223,43 @@ reaching the grader.
 
 **Prove the task discriminates.** Every task's
 `instruction` opens with a `Read the skill at
-.agents/skills/<skill>/SKILL.md` line, and that line
-is the only thing that loads the skill. To run the
-task without it, comment the line out and run that
-task alone:
+.agents/skills/<skill>/SKILL.md` line. Delete that
+line for the run and restore it afterwards. Do not
+comment it out: `instruction:` is a literal block
+scalar, so a `#` is body text and the model still
+receives the pointer.
+
+Deleting it removes the pointer, not the skill.
+skillgrade copies the working tree into the sandbox,
+so the files stay findable and the model may read
+them anyway. Run the task without the line:
 
 ```bash
 skillgrade --eval=<task-name> --trials=1
-# then restore the line
+# then put the line back
 ```
 
 Leave the rest of the instruction untouched, since
-the task body is what you are testing. If the grader
-still scores 1.0, the task measures the model rather
-than the skill; that is a broken task, not a passing
-one. Make the prompt harder, or grade something only
-the skill's rules produce.
+the task body is what you are testing. A score below
+1.0 proves the task discriminates. A 1.0 does not
+prove the opposite. It has three readings:
+
+- **The model read the skill anyway.** The tell is an
+  answer quoting the rule near-verbatim. The proof is
+  inconclusive, not failed.
+- **The task measures the model.** The answer is right
+  and never reaches for the rule. Harden the prompt, or
+  grade something only the rule produces.
+- **The defect is not model behaviour.** Where the rule
+  corrects drift between our reference and an upstream
+  surface, the model answers from training knowledge
+  either way. No prompt fixes that: the test surface is
+  a pytest under `tests/` asserting our reference
+  against that surface both ways, and step 4 of
+  `rule-equals-test.md` carves the eval task out.
+
+When it stays inconclusive, the usable evidence is the
+before/after score on the same prompt and grader.
 
 ## Iteration Loop
 
