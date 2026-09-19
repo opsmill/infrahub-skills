@@ -50,7 +50,7 @@ LEAVES: set[str] = {
 # A leaf command takes its target as a positional argument, so the token
 # after it is a user-chosen name we cannot validate. What we can catch is a
 # generic verb sitting there, which is nearly always an invented subcommand:
-# `infrahubctl check run <name>` reads fine and silently looks for a check  # cli-check: ignore
+# `infrahubctl check run <name>` reads fine and silently looks for a check  # cli-check: ignore infrahubctl check run
 # literally named "run".
 SUSPICIOUS_VERBS: set[str] = {
     "run", "list", "get", "create", "delete", "load", "dump",
@@ -85,7 +85,7 @@ TOKEN = r"[a-z][a-z0-9_-]*"
 INVOCATION = re.compile(rf"infrahubctl[ \t]+({TOKEN})(?:[ \t]+({TOKEN}))?")
 
 # Bare `infrahubctl`-less `group sub` inside a code span, for prose that
-# drops the binary name: "`infrahubctl schema load`, then `schema validate`".  # cli-check: ignore
+# drops the binary name: "`infrahubctl schema load`, then `schema validate`".  # cli-check: ignore schema validate
 #
 # The span has to open with `group sub`, and — with no `infrahubctl` here to
 # say the span is a command at all — the second token has to read as one.
@@ -108,9 +108,33 @@ _SHELL_COMMENT = re.compile(r"^\s*#.*$", re.MULTILINE)
 
 # The one legitimate reason to print a command that does not exist is to
 # tell the reader it does not exist. Put the marker on the same line, in
-# whatever comment syntax the file uses: `<!-- cli-check: ignore -->` in
-# markdown, `# cli-check: ignore` in Python.
+# whatever comment syntax the file uses — an HTML comment in markdown, a
+# `#` comment in Python — followed by the exact invocation it silences.
+# The marker silences only that named form. A blanket `IGNORE_MARKER in
+# line` check used to silence the whole line instead, so appending a
+# second, different bad invocation to an already-marked line passed
+# unnoticed.
 IGNORE_MARKER = "cli-check: ignore"
+
+# Everything after the marker, up to a trailing HTML-comment closer, is the
+# invocation it names. A marker with nothing after it names nothing and so
+# silences nothing, rather than falling back to silencing the whole line.
+_IGNORE = re.compile(re.escape(IGNORE_MARKER) + r"[ \t]+(\S.*)$")
+
+
+def ignored_invocation(line: str) -> str | None:
+    """The invocation a `cli-check: ignore <invocation>` marker on this line names.
+
+    None when the line carries no marker, or a bare one with nothing after
+    it to name.
+    """
+    match = _IGNORE.search(line)
+    if not match:
+        return None
+    text = match.group(1).rstrip()
+    if text.endswith("-->"):
+        text = text[: -len("-->")].rstrip()
+    return text or None
 
 
 def code_regions(text: str) -> list[str]:
@@ -123,7 +147,7 @@ def code_regions(text: str) -> list[str]:
     Regions are returned as a list rather than one joined string because
     joining welds unrelated spans into commands that were never written:
     "The `infrahubctl` CLI ... name the transform `spine_config`" becomes
-    the invocation `infrahubctl spine_config`. Callers scan each region.  # cli-check: ignore
+    the invocation `infrahubctl spine_config`. Callers scan each region.  # cli-check: ignore infrahubctl spine_config
 
     Shell comment lines inside a fence are stripped for the same reason —
     they are prose, and this repository's own rules annotate fences that

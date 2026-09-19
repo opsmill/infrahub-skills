@@ -1,19 +1,41 @@
 ---
-title: Installation & Setup
-sidebar_position: 2
+title: Installation and setup
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Infrahub Skills can be installed into any AI tool that supports skills or custom context files. Installation takes one command for most setups — install into a specific Infrahub repository to work in that project, or install globally to use the skills across all your projects.
+Infrahub Skills can be installed into any AI tool that supports skills or custom context files. Installation takes one command for most setups: install into a specific Infrahub repository to work in that project, or install globally to use the skills across all your projects.
 
 ## Prerequisites
 
-- **AI coding assistant** — any tool that supports the Agent Skills format or reads custom context files: Claude Code, GitHub Copilot, Cursor, Windsurf, Amp, Cline, Codex, and others
-- **Infrahub instance** — version 1.7 or later (earlier versions may work but are not tested). See the [Infrahub installation docs](https://docs.infrahub.app/) for setup instructions
-- **infrahubctl** — required for loading generated schemas, objects, and running generators. See the [infrahubctl docs](https://docs.infrahub.app/infrahubctl)
-- **Infrahub MCP server** (optional) — required only for the [Data Analyzer](./skills-reference/analyzing-data.mdx) skill, beneficial but not required for other skills. See the [MCP server docs](https://docs.infrahub.app/mcp)
+- **AI coding assistant**: any tool that supports the Agent Skills format or reads custom context files: Claude Code, GitHub Copilot, Cursor, Windsurf, Amp, Cline, Codex, and others
+- **Infrahub instance**: version 1.7 or later (earlier versions may work but are not tested). See the [Infrahub installation docs](https://docs.infrahub.app/) for setup instructions
+- **infrahubctl**: required for loading generated schemas, objects, and running generators. See the [infrahubctl docs](https://docs.infrahub.app/infrahubctl)
+- **Infrahub MCP server** (optional): required only for the [Data Analyzer](./skills-reference/analyzing-data.mdx) skill, beneficial but not required for other skills. See the [MCP server docs](https://docs.infrahub.app/mcp)
+
+## Supported AI tools
+
+| AI Tool | Installation Method | Auto-detection | Direct Skill Invocation |
+| --------- | ------------------- | ---------------- | ------------------------ |
+| Claude Code (plugin) | `/plugin install infrahub@opsmill` | Yes (session hook) | Yes (`/infrahub:managing-schemas`, etc.) |
+| Claude Code (npx) | `npx skills add` | No | Yes |
+| GitHub Copilot | `npx skills add` | No | No, passive only |
+| Cursor | `npx skills add` | No | No, passive only |
+| Windsurf | `npx skills add` | No | No, passive only |
+| Amp | `npx skills add` | No | No, passive only |
+| Cline | `npx skills add` | No | No, passive only |
+| Codex | `npx skills add` | No | No, passive only |
+
+**Auto-detection** means the tool recognizes an Infrahub project and
+activates skills without you asking. It is a plugin feature, via the
+session start hook.
+
+**Direct skill invocation** means calling a skill by name, for example
+`/infrahub:managing-schemas`. Available where the agent supports
+plugins. Every other tool is passive: it reads skill content as context
+when the request is relevant. For those, describe what you want and the
+AI applies the right skill.
 
 ## Installation
 
@@ -52,7 +74,7 @@ rm -rf infrahub-skills
 ```
 
 :::warning
-Always include `skills/infrahub-common/` — it contains shared references that all skills depend on. Omitting it will cause skills to produce incomplete or incorrect output.
+Always include `skills/infrahub-common/`. It contains shared references that all skills depend on. Omitting it will cause skills to produce incomplete or incorrect output.
 :::
 
 </TabItem>
@@ -116,15 +138,15 @@ Without MCP, the AI can still query Infrahub data by constructing GraphQL API ca
 
 ## Verifying the installation
 
-1. **Check the files are present** — confirm that `skills/*/SKILL.md` files exist in your project directory (or globally, depending on your install method).
+1. **Check the files are present**: confirm that `skills/*/SKILL.md` files exist in your project directory (or globally, depending on your install method).
 
-2. **Test skill activation** — open the project in your AI tool and ask:
+2. **Test skill activation**: open the project in your AI tool and ask:
 
    > What Infrahub skills do you have available?
 
    The AI should list the installed skills.
 
-3. **Test skill output** — ask the AI to create a simple schema:
+3. **Test skill output**: ask the AI to create a small schema:
 
    > Create a Device node with a name and status attribute.
 

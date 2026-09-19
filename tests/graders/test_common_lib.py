@@ -142,7 +142,7 @@ def test_ordinary_noun_phrases_do_not_break_the_gate(text):
 def test_bare_group_with_a_command_word_is_still_caught():
     """The reason the bare form is scanned at all must survive the fix."""
     assert invalid_invocations(
-        "Run `infrahubctl schema load`, then `schema validate`."  # cli-check: ignore
+        "Run `infrahubctl schema load`, then `schema validate`."  # cli-check: ignore schema validate
     ) == ["schema validate"]
 
 
@@ -179,14 +179,23 @@ def test_cli_commands_exist_accepts(text):
 CLI_REJECTED = [
     pytest.param("", id="empty-output"),
     pytest.param("A plan with no commands in it at all.", id="names-no-command"),
-    pytest.param("```\ninfrahubctl check run my_check\n```", id="invented-run"),  # cli-check: ignore
-    pytest.param("Run `infrahubctl schema validate schemas/`.", id="invented-group-sub"),  # cli-check: ignore
-    pytest.param("Run `infrahubctl generator list`.", id="invented-list"),  # cli-check: ignore
+    pytest.param(
+        "```\ninfrahubctl check run my_check\n```",  # cli-check: ignore infrahubctl check run
+        id="invented-run",
+    ),
+    pytest.param(
+        "Run `infrahubctl schema validate schemas/`.",  # cli-check: ignore infrahubctl schema validate
+        id="invented-group-sub",
+    ),
+    pytest.param(
+        "Run `infrahubctl generator list`.",  # cli-check: ignore infrahubctl generator list
+        id="invented-list",
+    ),
     # The binary name may be dropped once prose has established it, so the
     # bare form still has to be caught when the second token reads as a
     # command word.
     pytest.param(
-        "Run `infrahubctl schema load`, then `schema validate`.",  # cli-check: ignore
+        "Run `infrahubctl schema load`, then `schema validate`.",  # cli-check: ignore schema validate
         id="bare-group-with-invented-sub",
     ),
 ]

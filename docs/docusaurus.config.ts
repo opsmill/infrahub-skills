@@ -16,11 +16,14 @@ const config: Config = {
   projectName: 'infrahub-skills',
 
   onBrokenLinks: 'throw',
+  // Matches opsmill/infrahub-docs so a broken anchor or markdown link fails
+  // here, not after it syncs downstream.
+  onBrokenAnchors: 'throw',
   onDuplicateRoutes: "throw",
   markdown: {
     mermaid: true,
     hooks: {
-      onBrokenMarkdownLinks: 'warn',
+      onBrokenMarkdownLinks: 'throw',
     },
   },
   themes: ['@docusaurus/theme-mermaid'],

@@ -1,17 +1,10 @@
 ---
 title: Data Analyzer
-sidebar_position: 7
 ---
 
-The Data Analyzer skill queries and analyzes data from a live Infrahub instance using the Infrahub MCP server. It answers operational questions that span multiple node types — correlating data, detecting drift, tracing service impact, auditing data quality — without requiring the user to write GraphQL queries manually.
+Skill: `infrahub-analyzing-data`
 
-## Requirements
-
-The Data Analyzer skill requires the **Infrahub MCP server** to be configured and connected to your AI tool. See the [MCP server docs](https://docs.infrahub.app/mcp) for setup instructions.
-
-:::tip
-Without MCP, the AI can still query Infrahub data by constructing GraphQL API calls directly. The interaction is more verbose and less intuitive, but functional.
-:::
+The Data Analyzer skill queries and analyzes data from a live Infrahub instance using the Infrahub MCP server. It answers operational questions that span multiple node types: correlating data, detecting drift, tracing service impact, auditing data quality, without requiring you to write GraphQL queries manually.
 
 ## When to use
 
@@ -21,6 +14,50 @@ Without MCP, the AI can still query Infrahub data by constructing GraphQL API ca
 - Auditing data quality (missing fields, stale records, naming violations)
 - Exploring schema structure and data before writing a generator or check
 - Producing one-time or on-demand reports
+
+## What it produces
+
+A findings report built from live queries, not a stored artifact:
+
+- A header naming the policy or question, the scope, and a checked/compliant/violations count with a compliance percentage
+- Per-violation detail: object name, ID, kind, what was violated, and a suggested fix, so you don't have to re-run the query to look the object up
+- A remediation hint matched to the violation type: an `mcp__infrahub__node_upsert` call, a rename, a generator run, or a suggestion to add an `InfrahubCheck` for a policy worth enforcing on every future change
+- For a run covering several policies, a summary table (checked/pass/fail/status per policy) before the per-violation detail
+
+## Example prompts
+
+- "Are all devices following the naming convention `<site>-<role>-<number>`?"
+- "Which devices are in the PAR01 maintenance window starting tonight?"
+- "Show me all BGP sessions missing a prefix-list"
+- "What services depend on devices in rack PAR01-A01?"
+
+## Key rules enforced
+
+- **Schema discovery before raw GraphQL**: kinds and filters are confirmed via `get_schema` (or the `infrahub://schema` resource) before reaching for `query_graphql`, so a typo in a kind name surfaces as an introspection miss rather than a failed query
+- **Typed reads for single-kind fetches**: `get_nodes`/`search_nodes` are preferred over raw GraphQL when the question only needs objects of one kind
+- **Writes are branch-isolated**: `node_upsert`, `node_delete`, and `mutate_graphql` land on an auto-created `mcp/session-*` branch, never the default branch, until `propose_changes` opens a Proposed Change for a human to merge
+- **All objects of a kind by default**: compliance queries don't filter unless the check is intentionally scoped, since a filter typo can silently shrink the audit population
+- **Explicit join keys for correlation**: cross-query correlation matches on the same key (`id` or `human_friendly_id`) on both sides, because a mismatched key returns a silent "no violations" rather than an error
+- **Reports lead with the count**: policy, scope, and the checked/compliant/violation totals come before per-violation detail, with a remediation hint attached to each
+
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --------- | --------------------------- |
+| Reaching for raw GraphQL without checking the schema first | Confirms kind and filter names via `get_schema`/`infrahub://schema` before querying |
+| Treating the `edges`/`node` response as a flat list | Navigates `response.<Kind>.edges[].node` explicitly, so a dropped wrapper doesn't read as "no data" |
+| Adding filters to a compliance query "just in case" | Queries all objects of a kind by default, and only scopes intentionally |
+| Joining two queries on mismatched keys | Uses the same explicit key on both sides, so a broken join fails loudly instead of reporting false compliance |
+| Writing straight to the default branch | Lands writes on an auto-created session branch; `propose_changes` stages them for review |
+| Burying the compliance percentage in a violation list | Leads the report with policy and counts, then drills into per-violation detail |
+
+## Requirements
+
+The Data Analyzer skill requires the **Infrahub MCP server** to be configured and connected to your AI tool. See the [MCP server docs](https://docs.infrahub.app/mcp) for setup instructions.
+
+:::tip
+Without MCP, the AI can still query Infrahub data by constructing GraphQL API calls directly. The interaction is more verbose and less intuitive, but functional.
+:::
 
 ## Types of analysis
 
@@ -36,12 +73,9 @@ Without MCP, the AI can still query Infrahub data by constructing GraphQL API ca
 
 ## How it works
 
-The skill uses MCP tools (`infrahub_query`, `infrahub_list_schema`, `infrahub_get`) to fetch data from the running instance. For multi-step analysis, queries run sequentially or in combination — data is joined in the AI's context, not in the database. The skill reports findings with counts, lists of affected objects, and suggested next steps.
+The skill uses MCP tools (`infrahub_query`, `infrahub_list_schema`, `infrahub_get`) to fetch data from the running instance. For multi-step analysis, queries run sequentially or in combination: data is joined in the AI's context, not in the database. The skill reports findings with counts, lists of affected objects, and suggested next steps.
 
-## Data Analyzer vs. Check Manager vs. Transform Manager
+## Not sure this is the right skill?
 
-| Use Data Analyzer when... | Use Check Manager when... | Use Transform Manager when... |
-| ------------------- | ------------------------- | ------------------------------ |
-| Answering a one-time question | Enforcing a rule in the pipeline | Producing a repeatable scheduled report |
-| Interactive, exploratory analysis | Blocking changes that violate policy | Generating artifacts (configs, exports) |
-| No pipeline integration needed | Automated enforcement required | Output needs to be stored as a versioned artifact |
+See [Which skill do I use?](../choosing-a-skill.mdx) for how the Data
+Analyzer differs from the Check Manager and the Transform Manager.

@@ -1,7 +1,8 @@
 ---
 title: Issue Reporter
-sidebar_position: 11
 ---
+
+Skill: `infrahub-reporting-issues`
 
 The Issue Reporter files a bug report or feature request against the correct repository in the Infrahub ecosystem. There are 11 candidate repos and most people do not know which one owns their problem, so the skill reads your working directory for cues, proposes a target, searches for duplicates, and drafts an issue that matches that repo's intake form. It never auto-submits: it stops at a review gate and submits only after you approve both the content and the method.
 
@@ -10,7 +11,7 @@ The Issue Reporter files a bug report or feature request against the correct rep
 - You think you have found a bug in Infrahub or one of its components
 - You want to request a feature and do not know where it belongs
 - You are not sure which repo owns the problem you are seeing
-- You want an issue drafted properly before it goes on a public tracker
+- You want an issue reviewed before it goes on a public tracker
 
 Do not use it while you are still debugging locally with no intention of filing. Filing is what separates this skill from ordinary troubleshooting. For friction with an Infrahub *skill's* own guidance, use the [Skill Gap Reporter](./reporting-skill-gaps.mdx) instead, which drafts the report and hands it here.
 
@@ -31,6 +32,27 @@ Do not use it while you are still debugging locally with no intention of filing.
 - "Where should I file this?"
 - "This isn't working, I want to open a ticket"
 
+## Key rules enforced
+
+- **Never submit without approval**: the review gate shows you the target repo, the final title, the full body, and whether this is a new issue or a comment, before anything is posted
+- **Default to main when unsure**: ambiguous cues, equally matching repos, or your own uncertainty all route to `opsmill/infrahub`
+- **Search before filing**: open and closed issues both, with a second pass using synonyms when the first returns nothing
+- **Comment instead of duplicating**: when a match exists, the skill either complements the issue with genuinely new information or records a short "another hit" so maintainers can gauge frequency
+- **Minimal environment info**: versions, OS, and architecture only; no file paths, no project structure, no verbatim logs, no env dumps, no `docker compose ps` output
+- **Unknown beats guessed**: a version that cannot be determined cleanly is marked `unknown` rather than inferred by running broader discovery commands
+- **Support questions are not issues**: "how do I do X?" is routed to Discord or GitHub Discussions
+
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --------- | --------------------------- |
+| Filing in a sub-repo when the symptom is ambiguous | Files in `opsmill/infrahub` and lets maintainers re-route |
+| Opening a duplicate | Adds a comment to the existing issue with the new information |
+| Pasting full logs or `docker compose` output | Collects versions, OS, and architecture, nothing more |
+| Filing a support question as a bug | Points you to Discord or Discussions |
+| Guessing a version number | Marks it `unknown` |
+| Submitting before you have read it | Stops at the review gate until you explicitly approve |
+
 ## Where issues get routed
 
 | Repo | Owns |
@@ -49,27 +71,6 @@ Do not use it while you are still debugging locally with no intention of filing.
 
 **When routing is ambiguous, it defaults to `opsmill/infrahub`.** The main repo can re-route an incoming issue to a sub-repo far more easily than a sub-repo can send it back, so erring toward the platform is the cheaper mistake.
 
-## Key rules enforced
-
-- **Never submit without approval** — the review gate shows you the target repo, the final title, the full body, and whether this is a new issue or a comment, before anything is posted
-- **Default to main when unsure** — ambiguous cues, equally matching repos, or your own uncertainty all route to `opsmill/infrahub`
-- **Search before filing** — open and closed issues both, with a second pass using synonyms when the first returns nothing
-- **Comment instead of duplicating** — when a match exists, the skill either complements the issue with genuinely new information or records a short "another hit" so maintainers can gauge frequency
-- **Minimal environment info** — versions, OS, and architecture only; no file paths, no project structure, no verbatim logs, no env dumps, no `docker compose ps` output
-- **Unknown beats guessed** — a version that cannot be determined cleanly is marked `unknown` rather than inferred by running broader discovery commands
-- **Support questions are not issues** — "how do I do X?" is routed to Discord or GitHub Discussions
-
-## Common mistakes it catches
-
-| Mistake | What the skill does instead |
-| --------- | --------------------------- |
-| Filing in a sub-repo when the symptom is ambiguous | Files in `opsmill/infrahub` and lets maintainers re-route |
-| Opening a duplicate | Adds a comment to the existing issue with the new information |
-| Pasting full logs or `docker compose` output | Collects versions, OS, and architecture, nothing more |
-| Filing a support question as a bug | Points you to Discord or Discussions |
-| Guessing a version number | Marks it `unknown` |
-| Submitting before you have read it | Stops at the review gate until you explicitly approve |
-
 ## Finding your versions
 
 For bugs, the skill collects the relevant version. These are the commands it uses:
@@ -87,7 +88,7 @@ For bugs, the skill collects the relevant version. These are the commands it use
 | VS Code extension | Extensions panel in VS Code |
 | Skills plugin | `version` field in `.claude-plugin/plugin.json` |
 
-## Submitting
+## Submitting it
 
 Once you approve the content, the skill asks how you want to submit. All three methods work for a new issue or a comment on an existing one:
 
@@ -102,7 +103,7 @@ gh issue comment <number> --repo <owner/repo> --body "..."
 A GitHub MCP server is used instead when you have one, and manual mode prints copy-paste-ready markdown plus the right URL.
 
 :::warning
-Issue bodies are public and cannot be retracted. Error messages carry file paths, hostnames, and node kinds that identify your infrastructure, so the skill paraphrases rather than pasting. Read the draft at the review gate with that in mind.
+Issue bodies are public and cannot be retracted. Error messages include file paths, hostnames, and node kinds that identify your infrastructure, so the skill paraphrases rather than pasting. Read the draft at the review gate with that in mind.
 :::
 
 :::tip

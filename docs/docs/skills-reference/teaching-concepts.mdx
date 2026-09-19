@@ -1,9 +1,10 @@
 ---
 title: Concept Tutor
-sidebar_position: 13
 ---
 
-The Concept Tutor teaches Infrahub concepts starting from wherever the learner is, using their own repo files and live instance as lesson material instead of generic examples. It probes what the learner already knows, explains each concept anchored to their own schema and data, sets a hands-on exercise verified solvable before it's shown, and records progress so a later session resumes instead of restarting.
+Skill: `infrahub-teaching-concepts`
+
+The Concept Tutor teaches Infrahub concepts starting from wherever the learner is, using their own repo files and live instance as lesson material instead of generic examples. It probes what the learner already knows, explains each concept using their own schema and data, sets a hands-on exercise verified solvable before it's shown, and records progress so a later session resumes instead of restarting.
 
 ## When to use
 
@@ -37,7 +38,7 @@ The curriculum is dependency-ordered and enters wherever the probe says the lear
 | 10 | Generators | Generator Manager |
 | 11 | Menus | Menu Manager |
 
-A concept outside this list isn't refused. It's taught as an off-map lesson, grounded in a docs page found through the same lookup path other skills use, and flagged to the learner as coming from that fallback rather than the curriculum.
+A concept outside this list isn't refused. It's taught as a lesson outside the curriculum, based on a docs page found through the same lookup path other skills use, and flagged to the learner as coming from that fallback rather than the curriculum.
 
 ## Example prompts
 
@@ -58,13 +59,21 @@ A concept outside this list isn't refused. It's taught as an off-map lesson, gro
 - **Comparisons are sourced**: a NetBox or Nautobot comparison cites that tool's official docs or is explicitly marked unverified, never asserted from memory
 - **Graduation**: each concept closes by naming the sibling skill that does that work on real projects
 
-## Concept Tutor vs. Managing skills vs. Data Analyzer
+## Common mistakes it catches
 
-| Use Concept Tutor when... | Use a Managing skill when... | Use Data Analyzer when... |
-| -------------------------- | ------------------------------ | --------------------------- |
-| The learner wants to understand a concept | The learner wants the artifact built for them | The learner wants a live operational answer |
-| Progress and exercises matter | Correctness and load-readiness matter | Speed and accuracy on current data matter |
-| Output is a lesson and a verified exercise | Output is a schema, object, check, transform, generator, or menu file | Output is an answer, not a file |
+| Mistake | What the skill does instead |
+| --------- | --------------------------- |
+| Explaining before asking anything | Opens every lesson with 2-3 probe questions that place the learner first |
+| Pasting the full solution on the first "I'm stuck" | Climbs the hint ladder: a conceptual hint, then a concrete pointer, then the full solution |
+| Handing out an exercise with no verified solution | Builds and verifies the reference solution before the exercise is shown |
+| Explaining relationships with an invented `Person`/`Car` example when the learner has a real schema | Teaches through the learner's own schema, objects, and instance |
+| Writing to the default branch to demonstrate a concept | Asks for explicit consent first and scopes any write to a `learning-*` branch |
+| Making a NetBox/Nautobot comparison from memory with no citation | Cites that tool's official docs or marks the comparison explicitly unverified |
+
+## Not sure this is the right skill?
+
+See [Which skill do I use?](../choosing-a-skill.mdx) for how the Concept
+Tutor differs from the managing skills and the Data Analyzer.
 
 :::tip
 Instance access is read-only by default. The tutor only writes to your instance for lessons on branches or proposed changes, and only after asking first. See the safety rules above.

@@ -1,9 +1,10 @@
 ---
 title: Menu Manager
-sidebar_position: 6
 ---
 
-The Menu Manager produces YAML menu definition files that customize the Infrahub web UI sidebar. Menus can be flat or deeply nested, with group headers, icons, and ordering. The skill generates syntactically correct menu YAML and handles the nesting structure that is easy to get wrong by hand.
+Skill: `infrahub-managing-menus`
+
+The Menu Manager produces YAML menu definition files that customize the Infrahub web UI sidebar. Menus can be flat or deeply nested, with group headers, icons, and ordering. The skill generates syntactically correct menu YAML and handles the nesting structure that is easy to get wrong manually.
 
 ## When to use
 
@@ -19,20 +20,30 @@ The Menu Manager produces YAML menu definition files that customize the Infrahub
 
 ## Example prompts
 
-- "Create a menu with sections for Network Topology, IP Management, and Inventory — each with relevant schema nodes nested underneath"
+- "Create a menu with sections for Network Topology, IP Management, and Inventory, each with relevant schema nodes nested underneath"
 - "Build a flat menu that lists Device, Interface, Site, and Rack in that order"
 - "Add a nested sub-menu under Network Topology for BGP with entries for BGP Sessions and BGP Peers"
 
 ## Key rules enforced
 
-- **`spec.data` wrapping** — the top-level menu items must be in `spec.data`; a common mistake is writing `spec:` followed by a list directly
-- **`children.data` wrapping** — nested items must use `children.data:` not `children:` directly; this is the most common nesting mistake
-- **`kind` vs `path`** — each item uses either `kind:` (links to a schema node's list view) or `path:` (links to a custom URL), never both
-- **Group headers** — section headers with no link (no `kind` or `path`) are valid and used for visual grouping
-- **Icon format** — icons use the Material Design Icons format with `mdi:` prefix (e.g., `mdi:server`, `mdi:ip-network`)
-- **`order_weight`** — integer controlling item display order; lower numbers appear first
+- **`spec.data` wrapping**: the top-level menu items must be in `spec.data`; a common mistake is writing `spec:` followed by a list directly
+- **`children.data` wrapping**: nested items must use `children.data:` not `children:` directly; this is the most common nesting mistake
+- **`kind` vs `path`**: each item uses either `kind:` (links to a schema node's list view) or `path:` (links to a custom URL), never both
+- **Group headers**: section headers with no link (no `kind` or `path`) are valid and used for visual grouping
+- **Icon format**: icons use the Material Design Icons format with `mdi:` prefix (e.g., `mdi:server`, `mdi:ip-network`)
+- **`order_weight`**: integer controlling item display order; lower numbers appear first
 
-## Loading
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --------- | --------------------------- |
+| Registering the menu under `menu:` (singular) in `.infrahub.yml` | Uses `menus:` (plural), matching every other registration key; the singular form is rejected as `extra_forbidden` |
+| Nesting children directly under `children:` | Wraps nested items in `children.data`, the same shape every paginated Infrahub response uses |
+| Setting both `kind` and `path` on one item | Uses exactly one; both together fail the whole menu file to load, and the sidebar falls back to the auto-generated menu |
+| Leaving the menu unregistered in `.infrahub.yml` | Includes the registration comment in the output file so it isn't missed |
+| Deviating from the fixed envelope | Always emits `apiVersion`, `kind: Menu`, and `spec.data`; a deviation fails to load and falls back to the auto-generated menu |
+
+## Loading it
 
 Load a menu file into a running Infrahub instance:
 

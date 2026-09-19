@@ -1,0 +1,67 @@
+---
+title: Which skill do I use?
+---
+
+Fifteen skills is a lot to hold in your head. You do not have to. Find
+the row that matches what you are holding right now.
+
+## Start from what you have
+
+| You have | You want | Go to |
+| --- | --- | --- |
+| A data model in your head or on a whiteboard | Valid schema YAML | [Schema Manager](./skills-reference/managing-schemas.mdx) `infrahub-managing-schemas` |
+| A schema, and no data in it yet | Object YAML you can load | [Object Manager](./skills-reference/managing-objects.mdx) `infrahub-managing-objects` |
+| A CSV or TSV export from another system | Those rows as Infrahub objects | [Data Importer](./skills-reference/importing-data.mdx) `infrahub-importing-data` |
+| A NetBox device-type repository | Infrahub Object Templates | [NetBox Device Type Converter](./skills-reference/converting-netbox-device-types.mdx) `infrahub-converting-netbox-device-types` |
+| A design document and repeated build work | Objects generated from the design | [Generator Manager](./skills-reference/managing-generators.mdx) `infrahub-managing-generators` |
+| Infrahub data and a target format | Device configs, exports, or reports | [Transform Manager](./skills-reference/managing-transforms.mdx) `infrahub-managing-transforms` |
+| A rule people keep breaking | A check that blocks the proposed change | [Check Manager](./skills-reference/managing-checks.mdx) `infrahub-managing-checks` |
+| A crowded web UI sidebar | A grouped custom menu | [Menu Manager](./skills-reference/managing-menus.mdx) `infrahub-managing-menus` |
+| A running instance and a question | An answer, without writing GraphQL | [Data Analyzer](./skills-reference/analyzing-data.mdx) `infrahub-analyzing-data` |
+| A repository you inherited | A compliance report against best practices | [Repo Auditor](./skills-reference/auditing-repo.mdx) `infrahub-auditing-repo` |
+| An instance that is broken | A redacted bundle to hand to OpsMill | [Diagnostics Collector](./skills-reference/collecting-diagnostics.mdx) `infrahub-collecting-diagnostics` |
+| A collected bundle | A triage report naming the likely cause | [Diagnostics Analyzer](./skills-reference/analyzing-diagnostics.mdx) `infrahub-analyzing-diagnostics` |
+| A bug or a feature idea for Infrahub | A filed, routed, sanitized issue | [Issue Reporter](./skills-reference/reporting-issues.mdx) `infrahub-reporting-issues` |
+| A skill that kept getting it wrong | An issue proposing the rule change | [Skill Gap Reporter](./skills-reference/reporting-skill-gaps.mdx) `infrahub-reporting-skill-gaps` |
+| No Infrahub background yet | Understanding, taught against your own repo | [Concept Tutor](./skills-reference/teaching-concepts.mdx) `infrahub-teaching-concepts` |
+
+## Pairs that are easy to confuse
+
+### Data Analyzer, Check Manager, Transform Manager
+
+All three read Infrahub data. They differ in what happens to the answer.
+
+| Use Data Analyzer when... | Use Check Manager when... | Use Transform Manager when... |
+| --- | --- | --- |
+| Answering a one-time question | Enforcing a rule in the pipeline | Producing a repeatable scheduled report |
+| Interactive, exploratory analysis | Blocking changes that violate policy | Generating artifacts (configs, exports) |
+| No pipeline integration needed | Automated enforcement required | Output needs to be stored as a versioned artifact |
+
+### Diagnostics Collector, Diagnostics Analyzer
+
+Sequential, not alternatives. Collect first, then analyze.
+
+| Use the Diagnostics Collector when... | Use the Diagnostics Analyzer when... |
+| --- | --- |
+| Infrahub is misbehaving and no bundle exists yet | A bundle already exists, or you have its contents |
+| You need the right `infrahub-collect` command for your symptom | You need to know what the collected logs actually say |
+| Output is a support bundle on disk | Output is a findings report citing that bundle |
+| The next step is sharing it with OpsMill | The next step is an upgrade, a comment on an existing issue, or a new report |
+
+### Concept Tutor, the managing skills, Data Analyzer
+
+| Use Concept Tutor when... | Use a managing skill when... | Use Data Analyzer when... |
+| --- | --- | --- |
+| The learner wants to understand a concept | The learner wants the artifact built for them | The learner wants a live operational answer |
+| Progress and exercises matter | Correctness and load-readiness matter | Speed and accuracy on current data matter |
+| Output is a lesson and a verified exercise | Output is a schema, object, check, transform, generator, or menu file | Output is an answer, not a file |
+
+## You do not have to choose
+
+An agent that supports the Agent Skills format activates them on its
+own. Describe the task and the right skill fires. This page is for when
+you want to read ahead, or when two skills look like they overlap and
+you want to know which one owns the job.
+
+For a build that spans several skills, see
+[Spec-Driven Development](./spec-driven-development.mdx).
