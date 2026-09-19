@@ -26,21 +26,62 @@ SKILLS = ROOT / "skills"
 # The line each page carries, for example:  Skill: `infrahub-managing-schemas`
 _SKILL_LINE = re.compile(r"^Skill:\s*`(infrahub-[a-z0-9-]+)`\s*$", re.MULTILINE)
 
+# A skill opts out of needing a reference page by declaring itself not
+# user-invocable in its own frontmatter — `infrahub-common` is the one
+# example, a shared-references directory rather than something a reader
+# looks up directly. Deriving the exemption from the skill's own claim,
+# rather than naming it here, means a second skill in the same position
+# needs no change to this script.
+_USER_INVOCABLE_FALSE = re.compile(r"^user-invocable:\s*false\s*$", re.MULTILINE)
+
 
 def check_skill_names(docs_dir: Path, skills_dir: Path) -> list[tuple[str, str]]:
     """Return (page, claimed skill) for each page whose claim does not resolve.
 
     A page with no skill line is reported with an empty claim: the line is
     required, so a missing one is the same defect as a wrong one.
+
+    The claim has to match `infrahub-` plus the page's own filename, not
+    merely name *some* directory under skills/ — otherwise rewriting
+    managing-schemas.mdx to claim infrahub-managing-objects passes, because
+    that directory really exists, just not for this page.
     """
     bad: list[tuple[str, str]] = []
     for page in sorted(docs_dir.glob("*.mdx")):
         match = _SKILL_LINE.search(page.read_text(encoding="utf-8"))
         if match is None:
             bad.append((page.name, ""))
-        elif not (skills_dir / match.group(1)).is_dir():
-            bad.append((page.name, match.group(1)))
+            continue
+        claimed = match.group(1)
+        expected = f"infrahub-{page.stem}"
+        if claimed != expected or not (skills_dir / claimed).is_dir():
+            bad.append((page.name, claimed))
     return bad
+
+
+def check_skill_directories(docs_dir: Path, skills_dir: Path) -> list[str]:
+    """Return skill directory names with no skills-reference page.
+
+    `check_skill_names` only ever walks pages, so a skill added with no
+    page — `mkdir skills/infrahub-managing-widgets` and nothing else —
+    passed unnoticed. Walking skills/ too closes the other direction.
+    """
+    referenced: set[str] = set()
+    for page in docs_dir.glob("*.mdx"):
+        match = _SKILL_LINE.search(page.read_text(encoding="utf-8"))
+        if match is not None:
+            referenced.add(match.group(1))
+
+    missing: list[str] = []
+    for skill_dir in sorted(skills_dir.iterdir()):
+        if not skill_dir.is_dir() or skill_dir.name in referenced:
+            continue
+        skill_md = skill_dir / "SKILL.md"
+        frontmatter = skill_md.read_text(encoding="utf-8") if skill_md.is_file() else ""
+        if _USER_INVOCABLE_FALSE.search(frontmatter):
+            continue
+        missing.append(skill_dir.name)
+    return missing
 
 
 def main() -> int:
@@ -50,17 +91,37 @@ def main() -> int:
         return 1
 
     bad = check_skill_names(DOCS, SKILLS)
-    if not bad:
-        print(f"OK: all {pages} skills-reference pages name a skill that exists.")
+    missing = check_skill_directories(DOCS, SKILLS)
+    if not bad and not missing:
+        print(
+            f"OK: all {pages} skills-reference pages name a skill that exists, "
+            "and every user-invocable skill has one."
+        )
         return 0
 
-    print(f"FAIL: {len(bad)} skills-reference page(s) with a bad skill name.\n")
-    for page, claimed in bad:
-        if claimed:
-            print(f"  {page}: names `{claimed}`, which is not a directory under skills/")
-        else:
-            print(f"  {page}: carries no `Skill: \\`infrahub-...\\`` line")
-    print("\nAdd or correct the line so it matches the directory under skills/.")
+    if bad:
+        print(f"FAIL: {len(bad)} skills-reference page(s) with a bad skill name.\n")
+        for page, claimed in bad:
+            if claimed:
+                print(
+                    f"  {page}: names `{claimed}`, which is not "
+                    "`infrahub-` + this page's own filename, or not a directory under skills/"
+                )
+            else:
+                print(f"  {page}: carries no `Skill: \\`infrahub-...\\`` line")
+        print("\nAdd or correct the line so it matches the directory under skills/.")
+
+    if missing:
+        if bad:
+            print()
+        print(f"FAIL: {len(missing)} skill(s) under skills/ with no skills-reference page.\n")
+        for name in missing:
+            print(f"  {name}")
+        print(
+            "\nAdd docs/docs/skills-reference/<name>.mdx, or mark the skill "
+            "`user-invocable: false` if it is a shared reference like infrahub-common."
+        )
+
     return 1
 
 

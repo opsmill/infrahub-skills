@@ -38,7 +38,6 @@ cli_tree = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(cli_tree)
 
 SDK_VERSION = cli_tree.SDK_VERSION
-IGNORE_MARKER = cli_tree.IGNORE_MARKER
 
 # Every tree that can print or grade a command.
 # `dev/specs/` is deliberately absent: those are historical design records,
@@ -106,25 +105,61 @@ def _scannable(line: str, in_fence: bool) -> list[str]:
     return cli_tree.code_regions(line)
 
 
+def _fence_marker(line: str) -> int:
+    """The backtick-run length that opens or closes a fence on this line.
+
+    Zero when the line, once indentation is stripped, does not start with
+    three or more backticks.
+    """
+    stripped = line.lstrip()
+    run = len(stripped) - len(stripped.lstrip("`"))
+    return run if run >= 3 else 0
+
+
+def _bad_in_lines(lines: list[str], suffix: str) -> list[tuple[int, str, str]]:
+    """Bad invocations in one file's lines, as (lineno, shown form, line text).
+
+    A fence only closes on a run of backticks at least as long as the one
+    that opened it — the CommonMark rule. Toggling on any run of three or
+    more instead flips the tracked state on a nested fence's own marker
+    line, so a ```yaml block inside a four-backtick markdown block (how
+    `anatomy-of-a-skill.mdx` shows a rule's own fenced examples) reads as
+    prose rather than shell input from that point on.
+    """
+    bad: list[tuple[int, str, str]] = []
+    fence_len = 0
+    for lineno, line in enumerate(lines, 1):
+        if suffix in FENCED_SUFFIXES:
+            run = _fence_marker(line)
+            if fence_len:
+                # A shorter run does not close the fence, and per CommonMark
+                # is literal content of it — not a marker line to skip.
+                if run >= fence_len:
+                    fence_len = 0
+                    continue
+            elif run:
+                fence_len = run
+                continue
+        in_fence = fence_len > 0
+        ignored = cli_tree.ignored_invocation(line)
+        for region in _scannable(line, in_fence):
+            for shown in cli_tree.invalid_invocations_in_region(
+                region, spans_only=not in_fence
+            ):
+                if shown == ignored:
+                    continue
+                bad.append((lineno, shown, line.strip()))
+    return bad
+
+
 def scan() -> dict[str, list[tuple[str, int, str]]]:
     bad: dict[str, list[tuple[str, int, str]]] = defaultdict(list)
 
     for path in _files():
         rel = path.relative_to(ROOT).as_posix()
-        in_fence = False
-        for lineno, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), 1
-        ):
-            if path.suffix in FENCED_SUFFIXES and line.lstrip().startswith("```"):
-                in_fence = not in_fence
-                continue
-            if IGNORE_MARKER in line:
-                continue
-            for region in _scannable(line, in_fence):
-                for shown in cli_tree.invalid_invocations_in_region(
-                    region, spans_only=not in_fence
-                ):
-                    bad[shown].append((rel, lineno, line.strip()))
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for lineno, shown, text in _bad_in_lines(lines, path.suffix):
+            bad[shown].append((rel, lineno, text))
 
     return bad
 

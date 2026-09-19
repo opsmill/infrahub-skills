@@ -469,7 +469,7 @@ def test_dry_run_executes_query_accepts_a_kebab_case_name():
 def test_dry_run_executes_query_rejects_the_invented_run_subcommand():
     """The invented `run` subcommand: rewarding it undoes the rule."""
     ok, _ = _mod.CHECKS["dry-run-executes-query"](
-        md_text="Run `infrahubctl check run` before merging."  # cli-check: ignore
+        md_text="Run `infrahubctl check run` before merging."  # cli-check: ignore infrahubctl check run
     )
     assert not ok
 
