@@ -126,7 +126,7 @@ checks/transforms/generators) and a `file_path` to the
 | Field | Required | Description |
 | ----- | -------- | ----------- |
 | `name` | Yes | Unique identifier |
-| `file_path` | Yes | A `.gql` fragment file, or a directory of them |
+| `file_path` | Yes | A `.gql` fragment file, or a directory of them (not searched recursively) |
 
 Declares fragment files that queries can share, so one
 selection shape lives in one place. Requires Infrahub
@@ -164,16 +164,18 @@ Entry names here and `fragment` names inside the `.gql`
 files are separate namespaces, and both have to be
 unique.
 
-Once at least one entry is declared, a missing file, a
-spread naming a fragment no declared file defines, a name
-defined twice, and a cycle each fail the repository
-import and name the fragment. The exception is a query
-that spreads a fragment while this section is absent or
-empty: rendering is skipped entirely, the unresolved
-spread is stored as written, and it fails when the query
-runs. A local `infrahubctl generator`, `check`,
-`transform` or `render` re-renders each time, so these
-errors do show up on a dry run.
+Once at least one entry is declared **and** a query
+spreads a fragment, a missing file, a spread naming a
+fragment no declared file defines, a name defined twice,
+and a cycle each fail the repository import and name the
+fragment. Until both hold, rendering is skipped and the
+fragment files are never read, so a query spreading a
+fragment with nothing declared stores its unresolved
+spread as written and fails when the query runs, and
+declared-but-unspread files are not validated at all. A
+local `infrahubctl generator`, `check`, `transform` or
+`render` re-renders each time, so these errors do show up
+on a dry run.
 
 This is not an inline fragment (`... on SomeKind`), which
 narrows a selection to one type of a generic or union and

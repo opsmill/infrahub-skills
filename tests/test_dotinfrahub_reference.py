@@ -119,6 +119,21 @@ def test_no_section_the_sdk_does_not_define(reference_text: str) -> None:
     )
 
 
+def test_structure_block_declares_no_unknown_key(reference_text: str) -> None:
+    """The same direction, over the block readers copy from.
+
+    Asserting only over the `### \\`name\\`` headings leaves the Complete
+    Structure YAML unchecked, and that block is what the page presents as a
+    template. A stray key there is copied into a real `.infrahub.yml` and
+    rejected by `extra="forbid"` at import.
+    """
+    unknown = structure_keys(reference_text) - set(SECTIONS)
+    assert not unknown, (
+        f"the Complete Structure block of {REFERENCE.name} declares "
+        f"{sorted(unknown)}, which InfrahubRepositoryConfig does not define"
+    )
+
+
 # ---------------------------------------------------------------------------
 # The parsers, verified both ways against hand-written references.
 #
