@@ -3,7 +3,7 @@ title: Menu Manager
 sidebar_position: 6
 ---
 
-The Menu Manager produces YAML menu definition files that customize the Infrahub web UI sidebar. Menus can be flat or deeply nested, with group headers, icons, and ordering. The skill generates syntactically correct menu YAML and handles the nesting structure that is easy to get wrong by hand.
+The Menu Manager produces and restructures YAML menu definition files that customize the Infrahub web UI sidebar. Menus can be flat or deeply nested, with group headers, icons, and ordering. The skill generates syntactically correct menu YAML and handles the nesting structure that is easy to get wrong by hand.
 
 ## When to use
 
@@ -11,6 +11,7 @@ The Menu Manager produces YAML menu definition files that customize the Infrahub
 - Grouping schema nodes into logical sections (e.g., "IP Management", "Network Topology", "Inventory")
 - Adding nested sub-menus and section headers
 - Controlling the ordering of menu items
+- Reordering, renaming, or regrouping an existing menu, or working out why an item does not appear or sits in the wrong group
 
 ## What it produces
 
@@ -22,6 +23,7 @@ The Menu Manager produces YAML menu definition files that customize the Infrahub
 - "Create a menu with sections for Network Topology, IP Management, and Inventory — each with relevant schema nodes nested underneath"
 - "Build a flat menu that lists Device, Interface, Site, and Rack in that order"
 - "Add a nested sub-menu under Network Topology for BGP with entries for BGP Sessions and BGP Peers"
+- "Move BGP Sessions out of Network Topology into its own section, placed after IP Management"
 
 ## Key rules enforced
 

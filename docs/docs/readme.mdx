@@ -15,11 +15,11 @@ Describe your data model in plain language and the skills produce a valid Infrah
 
 ### Build generators, transforms, and checks
 
-Create Python generators that auto-create infrastructure objects from design definitions. Write Python or Jinja2 transforms that convert Infrahub data to device configs, reports, or other formats. Build validation checks that run in proposed change pipelines — with Infrahub-specific conventions handled automatically.
+Create Python generators that auto-create infrastructure objects from design definitions. Write Python or Jinja2 transforms that convert Infrahub data to device configs, reports, or other formats. Build validation checks that run in proposed change pipelines — with Infrahub-specific conventions handled automatically. The same skills modify and debug what already exists: changing what a check validates or a transform renders, and working out why the output is wrong.
 
 ### Populate and manage data
 
-Produce YAML data files for infrastructure objects — devices, locations, organizations, interfaces — with correct file structure, value mappings, and load order, including assigning profiles for shared defaults and creating objects from templates. Generate batches of objects from descriptions or seed data for new instances.
+Produce YAML data files for infrastructure objects — devices, locations, organizations, interfaces — with correct file structure, value mappings, and load order, including assigning profiles for shared defaults and creating objects from templates. Generate batches of objects from descriptions or seed data for new instances. Update attributes and relationships on objects already defined, and work out why a data file fails to load.
 
 ### Query and analyze a live instance
 
@@ -31,7 +31,7 @@ Run a comprehensive audit of an Infrahub repository against all best practices. 
 
 ### Customize the UI
 
-Design custom navigation menus for the Infrahub web interface — sidebar structure, section groupings, icons, and ordering — from a plain language description.
+Design custom navigation menus for the Infrahub web interface — sidebar structure, section groupings, icons, and ordering — from a plain language description. Restructure an existing menu, or work out why an item does not appear where it should.
 
 ## Three ways to work
 
@@ -51,12 +51,12 @@ For full lifecycle workflows. The AI generates files, loads them with `infrahubc
 
 | Skill | What it does |
 | ------- | ------------- |
-| [Schema Manager](./skills-reference/managing-schemas.mdx) | Creates and validates Infrahub schema YAML from natural language |
-| [Object Manager](./skills-reference/managing-objects.mdx) | Produces YAML data files for infrastructure objects |
-| [Check Manager](./skills-reference/managing-checks.mdx) | Builds Python validation checks for proposed change pipelines |
-| [Generator Manager](./skills-reference/managing-generators.mdx) | Creates design-driven generators that auto-create infrastructure objects |
-| [Transform Manager](./skills-reference/managing-transforms.mdx) | Builds Python or Jinja2 transforms for config generation and data export |
-| [Menu Manager](./skills-reference/managing-menus.mdx) | Designs custom navigation menus for the Infrahub web UI |
+| [Schema Manager](./skills-reference/managing-schemas.mdx) | Creates, validates, and modifies Infrahub schema YAML from natural language |
+| [Object Manager](./skills-reference/managing-objects.mdx) | Produces and updates YAML data files for infrastructure objects |
+| [Check Manager](./skills-reference/managing-checks.mdx) | Builds and debugs Python validation checks for proposed change pipelines |
+| [Generator Manager](./skills-reference/managing-generators.mdx) | Creates, modifies, and debugs design-driven generators that auto-create infrastructure objects |
+| [Transform Manager](./skills-reference/managing-transforms.mdx) | Builds and debugs Python or Jinja2 transforms for config generation and data export |
+| [Menu Manager](./skills-reference/managing-menus.mdx) | Designs and restructures custom navigation menus for the Infrahub web UI |
 | [Data Analyzer](./skills-reference/analyzing-data.mdx) | Queries and analyzes live Infrahub data via MCP |
 | [Repo Auditor](./skills-reference/auditing-repo.mdx) | Audits a repository against Infrahub best practices |
 | [Data Importer](./skills-reference/importing-data.mdx) | Converts CSV/TSV inputs into Infrahub object YAML and loads onto a fresh branch |
