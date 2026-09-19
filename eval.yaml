@@ -169,6 +169,62 @@ tasks:
       - name: schema-comment
         check: Includes the yaml-language-server $schema comment
 
+  - name: builtin-menu-sections
+    instruction: |
+      Read the skill at .agents/skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
+
+      Task: I run a service provider platform on Infrahub. My schema has IpamVlan,
+      IpamVrf, DcimDevice, DcimInterface, and OrganizationCustomer. In the sidebar I
+      want the VLAN and VRF entries to show up under IPAM, the device and interface
+      entries under a 'Network Devices' heading, and customers as their own top-level
+      entry.
+
+      Save ONLY the final YAML file to: output.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-menus/check_builtin_sections.py
+        weight: 1.0
+    expected_output: >-
+      A menu YAML whose IpamVlan and IpamVrf entries attach to Infrahub's
+      shipped IPAM section with parent: [Builtin, IPAM], rather than declaring
+      a new top-level IPAM section. The device entries sit under a custom
+      'Network Devices' group header using children.data, and customers
+      are a separate top-level item.
+    expectations:
+      - "File starts with apiVersion: infrahub.app/v1 and kind: Menu"
+      - >-
+        No menu item recreates a section Infrahub already ships (IPAM,
+        Other, Branches, Proposed Changes, Object Management, Actions,
+        Integrations, Activity, Admin)
+      - >-
+        The VLAN and VRF entries reach the shipped IPAM section, and no
+        other built-in section, either directly or via a parented group
+      - >-
+        Device and interface entries are nested under a custom group
+        header using the children.data wrapper
+      - Every menu item has both name and namespace properties
+    assertions:
+      - name: apiversion-and-kind
+        check: >-
+          File has apiVersion: infrahub.app/v1 and kind: Menu
+      - name: name-and-namespace
+        check: >-
+          Every menu item has both name and namespace properties
+      - name: children-data-wrapper
+        check: >-
+          Children use children.data wrapper, not children directly
+          as a list
+      - name: no-builtin-section-recreated
+        check: >-
+          No item reuses a built-in menu identifier, and no unparented
+          top-level item carries a built-in section's label
+      - name: parent-attaches-to-builtin
+        check: >-
+          IpamVlan and IpamVrf are reachable from an item whose parent
+          is the shipped IPAM section specifically, written either as
+          a two-element [Builtin, IPAM] list; another built-in section
+          does not count, and the concatenated string does not resolve
+
   # --- Schema Creator --- #
   - name: vlan-management
     instruction: |

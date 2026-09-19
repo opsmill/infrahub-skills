@@ -13,6 +13,11 @@ sidebar; it sits next to it. Schema nodes need
 `include_in_menu: false` to opt out of the
 auto-menu, or the user sees both entries.
 
+This covers the auto-menu only. Duplicates of the
+sections Infrahub itself ships have no schema side and
+are settled in the menu file with `parent:`, in
+[hierarchy-nesting.md](./hierarchy-nesting.md).
+
 ### Why it matters
 
 Infrahub builds the sidebar by merging custom menus

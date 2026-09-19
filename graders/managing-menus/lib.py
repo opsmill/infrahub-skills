@@ -28,6 +28,44 @@ except ImportError as exc:  # pragma: no cover
 
 
 # ---------------------------------------------------------------------------
+# Infrahub's built-in menu tree
+#
+# Source of truth is Infrahub itself: ``default_menu`` in
+# ``backend/infrahub/menu/menu.py``, verified at tag ``infrahub-v1.11.2``
+# (ee269fe2e64cf511d77c431fc6eb58a870d794d7). Every entry there is namespace
+# ``Builtin`` and ``protected=True``. ``menu/models.py`` computes an item's
+# identifier as ``f"{namespace}{name}"``, which is what these keys hold.
+#
+# That concatenated string is NOT the value ``parent:`` takes in a menu file,
+# despite ``docs/docs/reference/menu.mdx`` saying so — see
+# ``_parent_identifier`` below for the measurement. Do not re-derive the
+# spelling from that page.
+#
+# This mapping and the table in ``rules/hierarchy-nesting.md`` are both copies
+# of the upstream list, and ``test_rule_tables_match_the_constant`` pins them
+# to each other, so editing one fails until the other follows. Re-read menu.py
+# at the current tag, then change both.
+# ---------------------------------------------------------------------------
+
+BUILTIN_MENU_SECTIONS: dict[str, str] = {
+    "BuiltinOther": "Other",
+    "BuiltinIPAM": "IPAM",
+    "BuiltinProposedChanges": "Proposed Changes",
+    "BuiltinBranches": "Branches",
+    "BuiltinObjectManagement": "Object Management",
+    "BuiltinActions": "Actions",
+    "BuiltinIntegration": "Integrations",
+    "BuiltinActivity": "Activity",
+    "BuiltinAdmin": "Admin",
+}
+
+# The two sections carrying ``section=MenuSection.OBJECT`` in ``default_menu``
+# (menu.py:31 and :51). The other seven are ``MenuSection.INTERNAL``: platform
+# features, not somewhere user object nodes belong.
+OBJECT_AREA_SECTIONS: frozenset[str] = frozenset({"BuiltinOther", "BuiltinIPAM"})
+
+
+# ---------------------------------------------------------------------------
 # Low-level menu traversal helpers
 # ---------------------------------------------------------------------------
 
@@ -70,6 +108,79 @@ def _all_menu_items_recursive(doc: dict) -> list[dict]:
 
     _walk(_menu_items(doc))
     return items
+
+
+def _child_items(item: dict) -> list[dict]:
+    """Return an item's direct children, tolerating both children shapes."""
+    children = item.get("children", {})
+    if isinstance(children, dict):
+        return children.get("data", []) or []
+    if isinstance(children, list):
+        return children
+    return []
+
+
+def _subtree(item: dict) -> list[dict]:
+    """Return an item plus every descendant beneath it."""
+    collected = [item]
+    for child in _child_items(item):
+        collected.extend(_subtree(child))
+    return collected
+
+
+def _identifier(item: dict) -> str:
+    """Return the menu item's identifier: namespace concatenated with name."""
+    return f"{item.get('namespace') or ''}{item.get('name') or ''}"
+
+
+def _declares_parent(item: dict) -> bool:
+    """Whether the item declares a parent at all, resolvable or not.
+
+    An item that names a parent is not rendered at the top level, so it cannot
+    duplicate a top-level heading — and if the reference is malformed the item
+    does not load at all. Either way it is out of scope for the recreate check.
+    """
+    parent = item.get("parent")
+    return bool(parent) if isinstance(parent, (str, list)) else False
+
+
+def _parent_identifier(item: dict) -> str:
+    """Return the built-in section this item attaches to, or an empty string.
+
+    A menu file is loaded through the generic object spec, so ``parent`` is a
+    cardinality-one relationship reference resolved by human-friendly ID.
+    ``CoreMenu``'s HFID is two components, ``[namespace__value, name__value]``,
+    and only a two-element list survives that:
+
+        >>> from infrahub_sdk.spec.object import normalize_hfid_reference
+        >>> normalize_hfid_reference("BuiltinIPAM")        # 1 element
+        ['BuiltinIPAM']
+        >>> normalize_hfid_reference(["Builtin", "IPAM"])  # 2 elements
+        ['Builtin', 'IPAM']
+
+    Measured on infrahub-sdk 1.23.2. The backend compares those lengths before
+    it queries anything (``core/manager.py``: ``if
+    len(node_schema.human_friendly_id) != len(hfid): raise NodeNotFoundError``),
+    so the concatenated string cannot resolve whatever the data holds. Infrahub's
+    own ``docs/docs/reference/menu.mdx`` documents the string form; it is wrong
+    on this point, which is why anything but a two-element list returns "" here.
+    """
+    parent = item.get("parent")
+    if isinstance(parent, list) and len(parent) == 2 and all(isinstance(p, str) for p in parent):
+        return "".join(p.strip() for p in parent)
+    return ""
+
+
+def _normalized(value: Any) -> str:
+    """Lowercase and strip non-alphanumerics, for comparing display labels."""
+    if not isinstance(value, str):
+        return ""
+    return "".join(ch for ch in value.lower() if ch.isalnum())
+
+
+_BUILTIN_LABELS: dict[str, str] = {
+    _normalized(label): label for label in BUILTIN_MENU_SECTIONS.values()
+}
 
 
 # ---------------------------------------------------------------------------
@@ -368,6 +479,106 @@ def check_schema_comment(doc: dict, raw_text: str = "", **_: Any) -> tuple[bool,
     return False, "No $schema or yaml-language-server comment found"
 
 
+def check_no_builtin_section_recreated(doc: dict, **_: Any) -> tuple[bool, str]:
+    """No menu item duplicates a section Infrahub already ships."""
+    all_items = _all_menu_items_recursive(doc)
+    if not all_items:
+        return False, "No menu items found"
+
+    collisions: list[str] = []
+
+    for item in all_items:
+        identifier = _identifier(item)
+        if identifier in BUILTIN_MENU_SECTIONS:
+            collisions.append(
+                f"item '{identifier}' reuses the identifier of the built-in "
+                f"{BUILTIN_MENU_SECTIONS[identifier]} section"
+            )
+
+    # Object nodes belong in the object area. Attaching them to a platform
+    # section buries user data in Infrahub's own part of the sidebar.
+    for item in all_items:
+        target = _parent_identifier(item)
+        if target and target not in OBJECT_AREA_SECTIONS:
+            if any(child.get("kind") for child in _subtree(item)):
+                collisions.append(
+                    f"'{_identifier(item)}' attaches object content to "
+                    f"{target}, a platform section; only "
+                    f"{', '.join(sorted(OBJECT_AREA_SECTIONS))} hold object data"
+                )
+
+    # A top-level entry that declares a parent is not top level in the rendered
+    # sidebar — it attaches under that parent, so it cannot collide.
+    for item in _menu_items(doc):
+        if _declares_parent(item):
+            continue
+        # The sidebar renders `label`, so that is what can duplicate a shipped
+        # heading. `name` only matters when no label is there to override it:
+        # a "Device Actions" group whose name happens to be "Actions" shows no
+        # duplicate and must not be flagged.
+        field = "label" if item.get("label") else "name"
+        match = _BUILTIN_LABELS.get(_normalized(item.get(field)))
+        if match:
+            collisions.append(
+                f"top-level {field} '{item.get(field)}' recreates the "
+                f"built-in {match} section"
+            )
+
+    if collisions:
+        return False, "Duplicates Infrahub's built-in menu: " + "; ".join(
+            sorted(set(collisions))
+        )
+    return True, f"None of the {len(all_items)} items duplicate a built-in section"
+
+
+def check_parent_attaches_to_builtin(doc: dict, **_: Any) -> tuple[bool, str]:
+    """IPAM-domain items reach the shipped IPAM section via parent: BuiltinIPAM."""
+    target = "BuiltinIPAM"
+    expected_kinds = {"ipamvlan", "ipamvrf"}
+
+    all_items = _all_menu_items_recursive(doc)
+    if not all_items:
+        return False, "No menu items found"
+
+    attached: list[dict] = []
+    for item in all_items:
+        if _parent_identifier(item) == target:
+            attached.extend(_subtree(item))
+
+    if not attached:
+        # Distinguish the three ways this goes wrong, because they need
+        # different corrections.
+        elsewhere = sorted(
+            {p for p in (_parent_identifier(i) for i in all_items) if p in BUILTIN_MENU_SECTIONS}
+        )
+        unresolvable = sorted(
+            {
+                str(i.get("parent"))
+                for i in all_items
+                if _declares_parent(i) and not _parent_identifier(i)
+            }
+        )
+        if elsewhere:
+            detail = f"attaches to {', '.join(elsewhere)} instead"
+        elif unresolvable:
+            detail = (
+                f"parent must be a two-element HFID like [Builtin, IPAM]; "
+                f"found {', '.join(unresolvable)}"
+            )
+        else:
+            detail = "no item declares a parent"
+        return False, f"No item declares parent: [Builtin, IPAM] — {detail}"
+
+    reached = {_normalized(item.get("kind")) for item in attached}
+    missing = sorted(expected_kinds - reached)
+    if missing:
+        return False, (
+            f"Not reachable from {target}: {', '.join(missing)} "
+            f"(attached kinds: {', '.join(sorted(k for k in reached if k)) or 'none'})"
+        )
+    return True, f"{len(expected_kinds)} IPAM-domain kinds attach under {target}"
+
+
 # ---------------------------------------------------------------------------
 # Check registry
 # ---------------------------------------------------------------------------
@@ -391,6 +602,8 @@ CHECKS: dict[str, Any] = {
     "include-in-menu-false": check_include_in_menu_false,
     "infrahub-yml-registration": check_infrahub_yml_registration,
     "schema-comment": check_schema_comment,
+    "no-builtin-section-recreated": check_no_builtin_section_recreated,
+    "parent-attaches-to-builtin": check_parent_attaches_to_builtin,
 }
 
 

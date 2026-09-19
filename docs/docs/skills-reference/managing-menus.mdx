@@ -7,8 +7,9 @@ The Menu Manager produces YAML menu definition files that customize the Infrahub
 
 ## When to use
 
-- Replacing Infrahub's auto-generated sidebar navigation with a custom structure
-- Grouping schema nodes into logical sections (e.g., "IP Management", "Network Topology", "Inventory")
+- Adding a custom structure alongside Infrahub's auto-generated sidebar navigation
+- Grouping schema nodes into logical sections (e.g., "Network Topology", "Inventory", "Circuits")
+- Placing your own nodes inside a section Infrahub already ships, such as IPAM
 - Adding nested sub-menus and section headers
 - Controlling the ordering of menu items
 
@@ -19,7 +20,8 @@ The Menu Manager produces YAML menu definition files that customize the Infrahub
 
 ## Example prompts
 
-- "Create a menu with sections for Network Topology, IP Management, and Inventory — each with relevant schema nodes nested underneath"
+- "Create a menu with sections for Network Topology, Circuits, and Inventory — each with relevant schema nodes nested underneath"
+- "Put my VLAN and VRF entries under the IPAM section Infrahub already has"
 - "Build a flat menu that lists Device, Interface, Site, and Rack in that order"
 - "Add a nested sub-menu under Network Topology for BGP with entries for BGP Sessions and BGP Peers"
 
@@ -28,6 +30,7 @@ The Menu Manager produces YAML menu definition files that customize the Infrahub
 - **`spec.data` wrapping** — the top-level menu items must be in `spec.data`; a common mistake is writing `spec:` followed by a list directly
 - **`children.data` wrapping** — nested items must use `children.data:` not `children:` directly; this is the most common nesting mistake
 - **`kind` vs `path`** — each item uses either `kind:` (links to a schema node's list view) or `path:` (links to a custom URL), never both
+- **Built-in sections** — Infrahub ships its own top-level sections; the skill attaches your nodes to the two that hold object data (`Other` and `IPAM`) with `parent: [Builtin, IPAM]` instead of declaring a second one, and keeps clear of the platform sections such as Branches and Object Management
 - **Group headers** — section headers with no link (no `kind` or `path`) are valid and used for visual grouping
 - **Icon format** — icons use the Material Design Icons format with `mdi:` prefix (e.g., `mdi:server`, `mdi:ip-network`)
 - **`order_weight`** — integer controlling item display order; lower numbers appear first
