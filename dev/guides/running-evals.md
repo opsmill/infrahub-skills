@@ -223,15 +223,20 @@ reaching the grader.
 
 **Prove the task discriminates.** Every task's
 `instruction` opens with a `Read the skill at
-.agents/skills/<skill>/SKILL.md` line. Commenting it
-out removes the pointer, not the skill: skillgrade
-copies the working tree into the sandbox, so the
-files stay findable and the model may read them
-anyway. Run the task without the line:
+.agents/skills/<skill>/SKILL.md` line. Delete that
+line for the run and restore it afterwards. Do not
+comment it out: `instruction:` is a literal block
+scalar, so a `#` is body text and the model still
+receives the pointer.
+
+Deleting it removes the pointer, not the skill.
+skillgrade copies the working tree into the sandbox,
+so the files stay findable and the model may read
+them anyway. Run the task without the line:
 
 ```bash
 skillgrade --eval=<task-name> --trials=1
-# then restore the line
+# then put the line back
 ```
 
 Leave the rest of the instruction untouched, since
@@ -249,7 +254,9 @@ prove the opposite. It has three readings:
   corrects drift between our reference and an upstream
   surface, the model answers from training knowledge
   either way. No prompt fixes that: the test surface is
-  a pytest, not an eval.
+  a pytest under `tests/` asserting our reference
+  against that surface both ways, and step 4 of
+  `rule-equals-test.md` carves the eval task out.
 
 When it stays inconclusive, the usable evidence is the
 before/after score on the same prompt and grader.

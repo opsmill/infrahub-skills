@@ -95,8 +95,9 @@ belongs in `skills/<skill>/rules/`, and prose alone is not a landing:
 > — `dev/guidelines/rule-equals-test.md`
 
 That means a check function in `graders/<skill>/lib.py` registered in `CHECKS`,
-an `eval.yaml` task that fails with the instruction's `Read the skill at ...`
-line commented out, a task grader run against four fixtures, and
+an `eval.yaml` task run with the instruction's `Read the skill at ...` line
+deleted, scoring below 1.0 or recording which reading explains the 1.0, a
+task grader run against four fixtures, and
 `python scripts/sync-evals.py`. Budget for it before proposing the rule, and
 say in the report that this is the expensive track. Full procedure:
 `dev/guides/adding-a-rule.md`.

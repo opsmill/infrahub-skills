@@ -190,7 +190,7 @@ exercise the rule*, and it must not carry the answer:
   the rule", and don't dictate the output schema — a
   prompt that names the fields it wants back is
   answerable without the skill.
-- **Prove it discriminates.** Comment out the
+- **Prove it discriminates.** Delete the
   instruction's `Read the skill at ...` line and run
   `skillgrade --eval=<task-name> --trials=1`
   ([procedure](./running-evals.md#writing-good-eval-prompts)).
@@ -369,8 +369,9 @@ prose. If smoke fails:
   `graders/<skill>/lib.py` and registered in
   `CHECKS`, parsing rather than substring-matching
 - [ ] New task block added to `eval.yaml`, run with
-  the skill's `Read the skill at ...` line commented
-  out and the result read per running-evals.md
+  the skill's `Read the skill at ...` line deleted,
+  scoring below 1.0 or the 1.0 recorded against one
+  of the three readings in running-evals.md
 - [ ] `graders/<skill>/check_<task>.py` task grader
   script
 - [ ] Grader run against all four fixtures, including

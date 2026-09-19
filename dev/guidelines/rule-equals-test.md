@@ -32,10 +32,21 @@ rule as covered forever.
    than substring-matching it (see `graders.md`).
 4. A task block in `eval.yaml` whose prompt naturally
    exercises the rule, run with the instruction's
-   `Read the skill at ...` line commented out. That
-   line is a pointer, not the loader: read a 1.0 per
-   `dev/guides/running-evals.md` before calling the
-   task broken.
+   `Read the skill at ...` line **deleted**, not
+   commented out, since `instruction:` is a block
+   scalar and a `#` leaves the pointer in the prompt.
+   It scores below 1.0, or you record the 1.0 against
+   one of the three readings in
+   `dev/guides/running-evals.md`. A tick with neither
+   is not a result.
+
+   Carve-out, for the third reading only: where the
+   rule corrects drift against an upstream surface,
+   the model answers the same either way and no
+   prompt changes that. Replace the eval task with a
+   pytest under `tests/` asserting our reference
+   against that surface in both directions, and say
+   in the PR which reading you are claiming.
 5. A task grader script at
    `graders/<skill>/check_<task>.py`, run against four
    fixtures: compliant, compliant phrased differently,
