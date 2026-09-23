@@ -151,14 +151,20 @@ def _trigger_scope(description: str) -> str:
 def names_modification_intent(description: str) -> bool:
     """True if the `TRIGGER when:` clauses name work on an artifact that exists.
 
-    The lookbehind rejects a verb buried in a hyphenated compound. `\\b` alone
-    matches inside one, so "implementing idempotent create-or-update workflows"
-    satisfied a search for "update" while naming no day-two work at all. That
-    phrase is lifted from a skill body, so it is the likely shape rather than a
-    contrived one.
+    Both edges of a hyphenated compound are closed. `\\b` alone matches inside
+    one, so "create-or-update", "update-or-create", "update-safe" and
+    "debug-friendly" all satisfied a naive search while naming no day-two work.
+    Those spellings come from skill bodies and ORM vocabulary, not from
+    invention.
+
+    The right edge is `(?!-)` rather than `(?![-\\w])` on purpose. The verb list
+    carries "update" but not "updates", so a full word boundary on the right
+    would reject the legitimate plural along with the compound.
     """
     scope = _trigger_scope(description)
-    return any(re.search(rf"(?<![-\w]){re.escape(verb)}", scope, re.I) for verb in MODIFICATION_VERBS)
+    return any(
+        re.search(rf"(?<![-\w]){re.escape(verb)}(?!-)", scope, re.I) for verb in MODIFICATION_VERBS
+    )
 
 
 # compliant, compliant variant, violating, and two near misses.
@@ -218,6 +224,26 @@ INTENT_FIXTURES = [
         False,
         id="violating-hyphenated-compound",
     ),
+    pytest.param(
+        # The mirror image: the verb leads the compound instead of trailing it,
+        # so a left-edge lookbehind alone lets it through. "update-or-create" is
+        # Django's spelling; "update-safe" and "debug-friendly" land the same way.
+        "Creates design-driven generators. "
+        "TRIGGER when: building design-to-implementation workflows, "
+        "implementing idempotent update-or-create workflows. "
+        "DO NOT TRIGGER when: designing schemas.",
+        False,
+        id="violating-hyphenated-compound-leading",
+    ),
+    pytest.param(
+        # A plural the verb list does not carry as its own entry. This is why
+        # the right edge is (?!-) and not a full word boundary.
+        "Creates Infrahub object data files. "
+        "TRIGGER when: populating data files, updates to an existing data file. "
+        "DO NOT TRIGGER when: designing schemas.",
+        True,
+        id="compliant-plural-verb-form",
+    ),
 ]
 
 
@@ -271,11 +297,11 @@ def test_artifact_skill_description_names_modification_triggers(path: Path) -> N
     if name in NOT_ARTIFACT_PRODUCING:
         pytest.skip(f"{name} produces no editable artifact: {NOT_ARTIFACT_PRODUCING[name]}")
     assert names_modification_intent(description), (
-        f"{name}: the description opens on a creation verb but its `TRIGGER when:` "
-        f"clauses name only building. Add modifying / debugging / extending an "
-        f"existing artifact to TRIGGER itself, not just to the lead-in sentence, "
-        f"so the skill fires on day-two work. If the skill genuinely leaves no "
-        f"artifact behind, add it to NOT_ARTIFACT_PRODUCING with the reason. "
+        f"{name}: this skill produces an artifact, but its `TRIGGER when:` clauses "
+        f"name only building. Add modifying / debugging / extending an existing "
+        f"artifact to TRIGGER itself, not just to the lead-in sentence, so the skill "
+        f"fires on day-two work. If the skill genuinely leaves nothing behind that "
+        f"anyone edits, add it to NOT_ARTIFACT_PRODUCING with the reason. "
         f"TRIGGER clauses were: {_trigger_scope(description)!r}"
     )
 
