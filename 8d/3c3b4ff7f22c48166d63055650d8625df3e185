@@ -1,0 +1,21 @@
+dev/review/jev-checks.yaml
+  s_aafacfc47dd310::t_e39d8546c52da2 27-28,63-65,120-121
+dev/specs/2026-09-23-jev-review-design.md
+  s_aafacfc47dd310::t_ef2a64165eb4cd 210-246
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8d3c3b4ff7f22c48166d63055650d8625df3e185",
+  "prompts": {},
+  "sessions": {
+    "s_aafacfc47dd310": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c7a6fe13-0b0a-40f8-ba25-e5fae68a98a8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
