@@ -56,7 +56,7 @@ SDK_VERSION = cli_tree.SDK_VERSION
 SCAN_TARGETS = (
     "skills", "graders", "tests", "eval.yaml",
     "dev/guides", "dev/knowledges", "dev/commands", "dev/guidelines",
-    "dev/README.md", ".claude/skills", "docs/docs",
+    "dev/README.md", ".agents/skills", "docs/docs",
 )
 # `.mdx` is required for `docs/docs` to mean anything: every page in that
 # tree is `.mdx` (Docusaurus's Markdown-plus-JSX format), not `.md`. Without

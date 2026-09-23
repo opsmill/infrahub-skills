@@ -370,7 +370,10 @@ prose. If smoke fails:
   `CHECKS`, parsing rather than substring-matching
 - [ ] New task block added to `eval.yaml`, verified
   to fail with the skill's `Read the skill at ...`
-  line commented out
+  line commented out — unless the rule meets the
+  carve-out in
+  [rule-equals-test.md](../guidelines/rule-equals-test.md#when-no-task-can-score-the-rule),
+  which also means shipping no task grader script
 - [ ] `graders/<skill>/check_<task>.py` task grader
   script
 - [ ] Grader run against all four fixtures, including

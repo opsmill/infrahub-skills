@@ -6,7 +6,7 @@ This file is a router for AI coding assistants working with this repository: it 
 
 This is a Claude Code plugin for [Infrahub](https://github.com/opsmill/infrahub), the infrastructure data management platform by OpsMill. The plugin provides skills covering the full Infrahub development lifecycle: schema design, data population, validation checks, generators, transforms, menu customization, and live data analysis.
 
-The repository is a pure Markdown-based skills project (no Python code). Each skill is defined in its own directory under `skills/` with rules, examples, and reference documentation. Skills follow the [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) format.
+The skills themselves are Markdown: each one is a directory under `skills/` holding rules, examples, and reference documentation, in the [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) format. The machinery around them is Python — graders under `graders/`, the test suite under `tests/`, the gate scripts under `scripts/`, and a few bundled skill scripts — and CI runs `ruff` and `pytest` over all of it. Treat a change to that half as code, not documentation.
 
 ## Navigation
 
@@ -19,8 +19,8 @@ The repository is a pure Markdown-based skills project (no Python code). Each sk
 | What rules apply to the file I am editing? | [dev/guidelines/](dev/guidelines/) |
 | What commands are available? | [§ Commands](#commands) |
 | Where do AI command definitions live? | [dev/commands/](dev/commands/) |
-| How do I turn PR review feedback into rules? | [.claude/skills/harvesting-skill-review/](.claude/skills/harvesting-skill-review/) |
-| How do I fix a bug or add a rule in this repo? | [.claude/skills/](.claude/skills/) — `analyzing-skill-bugs` or `grilling-skill-features`, then `test-driving-skill-changes` and `implementing-skill-changes` |
+| How do I turn PR review feedback into rules? | [.agents/skills/harvesting-skill-review/](.agents/skills/harvesting-skill-review/) |
+| How do I fix a bug or add a rule in this repo? | [.agents/skills/](.agents/skills/) — `analyzing-skill-bugs` or `grilling-skill-features`, then `test-driving-skill-changes` and `implementing-skill-changes` |
 
 Index of the whole tree: [dev/README.md](dev/README.md).
 
@@ -85,7 +85,11 @@ fraction of it, and that is the question nearly every change asks.
 
 ## Rules
 
-Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rules` symlinks to. Each declares the globs it applies to in frontmatter, so it loads when a matching file is in play rather than waiting for someone to go looking for it. Another agent is one symlink away, though its frontmatter key differs — `paths:` for Claude, `globs:` for Cursor, `applyTo:` for Copilot. Two routing directories carry that idea further. `.agents/` and `.codex/` each hold three relative symlinks: `skills` to [`skills/`](skills/), `contributor-skills` to [`.claude/skills/`](.claude/skills/), and `rules` to [`dev/guidelines/`](dev/guidelines/). Any agent that looks in its own conventional directory finds the same shipped skills, contributor skills, and rules, with no second copy of any of them.
+Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rules` symlinks to. Each declares the globs it applies to in frontmatter, so it loads when a matching file is in play rather than waiting for someone to go looking for it. Another agent is one symlink away, though its frontmatter key differs — `paths:` for Claude, `globs:` for Cursor, `applyTo:` for Copilot.
+
+[`.agents/`](.agents/) is the source of truth for everything this repo authors for its own agents: [`.agents/skills/`](.agents/skills/) holds the contributor skills, and `.agents/rules` points at `dev/guidelines/`. `.claude/` and `.codex/` are adapters — they hold nothing but relative symlinks into `.agents/`, so any agent that looks in its own conventional directory finds the same skills and rules, with no second copy of any of them and no adapter owning the originals.
+
+[`skills/`](skills/) at the root is deliberately outside that scheme. It is the product: the skills the plugin ships, which `plugin.json` exposes and which `eval.yaml` reads directly. No agent working *on* this repo needs to invoke them — doing so loads the installed plugin, not your edit — so nothing routes to them. That leaves five links, and `scripts/check-symlinks.py` is what keeps them true.
 
 | Rule | What it constrains |
 | ---- | ------------------ |
@@ -138,12 +142,12 @@ the skill fires at all.
 
 | Skill | Directory | Description |
 | ------- | ----------- | ------------- |
-| `infrahub-managing-schemas` | `skills/infrahub-managing-schemas/` | Schema nodes, generics, attributes, relationships |
-| `infrahub-managing-objects` | `skills/infrahub-managing-objects/` | YAML data files for infrastructure objects |
-| `infrahub-managing-checks` | `skills/infrahub-managing-checks/` | Python validation checks for proposed changes |
-| `infrahub-managing-generators` | `skills/infrahub-managing-generators/` | Design-driven automation |
-| `infrahub-managing-transforms` | `skills/infrahub-managing-transforms/` | Data transforms (Python/Jinja2) |
-| `infrahub-managing-menus` | `skills/infrahub-managing-menus/` | Custom navigation menus |
+| `infrahub-managing-schemas` | `skills/infrahub-managing-schemas/` | Schema nodes, generics, attributes, relationships (create, modify, debug) |
+| `infrahub-managing-objects` | `skills/infrahub-managing-objects/` | YAML data files for infrastructure objects (create, modify, debug) |
+| `infrahub-managing-checks` | `skills/infrahub-managing-checks/` | Python validation checks for proposed changes (create, modify, debug) |
+| `infrahub-managing-generators` | `skills/infrahub-managing-generators/` | Design-driven automation (create, modify, debug) |
+| `infrahub-managing-transforms` | `skills/infrahub-managing-transforms/` | Data transforms, Python/Jinja2 (create, modify, debug) |
+| `infrahub-managing-menus` | `skills/infrahub-managing-menus/` | Custom navigation menus (create, modify, debug) |
 | `infrahub-analyzing-data` | `skills/infrahub-analyzing-data/` | Live data analysis via MCP server |
 | `infrahub-auditing-repo` | `skills/infrahub-auditing-repo/` | Audit repository against best practices (incl. YAGNI / cost-to-fix rules) |
 | `infrahub-reporting-issues` | `skills/infrahub-reporting-issues/` | Route and prepare bug/feature reports for any opsmill/infrahub-* repo |
@@ -162,6 +166,15 @@ eval coverage in the same change: the rule linked from
 an `eval.yaml` task, a task grader run against four
 fixtures, contradicted claims swept, and
 `evaluations/*.json` regenerated.
+
+Two of those steps carry a carve-out, for a verified rule
+no prompt can make a current model break: the `eval.yaml`
+task, **and the task grader script that would have no task
+behind it**. Dropping only the first leaves a dead
+`check_<task>.py`, which is the defect #147 was opened on.
+It is a measured exception, not a judgement call, and
+[rule-equals-test.md](dev/guidelines/rule-equals-test.md)
+§ "When no task can score the rule" sets the bar.
 
 The seven steps and what each one guards against live in
 [dev/guidelines/rule-equals-test.md](dev/guidelines/rule-equals-test.md),

@@ -168,12 +168,12 @@ are the foundation; the rest depends on your use case.
 
 | Skill | Use When |
 | ----- | -------- |
-| `infrahub:managing-schemas` | Designing data models — nodes, generics, attributes, relationships, hierarchies |
-| `infrahub:managing-objects` | Creating YAML data files — devices, locations, organizations, modules |
-| `infrahub:managing-checks` | Writing Python validation checks for proposed change pipelines |
-| `infrahub:managing-generators` | Building design-driven automation (create objects from design definitions) |
-| `infrahub:managing-transforms` | Converting Infrahub data to other formats (JSON, text, CSV, device configs) |
-| `infrahub:managing-menus` | Customizing the web UI sidebar with nested navigation menus |
+| `infrahub:managing-schemas` | Designing, modifying, or debugging data models — nodes, generics, attributes, relationships, hierarchies |
+| `infrahub:managing-objects` | Creating or updating YAML data files — devices, locations, organizations, modules |
+| `infrahub:managing-checks` | Writing or debugging Python validation checks for proposed change pipelines |
+| `infrahub:managing-generators` | Building or debugging design-driven automation (create objects from design definitions) |
+| `infrahub:managing-transforms` | Converting Infrahub data to other formats, or debugging wrong output (JSON, text, CSV, device configs) |
+| `infrahub:managing-menus` | Customizing or restructuring the web UI sidebar with nested navigation menus |
 | `infrahub:analyzing-data` | Querying and correlating live Infrahub data via the MCP server |
 | `infrahub:auditing-repo` | Auditing a repository against all rules and best practices |
 

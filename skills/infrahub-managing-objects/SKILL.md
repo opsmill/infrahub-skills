@@ -1,9 +1,9 @@
 ---
 name: infrahub-managing-objects
 description: >-
-  Creates and manages Infrahub object data YAML files for populating infrastructure instances — devices, locations, organizations, and modules.
-  TRIGGER when: creating device instances, populating data files, defining locations or organizations, adding infrastructure objects.
-  DO NOT TRIGGER when: designing schemas, writing Python checks/generators, querying live data.
+  Creates, modifies and manages Infrahub object data YAML files for populating infrastructure instances — devices, locations, organizations, and modules.
+  TRIGGER when: creating device instances, populating data files, defining locations or organizations, adding infrastructure objects, modifying or extending an existing data file, updating attribute values or relationship links on objects already defined in a data file, debugging why an object fails to load.
+  DO NOT TRIGGER when: designing or modifying schemas, including changing an attribute or relationship definition on a node kind (use infrahub-managing-schemas), writing Python checks/generators, querying live data.
 allowed-tools:
   - Read
   - Write
@@ -43,6 +43,8 @@ use the first argument as the kind and remaining arguments as object details.
 - Referencing related objects across files
 - Managing component children (interfaces, modules)
 - Organizing object files for correct load order
+- Updating attribute values or relationship links in an existing data file
+- Debugging why an object fails to load or resolves the wrong reference
 
 ## Rule Categories
 

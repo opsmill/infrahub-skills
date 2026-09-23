@@ -2,8 +2,8 @@
 name: infrahub-managing-schemas
 description: >-
   Creates, validates, formats, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions. Also checks the Infrahub Marketplace for an existing published schema to reuse before modelling a domain from scratch.
-  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations, looking for an existing/off-the-shelf schema or checking the marketplace for a domain (DCIM, location, routing, etc.), modeling file objects / attachments / uploads (storing PDFs, diagrams, images, certificates, documents as Infrahub objects), formatting or tidying schema files, normalising / canonicalising schema key order, cleaning up noisy schema diffs where every edit reshuffles keys, or running `infrahubctl schema format` (including as a CI gate).
-  DO NOT TRIGGER when: populating data objects, writing checks/generators/transforms, querying live data.
+  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations, modifying or extending an existing schema, changing an attribute or relationship definition on a node kind, debugging why a schema fails to load or a migration is rejected, checking the marketplace for an off-the-shelf schema in any domain, modeling file objects / attachments / uploads (storing PDFs, diagrams, images, certificates, documents as Infrahub objects), formatting or tidying schema files, canonicalising schema key order, or running `infrahubctl schema format` (including as a CI gate).
+  DO NOT TRIGGER when: populating or editing object data files (use infrahub-managing-objects), writing checks/generators/transforms, querying live data.
 allowed-tools:
   - Read
   - Write

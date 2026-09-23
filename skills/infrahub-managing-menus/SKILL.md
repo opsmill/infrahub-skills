@@ -1,9 +1,9 @@
 ---
 name: infrahub-managing-menus
 description: >-
-  Creates Infrahub custom navigation menus for the web UI sidebar, organizing node types into logical groups.
-  TRIGGER when: designing sidebar menus, grouping node types in UI, customizing Infrahub web interface navigation.
-  DO NOT TRIGGER when: designing schemas, writing checks or transforms, populating data objects.
+  Creates, modifies and debugs Infrahub custom navigation menus for the web UI sidebar, organizing node types into logical groups.
+  TRIGGER when: designing sidebar menus, grouping node types in UI, customizing Infrahub web interface navigation, modifying or extending an existing menu, changing the order, nesting, or icons inside a menu file, debugging why a menu item does not appear or lands in the wrong group.
+  DO NOT TRIGGER when: designing or modifying schemas, including setting menu_placement, icon, or order_weight on a schema node (use infrahub-managing-schemas), writing checks or transforms, populating data objects.
 allowed-tools:
   - Read
   - Write
@@ -42,6 +42,10 @@ Schema files (to identify available node types):
   with nested children
 - Configuring schema nodes to use custom menus
   instead of auto-generated ones
+- Reordering, renaming, or regrouping an existing
+  menu file
+- Debugging why a menu item does not appear, or
+  lands in the wrong group
 
 ## Rule Categories
 
@@ -59,6 +63,13 @@ Schema files (to identify available node types):
 A custom menu doesn't replace the auto-menu — it
 augments it. Schemas need cooperating settings to
 avoid duplicates and stay UI-stable.
+
+Duplicates come from two places, and only one of them
+is the schema's. Nodes the auto-menu also emits are
+settled below with `include_in_menu: false`; sections
+Infrahub itself ships are settled in the menu file
+with `parent:`, covered in
+[rules/hierarchy-nesting.md](./rules/hierarchy-nesting.md).
 
 | If the menu item... | The schema must... | See |
 | ------------------- | ------------------ | --- |
@@ -99,9 +110,13 @@ Follow these steps when creating a menu:
    the user wants flat or hierarchical navigation.
 2. **Read relevant rules** — Read `rules/format-structure.md`
    for the required YAML structure, `rules/item-properties.md`
-   for item fields, and `rules/hierarchy-nesting.md`
-   if nesting is needed. Read `rules/icons-reference.md`
-   to pick appropriate MDI icons.
+   for item fields, and `rules/icons-reference.md`
+   to pick appropriate MDI icons. Read
+   `rules/hierarchy-nesting.md` before placing any item,
+   flat menus included: Infrahub already ships IPAM,
+   Object Management, Branches and others, and anything
+   belonging in one of those attaches with `parent:`
+   rather than being declared again.
 3. **Generate the menu YAML** — Start with the
    `$schema` comment and `apiVersion`/`kind`/`spec`
    structure. Apply rules from step 2.

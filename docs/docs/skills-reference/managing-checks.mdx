@@ -4,7 +4,7 @@ title: Check Manager
 
 Skill: `infrahub-managing-checks`
 
-The Check Manager produces Python validation checks that run in Infrahub's proposed change pipeline. Each check consists of three components: a GraphQL query file, a Python class inheriting from `InfrahubCheck`, and a `.infrahub.yml` registration entry. The skill generates all three and ensures they are correctly wired together.
+The Check Manager produces, modifies, and debugs Python validation checks that run in Infrahub's proposed change pipeline. Each check consists of three components: a GraphQL query file, a Python class inheriting from `InfrahubCheck`, and a `.infrahub.yml` registration entry. The skill generates all three and ensures they are correctly wired together.
 
 ## When to use
 
@@ -12,6 +12,7 @@ The Check Manager produces Python validation checks that run in Infrahub's propo
 - Validating that required relationships are populated (e.g., every device has a primary IP)
 - Blocking changes that would violate design intent (e.g., a BGP session referencing a decommissioned device)
 - Any validation that should block a proposed change from merging
+- Changing what an existing check validates, or working out why one fails, passes when it should not, or flags the wrong nodes
 
 ## What it produces
 
@@ -26,6 +27,7 @@ Three files that must be used together:
 - "Create a check that validates every device has a primary IP assigned"
 - "Write a check that enforces the naming convention `<site>-<role>-<number>` for all device names"
 - "Create a check that blocks any proposed change that removes a BGP session from an active device"
+- "This check passes even when a device has no primary IP. Work out why and fix it"
 
 ## Key rules enforced
 

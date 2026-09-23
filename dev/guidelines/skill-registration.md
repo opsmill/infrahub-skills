@@ -60,7 +60,7 @@ claim, and the skill name, across every surface at once:
 
 ```bash
 grep -rn "<old claim or skill name>" \
-  README.md AGENTS.md docs/ dev/ .claude/
+  README.md AGENTS.md docs/ dev/ .agents/skills/
 ```
 
 "Nothing to change" is a complete answer. The point is

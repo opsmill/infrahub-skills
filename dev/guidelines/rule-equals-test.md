@@ -52,6 +52,56 @@ rule as covered forever.
    `evaluations/*.json` committed alongside `eval.yaml`.
    CI fails when the two diverge.
 
+## When no task can score the rule
+
+Rarely, step 4 cannot be met: the rule is correct and
+verified, and no prompt makes a current model break it.
+That is not licence to skip coverage. Establish it, and
+say so where the next reader will look.
+
+The bar is a measurement, not an opinion. Show the
+scenarios tried, the trial scores, and the mechanism that
+makes the task unbuildable rather than merely
+un-hardened. "The model got it right" is the weakest
+form; the useful form names why forcing the precondition
+for the bug also supplies its answer.
+
+When that bar is met:
+
+- Ship the rule. Prose that prevents a verified bug is
+  worth more than the coverage it is missing.
+- Ship no task grader script. One with no task behind it
+  is worse than nothing: it reads as coverage and runs
+  never. That specific defect is what #147 was opened on.
+- Record it here and in the pull request, not only in a
+  docstring. A carve-out that lives in a grader comment
+  is invisible to the next person writing a rule.
+- Keep the check functions and their fixtures if they are
+  sound. They pin a contract, and they are what a future
+  task would wire, but be explicit that they guard the
+  checks and not the prose.
+
+Taken once, for
+`skills/infrahub-managing-generators/rules/python-delete-ordering.md`
+(#147). Four scenarios, around twenty trials.
+
+The bug needs the relationship hydrated on the node being
+saved. That precondition is itself the cue: once the peers
+are in hand, detaching them before deleting reads as the
+obvious order, and the model writes it unprompted. The
+last scenario is the one that settles it, because it
+reaches hydration for free through an `Attribute`-kind
+relationship rather than through any call the model has to
+make, and still scored 1.0 with the skill unread.
+
+An earlier version of this entry claimed the mechanism was
+`.add()` on the manager forcing hydration. That was wrong,
+and it was caught in review rather than by this bar, which
+is worth recording: the first three scenarios all happened
+to reach hydration through `.add()`, so the sample looked
+like the cause. Name the mechanism from what the scenarios
+share, not from what the ones you happened to write share.
+
 ## When the grader and the rule disagree, decide which side moves
 
 A check that encodes a stricter contract than the rule

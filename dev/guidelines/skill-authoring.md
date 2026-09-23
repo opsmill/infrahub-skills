@@ -1,7 +1,9 @@
 ---
 paths:
   - "skills/**/*.md"
+  - ".agents/skills/**/*.md"
   - ".claude/skills/**/*.md"
+  - ".codex/skills/**/*.md"
 ---
 
 # Skill Authoring
@@ -24,6 +26,29 @@ action plus specific trigger contexts, mention synonyms
 users might say, and use TRIGGER / DO NOT TRIGGER to
 disambiguate against neighbouring skills. Lean slightly
 pushy — agents under-trigger skills.
+
+A skill that creates an artifact also changes one. If
+the skill leaves behind anything somebody later edits,
+its TRIGGER clauses name modifying, debugging, and
+extending what already exists too, and the lead-in
+sentence saying so does not count: an agent matches
+against the triggers. Otherwise day-two work does not
+merely fall outside the triggers, it reads as a positive
+signal that the skill does not apply. Issue #78 paid for
+that gap: a session asked to investigate an existing
+generator never invoked the skill, and deleted a live
+interface the generator did not own, while the skill's
+own front page warned about that failure twice.
+`tests/test_skill_frontmatter.py` fails a description
+that names no modification trigger, and caps its length.
+Every shipped skill is held to it unless listed in that
+file's `NOT_ARTIFACT_PRODUCING` with a reason, so a skill
+that answers a question rather than writing a file opts
+out explicitly instead of slipping through. That is the
+only gate a description has.
+Descriptions have no eval coverage, because eval prompts
+say `Read the skill at ...` and bypass triggering
+altogether.
 
 State triggers, never a workflow summary. A description
 that narrates the steps gives the agent a shortcut: it
@@ -105,7 +130,8 @@ needing it links there rather than restating the number.
 
 `scripts/check-cli-invocations.py` validates the
 `infrahubctl` invocations printed under `skills/`,
-`graders/`, `tests/`, `eval.yaml`, `.claude/skills/` and
+`graders/`, `tests/`, `eval.yaml`,
+`.agents/skills/` and
 most of `dev/`, against the tree pinned in
 `graders/common/cli_tree.py`. Its `SCAN_TARGETS` is the
 authority; `docs/`, `README.md` and `dev/specs/` are

@@ -4,7 +4,7 @@ title: Generator Manager
 
 Skill: `infrahub-managing-generators`
 
-The Generator Manager produces Python generators that query Infrahub for design objects and automatically create or update the infrastructure objects derived from them. Generators are idempotent: re-running them updates existing objects rather than creating duplicates. The skill generates the Python class, GraphQL query, and `.infrahub.yml` registration.
+The Generator Manager produces, modifies, and debugs Python generators that query Infrahub for design objects and automatically create or update the infrastructure objects derived from them. Generators are idempotent: re-running them updates existing objects rather than creating duplicates. The skill generates the Python class, GraphQL query, and `.infrahub.yml` registration.
 
 ## When to use
 
@@ -12,6 +12,7 @@ The Generator Manager produces Python generators that query Infrahub for design 
 - Generating BGP sessions from a topology design
 - Creating any set of objects that should be derived from a design definition and kept in sync with it
 - Any scenario where "given this design, create these objects" needs to run repeatedly as the design evolves
+- Changing what an existing generator produces, or working out why a run created, skipped, or deleted the wrong objects
 
 ## What it produces
 
@@ -28,6 +29,7 @@ The `.infrahub.yml` entry tying them together includes a `watch` dependency decl
 - "Create a generator that takes a fabric design object and creates all spine and leaf devices with their loopback interfaces"
 - "Write a generator that creates BGP sessions between all spine-leaf pairs defined in a topology design"
 - "Generate IP address assignments for all interfaces based on a design's IP allocation scheme"
+- "Re-running this generator deleted an interface it did not create. Work out why and fix it"
 
 ## Key rules enforced
 
@@ -47,6 +49,7 @@ The `.infrahub.yml` entry tying them together includes a `watch` dependency decl
 | Sync `generate()` method | Uses `async def generate(self, data):` |
 | Missing target group configuration | Generates the `CoreGeneratorGroup` definition |
 | Generator that only stamps a fixed structure with constant values | Recommends an Object Template (`generate_template`) to clone instead; the structure is in data, not Python |
+| Hand-editing `schema.graphql` to add a field a query needs | Re-exports it with `infrahubctl graphql export-schema`: the file is generated, so a hand-edit is discarded on the next export |
 
 ## Running it
 

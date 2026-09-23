@@ -82,7 +82,8 @@ YAML comment in the output file so the user knows:
 - Include `.infrahub.yml` registration comment
 - Include `include_in_menu: false` advice comment
 - One menu file per project typically
-- The menu replaces the auto-generated sidebar
-  navigation
+- The menu is merged into the sidebar Infrahub already
+  builds; it does not replace it
+  (see [hierarchy-nesting.md](./hierarchy-nesting.md))
 
 Reference: [infrahub-yml-reference.md](../../infrahub-common/infrahub-yml-reference.md)
