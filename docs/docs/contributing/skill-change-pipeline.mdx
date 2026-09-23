@@ -28,11 +28,12 @@ runs after the pull request, on review feedback, rather than as a stage
 the change has to pass through.
 
 These live in
-[`.claude/skills/`](https://github.com/opsmill/infrahub-skills/tree/main/.claude/skills),
-with `.agents/` and `.codex/` symlinking to them so other assistants find
-them in the directory they expect. They ship with the repository, not
-with the installed plugin, so they exist only for somebody working in a
-checkout.
+[`.agents/skills/`](https://github.com/opsmill/infrahub-skills/tree/main/.agents/skills),
+which is the source of truth. `.claude/` and `.codex/` hold nothing but
+relative symlinks into it, so an assistant that looks in the directory it
+expects finds the same skills, with no second copy of any of them. They
+ship with the repository, not with the installed plugin, so they exist
+only for somebody working in a checkout.
 
 ## Two entrances
 
