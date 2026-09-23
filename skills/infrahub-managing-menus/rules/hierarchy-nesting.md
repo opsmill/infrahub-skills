@@ -124,12 +124,15 @@ human-friendly ID, which for a menu item is its
 namespace and name as a two-element list. Reach for it
 when a node belongs in a section from the object table:
 
+Here `IpamPrefix` inherits `BuiltinIPPrefix`, which is
+what keeps the shipped IPAM section on screen:
+
 ```yaml
 - namespace: Ipam
-  name: Vlans
-  label: VLANs
-  kind: IpamVlan
-  icon: "mdi:lan"
+  name: Prefixes
+  label: Prefixes
+  kind: IpamPrefix
+  icon: "mdi:ip-network"
   parent: [Builtin, IPAM]     # under the shipped IPAM section
 ```
 
@@ -145,10 +148,16 @@ with it:
   children:
     data:
       - namespace: Ipam
-        name: Vrf
-        label: VRFs
-        kind: IpamVrf
-        icon: "mdi:router-network"
+        name: Prefix
+        label: Prefixes
+        kind: IpamPrefix
+        icon: "mdi:ip-network"
+
+      - namespace: Ipam
+        name: Vlan
+        label: VLANs
+        kind: IpamVlan
+        icon: "mdi:lan"
 ```
 
 It has to be the two-element list. The concatenated
@@ -159,6 +168,17 @@ that Infrahub's own
 [menu reference](https://docs.infrahub.app/reference/menu)
 still types `parent` as a "concatenated namespace +
 name" string; that page is wrong on this point.
+
+**Check the IPAM section will render before you attach
+to it.** Infrahub drops `BuiltinIPAM` from the sidebar
+entirely when no node inherits `BuiltinIPPrefix` or
+`BuiltinIPAddress`, and anything parented to it goes
+with it. A schema of VLANs and VRFs alone inherits
+neither, so the file loads without complaint and neither
+IPAM nor your items appear. Attach to `[Builtin, IPAM]`
+when the schema has prefix or address nodes; otherwise
+use `[Builtin, Other]` or keep the group at the top
+level under a label of its own.
 
 Both elements are matched exactly too, so
 `[Builtin, Ipam]` finds nothing and the load fails with

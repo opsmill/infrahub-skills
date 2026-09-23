@@ -497,9 +497,13 @@ def check_no_builtin_section_recreated(doc: dict, **_: Any) -> tuple[bool, str]:
 
     # Object nodes belong in the object area. Attaching them to a platform
     # section buries user data in Infrahub's own part of the sidebar.
+    #
+    # Only shipped sections are judged here: `parent` takes any CoreMenu HFID,
+    # so parenting to a group of your own is ordinary nesting, and a misspelled
+    # built-in is a lookup failure that `parent-attaches-to-builtin` reports.
     for item in all_items:
         target = _parent_identifier(item)
-        if target and target not in OBJECT_AREA_SECTIONS:
+        if target in BUILTIN_MENU_SECTIONS and target not in OBJECT_AREA_SECTIONS:
             if any(child.get("kind") for child in _subtree(item)):
                 collisions.append(
                     f"'{_identifier(item)}' attaches object content to "

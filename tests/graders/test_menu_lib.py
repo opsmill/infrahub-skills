@@ -1041,6 +1041,51 @@ class TestCheckNoBuiltinSectionRecreated:
         ok, msg = check_no_builtin_section_recreated(doc)
         assert ok, msg
 
+    def test_parenting_to_your_own_group_is_ordinary_nesting(self):
+        """`parent` takes any CoreMenu HFID, not only a built-in one.
+
+        Regression test for PR #153 review: the platform-section guard treated
+        every resolvable parent outside the object area as a platform section,
+        so a DcimDevice item on `parent: [Dcim, NetworkDevices]` was scored as
+        a violation, with a message calling the user's own group a platform
+        section. The same menu written with children.data alone passed, and no
+        rule forbids the parent form.
+        """
+        doc = _menu(
+            {
+                "namespace": "Dcim",
+                "name": "NetworkDevices",
+                "label": "Network Devices",
+                "children": _children(
+                    {
+                        "namespace": "Dcim",
+                        "name": "Device",
+                        "kind": "DcimDevice",
+                        "label": "Devices",
+                        "parent": ["Dcim", "NetworkDevices"],
+                    },
+                ),
+            }
+        )
+        ok, msg = check_no_builtin_section_recreated(doc)
+        assert ok, msg
+
+    def test_misspelled_builtin_is_not_called_a_platform_section(self):
+        """`[Builtin, Ipam]` is a lookup failure, which the other check reports."""
+        doc = _menu(
+            {
+                "namespace": "Ipam",
+                "name": "Addressing",
+                "label": "Addressing",
+                "parent": ["Builtin", "Ipam"],
+                "children": _children(
+                    {"namespace": "Ipam", "name": "Vlan", "kind": "IpamVlan", "label": "VLANs"},
+                ),
+            }
+        )
+        ok, msg = check_no_builtin_section_recreated(doc)
+        assert ok, msg
+
     def test_headers_only_under_a_platform_section_are_left_alone(self):
         """No `kind` anywhere in the subtree means no object content to misplace."""
         doc = _menu(
@@ -1273,8 +1318,13 @@ class TestBuiltinMenuSectionsRegistry:
             _REPO_ROOT / "skills" / "infrahub-managing-menus" / "rules" / "hierarchy-nesting.md"
         ).read_text(encoding="utf-8")
         object_area, _, platform_area = rule.partition("Infrahub's own area")
-        object_ids = set(re.findall(r"`(Builtin\w+)`", object_area.split("Object area")[-1]))
-        platform_ids = set(re.findall(r"`(Builtin\w+)`", platform_area))
+        # Table rows only. Prose in this rule also names generics such as
+        # BuiltinIPPrefix, which are schema kinds rather than menu sections.
+        row = r"^\|\s*`(Builtin\w+)`\s*\|"
+        object_ids = set(
+            re.findall(row, object_area.split("Object area")[-1], re.MULTILINE)
+        )
+        platform_ids = set(re.findall(row, platform_area, re.MULTILINE))
 
         assert object_ids == set(OBJECT_AREA_SECTIONS), (
             "the rule's object table and OBJECT_AREA_SECTIONS disagree; "

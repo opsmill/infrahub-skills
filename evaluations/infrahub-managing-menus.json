@@ -123,7 +123,7 @@
     },
     {
       "id": 4,
-      "prompt": "I run a service provider platform on Infrahub. My schema has IpamVlan,\nIpamVrf, DcimDevice, DcimInterface, and OrganizationCustomer. In the sidebar I\nwant the VLAN and VRF entries to show up under IPAM, the device and interface\nentries under a 'Network Devices' heading, and customers as their own top-level\nentry.",
+      "prompt": "I run a service provider platform on Infrahub. My schema has IpamPrefix\n(which inherits BuiltinIPPrefix), IpamVlan, IpamVrf, DcimDevice, DcimInterface,\nand OrganizationCustomer. In the sidebar I want the prefix, VLAN and VRF entries\nto show up under IPAM, the device and interface entries under a 'Network Devices'\nheading, and customers as their own top-level entry.",
       "expected_output": "A menu YAML whose IpamVlan and IpamVrf entries attach to Infrahub's shipped IPAM section with parent: [Builtin, IPAM], rather than declaring a new top-level IPAM section. The device entries sit under a custom 'Network Devices' group header using children.data, and customers are a separate top-level item.",
       "files": [],
       "expectations": [
@@ -148,7 +148,7 @@
         },
         {
           "name": "no-builtin-section-recreated",
-          "check": "No item reuses a built-in menu identifier, and no unparented top-level item carries a built-in section's label"
+          "check": "No item reuses a built-in menu identifier, no unparented top-level item carries a built-in section's label, and no object content is parented to one of Infrahub's platform sections"
         },
         {
           "name": "parent-attaches-to-builtin",
