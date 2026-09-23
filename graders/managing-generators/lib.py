@@ -2048,6 +2048,457 @@ def check_group_membership_from_member_side(
     return False, "no group membership assignment found in the YAML block"
 
 
+# ---------------------------------------------------------------------------
+# Delete ordering: detach peers before deleting them
+# ---------------------------------------------------------------------------
+
+
+def _rel_chain_of(receiver: ast.AST) -> tuple[str, str] | None:
+    """If ``receiver`` is ``<Name>.<attr>``, return ``(name, attr)``.
+
+    ``self`` is excluded: a relationship manager hangs off a node variable,
+    so ``self.cache.remove(x)`` is a container operation, not a detach.
+    """
+    if isinstance(receiver, ast.Attribute) and isinstance(receiver.value, ast.Name):
+        if receiver.value.id == "self":
+            return None
+        return receiver.value.id, receiver.attr
+    return None
+
+
+def _manager_aliases(tree: ast.Module) -> dict[str, tuple[str, str]]:
+    """Locals bound to a relationship manager: ``mgmt = site.addresses``.
+
+    Hoisting a manager into a local is ordinary Python, and the alias is the
+    same object, so every read and write through it has to resolve back to
+    ``(site, addresses)`` or a correct answer reads as having no detach.
+    """
+    aliases: dict[str, tuple[str, str]] = {}
+    for stmt in ast.walk(tree):
+        if not (isinstance(stmt, ast.Assign) and len(stmt.targets) == 1):
+            continue
+        target, value = stmt.targets[0], stmt.value
+        if not isinstance(target, ast.Name):
+            continue
+        chain = _rel_chain_of(value)
+        if chain:
+            aliases[target.id] = chain
+    return aliases
+
+
+def _chain_for(
+    receiver: ast.AST, aliases: dict[str, tuple[str, str]]
+) -> tuple[str, str] | None:
+    """Resolve ``N.rel`` or a local alias of one to its ``(N, rel)`` pair."""
+    if isinstance(receiver, ast.Name):
+        return aliases.get(receiver.id)
+    return _rel_chain_of(receiver)
+
+
+# Properties over the manager's own peer list. All three put a relationship's
+# peers in the caller's hands, so all three mark it as a deletion source;
+# matching only ``peers`` let the other two slip the narrowing.
+_PEER_READ_ATTRS = {"peers", "peer_ids", "peer_hfids"}
+
+
+def _peer_source_relationships(
+    tree: ast.Module, aliases: dict[str, tuple[str, str]]
+) -> set[tuple[str, str]]:
+    """``(N, rel)`` pairs whose peer list this module reads.
+
+    Deliberately narrow. Only a read of ``N.<rel>.peers`` (or ``peer_ids`` /
+    ``peer_hfids``) counts, because that is the code taking the peers into
+    its own hands and so the only honest evidence of which relationship the
+    deletes belong to. Bare ``for x in N.<rel>:`` used to count here and must
+    not: iterating an unrelated relationship for any other purpose then
+    poisoned the set and failed correct answers with a message naming the
+    wrong relationship.
+    """
+    sources: set[tuple[str, str]] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr in _PEER_READ_ATTRS:
+            chain = _chain_for(node.value, aliases)
+            if chain:
+                sources.add(chain)
+    return sources
+
+
+def _enclosing_functions(tree: ast.Module) -> dict[int, str | None]:
+    """Map ``id(node)`` to the name of the function whose body it sits in."""
+    out: dict[int, str | None] = {}
+
+    def visit(node: ast.AST, current: str | None) -> None:
+        for child in ast.iter_child_nodes(node):
+            out[id(child)] = current
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                visit(child, child.name)
+            else:
+                visit(child, current)
+
+    visit(tree, None)
+    return out
+
+
+def _function_prefixes(tree: ast.Module) -> dict[str, tuple[int, ...]]:
+    """Map each helper to the path of call sites that reaches it.
+
+    A helper called from another helper cannot be placed by the raw line of
+    its own call: that line sits inside the caller's body, which is not
+    comparable with the caller's own collapsed position. Resolving the chain
+    gives ``_purge`` reached through ``_reconcile`` a path like ``(4, 8)``,
+    which orders correctly against ``(4, 10)`` in the caller at any depth.
+    """
+    funcs = {
+        fn.name
+        for fn in ast.walk(tree)
+        if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    enclosing = _enclosing_functions(tree)
+
+    sites: dict[str, tuple[str | None, int]] = {}
+    for call in _iter_calls(tree):
+        func = call.func
+        if not (
+            isinstance(func, ast.Attribute)
+            and isinstance(func.value, ast.Name)
+            and func.value.id == "self"
+            and func.attr in funcs
+        ):
+            continue
+        current = sites.get(func.attr)
+        if current is None or call.lineno < current[1]:
+            sites[func.attr] = (enclosing.get(id(call)), call.lineno)
+
+    def resolve(name: str, seen: frozenset[str]) -> tuple[int, ...]:
+        if name in seen or name not in sites:
+            return ()
+        caller, line = sites[name]
+        if caller is None:
+            return (line,)
+        return resolve(caller, seen | {name}) + (line,)
+
+    return {name: resolve(name, frozenset()) for name in funcs}
+
+
+def _position_map(tree: ast.Module) -> dict[int, tuple[int, ...]]:
+    """Map ``id(node)`` to its execution position.
+
+    The position is the call-site path of the enclosing helper followed by
+    the node's own line, so tuples compare lexicographically: across
+    functions by where each is called, and within one function by line.
+    Every node is mapped, not only calls -- the peer-list read is an
+    ``ast.Attribute`` and is compared against delete positions, so mapping
+    one side and not the other puts the comparison in two coordinate systems.
+    """
+    prefixes = _function_prefixes(tree)
+    enclosing = _enclosing_functions(tree)
+    out: dict[int, tuple[int, ...]] = {}
+    for node in ast.walk(tree):
+        if not hasattr(node, "lineno"):
+            continue
+        fn = enclosing.get(id(node))
+        out[id(node)] = prefixes.get(fn, ()) + (node.lineno,) if fn else (node.lineno,)
+    return out
+
+
+def _pos(node: ast.AST, positions: dict[int, tuple[int, ...]]) -> tuple[int, ...]:
+    """Execution position of ``node``."""
+    return positions.get(id(node), (getattr(node, "lineno", 0),))
+
+
+def _peer_delete_calls(tree: ast.Module) -> list[ast.Call]:
+    """Recognised deletes: ``<name>.delete()`` or ``self.client.delete(...)``.
+
+    Any local name counts, not only one bound from ``self.client.*``. A
+    generator following this skill's hydration rule builds peers with
+    ``InfrahubNode.from_graphql()`` off the query payload rather than
+    re-fetching each one, and ``check_no_client_get_in_loop`` actively pushes
+    it that way. Pinning the receiver to a client-obtained name would report
+    that answer as never having deleted anything.
+    """
+    calls: list[ast.Call] = []
+    for call in _iter_calls(tree):
+        if _is_self_client_method(call, "delete"):
+            calls.append(call)
+        elif (
+            isinstance(call.func, ast.Attribute)
+            and call.func.attr == "delete"
+            and isinstance(call.func.value, ast.Name)
+        ):
+            calls.append(call)
+    return calls
+
+
+def _holder_fetch_ids(tree: ast.Module, holders: set[str]) -> set[str]:
+    """The ``id=`` expressions the holder nodes were fetched with.
+
+    A generator that fetched ``site`` with ``id=data["site"]["id"]`` already
+    has that expression in hand and can delete the holder by repeating it,
+    never naming ``site`` at the delete. Recording what each holder was
+    fetched with is what lets the guard recognise that spelling.
+    """
+    out: set[str] = set()
+    for stmt in ast.walk(tree):
+        if not (isinstance(stmt, ast.Assign) and len(stmt.targets) == 1):
+            continue
+        target = stmt.targets[0]
+        if not (isinstance(target, ast.Name) and target.id in holders):
+            continue
+        value = stmt.value
+        if isinstance(value, ast.Await):
+            value = value.value
+        if not (isinstance(value, ast.Call) and _is_self_client_method(value, "get")):
+            continue
+        for kw in value.keywords:
+            if kw.arg == "id":
+                out.add(ast.unparse(kw.value))
+    return out
+
+
+def _deletes_a_holder(
+    call: ast.Call, holders: set[str], holder_ids: set[str]
+) -> bool:
+    """True when ``call`` deletes a node that holds a relationship in play.
+
+    Three spellings have to be tested. ``site.delete()`` names its target as
+    the receiver; ``self.client.delete(kind=..., id=site.id)`` names it in
+    the ``id`` keyword; and ``self.client.delete(kind=..., id=data["site"]["id"])``
+    names neither, repeating the expression the holder was fetched with.
+    """
+    func = call.func
+    if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+        if func.value.id in holders:
+            return True
+    if _is_self_client_method(call, "delete"):
+        for kw in call.keywords:
+            if kw.arg != "id":
+                continue
+            value = kw.value
+            if isinstance(value, ast.Attribute) and isinstance(value.value, ast.Name):
+                if value.value.id in holders:
+                    return True
+            elif isinstance(value, ast.Name) and value.id in holders:
+                return True
+            if ast.unparse(value) in holder_ids:
+                return True
+    return False
+
+
+def _manager_remove_calls(
+    tree: ast.Module, aliases: dict[str, tuple[str, str]]
+) -> list[tuple[ast.Call, tuple[str, str]]]:
+    """``N.<rel>.remove(...)`` calls, paired with their ``(N, rel)`` chain."""
+    out: list[tuple[ast.Call, tuple[str, str]]] = []
+    for call in _iter_calls(tree):
+        if not (isinstance(call.func, ast.Attribute) and call.func.attr == "remove"):
+            continue
+        chain = _chain_for(call.func.value, aliases)
+        if chain:
+            out.append((call, chain))
+    return out
+
+
+def _save_calls_on(tree: ast.Module, name: str) -> list[ast.Call]:
+    """Every ``<name>.save(...)`` call in the tree."""
+    return [
+        c
+        for c in _iter_calls(tree)
+        if isinstance(c.func, ast.Attribute)
+        and c.func.attr == "save"
+        and isinstance(c.func.value, ast.Name)
+        and c.func.value.id == name
+    ]
+
+
+def check_peer_delete_present(tree: ast.Module | None, **_: Any) -> tuple[bool, str]:
+    """The stale peers are actually deleted, not merely unlinked.
+
+    Deleting the holder is not deleting its peers, so a delete whose receiver
+    is a node that owns one of the relationships in play, or that gets saved,
+    does not count. Neither does anything at all when no relationship is
+    touched: with no relationship there are no peers to have deleted.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    aliases = _manager_aliases(tree)
+    # Only real relationship evidence counts. A bare ``N.<attr>`` sweep looks
+    # tempting and is wrong: it reads ``address.delete`` and ``site.save`` as
+    # relationships, which puts the peer being deleted into the holder set and
+    # fails the rule's own correct pattern.
+    chains = {chain for _, chain in _manager_remove_calls(tree, aliases)}
+    chains |= _peer_source_relationships(tree, aliases)
+
+    if not chains:
+        return False, (
+            "no relationship is touched anywhere, so nothing here identifies "
+            "a peer that could have been deleted"
+        )
+
+    # Exactly the names that hold a relationship in play. Widening this to
+    # every saved name, or to every alias base, excludes peers that are
+    # perfectly ordinary to save or read an attribute off before deleting.
+    holders = {n for n, _ in chains}
+    holder_ids = _holder_fetch_ids(tree, holders)
+
+    for call in _peer_delete_calls(tree):
+        if _deletes_a_holder(call, holders, holder_ids):
+            continue  # deleting the holder, not one of its peers
+        return True, "the stale peers are deleted from Infrahub"
+
+    return False, (
+        "no .delete() on anything but the relationship holder itself: the "
+        "stale peers are only unlinked, never removed from Infrahub"
+    )
+
+
+def check_detach_precedes_peer_delete(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """The node is detached and saved before its peers are deleted.
+
+    Asserts the ordering the rule prescribes rather than the absence of a
+    violation shape: a ``N.<rel>.remove(...)`` exists, a ``N.save(...)``
+    follows it, and every recognised peer delete comes after that save. An
+    answer that deletes first has no detach to find and fails here.
+
+    The detach must be on the relationship whose peers are in hand, not just
+    on the saved node. Where the module reads ``N.<rel>.peers`` (or
+    ``peer_ids`` / ``peer_hfids``), only that relationship counts: detaching
+    ``site.tags`` and saving does not license deleting
+    ``site.management_addresses`` peers. Where no peer list is read the ids
+    came from the query payload, nothing correlates them, and any detach on
+    the saved node counts.
+
+    Ordering is by execution position, not source position: a call inside a
+    helper is placed at the helper's call site, so moving a ``def`` above or
+    below its caller cannot change the verdict. Deletes running before the
+    peer list is ever read are somebody else's cleanup and are ignored.
+
+    ``remove_relationships()`` alone does not satisfy this. It never touches
+    the in-memory manager, so a later ``save(allow_upsert=True)`` re-sends
+    the very ids it detached server-side.
+
+    Precondition. The rule sanctions a second correct shape: never hydrating
+    the relationship on the node you save. An uninitialized manager is left
+    out of the payload entirely, so nothing is re-sent, and ``.remove()``
+    would raise ``UninitializedError`` there anyway. This check fails that
+    shape, so any task wiring it must make hydration unavoidable -- by also
+    requiring peers to be attached, since ``.add()`` and ``.extend()`` need a
+    hydrated manager. Wiring it to a task without that property would fail
+    correct answers.
+
+    No task wires it today; ``tests/graders/`` holds its fixtures and the
+    reasoning. See the pull request for #147 for why, which is measurement
+    rather than oversight.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    aliases = _manager_aliases(tree)
+    positions = _position_map(tree)
+
+    deletes = _peer_delete_calls(tree)
+    if not deletes:
+        return False, "no recognised peer delete to order against"
+
+    removes = _manager_remove_calls(tree, aliases)
+    if not removes:
+        return False, (
+            "no <node>.<relationship>.remove(...) call: the peers are deleted "
+            "while the node still holds them in its relationship manager, so "
+            "the next save(allow_upsert=True) re-sends the deleted ids"
+        )
+
+    sources = _peer_source_relationships(tree, aliases)
+    considered = [rc for rc in removes if rc[1] in sources] if sources else removes
+
+    if sources and not considered:
+        detached = ", ".join(sorted(f"{n}.{r}" for _, (n, r) in removes))
+        wanted = ", ".join(sorted(f"{n}.{r}" for n, r in sources))
+        return False, (
+            f"the detach is on {detached}, but the deleted peers come from "
+            f"{wanted}, which is never detached; a save re-sends that "
+            "relationship's stale ids"
+        )
+
+    # A delete running before the peer list is even read cannot be deleting
+    # those peers, so it must not drag the ordering window backwards.
+    # Same coordinate system on both sides: the read is an execution position
+    # too, or moving it into a helper filters out every delete and a compliant
+    # answer reads as having none.
+    reads = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Attribute)
+        and node.attr in _PEER_READ_ATTRS
+        and _chain_for(node.value, aliases)
+    ]
+    first_read = min((_pos(r, positions) for r in reads), default=None)
+
+    relevant = [c for c in deletes if first_read is None or _pos(c, positions) >= first_read]
+    if not relevant:
+        return False, "no recognised peer delete to order against"
+    first_delete = min(_pos(c, positions) for c in relevant)
+
+    for call, (n_name, rel) in considered:
+        later_saves = [
+            s
+            for s in _save_calls_on(tree, n_name)
+            if _pos(s, positions) > _pos(call, positions)
+        ]
+        if not later_saves:
+            continue
+        save_pos = min(_pos(s, positions) for s in later_saves)
+        if save_pos < first_delete:
+            return True, (
+                f"{n_name}.{rel}.remove() (line {call.lineno}) runs before "
+                f"{n_name}.save() (line {save_pos[-1]}), which runs before "
+                f"the first peer delete (line {first_delete[-1]})"
+            )
+
+    return False, (
+        "a detach exists but no save of the detached node runs between it and "
+        f"the first peer delete (line {first_delete[-1]}); the peers are deleted "
+        "while the node still holds them"
+    )
+
+
+def check_detach_iterates_id_list(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """The detach loop runs over a separate id list, not the live peer list.
+
+    ``RelationshipManager.remove()`` pops from the same list ``.peers`` hands
+    back, so a loop that iterates it while removing skips every other element
+    and the next save re-sends the ids the loop meant to drop.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+
+    aliases = _manager_aliases(tree)
+    removes = _manager_remove_calls(tree, aliases)
+
+    for loop in _for_loops(tree):
+        iterated = loop.iter
+        if isinstance(iterated, ast.Attribute) and iterated.attr in _PEER_READ_ATTRS:
+            chain, suffix = _chain_for(iterated.value, aliases), f".{iterated.attr}"
+        else:
+            chain, suffix = _chain_for(iterated, aliases), ""
+        if not chain:
+            continue
+        for call, remove_chain in removes:
+            if remove_chain == chain and _node_within(call, loop):
+                return False, (
+                    f"the detach loop iterates {chain[0]}.{chain[1]}{suffix} "
+                    f"while calling {chain[0]}.{chain[1]}.remove() inside it "
+                    f"(line {call.lineno}); remove() pops from that same list, "
+                    "so every other peer is skipped. Build the id list first "
+                    "and iterate that"
+                )
+
+    return True, "the detach loop does not iterate the live peer list"
+
 CHECKS: dict[str, Any] = {
     "traversal-uses-relationship-filter": check_traversal_uses_relationship_filter,
     "traversal-enumerates-and-checks-truncation": check_traversal_enumerates_and_checks_truncation,
@@ -2067,6 +2518,9 @@ CHECKS: dict[str, Any] = {
     "add-relationships-passes-ids": check_add_relationships_passes_ids,
     "preflight-or-upsert": check_preflight_or_upsert,
     "no-raw-create-without-handler": check_no_raw_create_without_handler,
+    "peer-delete-present": check_peer_delete_present,
+    "detach-precedes-peer-delete": check_detach_precedes_peer_delete,
+    "detach-iterates-id-list": check_detach_iterates_id_list,
     # from_graphql hydration family (output.md)
     "imports-infrahub-node": check_imports_infrahub_node,
     "uses-from-graphql": check_uses_from_graphql,

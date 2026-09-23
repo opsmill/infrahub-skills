@@ -163,6 +163,15 @@ an `eval.yaml` task, a task grader run against four
 fixtures, contradicted claims swept, and
 `evaluations/*.json` regenerated.
 
+Two of those steps carry a carve-out, for a verified rule
+no prompt can make a current model break: the `eval.yaml`
+task, **and the task grader script that would have no task
+behind it**. Dropping only the first leaves a dead
+`check_<task>.py`, which is the defect #147 was opened on.
+It is a measured exception, not a judgement call, and
+[rule-equals-test.md](dev/guidelines/rule-equals-test.md)
+§ "When no task can score the rule" sets the bar.
+
 The seven steps and what each one guards against live in
 [dev/guidelines/rule-equals-test.md](dev/guidelines/rule-equals-test.md),
 which loads automatically when you touch a rule, a

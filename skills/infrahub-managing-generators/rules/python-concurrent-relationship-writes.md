@@ -55,7 +55,27 @@ await group.add_relationships(
 )
 ```
 
-`remove_relationships()` is the symmetric operation.
+`remove_relationships()` is the symmetric operation **on
+the wire**. It is not symmetric in memory: like
+`add_relationships()` it never touches the node's own
+relationship manager, and on removal that matters,
+because a later `save(allow_upsert=True)` re-sends the
+peer you just detached server-side.
+
+Do not answer that by pairing it with `.remove()`. That is
+the whole-list write this rule exists to stop, and it
+drops whatever a concurrent run attached in between.
+Fetch the node without naming the relationship instead, so
+its manager stays uninitialized and the save cannot ship
+it.
+
+That works only where the plain fetch actually skips the
+relationship. A cardinality-many relationship of kind
+`Attribute` or `Parent` is hydrated by a plain
+`client.get()` anyway, and tag-style relationships are both
+the common case and the contended one. Check the kind
+rather than assuming --
+[python-delete-ordering.md](python-delete-ordering.md).
 
 ### `related_nodes` takes IDs, not nodes
 
