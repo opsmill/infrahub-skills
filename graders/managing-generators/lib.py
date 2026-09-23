@@ -2123,58 +2123,87 @@ def _peer_source_relationships(
     return sources
 
 
-def _call_site_linenos(tree: ast.Module) -> dict[str, int]:
-    """Earliest line each ``self.<helper>()`` is called from."""
-    sites: dict[str, int] = {}
+def _enclosing_functions(tree: ast.Module) -> dict[int, str | None]:
+    """Map ``id(node)`` to the name of the function whose body it sits in."""
+    out: dict[int, str | None] = {}
+
+    def visit(node: ast.AST, current: str | None) -> None:
+        for child in ast.iter_child_nodes(node):
+            out[id(child)] = current
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                visit(child, child.name)
+            else:
+                visit(child, current)
+
+    visit(tree, None)
+    return out
+
+
+def _function_prefixes(tree: ast.Module) -> dict[str, tuple[int, ...]]:
+    """Map each helper to the path of call sites that reaches it.
+
+    A helper called from another helper cannot be placed by the raw line of
+    its own call: that line sits inside the caller's body, which is not
+    comparable with the caller's own collapsed position. Resolving the chain
+    gives ``_purge`` reached through ``_reconcile`` a path like ``(4, 8)``,
+    which orders correctly against ``(4, 10)`` in the caller at any depth.
+    """
+    funcs = {
+        fn.name
+        for fn in ast.walk(tree)
+        if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    enclosing = _enclosing_functions(tree)
+
+    sites: dict[str, tuple[str | None, int]] = {}
     for call in _iter_calls(tree):
         func = call.func
-        if (
+        if not (
             isinstance(func, ast.Attribute)
             and isinstance(func.value, ast.Name)
             and func.value.id == "self"
+            and func.attr in funcs
         ):
-            prev = sites.get(func.attr)
-            if prev is None or call.lineno < prev:
-                sites[func.attr] = call.lineno
-    return sites
-
-
-def _effective_lineno_map(tree: ast.Module) -> dict[int, int]:
-    """Map ``id(node)`` to the line where the enclosing helper is called.
-
-    Source position is not execution order once a helper is involved. A
-    delete inside ``_purge`` runs where ``self._purge()`` is called, not
-    where ``def _purge`` happens to sit, so ordering a helper's calls by
-    their own ``lineno`` makes the verdict depend on whether the helper is
-    defined above or below its caller.
-    """
-    sites = _call_site_linenos(tree)
-    mapping: dict[int, int] = {}
-    for fn in ast.walk(tree):
-        if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
-        site = sites.get(fn.name)
-        if site is None:
-            continue
-        # Every node, not only calls: the peer-list read is an ast.Attribute
-        # and is compared against delete positions, so mapping one and not
-        # the other puts the two sides in different coordinate systems.
-        for inner in ast.walk(fn):
-            mapping[id(inner)] = site
-    return mapping
+        current = sites.get(func.attr)
+        if current is None or call.lineno < current[1]:
+            sites[func.attr] = (enclosing.get(id(call)), call.lineno)
+
+    def resolve(name: str, seen: frozenset[str]) -> tuple[int, ...]:
+        if name in seen or name not in sites:
+            return ()
+        caller, line = sites[name]
+        if caller is None:
+            return (line,)
+        return resolve(caller, seen | {name}) + (line,)
+
+    return {name: resolve(name, frozenset()) for name in funcs}
 
 
-def _pos(node: ast.AST, effective: dict[int, int]) -> tuple[int, int]:
-    """Execution position: ``(call site of the enclosing helper, own line)``.
+def _position_map(tree: ast.Module) -> dict[int, tuple[int, ...]]:
+    """Map ``id(node)`` to its execution position.
 
-    Both halves are needed. The call site alone orders across functions but
-    collapses every statement inside one helper to a single value, so a
-    correct answer and a delete-first violation factored into the same
-    helper become indistinguishable. Own line alone is source position,
-    which is what this replaced. Ranking on the pair keeps the cross-function
-    fix and the ordering within a function.
+    The position is the call-site path of the enclosing helper followed by
+    the node's own line, so tuples compare lexicographically: across
+    functions by where each is called, and within one function by line.
+    Every node is mapped, not only calls -- the peer-list read is an
+    ``ast.Attribute`` and is compared against delete positions, so mapping
+    one side and not the other puts the comparison in two coordinate systems.
     """
-    return effective.get(id(node), node.lineno), node.lineno
+    prefixes = _function_prefixes(tree)
+    enclosing = _enclosing_functions(tree)
+    out: dict[int, tuple[int, ...]] = {}
+    for node in ast.walk(tree):
+        if not hasattr(node, "lineno"):
+            continue
+        fn = enclosing.get(id(node))
+        out[id(node)] = prefixes.get(fn, ()) + (node.lineno,) if fn else (node.lineno,)
+    return out
+
+
+def _pos(node: ast.AST, positions: dict[int, tuple[int, ...]]) -> tuple[int, ...]:
+    """Execution position of ``node``."""
+    return positions.get(id(node), (getattr(node, "lineno", 0),))
 
 
 def _peer_delete_calls(tree: ast.Module) -> list[ast.Call]:
@@ -2200,13 +2229,41 @@ def _peer_delete_calls(tree: ast.Module) -> list[ast.Call]:
     return calls
 
 
-def _deletes_a_holder(call: ast.Call, holders: set[str]) -> bool:
+def _holder_fetch_ids(tree: ast.Module, holders: set[str]) -> set[str]:
+    """The ``id=`` expressions the holder nodes were fetched with.
+
+    A generator that fetched ``site`` with ``id=data["site"]["id"]`` already
+    has that expression in hand and can delete the holder by repeating it,
+    never naming ``site`` at the delete. Recording what each holder was
+    fetched with is what lets the guard recognise that spelling.
+    """
+    out: set[str] = set()
+    for stmt in ast.walk(tree):
+        if not (isinstance(stmt, ast.Assign) and len(stmt.targets) == 1):
+            continue
+        target = stmt.targets[0]
+        if not (isinstance(target, ast.Name) and target.id in holders):
+            continue
+        value = stmt.value
+        if isinstance(value, ast.Await):
+            value = value.value
+        if not (isinstance(value, ast.Call) and _is_self_client_method(value, "get")):
+            continue
+        for kw in value.keywords:
+            if kw.arg == "id":
+                out.add(ast.unparse(kw.value))
+    return out
+
+
+def _deletes_a_holder(
+    call: ast.Call, holders: set[str], holder_ids: set[str]
+) -> bool:
     """True when ``call`` deletes a node that holds a relationship in play.
 
-    Both spellings have to be tested. ``site.delete()`` names its target as
+    Three spellings have to be tested. ``site.delete()`` names its target as
     the receiver; ``self.client.delete(kind=..., id=site.id)`` names it in
-    the ``id`` keyword, and checking only the receiver let the second form
-    skip the guard entirely.
+    the ``id`` keyword; and ``self.client.delete(kind=..., id=data["site"]["id"])``
+    names neither, repeating the expression the holder was fetched with.
     """
     func = call.func
     if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
@@ -2221,6 +2278,8 @@ def _deletes_a_holder(call: ast.Call, holders: set[str]) -> bool:
                 if value.value.id in holders:
                     return True
             elif isinstance(value, ast.Name) and value.id in holders:
+                return True
+            if ast.unparse(value) in holder_ids:
                 return True
     return False
 
@@ -2280,9 +2339,10 @@ def check_peer_delete_present(tree: ast.Module | None, **_: Any) -> tuple[bool, 
     # every saved name, or to every alias base, excludes peers that are
     # perfectly ordinary to save or read an attribute off before deleting.
     holders = {n for n, _ in chains}
+    holder_ids = _holder_fetch_ids(tree, holders)
 
     for call in _peer_delete_calls(tree):
-        if _deletes_a_holder(call, holders):
+        if _deletes_a_holder(call, holders, holder_ids):
             continue  # deleting the holder, not one of its peers
         return True, "the stale peers are deleted from Infrahub"
 
@@ -2336,7 +2396,7 @@ def check_detach_precedes_peer_delete(
         return False, "No Python source to inspect"
 
     aliases = _manager_aliases(tree)
-    effective = _effective_lineno_map(tree)
+    positions = _position_map(tree)
 
     deletes = _peer_delete_calls(tree)
     if not deletes:
@@ -2374,32 +2434,32 @@ def check_detach_precedes_peer_delete(
         and node.attr in _PEER_READ_ATTRS
         and _chain_for(node.value, aliases)
     ]
-    first_read = min((_pos(r, effective) for r in reads), default=None)
+    first_read = min((_pos(r, positions) for r in reads), default=None)
 
-    relevant = [c for c in deletes if first_read is None or _pos(c, effective) >= first_read]
+    relevant = [c for c in deletes if first_read is None or _pos(c, positions) >= first_read]
     if not relevant:
         return False, "no recognised peer delete to order against"
-    first_delete = min(_pos(c, effective) for c in relevant)
+    first_delete = min(_pos(c, positions) for c in relevant)
 
     for call, (n_name, rel) in considered:
         later_saves = [
             s
             for s in _save_calls_on(tree, n_name)
-            if _pos(s, effective) > _pos(call, effective)
+            if _pos(s, positions) > _pos(call, positions)
         ]
         if not later_saves:
             continue
-        save_pos = min(_pos(s, effective) for s in later_saves)
+        save_pos = min(_pos(s, positions) for s in later_saves)
         if save_pos < first_delete:
             return True, (
                 f"{n_name}.{rel}.remove() (line {call.lineno}) runs before "
-                f"{n_name}.save() (line {save_pos[1]}), which runs before "
-                f"the first peer delete (line {first_delete[1]})"
+                f"{n_name}.save() (line {save_pos[-1]}), which runs before "
+                f"the first peer delete (line {first_delete[-1]})"
             )
 
     return False, (
         "a detach exists but no save of the detached node runs between it and "
-        f"the first peer delete (line {first_delete[1]}); the peers are deleted "
+        f"the first peer delete (line {first_delete[-1]}); the peers are deleted "
         "while the node still holds them"
     )
 

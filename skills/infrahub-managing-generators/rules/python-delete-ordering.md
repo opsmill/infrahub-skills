@@ -164,4 +164,15 @@ stays uninitialized and the save cannot touch it, and let
 is the only shape here that is both correctly ordered and
 safe under concurrent writers.
 
+**Check the relationship's kind before you rely on that.**
+Not naming it is only enough for a relationship the plain
+fetch actually skips. An `Attribute` or `Parent` kind comes
+back hydrated regardless, per the carve-out above, and
+tag-style relationships are exactly the shared, contended
+ones this case is about. Where the kind puts it in the
+payload anyway, there is no unhydrated handle to be had:
+re-fetch it into a separate handle you never save, and keep
+every write to that relationship on
+`add_relationships()` / `remove_relationships()`.
+
 Verified against Infrahub 1.11.2 and infrahub-sdk 1.23.2.

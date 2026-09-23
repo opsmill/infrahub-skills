@@ -83,11 +83,24 @@ When that bar is met:
 
 Taken once, for
 `skills/infrahub-managing-generators/rules/python-delete-ordering.md`
-(#147). Three scenarios, roughly a dozen trials. Forcing
-hydration is the only way to make the bug reachable, and
-forcing hydration requires `.add()` on the manager, at
-which point `.remove()` is the obvious partner and the
-model writes it unprompted.
+(#147). Four scenarios, around twenty trials.
+
+The bug needs the relationship hydrated on the node being
+saved. That precondition is itself the cue: once the peers
+are in hand, detaching them before deleting reads as the
+obvious order, and the model writes it unprompted. The
+last scenario is the one that settles it, because it
+reaches hydration for free through an `Attribute`-kind
+relationship rather than through any call the model has to
+make, and still scored 1.0 with the skill unread.
+
+An earlier version of this entry claimed the mechanism was
+`.add()` on the manager forcing hydration. That was wrong,
+and it was caught in review rather than by this bar, which
+is worth recording: the first three scenarios all happened
+to reach hydration through `.add()`, so the sample looked
+like the cause. Name the mechanism from what the scenarios
+share, not from what the ones you happened to write share.
 
 ## When the grader and the rule disagree, decide which side moves
 

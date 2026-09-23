@@ -67,7 +67,14 @@ the whole-list write this rule exists to stop, and it
 drops whatever a concurrent run attached in between.
 Fetch the node without naming the relationship instead, so
 its manager stays uninitialized and the save cannot ship
-it --
+it.
+
+That works only where the plain fetch actually skips the
+relationship. A cardinality-many relationship of kind
+`Attribute` or `Parent` is hydrated by a plain
+`client.get()` anyway, and tag-style relationships are both
+the common case and the contended one. Check the kind
+rather than assuming --
 [python-delete-ordering.md](python-delete-ordering.md).
 
 ### `related_nodes` takes IDs, not nodes

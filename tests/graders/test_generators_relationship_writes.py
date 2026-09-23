@@ -1017,3 +1017,69 @@ def test_peer_read_in_a_helper_does_not_filter_out_every_delete():
         tree=_tree(DELETE_PEER_READ_IN_HELPER_BELOW)
     )
     assert ok, f"the read and the deletes must use one coordinate system: {msg}"
+
+
+# Fourth review round on #148. Depth-2 helpers and the payload-id spelling.
+
+DELETE_DEPTH2_HELPER_BAD = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    await self._reconcile(site, data)
+
+async def _reconcile(self, site, data):
+    stale_ids = [p.id for p in site.management_addresses.peers]
+    await self._purge(stale_ids)
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+
+async def _purge(self, ids):
+    for peer_id in ids:
+        addr = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        await addr.delete()
+"""
+
+DELETE_DEPTH2_HELPER_OK = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    await self._reconcile(site, data)
+
+async def _reconcile(self, site, data):
+    stale_ids = [p.id for p in site.management_addresses.peers]
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+    await self._purge(stale_ids)
+
+async def _purge(self, ids):
+    for peer_id in ids:
+        addr = await self.client.get(kind="IpamIPAddress", id=peer_id)
+        await addr.delete()
+"""
+
+DELETE_HOLDER_BY_PAYLOAD_ID = """
+async def generate(self, data):
+    site = await self.client.get(kind="LocationSite", id=data["site"]["id"])
+    stale_ids = [p.id for p in site.management_addresses.peers]
+    for peer_id in stale_ids:
+        site.management_addresses.remove(peer_id)
+    await site.save(allow_upsert=True)
+    await self.client.delete(kind="LocationSite", id=data["site"]["id"])
+"""
+
+
+def test_ordering_survives_a_helper_called_from_a_helper():
+    """Call sites resolve to a fixed point, so depth 2 orders correctly."""
+    bad, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_DEPTH2_HELPER_BAD)
+    )
+    assert not bad, f"purge reached before the detach is a violation at depth 2: {msg}"
+    good, msg = CHECKS["detach-precedes-peer-delete"](
+        tree=_tree(DELETE_DEPTH2_HELPER_OK)
+    )
+    assert good, f"the same depth-2 purge after the save is correct: {msg}"
+
+
+def test_holder_deleted_by_the_id_it_was_fetched_with():
+    ok, msg = CHECKS["peer-delete-present"](tree=_tree(DELETE_HOLDER_BY_PAYLOAD_ID))
+    assert not ok, f"deleting the holder by its payload id is not a peer delete: {msg}"
