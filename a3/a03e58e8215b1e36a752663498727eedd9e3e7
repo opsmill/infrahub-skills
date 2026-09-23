@@ -1,0 +1,22 @@
+scripts/jev-review.py
+  s_aafacfc47dd310::t_dd6ab83c979261 17,330-384
+tests/scripts/test_jev_review.py
+  s_aafacfc47dd310::t_b08d103c7c6084 10,367-370,375-431
+  s_aafacfc47dd310::t_afd7597c1027e7 371-374
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a3a03e58e8215b1e36a752663498727eedd9e3e7",
+  "prompts": {},
+  "sessions": {
+    "s_aafacfc47dd310": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c7a6fe13-0b0a-40f8-ba25-e5fae68a98a8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
