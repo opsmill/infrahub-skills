@@ -26,6 +26,11 @@ queries:
   - name: my_query              # Unique query identifier
     file_path: "queries/my_query.gql"
 
+# Reusable GraphQL fragments (spread into queries by name)
+graphql_fragments:
+  - name: interface_fields      # Unique identifier
+    file_path: "fragments/interfaces.gql"   # File or directory
+
 # Check definitions (validation logic)
 check_definitions:
   - name: my_check              # Unique identifier
@@ -115,6 +120,74 @@ recursively, sorted by filename.
 Each query needs a `name` (used to reference it from
 checks/transforms/generators) and a `file_path` to the
 `.gql` file.
+
+### `graphql_fragments`
+
+| Field | Required | Description |
+| ----- | -------- | ----------- |
+| `name` | Yes | Unique identifier |
+| `file_path` | Yes | A `.gql` fragment file, or a directory of them (not searched recursively) |
+
+Declares fragment files that queries can share, so one
+selection shape lives in one place. Requires Infrahub
+1.9.0, which itself requires infrahub-sdk 1.20.0. The
+config model forbids unknown keys, so an older version
+rejects the file rather than ignoring the section.
+
+A fragment reaches a query only when that query spreads
+it by name. The type after `on` must be a real schema
+kind:
+
+```graphql
+# fragments/interfaces.gql
+fragment interfaceFields on InfraInterfaceL3 {
+  name { value }
+  speed { value }
+}
+
+# queries/device_interfaces.gql
+query device_interfaces {
+  InfraInterface { edges { node { ...interfaceFields } } }
+}
+```
+
+Registering a file does nothing on its own. A query with
+no `...FragmentName` in it is stored exactly as written.
+
+Definitions are inlined when the repository syncs, and
+only the fragments a query actually spreads are included,
+so the stored query is self-contained. This deduplicates
+the source you maintain, not the document sent to the
+server.
+
+Entry names here and `fragment` names inside the `.gql`
+files are separate namespaces, and both have to be
+unique.
+
+Rendering runs only when entries are declared **and** the
+query spreads a fragment. Until both hold it is skipped,
+so a query spreading a fragment with nothing declared
+stores the unresolved spread as written and fails when
+the query runs.
+
+Once it runs, the failures differ in reach. Every
+declared entry is loaded and indexed whether or not
+anything spreads it, so a missing file (reported by its
+declared path, not by a fragment name) or a name defined
+twice across those files fails the repository import.
+Only the fragments the query actually reaches are then
+resolved, so a spread naming a fragment no declared file
+defines, and a cycle, fail on that chain alone. An
+unspread entry is therefore not inert.
+
+A local `infrahubctl generator`, `check`, `transform` or
+`render` re-renders each time, so these errors show up on
+a dry run.
+
+This is not an inline fragment (`... on SomeKind`), which
+narrows a selection to one type of a generic or union and
+shares nothing between files. That one is covered in
+[queries-union-fragments.md](../infrahub-managing-transforms/rules/queries-union-fragments.md).
 
 ### `check_definitions`
 

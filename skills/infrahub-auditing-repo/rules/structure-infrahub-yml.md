@@ -41,9 +41,9 @@ line finding.
 2. File is valid YAML (no syntax errors)
 3. Only recognized top-level keys are present:
    `schemas`, `menus`, `objects`, `queries`,
-   `check_definitions`, `python_transforms`,
-   `jinja2_transforms`, `artifact_definitions`,
-   `generator_definitions`
+   `graphql_fragments`, `check_definitions`,
+   `python_transforms`, `jinja2_transforms`,
+   `artifact_definitions`, `generator_definitions`
 4. `watch` appears only on `python_transforms`,
    `jinja2_transforms`, and `generator_definitions`;
    on any other section it fails the whole file's
