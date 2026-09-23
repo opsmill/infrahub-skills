@@ -1,0 +1,23 @@
+changelog/+jev-review.housekeeping.md
+  s_aafacfc47dd310::t_74a9231a40ba60 1
+AGENTS.md
+  s_aafacfc47dd310::t_74a9231a40ba60 67-69
+.github/workflows/jev-review.yml
+  s_aafacfc47dd310::t_74a9231a40ba60 1-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f300ffeee655f528ad750d928453779c9c7c2ce3",
+  "prompts": {},
+  "sessions": {
+    "s_aafacfc47dd310": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c7a6fe13-0b0a-40f8-ba25-e5fae68a98a8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
