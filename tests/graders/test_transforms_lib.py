@@ -619,7 +619,12 @@ def test_body_ready_accepts_lambda_called_by_name():
 
 
 def test_body_ready_rejects_uncalled_lambda():
-    """A lambda that is defined and never called gates nothing."""
+    """A lambda that is defined and never called gates nothing.
+
+    The gate here does not mention the name at all, which is the weak form
+    of this case; `test_body_ready_rejects_uncalled_lambda_named_in_gate`
+    covers the one where it does.
+    """
     src = "is_ready = lambda a: a.status.value == 'Ready'\n" + _helper(
         UNFILTERED, "len(artifacts) >= expected_count"
     )
@@ -645,4 +650,74 @@ def test_body_ready_rejects_empty_storage_id_values():
             "len(artifacts) >= expected_count",
         )
     )
+    assert not ok
+
+
+# -- third review round on PR #154 ----------------------------------------
+#
+# Expanding on any name *mentioned* under the gate treated mentioning as
+# gating. These pin what the gate actually consumes.
+
+
+def test_body_ready_rejects_uncalled_lambda_named_in_gate():
+    """`if is_ready and ...` tests that a function object exists.
+
+    That is true however the wait is gated, so it narrows nothing.
+    """
+    src = "is_ready = lambda a: a.status.value == 'Ready'\n" + _helper(
+        UNFILTERED, "is_ready and len(artifacts) >= expected_count"
+    )
+    ok, _ = _body_ready(src)
+    assert not ok
+
+
+def test_body_ready_rejects_projection_name_in_gate():
+    """A comprehension that *projects* storage_id is not narrowed by it."""
+    src = _helper(
+        UNFILTERED,
+        "results and len(artifacts) >= expected_count",
+        "        results = [{'id': a.id, 'storage_id': a.storage_id.value} "
+        "for a in artifacts]\n",
+    )
+    ok, _ = _body_ready(src)
+    assert not ok
+
+
+def test_body_ready_accepts_filter_with_named_predicate():
+    """`ready = list(filter(is_ready, artifacts))` is two hops from the gate."""
+    src = "is_ready = lambda a: a.storage_id.value\n" + _helper(
+        UNFILTERED,
+        "len(ready) >= expected_count",
+        "        ready = list(filter(is_ready, artifacts))\n",
+    )
+    ok, msg = _body_ready(src)
+    assert ok, msg
+
+
+def test_body_ready_accepts_predicate_def_in_comprehension():
+    src = "def is_ready(a):\n    return a.status.value == 'Ready'\n\n" + _helper(
+        UNFILTERED, "len([a for a in artifacts if is_ready(a)]) >= expected_count"
+    )
+    ok, msg = _body_ready(src)
+    assert ok, msg
+
+
+def test_body_ready_accepts_helper_def_returning_narrowed_list():
+    src = "def _downloadable(arts):\n    return [a for a in arts if a.storage_id.value]\n\n" + _helper(
+        UNFILTERED,
+        "len(ready) >= expected_count",
+        "        ready = _downloadable(artifacts)\n",
+    )
+    ok, msg = _body_ready(src)
+    assert ok, msg
+
+
+def test_body_ready_ignores_binding_from_another_function():
+    """Name resolution is scoped; a sibling function's `artifacts` is not ours."""
+    src = (
+        "def other(xs):\n"
+        "    artifacts = [a for a in xs if a.storage_id.value]\n"
+        "    return artifacts\n\n"
+    ) + _helper(UNFILTERED, "len(artifacts) >= expected_count")
+    ok, _ = _body_ready(src)
     assert not ok
