@@ -15,6 +15,7 @@ CHECKS = [
     "posts-artifact-generate-endpoint",
     "has-polling-loop",
     "polls-coreartifact-after-post",
+    "artifact-poll-requires-body-ready",
 ]
 
 if __name__ == "__main__":

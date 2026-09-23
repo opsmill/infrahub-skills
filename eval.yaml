@@ -1781,13 +1781,17 @@ tasks:
       Read the skill at skills/infrahub-managing-transforms/SKILL.md and
       follow its workflow and rules.
 
-      Task: Write a Python async helper named regenerate_and_wait that triggers
-      regeneration for an Infrahub artifact definition by POSTing to
-      /api/artifact/generate/<def-id>?branch=<branch>, then waits for completion
-      by polling CoreArtifact filtered by the definition until at least
-      `expected_count` instances exist. Time out after 60 seconds and raise
-      TimeoutError. The helper takes (client, def_id, expected_count, branch)
-      as parameters.
+      Task: A CI job gates a deployment on freshly rendered device configs. It
+      regenerates the artifacts for an Infrahub artifact definition, then
+      downloads each artifact's content and diffs it against the running
+      config before promoting the change.
+
+      Write a Python async helper named regenerate_and_wait that triggers
+      regeneration by POSTing to /api/artifact/generate/<def-id>?branch=<branch>,
+      then polls CoreArtifact for that definition and returns once regeneration
+      has finished for all `expected_count` artifacts. Time out after 60 seconds
+      and raise TimeoutError. The helper takes (client, def_id, expected_count,
+      branch) as parameters.
 
       Save ONLY the final Python helper to: output.py
     graders:
@@ -1796,12 +1800,14 @@ tasks:
         weight: 1.0
     expected_output: >-
       A Python async function that POSTs to /api/artifact/generate/<def-id>,
-      then polls CoreArtifact in a loop until count >= expected_count, with
-      a hard timeout.
+      then polls CoreArtifact in a loop until expected_count artifacts are
+      body-ready — status "Ready", or a present storage_id — rather than
+      merely present, with a hard timeout.
     expectations:
       - "Helper POSTs to /api/artifact/generate/<def-id>?branch=<branch>"
       - "Helper contains a loop (while or for) that waits for completion"
       - "Helper polls CoreArtifact via client.filters or client.get with kind='CoreArtifact'"
+      - "Acceptance counts only artifacts whose body is retrievable, not bare nodes"
       - "Hard timeout exists (raises after some seconds)"
     assertions:
       - name: posts-artifact-generate-endpoint
@@ -1815,6 +1821,11 @@ tasks:
         check: >-
           A call passes kind="CoreArtifact" (read of artifact state
           after the POST)
+      - name: artifact-poll-requires-body-ready
+        check: >-
+          The acceptance decision gates on artifact readiness — status
+          compared to "Ready", or a present storage_id — either as a query
+          filter or applied to the fetched artifacts before counting
 
   - name: transform-watch-dependencies
     trials: 3

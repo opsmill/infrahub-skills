@@ -268,6 +268,386 @@ def references_core_artifact_in_call(tree: ast.Module | None) -> bool:
     return False
 
 
+_ARTIFACT_READY_STATUS = "Ready"
+
+
+def _attribute_chain(node: ast.AST) -> list[str]:
+    """Attribute names of ``a.b.c`` as ``["b", "c"]``, outermost last.
+
+    Returns ``[]`` for anything that is not an attribute access.
+    """
+    names: list[str] = []
+    while isinstance(node, ast.Attribute):
+        names.append(node.attr)
+        node = node.value
+    return list(reversed(names))
+
+
+def _mentions_attribute(node: ast.AST, attr: str) -> bool:
+    """True if ``attr`` appears anywhere in an attribute chain under ``node``."""
+    return any(
+        attr in _attribute_chain(sub)
+        for sub in ast.walk(node)
+        if isinstance(sub, ast.Attribute)
+    )
+
+
+def _is_ready_status_value(node: ast.AST) -> bool:
+    """True for the literal ``"Ready"`` or an ``ArtifactStatus.READY`` chain.
+
+    Deliberately narrow: ``"Error"`` and ``"Pending"`` are the other members of
+    Infrahub's ``ArtifactStatus`` enum, and comparing against either is error
+    handling, not a readiness gate.
+    """
+    if isinstance(node, ast.Constant) and node.value == _ARTIFACT_READY_STATUS:
+        return True
+    return any(name.upper() == "READY" for name in _attribute_chain(node))
+
+
+def _call_name(node: ast.AST) -> str:
+    """The bare callable name of a ``Call``: ``len``, ``filter``, ``filters``."""
+    if not isinstance(node, ast.Call):
+        return ""
+    func = node.func
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    if isinstance(func, ast.Name):
+        return func.id
+    return ""
+
+
+def _unwrap(node: ast.AST) -> ast.AST:
+    """Strip ``await`` and redundant parentheses/starred forms."""
+    while isinstance(node, (ast.Await, ast.Starred)):
+        node = node.value
+    return node
+
+
+class _Bindings:
+    """What the names visible at a gate were bound to, scoped to its function.
+
+    ``_assignment_sources`` used to be one flat module-wide map, which made a
+    rebinding of ``artifacts`` in an unrelated function reach this one. Names
+    are resolved here against the enclosing function first, then module level,
+    and never against a sibling function.
+    """
+
+    def __init__(self, tree: ast.Module) -> None:
+        self._scopes: dict[ast.AST, dict[str, list[ast.AST]]] = {}
+        self._parent: dict[ast.AST, ast.AST] = {}
+        self._functions: dict[str, list[ast.AST]] = {}
+        self._owner: dict[int, ast.AST] = {}
+        self._build(tree, tree)
+
+    def _build(self, node: ast.AST, scope: ast.AST) -> None:
+        self._scopes.setdefault(scope, {})
+        for child in ast.iter_child_nodes(node):
+            self._parent[child] = node
+            self._owner[id(child)] = scope
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                self._functions.setdefault(child.name, []).append(child)
+                self._build(child, child)
+                continue
+            self._record(child, scope)
+            self._build(child, scope)
+
+    def _record(self, node: ast.AST, scope: ast.AST) -> None:
+        targets: list[ast.AST] = []
+        value: ast.AST | None = None
+        if isinstance(node, ast.Assign):
+            targets, value = list(node.targets), node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets, value = [node.target], node.value
+        elif isinstance(node, ast.NamedExpr):
+            targets, value = [node.target], node.value
+        if value is None:
+            return
+        for target in targets:
+            if isinstance(target, ast.Name):
+                self._scopes[scope].setdefault(target.id, []).append(value)
+
+    def scope_of(self, node: ast.AST) -> ast.AST | None:
+        return self._owner.get(id(node))
+
+    def resolve(self, name: str, scope: ast.AST | None) -> list[ast.AST]:
+        """Expressions bound to ``name``, enclosing function first."""
+        found: list[ast.AST] = []
+        seen: set[int] = set()
+        current = scope
+        while current is not None:
+            for expr in self._scopes.get(current, {}).get(name, []):
+                if id(expr) not in seen:
+                    seen.add(id(expr))
+                    found.append(expr)
+            current = self._parent.get(current)
+        return found
+
+    def returns_of(self, name: str) -> list[ast.AST]:
+        """Every value a function of this name returns."""
+        out: list[ast.AST] = []
+        for func in self._functions.get(name, []):
+            for node in ast.walk(func):
+                if isinstance(node, ast.Return) and node.value is not None:
+                    out.append(node.value)
+        return out
+
+
+def _predicate_gates_on_ready_status(expr: ast.AST) -> bool:
+    """True if ``expr`` compares an artifact's ``status`` against ``"Ready"``."""
+    for sub in ast.walk(expr):
+        if not isinstance(sub, ast.Compare):
+            continue
+        operands = [sub.left, *sub.comparators]
+        if not any(_mentions_attribute(o, "status") for o in operands):
+            continue
+        for operand in operands:
+            if any(_is_ready_status_value(inner) for inner in ast.walk(operand)):
+                return True
+    return False
+
+
+def _is_readiness_test(expr: ast.AST) -> bool:
+    """A leaf predicate that distinguishes a ready artifact from a bare node.
+
+    Used for the places that genuinely filter: a comprehension's ``if``, a
+    lambda body, a predicate function's return value.
+    """
+    return _predicate_gates_on_ready_status(expr) or _mentions_attribute(
+        expr, "storage_id"
+    )
+
+
+def _selects_absent_storage(node: ast.AST) -> bool:
+    """True for a filter value that selects artifacts with *no* stored body.
+
+    ``None``, ``""`` and an empty container all mean "no storage id", and
+    ``True`` is how an ``isnull``-flavoured key spells the same thing.
+    """
+    if isinstance(node, ast.Constant):
+        return node.value is True or not node.value
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        return not node.elts or all(_selects_absent_storage(e) for e in node.elts)
+    return False
+
+
+def _call_has_readiness_filter(call: ast.Call) -> bool:
+    """True if this call pushes readiness into the query as a filter keyword.
+
+    Covers ``status__value="Ready"``, ``status__values=["Ready"]`` and
+    ``storage_id__isnull=False``. The value matters as much as the key, on
+    every spelling: ``storage_id__isnull=True`` and ``storage_id__value=None``
+    both select exactly the artifacts that have no body yet, so each is the
+    inverse of a readiness gate rather than one.
+    """
+    for kw in call.keywords:
+        if kw.arg is None:
+            continue
+        if kw.arg.startswith("storage_id"):
+            if "isnull" in kw.arg or "is_null" in kw.arg:
+                if isinstance(kw.value, ast.Constant) and kw.value.value is False:
+                    return True
+                continue
+            if _selects_absent_storage(kw.value):
+                continue
+            return True
+        if kw.arg.startswith("status"):
+            if any(_is_ready_status_value(v) for v in ast.walk(kw.value)):
+                return True
+    return False
+
+
+def _query_filters_on_readiness(tree: ast.Module) -> bool:
+    """True if any call in the module filters the query on readiness."""
+    return any(_call_has_readiness_filter(call) for call in _iter_calls(tree))
+
+
+_COLLECTION_WRAPPERS = ("list", "tuple", "set", "sorted", "reversed")
+
+
+def _is_readiness_callable(
+    node: ast.AST, binds: _Bindings, scope: ast.AST | None, depth: int
+) -> bool:
+    """True if ``node`` is a callable whose result is a readiness test.
+
+    A lambda written inline, a lambda bound to a name, or a ``def`` whose
+    returns test readiness. This is what makes ``filter(is_ready, artifacts)``
+    count while a lambda that is merely defined does not.
+    """
+    node = _unwrap(node)
+    if isinstance(node, ast.Lambda):
+        return _is_readiness_test(node.body)
+    if depth <= 0:
+        return False
+    if isinstance(node, ast.Name):
+        if any(
+            _is_readiness_callable(src, binds, scope, depth - 1)
+            for src in binds.resolve(node.id, scope)
+        ):
+            return True
+        return any(_is_readiness_test(r) for r in binds.returns_of(node.id))
+    return False
+
+
+def _resolved_readiness_test(
+    expr: ast.AST, binds: _Bindings, scope: ast.AST | None, depth: int
+) -> bool:
+    """``_is_readiness_test``, plus a predicate invoked by name.
+
+    ``[a for a in artifacts if is_ready(a)]`` narrows on readiness just as
+    much as the inline comparison does; the test simply lives behind a call.
+    """
+    if _is_readiness_test(expr):
+        return True
+    node = _unwrap(expr)
+    if isinstance(node, ast.BoolOp):
+        return any(
+            _resolved_readiness_test(v, binds, scope, depth) for v in node.values
+        )
+    if isinstance(node, ast.UnaryOp):
+        return _resolved_readiness_test(node.operand, binds, scope, depth)
+    if isinstance(node, ast.Call) and depth > 0:
+        if isinstance(node.func, ast.Name) and _is_readiness_callable(
+            node.func, binds, scope, depth
+        ):
+            return True
+        name = _call_name(node)
+        if name and any(_is_readiness_test(r) for r in binds.returns_of(name)):
+            return True
+    return False
+
+
+def _narrows_on_readiness(
+    comp: ast.AST, binds: _Bindings, scope: ast.AST | None, depth: int
+) -> bool:
+    """True if a comprehension's ``if`` clauses filter on readiness.
+
+    Only the generators' ``ifs`` count, never the element: a comprehension
+    that *projects* ``storage_id`` into a dict is not narrowed by it.
+    """
+    return any(
+        _resolved_readiness_test(test, binds, scope, depth)
+        for gen in comp.generators
+        for test in gen.ifs
+    )
+
+
+def _is_narrowed_collection(
+    node: ast.AST, binds: _Bindings, scope: ast.AST | None, depth: int = 3
+) -> bool:
+    """True if ``node`` is a collection already narrowed to ready artifacts.
+
+    This is the question the acceptance count actually depends on. A
+    comprehension that *projects* ``storage_id`` into a dict is not narrowed
+    by it, so only a generator's ``if`` clauses count, never its element.
+    """
+    node = _unwrap(node)
+    if depth <= 0:
+        return False
+    if isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp)):
+        return _narrows_on_readiness(node, binds, scope, depth)
+    if isinstance(node, ast.Name):
+        return any(
+            _is_narrowed_collection(src, binds, scope, depth - 1)
+            for src in binds.resolve(node.id, scope)
+        )
+    if isinstance(node, ast.Call):
+        if _call_has_readiness_filter(node):
+            return True
+        name = _call_name(node)
+        if name == "filter" and node.args:
+            return _is_readiness_callable(node.args[0], binds, scope, depth)
+        if name in _COLLECTION_WRAPPERS and node.args:
+            return _is_narrowed_collection(node.args[0], binds, scope, depth - 1)
+        if name:
+            # A helper such as `_downloadable(found)` narrows inside its body.
+            return any(
+                _is_narrowed_collection(r, binds, scope, depth - 1)
+                for r in binds.returns_of(name)
+            )
+    return False
+
+
+def _is_readiness_boolean(
+    node: ast.AST, binds: _Bindings, scope: ast.AST | None, depth: int = 3
+) -> bool:
+    """True if the *truth value* of ``node`` encodes "the artifacts are ready".
+
+    ``all(a.status.value == "Ready" for a in artifacts)`` qualifies, whether
+    written inline or hoisted into a name. A lambda does not: its truth value
+    is that a function object exists, which is true however the wait is gated.
+    A list's truth value says it is non-empty, not that it was narrowed.
+    """
+    node = _unwrap(node)
+    if depth <= 0:
+        return False
+    if isinstance(node, ast.Compare):
+        return _is_readiness_test(node)
+    if isinstance(node, ast.BoolOp):
+        return any(
+            _is_readiness_boolean(v, binds, scope, depth) for v in node.values
+        )
+    if isinstance(node, ast.UnaryOp):
+        return _is_readiness_boolean(node.operand, binds, scope, depth)
+    if isinstance(node, ast.Name):
+        return any(
+            _is_readiness_boolean(src, binds, scope, depth - 1)
+            for src in binds.resolve(node.id, scope)
+        )
+    if isinstance(node, ast.Call):
+        name = _call_name(node)
+        if name in ("all", "any") and node.args:
+            arg = _unwrap(node.args[0])
+            if isinstance(arg, (ast.ListComp, ast.SetComp, ast.GeneratorExp)):
+                if _resolved_readiness_test(arg.elt, binds, scope, depth):
+                    return True
+                return _narrows_on_readiness(arg, binds, scope, depth)
+            if _is_narrowed_collection(arg, binds, scope, depth):
+                return True
+        if name in ("all", "any", "map") and len(node.args) >= 1:
+            return _is_readiness_callable(node.args[0], binds, scope, depth)
+    return False
+
+
+def _gate_requires_readiness(
+    test: ast.AST, binds: _Bindings, scope: ast.AST | None
+) -> bool:
+    """True if this loop-ending condition cannot be met by bare nodes.
+
+    Two shapes qualify, and nothing else does. Either the condition's truth
+    value encodes readiness, or it sizes a collection that was already
+    narrowed to ready artifacts.
+    """
+    if _is_readiness_boolean(test, binds, scope):
+        return True
+    for sub in ast.walk(test):
+        if isinstance(sub, ast.Compare):
+            for operand in [sub.left, *sub.comparators]:
+                operand = _unwrap(operand)
+                if _call_name(operand) == "len" and operand.args:
+                    if _is_narrowed_collection(operand.args[0], binds, scope):
+                        return True
+                elif _is_narrowed_collection(operand, binds, scope):
+                    return True
+    return False
+
+
+def _gate_tests(tree: ast.Module) -> list[ast.AST]:
+    """Every expression evaluated as a condition, not merely present.
+
+    Assignments, f-strings, and bare call arguments are excluded on purpose:
+    setting ``artifact.status.value``, logging the word "Ready", or computing
+    an unused comparison is not a gate, and a check that accepted any of them
+    would grade vocabulary.
+    """
+    found: list[ast.AST] = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.If, ast.While, ast.IfExp, ast.Assert)):
+            found.append(node.test)
+        elif isinstance(node, ast.comprehension):
+            found.extend(node.ifs)
+    return found
+
+
 # ---------------------------------------------------------------------------
 # Union-fragments checks
 # ---------------------------------------------------------------------------
@@ -352,6 +732,34 @@ def check_polls_coreartifact_after_post(
     if references_core_artifact_in_call(tree):
         return True, "CoreArtifact read found after POST"
     return False, "No call references kind='CoreArtifact'"
+
+
+def check_artifact_poll_requires_body_ready(
+    tree: ast.Module | None = None, py_raw: str = "", **_: Any
+) -> tuple[bool, str]:
+    """The poll must accept only artifacts whose body is retrievable.
+
+    Infrahub creates the ``CoreArtifact`` node with ``status: "Pending"`` and
+    no ``storage_id``, then fills both in once the transform has rendered, so a
+    poll that counts nodes converges while a content fetch still 404s. The
+    acceptance decision has to gate on a readiness signal — ``status`` equal to
+    ``"Ready"``, or a present ``storage_id`` — either pushed into the
+    ``CoreArtifact`` query or applied to the fetched artifacts before counting.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+    if not has_post_to_artifact_generate(tree, py_raw):
+        return False, "No POST to /api/artifact/generate; nothing to poll"
+    if _query_filters_on_readiness(tree):
+        return True, "CoreArtifact query filters on artifact readiness"
+    binds = _Bindings(tree)
+    for test in _gate_tests(tree):
+        if _gate_requires_readiness(test, binds, binds.scope_of(test)):
+            return True, "Acceptance gate requires ready artifacts, not bare nodes"
+    return False, (
+        "Acceptance predicate counts CoreArtifact nodes without requiring a "
+        "retrievable body — no status == 'Ready' or storage_id gate"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1167,6 +1575,7 @@ CHECKS: dict[str, Any] = {
     "posts-artifact-generate-endpoint": check_posts_artifact_generate_endpoint,
     "has-polling-loop": check_has_polling_loop,
     "polls-coreartifact-after-post": check_polls_coreartifact_after_post,
+    "artifact-poll-requires-body-ready": check_artifact_poll_requires_body_ready,
     "dry-run-executes-query": check_dry_run_executes_query,
     "dry-run-before-merge": check_dry_run_before_merge,
     "watch-present-on-python-transforms": check_watch_present_on_python_transforms,
