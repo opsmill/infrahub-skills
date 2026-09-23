@@ -136,18 +136,20 @@ fi
 ```
 
 Then, guidance class only, prove the task measures the skill rather than the
-model. The green run above scored 1.0 with the skill read. Comment out the
-task's `Read the skill at ...` line and run the same task again:
+model. The green run above scored 1.0 with the skill read. Delete the task's
+`Read the skill at ...` line and run the same task again. Delete, not comment:
+`instruction:` is a block scalar, so a `#` leaves the pointer in the prompt.
 
 ```bash
-skillgrade --eval=<task> --trials=1     # skill unread, must score below 1.0
+skillgrade --eval=<task> --trials=1     # skill unread, expect below 1.0
 # then restore the line
 ```
 
-A task that still scores 1.0 with the skill unread is graded by the model, not
-by the rule you just wrote: harden the prompt, or grade something only the rule
-produces, then re-run with the line commented out to confirm the score drops.
-This proof only carries signal now that the rule exists, which is why
+Below 1.0 and the proof lands. A 1.0 does not mean the task is broken: the
+line is a pointer and the sandbox still ships the skill, so read the three
+cases in `dev/guides/running-evals.md` and report which one this is rather
+than hardening a prompt that was never the problem. This proof only carries
+signal now that the rule exists, which is why
 `test-driving-skill-changes` leaves it to this stage: with the rule absent the
 task scores below 1.0 either way.
 
@@ -242,8 +244,8 @@ Stop and report rather than guessing forward, when:
 - local mode, and the failing test already passes before any fix is applied
 - the fix the diagnosis calls for needs an artifact the recorded rung forbids
 - the targeted eval will not reach 1.0 after reasonable rewording
-- the discrimination run scores 1.0 with the skill unread and the prompt
-  cannot be hardened further
+- the discrimination run scores 1.0 with the skill unread and none of the
+  three readings in `dev/guides/running-evals.md` accounts for it
 - a gate fails for a reason outside the handoff's scope
 
 ## Common mistakes
@@ -253,7 +255,7 @@ Stop and report rather than guessing forward, when:
 | Weakening the grader instead of fixing the cause | The test passes, but the defect the handoff diagnosed is still there |
 | Adding a rule file when the rung said edit an existing one | Splits one concern across two files and pays a second grader and eval forever |
 | Linking the rule only from `_sections.md` | The rule is read after the mistake, which is the same as not writing it down |
-| Skipping the discrimination proof | A task that scores 1.0 with the skill unread measures the model, not the rule |
+| Skipping the discrimination proof | An unread run scoring 1.0 is unexplained until one of the three readings accounts for it |
 | Skipping the sweep | An old claim the change makes wrong survives next to the new one |
 | Committing `eval.yaml` without the regenerated JSON | `evaluations/*.json` silently diverges from the source it was built from |
 | Editing `CHANGELOG.md` by hand | Bypasses the fragment system that assembles the release notes |

@@ -190,13 +190,18 @@ exercise the rule*, and it must not carry the answer:
   the rule", and don't dictate the output schema — a
   prompt that names the fields it wants back is
   answerable without the skill.
-- **Prove it discriminates.** Comment out the
+- **Prove it discriminates.** Delete the
   instruction's `Read the skill at ...` line and run
   `skillgrade --eval=<task-name> --trials=1`
-  ([procedure](./running-evals.md#writing-good-eval-prompts)).
-  If the grader still scores 1.0, the task measures
-  the model, not the skill; make the prompt harder,
-  or grade something only the rule produces.
+  ([procedure](./running-evals.md#writing-good-eval-prompts)),
+  then restore the line before you run
+  `sync-evals.py`. It reads the task's skill off
+  that path and silently drops the task without it.
+  Below 1.0 and the task discriminates. A 1.0 is not
+  a verdict: each of the three readings in the linked
+  procedure carries its own disposition, and reading 2
+  is not a result until the prompt is hardened and
+  re-run.
 - **Reproduce the antipattern conditions.** Where the
   rule has a tempting wrong shape, put the temptation
   in the prompt instead of hoping the AI stumbles
@@ -268,15 +273,21 @@ compliant/violating pair catches neither. Hand-craft
 | Fixture | Expected |
 | ------- | -------- |
 | Compliant, written the way the rule shows | 1.0 |
-| Compliant, written differently — other field order, a helper, a synonym | 1.0 |
+| Compliant, refactored the way the check's traversal is vulnerable to | 1.0 |
 | Violating, obviously | < 1.0 |
 | Violating **near-miss** — satisfies the check's keyword while breaking the rule | < 1.0 |
 
 The last of each pair is the one that finds bugs:
 
-- **False fail.** A correct answer phrased differently
-  scores < 1.0. Write out the answer the rule's own
-  example shows and watch whether it passes.
+- **False fail.** A correct answer scores < 1.0. Vary
+  what the check actually reads, not the cosmetics. If
+  it walks the AST for call order, extract the calls
+  into a helper; if it reads a comparison in a test
+  position, hoist it into a variable; if it keys on a
+  node name, put two relationships on one node. Field
+  order and synonyms exercise nothing. Write out the
+  answer the rule's own example shows too, and watch
+  whether it passes.
 - **Laundering.** A violating answer scores 1.0
   because it mentions the right word, imports the
   right module, or names the right helper somewhere
@@ -312,7 +323,7 @@ hand edits:
 
 ```bash
 grep -rn "<old claim, command, or field>" \
-  skills/ graders/ eval.yaml evaluations/ dev/
+  skills/ graders/ eval.yaml dev/ .agents/skills/
 ```
 
 The hits that get missed are the ones outside
@@ -368,19 +379,30 @@ prose. If smoke fails:
 - [ ] New check function added to
   `graders/<skill>/lib.py` and registered in
   `CHECKS`, parsing rather than substring-matching
-- [ ] New task block added to `eval.yaml`, verified
-  to fail with the skill's `Read the skill at ...`
-  line commented out — unless the rule meets the
-  carve-out in
-  [rule-equals-test.md](../guidelines/rule-equals-test.md#when-no-task-can-score-the-rule),
-  which also means shipping no task grader script
+- [ ] New task block added to `eval.yaml`, run with
+  the skill's `Read the skill at ...` line deleted,
+  scoring below 1.0 or the 1.0 met by its reading's
+  disposition in running-evals.md
+- [ ] That line restored before `sync-evals.py` runs
 - [ ] `graders/<skill>/check_<task>.py` task grader
   script
+- [ ] (carve-out, replacing the three items above)
+  the rule meets
+  [rule-equals-test.md](../guidelines/rule-equals-test.md#when-no-task-can-score-the-rule),
+  which means no task and no task grader script. A
+  task grader's only call site is its task's `run:`
+  line, so one written without a task is a script
+  nothing ever invokes. Where the rule corrects
+  reference drift rather than model behaviour, a
+  pytest under `tests/` asserting our reference
+  against the upstream surface in both directions
+  takes its place
 - [ ] Grader run against all four fixtures, including
   the compliant variant and the violating
   near-miss
 - [ ] Old claims the rule contradicts swept from
-  `skills/`, `graders/`, and `eval.yaml`
+  `skills/`, `graders/`, `eval.yaml`, `dev/` and
+  `.agents/skills/`
 - [ ] `python scripts/sync-evals.py` run and the
   regenerated `evaluations/*.json` committed
 - [ ] `skillgrade --smoke` passes (or smoke failures
