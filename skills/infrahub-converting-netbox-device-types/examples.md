@@ -1,6 +1,6 @@
 # Examples
 
-Three worked conversions, from the simplest case to a
+Four worked conversions, from the simplest case to a
 schema extension that closes a coverage gap.
 
 ## 1. A single switch against the schema-library
@@ -183,7 +183,75 @@ Weight conversion shows up in the report:
 - Coerced weight: weight 16.1 lb converted to 7 kg
 ```
 
-## 3. Closing a coverage gap
+## 3. From a running NetBox, end to end
+
+The device types someone actually runs live in their own
+NetBox, not in the published library. Two commands cover
+the whole path.
+
+### Export
+
+```bash
+export NETBOX_TOKEN=...
+python scripts/netbox_export_device_types.py \
+  --url https://netbox.example.com \
+  --in-use --module-types \
+  --output-dir ./netbox-export
+```
+
+```text
+netbox-export/device-types/APC/ap7901.yaml
+netbox-export/device-types/Cisco/c9200-48p.yaml
+netbox-export/module-types/Juniper/EX9200-32XS.yaml
+...
+19 file(s) written to netbox-export
+
+Not carried into the library format:
+  - AP7901: power-ports: 1 of 1 unset 'type', which the library schema requires
+```
+
+That last line is the export equivalent of the coverage
+report. NetBox is the looser of the two formats, so it
+happily holds a power port with no type; the library
+schema requires one. The file is still written, because
+the data is real, but the gap is stated rather than left
+to surface later as a validation failure.
+
+### Convert
+
+The exported tree is the library format, so the
+converter takes it unchanged:
+
+```bash
+python scripts/netbox_to_infrahub_templates.py \
+  ./netbox-export/device-types ./netbox-export/module-types \
+  --mapping scripts/mappings/schema-library-modules.yml \
+  --output-dir ./generated \
+  --report ./generated/coverage-report.md
+```
+
+```text
+generated/01_manufacturers.yml     OrganizationManufacturer   rows=7
+generated/02_device_types.yml      DcimDeviceType             rows=18
+generated/03_device_templates.yml  TemplateDcimDevice         rows=18
+generated/04_module_types.yml      DcimModuleType             rows=1
+```
+
+### Load
+
+```bash
+infrahubctl branch create netbox-import
+for file in generated/0*.yml; do
+  infrahubctl object load "$file" --branch netbox-import
+done
+```
+
+Both reports are worth reading before that last step:
+the export report says what NetBox held that the file
+format could not carry, and the conversion report says
+what the file format held that your schema could not.
+
+## 4. Closing a coverage gap
 
 Console ports are skipped because schema-library has
 no node for them. Closing that gap is a schema change
