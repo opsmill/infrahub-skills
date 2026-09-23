@@ -396,10 +396,16 @@ _HAND_EDIT_LEAD = (
     r"(?:^|[.!?;,\n]|\b(?:and|so|then|but)\b)[ \t]*(?:[*\-+]|\d+\.)?[ \t]*(?:\*\*)?"
     r"(?:(?:just|simply|then|now|manually|instead)[ \t]+)*"
 )
+# Prose wraps. "Edit\n`schema.graphql` and add the attribute" is one
+# instruction split across two lines, so the gap has to survive a single
+# newline — but not a blank one, which ends the paragraph and with it any
+# claim that the filename is still this verb's object.
+_SOFT_WRAP = r"(?:[^.\n]|\n(?!\s*\n))"
+
 _HAND_EDIT_IMPERATIVE = re.compile(
     _HAND_EDIT_LEAD
     + r"(?P<verb>hand[- ]edit|edit|add|append|insert|paste|patch|write)\b"
-    + r"(?P<gap>[^.\n]{0,80}?)"
+    + r"(?P<gap>" + _SOFT_WRAP + r"{0,80}?)"
     + _SCHEMA_FILE,
     re.IGNORECASE,
 )
@@ -411,9 +417,9 @@ _HAND_EDIT_IMPERATIVE = re.compile(
 # `type DcimDevice` block lists serial_number" is a verification too.
 _OPEN_THEN_AUTHOR = re.compile(
     _HAND_EDIT_LEAD
-    + r"(?P<verb>open)\b(?P<gap>[^.\n]{0,80}?)"
+    + r"(?P<verb>open)\b(?P<gap>" + _SOFT_WRAP + r"{0,80}?)"
     + _SCHEMA_FILE
-    + r"[^.\n]{0,60}\b(?:add|append|insert|paste|write)\b",
+    + _SOFT_WRAP + r"{0,60}\b(?:add|append|insert|paste|write)\b",
     re.IGNORECASE,
 )
 
@@ -421,8 +427,14 @@ _OPEN_THEN_AUTHOR = re.compile(
 # different verb. "Add the field to your schema YAML, then re-export
 # `schema.graphql`" instructs an edit of the YAML; the file belongs to the
 # re-export, not to the `Add`.
+#
+# The `re-` prefix is optional because plenty of correct answers say "run
+# the export to update `schema.graphql`" or "export it again so
+# `schema.graphql` matches" — the same hand-off without the prefix. It was
+# mandatory while the gap was 25 characters, which hid the problem: those
+# gaps run to 50-60 characters and never reached the filename at all.
 _REGEN_CLAIMS_FILE = re.compile(
-    r"re-?export|re-?generat|refresh|re-?run|export-schema", re.IGNORECASE
+    r"(?:re-?)?export|re-?generat|refresh|re-?run", re.IGNORECASE
 )
 
 
@@ -473,16 +485,23 @@ def check_graphql_schema_regenerated(text: str) -> tuple[bool, str]:
         for match in pattern.finditer(text):
             if _REGEN_CLAIMS_FILE.search(match.group("gap")):
                 continue
-            # Negation is read from the verb's own clause, never across the
-            # boundary the lead anchored on. Measuring from `match.start()`
-            # inspected the *previous* sentence, which both suppressed a
-            # real hand-edit after "... is not there yet." and rejected
-            # "Add the field in YAML, not `schema.graphql`." — the most
-            # natural way to state the rule.
-            clause = text[match.start("verb") : match.end("gap")]
+            # Negation is read from the verb's own clause and nowhere else:
+            # from the verb to the filename, which is the span a negation
+            # has to sit in to be about this instruction.
+            #
+            # There was a second, wider `_is_negated` lookback here. It read
+            # across whatever boundary the lead anchored on, so a negation
+            # in the previous clause suppressed a real hand-edit — "... is
+            # not there yet; edit `schema.graphql` and add the attribute"
+            # scored as correct. Widening the lead to `; , and so then but`
+            # without widening `_NEGATED_BEFORE`'s `[^.\n]{0,40}$` left the
+            # two disagreeing about where a clause ends. The window below
+            # already covers in-clause negation, so the lookback only ever
+            # reached text that was not this instruction's.
+            # Newlines are collapsed first: `_NEGATED_BEFORE` stops at one,
+            # so a wrapped clause would hide its own negation.
+            clause = " ".join(text[match.start("verb") : match.end("gap")].split())
             if _NEGATED_BEFORE.search(clause.lower()):
-                continue
-            if _is_negated(text, match.start("verb")):
                 continue
             offenders.append(" ".join(match.group(0).split()))
 

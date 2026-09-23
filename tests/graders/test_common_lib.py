@@ -410,6 +410,43 @@ SCHEMA_ACCEPTED = [
         "`infrahubctl graphql export-schema`.",
         id="contrastive-not-the-schema-file",
     ),
+    # The hand-off to a regeneration verb is often written without the
+    # `re-` prefix, and those gaps are long enough that only a wide window
+    # reaches the filename at all.
+    pytest.param(
+        "Add the new attribute to your schema YAML and run the export to "
+        "update `schema.graphql`. Use `infrahubctl graphql export-schema` "
+        "to refresh it.",
+        id="the-export-without-the-re-prefix",
+    ),
+    pytest.param(
+        "Add the attribute in your schema YAML, load the branch, and export "
+        "it again so `schema.graphql` matches. Use `infrahubctl graphql "
+        "export-schema` afterwards.",
+        id="export-it-again",
+    ),
+    pytest.param(
+        "Add the attribute to the YAML, then regenerate `schema.graphql`. "
+        "Use `infrahubctl graphql export-schema`.",
+        id="regenerate-after-a-comma",
+    ),
+    # Prose wraps, so the clause tests have to survive a line break — in
+    # both directions.
+    pytest.param(
+        "Add the field in YAML, not\n`schema.graphql`. Then run "
+        "`infrahubctl graphql export-schema`.",
+        id="negation-across-a-line-break",
+    ),
+    pytest.param(
+        "Add the new attribute to your schema YAML and run the export to\n"
+        "update `schema.graphql`. Use `infrahubctl graphql export-schema`.",
+        id="regen-cue-across-a-line-break",
+    ),
+    pytest.param(
+        "Add the attribute to your schema YAML.\n\n`schema.graphql` is "
+        "regenerated. Run `infrahubctl graphql export-schema`.",
+        id="blank-line-ends-the-clause",
+    ),
     pytest.param(
         "Re-export with `infrahubctl graphql export-schema` rather than "
         "editing `schema.graphql` by hand.",
@@ -471,6 +508,38 @@ SCHEMA_REJECTED = [
         "Write `serial_number: TextAttribute!` into `schema.graphql`, then "
         "run `infrahubctl graphql export-schema`.",
         id="writing-into-the-file",
+    ),
+    # The lead anchors on `; , and so then but`, so a negation one
+    # punctuation class below a full stop must not reach across either.
+    pytest.param(
+        "Run `infrahubctl graphql export-schema`. The export reads main, so "
+        "`serial_number` is not there yet; edit `schema.graphql` and add the "
+        "attribute yourself.",
+        id="negation-across-a-semicolon",
+    ),
+    pytest.param(
+        "Run `infrahubctl graphql export-schema`. If the export does not "
+        "show it, add `serial_number` to `schema.graphql` manually.",
+        id="conditional-fallback-to-a-hand-edit",
+    ),
+    pytest.param(
+        "Run `infrahubctl graphql export-schema`. That usually works, but "
+        "add `serial_number` to `schema.graphql` yourself if it does not.",
+        id="hand-edit-after-a-but-clause",
+    ),
+    # The instruction wrapping between the verb and the filename is the
+    # commonest shape in markdown, and it slipped a gap that stopped at
+    # every newline.
+    pytest.param(
+        "Run `infrahubctl graphql export-schema`. The export reads main, so "
+        "it is missing. Edit\n`schema.graphql` and add the attribute "
+        "yourself.",
+        id="hand-edit-wrapped-before-the-filename",
+    ),
+    pytest.param(
+        "Open `schema.graphql` and\nadd `serial_number` under "
+        "`type DcimDevice`, then run `infrahubctl graphql export-schema`.",
+        id="open-then-author-across-a-line-break",
     ),
 ]
 
