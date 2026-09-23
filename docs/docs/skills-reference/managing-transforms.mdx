@@ -3,7 +3,7 @@ title: Transform Manager
 sidebar_position: 5
 ---
 
-The Transform Manager produces data transforms that convert Infrahub data into other formats — device configurations, JSON exports, CSV reports, and more. Transforms can be implemented as Python classes, Jinja2 templates, or a hybrid of both. The skill generates the transform code, GraphQL query, optional Jinja2 templates, and `.infrahub.yml` registration.
+The Transform Manager produces, modifies, and debugs data transforms that convert Infrahub data into other formats — device configurations, JSON exports, CSV reports, and more. Transforms can be implemented as Python classes, Jinja2 templates, or a hybrid of both. The skill generates the transform code, GraphQL query, optional Jinja2 templates, and `.infrahub.yml` registration.
 
 ## When to use
 
@@ -11,6 +11,7 @@ The Transform Manager produces data transforms that convert Infrahub data into o
 - Exporting infrastructure data to JSON, CSV, or other formats
 - Producing human-readable reports from graph data
 - Any scenario where Infrahub data needs to be rendered into a different representation
+- Changing what an existing transform or template renders, or working out why its output is wrong or an artifact fails to generate
 
 ## Transform types
 
@@ -47,6 +48,7 @@ Use when data needs preprocessing before rendering.
 - "Create a Jinja2 transform that produces Cisco IOS configuration for each device, pulling interface and BGP data from Infrahub"
 - "Write a Python transform that exports all IP addresses to a CSV file"
 - "Build a hybrid transform that generates vendor-specific configs — Cisco IOS for routers, Juniper JunOS for switches"
+- "The interface section of this config transform renders empty. Work out why and fix the template"
 
 ## Key rules enforced
 

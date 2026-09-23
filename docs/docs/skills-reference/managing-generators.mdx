@@ -3,7 +3,7 @@ title: Generator Manager
 sidebar_position: 4
 ---
 
-The Generator Manager produces Python generators that query Infrahub for design objects and automatically create or update the infrastructure objects derived from them. Generators are idempotent: re-running them updates existing objects rather than creating duplicates. The skill generates the Python class, GraphQL query, and `.infrahub.yml` registration.
+The Generator Manager produces, modifies, and debugs Python generators that query Infrahub for design objects and automatically create or update the infrastructure objects derived from them. Generators are idempotent: re-running them updates existing objects rather than creating duplicates. The skill generates the Python class, GraphQL query, and `.infrahub.yml` registration.
 
 ## When to use
 
@@ -11,6 +11,7 @@ The Generator Manager produces Python generators that query Infrahub for design 
 - Generating BGP sessions from a topology design
 - Creating any set of objects that should be derived from a design definition and kept in sync with it
 - Any scenario where "given this design, create these objects" needs to run repeatedly as the design evolves
+- Changing what an existing generator produces, or working out why a run created, skipped, or deleted the wrong objects
 
 ## What it produces
 
@@ -27,6 +28,7 @@ The `.infrahub.yml` entry tying them together carries a `watch` dependency decla
 - "Create a generator that takes a fabric design object and creates all spine and leaf devices with their loopback interfaces"
 - "Write a generator that creates BGP sessions between all spine-leaf pairs defined in a topology design"
 - "Generate IP address assignments for all interfaces based on a design's IP allocation scheme"
+- "Re-running this generator deleted an interface it did not create. Work out why and fix it"
 
 ## Key rules enforced
 

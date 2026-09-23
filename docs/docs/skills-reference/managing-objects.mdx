@@ -3,7 +3,7 @@ title: Object Manager
 sidebar_position: 2
 ---
 
-The Object Manager produces YAML data files for Infrahub infrastructure objects — devices, locations, organizations, interfaces, modules, and any custom node type. It applies the correct file structure, value mappings, and load order so files are ready to load into a running Infrahub instance.
+The Object Manager produces and updates YAML data files for Infrahub infrastructure objects — devices, locations, organizations, interfaces, modules, and any custom node type. It applies the correct file structure, value mappings, and load order so files are ready to load into a running Infrahub instance.
 
 ## When to use
 
@@ -12,6 +12,7 @@ The Object Manager produces YAML data files for Infrahub infrastructure objects 
 - Creating a batch of devices, interfaces, or IP addresses with consistent structure
 - Generating test or demo data for a schema
 - Adding new infrastructure objects to an existing instance
+- Updating attributes or relationships on objects already defined in a data file, or working out why a file fails to load
 
 ## What it produces
 
@@ -27,6 +28,7 @@ The Object Manager produces YAML data files for Infrahub infrastructure objects 
 - "Populate 5 locations: 2 regions, 2 sites within each region, and a rack in each site"
 - "Generate 48 interfaces on a device named `spine-01` using expand_range"
 - "Create organization objects for Cisco, Juniper, and Arista as manufacturers"
+- "Change the rack assignment on leaf-03 through leaf-06 and fix whatever is breaking the load"
 
 ## Key rules enforced
 

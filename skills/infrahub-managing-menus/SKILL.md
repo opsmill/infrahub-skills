@@ -1,9 +1,9 @@
 ---
 name: infrahub-managing-menus
 description: >-
-  Creates Infrahub custom navigation menus for the web UI sidebar, organizing node types into logical groups.
-  TRIGGER when: designing sidebar menus, grouping node types in UI, customizing Infrahub web interface navigation.
-  DO NOT TRIGGER when: designing schemas, writing checks or transforms, populating data objects.
+  Creates, modifies and debugs Infrahub custom navigation menus for the web UI sidebar, organizing node types into logical groups.
+  TRIGGER when: designing sidebar menus, grouping node types in UI, customizing Infrahub web interface navigation, modifying or extending an existing menu, changing the order, nesting, or icons inside a menu file, debugging why a menu item does not appear or lands in the wrong group.
+  DO NOT TRIGGER when: designing or modifying schemas, including setting menu_placement, icon, or order_weight on a schema node (use infrahub-managing-schemas), writing checks or transforms, populating data objects.
 allowed-tools:
   - Read
   - Write
@@ -42,6 +42,10 @@ Schema files (to identify available node types):
   with nested children
 - Configuring schema nodes to use custom menus
   instead of auto-generated ones
+- Reordering, renaming, or regrouping an existing
+  menu file
+- Debugging why a menu item does not appear, or
+  lands in the wrong group
 
 ## Rule Categories
 

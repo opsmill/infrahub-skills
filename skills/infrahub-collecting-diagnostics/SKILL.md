@@ -7,7 +7,9 @@ description: >-
   debugging, wants to collect logs/diagnostics, prepares a hand-off for OpsMill
   support, or reports a crash/timeout/connection issue (upgrade failure, stuck
   branch, container CrashLoopBackOff, 500s, OOM).
-  DO NOT TRIGGER when: a bundle has already been collected and the user wants
+  DO NOT TRIGGER when: debugging a check, transform, generator, menu, or schema
+  in the repository (use the infrahub-managing-* skills), a bundle has already
+  been collected and the user wants
   it analyzed (use infrahub-analyzing-diagnostics), filing a public GitHub
   issue (use infrahub-reporting-issues), or running operational queries
   (use infrahub-analyzing-data).

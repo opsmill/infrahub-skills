@@ -142,12 +142,12 @@ the skill fires at all.
 
 | Skill | Directory | Description |
 | ------- | ----------- | ------------- |
-| `infrahub-managing-schemas` | `skills/infrahub-managing-schemas/` | Schema nodes, generics, attributes, relationships |
-| `infrahub-managing-objects` | `skills/infrahub-managing-objects/` | YAML data files for infrastructure objects |
-| `infrahub-managing-checks` | `skills/infrahub-managing-checks/` | Python validation checks for proposed changes |
-| `infrahub-managing-generators` | `skills/infrahub-managing-generators/` | Design-driven automation |
-| `infrahub-managing-transforms` | `skills/infrahub-managing-transforms/` | Data transforms (Python/Jinja2) |
-| `infrahub-managing-menus` | `skills/infrahub-managing-menus/` | Custom navigation menus |
+| `infrahub-managing-schemas` | `skills/infrahub-managing-schemas/` | Schema nodes, generics, attributes, relationships (create, modify, debug) |
+| `infrahub-managing-objects` | `skills/infrahub-managing-objects/` | YAML data files for infrastructure objects (create, modify, debug) |
+| `infrahub-managing-checks` | `skills/infrahub-managing-checks/` | Python validation checks for proposed changes (create, modify, debug) |
+| `infrahub-managing-generators` | `skills/infrahub-managing-generators/` | Design-driven automation (create, modify, debug) |
+| `infrahub-managing-transforms` | `skills/infrahub-managing-transforms/` | Data transforms, Python/Jinja2 (create, modify, debug) |
+| `infrahub-managing-menus` | `skills/infrahub-managing-menus/` | Custom navigation menus (create, modify, debug) |
 | `infrahub-analyzing-data` | `skills/infrahub-analyzing-data/` | Live data analysis via MCP server |
 | `infrahub-auditing-repo` | `skills/infrahub-auditing-repo/` | Audit repository against best practices (incl. YAGNI / cost-to-fix rules) |
 | `infrahub-reporting-issues` | `skills/infrahub-reporting-issues/` | Route and prepare bug/feature reports for any opsmill/infrahub-* repo |

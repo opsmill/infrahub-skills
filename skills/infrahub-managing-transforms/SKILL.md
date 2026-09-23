@@ -1,8 +1,8 @@
 ---
 name: infrahub-managing-transforms
 description: >-
-  Creates Infrahub transforms that convert data into JSON, text, CSV, or device configs using Python or Jinja2 templates, with YAML-driven tests.
-  TRIGGER when: building config generation, data export, format conversion, Jinja2 templates, artifact pipelines, writing or running tests for a transform.
+  Creates, modifies and debugs Infrahub transforms that convert data into JSON, text, CSV, or device configs using Python or Jinja2 templates, with YAML-driven tests.
+  TRIGGER when: building config generation, data export, format conversion, Jinja2 templates, artifact pipelines, writing or running tests for a transform, modifying or extending an existing transform or template, debugging why a transform renders the wrong output or an artifact fails to generate.
   DO NOT TRIGGER when: designing schemas, writing validation checks, creating generators, querying live data.
 allowed-tools:
   - Read
@@ -41,6 +41,8 @@ Existing transforms:
 - Rendering Jinja2 templates with query data
 - Combining Python logic with Jinja2 rendering
 - Connecting transforms to artifacts for automated output
+- Changing what an existing transform or template renders
+- Debugging wrong output, or an artifact that fails to generate
 
 ## Rule Categories
 
