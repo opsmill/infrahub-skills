@@ -12,7 +12,7 @@ tasks:
   # --- Menu Creator --- #
   - name: flat-menu
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub menu for a small data center project. I have these schema
       nodes: DcimDevice, DcimInterface, LocationSite, and OrganizationManufacturer. I just
@@ -59,7 +59,7 @@ tasks:
 
   - name: hierarchical-menu
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
 
       Task: I need a hierarchical Infrahub menu for a network management project. I want
       two top-level groups: 'Infrastructure' (containing DcimServer, DcimSwitch, DcimPdu)
@@ -116,7 +116,7 @@ tasks:
 
   - name: generic-kind-menu
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
 
       Task: I have an Infrahub project with a location hierarchy (LocationRegion,
       LocationSite, LocationRoom, LocationRack) and some device nodes (DcimDevice,
@@ -172,7 +172,7 @@ tasks:
   # --- Schema Creator --- #
   - name: vlan-management
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema for a VLAN management system. I need a VLAN node
       with an id attribute (just the VLAN number), a name, a status that should be a
@@ -226,7 +226,7 @@ tasks:
 
   - name: circuit-management
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema for a circuit management system. A Circuit connects
       two endpoints (side A and side Z). Each CircuitEndpoint is installed in a specific
@@ -287,7 +287,7 @@ tasks:
 
   - name: location-hierarchy
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema for a location hierarchy: Region > Site > Room > Rack.
       Each level has a name and shortname. Objects should be easily identifiable in the UI.
@@ -338,7 +338,7 @@ tasks:
   - name: parent-relationships
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema for a rack-and-device inventory. A Rack contains many
       Devices, and each Device must belong to exactly one Rack — a device cannot exist
@@ -392,7 +392,7 @@ tasks:
   - name: uniqueness-scoped-by-relationship
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema in the 'Virtualization' namespace with a Cluster node
       (name) and a VirtualMachine node with a numeric 'vmid'. A VM records which cluster it
@@ -446,7 +446,7 @@ tasks:
   - name: inverse-identifier-reuse
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: A schema is already loaded into a running Infrahub instance. The DcimDevice node
       declares a forward relationship to its interfaces, and that relationship was first loaded
@@ -515,7 +515,7 @@ tasks:
   - name: computed-jinja2-name
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema for a BGP autonomous-system catalog. An AutonomousSystem
       node has an asn (number) and a description. The display name should NOT be entered by
@@ -563,7 +563,7 @@ tasks:
   - name: service-cascade
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema for a load-balancer VIP service. A VIPService has a
       name (Text) and references a frontend IP (IpamIPAddress). The VIPService owns a list
@@ -622,7 +622,7 @@ tasks:
   - name: device-artifact-target
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema for a network-device inventory. Define a generic
       GenericDevice (with shared attributes like hostname and role) and a concrete Device
@@ -685,7 +685,7 @@ tasks:
   - name: network-diagram-file-object
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Add a DcimNetworkDiagram node to my Infrahub schema. Each diagram is a Visio
       file attached to a LocationSite. Track a title, the author, and the date it was
@@ -750,7 +750,7 @@ tasks:
   - name: schema-generate-profile
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Model a network-device inventory where many devices share the
       same operational defaults (MTU, status, timezone) that operators want
@@ -784,7 +784,7 @@ tasks:
   - name: string-length-limits
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Create an Infrahub schema for a service-handoff intent model. Namespace: 'Service'.
 
@@ -856,7 +856,7 @@ tasks:
   - name: schema-branch-first
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Production incident — we need a new `maintenance_window` optional Dropdown
       attribute on DcimDevice live on our shared, team-wide Infrahub instance in the next 10
@@ -923,7 +923,7 @@ tasks:
   - name: schema-format-key-order
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md and follow its workflow and rules.
 
       Task: Our schema reviews are drowning in noise — every edit reshuffles keys and the
       real change gets lost, so CI now rejects any schema file that isn't in our canonical
@@ -991,7 +991,7 @@ tasks:
   - name: uniqueness-scope-per-kind
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md
       and follow its workflow and rules.
 
       Task: I have one node kind `NetEndpoint` and I am splitting it into
@@ -1084,7 +1084,7 @@ tasks:
   - name: global-check-registration
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-checks/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-checks/SKILL.md and follow its workflow and rules.
 
       Task: I need to register a global Infrahub check that detects rack unit collisions
       across all racks. The check class is RackUnitCollisionCheck and lives in
@@ -1139,7 +1139,7 @@ tasks:
   - name: targeted-check-registration
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-checks/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-checks/SKILL.md and follow its workflow and rules.
 
       Task: Register a targeted Infrahub check called LeafValidation that runs once per
       leaf device. The class is in checks/leaf.py, the GraphQL query is leaf_config stored
@@ -1198,7 +1198,7 @@ tasks:
   - name: relationship-traversal-check
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-checks/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-checks/SKILL.md and follow its workflow and rules.
 
       Task: Write a global check that stops an interface being brought into
       service ahead of the device it belongs to. Flag any InfraInterface
@@ -1261,7 +1261,7 @@ tasks:
   - name: check-error-surfaces
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-checks/SKILL.md and
+      Read the skill at skills/infrahub-managing-checks/SKILL.md and
       follow its workflow and rules.
 
       Task: Write a check that has to distinguish two different problems on
@@ -1337,7 +1337,7 @@ tasks:
   - name: check-shared-module
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-checks/SKILL.md and
+      Read the skill at skills/infrahub-managing-checks/SKILL.md and
       follow its workflow and rules.
 
       Task: One piece of logic in our repository, a VLAN allocation planner,
@@ -1411,7 +1411,7 @@ tasks:
   - name: generator-relationship-hfid-encoding
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      Read the skill at skills/infrahub-managing-generators/SKILL.md and
       follow its workflow and rules.
 
       Task: Write an Infrahub Generator that creates a DcimDevice named 'cEdge-1'
@@ -1459,7 +1459,7 @@ tasks:
   - name: generator-relationship-three-forms
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      Read the skill at skills/infrahub-managing-generators/SKILL.md and
       follow its workflow and rules.
 
       Task: Write an Infrahub Generator that creates a DcimDevice 'cEdge-1' and
@@ -1498,7 +1498,7 @@ tasks:
   - name: generator-multi-peer-iteration
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      Read the skill at skills/infrahub-managing-generators/SKILL.md and
       follow its workflow and rules.
 
       Task: Write an Infrahub Generator that creates a CoreStandardGroup named
@@ -1527,7 +1527,7 @@ tasks:
   - name: generator-concurrent-relationship-writes
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      Read the skill at skills/infrahub-managing-generators/SKILL.md and
       follow its workflow and rules.
 
       Task: Write an Infrahub Generator that runs once per created DcimDevice
@@ -1557,7 +1557,7 @@ tasks:
   - name: generator-natural-key-preflight
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      Read the skill at skills/infrahub-managing-generators/SKILL.md and
       follow its workflow and rules.
 
       Task: Write a Python script that creates an IpamPrefix '10.250.10.0/24'
@@ -1592,7 +1592,7 @@ tasks:
   - name: generator-process-integration-test
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      Read the skill at skills/infrahub-managing-generators/SKILL.md and
       follow its workflow and rules.
 
       Task: Write an Infrahub Generator that creates three DcimDevice instances
@@ -1644,7 +1644,7 @@ tasks:
   - name: generator-traversal-and-shared-object
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md
+      Read the skill at skills/infrahub-managing-generators/SKILL.md
       and follow its workflow and rules.
 
       Task: Write a generator that provisions a service. It runs once per
@@ -1742,7 +1742,7 @@ tasks:
   - name: transform-query-union-fragments
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-transforms/SKILL.md and
+      Read the skill at skills/infrahub-managing-transforms/SKILL.md and
       follow its workflow and rules.
 
       Task: Write a GraphQL query for a Jinja2 transform that fetches DcimDevice
@@ -1778,7 +1778,7 @@ tasks:
   - name: transform-artifact-regen-polling
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-transforms/SKILL.md and
+      Read the skill at skills/infrahub-managing-transforms/SKILL.md and
       follow its workflow and rules.
 
       Task: Write a Python async helper named regenerate_and_wait that triggers
@@ -1819,7 +1819,7 @@ tasks:
   - name: transform-watch-dependencies
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-transforms/SKILL.md and
+      Read the skill at skills/infrahub-managing-transforms/SKILL.md and
       follow its workflow and rules.
 
       Task: I am not confident our transform registrations in
@@ -1953,7 +1953,7 @@ tasks:
   - name: transform-query-dry-run-before-merge
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-transforms/SKILL.md and
+      Read the skill at skills/infrahub-managing-transforms/SKILL.md and
       follow its workflow and rules.
 
       Task: I just edited the GraphQL query (queries/device_config.gql) that feeds
@@ -2007,7 +2007,7 @@ tasks:
   - name: artifact-svg-content-type
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-transforms/SKILL.md
+      Read the skill at skills/infrahub-managing-transforms/SKILL.md
       and follow its workflow and rules.
 
       Task: I want an artifact that delivers a generated **rack elevation
@@ -2086,7 +2086,7 @@ tasks:
   - name: branch-first-load
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-objects/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-objects/SKILL.md and follow its workflow and rules.
 
       Task: Our Infrahub demo is in 15 minutes and my VP is watching. The ~1,200-device
       dataset under objects/ has to be visible in our shared, team-wide server now. I don't
@@ -2144,7 +2144,7 @@ tasks:
   - name: object-profiles-and-templates
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-objects/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-objects/SKILL.md and follow its workflow and rules.
 
       Task: Write an object data file (kind DcimDevice) that creates three
       leaf switches. leaf-01 and leaf-02 both take their default MTU, status,
@@ -2187,7 +2187,7 @@ tasks:
   - name: docs-fallback-delete-node
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-objects/SKILL.md
+      Read the skill at skills/infrahub-managing-objects/SKILL.md
       and follow its workflow and rules.
 
       Task: How do I delete an object/node in Infrahub after I've already
@@ -2218,7 +2218,7 @@ tasks:
   - name: common-dry-run-python-transform
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-common/SKILL.md and follow
+      Read the skill at skills/infrahub-common/SKILL.md and follow
       its rules.
 
       Task: I changed `queries/spine.gql`. It is the query behind a
@@ -2293,7 +2293,7 @@ tasks:
   - name: common-preflight-before-write
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-common/SKILL.md and follow
+      Read the skill at skills/infrahub-common/SKILL.md and follow
       its rules.
 
       Task: I am about to run `infrahubctl branch create` and then
@@ -2368,7 +2368,7 @@ tasks:
   - name: common-dry-run-generator
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-common/SKILL.md and follow
+      Read the skill at skills/infrahub-common/SKILL.md and follow
       its rules.
 
       Task: I changed `queries/dc_topology.gql`. It feeds a generator
@@ -2442,7 +2442,7 @@ tasks:
   # --- Issue Reporter --- #
   - name: bug-sanitization
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-issues/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-reporting-issues/SKILL.md and follow its workflow and rules.
 
       Task: A user is reporting a bug in the Infrahub Python SDK. Here is the raw context they shared:
 
@@ -2514,7 +2514,7 @@ tasks:
 
   - name: route-to-main-on-doubt
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-issues/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-reporting-issues/SKILL.md and follow its workflow and rules.
 
       Task: A user reports: "Something weird is happening — my schema loads fine in the UI
       but my Ansible playbook can't find one of the nodes. I'm not sure if it's a schema
@@ -2555,7 +2555,7 @@ tasks:
 
   - name: template-fidelity
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-issues/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-reporting-issues/SKILL.md and follow its workflow and rules.
 
       Task: A user wants to file a bug against opsmill/infrahub. Before composing the issue
       body, list the commands you would run to fetch the repo's bug_report.yml issue template
@@ -2600,7 +2600,7 @@ tasks:
   - name: collecting-diagnostics-performance
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-collecting-diagnostics/SKILL.md and
+      Read the skill at skills/infrahub-collecting-diagnostics/SKILL.md and
       follow its workflow and rules.
 
       Task: Infrahub feels very slow — the UI hangs and a task-worker was OOM-killed
@@ -2635,7 +2635,7 @@ tasks:
   - name: collecting-diagnostics-db-queries
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-collecting-diagnostics/SKILL.md and
+      Read the skill at skills/infrahub-collecting-diagnostics/SKILL.md and
       follow its workflow and rules.
 
       Task: Database operations are slow and some queries seem to fail on our
@@ -2670,7 +2670,7 @@ tasks:
   - name: collecting-diagnostics-basic-workflow
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-collecting-diagnostics/SKILL.md and
+      Read the skill at skills/infrahub-collecting-diagnostics/SKILL.md and
       follow its workflow and rules.
 
       Task: My proposed-change pipeline is failing and the repo won't load schemas
@@ -2710,7 +2710,7 @@ tasks:
   - name: analyzing-diagnostics-traceback-triage
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
       follow its workflow and rules.
 
       Task: I collected a diagnostic bundle with infrahub-collect after our
@@ -2771,7 +2771,7 @@ tasks:
   - name: analyzing-diagnostics-restart-correlation
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
       follow its workflow and rules.
 
       Task: Our Docker Compose Infrahub deployment fell over yesterday and I
@@ -2830,7 +2830,7 @@ tasks:
   - name: analyzing-diagnostics-issue-matching
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
       follow its workflow and rules.
 
       Task: Our task-workers will not start after an upgrade. In the diagnostic
@@ -2878,7 +2878,7 @@ tasks:
   - name: analyzing-diagnostics-version-context
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
       follow its workflow and rules.
 
       Task: After a proposed-change merge crashed halfway yesterday, every new merge
@@ -2939,7 +2939,7 @@ tasks:
   - name: analyzing-diagnostics-ask-bundle-location
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
       follow its workflow and rules.
 
       Task: I collected a diagnostic bundle with infrahub-collect yesterday after
@@ -2970,7 +2970,7 @@ tasks:
   - name: analyzing-diagnostics-benchmark-evaluation
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
       follow its workflow and rules.
 
       Task: Everything in Infrahub feels slow — queries take seconds and merges
@@ -3021,7 +3021,7 @@ tasks:
   - name: analyzing-diagnostics-benchmark-recommendation
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
       follow its workflow and rules.
 
       Task: Infrahub has been sluggish for a week on our Docker Compose
@@ -3065,7 +3065,7 @@ tasks:
   - name: analyzing-diagnostics-edition-cap
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
       follow its workflow and rules.
 
       Task: We run Infrahub at scale — around 200 concurrent automation clients.
@@ -3117,7 +3117,7 @@ tasks:
   - name: analyzing-diagnostics-service-sweep
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
       follow its workflow and rules.
 
       Task: Users report that saving changes in the Infrahub UI intermittently
@@ -3177,7 +3177,7 @@ tasks:
   - name: analyzing-diagnostics-scope-pressure
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-analyzing-diagnostics/SKILL.md and
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
       follow its workflow and rules.
 
       Task: Production is down and my boss is standing behind me. I collected a
@@ -3231,7 +3231,7 @@ tasks:
   - name: from-graphql-hydration-refactor
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-generators/SKILL.md and follow its workflow and rules.
 
       Task: Refactor an existing generator that performs an N+1 fetch
       pattern into one that uses response-driven hydration. The
@@ -3337,7 +3337,7 @@ tasks:
   - name: generator-watch-dependencies
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-generators/SKILL.md and
+      Read the skill at skills/infrahub-managing-generators/SKILL.md and
       follow its workflow and rules.
 
       Task: Register these two new Generators in `.infrahub.yml`. Both target
@@ -3436,7 +3436,7 @@ tasks:
   - name: practices-watch-dependencies
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 7. Emit JSON findings to output.json.
 
       This repository runs on Infrahub 1.11.1. Audit the registrations
@@ -3568,7 +3568,7 @@ tasks:
   - name: csv-import-single-kind-envelope
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have a single CSV file `manufacturers.csv` with the following columns
       and rows:
@@ -3608,7 +3608,7 @@ tasks:
   - name: csv-import-load-order-numbering
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have three CSVs that reference each other:
 
@@ -3659,7 +3659,7 @@ tasks:
   - name: csv-import-dropdown-name-not-label
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have `devices.csv` with display-label values for a dropdown attribute:
 
@@ -3710,7 +3710,7 @@ tasks:
   - name: csv-import-hfid-reference-shape
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have two CSV files referencing each other:
 
@@ -3758,7 +3758,7 @@ tasks:
   - name: csv-import-component-children-shape
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have `devices_with_interfaces.csv` where the device columns repeat
       per interface:
@@ -3803,7 +3803,7 @@ tasks:
   - name: csv-import-range-expansion
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have `interfaces.csv` for a single device, with 48 contiguous
       interface names all sharing the same role and status:
@@ -3849,7 +3849,7 @@ tasks:
   - name: csv-import-no-schema-mutation
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have `devices.csv` with an extra `gpu_count` column the schema
       does not declare:
@@ -3893,7 +3893,7 @@ tasks:
   - name: csv-import-value-coercion
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have `devices.csv` with a mix of attribute types whose values arrive as CSV strings:
 
@@ -3933,7 +3933,7 @@ tasks:
   - name: csv-import-empty-and-null
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have `manufacturers.csv` with optional attributes left blank in some rows:
 
@@ -3974,7 +3974,7 @@ tasks:
   - name: csv-import-csv-dialect
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have `manufacturers.csv` that was exported from a European
       spreadsheet — it is semicolon-delimited and has a UTF-8 BOM at the
@@ -4017,7 +4017,7 @@ tasks:
   - name: csv-import-pre-flight-closure
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have two CSVs that should produce internally consistent data:
 
@@ -4063,7 +4063,7 @@ tasks:
   - name: csv-import-provenance-comment
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have `manufacturers.csv` with two rows:
 
@@ -4104,7 +4104,7 @@ tasks:
   - name: csv-import-column-to-attribute
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have `devices.csv` with these CSV headers:
 
@@ -4154,7 +4154,7 @@ tasks:
   - name: csv-import-merge-same-kind
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have two CSV files that both map to the same target kind.
 
@@ -4206,7 +4206,7 @@ tasks:
   - name: csv-import-lineage-stamping
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: Import this CSV with lineage stamping turned on. Every value
       should be stamped with `source: csv-import-20260622` using the
@@ -4253,7 +4253,7 @@ tasks:
   - name: csv-import-fail-closed
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have `devices.csv` with a `license_tier` column the schema does
       not declare anywhere:
@@ -4294,7 +4294,7 @@ tasks:
   - name: csv-import-folder-coverage
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have a directory `./imports/` holding three CSV files, one kind
       each:
@@ -4351,7 +4351,7 @@ tasks:
   - name: csv-import-decomposition
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have ONE denormalized CSV that conflates three kinds — the site
       and manufacturer columns repeat on every device row:
@@ -4406,7 +4406,7 @@ tasks:
   # --- Auditing Repo (YAGNI) --- #
   - name: yagni-python-validator
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9 of the audit procedure (YAGNI / Cost-to-Fix). For this
       evaluation, emit findings as JSON to output.json (not the usual
       AUDIT_REPORT.md). Shape:
@@ -4467,7 +4467,7 @@ tasks:
 
   - name: yagni-python-validator-uniqueness-scope
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9 of the audit procedure (YAGNI / Cost-to-Fix). For this
       evaluation, emit findings as JSON to output.json (not the usual
       AUDIT_REPORT.md). Shape:
@@ -4598,7 +4598,7 @@ tasks:
 
   - name: yagni-redundant-graphql-check
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json (same shape as
       yagni-python-validator).
 
@@ -4645,7 +4645,7 @@ tasks:
 
   - name: yagni-python-vs-jinja2
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit this transform (transforms/interface_config.py):
@@ -4694,7 +4694,7 @@ tasks:
 
   - name: yagni-untyped-protocols
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json (same shape as
       yagni-python-validator).
 
@@ -4757,7 +4757,7 @@ tasks:
 
   - name: yagni-generator-hardcoding
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit these two generators:
@@ -4827,7 +4827,7 @@ tasks:
 
   - name: yagni-denormalized-rel
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit this schema (schemas/dcim.yml):
@@ -4892,7 +4892,7 @@ tasks:
 
   - name: yagni-duplicate-shape
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit this schema (schemas/devices.yml) — five device nodes each
@@ -4956,7 +4956,7 @@ tasks:
 
   - name: yagni-custom-ipam-vlan
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit this schema (schemas/ipam.yml) — defines custom IP-address
@@ -5004,7 +5004,7 @@ tasks:
 
   - name: yagni-missing-inverse
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit this schema (schemas/dcim.yml). The forward
@@ -5057,7 +5057,7 @@ tasks:
 
   - name: yagni-query-shape
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit this generator. The `.gql` references the trigger group
@@ -5113,7 +5113,7 @@ tasks:
 
   - name: yagni-imperative-allocation
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit these two generators:
@@ -5207,7 +5207,7 @@ tasks:
 
   - name: yagni-reuse-marketplace
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit these two schema files:
@@ -5296,7 +5296,7 @@ tasks:
 
   - name: yagni-profile-over-default
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit this schema and profile data:
@@ -5343,7 +5343,7 @@ tasks:
 
   - name: yagni-generator-should-be-template
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit this generator:
@@ -5380,7 +5380,7 @@ tasks:
 
   - name: yagni-unused-generate-flag
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit this repo excerpt:
@@ -5414,7 +5414,7 @@ tasks:
 
   - name: yagni-template-profile-confusion
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit this setup:
@@ -5467,7 +5467,7 @@ tasks:
 
   - name: yagni-findings-sorted
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json sorted by
       ladder_step ascending (cheapest fix on top), then by file path.
 
@@ -5559,7 +5559,7 @@ tasks:
   - name: audit-read-only-comparison
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       follow its audit procedure.
 
       Audit this repository. `git status --porcelain` reports:
@@ -5645,7 +5645,7 @@ tasks:
   - name: audit-reference-sites
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit this repository. `site_name` on DcimDevice duplicates
@@ -5757,7 +5757,7 @@ tasks:
   - name: audit-proposed-syntax
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       This repository targets Infrahub 1.11.1. You are auditing offline:
@@ -5834,7 +5834,7 @@ tasks:
   - name: audit-extraction-feasibility
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit these three schema files. They are already loaded on a live
@@ -5957,7 +5957,7 @@ tasks:
   - name: reporting-skill-gaps-tracker-no-match
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      Read the skill at skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: In this session, you used infrahub-managing-schemas to add a new
@@ -6005,7 +6005,7 @@ tasks:
   - name: reporting-skill-gaps-tracker-match
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      Read the skill at skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: In this session, you used infrahub-managing-schemas to add a new
@@ -6050,7 +6050,7 @@ tasks:
   - name: reporting-skill-gaps-triage
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      Read the skill at skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: This friction has now shown up in two separate sessions with
@@ -6092,7 +6092,7 @@ tasks:
   - name: reporting-skill-gaps-feature-gap
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      Read the skill at skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: While using infrahub-managing-generators, a generator needed to
@@ -6143,7 +6143,7 @@ tasks:
   - name: reporting-skill-gaps-product-bug
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      Read the skill at skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: While using infrahub-managing-schemas, you followed
@@ -6193,7 +6193,7 @@ tasks:
   - name: reporting-skill-gaps-existing-rule-bug
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      Read the skill at skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: While using infrahub-managing-schemas to set up a bidirectional
@@ -6242,7 +6242,7 @@ tasks:
   - name: reporting-skill-gaps-docs-gap
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      Read the skill at skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: While using infrahub-managing-generators, a generator needed to
@@ -6302,7 +6302,7 @@ tasks:
   - name: reporting-skill-gaps-docs-gap-unsettled
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      Read the skill at skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: While using infrahub-managing-transforms, a transform needed
@@ -6348,7 +6348,7 @@ tasks:
   - name: reporting-skill-gaps-handoff
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      Read the skill at skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: This friction has now shown up in two separate sessions with
@@ -6428,7 +6428,7 @@ tasks:
   - name: reporting-skill-gaps-cite-artifact
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      Read the skill at skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: While using infrahub-managing-checks to write a validation check,
@@ -6480,7 +6480,7 @@ tasks:
   - name: reporting-skill-gaps-detection-verifier
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      Read the skill at skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: You used infrahub-managing-schemas to add a relationship whose
@@ -6534,7 +6534,7 @@ tasks:
   - name: reporting-skill-gaps-detection-counters-only
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      Read the skill at skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: A session using infrahub-managing-generators felt slow. Looking
@@ -6576,7 +6576,7 @@ tasks:
   - name: reporting-skill-gaps-redaction
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-reporting-skill-gaps/SKILL.md and
+      Read the skill at skills/infrahub-reporting-skill-gaps/SKILL.md and
       follow its workflow and rules.
 
       Task: While using infrahub-managing-schemas for Quarrendon Vantis, you
@@ -6636,7 +6636,7 @@ tasks:
     trials: 3
     instruction: |
       Read the skill at
-      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      skills/infrahub-converting-netbox-device-types/SKILL.md and
       follow its workflow and rules.
 
       Task: I have this NetBox device-type definition saved as
@@ -6706,7 +6706,7 @@ tasks:
     trials: 3
     instruction: |
       Read the skill at
-      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      skills/infrahub-converting-netbox-device-types/SKILL.md and
       follow its workflow and rules.
 
       Task: Convert both of these NetBox device types into Infrahub object
@@ -6780,7 +6780,7 @@ tasks:
     trials: 3
     instruction: |
       Read the skill at
-      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      skills/infrahub-converting-netbox-device-types/SKILL.md and
       follow its workflow and rules.
 
       Task: Convert this NetBox device type into Infrahub object templates
@@ -6837,7 +6837,7 @@ tasks:
     trials: 3
     instruction: |
       Read the skill at
-      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      skills/infrahub-converting-netbox-device-types/SKILL.md and
       follow its workflow and rules.
 
       Task: Convert this NetBox device type for our OpsMill schema-library
@@ -6903,7 +6903,7 @@ tasks:
     trials: 3
     instruction: |
       Read the skill at
-      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      skills/infrahub-converting-netbox-device-types/SKILL.md and
       follow its workflow and rules.
 
       Task: I want to import NetBox device types as object templates. Here
@@ -6961,7 +6961,7 @@ tasks:
     trials: 3
     instruction: |
       Read the skill at
-      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      skills/infrahub-converting-netbox-device-types/SKILL.md and
       follow its workflow and rules.
 
       Task: Convert these two NetBox device types into a complete, loadable
@@ -7068,7 +7068,7 @@ tasks:
     trials: 3
     instruction: |
       Read the skill at
-      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      skills/infrahub-converting-netbox-device-types/SKILL.md and
       follow its workflow and rules.
 
       Task: Convert this NetBox device type for our OpsMill schema-library
@@ -7142,7 +7142,7 @@ tasks:
     trials: 3
     instruction: |
       Read the skill at
-      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      skills/infrahub-converting-netbox-device-types/SKILL.md and
       follow its workflow and rules.
 
       Task: Convert this NetBox device type into Infrahub object templates.
@@ -7234,7 +7234,7 @@ tasks:
     trials: 3
     instruction: |
       Read the skill at
-      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      skills/infrahub-converting-netbox-device-types/SKILL.md and
       follow its workflow and rules.
 
       Task: Convert these two NetBox **module type** definitions. Note they
@@ -7306,7 +7306,7 @@ tasks:
   - name: csv-import-up-front-interview
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I have `devices.csv` with these columns and rows:
 
@@ -7348,7 +7348,7 @@ tasks:
   - name: csv-import-profile-sample
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: Before mapping `inventory.csv` (which I will provide
       content-wise inline below), profile it: report distinct-value counts,
@@ -7386,7 +7386,7 @@ tasks:
   - name: csv-import-validate-error-mapping
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: After running `infrahubctl object validate ./output_dir/ --branch csv-import-20260622-1430`,
       the server returned:
@@ -7420,7 +7420,7 @@ tasks:
   - name: csv-import-self-check-against-managing-objects
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: After emitting Infrahub object YAML to ./output_dir/ (do this
       step first for the simple manufacturers CSV below), describe the
@@ -7458,7 +7458,7 @@ tasks:
   - name: csv-import-create-branch-first
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: Walk me through the validate-and-load sequence after the
       local self-check passes for a hypothetical ./output_dir/. Include
@@ -7490,7 +7490,7 @@ tasks:
   - name: csv-import-introspect-first
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: Before mapping `devices.csv` to the schema, describe how you
       would discover the schema. List the priority chain (MCP →
@@ -7521,7 +7521,7 @@ tasks:
   - name: csv-import-file-folder-list-input
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-importing-data/SKILL.md and follow its workflow and rules.
 
       Task: I will hand you any of three input shapes — a single CSV
       file, a directory of CSVs, or an explicit list of paths. Describe
@@ -7550,7 +7550,7 @@ tasks:
   - name: generic-inheritance-limits
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md
       and follow its workflow and rules.
 
       Task: Model ports and devices with two flat generics, `DcimDevice`
@@ -7627,7 +7627,7 @@ tasks:
   # --- Check Creator --- #
   - name: yagni-duplicate-shape-paired-rel
     instruction: |
-      Read the skill at .agents/skills/infrahub-auditing-repo/SKILL.md and
+      Read the skill at skills/infrahub-auditing-repo/SKILL.md and
       walk Phase 9. Emit JSON findings to output.json.
 
       Audit this schema (schemas/ports.yml) — three port nodes each
@@ -7724,7 +7724,7 @@ tasks:
   - name: reuse-kind-availability
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md
       and follow its workflow and rules.
 
       Task: I need a `NetEndpoint` node. Each endpoint is tagged, and each
@@ -7794,7 +7794,7 @@ tasks:
   - name: reuse-per-generic
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md
       and follow its workflow and rules.
 
       Task: I need a `NetOpticalEndpoint` node, and each endpoint is
@@ -7855,7 +7855,7 @@ tasks:
   - name: generic-membership-addition
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md
       and follow its workflow and rules.
 
       Task: We already have a `NetEndpoint` generic with two implementers,
@@ -7919,7 +7919,7 @@ tasks:
   - name: cardinality-shared-peer
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-schemas/SKILL.md
+      Read the skill at skills/infrahub-managing-schemas/SKILL.md
       and follow its workflow and rules.
 
       Task: I have this working schema. Today each service gets its own
@@ -8031,7 +8031,7 @@ tasks:
   - name: teach-probe-first
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
 
       Task: I'm brand new to Infrahub and honestly not sure where to start.
       Can you teach me what it actually is and how it thinks about data?
@@ -8061,7 +8061,7 @@ tasks:
   - name: teach-structured-lesson
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
 
       Task: Teach me how branches work in Infrahub. I know git well, so feel
       free to build on that.
@@ -8086,7 +8086,7 @@ tasks:
   - name: teach-record-progress
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
 
       Task: Teach me how GraphQL queries work in Infrahub. I'll be away next
       week, so keep track of what we covered for when I'm back.
@@ -8115,7 +8115,7 @@ tasks:
   - name: teach-sandbox-branch
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
 
       Task: We run Infrahub in production for my team. I want to properly
       understand proposed changes by doing one for real on our instance, not
@@ -8150,7 +8150,7 @@ tasks:
   - name: teach-verified-solution
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
 
       Task: My repo has this schema file at schemas/testbed.yml:
 
@@ -8199,7 +8199,7 @@ tasks:
   - name: teach-learner-authors
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
 
       Task: My repo has this schema file at schemas/testbed.yml:
 
@@ -8242,7 +8242,7 @@ tasks:
   - name: teach-hint-ladder
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
 
       Task: We are mid-lesson. The workspace ./.infrahub-learning/ already
       exists with this lesson at lessons/schema.md:
@@ -8311,7 +8311,7 @@ tasks:
   - name: teach-own-artifacts
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
 
       Task: My repo has this schema file at schemas/testbed.yml:
 
@@ -8361,7 +8361,7 @@ tasks:
   - name: teach-cite-docs
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
 
       Task: What are transforms in Infrahub? Teach me properly, I keep
       hearing the term and nodding along.
@@ -8388,7 +8388,7 @@ tasks:
   - name: teach-graduation
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
 
       Task: Teach me what generators are in Infrahub and when I'd want one.
 
@@ -8416,7 +8416,7 @@ tasks:
   - name: teach-off-map
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
 
       Task: Teach me how webhooks work in Infrahub. We want to notify an
       external system when data changes.
@@ -8444,7 +8444,7 @@ tasks:
   - name: teach-competitor-mapping
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
 
       Task: I'm coming from NetBox, where we lean heavily on config
       contexts. What's the equivalent way of doing that in Infrahub? Teach
@@ -8477,7 +8477,7 @@ tasks:
   - name: teach-competitor-mapping-sourced
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-teaching-concepts/SKILL.md and follow its workflow and rules.
 
       Task: I'm coming from NetBox. Here is the page our team works from
       for config contexts:

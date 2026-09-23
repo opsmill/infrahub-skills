@@ -269,7 +269,7 @@ three digits, not five:
 
 ```bash
 SCOPE=(dev/guidelines dev/guides dev/knowledges AGENTS.md
-       skills/*/*.md skills/*/rules/ .claude/skills/)
+       skills/*/*.md skills/*/rules/ .agents/skills/)
 EXCL=(--exclude=examples.md --exclude='*reference.md'
       --exclude-dir=harvesting-skill-review)
 

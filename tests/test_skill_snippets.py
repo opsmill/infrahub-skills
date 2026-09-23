@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-SKILL_DIR = ROOT / ".claude/skills"
+SKILL_DIR = ROOT / ".agents" / "skills"
 
 BASH_BLOCK = re.compile(r"```bash\n(.*?)```", re.S)
 PLACEHOLDER = re.compile(r"<[^>\n]+>")
