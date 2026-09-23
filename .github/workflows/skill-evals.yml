@@ -4,11 +4,6 @@ name: Skill Evaluations
 on:
   workflow_call:
     inputs:
-      preset:
-        description: "Skillgrade preset (smoke, reliable, regression)"
-        required: false
-        type: string
-        default: "smoke"
       model:
         description: "Agent model under test (haiku, sonnet)"
         required: false
@@ -29,10 +24,6 @@ on:
         required: true
   workflow_dispatch:
     inputs:
-      preset:
-        description: "Skillgrade preset (smoke, reliable, regression)"
-        required: false
-        default: "smoke"
       model:
         description: "Agent model under test"
         required: false
@@ -149,9 +140,10 @@ jobs:
           # Model used by the llm_rubric grader
           ANTHROPIC_MODEL: ${{ env.GRADER_MODEL }}
         run: |
+          # Trial count comes from eval.yaml (defaults.trials). No preset flag:
+          # --smoke/--reliable/--regression would override it with 5/15/30.
           echo "Agent model: $EVAL_MODEL | grader: $ANTHROPIC_MODEL | parallel: $EVAL_PARALLEL"
           skillgrade \
-            --${{ inputs.preset || 'smoke' }} \
             --ci \
             --provider=local \
             --agent=claude \
