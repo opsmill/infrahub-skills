@@ -81,6 +81,10 @@ Contents:
 - **Profiles and Object Templates**: when to use shared default values (profiles) vs. cloneable object structures (templates), and their mechanics
 - **Shared rules**: git integration patterns, protocol/generated file handling, Python environment detection, and display label caching
 
+### `.infrahub.yml` version requirement for shared fragments
+
+Most of `.infrahub.yml` works across the [supported Infrahub versions](./installation-setup.mdx#prerequisites). One section does not: `graphql_fragments`, which lets multiple queries spread the same GraphQL selection by name instead of repeating it. That section requires Infrahub 1.9.0, which itself requires infrahub-sdk 1.20.0. The config model rejects unknown keys, so an older Infrahub does not skip the section, it rejects the whole `.infrahub.yml` file. Check your target Infrahub version before adding `graphql_fragments` to a repository that runs an older release.
+
 ## Context efficiency
 
 Each skill is self-contained but references shared resources by file path rather than embedding them. When the AI activates a skill, it loads:
