@@ -64,6 +64,13 @@ A custom menu doesn't replace the auto-menu — it
 augments it. Schemas need cooperating settings to
 avoid duplicates and stay UI-stable.
 
+Duplicates come from two places, and only one of them
+is the schema's. Nodes the auto-menu also emits are
+settled below with `include_in_menu: false`; sections
+Infrahub itself ships are settled in the menu file
+with `parent:`, covered in
+[rules/hierarchy-nesting.md](./rules/hierarchy-nesting.md).
+
 | If the menu item... | The schema must... | See |
 | ------------------- | ------------------ | --- |
 | Links to a schema node's list view via `kind:` | Define that node (or generic) so the URL resolves — and set `include_in_menu: false` on it to suppress the duplicate auto-menu entry | [rules/schema-integration.md](./rules/schema-integration.md) |
@@ -103,9 +110,13 @@ Follow these steps when creating a menu:
    the user wants flat or hierarchical navigation.
 2. **Read relevant rules** — Read `rules/format-structure.md`
    for the required YAML structure, `rules/item-properties.md`
-   for item fields, and `rules/hierarchy-nesting.md`
-   if nesting is needed. Read `rules/icons-reference.md`
-   to pick appropriate MDI icons.
+   for item fields, and `rules/icons-reference.md`
+   to pick appropriate MDI icons. Read
+   `rules/hierarchy-nesting.md` before placing any item,
+   flat menus included: Infrahub already ships IPAM,
+   Object Management, Branches and others, and anything
+   belonging in one of those attaches with `parent:`
+   rather than being declared again.
 3. **Generate the menu YAML** — Start with the
    `$schema` comment and `apiVersion`/`kind`/`spec`
    structure. Apply rules from step 2.
