@@ -164,18 +164,25 @@ Entry names here and `fragment` names inside the `.gql`
 files are separate namespaces, and both have to be
 unique.
 
-Once at least one entry is declared **and** a query
-spreads a fragment, a missing file, a spread naming a
-fragment no declared file defines, a name defined twice,
-and a cycle each fail the repository import and name the
-fragment. Until both hold, rendering is skipped and the
-fragment files are never read, so a query spreading a
-fragment with nothing declared stores its unresolved
-spread as written and fails when the query runs, and
-declared-but-unspread files are not validated at all. A
-local `infrahubctl generator`, `check`, `transform` or
-`render` re-renders each time, so these errors do show up
-on a dry run.
+Rendering runs only when entries are declared **and** the
+query spreads a fragment. Until both hold it is skipped,
+so a query spreading a fragment with nothing declared
+stores the unresolved spread as written and fails when
+the query runs.
+
+Once it runs, the failures differ in reach. Every
+declared entry is loaded and indexed whether or not
+anything spreads it, so a missing file (reported by its
+declared path, not by a fragment name) or a name defined
+twice across those files fails the repository import.
+Only the fragments the query actually reaches are then
+resolved, so a spread naming a fragment no declared file
+defines, and a cycle, fail on that chain alone. An
+unspread entry is therefore not inert.
+
+A local `infrahubctl generator`, `check`, `transform` or
+`render` re-renders each time, so these errors show up on
+a dry run.
 
 This is not an inline fragment (`... on SomeKind`), which
 narrows a selection to one type of a generic or union and
