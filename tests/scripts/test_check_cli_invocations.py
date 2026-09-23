@@ -1,10 +1,12 @@
 """Tests for scripts/check-cli-invocations.py.
 
-Two bypasses the reviewer proved by mutating the real tree: a nested fence
-inverts the tracked state, and the ignore marker silences a whole line
-instead of the one invocation it names. Both are reproduced here against
-synthetic fixtures rather than by mutating real docs pages, so the tests
-keep working however those pages are edited later.
+Bypasses the reviewer proved by mutating the real tree: a nested fence
+inverts the tracked state, the ignore marker silences a whole line instead
+of the one invocation it names, a second marker on the same line collides
+with the first, and a marker written with the invocation's arguments does
+not match the truncated form the scanner reports. All are reproduced here
+against synthetic fixtures rather than by mutating real docs pages, so the
+tests keep working however those pages are edited later.
 """
 
 from __future__ import annotations
@@ -102,6 +104,42 @@ def test_named_ignore_marker_still_silences_a_simple_line(monkeypatch, tmp_path:
         "<!-- cli-check: ignore infrahubctl schema validate -->",
     ]
     bad = _scan_only(monkeypatch, tmp_path, "named-marker.mdx", lines)
+    assert bad == {}
+
+
+def test_two_markers_on_one_line_do_not_collide(monkeypatch, tmp_path: Path) -> None:
+    """The second-round reviewer's proof: a markdown bullet is one line, so
+    a bullet naming two different invalid invocations needs two markers on
+    that one line. `_IGNORE` used a greedy `.search`, so the first marker's
+    capture swallowed the second marker whole, and neither invocation
+    matched its own marker's (garbled) text, so both failed, including the
+    first one, whose marker worked before a second marker was added.
+    """
+    lines = [
+        "* Direct every write path: `infrahubctl generator run` and "  # cli-check: ignore infrahubctl generator run
+        "`infrahubctl schema validate ./x`. "  # cli-check: ignore infrahubctl schema validate
+        "<!-- cli-check: ignore infrahubctl generator run --> "
+        "<!-- cli-check: ignore infrahubctl schema validate -->",
+    ]
+    bad = _scan_only(monkeypatch, tmp_path, "two-markers.mdx", lines)
+    assert "infrahubctl generator run" not in bad
+    assert "infrahubctl schema validate" not in bad
+
+
+def test_marker_naming_the_invocation_with_its_argument_matches(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """A marker names the command the way it actually reads in the prose,
+    argument included, rather than the bare two-token form the scanner
+    reports. The comment on `IGNORE_MARKER` promises the marker names "the
+    exact invocation it silences"; comparing raw text made naming the
+    command with its argument the one spelling that failed.
+    """
+    lines = [
+        "Run `infrahubctl schema validate ./schemas`. "  # cli-check: ignore infrahubctl schema validate
+        "<!-- cli-check: ignore infrahubctl schema validate ./schemas -->",
+    ]
+    bad = _scan_only(monkeypatch, tmp_path, "with-argument.mdx", lines)
     assert bad == {}
 
 

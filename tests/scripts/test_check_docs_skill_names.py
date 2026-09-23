@@ -111,6 +111,38 @@ def test_non_user_invocable_skill_with_no_page_is_not_reported(tmp_path: Path) -
     assert check_skill_directories(docs, skills) == []
 
 
+def test_user_invocable_false_in_body_does_not_exempt_a_skill(tmp_path: Path) -> None:
+    """The exemption reads only the frontmatter, not the whole file.
+
+    A skill whose body documents frontmatter shape (for example, an example
+    showing a *different* skill's `user-invocable: false` line) carries
+    that exact text at column 0 outside its own `---` block. Matching
+    anywhere in the file, `MULTILINE` included, would exempt a genuinely
+    user-invocable skill with no reference page, the reverse check this
+    script exists to run.
+    """
+    docs = tmp_path / "skills-reference"
+    skills = tmp_path / "skills"
+    docs.mkdir(parents=True)
+    d = skills / "infrahub-managing-widgets"
+    d.mkdir(parents=True)
+    (d / "SKILL.md").write_text(
+        "---\n"
+        "name: infrahub-managing-widgets\n"
+        "---\n"
+        "\n"
+        "Body.\n"
+        "\n"
+        "Example frontmatter for a *different*, shared-reference skill:\n"
+        "\n"
+        "```yaml\n"
+        "user-invocable: false\n"
+        "```\n",
+        encoding="utf-8",
+    )
+    assert check_skill_directories(docs, skills) == ["infrahub-managing-widgets"]
+
+
 def test_real_repo_skills_all_have_a_page() -> None:
     """The live check, as CI runs it."""
     missing = check_skill_directories(

@@ -34,6 +34,19 @@ _SKILL_LINE = re.compile(r"^Skill:\s*`(infrahub-[a-z0-9-]+)`\s*$", re.MULTILINE)
 # needs no change to this script.
 _USER_INVOCABLE_FALSE = re.compile(r"^user-invocable:\s*false\s*$", re.MULTILINE)
 
+# The `---`-delimited block a SKILL.md opens with. Frontmatter is scanned
+# in isolation, not the whole file, because a skill's body is free to show
+# an example of frontmatter shape (another skill's, or its own) inside a
+# fenced code block: text that reads exactly like a real
+# `user-invocable: false` line at column 0 without being one.
+_FRONTMATTER = re.compile(r"\A---\n(.*?\n)---\n", re.DOTALL)
+
+
+def _frontmatter(skill_md_text: str) -> str:
+    """The frontmatter block of a SKILL.md's text, or "" if it has none."""
+    match = _FRONTMATTER.match(skill_md_text)
+    return match.group(1) if match else ""
+
 
 def check_skill_names(docs_dir: Path, skills_dir: Path) -> list[tuple[str, str]]:
     """Return (page, claimed skill) for each page whose claim does not resolve.
@@ -77,8 +90,8 @@ def check_skill_directories(docs_dir: Path, skills_dir: Path) -> list[str]:
         if not skill_dir.is_dir() or skill_dir.name in referenced:
             continue
         skill_md = skill_dir / "SKILL.md"
-        frontmatter = skill_md.read_text(encoding="utf-8") if skill_md.is_file() else ""
-        if _USER_INVOCABLE_FALSE.search(frontmatter):
+        skill_md_text = skill_md.read_text(encoding="utf-8") if skill_md.is_file() else ""
+        if _USER_INVOCABLE_FALSE.search(_frontmatter(skill_md_text)):
             continue
         missing.append(skill_dir.name)
     return missing

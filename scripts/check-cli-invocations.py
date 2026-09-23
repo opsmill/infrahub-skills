@@ -141,12 +141,12 @@ def _bad_in_lines(lines: list[str], suffix: str) -> list[tuple[int, str, str]]:
                 fence_len = run
                 continue
         in_fence = fence_len > 0
-        ignored = cli_tree.ignored_invocation(line)
+        ignored = cli_tree.ignored_invocations(line)
         for region in _scannable(line, in_fence):
             for shown in cli_tree.invalid_invocations_in_region(
                 region, spans_only=not in_fence
             ):
-                if shown == ignored:
+                if shown in ignored:
                     continue
                 bad.append((lineno, shown, line.strip()))
     return bad

@@ -108,33 +108,58 @@ _SHELL_COMMENT = re.compile(r"^\s*#.*$", re.MULTILINE)
 
 # The one legitimate reason to print a command that does not exist is to
 # tell the reader it does not exist. Put the marker on the same line, in
-# whatever comment syntax the file uses — an HTML comment in markdown, a
-# `#` comment in Python — followed by the exact invocation it silences.
-# The marker silences only that named form. A blanket `IGNORE_MARKER in
-# line` check used to silence the whole line instead, so appending a
-# second, different bad invocation to an already-marked line passed
-# unnoticed.
+# whatever comment syntax the file uses (an HTML comment in markdown, a
+# `#` comment in Python), followed by the invocation it silences, written
+# however it reads naturally in the prose (arguments included, since a
+# release note names a command the way it was actually run). The marker
+# silences only that named form, compared the same way this module compares
+# any two invocations: by its first two tokens after `infrahubctl` (or, for
+# the bare `group sub` span, its first two tokens outright). A blanket
+# `IGNORE_MARKER in line` check used to silence the whole line instead, so
+# appending a second, different bad invocation to an already-marked line
+# passed unnoticed. A markdown bullet is one line, so a bullet naming two
+# invalid invocations needs two markers on that one line, and both are
+# read, not just the first.
 IGNORE_MARKER = "cli-check: ignore"
 
-# Everything after the marker, up to a trailing HTML-comment closer, is the
-# invocation it names. A marker with nothing after it names nothing and so
-# silences nothing, rather than falling back to silencing the whole line.
-_IGNORE = re.compile(re.escape(IGNORE_MARKER) + r"[ \t]+(\S.*)$")
 
+def _named_invocation(text: str) -> str:
+    """Normalize one marker's free-form text to the two-token form this
+    module reports invocations in.
 
-def ignored_invocation(line: str) -> str | None:
-    """The invocation a `cli-check: ignore <invocation>` marker on this line names.
-
-    None when the line carries no marker, or a bare one with nothing after
-    it to name.
+    `invalid_invocations_in_region` never reports more than `infrahubctl`
+    plus two tokens (or, for a bare span, two tokens outright); arguments
+    play no part in identifying which invocation was flagged. Truncating
+    the marker's text the same way is what lets a marker name the command
+    the way it was actually written, arguments included, rather than the
+    one bare spelling the scanner happens to report.
     """
-    match = _IGNORE.search(line)
-    if not match:
-        return None
-    text = match.group(1).rstrip()
-    if text.endswith("-->"):
-        text = text[: -len("-->")].rstrip()
-    return text or None
+    match = INVOCATION.match(text)
+    if match:
+        first, second = match.groups()
+        return f"infrahubctl {first}" + (f" {second}" if second else "")
+    return " ".join(text.split()[:2])
+
+
+def ignored_invocations(line: str) -> set[str]:
+    """Every invocation a `cli-check: ignore <invocation>` marker on this
+    line names, normalized to the two-token form
+    `invalid_invocations_in_region` reports invocations in.
+
+    Splitting on the marker text, rather than a single regex search, is
+    what lets more than one marker share a line: each marker's text runs up
+    to the next marker or a trailing HTML-comment closer, whichever comes
+    first, so a second marker never gets swallowed into the first's
+    capture. Empty when the line carries no marker, or only bare ones with
+    nothing after them to name: a bare marker protects nothing, rather
+    than falling back to protecting the whole line.
+    """
+    named: set[str] = set()
+    for chunk in line.split(IGNORE_MARKER)[1:]:
+        text = chunk.split("-->", 1)[0].strip()
+        if text:
+            named.add(_named_invocation(text))
+    return named
 
 
 def code_regions(text: str) -> list[str]:
