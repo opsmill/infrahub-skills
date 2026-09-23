@@ -2450,6 +2450,91 @@ tasks:
       - name: cli-commands-exist
         check: No invented infrahubctl subcommand appears in the answer
 
+  - name: common-graphql-schema-generated
+    trials: 3
+    instruction: |
+      Read the skill at .agents/skills/infrahub-common/SKILL.md and follow
+      its rules.
+
+      Task: I added a `serial_number` attribute to `DcimDevice` in
+      `schemas/dcim.yml` and loaded it onto my branch `add-serial`. The
+      query behind my `device_inventory` Python transform now selects it:
+
+      ```graphql
+      query DeviceInventory {
+        DcimDevice {
+          edges { node { name { value } serial_number { value } } }
+        }
+      }
+      ```
+
+      Generating the Pydantic return types for that query fails:
+
+      ```text
+      Cannot query field 'serial_number' on type 'DcimDevice'.
+      ```
+
+      The repo has a `schema.graphql` at the root, checked into git, and
+      `DcimDevice` in it has no `serial_number`. My plan is to open
+      `schema.graphql`, add `serial_number: TextAttribute` next to `name`,
+      and commit it alongside the query. Is that the right fix? Give me
+      the commands to run.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/common/check_graphql_schema_generated.py
+        weight: 0.7
+      # As with the other common tasks, the deterministic half cannot see a
+      # command written as bare prose.
+      - type: llm_rubric
+        provider: anthropic
+        weight: 0.3
+        rubric: |
+          Read output.md. Score each criterion 0.0 or 1.0; return the
+          average.
+
+          1. The answer rejects the plan of editing `schema.graphql` by
+             hand, and says why: the file is generated output, so the
+             next export discards the edit, and in the meantime the
+             local file disagrees with the schema the server actually
+             serves. An answer that accepts the hand-edit, or that only
+             calls it "not ideal" while still giving it as the fix,
+             scores 0.0.
+          2. Every `infrahubctl` command the answer names, in prose or in
+             a code block, is a real command. Score 0.0 if `graphql` is
+             given any subcommand other than export-schema,
+             generate-return-types or query-report, or if any of check,
+             transform, render or generator is given a generic verb
+             (run, list, get, create, delete, execute) where its
+             positional target belongs.
+    expected_output: >-
+      An answer that rejects the hand-edit and re-exports instead:
+      `schema.graphql` is what `infrahubctl graphql export-schema` writes,
+      as a whole-file overwrite, so a field typed into it is discarded on
+      the next export and until then the query is validated against a
+      schema the server does not have. The fix is to re-export from the
+      branch that carries the new attribute, then regenerate the return
+      types.
+    expectations:
+      - >-
+        Says the hand-edit is the wrong fix, because `schema.graphql` is
+        generated output rather than a source file
+      - >-
+        Refreshes the file with `infrahubctl graphql export-schema` rather
+        than an editor
+      - >-
+        Notes that the export rewrites the whole file, so a hand-added
+        field is discarded on the next run
+      - Every infrahubctl command named in the answer actually exists
+    assertions:
+      - name: graphql-schema-regenerated
+        check: >-
+          Refreshes `schema.graphql` with `infrahubctl graphql
+          export-schema` and does not aim an editor or a redirection at it
+      - name: cli-commands-exist
+        check: No invented infrahubctl subcommand appears in the answer
+
   # --- Issue Reporter --- #
   - name: bug-sanitization
     instruction: |

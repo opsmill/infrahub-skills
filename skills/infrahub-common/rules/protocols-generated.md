@@ -1,17 +1,20 @@
 ---
-title: Protocol Files Are Generated -- Do Not Hand-Edit
+title: Generated Files Are Build Artifacts -- Do Not Hand-Edit
 impact: CRITICAL
-tags: protocols, generated-code, infrahubctl, schema, checks, generators, transforms
+tags: protocols, generated-code, infrahubctl, schema, graphql, checks, generators, transforms
 ---
 
-## Protocol Files Are Generated -- Do Not Hand-Edit
+## Generated Files Are Build Artifacts -- Do Not Hand-Edit
 
 Impact: CRITICAL
 
-Protocol files under `generated/` (or `protocols/`)
-are output from `infrahubctl protocols` —
-hand-edits to them are overwritten on the next
-regeneration.
+Two things in an Infrahub repository are written by
+`infrahubctl`, not by you: the protocol module under
+`generated/` (or `protocols/`), from `infrahubctl
+protocols`, and `schema.graphql`, from `infrahubctl
+graphql export-schema`. Each command rewrites its file
+whole, so a hand-edit to either is discarded the next
+time anyone regenerates.
 
 ### Why it matters
 
@@ -85,6 +88,36 @@ infrahubctl protocols --schemas schemas/ --sync --out lib/protocols_sync.py
 infrahubctl protocols --schemas schemas/ --out lib/protocols.py
 ```
 
+### The GraphQL Schema File
+
+`schema.graphql` is the GraphQL SDL for your instance,
+written by `infrahubctl graphql export-schema`. The
+command reads the schema from a **running server** and
+rewrites the file end to end:
+
+```bash
+# Refresh it from the instance.
+infrahubctl graphql export-schema
+```
+
+There is no `--branch` flag: the export follows the
+branch the SDK is configured for, so point that at the
+branch carrying your schema change before running it.
+Verified against infrahub-sdk 1.23.1; on `No such
+command`, upgrade, or fall back to the server's own
+GraphQL endpoint.
+
+A field missing from the file means the export is
+stale, not that the file needs topping up. Editing it
+by hand costs more than the line you lose at the next
+export: this file is what query tooling validates
+`.gql` files against, so a locally typed field makes a
+query validate clean against a schema the server does
+not serve. The query then fails during repository sync,
+where the symptom is a stalled import rather than a
+GraphQL error — the same papering-over that a
+hand-edited protocol does, one layer down.
+
 ### Correct Workflow
 
 When the schema changes, the correct sequence is:
@@ -92,10 +125,12 @@ When the schema changes, the correct sequence is:
 1. **Update the schema** files (YAML in `schemas/`)
 2. **Regenerate protocols**:
    `infrahubctl protocols --schemas schemas/ --out lib/protocols.py`
-3. **Use the updated protocols** in checks,
+3. **Re-export `schema.graphql`** if the repository
+   keeps one: `infrahubctl graphql export-schema`
+4. **Use the updated protocols** in checks,
    generators, and transforms
-4. **Commit** the regenerated protocol files
-   alongside the schema changes
+5. **Commit** the regenerated files alongside the
+   schema changes
 
 ### Common Mistakes
 
@@ -105,11 +140,12 @@ When the schema changes, the correct sequence is:
 | Editing protocols to fix a type | Masks a schema issue |
 | Creating protocol classes by hand | Missing fields, wrong types |
 | Forgetting to regen after changes | Stale types in code |
+| Adding a field to `schema.graphql` by hand | Discarded at the next export, and queries validate against a schema the server does not serve |
 
 ### Prevention
 
-- Treat the `generated/` directory as a build
-  artifact — read-only in normal development
+- Treat the `generated/` directory and `schema.graphql`
+  as build artifacts — read-only in normal development
 - After any schema change, regenerate protocols
   before updating Python code that consumes them
 - Consider adding protocol regeneration to your

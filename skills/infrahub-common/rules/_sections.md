@@ -22,10 +22,13 @@ specific to any single workflow.
    of `.gql` queries against a live schema (YAML-check
    alone misses GraphQL/schema mismatches).
 
-3. **Protocols (protocols-)** -- CRITICAL. Protocol files
-   are generated code (`infrahubctl protocols`),
-   never edit directly, regenerate after schema changes,
-   supports local schema directory.
+3. **Protocols (protocols-)** -- CRITICAL. Files
+   `infrahubctl` generates rather than you: the protocol
+   module (`infrahubctl protocols`) and `schema.graphql`
+   (`infrahubctl graphql export-schema`). Never edit
+   either directly, regenerate after schema changes;
+   protocol generation supports a local schema directory,
+   the schema export needs a running server.
 
 4. **Connectivity (connectivity-)** -- HIGH. Python
    environment detection (`uv run` / `poetry run` /

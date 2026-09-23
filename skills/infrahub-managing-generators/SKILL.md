@@ -139,7 +139,11 @@ Follow these steps when creating a generator:
 2. **Write the GraphQL query** — Create a `.gql` file
    that fetches the design data. Read
    [../infrahub-common/graphql-queries.md](../infrahub-common/graphql-queries.md)
-   for query patterns.
+   for query patterns. If the repository keeps a
+   `schema.graphql`, that file is generated — re-export
+   it instead of editing it when a field is missing.
+   Read
+   [../infrahub-common/rules/protocols-generated.md](../infrahub-common/rules/protocols-generated.md).
 3. **Implement the Python class** — Inherit from
    `InfrahubGenerator`, implement `generate()`. Read
    [rules/python-generate.md](./rules/python-generate.md)
