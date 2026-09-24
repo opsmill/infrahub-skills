@@ -70,8 +70,8 @@ What changed:
 
 **Release process**
 
-* Releases now arrive as a reviewable `chore(release)` pull request, gated by the `regression` evaluation suite. The changelog is assembled with [towncrier](https://towncrier.readthedocs.io/) from news fragments that every pull request adds, and the assembled changelog becomes the GitHub Release body.
-* The `smoke` evaluation preset no longer runs on every pull request that touches `skills/`. It bills a real API key, so it runs on dispatch only; the weekly `regression` run and the release pull request gate are unchanged.
+* Releases now arrive as a reviewable `chore(release)` pull request, gated by the `smoke` evaluation suite. The changelog is assembled with [towncrier](https://towncrier.readthedocs.io/) from news fragments that every pull request adds, and the assembled changelog becomes the GitHub Release body.
+* The `smoke` evaluation preset no longer runs on every pull request that touches `skills/`. It bills a real API key, so it runs on dispatch only; the full `regression` suite runs weekly against `main`.
 
 **Developer experience**
 
@@ -107,7 +107,7 @@ Notes: a generator that only one run at a time writes to is not affected.
 
 * `.agents` and `.codex` routing directories for agents other than Claude.
 * Four-skill contributor pipeline for skill changes.
-* towncrier news fragments replace release-drafter, and releases arrive as a reviewable pull request gated by the `regression` evaluation suite.
+* towncrier news fragments replace release-drafter, and releases arrive as a reviewable pull request gated by the `smoke` evaluation suite.
 * Corrected evaluation discrimination proof and ground truth ladder.
 * Five review lessons harvested into the contributor guidance.
 * Contributor skills moved from `.claude/skills/` to `.agents/skills/`.

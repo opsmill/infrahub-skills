@@ -210,7 +210,7 @@ Skill and tooling work goes under `housekeeping`. Add a fragment in the same PR 
 Do not run `towncrier build` or bump versions by hand. Merging to `main` does not prepare a
 release: dispatch the **Auto bump version** workflow from Actions with `main` selected, which
 opens a `chore(release): vX.Y.Z` pull request carrying the bump and the assembled changelog; the
-`regression` eval suite runs on it as the release gate, and merging it tags and publishes the
+`smoke` eval suite runs on it as the release gate, and merging it tags and publishes the
 release with that changelog as the body. The version is always passed explicitly because it lives
 in `plugin.json`, not in an importable package towncrier could read.
 
@@ -218,8 +218,8 @@ This accumulates the raw entries per PR; the curated `docs/docs/release-notes/re
 page stays a separate, hand-written narrative for each release.
 
 Evals are tiered by cost and none of them run per PR: dispatch `skill-evals.yml` manually with
-`preset: smoke` when a change needs it, and the full `regression` suite runs weekly against `main`
-and as a blocking check on the release PR.
+`preset: smoke` when a change needs it, `smoke` runs as a blocking check on the release PR, and the
+full `regression` suite runs weekly against `main`.
 
 ### Versioning
 
