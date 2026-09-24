@@ -211,11 +211,12 @@ Do not run `towncrier build` or bump versions by hand. Merging to `main` does no
 release: dispatch the **Auto bump version** workflow from Actions with `main` selected, which
 opens a `chore(release): vX.Y.Z` pull request carrying the bump and the assembled changelog; the
 `smoke` eval suite runs on it as the release gate, and merging it tags and publishes the
-release with that changelog as the body. The version is always passed explicitly because it lives
-in `plugin.json`, not in an importable package towncrier could read.
+release with the curated release-notes page as the body (the changelog section when no page
+exists). The version is always passed explicitly because it lives in `plugin.json`, not in an
+importable package towncrier could read.
 
 This accumulates the raw entries per PR; the curated `docs/docs/release-notes/release-X_Y_Z.mdx`
-page stays a separate, hand-written narrative for each release.
+page is the hand-written narrative for each release, and the one the GitHub Release shows.
 
 Evals are tiered by cost and none of them run per PR: dispatch `skill-evals.yml` manually with
 `preset: smoke` when a change needs it, `smoke` runs as a blocking check on the release PR, and the
