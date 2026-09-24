@@ -1,0 +1,24 @@
+.github/workflows/ci.yml
+  s_7e10f801b92060::t_5d41f2f77f0d4c 175-177,185-186
+.github/workflows/skill-evals.yml
+  s_7e10f801b92060::t_2e31d140a3721b 27-36
+  s_7e10f801b92060::t_a4372b46430c7b 60-67
+  s_7e10f801b92060::t_516fbc5f77b28d 77-78
+  s_7e10f801b92060::t_cbde204b41624e 173-178,181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c1ad8c35e94bd1ebf0326b2876408f5a22f4840f",
+  "prompts": {},
+  "sessions": {
+    "s_7e10f801b92060": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9369a77d-168a-4b08-a714-a1b1cfb2285a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
