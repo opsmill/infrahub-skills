@@ -1,0 +1,32 @@
+tests/scripts/test_release_body.py
+  s_78666b7dfc8a81::t_15448389e43ede 61-64
+  s_78666b7dfc8a81::t_c61b11c37ad9fa 1-60,65-94
+AGENTS.md
+  s_78666b7dfc8a81::t_edf3870397e823 219
+  s_78666b7dfc8a81::t_3258ce90ea3143 214-216
+changelog/+release-body-from-notes.fixed.md
+  s_78666b7dfc8a81::t_edf3870397e823 1
+scripts/release_body.py
+  s_78666b7dfc8a81::t_8304b6f59f0ce4 1-32,36-41,45-56,60-72
+  s_78666b7dfc8a81::t_15448389e43ede 33-35,42-44,57-59
+dev/guidelines/skill-registration.md
+  s_78666b7dfc8a81::t_edf3870397e823 72,76-79
+.github/workflows/release-publish.yml
+  s_78666b7dfc8a81::t_5652fa754b40ed 6-8,77,84-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ef6213b8f31ba72b447334055c48e80108cb3cad",
+  "prompts": {},
+  "sessions": {
+    "s_78666b7dfc8a81": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6cbe4d9f-ab85-4bba-97e6-928c55e7124f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
