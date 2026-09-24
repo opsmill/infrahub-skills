@@ -3,8 +3,9 @@
 name: Publish release
 
 # Fires when a release pull request lands on `main`: creates the tag and
-# publishes the GitHub Release whose body is the changelog section humans
-# wrote, rather than a generated list of pull-request titles.
+# publishes the GitHub Release whose body is the curated release-notes page
+# (docs/docs/release-notes/release-X_Y_Z.mdx), falling back to the changelog
+# section towncrier assembled when no page was written.
 #
 # Publishing the Release is what triggers release.yml, which validates the
 # versions against the tag and ships the artifacts.
@@ -73,12 +74,26 @@ jobs:
           echo "publish=true" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Extract the changelog section
+      - name: Build the release body
         if: steps.decide.outputs.publish == 'true'
         env:
           VERSION: ${{ steps.decide.outputs.version }}
         run: |
           set -euo pipefail
+
+          NOTES_PAGE="docs/docs/release-notes/release-${VERSION//./_}.mdx"
+          if [ -f "${NOTES_PAGE}" ]; then
+            # The new tag does not exist yet, so the nearest v* tag is the
+            # previous release.
+            PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match 'v*' HEAD 2>/dev/null || true)
+            python3 scripts/release_body.py "${VERSION}" \
+              ${PREVIOUS_TAG:+--previous-tag "${PREVIOUS_TAG}"} > /tmp/release-body.md
+            echo "Release body (from ${NOTES_PAGE}):"
+            cat /tmp/release-body.md
+            exit 0
+          fi
+
+          echo "::warning::No ${NOTES_PAGE}; publishing the changelog section instead."
 
           # Everything from the first release heading after the towncrier
           # marker up to (but excluding) the next one — i.e. the section this

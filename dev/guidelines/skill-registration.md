@@ -69,12 +69,14 @@ that somebody looked.
 ## Release notes
 
 Towncrier assembles `CHANGELOG.md` from the news
-fragments in `changelog/`, and that assembled section
-becomes the GitHub Release body — so a new skill ships a
+fragments in `changelog/` — so a new skill ships a
 fragment rather than a hand-edited changelog.
 
 Each release also gets a curated page under
-`docs/docs/release-notes/`. The new page takes
+`docs/docs/release-notes/`, and that page becomes the
+GitHub Release body (`scripts/release_body.py` converts
+it); without one, the assembled changelog section is
+published instead. The new page takes
 `sidebar_position: 1` and **every older page shifts down
 by one**. Write it before the release pull request
 merges, since merging is what tags and publishes.

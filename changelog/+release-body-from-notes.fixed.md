@@ -1,0 +1,1 @@
+GitHub Releases publish the curated release-notes page again — summary, upgrade notes, and full changelog — instead of only the towncrier changelog section, which is kept as the fallback when no page exists.
