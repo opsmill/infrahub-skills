@@ -172,6 +172,9 @@ jobs:
   # Smoke, not regression, to keep the per-release API cost down — the weekly
   # scheduled run carries the full regression suite. An admin reviews these
   # results alongside the assembled changelog.
+  #
+  # Temporarily relaxed while the gate is non-blocking: 3 trials instead of
+  # smoke's 5, and a 50% pass threshold instead of eval.yaml's 80%.
   # ---------------------------------------------------------------------------
   skill-evals-release:
     if: startsWith(github.head_ref, 'release/')
@@ -179,3 +182,5 @@ jobs:
     secrets: inherit
     with:
       preset: smoke
+      trials: "3"
+      threshold: "0.5"

@@ -24,6 +24,16 @@ on:
         required: false
         type: number
         default: 2
+      trials:
+        description: "Trials per eval; overrides the preset's count (empty = preset)"
+        required: false
+        type: string
+        default: ""
+      threshold:
+        description: "CI pass-rate threshold, 0-1 (empty = eval.yaml default)"
+        required: false
+        type: string
+        default: ""
     secrets:
       ANTHROPIC_API_KEY:
         required: true
@@ -47,6 +57,14 @@ on:
         description: "Concurrent trials per skill job"
         required: false
         default: "2"
+      trials:
+        description: "Trials per eval; overrides the preset's count (empty = preset)"
+        required: false
+        default: ""
+      threshold:
+        description: "CI pass-rate threshold, 0-1 (empty = eval.yaml default)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -56,6 +74,8 @@ env:
   EVAL_MODEL: ${{ inputs.model || 'haiku' }}
   GRADER_MODEL: ${{ inputs.grader_model || 'claude-haiku-4-5' }}
   EVAL_PARALLEL: ${{ inputs.parallel || 2 }}
+  EVAL_TRIALS: ${{ inputs.trials }}
+  EVAL_THRESHOLD: ${{ inputs.threshold }}
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -150,8 +170,15 @@ jobs:
           ANTHROPIC_MODEL: ${{ env.GRADER_MODEL }}
         run: |
           echo "Agent model: $EVAL_MODEL | grader: $ANTHROPIC_MODEL | parallel: $EVAL_PARALLEL"
+          # Optional overrides: --trials beats the preset's count and
+          # --threshold beats eval.yaml's defaults.threshold.
+          EXTRA=()
+          [ -n "$EVAL_TRIALS" ] && EXTRA+=("--trials=$EVAL_TRIALS")
+          [ -n "$EVAL_THRESHOLD" ] && EXTRA+=("--threshold=$EVAL_THRESHOLD")
+          echo "Overrides: ${EXTRA[*]:-none}"
           skillgrade \
             --${{ inputs.preset || 'smoke' }} \
+            "${EXTRA[@]}" \
             --ci \
             --provider=local \
             --agent=claude \
