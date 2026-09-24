@@ -125,8 +125,6 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
       fail-fast: false
-      # Cap concurrent skill jobs; total in-flight trials = max-parallel x EVAL_PARALLEL
-      max-parallel: 1
     steps:
       - uses: actions/checkout@v6
 
