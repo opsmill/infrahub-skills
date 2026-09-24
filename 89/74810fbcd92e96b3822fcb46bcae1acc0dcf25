@@ -1,0 +1,19 @@
+.github/workflows/skill-evals.yml
+  s_7e10f801b92060::t_62d44276243b54 118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8974810fbcd92e96b3822fcb46bcae1acc0dcf25",
+  "prompts": {},
+  "sessions": {
+    "s_7e10f801b92060": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9369a77d-168a-4b08-a714-a1b1cfb2285a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
