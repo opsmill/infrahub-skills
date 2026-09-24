@@ -2,35 +2,24 @@
 title: Infrahub Skills
 ---
 
-Infrahub Skills is an open-source AI skills package that gives your AI coding assistant built-in knowledge of Infrahub's data model, conventions, and workflow patterns. Instead of learning the platform from documentation alone, describe what you want to build in plain language and the skills produce valid, best-practice Infrahub resources (schemas, object data, generators, transforms, checks, and menus) ready to load into a running instance.
+Infrahub Skills is an open-source AI skills package covering the full Infrahub
+development lifecycle. Describe what you want to build in plain language, and the skills
+produce Infrahub resources that follow the platform's conventions: schemas, object data,
+generators, transforms, checks, and menus, ready to load into a running instance.
 
-The skills cover the full Infrahub development lifecycle. Each skill embeds the rules, examples, and references the AI needs for a specific task, and loads only the context required, so the assistant stays focused and accurate without exhausting its context window.
+## When you would reach for it
 
-## What you can do with it
+You are modelling a new domain and the relationship identifiers have to match on both
+sides. You have a CSV export from the system Infrahub is replacing, and every column
+needs a home. You inherited a repository and cannot tell which of its files still follow
+current conventions. A generator runs, produces the wrong objects, and the traceback
+points at the SDK rather than at your code. An instance stops answering and support
+wants logs you have not collected before.
 
-### Design and build your data model
-
-Describe your data model in plain language and the skills produce a valid Infrahub schema: node types, attribute kinds, relationships, generics, display properties, profiles (shared default values), and object templates (cloneable structures), without requiring manual study of the schema format. Naming conventions, relationship identifiers, and attribute type rules are applied at the point of generation.
-
-### Build generators, transforms, and checks
-
-Create Python generators that auto-create infrastructure objects from design definitions. Write Python or Jinja2 transforms that convert Infrahub data to device configs, reports, or other formats. Build validation checks that run in proposed change pipelines, with Infrahub-specific conventions handled automatically. The same skills modify and debug what already exists: changing what a check validates or a transform renders, and working out why the output is wrong.
-
-### Populate and manage data
-
-Produce YAML data files for infrastructure objects (devices, locations, organizations, interfaces) with correct file structure, value mappings, and load order, including assigning profiles for shared defaults and creating objects from templates. Generate batches of objects from descriptions or seed data for new instances. Update attributes and relationships on objects already defined, and work out why a data file fails to load.
-
-### Query and analyze a live instance
-
-The Data Analyzer skill connects to a running Infrahub instance via MCP and answers operational questions directly: cross-node correlation, drift detection, blast-radius analysis, and data quality audits, without writing GraphQL queries manually.
-
-### Audit your repository
-
-Run a full audit of an Infrahub repository against all best practices. The Repo Auditor checks schema files, object files, Python components, `.infrahub.yml` registration, and project structure, then reports what to fix and why.
-
-### Customize the UI
-
-Design custom navigation menus for the Infrahub web interface (sidebar structure, section groupings, icons, and ordering) from a plain language description. Restructure an existing menu, or work out why an item does not appear where it should.
+Each of those is a skill. The AI reads the one that matches, applies its rules while it
+writes, and leaves the rest unread. That last part is what keeps the assistant accurate
+on long sessions: a skill loads its entry point first and pulls in individual rule files
+only when the task reaches them.
 
 ## Three ways to work
 

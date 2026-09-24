@@ -94,3 +94,8 @@ infrahub-collect create --include-queries    # slow/failing database queries
 :::tip
 Collector failures on a degraded deployment are expected: a stopped container can't answer status queries. `create` still exits successfully and records each failure in the manifest; send the partial bundle as-is. See the [troubleshooting-bundle guide](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle) for the full workflow.
 :::
+
+## Not sure this is the right skill?
+
+See [Which skill do I use?](../choosing-a-skill.mdx) for how the Diagnostics
+Collector differs from the Diagnostics Analyzer. Collect first, then analyze.

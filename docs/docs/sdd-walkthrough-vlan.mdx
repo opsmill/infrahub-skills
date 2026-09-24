@@ -2,11 +2,15 @@
 title: "Walkthrough: VLAN management"
 ---
 
-## Example walkthrough: VLAN management domain
+This walkthrough builds a VLAN management domain end to end: a schema, the object data
+to populate it, and a validation check that guards it, all from a plain-language
+request. Follow it to see where each skill takes over and what you approve between the
+steps, before trying the same shape on a domain of your own.
 
-This example uses [Spec Kit](https://github.com/github/spec-kit) to design a VLAN management domain from scratch: schema, object data, and a validation check. Any SDD framework that follows a spec, plan, task, and implement workflow produces a similar result.
+It uses [Spec Kit](https://github.com/github/spec-kit). Any SDD framework with a spec,
+plan, task, and implement workflow produces a similar result.
 
-### Setup
+## Setup
 
 Start from [infrahub-template](https://github.com/opsmill/infrahub-template), which scaffolds the repository layout the skills expect and ships `invoke` tasks for the instance:
 
@@ -28,7 +32,7 @@ specify extension add infrahub-speckit --from https://github.com/opsmill/infrahu
 
 `specify init` creates the `.specify/` project configuration and installs slash commands into `.claude/commands/`. Having the instance up matters for more than the data: `before_specify` gates on `infrahubctl info`, so the cycle stops early rather than planning against an instance it cannot reach.
 
-### Step 1: Specify
+## Step 1: Specify
 
 Run `/speckit.specify` and describe the feature:
 
@@ -36,7 +40,7 @@ Run `/speckit.specify` and describe the feature:
 
 Spec Kit produces `spec.md` capturing the requirements: two schema nodes (VLAN, VLANGroup), a grouping relationship, a uniqueness check, and the attributes for each.
 
-### Step 2: Plan
+## Step 2: Plan
 
 Run `/speckit.plan`. The AI reads `spec.md` and the Infrahub skills to produce `plan.md`:
 
@@ -54,7 +58,7 @@ Run `/speckit.plan`. The AI reads `spec.md` and the Infrahub skills to produce `
 
 The plan is validated against Infrahub skills: the AI catches that `status` should be `kind: Dropdown` (not Text), that `vlan_id` is used instead of `id` (attribute names must be 3+ characters), and that the relationship between VLAN and VLANGroup needs matching identifiers on both sides.
 
-### Step 3: Review
+## Step 3: Review
 
 You review `plan.md` and adjust:
 
@@ -62,7 +66,7 @@ You review `plan.md` and adjust:
 
 The AI updates the plan.
 
-### Step 4: Tasks
+## Step 4: Tasks
 
 Run `/speckit.tasks`. The AI breaks the plan into discrete steps in `tasks.md`:
 
@@ -73,7 +77,7 @@ Run `/speckit.tasks`. The AI breaks the plan into discrete steps in `tasks.md`:
 > - [ ] Task 5: Register the check in `.infrahub.yml`
 > - [ ] Task 6: Validate schema with `infrahubctl schema check`
 
-### Step 5: Implement
+## Step 5: Implement
 
 Run `/speckit.implement`. The AI executes each task using the appropriate Infrahub skill. With the routing extension installed, the cycle closes with the friction check described in [Skill-gap detection after implement](./spec-kit-integration.mdx#skill-gap-detection-after-implement).
 
@@ -187,7 +191,7 @@ check_definitions:
     query: check_vlan_id_uniqueness
 ```
 
-### Step 6: Report the gap it exposed
+## Step 6: Report the gap it exposed
 
 Task 6 is where the cycle hit friction. The first version of `schemas/vlan_management.yml` left `optional` off the `group` relationship, and relationships default to optional, so `infrahubctl schema check` rejected it:
 
@@ -230,7 +234,7 @@ The draft carries the version lines the template requires, read from `infrahubct
 
 Asking for the same thing without the extension installed works too: "report skill friction" reaches the Skill Gap Reporter directly. The hook only removes the need to notice the friction yourself.
 
-### Result
+## Result
 
 From a single natural-language description, the SDD workflow produced:
 

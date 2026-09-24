@@ -2,7 +2,15 @@
 title: Spec Kit integration
 ---
 
-## Infrahub routing for Spec Kit
+Spec Kit runs its own specify, plan, tasks, and implement commands, and on its own it
+knows nothing about Infrahub. The routing extension closes that gap: it hooks those
+commands so the right Infrahub skill is loaded at each stage, and so the cycle stops
+early when the instance is unreachable instead of planning against it.
+
+Set this up if you run Spec Kit and want the Infrahub skills to fire without naming them
+at every step.
+
+## Installing the extension
 
 The [infrahub-speckit](https://github.com/opsmill/infrahub-speckit) extension wires the Infrahub skills into Spec Kit's own commands. It needs Spec Kit 0.8.0 or newer:
 
@@ -21,7 +29,7 @@ The extension registers four hooks against the core Spec Kit skills. All four fi
 
 All three `before_*` hooks halt with install guidance when the Infrahub skills are not present, and `before_specify` also halts when the instance is unreachable. The `after_implement` hook never halts: implementation is already done, so a missing skill, an error, or an ambiguous read all degrade to a no-op line rather than disrupting finished work.
 
-### Skill-gap detection after implement
+## Skill-gap detection after implement
 
 Infrahub skills fail quietly. A missing or unclear rule does not crash the run, it produces extra round trips and repeated nudges until the model works the answer out anyway. By the time the cycle ends, that friction is invisible. The `after_implement` hook looks for it while the session still holds the evidence.
 

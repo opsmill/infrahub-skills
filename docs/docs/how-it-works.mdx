@@ -2,7 +2,7 @@
 title: How it works
 ---
 
-Infrahub Skills gives an AI assistant domain-specific knowledge about the Infrahub platform. Each skill is a structured set of Markdown files (rules, examples, and references) that the AI reads at the point it's needed. The assistant matches each user request to the relevant skill automatically, loads only the context required for that task, and applies the rules embedded in the skill.
+A skill is a structured set of Markdown files: rules, examples, and references the AI reads at the point it needs them. The assistant matches each request against the available skills, activates the one that fits, loads only the files that task reaches, and applies their rules as it works.
 
 ## What a skill is
 
@@ -81,9 +81,9 @@ Contents:
 - **Profiles and Object Templates**: when to use shared default values (profiles) vs. cloneable object structures (templates), and their mechanics
 - **Shared rules**: git integration patterns, protocol/generated file handling, Python environment detection, and display label caching
 
-### `.infrahub.yml` version requirement for shared fragments
-
-Most of `.infrahub.yml` works across the [supported Infrahub versions](./installation-setup.mdx#prerequisites). One section does not: `graphql_fragments`, which lets multiple queries spread the same GraphQL selection by name instead of repeating it. That section requires Infrahub 1.9.0, which itself requires infrahub-sdk 1.20.0. The config model rejects unknown keys, so an older Infrahub does not skip the section, it rejects the whole `.infrahub.yml` file. Check your target Infrahub version before adding `graphql_fragments` to a repository that runs an older release.
+One part of that configuration format has a version floor: `graphql_fragments` requires
+Infrahub 1.9.0, and an older release rejects the whole file rather than skipping the
+section. See [Prerequisites](./installation-setup.mdx#graphql-fragments-version).
 
 ## Context efficiency
 
@@ -103,5 +103,5 @@ install for each, is in
 
 ## Building or changing a skill
 
-Wondering how a skill is put together, or want to add or edit one? See
-[Anatomy of a skill](./contributing/anatomy-of-a-skill.mdx).
+[Anatomy of a skill](./contributing/anatomy-of-a-skill.mdx) covers the file layout, the
+frontmatter, and the rule/grader pairing a change has to carry.

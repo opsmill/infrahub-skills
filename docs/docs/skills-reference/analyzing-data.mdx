@@ -4,7 +4,7 @@ title: Data Analyzer
 
 Skill: `infrahub-analyzing-data`
 
-The Data Analyzer skill queries and analyzes data from a live Infrahub instance using the Infrahub MCP server. It answers operational questions that span multiple node types: correlating data, detecting drift, tracing service impact, auditing data quality, without requiring you to write GraphQL queries manually.
+The Data Analyzer answers operational questions against a live Infrahub instance through the Infrahub MCP server: correlating data across node types, detecting drift, tracing service impact, and auditing data quality. You ask in plain language, and the skill chooses the schema lookups and queries that answer it.
 
 ## When to use
 
@@ -20,7 +20,7 @@ The Data Analyzer skill queries and analyzes data from a live Infrahub instance 
 A findings report built from live queries, not a stored artifact:
 
 - A header naming the policy or question, the scope, and a checked/compliant/violations count with a compliance percentage
-- Per-violation detail: object name, ID, kind, what was violated, and a suggested fix, so you don't have to re-run the query to look the object up
+- Per-violation detail: object name, ID, kind, what was violated, and a suggested fix, so each row carries everything needed to act on it
 - A remediation hint matched to the violation type: an `mcp__infrahub__node_upsert` call, a rename, a generator run, or a suggestion to add an `InfrahubCheck` for a policy worth enforcing on every future change
 - For a run covering several policies, a summary table (checked/pass/fail/status per policy) before the per-violation detail
 
@@ -73,7 +73,12 @@ Without MCP, the AI can still query Infrahub data by constructing GraphQL API ca
 
 ## How it works
 
-The skill uses MCP tools (`infrahub_query`, `infrahub_list_schema`, `infrahub_get`) to fetch data from the running instance. For multi-step analysis, queries run sequentially or in combination: data is joined in the AI's context, not in the database. The skill reports findings with counts, lists of affected objects, and suggested next steps.
+The skill reads the schema with `get_schema`, fetches objects with `get_nodes` or
+`search_nodes`, and falls back to `query_graphql` for questions that span several kinds.
+There is no single-object tool: fetching one object means filtering `get_nodes` by `ids`
+or `hfid`. For multi-step analysis, queries run sequentially or in combination, and the
+results are joined in the AI's context rather than in the database. The report gives
+counts, the affected objects, and the suggested next step for each violation.
 
 ## Not sure this is the right skill?
 

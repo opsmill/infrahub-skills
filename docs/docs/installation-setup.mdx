@@ -14,6 +14,17 @@ Infrahub Skills can be installed into any AI tool that supports skills or custom
 - **infrahubctl**: required for loading generated schemas, objects, and running generators. See the [infrahubctl docs](https://docs.infrahub.app/infrahubctl)
 - **Infrahub MCP server** (optional): required only for the [Data Analyzer](./skills-reference/analyzing-data.mdx) skill, beneficial but not required for other skills. See the [MCP server docs](https://docs.infrahub.app/mcp)
 
+### One `.infrahub.yml` section needs a newer Infrahub {#graphql-fragments-version}
+
+Most of `.infrahub.yml` works across every version above. One section does not:
+`graphql_fragments`, which lets several queries share the same GraphQL selection by name
+instead of repeating it. It requires Infrahub 1.9.0, which in turn requires infrahub-sdk
+1.20.0.
+
+The config model rejects unknown keys, so an older Infrahub does not skip the section.
+It rejects the whole `.infrahub.yml` file. Check your target version before adding
+`graphql_fragments` to a repository that runs an older release.
+
 ## Supported AI tools
 
 | AI Tool | Installation Method | Auto-detection | Direct Skill Invocation |
