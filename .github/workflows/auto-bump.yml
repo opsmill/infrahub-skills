@@ -26,7 +26,7 @@ jobs:
   #
   # Nothing is pushed to `main` directly and no tag is created here. The
   # version bump and the assembled changelog land as a reviewable pull
-  # request on which the regression eval suite runs; merging it is the act
+  # request on which the smoke eval suite runs; merging it is the act
   # that authorises the release, and release-publish.yml then creates the
   # tag and the GitHub Release.
   #
@@ -262,7 +262,7 @@ jobs:
           \`release-publish.yml\` then tags \`v${VERSION}\` and publishes the GitHub
           Release using the assembled changelog as its body.
 
-          The \`regression\` eval suite runs on this pull request and must pass
+          The \`smoke\` eval suite runs on this pull request and must pass
           before it can be merged — this is the quality gate for the release.
 
           - Version bumped to \`${VERSION}\` across plugin.json, the release manifest, pyproject and every SKILL.md

@@ -102,14 +102,19 @@ failure mode. Hand-craft **four** fixtures:
 | Fixture | Expected |
 | ------- | -------- |
 | Compliant, written the way the rule shows | 1.0 |
-| Compliant, written differently — other field order, a helper, a synonym | 1.0 |
+| Compliant, refactored the way the check's traversal is vulnerable to | 1.0 |
 | Violating, obviously | < 1.0 |
 | Violating **near-miss** — satisfies the check's keyword while breaking the rule | < 1.0 |
 
 The last of each pair finds the bugs:
 
-- **False fail.** A correct answer phrased differently
-  scores < 1.0.
+- **False fail.** A correct answer scores < 1.0. Vary
+  what the check actually reads, not the cosmetics. If
+  it walks the AST for call order, extract the calls
+  into a helper; if it reads a comparison in a test
+  position, hoist it into a variable; if it keys on a
+  node name, put two relationships on one node. Field
+  order and synonyms exercise nothing.
 - **Laundering.** A violating answer scores 1.0 because
   it mentions the right word, imports the right module,
   or names the right helper somewhere in the file. Ask

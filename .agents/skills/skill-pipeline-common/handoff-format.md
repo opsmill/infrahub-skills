@@ -42,7 +42,7 @@ re-deriving a slug that would drift from the original.
 <what the failing test asserts, which surface it lives on, and the four fixtures:>
 
 - compliant: <sketch>
-- compliant variant: <sketch, different field order or synonym>
+- compliant variant: <sketch, refactored the way the check's traversal is vulnerable to>
 - violating: <sketch>
 - violating near miss: <sketch that satisfies the check keyword and breaks the rule>
 

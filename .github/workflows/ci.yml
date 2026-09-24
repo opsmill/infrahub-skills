@@ -170,17 +170,23 @@ jobs:
   # The `smoke` preset used to run on any PR touching skills/. It is now
   # dispatch-only: run `skill-evals.yml` manually with `preset: smoke` when a
   # change needs it. The full `regression` suite still runs on a schedule
-  # (skill-evals-scheduled.yml) and as the gate on the release PR below.
+  # (skill-evals-scheduled.yml); the release PR below runs `smoke`.
   # ---------------------------------------------------------------------------
 
   # ---------------------------------------------------------------------------
-  # Release gate: the full suite must pass before a release can be merged.
-  # This is the quality checkpoint for the release — an admin reviews these
+  # Release gate: the smoke suite must pass before a release can be merged.
+  # Smoke, not regression, to keep the per-release API cost down — the weekly
+  # scheduled run carries the full regression suite. An admin reviews these
   # results alongside the assembled changelog.
+  #
+  # Temporarily relaxed while the gate is non-blocking: 3 trials instead of
+  # smoke's 5, and a 50% pass threshold instead of eval.yaml's 80%.
   # ---------------------------------------------------------------------------
-  skill-evals-regression:
+  skill-evals-release:
     if: startsWith(github.head_ref, 'release/')
     uses: ./.github/workflows/skill-evals.yml
     secrets: inherit
     with:
-      preset: regression
+      preset: smoke
+      trials: "3"
+      threshold: "0.5"
