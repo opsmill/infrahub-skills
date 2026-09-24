@@ -16,11 +16,14 @@ const config: Config = {
   projectName: 'infrahub-skills',
 
   onBrokenLinks: 'throw',
+  // Matches opsmill/infrahub-docs so a broken anchor or markdown link fails
+  // here, not after it syncs downstream.
+  onBrokenAnchors: 'throw',
   onDuplicateRoutes: "throw",
   markdown: {
     mermaid: true,
     hooks: {
-      onBrokenMarkdownLinks: 'warn',
+      onBrokenMarkdownLinks: 'throw',
     },
   },
   themes: ['@docusaurus/theme-mermaid'],
@@ -37,7 +40,13 @@ const config: Config = {
         docs: {
           editUrl: "https://github.com/opsmill/infrahub-skills/tree/main/docs",
           routeBasePath: "/",
-          sidebarCollapsed: true,
+          // Matches opsmill/infrahub-docs, which sets sidebarCollapsed: false on
+          // every section including docs-ai-skills. This preview is the only
+          // place the sidebar is reviewed before it ships, so it has to render
+          // the way the published site does: each category open, its pages
+          // visible without a click. sidebars.ts deliberately sets no collapsed
+          // value of its own, so each site decides here.
+          sidebarCollapsed: false,
           sidebarPath: "./sidebars.ts",
         },
         blog: false,

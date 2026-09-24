@@ -1,13 +1,14 @@
 ---
 title: Schema Manager
-sidebar_position: 1
 ---
 
-The Schema Manager produces valid Infrahub schema YAML from natural language descriptions. It applies Infrahub's naming conventions, relationship rules, attribute type requirements, and display property patterns automatically — without requiring manual study of the schema format.
+Skill: `infrahub-managing-schemas`
+
+The Schema Manager produces valid Infrahub schema YAML from natural language descriptions. Describe the model you want, and the skill applies Infrahub's naming conventions, relationship rules, attribute type requirements, and display property patterns as it writes the file.
 
 ## When to use
 
-- Reusing an existing schema from the Infrahub Marketplace instead of modelling any domain from scratch (the whole catalog is checked, not just common domains)
+- Reusing an existing schema from the Infrahub Marketplace instead of modelling any domain from scratch (the whole catalog is checked, not only common domains)
 - Creating a new schema node from a description
 - Adding attributes or relationships to an existing node
 - Designing a generic (abstract base type) with inheriting nodes
@@ -31,22 +32,22 @@ The Schema Manager produces valid Infrahub schema YAML from natural language des
 
 ## Key rules enforced
 
-- **Naming conventions** — namespace is PascalCase and meaningful (e.g., `Infra`, `Ipam`, `Dcim`); node names are PascalCase; attribute names are snake_case with minimum 3 characters
-- **Attribute types** — uses `Text` (not deprecated `String`); `Dropdown` for status/role fields with choices defined; `Number`, `Boolean`, `DateTime` as appropriate
-- **Relationship identifiers** — both sides of every relationship share the same identifier string; mismatched identifiers are the most common source of schema errors
-- **Relationship peer references** — uses full namespace+name (e.g., `IpamVlanGroup`) not short names
-- **human_friendly_id** — included for every node so objects are identifiable in the UI and through the API
-- **display_label** — Jinja2 template set for every node for dropdown and reference rendering
-- **order_weight** — integer set on attributes to control display order in the UI
-- **Hierarchy setup** — for hierarchical generics: `hierarchical: true`, `parent` and `children` relationships configured correctly
-- **Profiles (`generate_profile`)** — enabled when the same attribute or relationship values recur across many objects and should stay in sync; a single value that never varies stays an attribute `default_value` instead
-- **Object Templates (`generate_template`)** — enabled to clone a node together with its component children as a reusable starting structure; kept distinct from Profiles (which share live values, not structure)
+- **Naming conventions**: namespace is PascalCase and meaningful (e.g., `Infra`, `Ipam`, `Dcim`); node names are PascalCase; attribute names are snake_case with minimum 3 characters
+- **Attribute types**: uses `Text` (not deprecated `String`); `Dropdown` for status/role fields with choices defined; `Number`, `Boolean`, `DateTime` as appropriate
+- **Relationship identifiers**: both sides of every relationship share the same identifier string; mismatched identifiers are the most common source of schema errors
+- **Relationship peer references**: uses full namespace+name (e.g., `IpamVlanGroup`) not short names
+- **human_friendly_id**: included for every node so objects are identifiable in the UI and through the API
+- **display_label**: Jinja2 template set for every node for dropdown and reference rendering
+- **order_weight**: integer set on attributes to control display order in the UI
+- **Hierarchy setup**: for hierarchical generics: `hierarchical: true`, `parent` and `children` relationships configured correctly
+- **Profiles (`generate_profile`)**: enabled when the same attribute or relationship values recur across many objects and should stay in sync; a single value that never varies stays an attribute `default_value` instead
+- **Object Templates (`generate_template`)**: enabled to clone a node together with its component children as a reusable starting structure; kept distinct from Profiles (which share live values, not structure)
 
 ## Common mistakes it catches
 
 | Mistake | What the skill does instead |
 | --------- | --------------------------- |
-| Using `String` instead of `Text` | Uses `Text` — `String` is deprecated |
+| Using `String` instead of `Text` | Uses `Text`; `String` is deprecated |
 | Attribute names shorter than 3 characters | Uses descriptive names (e.g., `vlan_id` not `id`) |
 | `display_labels` (plural) | Uses `display_label` (singular) |
 | Mismatched relationship identifiers | Sets the same identifier on both sides |
@@ -55,15 +56,15 @@ The Schema Manager produces valid Infrahub schema YAML from natural language des
 
 ## Reusing published schemas
 
-Before modelling **any** domain from scratch, the skill searches the **entire** [Infrahub Marketplace](https://marketplace.infrahub.app/) for a published schema and reuses it rather than re-deriving the model — so if a schema already exists, no modelling is needed. The marketplace publishes far more than the obvious domains: DCIM, location, organization, circuits, cabling, routing (BGP, OSPF, PIM), compute and clusters, security and firewall policy, VLAN translation, cross-connects, and many more. The whole catalog is checked every time, not a fixed shortlist. Fetch a match with the CLI and `inherit_from` the result, adding only site-specific attributes:
+Before modelling **any** domain from scratch, the skill searches the **entire** [Infrahub Marketplace](https://marketplace.infrahub.app/) for a published schema and reuses it rather than re-deriving the model, so if a schema already exists, no modelling is needed. The marketplace publishes far more than the obvious domains: DCIM, location, organization, circuits, cabling, routing (BGP, OSPF, PIM), compute and clusters, security and firewall policy, VLAN translation, cross-connects, and many more. The whole catalog is checked every time, not a fixed shortlist. Fetch a match with the CLI and `inherit_from` the result, adding only site-specific attributes:
 
 ```bash
 infrahubctl marketplace get <namespace>/<name>
 ```
 
-Discovery is CLI-first: `infrahubctl marketplace list`, `search <term>`, and `show <namespace>/<name>` browse the whole published catalog (paging through every result by default), and `infrahubctl marketplace get` fetches the match. Reuse only from the marketplace, not from GitHub. In airgapped environments this is a fallback chain, not a blocker — point `--marketplace-url` (or `INFRAHUB_MARKETPLACE_URL`) at an internal mirror, and if none is reachable the skill proceeds with a custom schema (still preferring built-in primitives).
+Discovery is CLI-first: `infrahubctl marketplace list`, `search <term>`, and `show <namespace>/<name>` browse the whole published catalog (paging through every result by default), and `infrahubctl marketplace get` fetches the match. Reuse only from the marketplace, not from GitHub. In airgapped environments this is a fallback chain, not a blocker: point `--marketplace-url` (or `INFRAHUB_MARKETPLACE_URL`) at an internal mirror, and if none is reachable the skill proceeds with a custom schema (still preferring built-in primitives).
 
-## Validating and loading
+## Loading it
 
 Validate a generated schema before loading it into Infrahub:
 

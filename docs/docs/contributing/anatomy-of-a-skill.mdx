@@ -1,0 +1,145 @@
+---
+title: Anatomy of a skill
+---
+
+This page is for people changing the skills, not using them. It covers
+what a skill is made of and the one contract that governs every change to
+one. The step-by-step procedures live in
+[`dev/`](https://github.com/opsmill/infrahub-skills/tree/main/dev) in the
+repository; this is the map.
+
+## What a skill directory holds
+
+```text
+skills/infrahub-managing-schemas/
+├── SKILL.md         # Entry point: overview, workflow, rule index
+├── rules/           # One file per rule, plus _sections.md and _template.md
+├── examples.md      # Complete, ready-to-use patterns
+├── reference.md     # Property and format tables
+└── validation.md    # Skill-specific validation guidance (not every skill)
+```
+
+Some skills also include `scripts/`, for work that is better done by code
+than by prose. `infrahub-converting-netbox-device-types` is the example:
+its converter is a bundled Python program the skill runs.
+
+One directory is different. `skills/infrahub-common/` is not a skill you
+invoke. It holds references every other skill points at: GraphQL query
+syntax, the `.infrahub.yml` format, the marketplace reference, the
+Profiles versus Object Templates distinction, and shared rules. Every
+skill that loads it pays for all of it, so a reference only two skills
+need belongs in those two skills instead.
+
+## What a rule looks like
+
+Rules are small and independently addressable, so the assistant reads only
+the ones the task needs. Each includes frontmatter and follows a fixed shape:
+
+````markdown
+---
+title: Relationship identifiers must match on both sides
+impact: CRITICAL
+tags: relationships, schema
+---
+
+## Relationship identifiers must match on both sides
+
+Impact: CRITICAL
+
+One-sentence statement of the rule.
+
+### Why it matters
+
+Two or three sentences naming the concrete consequence: the loader
+rejection, the silent reference failure, the data that ends up in the
+wrong shape.
+
+### Incorrect
+
+```yaml
+# Bad example
+```
+
+### Correct
+
+```yaml
+# Good example
+```
+````
+
+The filename includes a category prefix, and `rules/_sections.md` is the
+index that defines those prefixes for the skill. `rules/_template.md` is
+the starting point for a new one.
+
+## The Rule = Test contract
+
+This is the part that matters most, and the part a first contribution
+usually misses.
+
+**A new rule ships with its grader check and its eval task in the same
+change.** Not a follow-up, not a later PR.
+
+The reason is what happens otherwise:
+
+| Situation | What goes wrong |
+| --- | --- |
+| A rule with no grader | The next refactor of the skill's prose drops the constraint, and no test fails. The rule rots silently. |
+| A grader that cannot fail | Worse. It reports the rule as covered forever, so nobody looks again. |
+| A grader that contradicts its rule | The check is what scores, so it wins by default and the rule rots unnoticed. Decide which side moves. |
+
+The full seven steps are in
+[`dev/guides/adding-a-rule.md`](https://github.com/opsmill/infrahub-skills/blob/main/dev/guides/adding-a-rule.md),
+and the rule that enforces them is
+[`dev/guidelines/rule-equals-test.md`](https://github.com/opsmill/infrahub-skills/blob/main/dev/guidelines/rule-equals-test.md).
+That guideline loads automatically when you touch a rule, a grader, or
+`eval.yaml`.
+
+## The trees a skill spans
+
+One skill is not one directory. A change to it usually touches several.
+Below, `<name>` is the skill name without its `infrahub-` prefix, so for
+`infrahub-managing-schemas` it is `managing-schemas`.
+
+| Tree | Holds |
+| --- | --- |
+| `skills/infrahub-<name>/` | The skill itself |
+| `graders/<name>/` | Deterministic Python that scores model output |
+| `eval.yaml` | Every eval task, for every skill, in one root file |
+| `evaluations/infrahub-<name>.json` | Generated from `eval.yaml` by `scripts/sync-evals.py` |
+| `docs/docs/skills-reference/<name>.mdx` | The reference page on this site |
+| `docs/sidebars.ts` | The sidebar entry `scripts/check-docs-sidebar.py` enforces |
+
+A new skill also has to appear in the tables in `AGENTS.md` and in this
+site's landing page. The list, and which of them go stale on a behavior
+change, is in
+[`dev/guidelines/skill-registration.md`](https://github.com/opsmill/infrahub-skills/blob/main/dev/guidelines/skill-registration.md).
+
+## A note on testing your own edit
+
+Editing a skill here and then invoking it does not test your edit. Three
+ways to exercise a skill load three different copies:
+
+| How | Loads | What it tests |
+| --- | --- | --- |
+| Invoking `infrahub-*` in a session | The installed plugin under `~/.claude/plugins/cache/` | The published skill, not your edit |
+| `skillgrade` | The working tree, copied into a sandbox | The prose, with triggering bypassed |
+| Reading `skills/infrahub-<name>/SKILL.md` and following it | The working tree | The prose, manually |
+
+`uv run invoke freshness` shows how far apart the first two have drifted.
+
+Note what none of them covers: **triggering**. Eval prompts tell the model
+to read the skill at a given path, so they exercise a skill's rules but
+never its `description`, which is the field that decides whether the skill
+fires at all.
+
+## Go deeper
+
+- [`dev/guides/adding-a-skill.md`](https://github.com/opsmill/infrahub-skills/blob/main/dev/guides/adding-a-skill.md)
+- [`dev/guides/adding-a-rule.md`](https://github.com/opsmill/infrahub-skills/blob/main/dev/guides/adding-a-rule.md)
+- [`dev/guides/running-evals.md`](https://github.com/opsmill/infrahub-skills/blob/main/dev/guides/running-evals.md)
+- [`dev/knowledges/skill-writing-guide.md`](https://github.com/opsmill/infrahub-skills/blob/main/dev/knowledges/skill-writing-guide.md)
+- [The skill-change pipeline](./skill-change-pipeline.mdx), for the skills
+  that walk a change from defect or idea through to a pull request
+
+For how skills load at runtime, from the reader's side, see
+[How it works](../how-it-works.mdx).

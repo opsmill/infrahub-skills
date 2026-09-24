@@ -1,0 +1,245 @@
+---
+title: "Walkthrough: VLAN management"
+---
+
+This walkthrough builds a VLAN management domain end to end: a schema, the object data
+to populate it, and a validation check that guards it, all from a plain-language
+request. Follow it to see where each skill takes over and what you approve between the
+steps, before trying the same shape on a domain of your own.
+
+It uses [Spec Kit](https://github.com/github/spec-kit). Any SDD framework with a spec,
+plan, task, and implement workflow produces a similar result.
+
+## Setup
+
+Start from [infrahub-template](https://github.com/opsmill/infrahub-template), which scaffolds the repository layout the skills expect and ships `invoke` tasks for the instance:
+
+```bash
+uv tool run --from 'copier' copier copy https://github.com/opsmill/infrahub-template.git vlan-demo
+cd vlan-demo
+uv sync --all-packages
+invoke start
+```
+
+Then install the skills, Spec Kit, and the Infrahub routing extension:
+
+```bash
+npx skills add opsmill/infrahub-skills
+uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+specify init --here --integration claude
+specify extension add infrahub-speckit --from https://github.com/opsmill/infrahub-speckit/archive/refs/heads/main.zip
+```
+
+`specify init` creates the `.specify/` project configuration and installs slash commands into `.claude/commands/`. Having the instance up matters for more than the data: `before_specify` gates on `infrahubctl info`, so the cycle stops early rather than planning against an instance it cannot reach.
+
+## Step 1: Specify
+
+Run `/speckit.specify` and describe the feature:
+
+> I need a VLAN management domain for our data center network. We need to track VLANs with their numeric ID, name, operational status, and role. VLANs should be grouped into VLAN Groups. We also need a validation check that ensures no two VLANs in the same group share the same VLAN ID.
+
+Spec Kit produces `spec.md` capturing the requirements: two schema nodes (VLAN, VLANGroup), a grouping relationship, a uniqueness check, and the attributes for each.
+
+## Step 2: Plan
+
+Run `/speckit.plan`. The AI reads `spec.md` and the Infrahub skills to produce `plan.md`:
+
+> **Plan Summary**
+>
+> 1. **Schema** (Schema Manager): Define `IpamVLAN` and `IpamVLANGroup` nodes in the `Ipam` namespace.
+>    - `IpamVLAN`: attributes `name` (Text), `vlan_id` (Number), `status` (Dropdown), `role` (Text, optional). Relationship to `IpamVLANGroup` (many-to-one).
+>    - `IpamVLANGroup`: attribute `name` (Text). Relationship back to `IpamVLAN` (one-to-many).
+>    - Both nodes get `human_friendly_id` and `display_label`.
+>    - Uniqueness constraint on VLAN: `[vlan_id__value, group]`.
+> 2. **Object data** (Object Manager): Seed two VLAN groups and sample VLANs.
+> 3. **Validation check** (Check Manager): Python check querying VLANs per group, flagging duplicates. Register in `.infrahub.yml`.
+>
+> **Dependencies:** Schema must be loaded before objects. Check depends on schema being present.
+
+The plan is validated against Infrahub skills: the AI catches that `status` should be `kind: Dropdown` (not Text), that `vlan_id` is used instead of `id` (attribute names must be 3+ characters), and that the relationship between VLAN and VLANGroup needs matching identifiers on both sides.
+
+## Step 3: Review
+
+You review `plan.md` and adjust:
+
+> Looks good, but add `description` as an optional Text attribute on both nodes. And use "provisioned" instead of "provisioning" for the status choice.
+
+The AI updates the plan.
+
+## Step 4: Tasks
+
+Run `/speckit.tasks`. The AI breaks the plan into discrete steps in `tasks.md`:
+
+> - [ ] Task 1: Create `schemas/vlan_management.yml` with IpamVLAN and IpamVLANGroup nodes
+> - [ ] Task 2: Create `data/vlan_groups.yml` with two seed groups
+> - [ ] Task 3: Create `data/vlans.yml` with sample VLANs assigned to groups
+> - [ ] Task 4: Create `checks/check_vlan_id_uniqueness/` with Python check class and GraphQL query
+> - [ ] Task 5: Register the check in `.infrahub.yml`
+> - [ ] Task 6: Validate schema with `infrahubctl schema check`
+
+## Step 5: Implement
+
+Run `/speckit.implement`. The AI executes each task using the appropriate Infrahub skill. With the routing extension installed, the cycle closes with the friction check described in [Skill-gap detection after implement](./spec-kit-integration.mdx#skill-gap-detection-after-implement).
+
+**Task 1 output**: `schemas/vlan_management.yml` (via Schema Manager):
+
+```yaml
+version: "1.0"
+nodes:
+  - name: VLAN
+    namespace: Ipam
+    label: "VLAN"
+    icon: "mdi:lan-pending"
+    human_friendly_id:
+      - "name__value"
+    display_label: "{{ name__value }}"
+    uniqueness_constraints:
+      - ["vlan_id__value", "group"]
+    attributes:
+      - name: name
+        kind: Text
+        order_weight: 1000
+      - name: vlan_id
+        kind: Number
+        order_weight: 1100
+      - name: status
+        kind: Dropdown
+        order_weight: 1200
+        choices:
+          - name: active
+            label: Active
+            color: "#7fbf7f"
+          - name: provisioned
+            label: Provisioned
+            color: "#ffff7f"
+          - name: maintenance
+            label: Maintenance
+            color: "#ffd27f"
+          - name: decommissioning
+            label: Decommissioning
+            color: "#bf7f7f"
+      - name: role
+        kind: Text
+        optional: true
+        order_weight: 1300
+      - name: description
+        kind: Text
+        optional: true
+        order_weight: 1400
+    relationships:
+      - name: group
+        peer: IpamVLANGroup
+        kind: Attribute
+        cardinality: one
+        optional: false
+        identifier: "group__vlans"
+
+  - name: VLANGroup
+    namespace: Ipam
+    label: "VLAN Group"
+    icon: "mdi:folder-network"
+    human_friendly_id:
+      - "name__value"
+    display_label: "{{ name__value }}"
+    attributes:
+      - name: name
+        kind: Text
+        order_weight: 1000
+      - name: description
+        kind: Text
+        optional: true
+        order_weight: 1100
+    relationships:
+      - name: vlans
+        peer: IpamVLAN
+        kind: Attribute
+        cardinality: many
+        identifier: "group__vlans"
+```
+
+**Task 4 output**: `checks/check_vlan_id_uniqueness/check.py` (via Check Manager):
+
+```python
+from infrahub_sdk.checks import InfrahubCheck
+
+
+class CheckVlanIdUniqueness(InfrahubCheck):
+    query = "check_vlan_id_uniqueness"
+
+    def validate(self, data):
+        vlans = data["IpamVLAN"]["edges"]
+        groups = {}
+        for vlan in vlans:
+            node = vlan["node"]
+            group_name = node["group"]["node"]["display_label"]
+            vlan_id = node["vlan_id"]["value"]
+            key = (group_name, vlan_id)
+            if key in groups:
+                self.log_error(
+                    message=f"Duplicate VLAN ID {vlan_id} in group {group_name}"
+                )
+            groups[key] = node["display_label"]
+```
+
+**Task 5 output**: registration added to `.infrahub.yml`:
+
+```yaml
+check_definitions:
+  - name: check_vlan_id_uniqueness
+    class_name: CheckVlanIdUniqueness
+    file_path: checks/check_vlan_id_uniqueness/check.py
+    query: check_vlan_id_uniqueness
+```
+
+## Step 6: Report the gap it exposed
+
+Task 6 is where the cycle hit friction. The first version of `schemas/vlan_management.yml` left `optional` off the `group` relationship, and relationships default to optional, so `infrahubctl schema check` rejected it:
+
+```text
+cannot use group relationship, relationship must be mandatory
+```
+
+The AI added `optional: false`, re-ran the check, and it passed. That is a verifier going red to green on the same target inside a single implement run, which is exactly what the `after_implement` hook looks for. When the cycle closes, it prints one offer:
+
+> **[infrahub-speckit — friction offer, /speckit.implement]**
+>
+> Skill: `infrahub-managing-schemas`
+> Evidence: `infrahubctl schema check` rejected the VLAN node, then passed once `optional: false` was added to the constrained relationship
+> Rule coverage: `rules/uniqueness-constraints.md`
+>
+> An Infrahub skill's guidance may have a gap here. Reply "report it" to draft a skill-friction report for review. Nothing is filed without your approval.
+
+Ignoring it ends the cycle there. Replying hands the session to the [Skill Gap Reporter](./skills-reference/reporting-skill-gaps.mdx), which searches the tracker, classifies the finding, and drafts:
+
+> **bug: infrahub-managing-schemas: state the mandatory requirement where the constraint is written**
+>
+> **Skill**: infrahub-managing-schemas
+> **Type**: bug
+> **Confidence**: unconfirmed single observation
+> **Tracker search**: `repo:opsmill/infrahub-skills uniqueness constraint mandatory relationship` returned no existing report
+>
+> **What was being attempted**: scoping a uniqueness constraint by the parent relationship of a child node.
+>
+> **Rules consulted**: `uniqueness-constraints.md`, which does state that a relationship in a constraint must be mandatory, cardinality one, and referenced bare.
+>
+> **Where it went wrong**: the constraint was written correctly but the relationship was left at its default, so the check failed on the mandatory requirement. One failed verifier run and one correction.
+>
+> **What finally worked**: `optional: false` on the constrained relationship.
+>
+> **Proposed rule change**: in `uniqueness-constraints.md`, put the three requirements next to the constraint example rather than in a later section, so the relationship and the constraint that binds it are authored together.
+
+It is a **bug** rather than a feature because a rule already claimed the ground and the model still got it wrong. Had no rule covered relationships in constraints, the same friction would have drafted as a `feat:` instead, and the offer would have read `Rule coverage: no rule file covers this topic`. That classification decides the title prefix and the target repository, which is why the coverage read runs before the draft.
+
+The draft carries the version lines the template requires, read from `infrahubctl info`, and nothing that identifies your infrastructure. The Skill Gap Reporter cannot file it: it hands the draft to the [Issue Reporter](./skills-reference/reporting-issues.mdx), which shows you the target repository and the full body, then asks whether to submit through `gh`, a GitHub MCP server, or copy-paste. You can stop at either gate.
+
+Asking for the same thing without the extension installed works too: "report skill friction" reaches the Skill Gap Reporter directly. The hook only removes the need to notice the friction yourself.
+
+## Result
+
+From a single natural-language description, the SDD workflow produced:
+
+- A schema with correct naming, Dropdown status, matching relationship identifiers, and uniqueness constraints
+- Seed data files with valid references
+- A working validation check registered in `.infrahub.yml`
+
+Each artifact follows Infrahub best practices because the AI applied the relevant skill at each step, not because you knew the conventions upfront.

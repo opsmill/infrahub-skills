@@ -9,10 +9,12 @@ def format(ctx):
 
 @task
 def lint(ctx):
-    """Run all linters (markdown + YAML + CLI invocations)."""
+    """Run all linters (markdown + YAML + CLI invocations + docs sidebar)."""
     ctx.run("uv run rumdl check .", pty=True)
     ctx.run("uv run yamllint -c .yamllint.yml .", pty=True)
     ctx.run("uv run python scripts/check-cli-invocations.py", pty=True)
+    ctx.run("uv run python scripts/check-docs-sidebar.py", pty=True)
+    ctx.run("uv run python scripts/check-docs-skill-names.py", pty=True)
 
 
 @task

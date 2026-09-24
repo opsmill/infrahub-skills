@@ -33,7 +33,7 @@ After upgrading, data changes target a dedicated branch by default, you can mode
 
 Data changes now target a dedicated branch by default instead of the default branch, so you can review them through a proposed change or discard the branch instead of reverting each object manually.
 
-* Direct every write path — `infrahubctl object load`, the MCP `infrahub_create` / `infrahub_update` / `infrahub_delete` tools, `infrahubctl generator run`, and the Python SDK — to a dedicated branch instead of the default branch (`main` by convention, configurable per deployment).
+* Direct every write path — `infrahubctl object load`, the MCP `infrahub_create` / `infrahub_update` / `infrahub_delete` tools, `infrahubctl generator run`, and the Python SDK — to a dedicated branch instead of the default branch (`main` by convention, configurable per deployment). <!-- cli-check: ignore infrahubctl generator run -->
 * A shared rule in `infrahub-common` covers when a direct write to the default branch is and is not appropriate, so the assistant defaults to a branch even when a request asks to write directly.
 
 ### Model file attachments with `CoreFileObject`

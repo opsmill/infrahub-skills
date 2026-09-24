@@ -50,7 +50,7 @@ LEAVES: set[str] = {
 # A leaf command takes its target as a positional argument, so the token
 # after it is a user-chosen name we cannot validate. What we can catch is a
 # generic verb sitting there, which is nearly always an invented subcommand:
-# `infrahubctl check run <name>` reads fine and silently looks for a check  # cli-check: ignore
+# `infrahubctl check run <name>` reads fine and silently looks for a check  # cli-check: ignore infrahubctl check run
 # literally named "run".
 SUSPICIOUS_VERBS: set[str] = {
     "run", "list", "get", "create", "delete", "load", "dump",
@@ -85,7 +85,7 @@ TOKEN = r"[a-z][a-z0-9_-]*"
 INVOCATION = re.compile(rf"infrahubctl[ \t]+({TOKEN})(?:[ \t]+({TOKEN}))?")
 
 # Bare `infrahubctl`-less `group sub` inside a code span, for prose that
-# drops the binary name: "`infrahubctl schema load`, then `schema validate`".  # cli-check: ignore
+# drops the binary name: "`infrahubctl schema load`, then `schema validate`".  # cli-check: ignore schema validate
 #
 # The span has to open with `group sub`, and — with no `infrahubctl` here to
 # say the span is a command at all — the second token has to read as one.
@@ -108,9 +108,58 @@ _SHELL_COMMENT = re.compile(r"^\s*#.*$", re.MULTILINE)
 
 # The one legitimate reason to print a command that does not exist is to
 # tell the reader it does not exist. Put the marker on the same line, in
-# whatever comment syntax the file uses: `<!-- cli-check: ignore -->` in
-# markdown, `# cli-check: ignore` in Python.
+# whatever comment syntax the file uses (an HTML comment in markdown, a
+# `#` comment in Python), followed by the invocation it silences, written
+# however it reads naturally in the prose (arguments included, since a
+# release note names a command the way it was actually run). The marker
+# silences only that named form, compared the same way this module compares
+# any two invocations: by its first two tokens after `infrahubctl` (or, for
+# the bare `group sub` span, its first two tokens outright). A blanket
+# `IGNORE_MARKER in line` check used to silence the whole line instead, so
+# appending a second, different bad invocation to an already-marked line
+# passed unnoticed. A markdown bullet is one line, so a bullet naming two
+# invalid invocations needs two markers on that one line, and both are
+# read, not just the first.
 IGNORE_MARKER = "cli-check: ignore"
+
+
+def _named_invocation(text: str) -> str:
+    """Normalize one marker's free-form text to the two-token form this
+    module reports invocations in.
+
+    `invalid_invocations_in_region` never reports more than `infrahubctl`
+    plus two tokens (or, for a bare span, two tokens outright); arguments
+    play no part in identifying which invocation was flagged. Truncating
+    the marker's text the same way is what lets a marker name the command
+    the way it was actually written, arguments included, rather than the
+    one bare spelling the scanner happens to report.
+    """
+    match = INVOCATION.match(text)
+    if match:
+        first, second = match.groups()
+        return f"infrahubctl {first}" + (f" {second}" if second else "")
+    return " ".join(text.split()[:2])
+
+
+def ignored_invocations(line: str) -> set[str]:
+    """Every invocation a `cli-check: ignore <invocation>` marker on this
+    line names, normalized to the two-token form
+    `invalid_invocations_in_region` reports invocations in.
+
+    Splitting on the marker text, rather than a single regex search, is
+    what lets more than one marker share a line: each marker's text runs up
+    to the next marker or a trailing HTML-comment closer, whichever comes
+    first, so a second marker never gets swallowed into the first's
+    capture. Empty when the line carries no marker, or only bare ones with
+    nothing after them to name: a bare marker protects nothing, rather
+    than falling back to protecting the whole line.
+    """
+    named: set[str] = set()
+    for chunk in line.split(IGNORE_MARKER)[1:]:
+        text = chunk.split("-->", 1)[0].strip()
+        if text:
+            named.add(_named_invocation(text))
+    return named
 
 
 def code_regions(text: str) -> list[str]:
@@ -123,7 +172,7 @@ def code_regions(text: str) -> list[str]:
     Regions are returned as a list rather than one joined string because
     joining welds unrelated spans into commands that were never written:
     "The `infrahubctl` CLI ... name the transform `spine_config`" becomes
-    the invocation `infrahubctl spine_config`. Callers scan each region.  # cli-check: ignore
+    the invocation `infrahubctl spine_config`. Callers scan each region.  # cli-check: ignore infrahubctl spine_config
 
     Shell comment lines inside a fence are stripped for the same reason —
     they are prose, and this repository's own rules annotate fences that
