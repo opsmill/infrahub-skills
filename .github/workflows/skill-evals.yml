@@ -115,7 +115,7 @@ jobs:
           echo "Discovered $SKILL_COUNT skill(s): $MATRIX"
 
   # ---------------------------------------------------------------------------
-  # Run skillgrade per skill (throttled matrix)
+  # Run skillgrade per skill (parallel matrix)
   # ---------------------------------------------------------------------------
   eval:
     needs: discover
