@@ -9,6 +9,31 @@ on:
         required: false
         type: string
         default: "smoke"
+      model:
+        description: "Agent model under test (haiku, sonnet)"
+        required: false
+        type: string
+        default: "haiku"
+      grader_model:
+        description: "LLM-rubric grader model ID"
+        required: false
+        type: string
+        default: "claude-haiku-4-5"
+      parallel:
+        description: "Concurrent trials per skill job"
+        required: false
+        type: number
+        default: 2
+      trials:
+        description: "Trials per eval; overrides the preset's count (empty = preset)"
+        required: false
+        type: string
+        default: ""
+      threshold:
+        description: "CI pass-rate threshold, 0-1 (empty = eval.yaml default)"
+        required: false
+        type: string
+        default: ""
     secrets:
       ANTHROPIC_API_KEY:
         required: true
@@ -18,10 +43,39 @@ on:
         description: "Skillgrade preset (smoke, reliable, regression)"
         required: false
         default: "smoke"
+      model:
+        description: "Agent model under test"
+        required: false
+        type: choice
+        options: [haiku, sonnet]
+        default: "haiku"
+      grader_model:
+        description: "LLM-rubric grader model ID"
+        required: false
+        default: "claude-haiku-4-5"
+      parallel:
+        description: "Concurrent trials per skill job"
+        required: false
+        default: "2"
+      trials:
+        description: "Trials per eval; overrides the preset's count (empty = preset)"
+        required: false
+        default: ""
+      threshold:
+        description: "CI pass-rate threshold, 0-1 (empty = eval.yaml default)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
   pull-requests: write
+
+env:
+  EVAL_MODEL: ${{ inputs.model || 'haiku' }}
+  GRADER_MODEL: ${{ inputs.grader_model || 'claude-haiku-4-5' }}
+  EVAL_PARALLEL: ${{ inputs.parallel || 2 }}
+  EVAL_TRIALS: ${{ inputs.trials }}
+  EVAL_THRESHOLD: ${{ inputs.threshold }}
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -81,7 +135,7 @@ jobs:
           echo "Discovered $SKILL_COUNT skill(s): $MATRIX"
 
   # ---------------------------------------------------------------------------
-  # Run skillgrade per skill (parallel matrix)
+  # Run skillgrade per skill (throttled matrix)
   # ---------------------------------------------------------------------------
   eval:
     needs: discover
@@ -91,6 +145,8 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
       fail-fast: false
+      # Cap concurrent skill jobs; total in-flight trials = max-parallel x EVAL_PARALLEL
+      max-parallel: 5
     steps:
       - uses: actions/checkout@v6
 
@@ -110,12 +166,24 @@ jobs:
       - name: Run skillgrade (${{ matrix.skill }})
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Model used by the llm_rubric grader
+          ANTHROPIC_MODEL: ${{ env.GRADER_MODEL }}
         run: |
+          echo "Agent model: $EVAL_MODEL | grader: $ANTHROPIC_MODEL | parallel: $EVAL_PARALLEL"
+          # Optional overrides: --trials beats the preset's count and
+          # --threshold beats eval.yaml's defaults.threshold.
+          EXTRA=()
+          [ -n "$EVAL_TRIALS" ] && EXTRA+=("--trials=$EVAL_TRIALS")
+          [ -n "$EVAL_THRESHOLD" ] && EXTRA+=("--threshold=$EVAL_THRESHOLD")
+          echo "Overrides: ${EXTRA[*]:-none}"
           skillgrade \
             --${{ inputs.preset || 'smoke' }} \
+            "${EXTRA[@]}" \
             --ci \
             --provider=local \
-            --parallel=5 \
+            --agent=claude \
+            --model="$EVAL_MODEL" \
+            --parallel="$EVAL_PARALLEL" \
             --eval="${{ matrix.evals }}" \
             --output=eval-results
 
@@ -177,6 +245,8 @@ jobs:
             const marker = '<!-- skill-eval-report -->';
             const body =
               `${marker}\n# Skill Evaluation Results\n\n` +
+              `_Agent model: \`${process.env.EVAL_MODEL}\` · ` +
+              `grader: \`${process.env.GRADER_MODEL}\`_\n\n` +
               reports.join('\n\n---\n\n');
 
             const {data: comments} =
