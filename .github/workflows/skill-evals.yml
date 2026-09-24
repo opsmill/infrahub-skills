@@ -115,7 +115,7 @@ jobs:
           echo "Discovered $SKILL_COUNT skill(s): $MATRIX"
 
   # ---------------------------------------------------------------------------
-  # Run skillgrade per skill (parallel matrix)
+  # Run skillgrade per skill (throttled matrix)
   # ---------------------------------------------------------------------------
   eval:
     needs: discover
@@ -125,6 +125,8 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
       fail-fast: false
+      # Cap concurrent skill jobs; total in-flight trials = max-parallel x EVAL_PARALLEL
+      max-parallel: 5
     steps:
       - uses: actions/checkout@v6
 
