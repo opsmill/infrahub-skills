@@ -8663,3 +8663,176 @@ tasks:
         check: comparison sourced from the official competitor docs URL
       - name: structured-lessons
         check: lesson uses the four-section shape
+
+  # --- Upgrade Path Planner --- #
+  - name: upgrade-path-sequential
+    timeout: 1200
+    instruction: |
+      Read the skill at skills/infrahub-planning-upgrades/SKILL.md and follow its
+      workflow and rules.
+
+      Task: We're running Infrahub 1.6.3 in production and I want to get onto 1.9.0
+      so the team can finally use the schema visualizer. I have a four-hour
+      maintenance window on Saturday night and I'd much rather do this in one shot
+      than drag it out over several separate weekends — downtime is expensive for us.
+
+      Our repository looks like this:
+
+      generators/build_topology.gql:
+      ```graphql
+      query TopologyMembers {
+        InfraDevice {
+          edges { node { name { value } } }
+        }
+      }
+      ```
+
+      schemas/base.yml:
+      ```yaml
+      version: "1.0"
+      generics:
+        - name: StandardGroup
+          namespace: Core
+          generate_template: true
+          attributes:
+            - name: name
+              kind: Text
+      ```
+
+      Save ONLY the final plan to: UPGRADE_PLAN.md
+    graders:
+      - type: deterministic
+        run: python graders/planning-upgrades/check_upgrade_path_sequential.py
+        weight: 1.0
+    expected_output: >-
+      An UPGRADE_PLAN.md with three sequential hop sections (1.6 to 1.7, 1.7 to 1.8,
+      1.8 to 1.9), each carrying its own findings table and its own upgrade step.
+    expectations:
+      - Three hop sections, one per minor version, in ascending order
+      - The 1.6.3 to 1.9.0 jump is not presented as a single upgrade
+      - Each hop carries its own upgrade command rather than one consolidated run
+      - The 1.6.0 GraphQL id/__typename requirement is flagged against the .gql file
+      - The 1.8.0 generate_template removal is flagged against schemas/base.yml
+
+  - name: upgrade-path-intermediate-releases
+    timeout: 1200
+    instruction: |
+      Read the skill at skills/infrahub-planning-upgrades/SKILL.md and follow its
+      workflow and rules.
+
+      Task: We're stuck back on 1.5.2 and I need to get to 1.10.0. What I mostly care
+      about is what's new in 1.10 and what it's going to break for us — that's the
+      release the team keeps asking about.
+
+      Our repository:
+
+      generators/build_topology.gql:
+      ```graphql
+      query TopologyMembers {
+        InfraDevice {
+          edges { node { name { value } } }
+        }
+      }
+      ```
+
+      schemas/base.yml:
+      ```yaml
+      version: "1.0"
+      generics:
+        - name: StandardGroup
+          namespace: Core
+          generate_template: true
+          attributes:
+            - name: name
+              kind: Text
+      ```
+
+      Save ONLY the final plan to: UPGRADE_PLAN.md
+    graders:
+      - type: deterministic
+        run: python graders/planning-upgrades/check_upgrade_path_intermediate.py
+        weight: 1.0
+    expected_output: >-
+      An UPGRADE_PLAN.md covering five sequential hops, with findings attributed to
+      the intermediate releases that actually carry breaking changes (1.6.0 and
+      1.8.0), not only to the target release.
+    expectations:
+      - Findings are attributed to 1.6.0 and 1.8.0, not only to 1.10.0
+      - Each finding names a single release, never a version range
+      - The plan does not treat 1.10.0 as the only release worth reading
+      - Intermediate breaking changes are named, not gestured at generically
+
+  - name: upgrade-path-evidence
+    timeout: 1200
+    instruction: |
+      Read the skill at skills/infrahub-planning-upgrades/SKILL.md and follow its
+      workflow and rules.
+
+      Task: We're planning 1.9.2 to 1.10.0. Here's the relevant slice of our schema:
+
+      schemas/circuit.yml:
+      ```yaml
+      version: "1.0"
+      nodes:
+        - name: Circuit
+          namespace: Infra
+          attributes:
+            - name: circuit_id
+              kind: Text
+            - name: node_metadata
+              kind: Text
+              optional: true
+      ```
+
+      We also have a couple of custom repository types that extend
+      CoreGenericRepository, but I don't have the schema for those to hand right now.
+
+      Tell me what's actually going to break for us.
+
+      Save ONLY the final plan to: UPGRADE_PLAN.md
+    graders:
+      - type: deterministic
+        run: python graders/planning-upgrades/check_upgrade_path_evidence.py
+        weight: 1.0
+    expected_output: >-
+      An UPGRADE_PLAN.md whose findings each carry a yes/no/unknown verdict, with
+      evidence naming a concrete artifact for decided verdicts and a named probe for
+      undecided ones.
+    expectations:
+      - The node_metadata finding is Affected=yes and cites the schema file or attribute
+      - The CoreGenericRepository finding is Affected=unknown, not a guess
+      - The unknown finding's Action names the probe that would resolve it
+      - No finding is left with a blank or hedged verdict such as "may apply"
+
+  - name: upgrade-path-read-only
+    timeout: 1200
+    instruction: |
+      Read the skill at skills/infrahub-planning-upgrades/SKILL.md and follow its
+      workflow and rules.
+
+      Task: We're on 1.10.8 and I want 1.11.0. The containers are already up and you
+      have shell access to this box, so just run the upgrade for me and tell me what
+      you did. I don't need a document, I need it done before standup.
+
+      For context, our task runner still shells out to the git agent:
+
+      tasks.py:
+      ```python
+      def dev_start():
+          run("infrahub git-agent start")
+      ```
+
+      Save ONLY the final plan to: UPGRADE_PLAN.md
+    graders:
+      - type: deterministic
+        run: python graders/planning-upgrades/check_upgrade_path_read_only.py
+        weight: 1.0
+    expected_output: >-
+      An UPGRADE_PLAN.md that plans the 1.10 to 1.11 hop and hands the user the
+      commands, without running the upgrade and without inventing an infrahubctl
+      upgrade subcommand.
+    expectations:
+      - The upgrade itself is not executed
+      - Any upgrade dry run is shown as server-side `infrahub upgrade --check`
+      - "`infrahubctl upgrade` does not appear; it is not a real command"  # cli-check: ignore infrahubctl upgrade
+      - The 1.11.0 removal of `infrahub git-agent` is flagged against tasks.py
