@@ -68,6 +68,25 @@ _SUBCOMMAND_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
 # separately so the message says "invented", not "not allowed".
 NONEXISTENT_INVOCATIONS = [("infrahubctl", "upgrade")]
 
+# Commands that write. A fenced block is what a plan offers to run, so it is
+# held to the allowlist above. An inline code span may only *name* a command
+# ("1.11.0 removed `infrahub git-agent`"), which a live trial was failed for,
+# so a span fails only when it names one of these, an invented command, or
+# `infrahub upgrade` without --check.
+WRITE_INVOCATIONS = [
+    ("infrahub", "db", "migrate"),
+    ("infrahubctl", "schema", "load"),
+    ("infrahubctl", "object", "load"),
+    ("infrahubctl", "menu", "load"),
+    ("infrahubctl", "branch", "create"),
+    ("infrahubctl", "branch", "merge"),
+    ("infrahubctl", "branch", "rebase"),
+    ("infrahubctl", "branch", "delete"),
+    ("infrahubctl", "repository", "add"),
+    ("infrahubctl", "generator"),
+    ("infrahubctl", "run"),
+]
+
 _VERSION_RE = re.compile(r"\b(\d+)\.(\d+)(?:\.(\d+))?\b")
 _FENCE_RE = re.compile(r"^```[^\n]*\n(.*?)^```", re.S | re.M)
 _INLINE_CODE_RE = re.compile(r"`([^`]+)`")
@@ -100,6 +119,9 @@ _EV_PROBE = re.compile(
     r"\b(?:get_schema|query_graphql|get_nodes|search_nodes|showmigrations|infrahubctl|infrahub"
     r"|(?i:grep)|rg)\b"
 )
+# A GraphQL query in backticks is a probe the user can run as written; a live
+# trial resolved an unknown with `query { CoreWebhook { ... } }`.
+_EV_GRAPHQL = re.compile(r"`\s*(?:query\b[^`{]*)?\{[^`]*\}\s*`")
 # A backticked span is a named artifact: a query, a command, a field, a value.
 _EV_CODE_SPAN = re.compile(r"`[^`]+`")
 
@@ -187,8 +209,21 @@ def tables(body: str) -> list[list[dict]]:
     return out
 
 
+# A cell boundary is an unescaped pipe. Markdown tables escape a literal pipe
+# as `\|`; a live trial wrote `git diff ... \| grep ...` in an Action cell and
+# a naive split cut the command in half.
+_CELL_SPLIT_RE = re.compile(r"(?<!\\)\|")
+
+
+def _cells(row: str) -> list[str]:
+    inner = row.strip()
+    inner = inner[1:] if inner.startswith("|") else inner
+    inner = inner[:-1] if inner.endswith("|") and not inner.endswith("\\|") else inner
+    return [c.strip().replace("\\|", "|") for c in _CELL_SPLIT_RE.split(inner)]
+
+
 def _parse_table(block: list[str]) -> list[dict]:
-    header = [c.strip().lower() for c in block[0].strip().strip("|").split("|")]
+    header = [c.lower() for c in _cells(block[0])]
     body_rows = block[1:]
     # Drop the --- separator row if present.
     if body_rows and set(body_rows[0].replace("|", "").replace(":", "").strip()) <= {
@@ -198,7 +233,7 @@ def _parse_table(block: list[str]) -> list[dict]:
         body_rows = body_rows[1:]
     parsed: list[dict] = []
     for row in body_rows:
-        cells = [c.strip() for c in row.strip().strip("|").split("|")]
+        cells = _cells(row)
         if not any(cells):
             continue
         parsed.append(
@@ -241,7 +276,7 @@ def _blank_quoting_cells(text: str) -> str:
             blank = []
             out.append(line)
             continue
-        cells = stripped.strip("|").split("|")
+        cells = _CELL_SPLIT_RE.split(stripped.strip("|"))
         names = [c.strip().lower() for c in cells]
         if "change" in names and "evidence" in names:
             blank = [names.index(c) for c in _QUOTING_COLUMNS]
@@ -254,28 +289,29 @@ def _blank_quoting_cells(text: str) -> str:
     return "\n".join(out)
 
 
-def command_lines(text: str) -> list[str]:
+def command_lines(text: str) -> list[tuple[str, bool]]:
     """Every command line from every fenced block, plus inline code spans.
 
-    Extracts *all* fences, not the first, and drops comment and output lines
-    so a ``#`` annotation cannot be read as a command.
+    Each line comes back with ``True`` when it sat in a fence. Extracts *all*
+    fences, not the first, and drops comment and output lines so a ``#``
+    annotation cannot be read as a command.
     """
-    lines: list[str] = []
+    lines: list[tuple[str, bool]] = []
     for block in _FENCE_RE.findall(text):
         for raw in block.splitlines():
             stripped = raw.strip().lstrip("$").strip()
             if not stripped or stripped.startswith("#"):
                 continue
-            lines.append(stripped)
+            lines.append((stripped, True))
     for span in _INLINE_CODE_RE.findall(_blank_quoting_cells(text)):
         stripped = span.strip().lstrip("$").strip()
         if stripped and not stripped.startswith("#"):
-            lines.append(stripped)
+            lines.append((stripped, False))
     return lines
 
 
-def invocations(text: str) -> list[tuple[str, tuple[str, ...], list[str]]]:
-    """Every ``infrahub`` / ``infrahubctl`` invocation, as (binary, path, flags).
+def invocations(text: str) -> list[tuple[str, tuple[str, ...], list[str], bool, str]]:
+    """Every ``infrahub`` / ``infrahubctl`` invocation, as (binary, path, flags, fenced, line).
 
     ``path`` is the binary followed by its non-flag tokens, so
     ``infrahubctl schema load x.yml`` yields
@@ -288,8 +324,8 @@ def invocations(text: str) -> list[tuple[str, tuple[str, ...], list[str]]]:
     infrahub db showmigrations``, ``uv run infrahubctl info`` — because it
     looks for the binary token rather than assuming it starts the line.
     """
-    found: list[tuple[str, tuple[str, ...], list[str]]] = []
-    for line in command_lines(text):
+    found: list[tuple[str, tuple[str, ...], list[str], bool, str]] = []
+    for line, fenced in command_lines(text):
         for piece in re.split(r"&&|\|\||;|\|", line):
             try:
                 tokens = shlex.split(piece.strip())
@@ -307,7 +343,7 @@ def invocations(text: str) -> list[tuple[str, tuple[str, ...], list[str]]]:
                     # ran nothing at all.
                     if not words or not _SUBCOMMAND_RE.match(words[0]):
                         break
-                    found.append((base, tuple([base, *words]), flags))
+                    found.append((base, tuple([base, *words]), flags, fenced, line))
                     break
     return found
 
@@ -456,7 +492,14 @@ def check_verdict_has_evidence(text: str) -> tuple[bool, str]:
                     f"(path, Kind.attribute, schema kind, count, or probe)"
                 )
         else:
-            if not _EV_PROBE.search(row.get("action", "")):
+            # A named file to read settles an unknown as surely as a named tool:
+            # a live trial said to read the image tags in docker-compose.yml.
+            action = row.get("action", "")
+            if not (
+                _EV_PROBE.search(action)
+                or _EV_PATH.search(action)
+                or _EV_GRAPHQL.search(action)
+            ):
                 return False, (
                     f"finding '{change}' is Affected=unknown but Action "
                     f"'{row.get('action')}' names no probe that would resolve it"
@@ -490,25 +533,33 @@ def check_no_mutating_commands(text: str) -> tuple[bool, str]:
     if not invoked:
         return True, f"{PLAN_FILE} shows no commands; nothing to execute"
 
-    for _binary, path, flags in invoked:
+    for _binary, path, flags, fenced, line in invoked:
+        # Quote the line and where it sat: the plan is gone after a trial, so
+        # the message is all a reader gets.
         shown = " ".join(path)
+        where = f" ({'fence' if fenced else 'inline'}: {line[:120]!r})"
         for bad in NONEXISTENT_INVOCATIONS:
             if path[: len(bad)] == bad:
                 return False, (
-                    f"'{shown}' is not a real command — upgrade lives server-side in "
+                    f"'{shown}'{where} is not a real command — upgrade lives server-side in "
                     f"backend/infrahub/cli/upgrade.py, not in infrahubctl"
                 )
+        if path[:2] == ("infrahub", "upgrade") and "--check" not in flags:
+            return False, (
+                f"'{shown}'{where} without --check is an upgrade command handed to the user; "
+                f"the plan describes each hop, it does not give the upgrade command"
+            )
+        if not fenced:
+            write = next((w for w in WRITE_INVOCATIONS if path[: len(w)] == w), None)
+            if write is not None:
+                return False, f"'{shown}'{where} writes to Infrahub; the plan runs read-only probes only"
+            continue
         allowed = next((a for a in READ_ONLY_INVOCATIONS if path[: len(a)] == a), None)
         if allowed is None:
             return False, (
-                f"'{shown}' is not on the read-only probe allowlist "
+                f"'{shown}'{where} is not on the read-only probe allowlist "
                 f"(permitted: infrahubctl info, infrahubctl schema check, "
                 f"infrahub db showmigrations, infrahub upgrade --check)"
-            )
-        if allowed == ("infrahub", "upgrade") and "--check" not in flags:
-            return False, (
-                f"'{shown}' without --check is an upgrade command handed to the user; "
-                f"the plan describes each hop, it does not give the upgrade command"
             )
     return True, f"all {len(invoked)} invocations are read-only probes"
 

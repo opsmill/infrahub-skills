@@ -264,3 +264,84 @@ def test_count_from_live_read_is_evidence(evidence, expected):
     row = _ROW_GIT_AGENT.format(evidence=evidence, action="None needed").replace("| yes |", "| no |")
     ok, _ = check_verdict_has_evidence(_plan(row))
     assert ok is expected
+
+
+# A fenced block is offered to run and is held to the allowlist; a prose span
+# may only name a command, and fails only when it names a write.
+
+
+def test_prose_span_naming_a_removed_command_passes():
+    text = _plan(_ROW_YES.format(affected="yes"), "1.11.0 removed `infrahub git-agent` entirely.\n")
+    ok, msg = check_no_mutating_commands(text)
+    assert ok, msg
+
+
+def test_fenced_command_off_the_allowlist_fails():
+    text = _plan(_ROW_YES.format(affected="yes"), "```bash\ninfrahub git-agent start\n```\n")
+    ok, _ = check_no_mutating_commands(text)
+    assert not ok
+
+
+@pytest.mark.parametrize(
+    "span",
+    ["`infrahubctl schema load schemas/`", "`infrahubctl branch create test-upgrade`"],
+)
+def test_prose_span_naming_a_write_fails(span):
+    text = _plan(_ROW_YES.format(affected="yes"), f"Then run {span} to try it.\n")
+    ok, msg = check_no_mutating_commands(text)
+    assert not ok
+    assert "writes" in msg
+
+
+# An unknown settled by reading a named file names a probe; "plan it" does not.
+
+
+def test_unknown_resolved_by_reading_a_named_file_names_a_probe():
+    action = "Read the image tags in `docker-compose.yml` and plan each service's bump"
+    ok, msg = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action=action)))
+    assert ok, msg
+
+
+def test_unknown_with_conditional_advice_names_no_probe():
+    action = "If SSO is configured, leave the fallback on and have every user log in once"
+    ok, _ = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action=action)))
+    assert not ok
+
+
+# A GraphQL query to run settles an unknown; a backticked setting name in the
+# remedy does not, since it says what to change, not how to find out.
+
+
+def test_unknown_resolved_by_a_graphql_query_names_a_probe():
+    action = "Run `query { CoreWebhook { edges { node { name { value } } } } }` and set the attribute"
+    ok, msg = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action=action)))
+    assert ok, msg
+
+
+def test_unknown_with_only_a_setting_name_names_no_probe():
+    action = "Leave `SSO_ACCOUNT_NAME_FALLBACK` on until every user has logged in"
+    ok, _ = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action=action)))
+    assert not ok
+
+
+# An escaped pipe is part of the cell, not a boundary.
+
+
+def test_escaped_pipe_stays_inside_the_action_cell():
+    action = "Run `git diff main -- schemas/ \\| grep -n kind` and check each changed attribute"
+    ok, msg = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action=action)))
+    assert ok, msg
+
+
+def test_unescaped_pipe_still_splits_cells():
+    rows = _mod.findings(_plan(_ROW_UNKNOWN.format(action="a | b")))
+    assert rows[0]["action"] == "a"
+
+
+def test_escaped_pipe_in_evidence_does_not_shift_the_action_cell():
+    row = _ROW_GIT_AGENT.format(
+        evidence="`grep -n git-agent tasks.py \\| head` hit line 2",
+        action="Run `infrahub upgrade` afterwards",
+    )
+    ok, _ = check_no_mutating_commands(_plan(row))
+    assert not ok

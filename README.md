@@ -115,6 +115,7 @@ A team already running Infrahub who needs to continue extending it — adding sc
 | **importing-data** | Convert CSV/TSV inputs into Infrahub object YAML, validate, and load onto a fresh branch |
 | **teaching-concepts** | Tutor for Infrahub concepts: probes what you know, teaches through your own repo and instance, sets verified hands-on exercises, and tracks progress across sessions |
 | **converting-netbox-device-types** | Convert NetBox device-type definitions (devicetype-library / NDX) into Infrahub object templates with a bundled converter, and report what the target schema could not hold |
+| **planning-upgrades** | Plan an Infrahub upgrade one minor version at a time, checking every release's breaking changes against your repository and instance, without running anything |
 
 Each skill lives in `skills/infrahub-<name>/` with a `SKILL.md` entry point, reference docs, examples, and modular rules. Shared references (GraphQL patterns, `.infrahub.yml` format, git integration) are in `skills/infrahub-common/`. Skills use gerund-form names following the [Agent Skills best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
 
@@ -224,7 +225,8 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 │   ├── infrahub-analyzing-diagnostics/ # Bundle triage, correlation, and known-issue matching
 │   ├── infrahub-importing-data/    # CSV/TSV → Infrahub objects
 │   ├── infrahub-teaching-concepts/ # Guided tutor for Infrahub concepts
-│   └── infrahub-converting-netbox-device-types/ # NetBox device types → object templates
+│   ├── infrahub-converting-netbox-device-types/ # NetBox device types → object templates
+│   └── infrahub-planning-upgrades/ # Version-by-version upgrade plans
 ├── CLAUDE.md
 ├── README.md
 └── LICENSE                      # Apache 2.0

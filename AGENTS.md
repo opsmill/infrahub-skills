@@ -157,6 +157,7 @@ the skill fires at all.
 | `infrahub-importing-data` | `skills/infrahub-importing-data/` | Convert CSV/TSV inputs into Infrahub object YAML and load onto a fresh branch |
 | `infrahub-teaching-concepts` | `skills/infrahub-teaching-concepts/` | Tutor for Infrahub concepts: probes the learner, teaches through their own repo/instance, verified hands-on exercises, tracked progress |
 | `infrahub-converting-netbox-device-types` | `skills/infrahub-converting-netbox-device-types/` | Convert NetBox device-type definitions into Infrahub object templates via a bundled, mapping-profile-driven Python converter |
+| `infrahub-planning-upgrades` | `skills/infrahub-planning-upgrades/` | Plan a version-by-version upgrade path, checking each release's breaking changes against the repo and instance (read-only) |
 
 ### Rule = Test (Required)
 

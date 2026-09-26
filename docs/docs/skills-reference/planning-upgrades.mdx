@@ -1,0 +1,50 @@
+---
+title: Upgrade Planner
+---
+
+Skill: `infrahub-planning-upgrades`
+
+The Upgrade Planner writes a plan for moving an Infrahub deployment from the version it runs to a target version. It lays out one hop per minor version, reads the release notes of every release in the range, and checks each breaking change against your repository and, when one is reachable, your instance. It plans; it does not upgrade.
+
+## When to use
+
+- Before a maintenance window, to know what the upgrade will break
+- When you are more than one minor version behind and need the route
+- When someone asks what changed between two versions and whether it matters for you
+- When the target release moved and an existing plan needs updating
+
+## What it produces
+
+`UPGRADE_PLAN.md`, with one section per hop. Each hop lists its steps in prose and a findings table:
+
+- **Change**: what the release changed
+- **Release**: the single version that introduced it
+- **Kind and severity**: breaking or preparation; critical, warning, or info
+- **When**: before, during, or after the hop
+- **Affected**: yes, no, or unknown for your deployment
+- **Evidence**: the file, schema kind, query result, or probe output behind the verdict
+- **Action and source**: what to do, and the release note it comes from
+
+## Example prompts
+
+- "Plan our upgrade from 1.9.2 to 1.10.0"
+- "We're on 1.5 and need 1.10. What breaks for us on the way?"
+- "What do I need to fix before upgrading to the latest release?"
+- "Just run the upgrade for me" (it plans and explains why it will not run it)
+
+## Key rules enforced
+
+- **One minor version at a time**: Infrahub supports upgrades only from the previous minor version, so a jump across several minors becomes several hops
+- **Every release in the range, patches included**: breaking changes also ship in patch releases, and no flag marks them, so the planner reads each release's notes rather than only the target's
+- **A verdict with evidence**: each finding says whether it affects you and names what proves it; an undecided finding names the check that would decide it
+- **Read-only**: it never runs the upgrade, a schema load, or a branch write, and the plan never gives the upgrade command. It may run read-only probes such as `infrahubctl info` and a server-side `infrahub upgrade --check`
+
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| ------- | --------------------------- |
+| Upgrading straight to the target across several minors | Plans one hop per minor version |
+| Reading only the target release's notes | Reads every release in the range and attributes each change to the one that introduced it |
+| A list of breaking changes with no verdict | Marks each yes, no, or unknown, backed by an artifact or a named probe |
+| An upgrade command pasted into a plan | Describes the step and links the upgrade guide for your deployment |
+| Writing an upgrade command for `infrahubctl` | Runs upgrade checks server-side with `infrahub upgrade --check`; `infrahubctl` has no upgrade command |
