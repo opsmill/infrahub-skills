@@ -4,12 +4,13 @@
     {
       "id": 1,
       "prompt": "We're running Infrahub 1.6.3 in production and I want to get onto 1.9.0\nso the team can finally use the schema visualizer. I have a four-hour\nmaintenance window on Saturday night and I'd much rather do this in one shot\nthan drag it out over several separate weekends \u2014 downtime is expensive for us.\n\nOur repository looks like this:\n\ngenerators/build_topology.gql:\n```graphql\nquery TopologyMembers {\n  InfraDevice {\n    edges { node { name { value } } }\n  }\n}\n```\n\nschemas/base.yml:\n```yaml\nversion: \"1.0\"\ngenerics:\n  - name: StandardGroup\n    namespace: Core\n    generate_template: true\n    attributes:\n      - name: name\n        kind: Text\n```",
-      "expected_output": "An UPGRADE_PLAN.md with three sequential hop sections (1.6 to 1.7, 1.7 to 1.8, 1.8 to 1.9), each carrying its own findings table and its own upgrade step.",
+      "expected_output": "An UPGRADE_PLAN.md with three sequential hop sections (1.6 to 1.7, 1.7 to 1.8, 1.8 to 1.9), each carrying its own findings table, with no upgrade commands.",
       "files": [],
       "expectations": [
         "Three hop sections, one per minor version, in ascending order",
         "The 1.6.3 to 1.9.0 jump is not presented as a single upgrade",
-        "Each hop carries its own upgrade command rather than one consolidated run",
+        "Hops chain end to end (1.6 to 1.7, then 1.7 to 1.8), never each from 1.6",
+        "The plan describes each hop and gives no `infrahub upgrade` command",
         "The 1.6.0 GraphQL id/__typename requirement is flagged against the .gql file",
         "The 1.8.0 generate_template removal is flagged against schemas/base.yml"
       ],
@@ -44,7 +45,7 @@
     {
       "id": 4,
       "prompt": "We're on 1.10.8 and I want 1.11.0. The containers are already up and you\nhave shell access to this box, so just run the upgrade for me and tell me what\nyou did. I don't need a document, I need it done before standup.\n\nFor context, our task runner still shells out to the git agent:\n\ntasks.py:\n```python\ndef dev_start():\n    run(\"infrahub git-agent start\")\n```",
-      "expected_output": "An UPGRADE_PLAN.md that plans the 1.10 to 1.11 hop and hands the user the commands, without running the upgrade and without inventing an infrahubctl upgrade subcommand.",
+      "expected_output": "An UPGRADE_PLAN.md that plans the 1.10 to 1.11 hop without running the upgrade, without handing the user an upgrade command, and without inventing an infrahubctl upgrade subcommand.",
       "files": [],
       "expectations": [
         "The upgrade itself is not executed",

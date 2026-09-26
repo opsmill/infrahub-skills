@@ -1,0 +1,12 @@
+# Upgrade plan: 1.9.2 to 1.10.0
+
+## 1.9 -> 1.10
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| node_metadata is now a reserved attribute name | 1.10.0 | breaking | critical | before | | may apply to your setup | Review your schema | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0 |
+
+```bash
+# read-only: reports what the upgrade would do, writes nothing
+docker compose exec infrahub-server infrahub upgrade --check
+```

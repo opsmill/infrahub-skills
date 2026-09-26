@@ -1,0 +1,28 @@
+# Upgrade plan: 1.10.8 to 1.11.0
+
+This plan does not run the upgrade. Roll up to the latest 1.10 patch first,
+then take the single supported minor hop. Upgrade `infrahub` only after the
+`tasks.py` fix below has landed.
+
+## 1.10.8 -> 1.10.10 (patch roll-up)
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Neo4j must move to 2026.05.0 | 1.11.0 | preparation | warning | during | unknown | Separately managed database; not visible from the repo | Run infrahubctl info to read the deployment, then upgrade Neo4j alongside Infrahub | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.11.0 |
+
+```bash
+kubectl exec deploy/infrahub-server -- infrahub db showmigrations
+kubectl exec deploy/infrahub-server -- infrahub upgrade --check
+```
+
+## 1.10 -> 1.11
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `infrahub git-agent` command removed | 1.11.0 | breaking | critical | before | yes | tasks.py runs `infrahub git-agent start` in dev_start; live read found 0 repositories | Replace the call with the task worker | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.11.0 |
+
+```bash
+# Kubernetes deployment: both probes are read-only
+kubectl exec deploy/infrahub-server -- infrahub db showmigrations
+kubectl exec deploy/infrahub-server -- infrahub upgrade --check
+```

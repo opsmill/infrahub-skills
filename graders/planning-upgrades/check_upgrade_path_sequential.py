@@ -2,7 +2,7 @@
 """Grader for the upgrade-path-sequential eval.
 
 Scores the N-1 rule: a 1.6.3 -> 1.9.0 request must produce three sequential
-minor hops, each carrying its own upgrade step, not one consolidated jump.
+minor hops that chain end to end, not one consolidated jump.
 """
 
 from __future__ import annotations
@@ -16,7 +16,6 @@ from lib import PLAN_FILE, run_checks  # noqa: E402
 
 CHECKS = [
     ("sequential-hops", {"source": "1.6", "target": "1.9"}),
-    "one-upgrade-per-hop",
     "verdict-has-evidence",
     "finding-vocabulary",
     "no-mutating-commands",

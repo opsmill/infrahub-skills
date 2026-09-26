@@ -1,0 +1,16 @@
+# Upgrade plan: 1.10.8 to 1.11.0
+
+This plan does not run the upgrade. Each command below is read-only; run the
+upgrade yourself once the findings are cleared.
+
+## 1.10 -> 1.11
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| infrahub git-agent command removed | 1.11.0 | breaking | critical | before | yes | tasks.py invokes infrahub git-agent in the dev target | Replace the call with the task worker | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.11.0 |
+| Neo4j must move to 2026.05.0 | 1.11.0 | preparation | warning | during | unknown | Separately managed database; not visible from the repo | Run infrahubctl info to read the deployment, then upgrade Neo4j alongside Infrahub | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.11.0 |
+
+```bash
+# read-only: reports what the upgrade would do, writes nothing
+docker compose exec infrahub-server infrahub upgrade --check
+```

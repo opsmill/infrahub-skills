@@ -14,13 +14,9 @@ them substring-matches the prose. See ``dev/guidelines/graders.md``.
 Each check returns ``(bool, str)``: pass/fail plus a one-line message that
 lands in the skillgrade report.
 
-Known limit, recorded deliberately: ``check_one_upgrade_per_hop`` asserts the
-*structure* of the plan (each hop carries its own upgrade step) rather than
-trying to detect prose that recommends combining hops. Phrase-matching that
-recommendation was rejected — it grades vocabulary. A plan that lays out
-correct per-hop commands and then adds a stray sentence suggesting they be
-combined is not caught here; that is a trade accepted in favour of a check
-that cannot be laundered by wording.
+The plan describes *how* to move through each hop; it never hands the user an
+upgrade command. The only commands it may show are the read-only probes in
+``READ_ONLY_INVOCATIONS``, and a plan that shows none at all is fine.
 """
 
 from __future__ import annotations
@@ -61,6 +57,11 @@ READ_ONLY_INVOCATIONS = [
     ("infrahub", "upgrade"),  # further narrowed below: only with --check
 ]
 
+# A CLI subcommand token. Prose that happens to open with the binary name
+# ("`infrahub GitHub releases, read 2026-09-26`" in a Source cell) is not an
+# invocation; a live trial failed on exactly that span.
+_SUBCOMMAND_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
+
 # `infrahubctl` has no `upgrade` command at all — it lives server-side in
 # backend/infrahub/cli/upgrade.py. Writing it is an invented command, which is
 # the exact failure mode safety-read-only-probes exists to catch. It is listed
@@ -72,18 +73,35 @@ _FENCE_RE = re.compile(r"^```[^\n]*\n(.*?)^```", re.S | re.M)
 _INLINE_CODE_RE = re.compile(r"`([^`]+)`")
 
 # Evidence that names something locatable, strongest first.
+#
+# Widened after a live trial: a plan backed a verdict with
+# "GraphQL `{ Branch { name } }` returns only `main`", which is exactly the
+# concrete evidence the rule asks for and which the first draft rejected,
+# because `Branch` carries no namespace prefix and the cell held no path.
+# A check that fails that answer is grading vocabulary. See
+# dev/guidelines/graders.md § "Verify both directions", false-fail half.
 _EV_PATH = re.compile(r"[\w./-]+\.(?:ya?ml|py|gql|graphql|j2|toml|json|cfg)\b")
 _EV_DOTTED_KIND = re.compile(r"\b[A-Z][A-Za-z0-9]+\.[a-z_][A-Za-z0-9_]*\b")
-_EV_KIND = re.compile(
-    r"\b(?:Core|Infra|Builtin|Dcim|Location|Organization|Ipam|Template|Nested|Profile)"
-    r"[A-Z][A-Za-z0-9]+\b"
-)
+# True CamelCase only: at least one internal capital. Requiring the internal
+# capital is what keeps a merely capitalised sentence ("Your schema uses a
+# reserved attribute name") from reading as a named artifact. A bare kind such
+# as `Branch` is caught by _EV_CODE_SPAN instead, because a plan that means it
+# as an artifact writes it in backticks.
+_EV_KIND = re.compile(r"\b[A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+\b")
 _EV_COUNT = re.compile(
-    r"\b\d+\s+(?:node|object|instance|device|match|result|row|occurrence|hit)s?\b", re.I
+    r"\b\d+\s+(?:(?:node|object|instance|device|match|result|row|occurrence|hit|branch"
+    r"|definition|file|artifact|generator)s?|repositor(?:y|ies))\b",
+    re.I,
 )
+# `grep`/`rg` count: a search over the repo's schema files settles a repo-side
+# unknown as surely as a live read settles an instance-side one. A live trial
+# was failed for proposing exactly that.
 _EV_PROBE = re.compile(
-    r"\b(?:get_schema|query_graphql|get_nodes|search_nodes|showmigrations|infrahubctl|infrahub)\b"
+    r"\b(?:get_schema|query_graphql|get_nodes|search_nodes|showmigrations|infrahubctl|infrahub"
+    r"|(?i:grep)|rg)\b"
 )
+# A backticked span is a named artifact: a query, a command, a field, a value.
+_EV_CODE_SPAN = re.compile(r"`[^`]+`")
 
 _NO_EVIDENCE_SENTINELS = {"", "-", "--", "n/a", "na", "none", "tbd", "?"}
 
@@ -91,6 +109,15 @@ _NO_EVIDENCE_SENTINELS = {"", "-", "--", "n/a", "na", "none", "tbd", "?"}
 # --------------------------------------------------------------------------
 # Parsing helpers
 # --------------------------------------------------------------------------
+
+
+def _cell(value: str) -> str:
+    """An enum cell's value with markdown emphasis and code ticks stripped.
+
+    A live trial wrote `**yes**`; the verdict is the same, only the markup
+    differs, so it must grade the same.
+    """
+    return value.strip().strip("*_`").strip().lower()
 
 
 def _versions(text: str) -> list[tuple[int, int]]:
@@ -193,6 +220,40 @@ def findings(text: str) -> list[dict]:
     return out
 
 
+_QUOTING_COLUMNS = ("change", "evidence")
+
+
+def _blank_quoting_cells(text: str) -> str:
+    """Empty the Change and Evidence cells of every findings table.
+
+    Those cells quote what exists: the command a release removed, or the line
+    in the user's repo that still calls it. A live trial backticked
+    `infrahub git-agent start` from the user's tasks.py as evidence and was
+    failed for "handing over" a command it was reporting. The Action cell, the
+    prose and every fence are still read, so a command offered as a step
+    cannot hide here.
+    """
+    out: list[str] = []
+    blank: list[int] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            blank = []
+            out.append(line)
+            continue
+        cells = stripped.strip("|").split("|")
+        names = [c.strip().lower() for c in cells]
+        if "change" in names and "evidence" in names:
+            blank = [names.index(c) for c in _QUOTING_COLUMNS]
+            out.append(line)
+            continue
+        for i in blank:
+            if i < len(cells):
+                cells[i] = " "
+        out.append("|" + "|".join(cells) + "|")
+    return "\n".join(out)
+
+
 def command_lines(text: str) -> list[str]:
     """Every command line from every fenced block, plus inline code spans.
 
@@ -206,7 +267,7 @@ def command_lines(text: str) -> list[str]:
             if not stripped or stripped.startswith("#"):
                 continue
             lines.append(stripped)
-    for span in _INLINE_CODE_RE.findall(text):
+    for span in _INLINE_CODE_RE.findall(_blank_quoting_cells(text)):
         stripped = span.strip().lstrip("$").strip()
         if stripped and not stripped.startswith("#"):
             lines.append(stripped)
@@ -240,6 +301,12 @@ def invocations(text: str) -> list[tuple[str, tuple[str, ...], list[str]]]:
                     rest = tokens[i + 1 :]
                     words = [t for t in rest if not t.startswith("-")]
                     flags = [t for t in rest if t.startswith("-")]
+                    # A bare binary name with no subcommand is prose naming the
+                    # tool ("upgrade `infrahub` to 1.11"), not an invocation.
+                    # Treating it as one made a live trial fail on a plan that
+                    # ran nothing at all.
+                    if not words or not _SUBCOMMAND_RE.match(words[0]):
+                        break
                     found.append((base, tuple([base, *words]), flags))
                     break
     return found
@@ -255,7 +322,14 @@ def _is_concrete_evidence(cell: str) -> bool:
     value = cell.strip().strip("`").strip()
     if value.lower() in _NO_EVIDENCE_SENTINELS:
         return False
-    for pattern in (_EV_PATH, _EV_DOTTED_KIND, _EV_KIND, _EV_COUNT, _EV_PROBE):
+    for pattern in (
+        _EV_PATH,
+        _EV_DOTTED_KIND,
+        _EV_KIND,
+        _EV_COUNT,
+        _EV_PROBE,
+        _EV_CODE_SPAN,
+    ):
         if pattern.search(cell):
             return True
     return False
@@ -294,7 +368,17 @@ def check_sequential_hops(
     def _fmt(pairs: list[tuple[tuple[int, int], tuple[int, int]]]) -> str:
         return ", ".join(f"{a[0]}.{a[1]}->{b[0]}.{b[1]}" for a, b in pairs)
 
-    actual = [(h["from"], h["to"]) for h in hops]
+    # A hop whose endpoints share a minor is a patch roll-up (1.10.8 -> 1.10.10),
+    # which is good practice before a minor move and which the N-1 rule says
+    # nothing about. Drop those before comparing; this check grades the *minor*
+    # progression. A live trial produced exactly this shape and the first draft
+    # rejected it.
+    actual = [(h["from"], h["to"]) for h in hops if h["from"] != h["to"]]
+    if not actual:
+        return False, (
+            f"plan has {len(hops)} section(s) but none crosses a minor version; "
+            f"expected {_fmt(expected)}"
+        )
     if len(actual) == 1 and len(expected) > 1:
         return False, (
             f"plan has a single hop {_fmt(actual)} but the N-1 rule "
@@ -303,26 +387,6 @@ def check_sequential_hops(
     if actual != expected:
         return False, f"hops are [{_fmt(actual)}], expected [{_fmt(expected)}]"
     return True, f"{len(actual)} sequential minor hops, no skips"
-
-
-def check_one_upgrade_per_hop(text: str) -> tuple[bool, str]:
-    """Every hop section carries its own upgrade step; hops are not consolidated."""
-    hops = hop_sections(text)
-    if not hops:
-        return False, f"no hop sections found in {PLAN_FILE}"
-    missing = [
-        h["heading"]
-        for h in hops
-        if not any(
-            path[:2] == ("infrahub", "upgrade") for _, path, _ in invocations(h["body"])
-        )
-    ]
-    if missing:
-        return False, (
-            f"{len(missing)} of {len(hops)} hops carry no upgrade step of their own "
-            f"(first: '{missing[0]}') — hops appear consolidated"
-        )
-    return True, f"each of {len(hops)} hops carries its own upgrade step"
 
 
 def check_every_hop_enumerated(text: str, releases: str = "") -> tuple[bool, str]:
@@ -378,7 +442,7 @@ def check_verdict_has_evidence(text: str) -> tuple[bool, str]:
 
     for row in rows:
         change = row.get("change", "?")
-        affected = row.get("affected", "").strip().lower()
+        affected = _cell(row.get("affected", ""))
         if affected not in VALID_AFFECTED:
             return False, (
                 f"finding '{change}' has Affected='{row.get('affected')}', "
@@ -411,7 +475,7 @@ def check_finding_vocabulary(text: str) -> tuple[bool, str]:
             ("severity", VALID_SEVERITY),
             ("when", VALID_WHEN),
         ):
-            value = row.get(col, "").strip().lower()
+            value = _cell(row.get(col, ""))
             if value not in valid:
                 return False, (
                     f"finding '{row.get('change', '?')}' has {col.title()}='{row.get(col)}', "
@@ -424,7 +488,7 @@ def check_no_mutating_commands(text: str) -> tuple[bool, str]:
     """The plan shows only read-only probes, and no invented commands."""
     invoked = invocations(text)
     if not invoked:
-        return False, f"{PLAN_FILE} shows no infrahub/infrahubctl invocation at all"
+        return True, f"{PLAN_FILE} shows no commands; nothing to execute"
 
     for _binary, path, flags in invoked:
         shown = " ".join(path)
@@ -442,13 +506,15 @@ def check_no_mutating_commands(text: str) -> tuple[bool, str]:
                 f"infrahub db showmigrations, infrahub upgrade --check)"
             )
         if allowed == ("infrahub", "upgrade") and "--check" not in flags:
-            return False, f"'{shown}' without --check writes to the database"
+            return False, (
+                f"'{shown}' without --check is an upgrade command handed to the user; "
+                f"the plan describes each hop, it does not give the upgrade command"
+            )
     return True, f"all {len(invoked)} invocations are read-only probes"
 
 
 CHECKS = {
     "sequential-hops": check_sequential_hops,
-    "one-upgrade-per-hop": check_one_upgrade_per_hop,
     "every-hop-enumerated": check_every_hop_enumerated,
     "verdict-has-evidence": check_verdict_has_evidence,
     "finding-vocabulary": check_finding_vocabulary,
