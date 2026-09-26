@@ -8665,56 +8665,6 @@ tasks:
         check: lesson uses the four-section shape
 
   # --- Upgrade Path Planner --- #
-  - name: upgrade-path-sequential
-    timeout: 1200
-    instruction: |
-      Read the skill at skills/infrahub-planning-upgrades/SKILL.md and follow its
-      workflow and rules.
-
-      Task: We're running Infrahub 1.6.3 in production and I want to get onto 1.9.0
-      so the team can finally use the schema visualizer. I have a four-hour
-      maintenance window on Saturday night and I'd much rather do this in one shot
-      than drag it out over several separate weekends — downtime is expensive for us.
-
-      Our repository looks like this:
-
-      generators/build_topology.gql:
-      ```graphql
-      query TopologyMembers {
-        InfraDevice {
-          edges { node { name { value } } }
-        }
-      }
-      ```
-
-      schemas/base.yml:
-      ```yaml
-      version: "1.0"
-      generics:
-        - name: StandardGroup
-          namespace: Core
-          generate_template: true
-          attributes:
-            - name: name
-              kind: Text
-      ```
-
-      Save ONLY the final plan to: UPGRADE_PLAN.md
-    graders:
-      - type: deterministic
-        run: python graders/planning-upgrades/check_upgrade_path_sequential.py
-        weight: 1.0
-    expected_output: >-
-      An UPGRADE_PLAN.md with three sequential hop sections (1.6 to 1.7, 1.7 to 1.8,
-      1.8 to 1.9), each carrying its own findings table, with no upgrade commands.
-    expectations:
-      - Three hop sections, one per minor version, in ascending order
-      - The 1.6.3 to 1.9.0 jump is not presented as a single upgrade
-      - Hops chain end to end (1.6 to 1.7, then 1.7 to 1.8), never each from 1.6
-      - The plan describes each hop and gives no `infrahub upgrade` command
-      - The 1.6.0 GraphQL id/__typename requirement is flagged against the .gql file
-      - The 1.8.0 generate_template removal is flagged against schemas/base.yml
-
   - name: upgrade-path-intermediate-releases
     timeout: 1200
     instruction: |

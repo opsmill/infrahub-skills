@@ -41,8 +41,17 @@ check_verdict_has_evidence = _mod.check_verdict_has_evidence
 check_finding_vocabulary = _mod.check_finding_vocabulary
 
 
+# N-1 has no task of its own: the model planned sequential hops in six of six
+# trials with no rule, so it is one line in SKILL.md rather than a rule. The
+# check still runs as a neighbour in every other task grader, and these
+# fixtures keep it honest.
+_STANDALONE = {"sequential": [("sequential-hops", {"source": "1.6", "target": "1.9"})]}
+
+
 def _task_checks(task: str) -> list:
     """The CHECKS list a task grader runs, read without importing the script."""
+    if task in _STANDALONE:
+        return _STANDALONE[task]
     tree = ast.parse((_GRADER_DIR / f"check_upgrade_path_{task}.py").read_text())
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
