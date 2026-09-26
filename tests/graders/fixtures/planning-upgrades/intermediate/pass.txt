@@ -1,0 +1,57 @@
+# Upgrade plan: 1.5.2 to 1.10.0
+
+## 1.5 -> 1.6
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| No breaking changes on the 1.5 line | 1.5.3 | preparation | info | before | no | infrahubctl schema check reported 0 errors | Take a backup, then proceed | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.5.3 |
+
+```bash
+# read-only: reports what the upgrade would do, writes nothing
+docker compose exec infrahub-server infrahub upgrade --check
+```
+
+## 1.6 -> 1.7
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Generator and transform queries must request id and __typename | 1.6.0 | breaking | critical | before | yes | generators/build_topology.gql | Add id and __typename to every node selection | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.6.0 |
+
+```bash
+# read-only: reports what the upgrade would do, writes nothing
+docker compose exec infrahub-server infrahub upgrade --check
+```
+
+## 1.7 -> 1.8
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| No breaking changes on the 1.7 line | 1.7.0 | preparation | info | before | no | infrahubctl schema check reported 0 errors across 12 schema files | Take a backup, then proceed | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.7.0 |
+
+```bash
+# read-only: reports what the upgrade would do, writes nothing
+docker compose exec infrahub-server infrahub upgrade --check
+```
+
+## 1.8 -> 1.9
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| generate_template removed from GenericSchema | 1.8.0 | breaking | critical | before | yes | schemas/base.yml -> CoreStandardGroup.generate_template | Delete the attribute from the generic before upgrading | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.8.0 |
+
+```bash
+# read-only: reports what the upgrade would do, writes nothing
+docker compose exec infrahub-server infrahub upgrade --check
+```
+
+## 1.9 -> 1.10
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Namespace restriction on internal Core generics | 1.9.0 | breaking | warning | before | unknown | Not determinable from the repo alone | Run get_schema against the instance to list inheritors of CoreGenericRepository | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.9.0 |
+| node_metadata is now a reserved attribute name | 1.10.0 | breaking | critical | before | yes | schemas/circuit.yml -> InfraCircuit.node_metadata | Rename the attribute before upgrading; Infrahub refuses to load the schema otherwise | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0 |
+
+```bash
+# read-only: reports what the upgrade would do, writes nothing
+docker compose exec infrahub-server infrahub upgrade --check
+```

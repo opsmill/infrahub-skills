@@ -1,0 +1,98 @@
+---
+title: Upgrade Planner
+---
+
+Skill: `infrahub-planning-upgrades`
+
+The Upgrade Planner writes a plan for moving an Infrahub deployment from the version it runs to a target version. It lays out one hop per minor version, as the [Infrahub upgrade guide](https://docs.infrahub.app/deploy-manage/maintain-upgrade/upgrade/overview) requires, reads the [release notes](https://github.com/opsmill/infrahub/releases) of every release in the range, and checks each breaking change against your repository and, when one is reachable, your instance through the same MCP read tools the [Data Analyzer](./analyzing-data.mdx) uses. It plans; it does not upgrade.
+
+## When to use
+
+- Before a maintenance window, to know what the upgrade will break
+- When you are more than one minor version behind and need the route
+- When someone asks what changed between two versions and whether it matters for you
+- When the target release moved and an existing plan needs updating
+
+## What it produces
+
+`UPGRADE_PLAN.md`, with one section per hop. Each hop lists its steps in prose and a findings table:
+
+- **Change**: what the release changed
+- **Release**: the single version that introduced it
+- **Kind and severity**: breaking or preparation; critical, warning, or info
+- **When**: before, during, or after the hop
+- **Affected**: yes, no, or unknown for your deployment
+- **Evidence**: the file, schema kind, query result, or probe output behind the verdict
+- **Action and source**: what to do, and the release note it comes from
+
+## Example output
+
+This is one hop from a real run of the skill against a small sample repository: a
+schema, a GraphQL mutation, and a Python generator, with no instance reachable. It
+was asked for 1.3.2 to 1.5.0, read the notes of all 22 releases in that range, and
+planned two hops. The second hop is shown in full. Every row rests on a line in that
+release's notes, and every `unknown` names the check that would settle it.
+
+````markdown
+## 1.4 -> 1.5
+
+Steps:
+
+1. Take a backup.
+2. Delete branches you no longer need; the 1.5.0 notes
+   say this speeds up the upgrade and avoids running
+   migrations for dead branches. Use
+   `infrahubctl branch list` to see what is open.
+3. Clear the `before` findings below. Run the 1.5.0
+   `infrahub upgrade --check` against the 1.4 database to
+   see the pending migrations and the branches that will
+   need a rebase.
+4. Upgrade the server to 1.5.0 following the upgrade
+   guide for your deployment. This release runs
+   migrations on `main` and then needs every remaining
+   branch rebased; the guide covers the options.
+5. Clear the `during` and `after` findings.
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Custom webhook transforms receive a new event data format, aligned with standard webhooks | 1.5.0 | breaking | warning | before | unknown | `.infrahub.yml` declares no `python_transforms`, so no transform in this repository is hit; webhooks live on the instance, which was not reachable | Run `get_nodes` for `CoreCustomWebhook` and check each for a transformation; adapt any such transform to the new payload before the hop | <https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.5.0> |
+| Infrahub 1.5.0 requires `infrahub-sdk` v1.15.0 | 1.5.0 | preparation | warning | during | unknown | `generators/site_builder.py` imports `infrahub_sdk.generator`; no dependency file in the repository pins its version | Run `infrahubctl info` where the generators run and read the SDK version; move it to v1.15.0 with the server | <https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.5.0> |
+| HFID, display label, and profile values move to write time; migrations run on `main` at upgrade | 1.5.0 | preparation | info | during | unknown | Pending migrations are a property of the database, which was not reachable | Run the 1.5.0 `infrahub upgrade --check` against the current database and read the migrations it lists | <https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.5.0> |
+| Branches not migrated during the upgrade move to `NEED_UPGRADE_REBASE` and cannot merge until rebased | 1.5.0 | breaking | warning | after | unknown | Open branches live on the instance, which was not reachable | Run `infrahubctl branch list` and the 1.5.0 `infrahub upgrade --check`; rebase every listed branch after the hop, resolving conflicts first | <https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.5.0> |
+| `display_labels` deprecated in favour of `display_label`; schema files need updating after the automatic migration | 1.5.0 | preparation | info | after | no | `grep -rn display_label schemas/` has no match | None | <https://docs.infrahub.app/release-notes/deprecation-guides/display_labels/> |
+| SDK `raise_for_error` deprecated on `execute_graphql`, `query_gql_query`, `get_diff_summary`, `allocate_next_ip_address`, `allocate_next_ip_prefix` | 1.5.0 | preparation | info | after | no | `generators/site_builder.py` line 7 calls only `self.client.create`, with no `raise_for_error` | None | <https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.5.0> |
+| Default timeout for transforms and checks raised from 10 to 60 seconds | 1.5.0 | preparation | info | after | no | `.infrahub.yml` declares no `check_definitions` and no `python_transforms` | None | <https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.5.0> |
+````
+
+## Example prompts
+
+- "Plan our upgrade from 1.9.2 to 1.10.0"
+- "We're on 1.5 and need 1.10. What breaks for us on the way?"
+- "What do I need to fix before upgrading to the latest release?"
+- "Just run the upgrade for me" (it plans and explains why it will not run it)
+
+## Key rules enforced
+
+- **One minor version at a time**: Infrahub supports upgrades only from the previous minor version, so a jump across several minors becomes several hops
+- **Every release in the range, patches included**: breaking changes also ship in patch releases, and no flag marks them, so the planner reads each release's notes rather than only the target's
+- **A verdict with evidence**: each finding says whether it affects you and names what proves it; an undecided finding names the check that would decide it
+- **Read-only**: it never runs the upgrade, a schema load, or a branch write, and the plan never gives the upgrade command. It may run read-only probes such as `infrahubctl info` and a server-side `infrahub upgrade --check`
+
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| ------- | --------------------------- |
+| Upgrading straight to the target across several minors | Plans one hop per minor version |
+| Reading only the target release's notes | Reads every release in the range and attributes each change to the one that introduced it |
+| A list of breaking changes with no verdict | Marks each yes, no, or unknown, backed by an artifact or a named probe |
+| An upgrade command pasted into a plan | Describes the step and links the upgrade guide for your deployment |
+| Writing an upgrade command for `infrahubctl` | Runs upgrade checks server-side with `infrahub upgrade --check`; `infrahubctl` has no upgrade command |
+
+## Not sure this is the right skill?
+
+See [Which skill do I use?](../choosing-a-skill.mdx) for how the Upgrade Planner
+differs from the Repo Auditor and the Diagnostics Collector.
+
+:::note
+The plan stops short of running anything. To take a hop, follow the upgrade guide for your deployment: [Community](https://docs.infrahub.app/deploy-manage/maintain-upgrade/upgrade/community) or [Enterprise](https://docs.infrahub.app/deploy-manage/maintain-upgrade/upgrade/enterprise). If an upgrade has already failed, start with the [Diagnostics Collector](./collecting-diagnostics.mdx) instead.
+:::

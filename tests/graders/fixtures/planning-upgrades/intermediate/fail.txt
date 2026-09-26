@@ -1,0 +1,57 @@
+# Upgrade plan: 1.5.2 to 1.10.0
+
+## 1.5 -> 1.6
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| node_metadata is now a reserved attribute name | 1.10.0 | breaking | critical | before | yes | schemas/circuit.yml -> InfraCircuit.node_metadata | Rename the attribute before upgrading; Infrahub refuses to load the schema otherwise | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0 |
+
+```bash
+# read-only: reports what the upgrade would do, writes nothing
+docker compose exec infrahub-server infrahub upgrade --check
+```
+
+## 1.6 -> 1.7
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| GraphQL error codes became strings | 1.10.0 | breaking | warning | after | yes | checks/check_circuit_capacity.py parses extensions.code as int | Update the client to read the string code | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0 |
+
+```bash
+# read-only: reports what the upgrade would do, writes nothing
+docker compose exec infrahub-server infrahub upgrade --check
+```
+
+## 1.7 -> 1.8
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| node_metadata is now a reserved attribute name | 1.10.0 | breaking | critical | before | yes | schemas/circuit.yml -> InfraCircuit.node_metadata | Rename the attribute before upgrading; Infrahub refuses to load the schema otherwise | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0 |
+
+```bash
+# read-only: reports what the upgrade would do, writes nothing
+docker compose exec infrahub-server infrahub upgrade --check
+```
+
+## 1.8 -> 1.9
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| GraphQL error codes became strings | 1.10.0 | breaking | warning | after | yes | checks/check_circuit_capacity.py parses extensions.code as int | Update the client to read the string code | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0 |
+
+```bash
+# read-only: reports what the upgrade would do, writes nothing
+docker compose exec infrahub-server infrahub upgrade --check
+```
+
+## 1.9 -> 1.10
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| node_metadata is now a reserved attribute name | 1.10.0 | breaking | critical | before | yes | schemas/circuit.yml -> InfraCircuit.node_metadata | Rename the attribute before upgrading; Infrahub refuses to load the schema otherwise | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0 |
+| GraphQL error codes became strings | 1.10.0 | breaking | warning | after | yes | checks/check_circuit_capacity.py parses extensions.code as int | Update the client to read the string code | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0 |
+
+```bash
+# read-only: reports what the upgrade would do, writes nothing
+docker compose exec infrahub-server infrahub upgrade --check
+```
