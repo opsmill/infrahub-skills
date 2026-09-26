@@ -2,7 +2,7 @@
 title: Which skill do I use?
 ---
 
-Fifteen skills is a lot to hold in your head. You do not have to: start from whatever
+Sixteen skills is a lot to hold in your head. You do not have to: start from whatever
 you already have in front of you, and each row names the skill that takes it from there.
 
 ## Start from what you have
@@ -46,6 +46,7 @@ the stage you are at. Each skill's `infrahub-*` name is in the
 | --- | --- | --- |
 | A running instance and a question | An answer, without writing GraphQL | [Data Analyzer](./skills-reference/analyzing-data.mdx) |
 | A repository you inherited | A compliance report against best practices | [Repo Auditor](./skills-reference/auditing-repo.mdx) |
+| An instance one or more versions behind | A hop-by-hop upgrade plan checked against your repo | [Upgrade Planner](./skills-reference/planning-upgrades.mdx) |
 
 ### When something breaks
 
@@ -78,6 +79,16 @@ Sequential, not alternatives. Collect first, then analyze.
 | You need the right `infrahub-collect` command for your symptom | You need to know what the collected logs actually say |
 | Output is a support bundle on disk | Output is a findings report citing that bundle |
 | The next step is sharing it with OpsMill | The next step is an upgrade, a comment on an existing issue, or a new report |
+
+### Upgrade Planner, Repo Auditor, Diagnostics Collector
+
+All three look at an existing deployment. They differ in the question they answer.
+
+| Use the Upgrade Planner when... | Use the Repo Auditor when... | Use the Diagnostics Collector when... |
+| --- | --- | --- |
+| You are about to move to a newer Infrahub version | You want the repository checked against current best practices | An upgrade, or anything else, has already failed |
+| The question is what the releases in between break | The question is what in the repository is wrong today | The question is why the instance is misbehaving |
+| Output is `UPGRADE_PLAN.md`, one section per hop | Output is `AUDIT_REPORT.md`, grouped by severity | Output is a redacted support bundle |
 
 ### Concept Tutor, the managing skills, Data Analyzer
 

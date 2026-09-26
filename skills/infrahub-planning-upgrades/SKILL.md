@@ -92,8 +92,11 @@ if the server is unreachable.
    the `before` findings, upgrade to the hop's target
    following the upgrade guide, clear the `during` and
    `after` findings. Link the guide rather than
-   transcribing it:
-   <https://docs.infrahub.app/deploy-manage/maintain-upgrade/upgrade/overview>
+   transcribing it, picking the edition page when you
+   know the edition:
+   - overview: <https://docs.infrahub.app/deploy-manage/maintain-upgrade/upgrade/overview>
+   - Community: <https://docs.infrahub.app/deploy-manage/maintain-upgrade/upgrade/community>
+   - Enterprise: <https://docs.infrahub.app/deploy-manage/maintain-upgrade/upgrade/enterprise>
 
 ## Plan Format
 

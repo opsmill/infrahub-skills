@@ -176,6 +176,7 @@ are the foundation; the rest depends on your use case.
 | `infrahub:managing-menus` | Customizing or restructuring the web UI sidebar with nested navigation menus |
 | `infrahub:analyzing-data` | Querying and correlating live Infrahub data via the MCP server |
 | `infrahub:auditing-repo` | Auditing a repository against all rules and best practices |
+| `infrahub:planning-upgrades` | Planning an Infrahub upgrade one minor version at a time, with each release's breaking changes checked against your repository |
 
 ## Using with Non-Claude Tools
 
