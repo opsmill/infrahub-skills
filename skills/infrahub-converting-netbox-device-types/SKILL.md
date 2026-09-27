@@ -5,18 +5,16 @@ description: >-
   devicetype-library format, also published via the NetBox Data Exchange / NDX)
   into Infrahub object templates as Infrahub object YAML, using a bundled Python
   converter driven by a schema mapping profile.
-  TRIGGER when: importing NetBox device types or module types into Infrahub,
-  exporting device types out of a running NetBox instance, converting
-  devicetype-library YAML, building object templates from vendor device models,
-  seeding Infrahub with device types from NDX, converting line cards / PSUs /
-  transceivers from NetBox module types, turning NetBox hardware definitions
-  into Template* objects, re-running a conversion after changing the mapping
-  profile, debugging a wrong or failed conversion.
+  TRIGGER when: importing NetBox device types or module types, exporting device
+  types from a running NetBox instance, building object templates from vendor
+  device models, converting line cards / PSUs / transceivers from NetBox module
+  types into Template* objects, re-running a conversion after changing the
+  mapping profile, debugging a wrong or failed conversion.
   DO NOT TRIGGER when: importing CSV/TSV data (use infrahub-importing-data),
   authoring schemas from scratch (use infrahub-managing-schemas), writing ordinary
   object data files (use infrahub-managing-objects), or setting up continuous
   two-way replication with a live NetBox (that is infrahub-sync, a separate
-  product — a one-off export of device types is in scope here).
+  product; a one-off export of device types is in scope here).
 allowed-tools:
   - Read
   - Write
