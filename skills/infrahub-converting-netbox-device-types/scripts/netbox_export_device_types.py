@@ -19,11 +19,18 @@ diff, and keep. Continuous replication between a live NetBox and Infrahub is
 
 Reading through pynetbox
 ------------------------
-The official client handles pagination, auth, retries and TLS, and tracks the
-API as it changes across NetBox versions. Fields are read as **attributes**,
-not via ``Record.serialize()``: serialising flattens a related object to its
-primary key, so an outlet's ``power_port`` would become ``16`` where the
-library format needs the port's name.
+The official client handles pagination and auth, and tracks the API as it
+changes across NetBox versions. Fields are read as **attributes**, not via
+``Record.serialize()``: serialising flattens a related object to its primary
+key, so an outlet's ``power_port`` would become ``16`` where the library
+format needs the port's name.
+
+What it does not hand you is resilience. ``pynetbox.api()`` builds a bare
+``requests.Session`` and mounts no adapter, so the default is ``Retry(0)``
+and there is no timeout at all. A full ``--in-use`` export runs to roughly a
+thousand requests, and one dropped connection anywhere in that sequence would
+abort the lot. Both are wired in below: see ``_mount_retries`` and the
+timeout wrapper in ``NetBoxSource.__init__``.
 
 Everything downstream of the client works on plain mappings or pynetbox
 records interchangeably (see ``field``), which keeps the reshaping testable
@@ -272,6 +279,51 @@ class Source(Protocol):
         ...  # pragma: no cover - protocol
 
 
+#: Statuses worth trying again. A 429 is NetBox rate-limiting and says so; the
+#: 5xx three are the shapes a reverse proxy in front of it produces while the
+#: application restarts or a worker is briefly gone. Deliberately no 500, which
+#: is an application error that will answer the same way next time, and no 4xx
+#: other than 429, which the failure classifier reports rather than retries.
+RETRY_STATUSES: tuple[int, ...] = (429, 502, 503, 504)
+
+#: Attempts after the first. A full ``--in-use`` export is on the order of a
+#: thousand requests, so a blip anywhere in the sequence would otherwise take
+#: the whole run down.
+RETRY_ATTEMPTS = 3
+
+#: urllib3 waits ``factor * (2 ** (attempt - 1))`` seconds, so 0.5 gives
+#: 0.5s, 1s, 2s: long enough to outlast a restart, short enough that a genuinely
+#: dead instance still fails while somebody is watching.
+RETRY_BACKOFF = 0.5
+
+
+def _mount_retries(session: Any) -> None:
+    """Give the session bounded retries on transient failures.
+
+    pynetbox builds a bare ``requests.Session`` and mounts nothing, so its
+    adapters carry ``Retry(total=0)`` and a single dropped connection aborts
+    an export of a thousand-odd requests. Only GET is retried, which is all
+    this exporter issues, and only the statuses above.
+
+    Args:
+        session: The ``requests.Session`` pynetbox created.
+    """
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+
+    retry = Retry(
+        total=RETRY_ATTEMPTS,
+        backoff_factor=RETRY_BACKOFF,
+        status_forcelist=RETRY_STATUSES,
+        allowed_methods=frozenset(["GET"]),
+        raise_on_status=False,
+        respect_retry_after_header=True,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+
+
 class NetBoxSource:
     """Reads a live NetBox through pynetbox.
 
@@ -294,6 +346,7 @@ class NetBoxSource:
         self._api = pynetbox.api(url.rstrip("/"), token=token)
         session = self._api.http_session
         session.verify = verify
+        _mount_retries(session)
         # pynetbox has no timeout setting of its own, so wrap the session's
         # request method. Without this --timeout parses and does nothing, and
         # a NetBox that accepts the connection then stalls hangs the export.

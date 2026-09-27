@@ -755,6 +755,65 @@ def test_live_path_follows_pagination(netbox_server, tmp_path):
     assert len(document["interfaces"]) == 300
 
 
+def test_a_transient_failure_is_retried_rather_than_aborting_the_export(tmp_path):
+    """One 503 mid-sequence must not take down a thousand-request export.
+
+    pynetbox mounts no adapter, so the session default is ``Retry(total=0)``
+    and this fails outright without ``_mount_retries``.
+    """
+    import json as _json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    seen = {"attempts": 0}
+
+    class Flaky(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802 - BaseHTTPRequestHandler's interface
+            seen["attempts"] += 1
+            if seen["attempts"] == 1:
+                self.send_response(503)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            body = _json.dumps(
+                {"count": 0, "next": None, "previous": None, "results": []}
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Flaky)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        source = NetBoxSource(f"http://127.0.0.1:{server.server_port}", "t")
+        assert list(source.records("dcim.device_types")) == []
+        assert seen["attempts"] >= 2, "the 503 was not retried"
+    finally:
+        server.shutdown()
+
+
+def test_retries_are_bounded_and_scoped_to_reads():
+    """A retry policy that never gives up is its own outage.
+
+    Also pins the statuses: a 500 is an application error that answers the
+    same next time, and 401/403/404 are what the failure classifier explains
+    rather than hammers.
+    """
+    source = NetBoxSource("http://127.0.0.1:1", "t")
+    retry = source._api.http_session.get_adapter("http://127.0.0.1:1").max_retries
+
+    assert retry.total == 3
+    assert set(retry.status_forcelist) == {429, 502, 503, 504}
+    assert set(retry.allowed_methods) == {"GET"}
+    for status in (400, 401, 403, 404, 500):
+        assert status not in retry.status_forcelist
+
+
 def test_live_path_reports_an_unreachable_host(tmp_path):
     source = NetBoxSource("http://127.0.0.1:1", "t")
 

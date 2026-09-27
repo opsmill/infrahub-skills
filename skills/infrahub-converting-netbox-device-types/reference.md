@@ -78,6 +78,17 @@ related object to its primary key — an outlet's
 `power_port` would become `16` where the library needs
 the port's name.
 
+pynetbox supplies no timeout and no retries: it builds
+a bare `requests.Session` and mounts nothing, so the
+default is `Retry(0)`. Both are wired in by the script,
+because a full `--in-use` run is on the order of a
+thousand requests and one blip would otherwise abort it.
+Reads are retried three times with exponential backoff
+on 429, 502, 503 and 504, honouring `Retry-After`.
+A 500 and the 4xx statuses are not retried: those answer
+the same way next time, and the export explains them
+instead.
+
 NetBox 4.5 reshaped front ports: the singular
 `rear_port` / `rear_port_position` fields became a
 `rear_ports` list of mappings, and front ports gained
