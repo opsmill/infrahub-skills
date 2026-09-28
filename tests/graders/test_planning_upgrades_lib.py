@@ -345,3 +345,29 @@ def test_escaped_pipe_in_evidence_does_not_shift_the_action_cell():
     )
     ok, _ = check_no_mutating_commands(_plan(row))
     assert not ok
+
+
+# Patches within one minor can be skipped: 1.9.1 -> 1.9.6 is one hop. A
+# patch-only request that crosses into the next minor still fails.
+
+check_sequential_hops = _mod.check_sequential_hops
+
+
+def _hop_plan(heading: str) -> str:
+    return f"# Upgrade plan\n\n## {heading}\n\n{_HEADER}{_ROW_YES.format(affected='yes')}\n"
+
+
+def test_patch_upgrade_within_a_minor_is_one_hop():
+    ok, msg = check_sequential_hops(_hop_plan("1.9.1 -> 1.9.6"), source="1.9.1", target="1.9.6")
+    assert ok, msg
+
+
+def test_patch_upgrade_that_crosses_a_minor_fails():
+    ok, msg = check_sequential_hops(_hop_plan("1.9.1 -> 1.10.0"), source="1.9.1", target="1.9.6")
+    assert not ok
+    assert "crosses a minor" in msg
+
+
+def test_minor_hop_from_an_older_patch_is_allowed():
+    ok, msg = check_sequential_hops(_hop_plan("1.9.1 -> 1.10.0"), source="1.9.1", target="1.10.0")
+    assert ok, msg

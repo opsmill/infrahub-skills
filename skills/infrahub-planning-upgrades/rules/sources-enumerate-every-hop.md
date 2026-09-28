@@ -13,6 +13,11 @@ current version and the target, patches included, and
 attribute each finding to the one release that
 introduced it.
 
+Reading every patch is not installing every patch. The
+upgrade to 1.9.6 applies what 1.9.2 through 1.9.6
+changed in one run, so their breaking changes all land
+in that one hop.
+
 ## Why it matters
 
 A plan built from the target release's notes alone

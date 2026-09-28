@@ -21,8 +21,9 @@ deployment.
 ## Why it matters
 
 An upgrade rewrites the database and cannot be undone
-without a restore. Run from the wrong starting version,
-it fails or corrupts partway. The exact commands depend
+without a restore. Run from more than one minor
+version back, it is outside what Infrahub supports, and
+nothing in the upgrade stops you. The exact commands depend
 on the deployment (Docker Compose or Helm, Community or
 Enterprise, backup tooling), which the planner cannot
 see, so a command lifted into the plan is a guess the

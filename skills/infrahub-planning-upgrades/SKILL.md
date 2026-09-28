@@ -62,9 +62,13 @@ if the server is unreachable.
    version (N-1), so 1.6.3 to 1.9.0 is three hops:
    1.6 to 1.7, 1.7 to 1.8, 1.8 to 1.9. Never plan a
    jump across minors, even when the user asks for
-   "one go". Rolling up patches within the current
+   "one go". Patches are different: one upgrade
+   applies every pending migration in order, so
+   1.9.1 to 1.9.6 is a single hop, and a minor hop can
+   start from any patch of the previous minor (1.9.1
+   to 1.10.0). Rolling up patches within the current
    minor first (1.10.8 to 1.10.10) is fine as its own
-   section.
+   section, not a requirement.
 2. **Enumerate every release in the range, patches
    included, and read each one's notes.** Read
    [rules/sources-enumerate-every-hop.md](./rules/sources-enumerate-every-hop.md)

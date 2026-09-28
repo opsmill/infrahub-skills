@@ -399,7 +399,19 @@ def check_sequential_hops(
         cur = nxt
         guard += 1
     if not expected:
-        return False, f"source {src} and target {tgt} describe no hop"
+        # Source and target share a minor (1.9.1 -> 1.9.6). Patches within a
+        # minor can be skipped: one upgrade applies every pending migration in
+        # order, and N-1 constrains minors only. The plan is one section that
+        # stays inside that minor.
+        if src != tgt:
+            return False, f"target {tgt} is older than source {src}"
+        crossing = [h for h in hops if h["from"] != h["to"]]
+        if crossing:
+            return False, (
+                f"source and target are both {src[0]}.{src[1]}, but the plan crosses a "
+                f"minor: '{crossing[0]['heading']}'"
+            )
+        return True, f"patch upgrade within {src[0]}.{src[1]}: {len(hops)} section(s), no minor crossed"
 
     def _fmt(pairs: list[tuple[tuple[int, int], tuple[int, int]]]) -> str:
         return ", ".join(f"{a[0]}.{a[1]}->{b[0]}.{b[1]}" for a, b in pairs)

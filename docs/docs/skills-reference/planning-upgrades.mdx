@@ -73,7 +73,7 @@ Steps:
 
 ## Key rules enforced
 
-- **One minor version at a time**: Infrahub supports upgrades only from the previous minor version, so a jump across several minors becomes several hops
+- **One minor version at a time**: Infrahub supports upgrades only from the previous minor version, so a jump across several minors becomes several hops. Patches within a minor can be skipped: 1.9.1 to 1.9.6 is one hop
 - **Every release in the range, patches included**: breaking changes also ship in patch releases, and no flag marks them, so the planner reads each release's notes rather than only the target's
 - **A verdict with evidence**: each finding says whether it affects you and names what proves it; an undecided finding names the check that would decide it
 - **Read-only**: it never runs the upgrade, a schema load, or a branch write, and the plan never gives the upgrade command. It may run read-only probes such as `infrahubctl info` and a server-side `infrahub upgrade --check`
