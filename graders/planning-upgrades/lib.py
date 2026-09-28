@@ -61,6 +61,7 @@ READ_ONLY_INVOCATIONS = [
 # ("`infrahub GitHub releases, read 2026-09-26`" in a Source cell) is not an
 # invocation; a live trial failed on exactly that span.
 _SUBCOMMAND_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
+_BINARIES = ("infrahub", "infrahubctl")
 
 # `infrahubctl` has no `upgrade` command at all — it lives server-side in
 # backend/infrahub/cli/upgrade.py. Writing it is an invented command, which is
@@ -87,9 +88,12 @@ WRITE_INVOCATIONS = [
     ("infrahubctl", "run"),
 ]
 
-_VERSION_RE = re.compile(r"\b(\d+)\.(\d+)(?:\.(\d+))?\b")
-_FENCE_RE = re.compile(r"^```[^\n]*\n(.*?)^```", re.S | re.M)
+# A leading `v` is allowed: upstream tags read `infrahub-v1.10.0`, so plans
+# write `v1.10` too, and `\b` alone never matched between `v` and the digit.
+_VERSION_RE = re.compile(r"(?<![\d.])v?(\d+)\.(\d+)(?:\.(\d+))?(?!\d)")
 _INLINE_CODE_RE = re.compile(r"`([^`]+)`")
+_FENCE_OPEN_RE = re.compile(r"^\s*(```+|~~~+)")
+_LIST_MARKER_RE = re.compile(r"^(?:[-*+]|\d+[.)])\s")
 
 # Evidence that names something locatable, strongest first.
 #
@@ -101,12 +105,9 @@ _INLINE_CODE_RE = re.compile(r"`([^`]+)`")
 # dev/guidelines/graders.md § "Verify both directions", false-fail half.
 _EV_PATH = re.compile(r"[\w./-]+\.(?:ya?ml|py|gql|graphql|j2|toml|json|cfg)\b")
 _EV_DOTTED_KIND = re.compile(r"\b[A-Z][A-Za-z0-9]+\.[a-z_][A-Za-z0-9_]*\b")
-# True CamelCase only: at least one internal capital. Requiring the internal
-# capital is what keeps a merely capitalised sentence ("Your schema uses a
-# reserved attribute name") from reading as a named artifact. A bare kind such
-# as `Branch` is caught by _EV_CODE_SPAN instead, because a plan that means it
-# as an artifact writes it in backticks.
-_EV_KIND = re.compile(r"\b[A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+\b")
+# No bare-CamelCase pattern: `GitHub`, `GraphQL` and `PostgreSQL` read as
+# schema kinds, so "See the GitHub release notes" passed as evidence. A kind
+# meant as an artifact is backticked (_EV_CODE_SPAN) or dotted (_EV_DOTTED_KIND).
 _EV_COUNT = re.compile(
     r"\b\d+\s+(?:(?:node|object|instance|device|match|result|row|occurrence|hit|branch"
     r"|definition|file|artifact|generator)s?|repositor(?:y|ies))\b",
@@ -115,9 +116,17 @@ _EV_COUNT = re.compile(
 # `grep`/`rg` count: a search over the repo's schema files settles a repo-side
 # unknown as surely as a live read settles an instance-side one. A live trial
 # was failed for proposing exactly that.
+# The Infrahub probes are the read-only allowlist itself, so one list decides
+# both what a plan may run and what counts as naming a probe. The bare binary
+# name does not count: "check with your infrahub admin" names no probe.
 _EV_PROBE = re.compile(
-    r"\b(?:get_schema|query_graphql|get_nodes|search_nodes|showmigrations|infrahubctl|infrahub"
-    r"|(?i:grep)|rg)\b"
+    r"\b(?:get_schema|query_graphql|get_nodes|search_nodes|showmigrations|(?i:grep)|rg)\b"
+    + "".join(
+        "|\\b" + r"\s+".join(re.escape(w) for w in inv)
+        + (r"\s+--check" if inv == ("infrahub", "upgrade") else "")
+        + "\\b"
+        for inv in READ_ONLY_INVOCATIONS
+    )
 )
 # A GraphQL query in backticks is a probe the user can run as written; a live
 # trial resolved an unknown with `query { CoreWebhook { ... } }`.
@@ -148,8 +157,10 @@ def _versions(text: str) -> list[tuple[int, int]]:
 
 
 def _full_versions(text: str) -> list[str]:
-    """Every version in the text, as written."""
-    return [m.group(0) for m in _VERSION_RE.finditer(text)]
+    """Every version in the text, without a leading ``v``."""
+    return [
+        ".".join(g for g in m.groups() if g is not None) for m in _VERSION_RE.finditer(text)
+    ]
 
 
 def hop_sections(text: str) -> list[dict]:
@@ -189,7 +200,16 @@ def hop_sections(text: str) -> list[dict]:
             current["lines"].append(line)
     for s in sections:
         s["body"] = "\n".join(s["lines"])
-    return sections
+    # A section whose range holds two or more other sections is an overview
+    # ("## Overview: 1.5.2 -> 1.10.0" above five hops), not a hop of its own.
+    def _contains(outer: dict, inner: dict) -> bool:
+        return outer["from"] <= inner["from"] and inner["to"] <= outer["to"]
+
+    return [
+        s
+        for s in sections
+        if sum(1 for o in sections if o is not s and _contains(s, o)) < 2
+    ]
 
 
 def tables(body: str) -> list[list[dict]]:
@@ -223,7 +243,7 @@ def _cells(row: str) -> list[str]:
 
 
 def _parse_table(block: list[str]) -> list[dict]:
-    header = [c.lower() for c in _cells(block[0])]
+    header = [_cell(c) for c in _cells(block[0])]
     body_rows = block[1:]
     # Drop the --- separator row if present.
     if body_rows and set(body_rows[0].replace("|", "").replace(":", "").strip()) <= {
@@ -277,7 +297,7 @@ def _blank_quoting_cells(text: str) -> str:
             out.append(line)
             continue
         cells = _CELL_SPLIT_RE.split(stripped.strip("|"))
-        names = [c.strip().lower() for c in cells]
+        names = [_cell(c) for c in cells]
         if "change" in names and "evidence" in names:
             blank = [names.index(c) for c in _QUOTING_COLUMNS]
             out.append(line)
@@ -289,21 +309,65 @@ def _blank_quoting_cells(text: str) -> str:
     return "\n".join(out)
 
 
-def command_lines(text: str) -> list[tuple[str, bool]]:
-    """Every command line from every fenced block, plus inline code spans.
+def _split_code(text: str) -> tuple[list[str], str]:
+    """Code block lines, and the prose with those lines removed.
 
-    Each line comes back with ``True`` when it sat in a fence. Extracts *all*
-    fences, not the first, and drops comment and output lines so a ``#``
-    annotation cannot be read as a command.
+    Code is a backtick or tilde fence at any indent (a fence inside a list item
+    is indented), or an indented block: four or more spaces after a blank line,
+    not a list item. The indented form was invisible to a column-0 fence regex,
+    so a plan could hand over `infrahub upgrade` in one and pass. Inline spans
+    are then read from the prose only, since a fence's backticks shifted the
+    pairing and made later prose read as code.
+    """
+    code: list[str] = []
+    prose: list[str] = []
+    fence: str | None = None
+    in_indented = False
+    prev_blank = True
+    for line in text.splitlines():
+        opener = _FENCE_OPEN_RE.match(line)
+        if fence is not None:
+            if opener and opener.group(1)[0] == fence[0] and len(opener.group(1)) >= len(fence):
+                fence = None
+            else:
+                code.append(line)
+            prose.append("")
+            prev_blank = False
+            continue
+        if opener:
+            fence = opener.group(1)
+            in_indented = False
+            prose.append("")
+            prev_blank = False
+            continue
+        indented = line.startswith(("    ", "\t")) and line.strip() != ""
+        if indented and (in_indented or prev_blank) and not _LIST_MARKER_RE.match(line.strip()):
+            in_indented = True
+            code.append(line)
+            prose.append("")
+            prev_blank = False
+            continue
+        if line.strip():
+            in_indented = False
+        prev_blank = line.strip() == ""
+        prose.append(line)
+    return code, "\n".join(prose)
+
+
+def command_lines(text: str) -> list[tuple[str, bool]]:
+    """Every command line from every code block, plus inline code spans.
+
+    Each line comes back with ``True`` when it sat in a code block. Drops
+    comment and output lines so a ``#`` annotation cannot be read as a command.
     """
     lines: list[tuple[str, bool]] = []
-    for block in _FENCE_RE.findall(text):
-        for raw in block.splitlines():
-            stripped = raw.strip().lstrip("$").strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            lines.append((stripped, True))
-    for span in _INLINE_CODE_RE.findall(_blank_quoting_cells(text)):
+    code, prose = _split_code(text)
+    for raw in code:
+        stripped = raw.strip().lstrip("$").strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        lines.append((stripped, True))
+    for span in _INLINE_CODE_RE.findall(_blank_quoting_cells(prose)):
         stripped = span.strip().lstrip("$").strip()
         if stripped and not stripped.startswith("#"):
             lines.append((stripped, False))
@@ -333,18 +397,23 @@ def invocations(text: str) -> list[tuple[str, tuple[str, ...], list[str], bool, 
                 continue
             for i, tok in enumerate(tokens):
                 base = tok.rsplit("/", 1)[-1]
-                if base in ("infrahub", "infrahubctl"):
-                    rest = tokens[i + 1 :]
-                    words = [t for t in rest if not t.startswith("-")]
-                    flags = [t for t in rest if t.startswith("-")]
-                    # A bare binary name with no subcommand is prose naming the
-                    # tool ("upgrade `infrahub` to 1.11"), not an invocation.
-                    # Treating it as one made a live trial fail on a plan that
-                    # ran nothing at all.
-                    if not words or not _SUBCOMMAND_RE.match(words[0]):
-                        break
-                    found.append((base, tuple([base, *words]), flags, fenced, line))
-                    break
+                if base not in _BINARIES:
+                    continue
+                # `kubectl exec -n infrahub ...`: the value of an option, not
+                # the binary. Stopping here hid the real command after `--`.
+                prev = tokens[i - 1] if i else ""
+                if prev.startswith("-") and prev != "--" and "=" not in prev:
+                    continue
+                rest = tokens[i + 1 :]
+                words = [t for t in rest if not t.startswith("-")]
+                flags = [t for t in rest if t.startswith("-")]
+                # A bare binary name with no subcommand is prose naming the
+                # tool ("upgrade `infrahub` to 1.11"), not an invocation. A
+                # compose service named `infrahub` is followed by the binary.
+                if not words or not _SUBCOMMAND_RE.match(words[0]) or words[0] in _BINARIES:
+                    continue
+                found.append((base, tuple([base, *words]), flags, fenced, line))
+                break
     return found
 
 
@@ -361,7 +430,6 @@ def _is_concrete_evidence(cell: str) -> bool:
     for pattern in (
         _EV_PATH,
         _EV_DOTTED_KIND,
-        _EV_KIND,
         _EV_COUNT,
         _EV_PROBE,
         _EV_CODE_SPAN,
@@ -390,21 +458,16 @@ def check_sequential_hops(
     src = _versions(source)[0] if _versions(source) else hops[0]["from"]
     tgt = _versions(target)[0] if _versions(target) else hops[-1]["to"]
 
-    expected = []
-    cur = src
-    guard = 0
-    while cur != tgt and guard < 64:
-        nxt = (cur[0], cur[1] + 1)
-        expected.append((cur, nxt))
-        cur = nxt
-        guard += 1
-    if not expected:
+    def _fmt(pairs: list[tuple[tuple[int, int], tuple[int, int]]]) -> str:
+        return ", ".join(f"{a[0]}.{a[1]}->{b[0]}.{b[1]}" for a, b in pairs)
+
+    if tgt < src:
+        return False, f"target {tgt[0]}.{tgt[1]} is older than source {src[0]}.{src[1]}"
+    if src == tgt:
         # Source and target share a minor (1.9.1 -> 1.9.6). Patches within a
         # minor can be skipped: one upgrade applies every pending migration in
         # order, and N-1 constrains minors only. The plan is one section that
         # stays inside that minor.
-        if src != tgt:
-            return False, f"target {tgt} is older than source {src}"
         crossing = [h for h in hops if h["from"] != h["to"]]
         if crossing:
             return False, (
@@ -413,8 +476,16 @@ def check_sequential_hops(
             )
         return True, f"patch upgrade within {src[0]}.{src[1]}: {len(hops)} section(s), no minor crossed"
 
-    def _fmt(pairs: list[tuple[tuple[int, int], tuple[int, int]]]) -> str:
-        return ", ".join(f"{a[0]}.{a[1]}->{b[0]}.{b[1]}" for a, b in pairs)
+    # Within one major the hops are known exactly. Across a major (1.11 ->
+    # 2.0) the last minor of the old major is not in the plan's inputs, so
+    # the chain is checked link by link instead: each hop is the next minor,
+    # or the first minor of the next major.
+    expected: list[tuple[tuple[int, int], tuple[int, int]]] | None = None
+    if src[0] == tgt[0]:
+        expected = [((src[0], m), (src[0], m + 1)) for m in range(src[1], tgt[1])]
+
+    def _one_step(a: tuple[int, int], b: tuple[int, int]) -> bool:
+        return b == (a[0], a[1] + 1) or (b[0] == a[0] + 1 and b[1] == 0)
 
     # A hop whose endpoints share a minor is a patch roll-up (1.10.8 -> 1.10.10),
     # which is good practice before a minor move and which the N-1 rule says
@@ -422,19 +493,25 @@ def check_sequential_hops(
     # progression. A live trial produced exactly this shape and the first draft
     # rejected it.
     actual = [(h["from"], h["to"]) for h in hops if h["from"] != h["to"]]
+    want = _fmt(expected) if expected else f"one minor at a time from {src[0]}.{src[1]} to {tgt[0]}.{tgt[1]}"
     if not actual:
         return False, (
-            f"plan has {len(hops)} section(s) but none crosses a minor version; "
-            f"expected {_fmt(expected)}"
+            f"plan has {len(hops)} section(s) but none crosses a minor version; expected {want}"
         )
-    if len(actual) == 1 and len(expected) > 1:
+    chained = (
+        actual[0][0] == src
+        and actual[-1][1] == tgt
+        and all(actual[i][1] == actual[i + 1][0] for i in range(len(actual) - 1))
+        and all(_one_step(a, b) for a, b in actual)
+    )
+    if chained:
+        return True, f"{len(actual)} sequential minor hops, no skips"
+    if len(actual) == 1:
         return False, (
-            f"plan has a single hop {_fmt(actual)} but the N-1 rule "
-            f"requires {len(expected)} sequential hops: {_fmt(expected)}"
+            f"plan has a single hop {_fmt(actual)} but the N-1 rule requires "
+            f"sequential hops: {want}"
         )
-    if actual != expected:
-        return False, f"hops are [{_fmt(actual)}], expected [{_fmt(expected)}]"
-    return True, f"{len(actual)} sequential minor hops, no skips"
+    return False, f"hops are [{_fmt(actual)}], expected [{want}]"
 
 
 def check_every_hop_enumerated(text: str, releases: str = "") -> tuple[bool, str]:
@@ -549,7 +626,7 @@ def check_no_mutating_commands(text: str) -> tuple[bool, str]:
         # Quote the line and where it sat: the plan is gone after a trial, so
         # the message is all a reader gets.
         shown = " ".join(path)
-        where = f" ({'fence' if fenced else 'inline'}: {line[:120]!r})"
+        where = f" ({'code block' if fenced else 'inline'}: {line[:120]!r})"
         for bad in NONEXISTENT_INVOCATIONS:
             if path[: len(bad)] == bad:
                 return False, (

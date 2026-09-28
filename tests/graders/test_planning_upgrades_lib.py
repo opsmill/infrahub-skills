@@ -371,3 +371,178 @@ def test_patch_upgrade_that_crosses_a_minor_fails():
 def test_minor_hop_from_an_older_patch_is_allowed():
     ok, msg = check_sequential_hops(_hop_plan("1.9.1 -> 1.10.0"), source="1.9.1", target="1.10.0")
     assert ok, msg
+
+
+# --- Review findings on #159, each pinned both ways ------------------------
+
+
+def _hop(body: str, heading: str = "1.10 -> 1.11") -> str:
+    return f"# Upgrade plan\n\n## {heading}\n\n{_HEADER}{_ROW_YES.format(affected='yes')}\n{body}"
+
+
+# An indented code block is a code block: the upgrade in one is handed over,
+# and a read-only probe in one is fine.
+
+
+def test_indented_block_handing_over_the_upgrade_fails():
+    ok, _ = check_no_mutating_commands(_hop("Run the upgrade:\n\n    docker compose exec infrahub-server infrahub upgrade\n"))
+    assert not ok
+
+
+def test_indented_block_with_a_probe_passes():
+    ok, msg = check_no_mutating_commands(_hop("Check first:\n\n    docker compose exec infrahub-server infrahub upgrade --check\n"))
+    assert ok, msg
+
+
+def test_indented_fence_inside_a_list_item_is_graded():
+    body = "1. Upgrade:\n\n   ```bash\n   docker compose exec infrahub-server infrahub upgrade\n   ```\n"
+    ok, _ = check_no_mutating_commands(_hop(body))
+    assert not ok
+
+
+def test_nested_list_item_is_not_a_code_block():
+    body = "- Step\n\n    - Upgrade infrahub to 1.11 following the guide\n"
+    ok, msg = check_no_mutating_commands(_hop(body))
+    assert ok, msg
+
+
+# `-n infrahub` is an option value; the real binary comes after `--`.
+
+
+def test_kubectl_namespace_does_not_hide_a_write():
+    body = "```bash\nkubectl exec -n infrahub deploy/infrahub-server -- infrahub db migrate\n```\n"
+    ok, _ = check_no_mutating_commands(_hop(body))
+    assert not ok
+
+
+def test_kubectl_namespace_does_not_fail_a_probe():
+    body = "```bash\nkubectl exec -n infrahub infrahub-server-0 -- infrahub upgrade --check\n```\n"
+    ok, msg = check_no_mutating_commands(_hop(body))
+    assert ok, msg
+
+
+def test_compose_service_named_infrahub_is_skipped():
+    body = "```bash\ndocker compose exec infrahub infrahub upgrade\n```\n"
+    ok, _ = check_no_mutating_commands(_hop(body))
+    assert not ok
+
+
+# A fence's backticks do not shift inline-span pairing in the prose after it.
+
+
+def test_prose_after_a_fence_is_not_read_as_code():
+    body = "```bash\ninfrahubctl info\n```\n\nAfter `1.11.0` lands, the infrahub upgrade step follows the guide, see `docs`.\n"
+    ok, msg = check_no_mutating_commands(_hop(body))
+    assert ok, msg
+
+
+def test_inline_upgrade_after_a_fence_is_still_graded():
+    body = "```bash\ninfrahubctl info\n```\n\nThen run `infrahub upgrade`.\n"
+    ok, _ = check_no_mutating_commands(_hop(body))
+    assert not ok
+
+
+# A product name is not evidence, and the bare binary name is not a probe.
+
+
+@pytest.mark.parametrize(
+    "evidence",
+    ["See the GitHub release notes", "Affects every infrahub deployment", "PostgreSQL is upgraded"],
+)
+def test_product_names_are_not_evidence(evidence):
+    row = _ROW_GIT_AGENT.format(evidence=evidence, action="Fix it")
+    ok, _ = check_verdict_has_evidence(_plan(row))
+    assert not ok
+
+
+@pytest.mark.parametrize(
+    "evidence",
+    ["`CoreStandardGroup` inherits it", "InfraCircuit.node_metadata", "`infrahubctl info` reported 1.10.8"],
+)
+def test_named_kinds_and_probes_are_evidence(evidence):
+    row = _ROW_GIT_AGENT.format(evidence=evidence, action="Fix it")
+    ok, msg = check_verdict_has_evidence(_plan(row))
+    assert ok, msg
+
+
+def test_asking_an_admin_names_no_probe():
+    ok, _ = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action="Check with your infrahub admin")))
+    assert not ok
+
+
+def test_a_read_only_probe_resolves_an_unknown():
+    ok, msg = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action="Run infrahub db showmigrations on the server")))
+    assert ok, msg
+
+
+# A `v` prefix is a version.
+
+
+def test_v_prefixed_hop_headings_parse():
+    ok, msg = check_sequential_hops(_hop("", heading="v1.10 -> v1.11"), source="1.10", target="1.11")
+    assert ok, msg
+
+
+def test_v_prefixed_release_cell_counts():
+    row = _ROW_GIT_AGENT.format(evidence="`tasks.py`", action="Fix it").replace("| 1.11.0 |", "| v1.11.0 |")
+    ok, msg = _mod.check_every_hop_enumerated(_plan(row).replace("1.9 -> 1.10", "1.10 -> 1.11"), releases="1.11.0")
+    assert ok, msg
+
+
+def test_v_prefixed_skip_still_fails():
+    ok, _ = check_sequential_hops(_hop("", heading="v1.8 -> v1.11"), source="1.8", target="1.11")
+    assert not ok
+
+
+# An overview heading spanning the whole range is not a hop.
+
+_FIVE_HOPS = "".join(f"## 1.{i} -> 1.{i + 1}\n\n{_HEADER}{_ROW_YES.format(affected='yes')}\n" for i in range(5, 10))
+
+
+def test_overview_heading_is_not_a_hop():
+    text = "# Plan\n\n## Overview: 1.5.2 -> 1.10.0\n\nFive hops.\n\n" + _FIVE_HOPS
+    ok, msg = check_sequential_hops(text, source="1.5", target="1.10")
+    assert ok, msg
+
+
+def test_single_consolidated_hop_still_fails():
+    text = f"# Plan\n\n## 1.5.2 -> 1.10.0\n\n{_HEADER}{_ROW_YES.format(affected='yes')}\n"
+    ok, _ = check_sequential_hops(text, source="1.5", target="1.10")
+    assert not ok
+
+
+# Crossing a major, and a target older than the source.
+
+
+def test_crossing_into_the_next_major_is_one_hop():
+    ok, msg = check_sequential_hops(_hop("", heading="1.11 -> 2.0"), source="1.11", target="2.0")
+    assert ok, msg
+
+
+def test_skipping_the_first_minor_of_a_new_major_fails():
+    ok, _ = check_sequential_hops(_hop("", heading="1.11 -> 2.1"), source="1.11", target="2.1")
+    assert not ok
+
+
+def test_target_older_than_source_fails_with_its_own_message():
+    ok, msg = check_sequential_hops(_hop("", heading="1.9 -> 1.10"), source="1.10", target="1.9")
+    assert not ok
+    assert "older than source" in msg
+
+
+# Bold table headers are the same columns.
+
+
+def test_bold_headers_are_parsed():
+    header = _HEADER.replace("| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |",
+                             "| **Change** | **Release** | **Kind** | **Severity** | **When** | **Affected** | **Evidence** | **Action** | **Source** |")
+    text = f"# Plan\n\n## 1.10 -> 1.11\n\n{header}{_ROW_YES.format(affected='yes')}\n"
+    ok, msg = check_verdict_has_evidence(text)
+    assert ok, msg
+
+
+def test_bold_headers_still_catch_a_bad_verdict():
+    header = _HEADER.replace("| Affected |", "| **Affected** |")
+    text = f"# Plan\n\n## 1.10 -> 1.11\n\n{header}{_ROW_YES.format(affected='probably')}\n"
+    ok, _ = check_verdict_has_evidence(text)
+    assert not ok
