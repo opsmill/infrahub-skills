@@ -35,9 +35,9 @@ checked against this repository and, when reachable,
 this instance.
 
 **The plan describes how to upgrade; it does not
-upgrade.** It never runs `infrahub upgrade`, a schema
-load, or a branch write, and it never hands the user the
-upgrade command. It may run and show read-only probes.
+upgrade.** It never runs the upgrade, a schema load, or
+a branch write, and it never hands the user the upgrade
+command. It may run and show read-only probes.
 The user's deployment method (Docker Compose, Helm,
 Enterprise, Community) decides the exact commands, and
 the upgrade guide for that deployment owns them.

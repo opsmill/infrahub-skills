@@ -41,8 +41,8 @@ user may paste into production.
    | `infrahub db showmigrations` | inside the Infrahub server container | current and target database versions |
    | `infrahub upgrade --check` | inside the Infrahub server container | pending migrations, whether the core schema changes, which branches need a rebase; writes nothing |
 
-2. `infrahub upgrade` and `infrahub db` are server
-   commands. They run inside the server container,
+2. `infrahub upgrade --check` and
+   `infrahub db showmigrations` are server commands. They run inside the server container,
    wrapped in `docker compose exec` or `kubectl exec`.
    `infrahubctl` has no upgrade command; writing one
    invents a command that looks safe and fails with
@@ -54,6 +54,13 @@ user may paste into production.
    migrations and wrote nothing.
 4. Describe each upgrade step in prose and link the
    upgrade guide for the user's deployment.
+5. In prose, write "the upgrade", never the command,
+   even to say you did not run it. The only form of the
+   upgrade command a plan contains is the
+   `infrahub upgrade --check` probe. A reader skimming
+   for commands copies whatever is backticked, and
+   "I did not run `infrahub upgrade`" hands it over all
+   the same.
 
 ## Examples
 
@@ -82,5 +89,7 @@ Run the upgrade:
   containers were up.
 - Putting the upgrade command in the plan "for
   convenience".
+- Naming the upgrade command in prose to say it was
+  not run, instead of writing "the upgrade".
 - A schema load or a branch creation as a "test".
 - Hanging `upgrade --check` off `infrahubctl`.

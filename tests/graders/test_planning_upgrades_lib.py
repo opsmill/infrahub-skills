@@ -546,3 +546,33 @@ def test_bold_headers_still_catch_a_bad_verdict():
     text = f"# Plan\n\n## 1.10 -> 1.11\n\n{header}{_ROW_YES.format(affected='probably')}\n"
     ok, _ = check_verdict_has_evidence(text)
     assert not ok
+
+
+# A backticked command in the Action is a runnable probe; a backticked package
+# name is not.
+
+
+def test_backticked_shell_command_resolves_an_unknown():
+    action = "Run `pip show infrahub-sdk` where the generators run, then move it with the server"
+    ok, msg = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action=action)))
+    assert ok, msg
+
+
+def test_backticked_package_name_is_not_a_probe():
+    action = "Pin `infrahub-sdk` to 1.19.0 or later in the dependency file"
+    ok, _ = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action=action)))
+    assert not ok
+
+
+# Decided on #159: the plan never writes the upgrade command, even to say it
+# was not run. The `--check` probe is the only form allowed.
+
+
+def test_saying_the_upgrade_command_was_not_run_still_fails():
+    ok, _ = check_no_mutating_commands(_hop("I did not run `infrahub upgrade`; the plan is below.\n"))
+    assert not ok
+
+
+def test_saying_the_upgrade_was_not_run_passes():
+    ok, msg = check_no_mutating_commands(_hop("I did not run the upgrade; the plan is below.\n"))
+    assert ok, msg

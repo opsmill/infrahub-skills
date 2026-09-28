@@ -131,6 +131,11 @@ _EV_PROBE = re.compile(
 # A GraphQL query in backticks is a probe the user can run as written; a live
 # trial resolved an unknown with `query { CoreWebhook { ... } }`.
 _EV_GRAPHQL = re.compile(r"`\s*(?:query\b[^`{]*)?\{[^`]*\}\s*`")
+# A backticked shell command in an Action is a probe the user can run as
+# written: `pip show infrahub-sdk` settles an SDK-version unknown, and a live
+# trial was failed for it. A span with no argument (`infrahub-sdk`) is a name,
+# not a command.
+_EV_COMMAND = re.compile(r"`\s*[a-z][\w.-]*\s+[^`]+`")
 # A backticked span is a named artifact: a query, a command, a field, a value.
 _EV_CODE_SPAN = re.compile(r"`[^`]+`")
 
@@ -588,6 +593,7 @@ def check_verdict_has_evidence(text: str) -> tuple[bool, str]:
                 _EV_PROBE.search(action)
                 or _EV_PATH.search(action)
                 or _EV_GRAPHQL.search(action)
+                or _EV_COMMAND.search(action)
             ):
                 return False, (
                     f"finding '{change}' is Affected=unknown but Action "

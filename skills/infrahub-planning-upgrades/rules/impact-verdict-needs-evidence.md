@@ -65,6 +65,12 @@ guess before the window opens.
    above" leaves this row with no evidence or probe of
    its own, and rows get read, sorted, and copied one
    at a time.
+7. A change that touches nothing in the repository or
+   the instance, such as a UI URL format that only
+   bookmarks and runbooks hold, either gets a runnable
+   search naming the place (`grep -rn '?tab=' docs/`)
+   or is not a finding: put it in the hop's steps as a
+   note. "Search your runbooks" names no probe.
 
 ## Examples
 
