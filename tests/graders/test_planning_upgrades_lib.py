@@ -576,3 +576,23 @@ def test_saying_the_upgrade_command_was_not_run_still_fails():
 def test_saying_the_upgrade_was_not_run_passes():
     ok, msg = check_no_mutating_commands(_hop("I did not run the upgrade; the plan is below.\n"))
     assert ok, msg
+
+
+# A write command named bare in prose is a name (a release note quoting it); one
+# carrying its target, or one that runs bare, is a handover.
+
+
+def test_prose_naming_a_write_command_bare_passes():
+    body = "1.11.0 keeps `pyarrow` in the `object-transfer` extra for `infrahubctl object load`.\n"
+    ok, msg = check_no_mutating_commands(_hop(body))
+    assert ok, msg
+
+
+@pytest.mark.parametrize(
+    "span",
+    ["`infrahubctl object load objects/`", "`infrahubctl branch create test-upgrade`", "`infrahub db migrate`"],
+)
+def test_prose_write_with_a_target_or_runnable_bare_fails(span):
+    ok, msg = check_no_mutating_commands(_hop(f"Then run {span} to check.\n"))
+    assert not ok
+    assert "writes" in msg

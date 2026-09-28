@@ -6,6 +6,10 @@ Skill: `infrahub-planning-upgrades`
 
 The Upgrade Planner writes a plan for moving an Infrahub deployment from the version it runs to a target version. It lays out one hop per minor version, as the [Infrahub upgrade guide](https://docs.infrahub.app/deploy-manage/maintain-upgrade/upgrade/overview) requires, reads the [release notes](https://github.com/opsmill/infrahub/releases) of every release in the range, and checks each breaking change against your repository and, when one is reachable, your instance through the same MCP read tools the [Data Analyzer](./analyzing-data.mdx) uses. It plans; it does not upgrade.
 
+:::warning Not for switching editions
+The Upgrade Planner plans a move from one Infrahub version to a later one within the same edition. It does not plan a move from Community to Enterprise, or from Enterprise back to Community. Changing edition is not a version upgrade, and the release notes the planner reads do not cover it. For that, see [Community vs Enterprise: Migration path](https://docs.infrahub.app/overview/community-vs-enterprise#migration-path) and [contact OpsMill](https://docs.infrahub.app/overview/community-vs-enterprise#contact-us).
+:::
+
 ## When to use
 
 - Before a maintenance window, to know what the upgrade will break

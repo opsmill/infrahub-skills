@@ -8,7 +8,8 @@ description: >-
   updating or extending an existing UPGRADE_PLAN.md after the target release or the
   repository moved, debugging a plan that missed a breaking change.
   DO NOT TRIGGER when: auditing a repo against best practices, querying live data,
-  designing schemas, collecting diagnostics after a failed upgrade.
+  designing schemas, collecting diagnostics after a failed upgrade, switching between
+  the Community and Enterprise editions.
   ALWAYS pass the current and target versions as args: this skill runs in a forked
   context and cannot see the parent conversation.
 context: fork
@@ -41,6 +42,16 @@ command. It may run and show read-only probes.
 The user's deployment method (Docker Compose, Helm,
 Enterprise, Community) decides the exact commands, and
 the upgrade guide for that deployment owns them.
+
+**Versions, not editions.** The plan covers a move to a
+later version within one edition. Switching between
+Community and Enterprise, in either direction, is not a
+version upgrade and the release notes do not cover it.
+Say so and point at
+<https://docs.infrahub.app/overview/community-vs-enterprise#migration-path>
+instead of planning it. A request that does both plans
+the version upgrade only and names the edition change
+as out of scope.
 
 `Write` is granted for `UPGRADE_PLAN.md` only. `Bash` is
 granted for reading release notes with `gh` and for the

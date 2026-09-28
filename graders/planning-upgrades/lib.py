@@ -88,6 +88,12 @@ WRITE_INVOCATIONS = [
     ("infrahubctl", "run"),
 ]
 
+# Writes that run with no argument. Any other write named bare in prose is a
+# name, not a handover: the 1.11.0 notes say `pyarrow` stays available "for
+# `infrahubctl object load`", and a live trial quoting that was failed. A write
+# someone could run carries its target (`infrahubctl object load objects/`).
+BARE_RUNNABLE_WRITES = [("infrahub", "db", "migrate")]
+
 # A leading `v` is allowed: upstream tags read `infrahub-v1.10.0`, so plans
 # write `v1.10` too, and `\b` alone never matched between `v` and the digit.
 _VERSION_RE = re.compile(r"(?<![\d.])v?(\d+)\.(\d+)(?:\.(\d+))?(?!\d)")
@@ -646,6 +652,13 @@ def check_no_mutating_commands(text: str) -> tuple[bool, str]:
             )
         if not fenced:
             write = next((w for w in WRITE_INVOCATIONS if path[: len(w)] == w), None)
+            if (
+                write is not None
+                and len(path) == len(write)
+                and not flags
+                and write not in BARE_RUNNABLE_WRITES
+            ):
+                continue
             if write is not None:
                 return False, f"'{shown}'{where} writes to Infrahub; the plan runs read-only probes only"
             continue
