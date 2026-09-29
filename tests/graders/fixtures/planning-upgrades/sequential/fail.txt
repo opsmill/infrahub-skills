@@ -10,5 +10,5 @@
 
 ```bash
 # read-only: reports what the upgrade would do, writes nothing
-docker compose exec infrahub-server infrahub upgrade --check
+VERSION=1.9.0 docker compose run --rm --no-deps infrahub-server infrahub upgrade --check
 ```

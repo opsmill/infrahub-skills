@@ -34,13 +34,13 @@ guess before the window opens.
      `queries/next_ip.gql -> IPAddressGetNextAvailable`
    - a schema kind or `Kind.attribute`
    - a query and its result: ``query_graphql `{ BuiltinIPAddress { count } }` returned 0``
-   - a probe and its output: `infrahub upgrade --check` listing 2 pending migrations
+   - a probe and its output: the target's `infrahub upgrade --check` listing 2 pending migrations
 3. Use `unknown` when the evidence is not in hand, for
    example a schema the user did not share. Then the
    `Action` names the probe that would decide it: an
    MCP read (`get_schema`, `get_nodes`,
    `query_graphql`), `infrahubctl info`,
-   `infrahub db showmigrations`, a `grep` over the
+   `infrahub db showmigrations` (from 1.10.0), a `grep` over the
    named files, or a named file to read. Lead with the
    probe, then the remedy: "if SSO is configured, do X"
    leaves the user unable to tell whether it is, so say
@@ -53,12 +53,22 @@ guess before the window opens.
    not.
 4. A change that reaches every deployment, such as a
    data migration, still needs evidence for `yes`: the
-   probe that shows it pending here, like
-   `infrahub upgrade --check` listing the migration.
-   Without a probe it is `unknown`, with that probe as
-   the `Action`. "The release applies it everywhere" is
-   the release note again, not evidence about this
-   deployment.
+   probe that shows it pending here, like the target
+   release's `infrahub upgrade --check` listing the
+   migration. Without a probe it is `unknown`, with that
+   probe as the `Action`. "The release applies it
+   everywhere" is the release note again, not evidence
+   about this deployment.
+
+   The probes have a version floor. Before 1.10.0,
+   `infrahub db showmigrations` does not exist and
+   `upgrade --check` prints only the pending count, so a
+   migration-level row for an older hop cannot be
+   settled by a probe. Its verdict rests on the release
+   note and the repository: `yes` or `no` when the note
+   names what the migration touches and the repository
+   shows it, otherwise `unknown` with the target's
+   `upgrade --check` count line as the `Action`.
 5. Write the bare value. The column holds `yes`, `no`,
    or `unknown`, not a sentence.
 6. Make each row stand on its own. "Same as the row

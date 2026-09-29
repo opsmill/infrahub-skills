@@ -10,8 +10,9 @@ description: >-
   DO NOT TRIGGER when: auditing a repo against best practices, querying live data,
   designing schemas, collecting diagnostics after a failed upgrade, switching between
   the Community and Enterprise editions.
-  ALWAYS pass the current and target versions as args: this skill runs in a forked
-  context and cannot see the parent conversation.
+  ALWAYS pass the user's request verbatim as args, versions, pasted schema, deployment,
+  and edition included: this skill runs in a forked context and cannot see the parent
+  conversation.
 context: fork
 allowed-tools:
   - Read
@@ -19,7 +20,7 @@ allowed-tools:
   - Grep
   - Glob
   - Write
-argument-hint: "<current version> to <target version>"
+argument-hint: "[the user's upgrade request, verbatim]"
 metadata:
   version: 1.3.0
   author: OpsMill
@@ -59,12 +60,18 @@ read-only probes.
 
 ## Project Context
 
-This skill runs in a forked context. The versions come
-from the arguments, for example
-`/infrahub:planning-upgrades 1.9.2 to 1.10.0`. With no
-target, ask for one. With no current version, read it
-from `infrahubctl info` (`Infrahub Version:`), and ask
-if the server is unreachable.
+This skill runs in a forked context and has no view of
+the parent conversation, so the user's request arrives
+verbatim as the arguments: the versions, and everything
+else the plan depends on, such as a pasted schema, the
+deployment method (step 6 picks the upgrade guide from
+it), the edition, and any pressure to "just run it".
+For example:
+`/infrahub:planning-upgrades We run 1.9.2 on Docker Compose, Community, and want 1.10.0. Here is our schema: ...`
+
+With no target, ask for one. With no current version,
+read it from `infrahubctl info` (`Infrahub Version:`),
+and ask if the server is unreachable.
 
 ## Workflow
 

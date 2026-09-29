@@ -596,3 +596,64 @@ def test_prose_write_with_a_target_or_runnable_bare_fails(span):
     ok, msg = check_no_mutating_commands(_hop(f"Then run {span} to check.\n"))
     assert not ok
     assert "writes" in msg
+
+
+# --- Review on #159 (BeArchiTek), each reproduction pinned both ways --------
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "```bash\ndocker compose exec infrahub-server infrahub upgrade \\\n  --rebase-branches\n```\n",
+        "```bash\nkubectl exec deploy/x -- sh -c \"infrahub upgrade\"\n```\n",
+        "```bash\nsudo -E infrahub upgrade\n```\n",
+        "Then run `infrahubctl object delete InfraDevice spine1`.\n",
+        "```bash\ninfrahub upgrade --rebase-branches 'unterminated\n```\n",
+    ],
+    ids=["continuation", "sh-c", "sudo-E", "object-delete", "unparseable"],
+)
+def test_handed_over_writes_fail(body):
+    ok, _ = check_no_mutating_commands(_hop(body))
+    assert not ok
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "```bash\nVERSION=1.11.0 docker compose run --rm --no-deps infrahub-server \\\n  infrahub upgrade --check\n```\n",
+        "```bash\nkubectl exec deploy/x -- sh -c \"infrahub db showmigrations\"\n```\n",
+        "Your compose file still starts the agent:\n\n```yaml\nservices:\n  agent:\n    command: infrahub git-agent start --debug\n```\n",
+    ],
+    ids=["continued-probe", "sh-c-probe", "yaml-quote"],
+)
+def test_probes_and_quoted_files_pass(body):
+    ok, msg = check_no_mutating_commands(_hop(body))
+    assert ok, msg
+
+
+def test_writes_come_from_the_cli_tree():
+    for path in [("infrahubctl", "object", "delete"), ("infrahubctl", "object", "update"), ("infrahubctl", "object", "create")]:
+        assert path in _mod.WRITE_INVOCATIONS
+
+
+# A title naming the whole range is not a second hop, and patch roll-ups around
+# a hop do not turn the hop into an "overview".
+
+
+def test_title_with_the_same_range_as_the_only_hop_passes():
+    text = f"# Plan\n\n## Upgrade plan: 1.9.2 to 1.10.0\n\nSummary.\n\n## 1.9 -> 1.10\n\n{_HEADER}{_ROW_YES.format(affected='yes')}\n"
+    ok, msg = check_sequential_hops(text, source="1.9", target="1.10")
+    assert ok, msg
+
+
+def test_patch_rollups_around_a_hop_pass():
+    body = f"{_HEADER}{_ROW_YES.format(affected='yes')}\n"
+    text = f"# Plan\n\n## 1.9.1 -> 1.9.6\n\n{body}\n## 1.9 -> 1.10\n\n{body}\n## 1.10.0 -> 1.10.3\n\n{body}"
+    ok, msg = check_sequential_hops(text, source="1.9", target="1.10")
+    assert ok, msg
+
+
+def test_title_does_not_hide_a_skipped_minor():
+    text = f"# Plan\n\n## Upgrade plan: 1.8.2 to 1.10.0\n\n## 1.8 -> 1.10\n\n{_HEADER}{_ROW_YES.format(affected='yes')}\n"
+    ok, _ = check_sequential_hops(text, source="1.8", target="1.10")
+    assert not ok

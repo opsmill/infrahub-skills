@@ -11,6 +11,7 @@ then take the single supported minor hop. Upgrade `infrahub` only after the
 | Neo4j must move to 2026.05.0 | 1.11.0 | preparation | warning | during | unknown | Separately managed database; not visible from the repo | Run infrahubctl info to read the deployment, then upgrade Neo4j alongside Infrahub | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.11.0 |
 
 ```bash
+# after the hop the running server is the target release; confirm the database followed
 kubectl exec deploy/infrahub-server -- infrahub db showmigrations
 kubectl exec deploy/infrahub-server -- infrahub upgrade --check
 ```
@@ -22,7 +23,7 @@ kubectl exec deploy/infrahub-server -- infrahub upgrade --check
 | `infrahub git-agent` command removed | 1.11.0 | breaking | critical | before | yes | tasks.py runs `infrahub git-agent start` in dev_start; live read found 0 repositories | Replace the call with the task worker | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.11.0 |
 
 ```bash
-# Kubernetes deployment: both probes are read-only
+# Kubernetes, after the hop: both probes are read-only and now run the target release
 kubectl exec deploy/infrahub-server -- infrahub db showmigrations
 kubectl exec deploy/infrahub-server -- infrahub upgrade --check
 ```

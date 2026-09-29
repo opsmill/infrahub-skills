@@ -14,7 +14,7 @@
 | `Action` | What the user does, in the imperative; for `unknown`, the probe that settles it |
 | `Source` | The release note, or the deprecation guide it links to |
 
-`infrahub upgrade --check` classifies each pending
+From 1.10.0, the target's `infrahub upgrade --check` classifies each pending
 migration. One that requires a branch rebase points at
 `When: during` or `after`, not `before`.
 

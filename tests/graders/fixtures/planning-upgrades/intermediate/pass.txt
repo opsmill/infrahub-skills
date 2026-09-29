@@ -8,7 +8,7 @@
 
 ```bash
 # read-only: reports what the upgrade would do, writes nothing
-docker compose exec infrahub-server infrahub upgrade --check
+VERSION=1.6.0 docker compose run --rm --no-deps infrahub-server infrahub upgrade --check
 ```
 
 ## 1.6 -> 1.7
@@ -19,7 +19,7 @@ docker compose exec infrahub-server infrahub upgrade --check
 
 ```bash
 # read-only: reports what the upgrade would do, writes nothing
-docker compose exec infrahub-server infrahub upgrade --check
+VERSION=1.7.0 docker compose run --rm --no-deps infrahub-server infrahub upgrade --check
 ```
 
 ## 1.7 -> 1.8
@@ -30,7 +30,7 @@ docker compose exec infrahub-server infrahub upgrade --check
 
 ```bash
 # read-only: reports what the upgrade would do, writes nothing
-docker compose exec infrahub-server infrahub upgrade --check
+VERSION=1.8.0 docker compose run --rm --no-deps infrahub-server infrahub upgrade --check
 ```
 
 ## 1.8 -> 1.9
@@ -41,7 +41,7 @@ docker compose exec infrahub-server infrahub upgrade --check
 
 ```bash
 # read-only: reports what the upgrade would do, writes nothing
-docker compose exec infrahub-server infrahub upgrade --check
+VERSION=1.9.0 docker compose run --rm --no-deps infrahub-server infrahub upgrade --check
 ```
 
 ## 1.9 -> 1.10
@@ -53,5 +53,5 @@ docker compose exec infrahub-server infrahub upgrade --check
 
 ```bash
 # read-only: reports what the upgrade would do, writes nothing
-docker compose exec infrahub-server infrahub upgrade --check
+VERSION=1.10.0 docker compose run --rm --no-deps infrahub-server infrahub upgrade --check
 ```
