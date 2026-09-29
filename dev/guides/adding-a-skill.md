@@ -280,10 +280,13 @@ case once a skill exists), see
 
 ### 7. Register in Documentation
 
-Five surfaces, none of them checked by CI. The list and
-what to add to each is in
+The surfaces, what to add to each, and the shape the
+skills-reference page takes are in
 [../guidelines/skill-registration.md](../guidelines/skill-registration.md),
 which loads on its own when you edit a `SKILL.md`.
+`uv run invoke lint` fails a skill missing from any of
+them. It does not judge the prose, and it does not build
+the docs: run `npm run build` in `docs/` too.
 
 Add a news fragment describing the skill — CI fails
 the pull request without one:

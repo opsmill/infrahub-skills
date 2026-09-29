@@ -51,6 +51,10 @@ cli_invocations_all:
 documentation_all:
   - *doc_files
   - *markdown_all
+  # Registration surfaces that are neither docs nor Markdown, so a change to
+  # either still runs check-skill-registration.py in the docs-build job.
+  - ".github/.release-manifest.json"
+  - "scripts/check-skill-registration.py"
 
 # What the pytest suite covers: every Python file, the dependency declarations
 # it runs against, and the mapping profiles / fixtures the converter tests read

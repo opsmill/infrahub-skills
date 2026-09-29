@@ -62,9 +62,11 @@ AI command definitions live in [dev/commands/](dev/commands/).
 | Regenerate the JSON evals | `uv run python scripts/sync-evals.py` |
 | Check the installed plugin against this tree | `uv run invoke freshness` |
 
-`uv run invoke lint` runs rumdl, yamllint, and
-`scripts/check-cli-invocations.py`. CI runs those three plus `ruff`,
-`pytest`, and `scripts/check-symlinks.py`.
+`uv run invoke lint` runs rumdl, yamllint,
+`scripts/check-cli-invocations.py`, and the three docs checks:
+`check-docs-sidebar.py`, `check-docs-skill-names.py`, and
+`check-skill-registration.py`. CI runs all of them plus `ruff`,
+`pytest`, `scripts/check-symlinks.py`, and `npm run build` in `docs/`.
 
 The single-eval line is the one that matters for cost. A full
 `skillgrade --smoke` run is the expensive default people reach for out of
@@ -97,7 +99,7 @@ Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rul
 | [graders.md](dev/guidelines/graders.md) | Parse the answer, never substring-match it; verify both directions |
 | [minimum-change.md](dev/guidelines/minimum-change.md) | The smallest artifact that closes the gap, and what to delete |
 | [skill-authoring.md](dev/guidelines/skill-authoring.md) | Description, body, examples, and how to verify an edit |
-| [skill-registration.md](dev/guidelines/skill-registration.md) | The five surfaces a new skill has to appear in, and which of them go stale when behavior changes |
+| [skill-registration.md](dev/guidelines/skill-registration.md) | Every surface a new skill has to appear in, the reference page shape, and which surfaces go stale when behavior changes |
 | [versioning.md](dev/guidelines/versioning.md) | The five files a version bump touches |
 
 Each rule's `paths:` frontmatter is the authority on when

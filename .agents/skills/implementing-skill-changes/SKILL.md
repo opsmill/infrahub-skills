@@ -135,6 +135,13 @@ else
 fi
 ```
 
+When the change adds a new skill, also build the docs. It runs with
+`onBrokenLinks: 'throw'`, and `uv run invoke lint` does not run it:
+
+```bash
+(cd docs && npm ci && npm run build)
+```
+
 Then, guidance class only, prove the task measures the skill rather than the
 model. The green run above scored 1.0 with the skill read. Delete the task's
 `Read the skill at ...` line and run the same task again. Delete, not comment:
@@ -180,11 +187,13 @@ silence.
 
 ## Registration
 
-Only when the change adds a new skill: wire the five surfaces listed in
-[`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md).
-Its five rows already include the per-skill docs page and the manifest entry,
-so there is nothing to add beyond them. Link the table rather than restating
-it here; a second copy is the exact drift the guideline warns about.
+Only when the change adds a new skill: wire every surface listed in
+[`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md),
+and write the skills-reference page in the shape that file gives. Link the
+table rather than restating it here; a second copy is the exact drift the
+guideline warns about. `uv run invoke lint` in Verify fails a skill missing
+from any surface it checks; the scenarios and pair tables are yours to judge.
+The report names each surface and what was added to it.
 
 ## Changelog
 
