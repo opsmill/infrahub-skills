@@ -135,9 +135,10 @@ needing it links there rather than restating the number.
 most of `dev/`, against the tree pinned in
 `graders/common/cli_tree.py`. Its `SCAN_TARGETS` is the
 authority; `docs/`, `README.md` and `dev/specs/` are
-outside it. It judges nothing else either, so a `gh`
-flag, a `curl`, or a REST path is only as good as the
-author who ran it. Run it, and say which version you ran
+outside it. Beyond `infrahubctl` it checks only the
+`--state` value on `gh search issues|prs`, so any other
+`gh` flag, a `curl`, or a REST path is only as good as
+the author who ran it. Run it, and say which version you ran
 it on.
 
 ## Verifying an edit
