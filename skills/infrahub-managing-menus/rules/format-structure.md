@@ -76,6 +76,54 @@ YAML comment in the output file so the user knows:
 > `jinja2_transforms:`, and
 > `artifact_definitions:` — all plurals.
 
+### Removing or Renaming Items
+
+Taking an item out of the file does not always take
+it out of Infrahub. What removes it depends on how the
+file got there. A rename (new `name` or `namespace`)
+counts as removing the old item and adding a new one.
+
+| File loaded by | Items dropped from the file | Do |
+| -------------- | --------------------------- | -- |
+| Git sync of a `menus:` entry in `.infrahub.yml` (Infrahub 1.3+) | Deleted by the next sync | Commit and push. Do not delete them by hand. |
+| `infrahubctl menu load` | Stay on the instance; the load only creates and updates, and still succeeds | Delete each one |
+
+A sync removes only items it loaded itself. An item
+loaded with `infrahubctl menu load` from a file the
+repository never had is not the sync's to remove, even
+in a git-synced project: delete it explicitly.
+
+Delete one item per command, by `namespace/name`
+(infrahubctl 1.20+):
+
+```bash
+infrahubctl object delete CoreMenuItem Dcim/RackMenu --yes
+```
+
+Deleting a group header leaves its children behind, so
+delete each child too. Items in the `Builtin` namespace
+are protected and cannot be deleted.
+
+The leftovers are silent: the load or sync succeeds and
+every wanted entry is there, so nobody notices the old
+ones until they count the sidebar.
+
+Incorrect: the file is git-synced, and the steps
+hand-delete what the next sync removes anyway:
+
+```bash
+git push origin main
+infrahubctl object delete CoreMenuItem Dcim/RackMenu --yes
+```
+
+Correct: push, and delete only what the sync never
+loaded:
+
+```bash
+git push origin main
+infrahubctl object delete CoreMenuItem Dcim/TempLabMenu --yes
+```
+
 ### Key Rules
 
 - Include the `$schema` comment for IDE validation
