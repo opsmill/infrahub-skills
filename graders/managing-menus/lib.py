@@ -18,6 +18,9 @@ Usage (in a per-task grader script)::
 
 from __future__ import annotations
 
+import json
+import re
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -584,6 +587,447 @@ def check_parent_attaches_to_builtin(doc: dict, **_: Any) -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
+# Removing items from a loaded menu
+#
+# ``infrahubctl menu load`` upserts every item in the file and deletes none
+# (SDK v1.23.2 ``infrahub_sdk/ctl/menu.py``, ``spec/object.py:535``), so an
+# item dropped from the file stays on the instance until something deletes
+# it. The checks below grade the apply steps the model writes next to the
+# edited menu: the GraphQL ``CoreMenuItemDelete`` calls and the
+# ``infrahubctl object delete CoreMenuItem`` commands in its fenced blocks,
+# resolved to ``[namespace, name]`` HFIDs, against the items the task removed.
+# ---------------------------------------------------------------------------
+
+_FENCE_RE = re.compile(r"^```[ \t]*([\w+-]*)[^\n]*\n(.*?)^```[ \t]*$", re.MULTILINE | re.DOTALL)
+
+_GQL_TOKEN_RE = re.compile(
+    r'"""(?:.|\n)*?"""'           # block string
+    r'|"(?:\\.|[^"\\\n])*"'        # string
+    r"|#[^\n]*"                    # comment
+    r"|\.\.\."                     # spread
+    r"|\$?[_A-Za-z][_0-9A-Za-z]*"  # name or variable
+    r"|-?\d+(?:\.\d+)?"            # number
+    r"|[{}()\[\]:!=@]"             # punctuator
+    r"|[\s,]+"                     # ignored
+    r"|."
+)
+
+_SHELL_LANGS = frozenset({"bash", "sh", "shell", "zsh", "console", "shell-session"})
+_GRAPHQL_LANGS = frozenset({"graphql", "gql"})
+
+
+def _fences(text: str) -> list[tuple[str, str]]:
+    """Every fenced block in document order, as ``(language, body)``."""
+    return [(m.group(1).lower(), m.group(2)) for m in _FENCE_RE.finditer(text or "")]
+
+
+def _gql_tokens(source: str) -> list[str]:
+    """GraphQL tokens with whitespace, commas and ``#`` comments removed."""
+    return [
+        tok
+        for tok in _GQL_TOKEN_RE.findall(source)
+        if not tok.isspace() and not tok.startswith("#") and tok.strip(", \t\r\n")
+    ]
+
+
+class _GqlVar:
+    """A ``$variable`` reference inside a GraphQL value."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+class _GqlParser:
+    """Just enough of a GraphQL parser to read top-level mutation fields."""
+
+    def __init__(self, tokens: list[str]) -> None:
+        self.toks = tokens
+        self.i = 0
+
+    def peek(self) -> str | None:
+        return self.toks[self.i] if self.i < len(self.toks) else None
+
+    def take(self) -> str:
+        tok = self.toks[self.i]
+        self.i += 1
+        return tok
+
+    def expect(self, tok: str) -> None:
+        if self.take() != tok:
+            raise ValueError(f"expected {tok!r}")
+
+    def skip_balanced(self, open_tok: str, close_tok: str) -> None:
+        self.expect(open_tok)
+        depth = 1
+        while depth:
+            tok = self.take()
+            if tok == open_tok:
+                depth += 1
+            elif tok == close_tok:
+                depth -= 1
+
+    def value(self) -> Any:
+        tok = self.take()
+        if tok == "[":
+            items = []
+            while self.peek() != "]":
+                items.append(self.value())
+            self.take()
+            return items
+        if tok == "{":
+            obj = {}
+            while self.peek() != "}":
+                key = self.take()
+                self.expect(":")
+                obj[key] = self.value()
+            self.take()
+            return obj
+        if tok.startswith("$"):
+            return _GqlVar(tok[1:])
+        if tok.startswith('"""'):
+            return tok[3:-3]
+        if tok.startswith('"'):
+            try:
+                return json.loads(tok)
+            except ValueError:
+                return tok[1:-1]
+        return tok
+
+    def arguments(self) -> dict:
+        args: dict = {}
+        self.expect("(")
+        while self.peek() != ")":
+            key = self.take()
+            self.expect(":")
+            args[key] = self.value()
+        self.take()
+        return args
+
+    def directives(self) -> None:
+        while self.peek() == "@":
+            self.take()
+            self.take()
+            if self.peek() == "(":
+                self.skip_balanced("(", ")")
+
+    def selection_set(self) -> list[tuple[str, dict]]:
+        """Parse ``{ ... }`` and return its direct fields as ``(name, args)``."""
+        fields: list[tuple[str, dict]] = []
+        self.expect("{")
+        while self.peek() != "}":
+            if self.peek() == "...":
+                self.take()
+                if self.peek() == "on":
+                    self.take()
+                    self.take()
+                elif self.peek() not in ("{", "@"):
+                    self.take()  # named fragment spread
+                    self.directives()
+                    continue
+                self.directives()
+                self.selection_set()
+                continue
+            name = self.take()
+            if self.peek() == ":":
+                self.take()
+                name = self.take()  # the field behind the alias
+            args = self.arguments() if self.peek() == "(" else {}
+            self.directives()
+            if self.peek() == "{":
+                self.selection_set()
+            fields.append((name, args))
+        self.take()
+        return fields
+
+    def mutation_fields(self) -> list[tuple[str, dict]]:
+        """Top-level fields of every ``mutation`` operation in the document."""
+        found: list[tuple[str, dict]] = []
+        while self.peek() is not None:
+            tok = self.take()
+            if tok in ("mutation", "query", "subscription", "fragment"):
+                while self.peek() not in ("{", "(", "@", None):
+                    self.take()  # operation name, or ``Name on Type`` for a fragment
+                if self.peek() == "(":
+                    self.skip_balanced("(", ")")
+                self.directives()
+                fields = self.selection_set()
+                if tok == "mutation":
+                    found.extend(fields)
+            elif tok == "{":
+                self.i -= 1
+                self.selection_set()  # anonymous query
+        return found
+
+
+def _resolve(value: Any, variables: dict) -> Any:
+    """Substitute ``$variable`` references, recursively."""
+    if isinstance(value, _GqlVar):
+        return variables.get(value.name)
+    if isinstance(value, list):
+        return [_resolve(v, variables) for v in value]
+    if isinstance(value, dict):
+        return {k: _resolve(v, variables) for k, v in value.items()}
+    return value
+
+
+def _json_variables(text: str) -> dict:
+    """Variables from every ``json`` fence: a bare object, or its ``variables`` key."""
+    variables: dict = {}
+    for lang, body in _fences(text):
+        if lang != "json":
+            continue
+        try:
+            data = json.loads(body)
+        except ValueError:
+            continue
+        if isinstance(data, dict):
+            inner = data.get("variables")
+            variables.update(inner if isinstance(inner, dict) else data)
+    return variables
+
+
+_CURL_DATA_FLAGS = frozenset({"-d", "--data", "--data-raw", "--data-binary", "--json"})
+
+
+def _shell_commands(body: str) -> list[list[str]]:
+    """Each command line of a shell fence, split with ``shlex``, prompts dropped."""
+    commands: list[list[str]] = []
+    for line in body.replace("\\\n", " ").splitlines():
+        try:
+            words = shlex.split(line, comments=True)
+        except ValueError:
+            continue
+        words = [w for w in words if w != "$"]
+        if words:
+            commands.append(words)
+    return commands
+
+
+def _request_body(raw: str) -> tuple[str, dict] | None:
+    """``(query, variables)`` from a JSON GraphQL request body, if it is one."""
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return None
+    if isinstance(data, dict) and isinstance(data.get("query"), str):
+        variables = data.get("variables")
+        return data["query"], variables if isinstance(variables, dict) else {}
+    return None
+
+
+def _graphql_documents(text: str) -> list[tuple[int, str, dict, bool]]:
+    """Every GraphQL document in the fences of ``text``, in document order.
+
+    Returns ``(fence_index, document, variables, declared)`` for ``graphql`` /
+    ``gql`` fences, untagged fences, JSON request bodies, and the ``-d`` /
+    ``--data*`` / ``--json`` payload of a ``curl`` in a shell fence.
+    ``declared`` is false for an untagged fence, which may hold anything.
+    """
+    documents: list[tuple[int, str, dict, bool]] = []
+    for index, (lang, body) in enumerate(_fences(text)):
+        if lang in _GRAPHQL_LANGS:
+            documents.append((index, body, {}, True))
+        elif lang == "":
+            documents.append((index, body, {}, False))
+        elif lang == "json":
+            request = _request_body(body)
+            if request:
+                documents.append((index, request[0], request[1], True))
+        elif lang in _SHELL_LANGS:
+            for words in _shell_commands(body):
+                for pos, word in enumerate(words):
+                    payload = None
+                    if word in _CURL_DATA_FLAGS and pos + 1 < len(words):
+                        payload = words[pos + 1]
+                    elif "=" in word and word.split("=", 1)[0] in _CURL_DATA_FLAGS:
+                        payload = word.split("=", 1)[1]
+                    request = _request_body(payload) if payload else None
+                    if request:
+                        documents.append((index, request[0], request[1], True))
+    return documents
+
+
+_CTL_VALUE_OPTIONS = frozenset({"--branch", "-b", "--config-file"})
+
+
+def _ctl_object_deletes(text: str) -> tuple[list[tuple[int, tuple[str, str]]], list[str]]:
+    """``infrahubctl object delete CoreMenuItem <namespace>/<name>`` in shell fences.
+
+    ``object delete`` (SDK 1.20.0+) takes the kind and an identifier, and
+    resolves an identifier written with ``/`` as a multi-part HFID.
+    """
+    deletes: list[tuple[int, tuple[str, str]]] = []
+    unresolved: list[str] = []
+    for index, (lang, body) in enumerate(_fences(text)):
+        if lang not in _SHELL_LANGS and lang != "":
+            continue
+        for words in _shell_commands(body):
+            for pos, word in enumerate(words[:-2]):
+                if Path(word).name != "infrahubctl" or words[pos + 1 : pos + 3] != ["object", "delete"]:
+                    continue
+                positional: list[str] = []
+                rest = iter(words[pos + 3 :])
+                for arg in rest:
+                    if arg in _CTL_VALUE_OPTIONS:
+                        next(rest, None)
+                    elif not arg.startswith("-"):
+                        positional.append(arg)
+                if len(positional) < 2 or positional[0] != "CoreMenuItem":
+                    continue
+                parts = positional[1].split("/")
+                if len(parts) == 2 and all(parts):
+                    deletes.append((index, (parts[0], parts[1])))
+                else:
+                    unresolved.append(f"infrahubctl object delete CoreMenuItem {positional[1]}")
+    return deletes, unresolved
+
+
+def _menu_item_deletes(text: str) -> tuple[list[tuple[int, tuple[str, str]]], list[str]]:
+    """Menu item deletes in ``text``: GraphQL ``CoreMenuItemDelete`` calls and
+    ``infrahubctl object delete CoreMenuItem`` commands.
+
+    Returns ``(deletes, unresolved)``: each delete is ``(fence_index, (namespace,
+    name))``; ``unresolved`` describes calls whose target is not a two-element
+    HFID (an ``id``, a variable nobody defined), since those cannot be compared
+    with the items the task removed.
+    """
+    shared_variables = _json_variables(text)
+    deletes, unresolved = _ctl_object_deletes(text)
+    for index, document, own_variables, declared in _graphql_documents(text):
+        variables = {**shared_variables, **own_variables}
+        try:
+            fields = _GqlParser(_gql_tokens(document)).mutation_fields()
+        except (IndexError, ValueError):
+            if declared:
+                unresolved.append(f"unparseable GraphQL in fence {index + 1}")
+            continue
+        for name, args in fields:
+            if name != "CoreMenuItemDelete":
+                continue
+            data = _resolve(args.get("data"), variables)
+            hfid = data.get("hfid") if isinstance(data, dict) else None
+            if (
+                isinstance(hfid, list)
+                and len(hfid) == 2
+                and all(isinstance(part, str) for part in hfid)
+            ):
+                deletes.append((index, (hfid[0], hfid[1])))
+            else:
+                unresolved.append(f"CoreMenuItemDelete with data={data!r}")
+    return deletes, unresolved
+
+
+def _menu_load_fences(text: str) -> list[int]:
+    """Indices of shell fences that run ``infrahubctl menu load``."""
+    indices: list[int] = []
+    for index, (lang, body) in enumerate(_fences(text)):
+        if lang not in _SHELL_LANGS and lang != "":
+            continue
+        for words in _shell_commands(body):
+            for pos, word in enumerate(words[:-2]):
+                if Path(word).name == "infrahubctl" and words[pos + 1 : pos + 3] == ["menu", "load"]:
+                    indices.append(index)
+                    break
+    return indices
+
+
+def _hfid_label(hfid: tuple[str, str]) -> str:
+    return f"[{hfid[0]}, {hfid[1]}]"
+
+
+def check_removed_items_dropped(
+    doc: dict,
+    removed_ids: frozenset[tuple[str, str]] = frozenset(),
+    kept_ids: frozenset[tuple[str, str]] = frozenset(),
+    **_: Any,
+) -> tuple[bool, str]:
+    """The edited menu omits every removed item and keeps every other one."""
+    present = {
+        (str(item.get("namespace") or ""), str(item.get("name") or ""))
+        for item in _all_menu_items_recursive(doc)
+    }
+    still_there = sorted(removed_ids & present)
+    if still_there:
+        return False, "Removed items still in the menu file: " + ", ".join(
+            _hfid_label(h) for h in still_there
+        )
+    lost = sorted(kept_ids - present)
+    if lost:
+        return False, "Items that should stay are missing from the menu file: " + ", ".join(
+            _hfid_label(h) for h in lost
+        )
+    return True, f"{len(removed_ids)} items dropped, {len(kept_ids)} kept"
+
+
+def check_removed_items_deleted(
+    doc: dict,
+    apply_raw: str = "",
+    removed_ids: frozenset[tuple[str, str]] = frozenset(),
+    kept_ids: frozenset[tuple[str, str]] = frozenset(),
+    hand_delete_ids: frozenset[tuple[str, str]] | None = None,
+    sync_removed_ids: frozenset[tuple[str, str]] = frozenset(),
+    **_: Any,
+) -> tuple[bool, str]:
+    """The apply steps delete by hand exactly the items nothing else removes.
+
+    ``infrahubctl menu load`` never deletes, so after a CLI load each removed
+    item, group header and children alike (a header delete does not cascade),
+    needs its own delete: ``hand_delete_ids`` defaults to ``removed_ids``.
+    A git-synced ``menus:`` file is reconciled by the sync, which deletes the
+    items it loaded before and no longer finds (Infrahub 1.3.0+), so those
+    (``sync_removed_ids``) must not be deleted by hand, while an item loaded
+    outside the sync still must. A purge of kept items is allowed only when a
+    later ``infrahubctl menu load`` puts them back; ``Builtin`` items are
+    protected and a delete of one is refused.
+    """
+    must_delete = removed_ids if hand_delete_ids is None else hand_delete_ids
+    deletes, unresolved = _menu_item_deletes(apply_raw)
+    targets = {hfid for _, hfid in deletes}
+
+    builtin = sorted(h for h in targets if h[0] == "Builtin")
+    if builtin:
+        return False, "Deletes protected built-in items: " + ", ".join(
+            _hfid_label(h) for h in builtin
+        )
+
+    loads = _menu_load_fences(apply_raw)
+    not_reloaded = sorted(
+        {hfid for index, hfid in deletes if hfid in kept_ids and not any(load > index for load in loads)}
+    )
+    if not_reloaded:
+        return False, (
+            "Deletes items the new menu keeps, with no later infrahubctl menu load "
+            "to restore them: " + ", ".join(_hfid_label(h) for h in not_reloaded)
+        )
+
+    by_hand = sorted(targets & sync_removed_ids)
+    if by_hand:
+        return False, (
+            "Deletes by hand items the git sync removes on its own: "
+            + ", ".join(_hfid_label(h) for h in by_hand)
+        )
+
+    missing = sorted(must_delete - targets)
+    if sync_removed_ids and len(unresolved) > len(missing):
+        # A delete by UUID or placeholder cannot be tied to an item. More of
+        # them than items still needing a delete means at least one lands on
+        # an item the sync owns or the menu keeps.
+        return False, (
+            f"{len(unresolved)} deletes by an identifier that is not a "
+            f"[namespace, name] HFID, but only {len(missing)} item(s) outside the "
+            "sync need one: " + "; ".join(unresolved)
+        )
+    if missing:
+        detail = f"; unresolved deletes: {'; '.join(unresolved)}" if unresolved else ""
+        return False, (
+            "No delete for items that nothing else removes (a menu load never deletes): "
+            + ", ".join(_hfid_label(h) for h in missing)
+            + detail
+        )
+    return True, f"Every item needing a delete ({len(must_delete)}) is deleted from the instance"
+
+
+# ---------------------------------------------------------------------------
 # Check registry
 # ---------------------------------------------------------------------------
 
@@ -608,6 +1052,8 @@ CHECKS: dict[str, Any] = {
     "schema-comment": check_schema_comment,
     "no-builtin-section-recreated": check_no_builtin_section_recreated,
     "parent-attaches-to-builtin": check_parent_attaches_to_builtin,
+    "removed-items-dropped": check_removed_items_dropped,
+    "removed-items-deleted": check_removed_items_deleted,
 }
 
 
@@ -620,6 +1066,8 @@ def run_checks(
     check_names: list[str],
     output_path: Path,
     raw_text: str | None = None,
+    apply_path: Path | None = None,
+    **check_kwargs: Any,
 ) -> dict:
     """Run named checks against a menu YAML file and return skillgrade JSON.
 
@@ -632,6 +1080,11 @@ def run_checks(
     raw_text:
         Optional pre-loaded raw text (used by checks that inspect comments).
         If ``None``, the file is read from ``output_path``.
+    apply_path:
+        Optional Markdown file of apply steps, passed to checks as
+        ``apply_raw`` (empty when absent).
+    check_kwargs:
+        Task inputs forwarded to every check, e.g. ``removed_ids``.
 
     Returns
     -------
@@ -648,6 +1101,12 @@ def run_checks(
     doc, file_raw = load_output(output_path)
     if raw_text is None:
         raw_text = file_raw
+    apply_raw = ""
+    if apply_path is not None:
+        try:
+            apply_raw = Path(apply_path).read_text(encoding="utf-8")
+        except (FileNotFoundError, OSError):
+            apply_raw = ""
 
     entries: list[dict] = []
     passed_count = 0
@@ -655,7 +1114,7 @@ def run_checks(
     for name in check_names:
         fn = CHECKS[name]  # raises KeyError for unknown names
         try:
-            ok, msg = fn(doc, raw_text=raw_text)
+            ok, msg = fn(doc, raw_text=raw_text, apply_raw=apply_raw, **check_kwargs)
         except Exception as exc:  # pragma: no cover — defensive
             ok, msg = False, f"Error running check: {exc}"
 

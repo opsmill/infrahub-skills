@@ -227,6 +227,124 @@ tasks:
           a two-element [Builtin, IPAM] list; another built-in section
           does not count, and the concatenated string does not resolve
 
+  - name: menu-remove-synced-items
+    instruction: |
+      Read the skill at skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
+
+      Task: Our Infrahub instance is connected to this git repository, and
+      menus/campus.yml is registered under `menus:` in .infrahub.yml, so Infrahub
+      picks it up whenever we push to main. This is the file today:
+
+      ```yaml
+      ---
+      apiVersion: infrahub.app/v1
+      kind: Menu
+      spec:
+        data:
+          - namespace: Campus
+            name: SitesMenu
+            label: Sites
+            icon: "mdi:office-building"
+            children:
+              data:
+                - namespace: Campus
+                  name: BuildingMenu
+                  label: Buildings
+                  kind: CampusBuilding
+                  icon: "mdi:domain"
+                - namespace: Campus
+                  name: FloorMenu
+                  label: Floors
+                  kind: CampusFloor
+                  icon: "mdi:floor-plan"
+          - namespace: Campus
+            name: SwitchingMenu
+            label: Switching
+            icon: "mdi:switch"
+            children:
+              data:
+                - namespace: Campus
+                  name: SwitchMenu
+                  label: Switches
+                  kind: CampusSwitch
+                  icon: "mdi:switch"
+          - namespace: Campus
+            name: WirelessMenu
+            label: Wireless
+            icon: "mdi:wifi"
+            children:
+              data:
+                - namespace: Campus
+                  name: AccessPointMenu
+                  label: Access Points
+                  kind: CampusAccessPoint
+                  icon: "mdi:access-point"
+                - namespace: Campus
+                  name: ControllerMenu
+                  label: Wireless Controllers
+                  kind: CampusWirelessController
+                  icon: "mdi:router-wireless"
+      ```
+
+      Separately, a while ago a colleague added a temporary Lab entry to the
+      sidebar by hand, with `infrahubctl menu load lab.yml` (namespace Campus,
+      name LabMenu). That file was never committed here.
+
+      We are retiring the wireless inventory and no longer track floors. Take the
+      whole Wireless section and the Floors entry out of the sidebar, and get rid
+      of the Lab entry too. Everything else stays as it is.
+
+      Save the updated menu file to: output.yml
+      Put the commands I run next in: notes.md
+    graders:
+      - type: deterministic
+        run: python graders/managing-menus/check_remove_synced_items.py
+        weight: 1.0
+    expected_output: >-
+      output.yml is the same menu without FloorMenu and without the Wireless
+      section (WirelessMenu, AccessPointMenu, ControllerMenu). notes.md commits
+      and pushes the file and leaves those four to the repository sync, which
+      deletes the items it loaded before and no longer finds (Infrahub 1.3.0+).
+      LabMenu was loaded by hand and never synced, so the sync never touches it:
+      notes.md deletes it explicitly, with infrahubctl object delete
+      CoreMenuItem Campus/LabMenu or CoreMenuItemDelete by [namespace, name]
+      HFID, and never touches a Builtin item.
+    expectations:
+      - "File starts with apiVersion: infrahub.app/v1 and kind: Menu"
+      - >-
+        The menu file no longer contains FloorMenu, WirelessMenu,
+        AccessPointMenu or ControllerMenu, and keeps SitesMenu, BuildingMenu,
+        SwitchingMenu and SwitchMenu
+      - >-
+        notes.md does not delete the four dropped file items by hand; the git
+        sync removes them
+      - >-
+        notes.md deletes LabMenu explicitly, since it was loaded outside the
+        sync and no sync or menu load removes it
+      - No step deletes a protected Builtin menu item
+    assertions:
+      - name: apiversion-and-kind
+        check: >-
+          File has apiVersion: infrahub.app/v1 and kind: Menu
+      - name: name-and-namespace
+        check: >-
+          Every menu item has both name and namespace properties
+      - name: children-data-wrapper
+        check: >-
+          Children use children.data wrapper, not children directly
+          as a list
+      - name: removed-items-dropped
+        check: >-
+          The menu file omits the four removed items and keeps the four
+          others
+      - name: removed-items-deleted
+        check: >-
+          notes.md deletes Campus/LabMenu by [namespace, name] HFID, through
+          GraphQL CoreMenuItemDelete (a graphql or untagged fence, a JSON
+          request body, or a curl payload) or infrahubctl object delete
+          CoreMenuItem, deletes none of the four items the sync removes, no
+          kept item, and no Builtin item
+
   # --- Schema Creator --- #
   - name: vlan-management
     instruction: |
