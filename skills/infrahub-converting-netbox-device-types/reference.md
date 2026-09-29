@@ -83,11 +83,24 @@ a bare `requests.Session` and mounts nothing, so the
 default is `Retry(0)`. Both are wired in by the script,
 because a full `--in-use` run is on the order of a
 thousand requests and one blip would otherwise abort it.
-Reads are retried three times with exponential backoff
-on 429, 502, 503 and 504, honouring `Retry-After`.
-A 500 and the 4xx statuses are not retried: those answer
-the same way next time, and the export explains them
-instead.
+GET is retried three times with exponential backoff on
+429, 502, 503 and 504. A 500 and the other 4xx statuses
+are not: those answer the same way next time, and the
+export explains them instead.
+
+Two bounds keep a retry from becoming its own outage:
+
+- **`Retry-After` is honoured up to 30 seconds**, not in
+  full. A proxy in maintenance answering
+  `Retry-After: 3600` would otherwise hang the export
+  for three hours. Short values, which is what a 429
+  actually sends, are still obeyed exactly.
+- **Read timeouts are not retried.** A read timeout
+  means NetBox took the query and is still working on
+  it, so re-sending adds a second copy to an instance
+  already struggling, and costs `--timeout` again for
+  each attempt. The export reports it instead, and
+  `--timeout` is the dial.
 
 NetBox 4.5 reshaped front ports: the singular
 `rear_port` / `rear_port_position` fields became a

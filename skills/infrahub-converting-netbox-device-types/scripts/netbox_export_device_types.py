@@ -292,9 +292,53 @@ RETRY_STATUSES: tuple[int, ...] = (429, 502, 503, 504)
 RETRY_ATTEMPTS = 3
 
 #: urllib3 waits ``factor * (2 ** (attempt - 1))`` seconds, so 0.5 gives
-#: 0.5s, 1s, 2s: long enough to outlast a restart, short enough that a genuinely
-#: dead instance still fails while somebody is watching.
+#: 0.5s, 1s, 2s: long enough to outlast a restart, short enough that a
+#: genuinely dead instance still fails while somebody is watching.
 RETRY_BACKOFF = 0.5
+
+#: Ceiling on a single ``Retry-After`` sleep. Honouring the header is the
+#: point of retrying a 429 at all, but honouring it without a bound is how a
+#: proxy in maintenance returning ``Retry-After: 3600`` turns a failed export
+#: into a three-hour hang. urllib3 grew a 6-hour default cap in 2.6.3, which
+#: is both too generous to help here and too new to rely on: ``requests``
+#: still allows ``urllib3>=1.26``, where an hour-long header is slept in full
+#: and the ``retry_after_max`` argument does not exist. Capping it here works
+#: on every version either of them allows.
+RETRY_AFTER_CAP = 30.0
+
+
+def _build_retry() -> Any:
+    """Build the retry policy, bounded in wall-clock terms.
+
+    Returns:
+        A ``Retry`` that gives up inside ``RETRY_ATTEMPTS * RETRY_AFTER_CAP``
+        seconds in the worst case, rather than for as long as a server asks.
+    """
+    from urllib3.util.retry import Retry
+
+    class BoundedRetry(Retry):
+        """``Retry`` that honours ``Retry-After`` only up to a ceiling."""
+
+        def get_retry_after(self, response: Any) -> float | None:
+            requested = super().get_retry_after(response)
+            if requested is None:
+                return None
+            return min(requested, RETRY_AFTER_CAP)
+
+    return BoundedRetry(
+        total=RETRY_ATTEMPTS,
+        # A read timeout means NetBox took the request and is still working on
+        # it. Re-sending adds a second copy of a query that is already too
+        # slow, to an instance already struggling, and multiplies --timeout by
+        # the attempt count while it does so. Surface it instead: the export
+        # names the endpoint, and --timeout is the dial for it.
+        read=0,
+        backoff_factor=RETRY_BACKOFF,
+        status_forcelist=RETRY_STATUSES,
+        allowed_methods=frozenset(["GET"]),
+        raise_on_status=False,
+        respect_retry_after_header=True,
+    )
 
 
 def _mount_retries(session: Any) -> None:
@@ -309,16 +353,8 @@ def _mount_retries(session: Any) -> None:
         session: The ``requests.Session`` pynetbox created.
     """
     from requests.adapters import HTTPAdapter
-    from urllib3.util.retry import Retry
 
-    retry = Retry(
-        total=RETRY_ATTEMPTS,
-        backoff_factor=RETRY_BACKOFF,
-        status_forcelist=RETRY_STATUSES,
-        allowed_methods=frozenset(["GET"]),
-        raise_on_status=False,
-        respect_retry_after_header=True,
-    )
+    retry = _build_retry()
     adapter = HTTPAdapter(max_retries=retry)
     session.mount("http://", adapter)
     session.mount("https://", adapter)

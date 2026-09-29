@@ -812,6 +812,70 @@ def test_retries_are_bounded_and_scoped_to_reads():
     assert set(retry.allowed_methods) == {"GET"}
     for status in (400, 401, 403, 404, 500):
         assert status not in retry.status_forcelist
+    # A read timeout means the query is still running server-side. Retrying it
+    # sends a second copy and multiplies --timeout by the attempt count.
+    assert retry.read == 0
+
+
+def test_a_long_retry_after_is_capped_rather_than_slept_in_full():
+    """`Retry-After: 3600` over three retries is a three-hour hang, not a retry.
+
+    urllib3 only grew a 6-hour default cap in 2.6.3, and `requests` still
+    allows `urllib3>=1.26`, where the header is slept in full and the
+    `retry_after_max` argument does not exist. So the bound is applied here
+    rather than handed to the library.
+    """
+
+    class Response:
+        def __init__(self, value):
+            self.headers = {"Retry-After": value} if value else {}
+
+    source = NetBoxSource("http://127.0.0.1:1", "t")
+    retry = source._api.http_session.get_adapter("http://127.0.0.1:1").max_retries
+
+    assert retry.get_retry_after(Response("3600")) == 30.0
+    assert retry.get_retry_after(Response("86400")) == 30.0
+    # A short one is still honoured: cooperating with a 429 is the point.
+    assert retry.get_retry_after(Response("5")) == 5
+    assert retry.get_retry_after(Response(None)) is None
+    # urllib3 rebuilds the policy on every increment, so the cap has to
+    # survive `.new()` or it applies to the first sleep only.
+    assert retry.new().get_retry_after(Response("3600")) == 30.0
+
+
+def test_a_stalled_netbox_fails_once_rather_than_four_times_over(tmp_path):
+    """With `read` left at None a `--timeout 30` stall costs 120s per request.
+
+    The server here accepts the connection and never answers, which is what a
+    NetBox chewing on a slow query looks like from the client side.
+    """
+    import threading
+    import time as _time
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    seen = {"attempts": 0}
+
+    class Stalls(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802 - BaseHTTPRequestHandler's interface
+            seen["attempts"] += 1
+            _time.sleep(2)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Stalls)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        source = NetBoxSource(f"http://127.0.0.1:{server.server_port}", "t", timeout=0.3)
+        started = _time.monotonic()
+        with pytest.raises(ExportError):
+            list(source.records("dcim.device_types"))
+        elapsed = _time.monotonic() - started
+    finally:
+        server.shutdown()
+
+    assert seen["attempts"] == 1, f"the stalled read was retried {seen['attempts']} times"
+    assert elapsed < 2, f"took {elapsed:.1f}s; the read timeout was retried"
 
 
 def test_live_path_reports_an_unreachable_host(tmp_path):
