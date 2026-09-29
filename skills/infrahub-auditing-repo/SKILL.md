@@ -3,7 +3,7 @@ name: infrahub-auditing-repo
 description: >-
   Audits an Infrahub repository against best practices and rules, producing a structured compliance report.
   TRIGGER when: reviewing repo for compliance, onboarding to existing project, pre-deployment validation, catching issues.
-  DO NOT TRIGGER when: creating schemas, writing checks/generators, querying live data, populating objects.
+  DO NOT TRIGGER when: creating schemas, writing checks/generators, querying live data, populating objects, planning an Infrahub version upgrade (use infrahub-planning-upgrades).
 context: fork
 allowed-tools:
   - Read
