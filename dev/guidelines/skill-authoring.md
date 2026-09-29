@@ -131,11 +131,11 @@ needing it links there rather than restating the number.
 `scripts/check-cli-invocations.py` validates the
 `infrahubctl` invocations printed under `skills/`,
 `graders/`, `tests/`, `eval.yaml`,
-`.agents/skills/` and
+`.agents/skills/`, `docs/docs/` and
 most of `dev/`, against the tree pinned in
 `graders/common/cli_tree.py`. Its `SCAN_TARGETS` is the
-authority; `docs/`, `README.md` and `dev/specs/` are
-outside it. Beyond `infrahubctl` it checks only the
+authority; `README.md` and `dev/specs/` are outside
+it. Beyond `infrahubctl` it checks only the
 `--state` value on `gh search issues|prs`, so any other
 `gh` flag, a `curl`, or a REST path is only as good as
 the author who ran it. Run it, and say which version you ran

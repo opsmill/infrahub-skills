@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check every `infrahubctl ...` invocation printed anywhere in this repo.
+"""Check every `infrahubctl ...` and `gh search --state` invocation printed in this repo.
 
 A skill that prints a command which does not exist costs a reader a failed
 run and, worse, teaches them the command is unavailable. Two such defects
