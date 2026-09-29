@@ -55,8 +55,21 @@ READ_ONLY_INVOCATIONS = [
     ("infrahubctl", "schema", "check"),
     ("infrahubctl", "branch", "list"),
     ("infrahub", "db", "showmigrations"),
-    ("infrahub", "upgrade"),  # further narrowed below: only with --check
+    ("infrahub", "db", "migrate"),  # only with a flag below
+    ("infrahub", "upgrade"),  # only with a flag below
 ]
+
+# Commands that write unless one of these flags makes them report instead. Both
+# return before applying anything: `upgrade --check`, and `db migrate --check`
+# (every 1.x) or `--plan` (from 1.10.0), checked in backend/infrahub/cli/.
+READ_ONLY_FLAGS: dict[tuple[str, ...], set[str]] = {
+    ("infrahub", "upgrade"): {"--check"},
+    ("infrahub", "db", "migrate"): {"--check", "--plan"},
+}
+_PERMITTED = ", ".join(
+    " ".join(inv) + (" " + "|".join(sorted(READ_ONLY_FLAGS[inv])) if inv in READ_ONLY_FLAGS else "")
+    for inv in READ_ONLY_INVOCATIONS
+)
 
 # A CLI subcommand token. Prose that happens to open with the binary name
 # ("`infrahub GitHub releases, read 2026-09-26`" in a Source cell) is not an
@@ -148,7 +161,11 @@ _EV_PROBE = re.compile(
     r"\b(?:get_schema|query_graphql|get_nodes|search_nodes|showmigrations|(?i:grep)|rg)\b"
     + "".join(
         "|\\b" + r"\s+".join(re.escape(w) for w in inv)
-        + (r"\s+--check" if inv == ("infrahub", "upgrade") else "")
+        + (
+            r"\s+(?:" + "|".join(re.escape(f) for f in sorted(READ_ONLY_FLAGS[inv])) + ")"
+            if inv in READ_ONLY_FLAGS
+            else ""
+        )
         + "\\b"
         for inv in READ_ONLY_INVOCATIONS
     )
@@ -736,11 +753,16 @@ def check_no_mutating_commands(text: str) -> tuple[bool, str]:
                     f"'{shown}'{where} is not a real command — upgrade lives server-side in "
                     f"backend/infrahub/cli/upgrade.py, not in infrahubctl"
                 )
-        if path[:2] == ("infrahub", "upgrade") and "--check" not in flags:
-            return False, (
-                f"'{shown}'{where} without --check is an upgrade command handed to the user; "
-                f"the plan describes each hop, it does not give the upgrade command"
-            )
+        guarded = next((g for g in READ_ONLY_FLAGS if path[: len(g)] == g), None)
+        if guarded is not None:
+            if set(flags) & READ_ONLY_FLAGS[guarded]:
+                continue
+            if guarded == ("infrahub", "upgrade"):
+                return False, (
+                    f"'{shown}'{where} without --check is an upgrade command handed to the user; "
+                    f"the plan describes each hop, it does not give the upgrade command"
+                )
+            return False, f"'{shown}'{where} writes to Infrahub; the plan runs read-only probes only"
         if not fenced:
             write = next((w for w in WRITE_INVOCATIONS if path[: len(w)] == w), None)
             if (
@@ -757,8 +779,7 @@ def check_no_mutating_commands(text: str) -> tuple[bool, str]:
         if allowed is None:
             return False, (
                 f"'{shown}'{where} is not on the read-only probe allowlist "
-                f"(permitted: infrahubctl info, infrahubctl schema check, "
-                f"infrahub db showmigrations, infrahub upgrade --check)"
+                f"(permitted: {_PERMITTED})"
             )
     return True, f"all {len(invoked)} invocations are read-only probes"
 

@@ -39,6 +39,8 @@ user may paste into production.
    | `infrahubctl schema check` | anywhere the SDK is installed | whether schema files validate against the server, without loading them |
    | `infrahubctl branch list` | anywhere the SDK is installed | open branches |
    | `infrahub db showmigrations` | inside an Infrahub server container; **from 1.10.0** | current and target database versions, and each migration |
+   | `infrahub db migrate --check` | inside an Infrahub server container | whether migrations are pending; applies nothing |
+   | `infrahub db migrate --plan` | inside an Infrahub server container; **from 1.10.0** | the migration plan, without executing it |
    | `infrahub upgrade --check` | inside an Infrahub server container | from 1.10.0: each pending migration, whether the core schema changes, which branches need a rebase. Before 1.10.0: one line with the graph-version gap and the pending count. Writes nothing either way |
 
    `infrahub db showmigrations` does not exist before

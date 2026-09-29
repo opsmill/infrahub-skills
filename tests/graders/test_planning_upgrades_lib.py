@@ -657,3 +657,25 @@ def test_title_does_not_hide_a_skipped_minor():
     text = f"# Plan\n\n## Upgrade plan: 1.8.2 to 1.10.0\n\n## 1.8 -> 1.10\n\n{_HEADER}{_ROW_YES.format(affected='yes')}\n"
     ok, _ = check_sequential_hops(text, source="1.8", target="1.10")
     assert not ok
+
+
+# `infrahub db migrate --check` and `--plan` report without applying; plain
+# `infrahub db migrate` applies.
+
+
+@pytest.mark.parametrize("flag", ["--check", "--plan"])
+def test_db_migrate_report_flags_are_probes(flag):
+    for body in (f"Then `infrahub db migrate {flag}` lists what is pending.\n", f"```bash\ninfrahub db migrate {flag}\n```\n"):
+        ok, msg = check_no_mutating_commands(_hop(body))
+        assert ok, msg
+
+
+def test_db_migrate_without_a_report_flag_fails():
+    for body in ("Then run `infrahub db migrate`.\n", "```bash\ninfrahub db migrate\n```\n"):
+        ok, _ = check_no_mutating_commands(_hop(body))
+        assert not ok
+
+
+def test_db_migrate_plan_resolves_an_unknown():
+    ok, msg = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action="Run infrahub db migrate --plan in the target image")))
+    assert ok, msg
