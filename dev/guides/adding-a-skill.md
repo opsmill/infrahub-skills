@@ -341,11 +341,12 @@ Review results with `skillgrade preview`.
 - [ ] `graders/my-skill/` with grader scripts
 - [ ] `python scripts/sync-evals.py` run and the
   regenerated `evaluations/*.json` committed
-- [ ] `CLAUDE.md` updated with the new skill
-- [ ] `README.md` updated (skills section + project
-  structure)
-- [ ] `AGENTS.md` quick reference table updated
+- [ ] Every surface in
+  [../guidelines/skill-registration.md](../guidelines/skill-registration.md)
+  wired, with the reference page in the shape it gives
   (see [Step 7](#7-register-in-documentation))
+- [ ] `uv run invoke lint` and `npm run build` in
+  `docs/` both pass
 - [ ] News fragment added under `changelog/`
 - [ ] PR labeled with `changes/*` so the version bump
   is calculated correctly

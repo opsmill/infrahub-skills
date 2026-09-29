@@ -117,6 +117,18 @@ Then branch on `Defect class`:
 The handoff's `Do NOT` list names artifacts the minimum-change rung already
 ruled out. Treat it as binding, not as a suggestion to reconsider.
 
+## Registration
+
+Only when the change adds a new skill: wire every surface listed in
+[`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md),
+and write the skills-reference page in the shape that file gives. Link the
+table rather than restating it here; a second copy is the exact drift the
+guideline warns about. It comes before Verify so that `uv run invoke lint`
+and the docs build there run against the wired surfaces: lint fails a skill
+missing from any surface it checks, and the scenarios and pair tables are
+yours to judge.
+The report names each surface and what was added to it.
+
 ## Verify
 
 Run every gate, each with its command:
@@ -184,16 +196,6 @@ having written nothing: a reader trusts a stale page and search finds it.
 § "When behavior changes" lists what goes stale and when. A `Docs impact` of
 `none` needs no edit, and the report says so rather than passing over it in
 silence.
-
-## Registration
-
-Only when the change adds a new skill: wire every surface listed in
-[`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md),
-and write the skills-reference page in the shape that file gives. Link the
-table rather than restating it here; a second copy is the exact drift the
-guideline warns about. `uv run invoke lint` in Verify fails a skill missing
-from any surface it checks; the scenarios and pair tables are yours to judge.
-The report names each surface and what was added to it.
 
 ## Changelog
 

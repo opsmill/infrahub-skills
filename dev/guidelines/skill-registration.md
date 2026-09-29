@@ -14,7 +14,10 @@ A new skill has to appear on every surface below. A
 skill missing from one ships invisible to whichever
 audience reads that surface, and readers pick a skill
 from the router and the front page, not from its
-`description`.
+`description`. A skill with `user-invocable: false` in
+its frontmatter, like `infrahub-common`, is exempt: it
+goes on none of these surfaces and is left out of the
+router's count.
 
 `README.md` is one of those surfaces but not a trigger:
 a bare `README.md` glob would match every nested README
@@ -86,6 +89,7 @@ Check these, in this order:
 | `AGENTS.md` | The one-line description changed |
 | `README.md` | The description changed, or the skill gained or lost files in the Project Structure tree |
 | `docs/docs/readme.mdx` | The description changed |
+| `docs/docs/choosing-a-skill.mdx` | What the skill starts from or produces changed (its row), or a new skill is easy to confuse with it (a pair table, plus "Not sure this is the right skill?" on both pages) |
 | `dev/guides/`, `dev/knowledges/`, `dev/guidelines/` | A page documents the behavior being changed |
 
 Find them rather than recalling them. Grep the old
