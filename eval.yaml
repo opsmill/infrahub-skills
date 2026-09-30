@@ -3601,18 +3601,6 @@ tasks:
       This repository runs on Infrahub 1.11.1. Audit the registrations
       below against how Infrahub decides what to regenerate.
 
-      Emit one finding per defective registration entry, shaped:
-
-      {"findings": [{"rule": "...", "severity": "MEDIUM|LOW",
-                     "file": ".infrahub.yml",
-                     "entry": "<registered file_path or template_path
-                                of the entry the finding is about>",
-                     "description": "...", "fix": "..."}]}
-
-      `entry` is what the finding is against, so name only entries you are
-      actually flagging. Emit no finding for an entry that is already
-      correct.
-
       Repository layout:
 
       ```text
