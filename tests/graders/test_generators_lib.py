@@ -1093,3 +1093,55 @@ def test_counting_hops_is_not_reading_their_labels(tmp_path):
     )
     ok, _ = _check("path-hop-shape", _answer(tmp_path, python=src))
     assert not ok
+
+
+
+# -- gen-watch-no-third-party ---------------------------------------------
+#
+# Same fixtures as the transforms copy in test_transforms_lib.py: the two
+# checks are duplicated per skill and must agree.
+
+check_gen_watch_no_third_party = _mod.check_gen_watch_no_third_party
+
+
+def _gen_manifest(watch):
+    entry = {"name": "generate_fabric", "file_path": "generators/generate_fabric.py"}
+    if watch is not None:
+        entry["watch"] = watch
+    return {"generator_definitions": [entry]}
+
+
+@pytest.mark.parametrize(
+    "watch",
+    [
+        {"files": ["generators/fabric_generator_query.py"]},
+        {"files": ["src/httpx_helpers.py"]},
+        {"files": ["src/pydantic_models/"]},
+        {"files": ["lib/infrahub_sdk_helpers.py"]},
+        {"files": ["src/pydantic/models.py"]},
+        {"files": ["lib/"]},
+        {"files": []},
+        None,
+    ],
+    ids=repr,
+)
+def test_gen_watch_no_third_party_leaves_first_party_paths_alone(watch):
+    ok, detail = check_gen_watch_no_third_party(_gen_manifest(watch))
+    assert ok is True, detail
+
+
+@pytest.mark.parametrize(
+    "watch",
+    [
+        {"files": ["infrahub_sdk"]},
+        {"files": ["netutils"]},
+        {"files": ["INFRAHUB_SDK"]},
+        {"files": ["pydantic/main.py"]},
+        {"files": [".venv/lib/python3.12/site-packages/httpx/"]},
+        ["infrahub_sdk"],
+    ],
+    ids=repr,
+)
+def test_gen_watch_no_third_party_catches_installed_packages(watch):
+    ok, _ = check_gen_watch_no_third_party(_gen_manifest(watch))
+    assert ok is False

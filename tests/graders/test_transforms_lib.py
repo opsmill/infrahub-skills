@@ -4,6 +4,8 @@ import ast
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _LIB_PATH = _REPO_ROOT / "graders" / "managing-transforms" / "lib.py"
@@ -761,4 +763,51 @@ def test_watch_no_third_party_sees_through_the_bare_list_form():
     # watch_files() returns None for the bare-list form Infrahub rejects at
     # import, so a check reading it would let this through unexamined.
     ok, _ = check_watch_no_third_party(yml_doc=_manifest(["infrahub_sdk"]))
+    assert ok is False
+
+
+# Paths the third-party check must leave alone: first-party files and
+# directories whose names merely contain a package name, a top-level
+# directory (canonicalized to a bare name), and entries with nothing
+# declared at all.
+_FIRST_PARTY_WATCH = [
+    {"files": ["src/httpx_helpers.py"]},
+    {"files": ["transforms/pydantic_schema.py"]},
+    {"files": ["src/pydantic_models/"]},
+    {"files": ["lib/infrahub_sdk_helpers.py"]},
+    {"files": ["src/pydantic/models.py"]},
+    {"files": ["lib/"]},
+    {"files": []},
+    None,
+]
+
+# Installed packages, including the one only the audit copy listed, an
+# upper-cased name, and a package reached as a path.
+_INSTALLED_WATCH = [
+    {"files": ["netutils"]},
+    {"files": ["INFRAHUB_SDK"]},
+    {"files": ["pydantic/main.py"]},
+    {"files": [".venv/lib/python3.12/site-packages/httpx/"]},
+]
+
+
+def _manifest_or_bare(watch):
+    if watch is None:
+        return {
+            "python_transforms": [
+                {"name": "device_config", "file_path": "transforms/device_config.py"}
+            ]
+        }
+    return _manifest(watch)
+
+
+@pytest.mark.parametrize("watch", _FIRST_PARTY_WATCH, ids=repr)
+def test_watch_no_third_party_leaves_first_party_paths_alone(watch):
+    ok, detail = check_watch_no_third_party(yml_doc=_manifest_or_bare(watch))
+    assert ok is True, detail
+
+
+@pytest.mark.parametrize("watch", _INSTALLED_WATCH, ids=repr)
+def test_watch_no_third_party_catches_installed_packages(watch):
+    ok, _ = check_watch_no_third_party(yml_doc=_manifest(watch))
     assert ok is False
