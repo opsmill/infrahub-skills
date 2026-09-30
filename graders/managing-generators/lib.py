@@ -1343,12 +1343,36 @@ def check_gen_watch_declares_shared_package(output: dict) -> tuple[bool, str]:
     )
 
 
+# Kept in step with the copies in graders/managing-transforms/lib.py and
+# graders/auditing-repo/lib.py.
+_INSTALLED_PACKAGES = ("infrahub_sdk", "site-packages", "pydantic", "httpx", "netutils")
+
+
+def names_installed_package(path: str) -> bool:
+    """True if a watch path points at an installed package, not a repo file.
+
+    A package is the path's first segment (``pydantic``, ``pydantic/main.py``,
+    ``infrahub_sdk.py``) or anything under ``site-packages``. A first-party
+    path that merely contains a package name does not count.
+    """
+    segments = [s for s in canonical_watch_path(path).lower().split("/") if s]
+    if not segments:
+        return False
+    if "site-packages" in segments:
+        return True
+    return segments[0].removesuffix(".py") in _INSTALLED_PACKAGES
+
+
 def check_gen_watch_no_third_party(output: dict) -> tuple[bool, str]:
-    """Installed packages are not tracked repo files and never belong in watch."""
-    third_party = ("infrahub_sdk", "site-packages", "pydantic", "httpx")
+    """Installed packages are not tracked repo files and never belong in watch.
+
+    Matched on whole path segments, so ``src/httpx_helpers.py`` is a
+    repository file, not ``httpx``. Packages missing from the list pass;
+    that is a known limit of matching on a list.
+    """
     for entry in _generator_entries(output):
         for path in declared_watch_paths(entry):
-            if any(token in path for token in third_party):
+            if names_installed_package(path):
                 return False, (
                     f"{entry.get('name', '<unnamed>')}: watch names an installed "
                     f"dependency ({path}), which is not a tracked repository file"

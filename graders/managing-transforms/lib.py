@@ -1096,6 +1096,26 @@ def check_watch_declares_dynamic_jinja2_partials(
     )
 
 
+# Kept in step with the copies in graders/managing-generators/lib.py and
+# graders/auditing-repo/lib.py.
+_INSTALLED_PACKAGES = ("infrahub_sdk", "site-packages", "pydantic", "httpx", "netutils")
+
+
+def names_installed_package(path: str) -> bool:
+    """True if a watch path points at an installed package, not a repo file.
+
+    A package is the path's first segment (``pydantic``, ``pydantic/main.py``,
+    ``infrahub_sdk.py``) or anything under ``site-packages``. A first-party
+    path that merely contains a package name does not count.
+    """
+    segments = [s for s in canonical_watch_path(path).lower().split("/") if s]
+    if not segments:
+        return False
+    if "site-packages" in segments:
+        return True
+    return segments[0].removesuffix(".py") in _INSTALLED_PACKAGES
+
+
 def check_watch_no_third_party(
     yml_doc: dict | None = None, **_: Any
 ) -> tuple[bool, str]:
@@ -1105,13 +1125,16 @@ def check_watch_no_third_party(
     "installed dependencies, not tracked" — and the generators task already
     grades it. Without the mirror here, a manifest declaring
     ``infrahub_sdk`` alongside a real path scores a clean sheet.
+
+    Matched on whole path segments, so ``src/httpx_helpers.py`` is a
+    repository file, not ``httpx``. Packages missing from the list pass;
+    that is a known limit of matching on a list.
     """
-    third_party = ("infrahub_sdk", "site-packages", "pydantic", "httpx")
     doc = yml_doc or {}
     for section in _WATCH_SECTIONS:
         for entry in _entries(doc, section):
             for path in declared_watch_paths(entry):
-                if any(token in path for token in third_party):
+                if names_installed_package(path):
                     return False, (
                         f"{section}/{entry.get('name', '<unnamed>')}: watch names an "
                         f"installed dependency ({path}), which is not a tracked "

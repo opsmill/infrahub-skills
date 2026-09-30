@@ -194,14 +194,20 @@ def check_yagni_replacement_target(
 def check_yagni_finding_severity(
     findings: list[dict], rule: str, expected: str
 ) -> tuple[bool, str]:
-    """Assert the named rule's finding carries the expected severity."""
-    f = _find(findings, rule)
-    if f is None:
+    """Assert every finding for the named rule carries the expected severity.
+
+    Every finding, not the first: a rule that emits one finding per
+    defective entry would otherwise pass with its second finding at
+    CRITICAL.
+    """
+    matching = _find_all(findings, rule)
+    if not matching:
         return False, f"{rule} missing — cannot check severity"
-    actual = f.get("severity", "<missing>")
-    if str(actual).upper() == expected.upper():
-        return True, f"{rule} severity={actual}"
-    return False, f"{rule} severity={actual}, expected {expected}"
+    actual = [str(f.get("severity", "<missing>")) for f in matching]
+    wrong = [s for s in actual if s.upper() != expected.upper()]
+    if not wrong:
+        return True, f"{rule} severity={', '.join(actual)}"
+    return False, f"{rule} severity={', '.join(actual)}, expected {expected} on every finding"
 
 
 def check_yagni_finding_ladder_step(
@@ -1094,11 +1100,6 @@ def _findings_for(findings: list[dict], rule: str) -> list[dict]:
     return [f for f in findings if isinstance(f, dict) and f.get("rule") == rule]
 
 
-def _finding_files(findings: list[dict], rule: str) -> list[str]:
-    """Every ``file`` value attributed to the named rule, lowercased."""
-    return [str(f.get("file", "")).lower() for f in _findings_for(findings, rule)]
-
-
 # Fields that identify *which* definition a finding is about. A watch defect
 # lives in the `.infrahub.yml` registration, so citing `.infrahub.yml` as the
 # file is correct and common; the entry is then named in one of these instead.
@@ -1107,8 +1108,35 @@ _IDENTITY_FIELDS = (
 )
 
 
-def _identity_blob(finding: dict) -> str:
-    return " ".join(str(finding.get(k, "")) for k in _IDENTITY_FIELDS).lower()
+_PATH_TOKEN = re.compile(r"[\w./-]+")
+
+
+def _identifies(finding: dict, needle: str) -> bool:
+    """True if an identity field names the definition ``needle``.
+
+    Whole tokens, not substrings: ``device_config_artifact`` is a different
+    entry from ``device_config``. A token names the definition when it is the
+    registered path, the entry name (the path's last segment without its
+    extension), or a path whose last segment is that name.
+    """
+    needle = needle.lower()
+    stem = needle.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+    for key in _IDENTITY_FIELDS:
+        for token in _PATH_TOKEN.findall(str(finding.get(key, "")).lower()):
+            token = token.removeprefix("./").strip("/.")
+            if token in (needle, stem):
+                return True
+            if token.rsplit("/", 1)[-1].rsplit(".", 1)[0] == stem:
+                return True
+    return False
+
+
+def _entries_named(findings: list[dict], rule: str) -> list[str]:
+    """What each finding for ``rule`` says it is about, for failure messages."""
+    return [
+        str(f.get("entry") or f.get("name") or f.get("file") or "<unidentified>")
+        for f in _findings_for(findings, rule)
+    ]
 
 
 def check_watch_flags_entry(
@@ -1133,14 +1161,13 @@ def check_watch_flags_entry(
     matching = _findings_for(findings, rule)
     if not matching:
         return False, f"no {rule} finding emitted at all"
-    stem = needle.lower().rsplit("/", 1)[-1].rsplit(".", 1)[0]
     for f in matching:
-        blob = _identity_blob(f)
-        if needle.lower() in blob or (stem and stem in blob):
+        if _identifies(f, needle):
             return True, f"{rule} flags {needle}"
+    stem = needle.lower().rsplit("/", 1)[-1].rsplit(".", 1)[0]
     return False, (
         f"{rule} does not flag {needle} (nor the entry name {stem!r}) in any "
-        f"identity field; files flagged: {_finding_files(findings, rule)}"
+        f"identity field; findings are about: {_entries_named(findings, rule)}"
     )
 
 
@@ -1158,14 +1185,12 @@ def check_watch_does_not_flag_entry(
     interface_names, which declares files: [] correctly", and that sentence
     must not read as a finding against interface_names.
     """
-    stem = needle.lower().rsplit("/", 1)[-1].rsplit(".", 1)[0]
     offenders = []
     for f in _findings_for(findings, rule):
-        blob = _identity_blob(f)
         # `.infrahub.yml` alone identifies no single entry, so it is only an
         # offender when the entry itself is named in an identity field.
-        if needle.lower() in blob or (stem and stem in blob):
-            offenders.append(f.get("file", "<no-file>"))
+        if _identifies(f, needle):
+            offenders.append(f.get("entry") or f.get("file", "<no-file>"))
     if offenders:
         return False, f"{rule} wrongly flags {needle}: {offenders}"
     return True, f"{rule} leaves {needle} alone"
@@ -1206,16 +1231,34 @@ def check_watch_no_third_party_in_fix(findings: list[dict], rule: str) -> tuple[
     Installed dependencies are not tracked repository files, so naming one
     produces an entry that matches nothing while still counting as a
     declaration.
+
+    The fix is prose, so each path-like token in it is judged the way the
+    transforms and generators graders judge a watch path: by whole segment,
+    so ``src/httpx_helpers.py`` is a repository file, not ``httpx``.
     """
-    third_party = ("infrahub_sdk", "site-packages", "pydantic", "httpx", "netutils")
     for f in _findings_for(findings, rule):
         blob = " ".join(
             str(f.get(k, "")) for k in ("fix", "replacement", "suggestion")
         ).lower()
-        hit = next((t for t in third_party if t in blob), None)
+        hit = next((t for t in _PATH_TOKEN.findall(blob) if _names_installed_package(t)), None)
         if hit:
             return False, f"{rule} proposes watching an installed package ({hit})"
     return True, "no proposed watch list names an installed package"
+
+
+# Kept in step with the copies in graders/managing-transforms/lib.py and
+# graders/managing-generators/lib.py.
+_INSTALLED_PACKAGES = ("infrahub_sdk", "site-packages", "pydantic", "httpx", "netutils")
+
+
+def _names_installed_package(path: str) -> bool:
+    """True if a path's first segment, or any ``site-packages`` segment, is a package."""
+    segments = [s for s in path.lower().removeprefix("./").split("/") if s]
+    if not segments:
+        return False
+    if "site-packages" in segments:
+        return True
+    return segments[0].removesuffix(".py") in _INSTALLED_PACKAGES
 
 
 # ---------------------------------------------------------------------------
