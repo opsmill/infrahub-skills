@@ -1116,17 +1116,17 @@ def _identifies(finding: dict, needle: str) -> bool:
 
     Whole tokens, not substrings: ``device_config_artifact`` is a different
     entry from ``device_config``. A token names the definition when it is the
-    registered path, the entry name (the path's last segment without its
-    extension), or a path whose last segment is that name.
+    registered path, or when one of its ``/``- or ``.``-separated segments is
+    the entry name (the path's last segment without its extension), which
+    covers ``transforms/device_config.py`` and
+    ``python_transforms.device_config`` alike.
     """
     needle = needle.lower()
     stem = needle.rsplit("/", 1)[-1].rsplit(".", 1)[0]
     for key in _IDENTITY_FIELDS:
         for token in _PATH_TOKEN.findall(str(finding.get(key, "")).lower()):
             token = token.removeprefix("./").strip("/.")
-            if token in (needle, stem):
-                return True
-            if token.rsplit("/", 1)[-1].rsplit(".", 1)[0] == stem:
+            if token == needle or stem in re.split(r"[/.]", token):
                 return True
     return False
 

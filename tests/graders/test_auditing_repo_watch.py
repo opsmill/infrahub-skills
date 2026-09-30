@@ -85,8 +85,10 @@ def test_negative_control_still_ignores_a_passing_mention_in_prose():
         {"rule": RULE, "file": ".infrahub.yml", "name": "device_config"},
         {"rule": RULE, "file": DEVICE_CONFIG},
         {"rule": RULE, "file": ".infrahub.yml", "entry": "device_config"},
+        # Seen in a live trial: section-qualified with a dot.
+        {"rule": RULE, "file": ".infrahub.yml", "entry": "python_transforms.device_config"},
     ],
-    ids=["name-only", "file-only", "entry-stem"],
+    ids=["name-only", "file-only", "entry-stem", "section-dotted"],
 )
 def test_flags_entry_named_another_way(finding):
     ok, detail = check_watch_flags_entry([finding], RULE, DEVICE_CONFIG)
@@ -99,6 +101,18 @@ def test_neighbouring_entry_sharing_a_prefix_does_not_flag_it():
     # transform.
     findings = [
         {"rule": RULE, "file": ".infrahub.yml", "entry": "device_config_artifact"}
+    ]
+    ok, _ = check_watch_flags_entry(findings, RULE, DEVICE_CONFIG)
+    assert ok is False
+
+
+def test_section_qualified_neighbour_does_not_flag_it():
+    findings = [
+        {
+            "rule": RULE,
+            "file": ".infrahub.yml",
+            "entry": "artifact_definitions.device_config_artifact",
+        }
     ]
     ok, _ = check_watch_flags_entry(findings, RULE, DEVICE_CONFIG)
     assert ok is False
