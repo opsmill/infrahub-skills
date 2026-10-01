@@ -316,8 +316,8 @@ tasks:
         AccessPointMenu or ControllerMenu, and keeps SitesMenu, BuildingMenu,
         SwitchingMenu and SwitchMenu
       - >-
-        notes.md does not delete the four dropped file items by hand; the git
-        sync removes them
+        notes.md pushes the change and does not delete the four dropped file
+        items by hand; the git sync removes them
       - >-
         notes.md deletes LabMenu explicitly, since it was loaded outside the
         sync and no sync or menu load removes it
@@ -342,8 +342,9 @@ tasks:
           notes.md deletes Campus/LabMenu by [namespace, name] HFID, through
           GraphQL CoreMenuItemDelete (a graphql or untagged fence, a JSON
           request body, or a curl payload) or infrahubctl object delete
-          CoreMenuItem, deletes none of the four items the sync removes, no
-          kept item, and no Builtin item
+          CoreMenuItem, runs a git push so the sync happens at all, deletes
+          none of the four items the sync removes, no kept item, and no
+          Builtin item
 
   # --- Schema Creator --- #
   - name: vlan-management

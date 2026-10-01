@@ -85,7 +85,8 @@ counts as removing the old item and adding a new one.
 
 | File loaded by | Items dropped from the file | Do |
 | -------------- | --------------------------- | -- |
-| Git sync of a `menus:` entry in `.infrahub.yml` (Infrahub 1.3+) | Deleted by the next sync | Commit and push. Do not delete them by hand. |
+| A `CoreRepository` syncing a `menus:` entry in `.infrahub.yml` (Infrahub 1.3+) | Deleted by the next sync | Commit and push. Do not delete them by hand. |
+| A `CoreReadOnlyRepository` (Infrahub 1.3+) | Stay until it re-imports; a push alone does not trigger that | Push, then update the repository's `commit` (or `ref`) so it re-imports and deletes them |
 | `infrahubctl menu load` | Stay on the instance; the load only creates and updates, and still succeeds | Delete each one |
 
 A sync removes only items it loaded itself. An item

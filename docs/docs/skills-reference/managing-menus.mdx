@@ -63,4 +63,4 @@ The load creates and updates entries but never deletes one. An entry you take ou
 infrahubctl object delete CoreMenuItem <namespace>/<name> --yes
 ```
 
-A menu file registered under `menus:` in a git-synced repository is different: from Infrahub 1.3, the next sync deletes the entries it loaded before and no longer finds.
+A menu file registered under `menus:` in a git-synced repository is different: from Infrahub 1.3, the next sync deletes the entries it loaded before and no longer finds. A read-only repository syncs only when its `commit` or `ref` is updated, not on push.

@@ -1804,9 +1804,10 @@ class TestRemoveSyncedItemsTask:
             f"infrahubctl object delete CoreMenuItem <{name}-id>\n"
             for name in ("AccessPointMenu", "ControllerMenu", "WirelessMenu", "FloorMenu", "LabMenu")
         )
-        ok, msg = self._deleted(f"```bash\n{lines}```\n")
+        ok, msg = self._deleted(f"```bash\ngit push origin main\n{lines}```\n")
         assert not ok
-        assert "5 deletes by an identifier" in msg
+        assert "the git sync removes on its own" in msg
+        assert "[Campus, WirelessMenu]" in msg
 
     def test_id_deletes_of_synced_items_beside_an_hfid_lab_delete_fail(self):
         lines = "".join(
@@ -1814,9 +1815,123 @@ class TestRemoveSyncedItemsTask:
             for name in ("AccessPointMenu", "ControllerMenu", "WirelessMenu", "FloorMenu")
         )
         lines += "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n"
-        ok, msg = self._deleted(f"```bash\n{lines}```\n")
+        ok, msg = self._deleted(f"```bash\ngit push origin main\n{lines}```\n")
         assert not ok
-        assert "only 0 item(s) outside the sync" in msg
+        assert "the git sync removes on its own" in msg
+        assert "[Campus, LabMenu]" not in msg
+
+    def test_shell_variable_hfid_is_not_a_resolved_delete(self):
+        """A loop over ``Campus/$n`` hand-deletes synced items the grader cannot name."""
+        notes = """\
+```bash
+git push origin main
+for n in FloorMenu WirelessMenu; do infrahubctl object delete CoreMenuItem "Campus/$n" --yes; done
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, FloorMenu], [Campus, WirelessMenu]" in msg
+
+    def test_unexpanded_variable_beyond_the_needed_deletes_fails(self):
+        notes = """\
+```bash
+git push origin main
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+infrahubctl object delete CoreMenuItem "Campus/$ITEM" --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "Campus/$ITEM" in msg
+
+    def test_placeholder_never_satisfies_the_required_delete(self):
+        for target in ("Campus/<LabMenu>", "Campus/{}", "<ns>/LabMenu"):
+            notes = (
+                "```bash\ngit push origin main\n"
+                f"infrahubctl object delete CoreMenuItem {target} --yes\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert not ok, target
+            assert "[Campus, LabMenu]" in msg, target
+
+    def test_placeholder_naming_a_synced_item_counts_as_deleting_it(self):
+        notes = (
+            "```bash\ngit push origin main\n"
+            "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n"
+            "infrahubctl object delete CoreMenuItem Campus/<FloorMenu> --yes\n```\n"
+        )
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, FloorMenu]" in msg
+
+    def test_placeholder_for_unknown_children_is_ignored(self):
+        """The trial shape: delete Lab, plus a template for any children it has."""
+        notes = """\
+```bash
+git push origin main
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+# only if Lab had entries nested under it:
+infrahubctl object delete CoreMenuItem Campus/<ChildName> --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_reload_instead_of_push_fails(self):
+        """A menu load runs no sync, so the dropped file items stay."""
+        notes = """\
+```bash
+infrahubctl menu load output.yml
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git push" in msg
+
+    def test_push_inside_a_chained_command_counts(self):
+        notes = """\
+```bash
+git add menus/campus.yml && git -C . commit -m "Retire wireless" && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_indented_fences_under_a_numbered_list_count(self):
+        notes = """\
+1. Push the change:
+
+   ```bash
+   git push origin main
+   ```
+
+2. Delete the hand-loaded entry:
+
+   ```bash
+   infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+   ```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_shorter_backtick_run_does_not_close_a_longer_fence(self):
+        notes = """\
+````markdown
+```bash
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+```
+````
+
+```bash
+git push origin main
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
 
     def test_task_script_scores_four_fixtures(self, tmp_path):
         """The task grader scores the four fixtures 1.0 / 1.0 / <1.0 / <1.0."""

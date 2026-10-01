@@ -164,7 +164,7 @@
       "expectations": [
         "File starts with apiVersion: infrahub.app/v1 and kind: Menu",
         "The menu file no longer contains FloorMenu, WirelessMenu, AccessPointMenu or ControllerMenu, and keeps SitesMenu, BuildingMenu, SwitchingMenu and SwitchMenu",
-        "notes.md does not delete the four dropped file items by hand; the git sync removes them",
+        "notes.md pushes the change and does not delete the four dropped file items by hand; the git sync removes them",
         "notes.md deletes LabMenu explicitly, since it was loaded outside the sync and no sync or menu load removes it",
         "No step deletes a protected Builtin menu item"
       ],
@@ -187,7 +187,7 @@
         },
         {
           "name": "removed-items-deleted",
-          "check": "notes.md deletes Campus/LabMenu by [namespace, name] HFID, through GraphQL CoreMenuItemDelete (a graphql or untagged fence, a JSON request body, or a curl payload) or infrahubctl object delete CoreMenuItem, deletes none of the four items the sync removes, no kept item, and no Builtin item"
+          "check": "notes.md deletes Campus/LabMenu by [namespace, name] HFID, through GraphQL CoreMenuItemDelete (a graphql or untagged fence, a JSON request body, or a curl payload) or infrahubctl object delete CoreMenuItem, runs a git push so the sync happens at all, deletes none of the four items the sync removes, no kept item, and no Builtin item"
         }
       ]
     }

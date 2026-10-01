@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import re
 import shlex
+import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -598,7 +599,13 @@ def check_parent_attaches_to_builtin(doc: dict, **_: Any) -> tuple[bool, str]:
 # resolved to ``[namespace, name]`` HFIDs, against the items the task removed.
 # ---------------------------------------------------------------------------
 
-_FENCE_RE = re.compile(r"^```[ \t]*([\w+-]*)[^\n]*\n(.*?)^```[ \t]*$", re.MULTILINE | re.DOTALL)
+# A fence may be indented (under a list item, say); the closer repeats the
+# opener's backticks or tildes, so a shorter run inside the body cannot end it.
+_FENCE_RE = re.compile(
+    r"^[ \t]*(?P<fence>`{3,}|~{3,})[ \t]*(?P<lang>[\w+-]*)[^\n]*\n"
+    r"(?P<body>.*?)^[ \t]*(?P=fence)[ \t]*$",
+    re.MULTILINE | re.DOTALL,
+)
 
 _GQL_TOKEN_RE = re.compile(
     r'"""(?:.|\n)*?"""'           # block string
@@ -618,7 +625,10 @@ _GRAPHQL_LANGS = frozenset({"graphql", "gql"})
 
 def _fences(text: str) -> list[tuple[str, str]]:
     """Every fenced block in document order, as ``(language, body)``."""
-    return [(m.group(1).lower(), m.group(2)) for m in _FENCE_RE.finditer(text or "")]
+    return [
+        (m.group("lang").lower(), textwrap.dedent(m.group("body")))
+        for m in _FENCE_RE.finditer(text or "")
+    ]
 
 
 def _gql_tokens(source: str) -> list[str]:
@@ -792,7 +802,7 @@ _CURL_DATA_FLAGS = frozenset({"-d", "--data", "--data-raw", "--data-binary", "--
 def _shell_commands(body: str) -> list[list[str]]:
     """Each command line of a shell fence, split with ``shlex``, prompts dropped."""
     commands: list[list[str]] = []
-    for line in body.replace("\\\n", " ").splitlines():
+    for line in _expand_for_loops(body.replace("\\\n", " ")).splitlines():
         try:
             words = shlex.split(line, comments=True)
         except ValueError:
@@ -847,17 +857,92 @@ def _graphql_documents(text: str) -> list[tuple[int, str, dict, bool]]:
     return documents
 
 
+_TEMPLATE_CHARS = frozenset("<>{}")
+
+Hfid = tuple[str, str]
+
+
+def _classify_target(identifier: str, known_ids: frozenset[Hfid]) -> tuple[str, list[Hfid]]:
+    """Sort a delete target into ``hfid``, ``template`` or ``unresolved``.
+
+    - ``hfid``: two literal parts, the one form that names an item.
+    - ``template``: a ``<placeholder>`` or ``{}``. It names no item the grader
+      can confirm, so it never satisfies a required delete; but one that spells
+      a known item's name (``<WirelessMenu-id>``) still counts as deleting it.
+      A placeholder naming nothing known (``Campus/<ChildName>``) is ignored.
+    - ``unresolved``: a ``$variable`` left after loop expansion, a UUID, or a
+      one-part name. The grader cannot tell what it deletes.
+    """
+    if "$" in identifier:
+        return "unresolved", []
+    if _TEMPLATE_CHARS & set(identifier):
+        return "template", sorted(h for h in known_ids if h[1] in identifier)
+    parts = identifier.split("/")
+    if len(parts) == 2 and all(parts):
+        return "hfid", [(parts[0], parts[1])]
+    return "unresolved", []
+
+
+_FOR_LOOP_RE = re.compile(
+    r"\bfor[ \t]+(?P<var>\w+)[ \t]+in[ \t]+(?P<values>[^;\n]*?)[ \t]*[;\n]\s*do\b"
+    r"(?P<body>.*?)[;\n]\s*done\b",
+    re.DOTALL,
+)
+
+
+def _expand_for_loops(body: str) -> str:
+    """Unroll ``for VAR in a b; do ... $VAR ...; done`` into one command per value."""
+
+    def unroll(match: re.Match) -> str:
+        var = match.group("var")
+        try:
+            values = shlex.split(match.group("values"))
+        except ValueError:
+            return match.group(0)
+        loop_body = match.group("body").strip()
+        return "\n".join(
+            re.sub(rf"\$\{{{var}\}}|\${var}\b", value, loop_body) for value in values
+        )
+
+    return _FOR_LOOP_RE.sub(unroll, body)
+
+
+def _git_pushes(text: str) -> bool:
+    """Whether a shell or untagged fence runs ``git ... push``."""
+    separators = {"&&", "||", ";", "|"}
+    for lang, body in _fences(text):
+        if lang not in _SHELL_LANGS and lang != "":
+            continue
+        for words in _shell_commands(body):
+            for pos, word in enumerate(words):
+                if Path(word).name != "git":
+                    continue
+                for arg in words[pos + 1 :]:
+                    if arg in separators:
+                        break
+                    if arg.rstrip(";") == "push":
+                        return True
+                    if arg.endswith(";"):
+                        break
+    return False
+
+
 _CTL_VALUE_OPTIONS = frozenset({"--branch", "-b", "--config-file"})
 
 
-def _ctl_object_deletes(text: str) -> tuple[list[tuple[int, tuple[str, str]]], list[str]]:
+def _ctl_object_deletes(
+    text: str, known_ids: frozenset[Hfid] = frozenset()
+) -> tuple[list[tuple[int, Hfid]], list[str], list[tuple[int, Hfid]]]:
     """``infrahubctl object delete CoreMenuItem <namespace>/<name>`` in shell fences.
 
     ``object delete`` (SDK 1.20.0+) takes the kind and an identifier, and
-    resolves an identifier written with ``/`` as a multi-part HFID.
+    resolves an identifier written with ``/`` as a multi-part HFID. Returns
+    ``(deletes, unresolved, template_hits)``, as classified by
+    ``_classify_target``.
     """
-    deletes: list[tuple[int, tuple[str, str]]] = []
+    deletes: list[tuple[int, Hfid]] = []
     unresolved: list[str] = []
+    template_hits: list[tuple[int, Hfid]] = []
     for index, (lang, body) in enumerate(_fences(text)):
         if lang not in _SHELL_LANGS and lang != "":
             continue
@@ -874,25 +959,30 @@ def _ctl_object_deletes(text: str) -> tuple[list[tuple[int, tuple[str, str]]], l
                         positional.append(arg)
                 if len(positional) < 2 or positional[0] != "CoreMenuItem":
                     continue
-                parts = positional[1].split("/")
-                if len(parts) == 2 and all(parts):
-                    deletes.append((index, (parts[0], parts[1])))
+                kind, hfids = _classify_target(positional[1], known_ids)
+                if kind == "hfid":
+                    deletes.extend((index, h) for h in hfids)
+                elif kind == "template":
+                    template_hits.extend((index, h) for h in hfids)
                 else:
                     unresolved.append(f"infrahubctl object delete CoreMenuItem {positional[1]}")
-    return deletes, unresolved
+    return deletes, unresolved, template_hits
 
 
-def _menu_item_deletes(text: str) -> tuple[list[tuple[int, tuple[str, str]]], list[str]]:
+def _menu_item_deletes(
+    text: str, known_ids: frozenset[Hfid] = frozenset()
+) -> tuple[list[tuple[int, Hfid]], list[str], list[tuple[int, Hfid]]]:
     """Menu item deletes in ``text``: GraphQL ``CoreMenuItemDelete`` calls and
     ``infrahubctl object delete CoreMenuItem`` commands.
 
-    Returns ``(deletes, unresolved)``: each delete is ``(fence_index, (namespace,
-    name))``; ``unresolved`` describes calls whose target is not a two-element
-    HFID (an ``id``, a variable nobody defined), since those cannot be compared
-    with the items the task removed.
+    Returns ``(deletes, unresolved, template_hits)``: each delete is
+    ``(fence_index, (namespace, name))`` for a target written as a literal
+    two-part HFID; ``unresolved`` describes targets the grader cannot tie to
+    an item (an ``id``, a variable nobody defined); ``template_hits`` are
+    placeholders that spell a known item's name. See ``_classify_target``.
     """
     shared_variables = _json_variables(text)
-    deletes, unresolved = _ctl_object_deletes(text)
+    deletes, unresolved, template_hits = _ctl_object_deletes(text, known_ids)
     for index, document, own_variables, declared in _graphql_documents(text):
         variables = {**shared_variables, **own_variables}
         try:
@@ -906,15 +996,17 @@ def _menu_item_deletes(text: str) -> tuple[list[tuple[int, tuple[str, str]]], li
                 continue
             data = _resolve(args.get("data"), variables)
             hfid = data.get("hfid") if isinstance(data, dict) else None
-            if (
-                isinstance(hfid, list)
-                and len(hfid) == 2
-                and all(isinstance(part, str) for part in hfid)
-            ):
-                deletes.append((index, (hfid[0], hfid[1])))
+            if isinstance(hfid, list) and len(hfid) == 2 and all(isinstance(p, str) for p in hfid):
+                kind, hfids = _classify_target("/".join(hfid), known_ids)
+            else:
+                kind, hfids = "unresolved", []
+            if kind == "hfid":
+                deletes.extend((index, h) for h in hfids)
+            elif kind == "template":
+                template_hits.extend((index, h) for h in hfids)
             else:
                 unresolved.append(f"CoreMenuItemDelete with data={data!r}")
-    return deletes, unresolved
+    return deletes, unresolved, template_hits
 
 
 def _menu_load_fences(text: str) -> list[int]:
@@ -975,14 +1067,19 @@ def check_removed_items_deleted(
     needs its own delete: ``hand_delete_ids`` defaults to ``removed_ids``.
     A git-synced ``menus:`` file is reconciled by the sync, which deletes the
     items it loaded before and no longer finds (Infrahub 1.3.0+), so those
-    (``sync_removed_ids``) must not be deleted by hand, while an item loaded
-    outside the sync still must. A purge of kept items is allowed only when a
+    (``sync_removed_ids``) must not be deleted by hand, the change must be
+    pushed so a sync runs at all, and an item loaded outside the sync still
+    needs a delete. A purge of kept items is allowed only when a
     later ``infrahubctl menu load`` puts them back; ``Builtin`` items are
     protected and a delete of one is refused.
     """
     must_delete = removed_ids if hand_delete_ids is None else hand_delete_ids
-    deletes, unresolved = _menu_item_deletes(apply_raw)
+    known_ids = removed_ids | kept_ids | must_delete | sync_removed_ids
+    deletes, unresolved, template_hits = _menu_item_deletes(apply_raw, known_ids)
     targets = {hfid for _, hfid in deletes}
+    # A placeholder spelling a known item counts against the answer, never for it.
+    touched = deletes + template_hits
+    touched_ids = {hfid for _, hfid in touched}
 
     builtin = sorted(h for h in targets if h[0] == "Builtin")
     if builtin:
@@ -992,7 +1089,7 @@ def check_removed_items_deleted(
 
     loads = _menu_load_fences(apply_raw)
     not_reloaded = sorted(
-        {hfid for index, hfid in deletes if hfid in kept_ids and not any(load > index for load in loads)}
+        {hfid for index, hfid in touched if hfid in kept_ids and not any(load > index for load in loads)}
     )
     if not_reloaded:
         return False, (
@@ -1000,11 +1097,17 @@ def check_removed_items_deleted(
             "to restore them: " + ", ".join(_hfid_label(h) for h in not_reloaded)
         )
 
-    by_hand = sorted(targets & sync_removed_ids)
+    by_hand = sorted(touched_ids & sync_removed_ids)
     if by_hand:
         return False, (
             "Deletes by hand items the git sync removes on its own: "
             + ", ".join(_hfid_label(h) for h in by_hand)
+        )
+
+    if sync_removed_ids and not _git_pushes(apply_raw):
+        return False, (
+            "No git push of the menu change: without it no sync runs, and the "
+            "items dropped from the file stay in the sidebar"
         )
 
     missing = sorted(must_delete - targets)
