@@ -90,9 +90,18 @@ def test_release_label_contract() -> None:
     assert forked_bot_release_pr.returncode != 0
     assert "exactly one" in forked_bot_release_pr.stdout
 
+    edited_title_release_pr = run_checker(
+        [],
+        title="chore(release): v1.2.3 (smoke rerun)",
+        head_ref="release/v1.2.3",
+        author_login="opsmill-bot",
+        head_repository=REPOSITORY,
+    )
+    assert edited_title_release_pr.returncode == 0, edited_title_release_pr.stdout
+
     mismatched_title_release_pr = run_checker(
         [],
-        title="chore(release): v9.9.9",
+        title="fix: v1.2.3",
         head_ref="release/v1.2.3",
         author_login="opsmill-bot",
         head_repository=REPOSITORY,
