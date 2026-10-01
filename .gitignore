@@ -1,6 +1,5 @@
 # Skill evaluation workspaces
 *-workspace/
-.bug-analysis-*.md
 .mcp.json
 
 # Python
