@@ -23,7 +23,7 @@ jobs:
       documentation: ${{ steps.changes.outputs.documentation_all }}
       tests: ${{ steps.changes.outputs.tests_all }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: opsmill/paths-filter@v3.0.2
         id: changes
         with:
@@ -37,7 +37,7 @@ jobs:
     if: needs.files-changed.outputs.markdown == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
       - run: uv run rumdl check .
 
@@ -49,7 +49,7 @@ jobs:
     if: needs.files-changed.outputs.yaml == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - run: pip install yamllint
       - run: yamllint -c .yamllint.yml .
 
@@ -68,7 +68,7 @@ jobs:
     if: needs.files-changed.outputs.tests == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
       - run: uv run ruff check .
 
@@ -89,7 +89,7 @@ jobs:
       matrix:
         python-version: ["3.10", "3.13"]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
@@ -106,7 +106,7 @@ jobs:
     if: needs.files-changed.outputs.cli == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -122,7 +122,7 @@ jobs:
     if: needs.files-changed.outputs.documentation == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -147,7 +147,7 @@ jobs:
     if: needs.files-changed.outputs.yaml == 'true' || needs.files-changed.outputs.skills == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"

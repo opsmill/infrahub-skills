@@ -87,7 +87,7 @@ jobs:
       matrix: ${{ steps.parse.outputs.matrix }}
       has-skills: ${{ steps.parse.outputs.has-skills }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
@@ -148,7 +148,7 @@ jobs:
       # Cap concurrent skill jobs; total in-flight trials = max-parallel x EVAL_PARALLEL
       max-parallel: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
