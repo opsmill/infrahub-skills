@@ -201,10 +201,21 @@ def _gh_regions(lines: list[str], suffix: str):
     def flush_para():
         if not para:
             return
-        text = "\n".join(line for _, line in para)
-        for m in _GH_SPAN.finditer(text):
-            lineno = para[0][0] + text.count("\n", 0, m.start())
-            yield lineno, m.group(1).replace("\n", " "), [line for _, line in para]
+        source = [line for _, line in para]
+        text = "\n".join(source)
+        spans = {
+            (para[0][0] + text.count("\n", 0, m.start()), m.group(1).replace("\n", " "))
+            for m in _GH_SPAN.finditer(text)
+        }
+        # One stray backtick run (an inline ```python mention) shifts the
+        # paragraph-wide pairing for everything after it, so each line is
+        # also paired on its own. The union keeps both wrapped spans and
+        # spans the paragraph pass misaligned.
+        spans |= {
+            (lineno, m.group(1)) for lineno, line in para for m in _GH_SPAN.finditer(line)
+        }
+        for lineno, span in sorted(spans):
+            yield lineno, span, source
         para.clear()
 
     def flush_cont():

@@ -223,6 +223,22 @@ def test_gh_search_state_all_in_wrapped_code_span_is_flagged(
     assert [s for s in _gh_findings(bad) if "--state all" in s], bad
 
 
+def test_gh_search_state_all_after_inline_triple_backticks_is_flagged(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """The reviewer's proof: an inline triple-backtick mention earlier in a
+    paragraph shifts paragraph-wide span pairing, so the span holding the
+    bad flag is never matched. `eval.yaml` has this shape ("Put the
+    generator in a ```python fence and ..."). Each line is also scanned on
+    its own, so a span that fits on one line is found either way."""
+    lines = [
+        "Put the grader in a " + TICK * 3 + "python fence and",
+        f'run {TICK}gh search issues --repo x --state {ALL} "kw"{TICK} first.',
+    ]
+    bad = _scan_only(monkeypatch, tmp_path, "triple-backtick.md", lines)
+    assert [s for s in _gh_findings(bad) if "--state all" in s], bad
+
+
 def test_real_repo_has_no_unignored_invalid_invocations() -> None:
     """The live check, as CI runs it."""
     bad = mod.scan()
