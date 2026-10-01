@@ -11,6 +11,7 @@ ROOT = Path(__file__).parents[1]
 CONFIG_PATH = ROOT / ".github" / "version-drafter.yml"
 LABELS_PATH = ROOT / ".github" / "labels.yml"
 CHECKER_PATH = ROOT / "scripts" / "check_release_labels.py"
+REPOSITORY = "opsmill/infrahub-skills"
 
 CANONICAL_CONFIG = """---
 # Only explicit release-intent labels drive semantic version bumps.
@@ -47,7 +48,7 @@ def run_checker(
             "--head-repository",
             head_repository,
             "--repository",
-            "opsmill/example",
+            REPOSITORY,
         ],
         check=False,
         capture_output=True,
@@ -63,13 +64,14 @@ def test_release_label_contract() -> None:
         assert f'name: "{label}"' in declared_labels
 
         accepted = run_checker([label, "type/housekeeping"])
-        assert accepted.returncode == 0, accepted.stderr
+        assert accepted.returncode == 0, accepted.stdout
         assert label in accepted.stdout
 
     for labels in ([], ["type/bug"], ["changes/patch", "changes/minor"]):
         rejected = run_checker(labels)
         assert rejected.returncode != 0
-        assert "exactly one" in rejected.stderr
+        assert "::error::" in rejected.stdout
+        assert "exactly one" in rejected.stdout
 
     spoofed_release_pr = run_checker(
         [],
@@ -77,7 +79,7 @@ def test_release_label_contract() -> None:
         head_ref="release/v1.2.3",
     )
     assert spoofed_release_pr.returncode != 0
-    assert "exactly one" in spoofed_release_pr.stderr
+    assert "exactly one" in spoofed_release_pr.stdout
 
     forked_bot_release_pr = run_checker(
         [],
@@ -86,14 +88,48 @@ def test_release_label_contract() -> None:
         author_login="opsmill-bot",
     )
     assert forked_bot_release_pr.returncode != 0
-    assert "exactly one" in forked_bot_release_pr.stderr
+    assert "exactly one" in forked_bot_release_pr.stdout
+
+    mismatched_title_release_pr = run_checker(
+        [],
+        title="chore(release): v9.9.9",
+        head_ref="release/v1.2.3",
+        author_login="opsmill-bot",
+        head_repository=REPOSITORY,
+    )
+    assert mismatched_title_release_pr.returncode != 0
+    assert "exactly one" in mismatched_title_release_pr.stdout
+
+    non_release_branch_pr = run_checker(
+        [],
+        title="chore(release): v1.2.3",
+        head_ref="feature/v1.2.3",
+        author_login="opsmill-bot",
+        head_repository=REPOSITORY,
+    )
+    assert non_release_branch_pr.returncode != 0
+    assert "exactly one" in non_release_branch_pr.stdout
 
     release_pr = run_checker(
         [],
         title="chore(release): v1.2.3",
         head_ref="release/v1.2.3",
         author_login="opsmill-bot",
-        head_repository="opsmill/example",
+        head_repository=REPOSITORY,
     )
-    assert release_pr.returncode == 0, release_pr.stderr
+    assert release_pr.returncode == 0, release_pr.stdout
     assert "generated release pull request" in release_pr.stdout
+
+    dependabot_pr = run_checker(
+        [],
+        title="chore(deps): bump example",
+        head_ref="dependabot/pip/example-1.2.3",
+        author_login="dependabot[bot]",
+        head_repository=REPOSITORY,
+    )
+    assert dependabot_pr.returncode == 0, dependabot_pr.stdout
+    assert "Dependabot" in dependabot_pr.stdout
+
+    lookalike_bot_pr = run_checker([], author_login="dependabot")
+    assert lookalike_bot_pr.returncode != 0
+    assert "exactly one" in lookalike_bot_pr.stdout
