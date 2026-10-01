@@ -24,7 +24,10 @@ patch-labels:
 
 
 def run_checker(
-    labels: list[str], *, title: str = "fix: example"
+    labels: list[str],
+    *,
+    title: str = "fix: example",
+    head_ref: str = "feature/example",
 ) -> subprocess.CompletedProcess[str]:
     """Run the label checker as the workflow does."""
     return subprocess.run(  # noqa: S603
@@ -35,6 +38,8 @@ def run_checker(
             json.dumps(labels),
             "--title",
             title,
+            "--head-ref",
+            head_ref,
         ],
         check=False,
         capture_output=True,
@@ -58,6 +63,14 @@ def test_release_label_contract() -> None:
         assert rejected.returncode != 0
         assert "exactly one" in rejected.stderr
 
-    release_pr = run_checker([], title="chore(release): v1.2.3")
+    spoofed_release_pr = run_checker([], title="chore(release): ordinary pull request")
+    assert spoofed_release_pr.returncode != 0
+    assert "exactly one" in spoofed_release_pr.stderr
+
+    release_pr = run_checker(
+        [],
+        title="chore(release): v1.2.3",
+        head_ref="release/v1.2.3",
+    )
     assert release_pr.returncode == 0, release_pr.stderr
     assert "generated release pull request" in release_pr.stdout
