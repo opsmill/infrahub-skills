@@ -1,0 +1,23 @@
+.github/workflows/release-label-check.yml
+  s_7b740b0a09bab8::t_b934d8a8910c45 24,29
+  s_7b740b0a09bab8::t_ddd25339cae51c 9
+scripts/check_release_labels.py
+  s_7b740b0a09bab8::t_b934d8a8910c45 21,29
+  s_7b740b0a09bab8::t_ccca347ee7c91c 30-31,41-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dc4b99e0d07f9e1b9230768fbd2554a5e1d9d93f",
+  "prompts": {},
+  "sessions": {
+    "s_7b740b0a09bab8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f3cf-b8e2-7472-8987-ae8cafa06948",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
