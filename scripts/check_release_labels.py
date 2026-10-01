@@ -18,6 +18,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--labels-json", required=True)
     parser.add_argument("--title", required=True)
+    parser.add_argument("--head-ref", required=True)
     return parser
 
 
@@ -25,7 +26,9 @@ def main() -> int:
     """Validate that a normal pull request has exactly one release label."""
     args = build_parser().parse_args()
 
-    if args.title.startswith(RELEASE_PR_PREFIX):
+    if args.title.startswith(RELEASE_PR_PREFIX) and args.head_ref.startswith(
+        "release/"
+    ):
         sys.stdout.write("Skipping label check for generated release pull request.\n")
         return 0
 
@@ -35,7 +38,9 @@ def main() -> int:
         sys.stderr.write(f"Invalid labels JSON: {exc}\n")
         return 1
 
-    if not isinstance(raw_labels, list) or not all(isinstance(label, str) for label in raw_labels):
+    if not isinstance(raw_labels, list) or not all(
+        isinstance(label, str) for label in raw_labels
+    ):
         sys.stderr.write("Labels JSON must be an array of strings.\n")
         return 1
 

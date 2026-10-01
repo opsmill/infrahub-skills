@@ -6,7 +6,7 @@ on:
   pull_request:
     branches:
       - main
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
 
 permissions: {}
 
@@ -21,8 +21,10 @@ jobs:
       - name: Validate release bump label
         env:
           PR_LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: >-
           python scripts/check_release_labels.py
           --labels-json "${PR_LABELS_JSON}"
+          --head-ref "${PR_HEAD_REF}"
           --title "${PR_TITLE}"
