@@ -14,8 +14,11 @@ BUMP_LABELS = frozenset({"changes/major", "changes/minor", "changes/patch"})
 RELEASE_PR_PREFIX = "chore(release):"
 RELEASE_PR_AUTHOR = "opsmill-bot"
 # The branch auto-bump.yml pushes: `release/v` plus the version string it
-# accepts, so no other branch name qualifies for the exemption.
-RELEASE_BRANCH = re.compile(r"release/v[0-9]+\.[0-9]+\.[0-9]+(?:[.-][0-9A-Za-z.-]+)?")
+# accepts, so no other branch name qualifies for the exemption. Both values are
+# copied verbatim from that workflow, and a test fails if they drift.
+RELEASE_BRANCH_PREFIX = "release/v"
+VERSION_PATTERN = r"[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?"
+RELEASE_BRANCH = re.compile(re.escape(RELEASE_BRANCH_PREFIX) + VERSION_PATTERN)
 
 
 def build_parser() -> argparse.ArgumentParser:

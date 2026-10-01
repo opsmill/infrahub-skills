@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
+import re
 import subprocess  # noqa: S404
 import sys
 
@@ -13,6 +15,7 @@ ROOT = Path(__file__).parents[1]
 CONFIG_PATH = ROOT / ".github" / "version-drafter.yml"
 LABELS_PATH = ROOT / ".github" / "labels.yml"
 DEPENDABOT_PATH = ROOT / ".github" / "dependabot.yml"
+AUTO_BUMP_PATH = ROOT / ".github" / "workflows" / "auto-bump.yml"
 CHECKER_PATH = ROOT / "scripts" / "check_release_labels.py"
 REPOSITORY = "opsmill/infrahub-skills"
 
@@ -173,3 +176,20 @@ def test_dependabot_pull_requests_carry_a_bump_label() -> None:
         assert bump_labels == ["changes/patch"], update["package-ecosystem"]
         for label in labels:
             assert f'name: "{label}"' in declared_labels, label
+
+
+def test_release_branch_pattern_matches_the_generator() -> None:
+    spec = importlib.util.spec_from_file_location("check_release_labels", CHECKER_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    checker = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(checker)
+
+    workflow = AUTO_BUMP_PATH.read_text()
+    version_check = re.search(r"grep -Eq '\^(?P<pattern>.+)\$'", workflow)
+    assert version_check, "auto-bump.yml no longer validates the version with grep -Eq"
+    branch = re.search(r'BRANCH="(?P<prefix>[^"$]*)\$\{VERSION\}"', workflow)
+    assert branch, "auto-bump.yml no longer names the branch from ${VERSION}"
+
+    assert checker.VERSION_PATTERN == version_check["pattern"]
+    assert checker.RELEASE_BRANCH_PREFIX == branch["prefix"]
