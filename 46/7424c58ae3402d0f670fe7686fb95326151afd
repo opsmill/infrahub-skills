@@ -1,0 +1,21 @@
+tests/test_release_label_contract.py
+  s_7b740b0a09bab8::t_e1adc52eb4664f 1-6,8-25,29,31-44,46-47,49
+  s_7b740b0a09bab8::t_d5cb491c795923 45,48,50-63
+  s_7b740b0a09bab8::t_34299296fb66b0 7,26-28,30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "467424c58ae3402d0f670fe7686fb95326151afd",
+  "prompts": {},
+  "sessions": {
+    "s_7b740b0a09bab8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f3cf-b8e2-7472-8987-ae8cafa06948",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
