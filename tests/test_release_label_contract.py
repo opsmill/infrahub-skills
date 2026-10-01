@@ -28,6 +28,8 @@ def run_checker(
     *,
     title: str = "fix: example",
     head_ref: str = "feature/example",
+    author_login: str = "contributor",
+    head_repository: str = "contributor/example",
 ) -> subprocess.CompletedProcess[str]:
     """Run the label checker as the workflow does."""
     return subprocess.run(  # noqa: S603
@@ -40,6 +42,12 @@ def run_checker(
             title,
             "--head-ref",
             head_ref,
+            "--author-login",
+            author_login,
+            "--head-repository",
+            head_repository,
+            "--repository",
+            "opsmill/example",
         ],
         check=False,
         capture_output=True,
@@ -63,14 +71,29 @@ def test_release_label_contract() -> None:
         assert rejected.returncode != 0
         assert "exactly one" in rejected.stderr
 
-    spoofed_release_pr = run_checker([], title="chore(release): ordinary pull request")
+    spoofed_release_pr = run_checker(
+        [],
+        title="chore(release): v1.2.3",
+        head_ref="release/v1.2.3",
+    )
     assert spoofed_release_pr.returncode != 0
     assert "exactly one" in spoofed_release_pr.stderr
+
+    forked_bot_release_pr = run_checker(
+        [],
+        title="chore(release): v1.2.3",
+        head_ref="release/v1.2.3",
+        author_login="opsmill-bot",
+    )
+    assert forked_bot_release_pr.returncode != 0
+    assert "exactly one" in forked_bot_release_pr.stderr
 
     release_pr = run_checker(
         [],
         title="chore(release): v1.2.3",
         head_ref="release/v1.2.3",
+        author_login="opsmill-bot",
+        head_repository="opsmill/example",
     )
     assert release_pr.returncode == 0, release_pr.stderr
     assert "generated release pull request" in release_pr.stdout
