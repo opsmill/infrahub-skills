@@ -1,0 +1,28 @@
+---
+# yamllint disable rule:truthy
+name: Release bump label
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions: {}
+
+jobs:
+  validate:
+    name: Require one release bump label
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate release bump label
+        env:
+          PR_LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: >-
+          python scripts/check_release_labels.py
+          --labels-json "${PR_LABELS_JSON}"
+          --title "${PR_TITLE}"
