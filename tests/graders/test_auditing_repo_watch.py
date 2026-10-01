@@ -181,3 +181,39 @@ def test_fix_naming_a_first_party_file_named_after_a_package_passes():
 def test_fix_naming_an_installed_package_fails(fix):
     ok, _ = check_watch_no_third_party_in_fix([{"rule": RULE, "fix": fix}], RULE)
     assert ok is False
+
+
+# -- review on #164 -------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "fix",
+    [
+        "Add watch files for the query module and pydantic.",
+        "watch the infrahub_sdk.node module",
+    ],
+    ids=["sentence-final-dot", "dotted-module"],
+)
+def test_fix_naming_a_package_in_prose_fails(fix):
+    ok, _ = check_watch_no_third_party_in_fix([{"rule": RULE, "fix": fix}], RULE)
+    assert ok is False
+
+
+ARISTA = "templates/startup_config_arista.j2|arista_startup_config"
+
+
+@pytest.mark.parametrize(
+    "entry",
+    ["arista_startup_config", "jinja2_transforms.arista_startup_config"],
+    ids=["registered-name", "section-qualified"],
+)
+def test_registered_name_that_differs_from_the_stem_is_an_offender(entry):
+    findings = [{"rule": RULE, "file": ".infrahub.yml", "entry": entry}]
+    ok, _ = check_watch_does_not_flag_entry(findings, RULE, ARISTA)
+    assert ok is False
+
+
+def test_registered_name_needle_still_leaves_other_entries_alone():
+    findings = [{"rule": RULE, "file": ".infrahub.yml", "entry": "device_config"}]
+    ok, detail = check_watch_does_not_flag_entry(findings, RULE, ARISTA)
+    assert ok is True, detail

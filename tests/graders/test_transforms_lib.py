@@ -788,6 +788,7 @@ _INSTALLED_WATCH = [
     {"files": ["INFRAHUB_SDK"]},
     {"files": ["pydantic/main.py"]},
     {"files": [".venv/lib/python3.12/site-packages/httpx/"]},
+    {"files": ["infrahub_sdk.node"]},
 ]
 
 

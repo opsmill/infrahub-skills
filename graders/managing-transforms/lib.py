@@ -1105,7 +1105,8 @@ def names_installed_package(path: str) -> bool:
     """True if a watch path points at an installed package, not a repo file.
 
     A package is the path's first segment (``pydantic``, ``pydantic/main.py``,
-    ``infrahub_sdk.py``) or anything under ``site-packages``. A first-party
+    ``infrahub_sdk.py``, ``infrahub_sdk.node``) or anything under
+    ``site-packages``. A first-party
     path that merely contains a package name does not count.
     """
     segments = [s for s in canonical_watch_path(path).lower().split("/") if s]
@@ -1113,7 +1114,9 @@ def names_installed_package(path: str) -> bool:
         return False
     if "site-packages" in segments:
         return True
-    return segments[0].removesuffix(".py") in _INSTALLED_PACKAGES
+    # First dotted part, so `infrahub_sdk.node`, `infrahub_sdk.py` and a
+    # sentence-final `pydantic.` all name the package.
+    return segments[0].strip(".").split(".")[0] in _INSTALLED_PACKAGES
 
 
 def check_watch_no_third_party(

@@ -1138,6 +1138,7 @@ def test_gen_watch_no_third_party_leaves_first_party_paths_alone(watch):
         {"files": ["INFRAHUB_SDK"]},
         {"files": ["pydantic/main.py"]},
         {"files": [".venv/lib/python3.12/site-packages/httpx/"]},
+        {"files": ["infrahub_sdk.node"]},
         ["infrahub_sdk"],
     ],
     ids=repr,

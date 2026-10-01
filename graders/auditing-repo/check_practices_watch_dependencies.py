@@ -21,7 +21,9 @@ CHECKS = [
     f"watch-flags-entry:{RULE}:generators/generate_fabric.py",
     # Negative controls. Both are already correct; flagging either is noise.
     f"watch-does-not-flag-entry:{RULE}:transforms/interface_names.py",
-    f"watch-does-not-flag-entry:{RULE}:templates/startup_config_arista.j2",
+    # Registered as arista_startup_config, which is not the template's stem,
+    # so the needle carries both names.
+    f"watch-does-not-flag-entry:{RULE}:templates/startup_config_arista.j2|arista_startup_config",
     # The fix must never land on a section whose model forbids the key, and
     # must never name an installed package.
     "watch-not-on-forbidden-section",

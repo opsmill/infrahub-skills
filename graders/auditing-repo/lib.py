@@ -1120,13 +1120,19 @@ def _identifies(finding: dict, needle: str) -> bool:
     the entry name (the path's last segment without its extension), which
     covers ``transforms/device_config.py`` and
     ``python_transforms.device_config`` alike.
+
+    ``needle`` may be ``<path>|<registered name>`` when the entry's
+    ``.infrahub.yml`` name is not its file stem (``arista_startup_config``
+    for ``templates/startup_config_arista.j2``); either name identifies it.
     """
-    needle = needle.lower()
-    stem = needle.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+    path, _, registered = needle.lower().partition("|")
+    names = {path.rsplit("/", 1)[-1].rsplit(".", 1)[0]}
+    if registered:
+        names.add(registered)
     for key in _IDENTITY_FIELDS:
         for token in _PATH_TOKEN.findall(str(finding.get(key, "")).lower()):
             token = token.removeprefix("./").strip("/.")
-            if token == needle or stem in re.split(r"[/.]", token):
+            if token == path or names & set(re.split(r"[/.]", token)):
                 return True
     return False
 
@@ -1148,8 +1154,8 @@ def check_watch_flags_entry(
     path segment without the extension) counts too. Both identify the same
     definition, and which one a finding cites is presentation, not substance
     — a defect in a ``.infrahub.yml`` entry is legitimately attributed to
-    ``.infrahub.yml`` with the entry named in the ``entry`` field, which the
-    task's finding shape requires.
+    ``.infrahub.yml`` with the entry named in the ``entry`` field, which
+    ``audit-procedure.md`` §9.6 teaches for registration findings.
 
     Identity fields only, symmetric with the negative control below. Reading
     the prose too would let a single all-clear finding — one that names both
@@ -1164,7 +1170,7 @@ def check_watch_flags_entry(
     for f in matching:
         if _identifies(f, needle):
             return True, f"{rule} flags {needle}"
-    stem = needle.lower().rsplit("/", 1)[-1].rsplit(".", 1)[0]
+    stem = needle.lower().partition("|")[0].rsplit("/", 1)[-1].rsplit(".", 1)[0]
     return False, (
         f"{rule} does not flag {needle} (nor the entry name {stem!r}) in any "
         f"identity field; findings are about: {_entries_named(findings, rule)}"
@@ -1258,7 +1264,9 @@ def _names_installed_package(path: str) -> bool:
         return False
     if "site-packages" in segments:
         return True
-    return segments[0].removesuffix(".py") in _INSTALLED_PACKAGES
+    # First dotted part, so `infrahub_sdk.node`, `infrahub_sdk.py` and a
+    # sentence-final `pydantic.` all name the package.
+    return segments[0].strip(".").split(".")[0] in _INSTALLED_PACKAGES
 
 
 # ---------------------------------------------------------------------------
