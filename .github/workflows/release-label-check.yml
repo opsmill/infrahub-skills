@@ -3,7 +3,14 @@
 name: Release bump label
 
 on:
-  pull_request:
+  # `pull_request_target`, not `pull_request`: under `pull_request` both this
+  # workflow and the checker come from the pull request's own head, so a branch
+  # could edit either to exit 0 and certify itself. Here the workflow and the
+  # checkout are the base branch's; nothing from the pull request is checked
+  # out or executed — the checker reads only the event payload. The flip side
+  # is that a change to this gate takes effect once it is merged, not on the
+  # pull request that makes it.
+  pull_request_target:
     branches:
       - main
     types: [opened, synchronize, reopened, edited, labeled, unlabeled]
@@ -18,6 +25,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Validate release bump label
         env:
           PR_AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}
