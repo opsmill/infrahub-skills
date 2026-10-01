@@ -17,16 +17,27 @@ on:
 
 permissions: {}
 
+# Adding several labels fires one `labeled` event each, and the runs race: an
+# early one that saw no `changes/*` label can finish last and leave a stale
+# red check. Only the newest run per pull request matters.
+concurrency:
+  group: label-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     name: Require one release bump label
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
       - name: Validate release bump label
         env:
           PR_AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}

@@ -70,3 +70,8 @@ tests_all:
   # tests/graders/test_teaching_graders.py and test_generic_inheritance.py
   # read eval.yaml, so an eval.yaml-only change has to run them too.
   - "eval.yaml"
+  # tests/test_release_label_contract.py reads these, so a change to any of
+  # them alone has to run it.
+  - ".github/version-drafter.yml"
+  - ".github/labels.yml"
+  - ".github/dependabot.yml"
