@@ -38,7 +38,7 @@ Steps:
 1. Take a backup.
 2. Clear the `before` findings below.
 3. Upgrade to 1.4.0.
-4. Clear the `after` findings.
+4. Clear the `during` and `after` findings.
 
 | Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |

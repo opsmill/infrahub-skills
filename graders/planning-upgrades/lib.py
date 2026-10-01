@@ -177,7 +177,13 @@ _EV_GRAPHQL = re.compile(r"`\s*(?:query\b[^`{]*)?\{[^`]*\}\s*`")
 # written: `pip show infrahub-sdk` settles an SDK-version unknown, and a live
 # trial was failed for it. A span with no argument (`infrahub-sdk`) is a name,
 # not a command.
-_EV_COMMAND = re.compile(r"`\s*[a-z][\w.-]*\s+[^`]+`")
+# Restricted to read-only inspection commands: any backticked phrase with a
+# space (`review the repo`) used to pass as a probe.
+_EV_COMMAND = re.compile(
+    r"`\s*(?:pip\s+(?:show|freeze|list)|uv\s+pip\s+(?:show|list)|grep|rg|git\s+(?:diff|log|show|grep|status)"
+    r"|cat|ls|find|head|tail|jq|yq|docker(?:\s+compose)?\s+(?:ps|images|config|inspect)"
+    r"|kubectl\s+(?:get|describe)|helm\s+(?:get|list|history|status))\s[^`]*`"
+)
 # A backticked span is a named artifact: a query, a command, a field, a value.
 _EV_CODE_SPAN = re.compile(r"`[^`]+`")
 
@@ -219,14 +225,17 @@ def hop_sections(text: str) -> list[dict]:
     """
     sections: list[dict] = []
     current: dict | None = None
-    in_fence = False
+    fence: str | None = None
     for line in text.splitlines():
-        if line.lstrip().startswith("```"):
-            in_fence = not in_fence
+        # Both fence styles, closed only by the same character: a `~~~` example
+        # holding "## 1.3 -> 1.4" was read as a hop.
+        opener = _FENCE_OPEN_RE.match(line)
+        if opener and (fence is None or (opener.group(1)[0] == fence[0] and len(opener.group(1)) >= len(fence))):
+            fence = None if fence is not None else opener.group(1)
             if current is not None:
                 current["lines"].append(line)
             continue
-        if in_fence:
+        if fence is not None:
             # A `# comment` inside a fenced block is not a heading.
             if current is not None:
                 current["lines"].append(line)
@@ -560,6 +569,24 @@ def _invocations_from(
                 # A bare binary name, or one followed by a word that is not
                 # its subcommand, is prose or an option value, not a call.
                 if not words or words[0] not in _KNOWN_SUBCOMMANDS[base]:
+                    # In a code block, a subcommand-shaped word that the binary
+                    # does not have is an invented command (`infrahub migrate`),
+                    # unless it is an option's value (`-n infrahub`), a service
+                    # name followed by the binary, or a real call follows.
+                    prev = tokens[i - 1] if i else ""
+                    invented = (
+                        fenced
+                        and words
+                        and _SUBCOMMAND_RE.match(words[0])
+                        and words[0] not in _BINARIES
+                        and not (prev.startswith("-") and prev != "--")
+                        and not any(
+                            t.rsplit("/", 1)[-1] in _BINARIES for t in tokens[i + 1 :]
+                        )
+                    )
+                    if invented:
+                        found.append((base, tuple([base, *words]), flags, fenced, line))
+                        break
                     continue
                 found.append((base, tuple([base, *words]), flags, fenced, line))
                 break
@@ -793,6 +820,8 @@ def check_no_mutating_commands(text: str) -> tuple[bool, str]:
                 f"a command naming infrahub could not be parsed{where}; "
                 f"failing closed rather than treating it as absent"
             )
+        if len(path) > 1 and path[1] not in _KNOWN_SUBCOMMANDS.get(path[0], set()):
+            return False, f"'{shown}'{where} is not a real command"
         for bad in NONEXISTENT_INVOCATIONS:
             if path[: len(bad)] == bad:
                 return False, (

@@ -27,7 +27,7 @@ VERSION=1.8.0 docker compose run --rm --no-deps infrahub-server infrahub upgrade
 | Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | generate_template removed from GenericSchema | 1.8.0 | breaking | critical | before | yes | schemas/base.yml -> CoreStandardGroup.generate_template | Delete the attribute from the generic before upgrading | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.8.0 |
-| Namespace restriction on internal Core generics | 1.9.0 | breaking | warning | before | unknown | Not determinable from the repo alone | Run get_schema against the instance to list inheritors of CoreGenericRepository | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.9.0 |
+| Namespace restriction on CoreGenericRepository and CoreWebhook extensions | 1.9.0 | breaking | critical | before | unknown | Not determinable from the repo alone | Run get_schema against the instance to list inheritors of CoreGenericRepository and CoreWebhook | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.9.0 |
 
 ```bash
 # read-only: reports what the upgrade would do, writes nothing

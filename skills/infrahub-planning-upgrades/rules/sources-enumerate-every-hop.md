@@ -37,13 +37,15 @@ straight through it.
 1. List the releases, keeping only the `infrahub-v`
    tags. The same repository also tags the Python SDK
    (`python-sdk-v*`), which is not an upgrade target.
-   `gh` returns them newest first by date, so sort by
-   version before walking the range:
+   Page through every release rather than a fixed
+   window, since a `--limit` counts the SDK tags too and
+   can cut off the oldest releases of a long range. The
+   list comes newest first by date, so sort by version
+   before walking the range:
 
    ```bash
-   gh release list --repo opsmill/infrahub --limit 400 \
-     --exclude-pre-releases --json tagName \
-     --jq '.[].tagName | select(startswith("infrahub-v"))'
+   gh api --paginate 'repos/opsmill/infrahub/releases?per_page=100' \
+     --jq '.[] | select(.prerelease | not) | .tag_name | select(startswith("infrahub-v"))'
    ```
 
 2. Read each release in the range, from the one after

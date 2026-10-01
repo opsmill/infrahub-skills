@@ -104,9 +104,11 @@ def test_task_grader_names_only_registered_checks(task):
         assert name in CHECKS, name
 
 
-def test_missing_plan_scores_zero(tmp_path):
+def test_missing_plan_fails_every_check_but_the_command_check(tmp_path):
     result = run_checks(_task_checks("read_only"), tmp_path / "UPGRADE_PLAN.md")
-    assert result["score"] < 1.0
+    # A missing plan shows no commands, which is the one thing it gets right.
+    assert _failed(result) and "no-mutating-commands" not in _failed(result)
+    assert len(_failed(result)) == len(result["checks"]) - 1
 
 
 _HEADER = (
@@ -732,3 +734,61 @@ def test_single_hop_section_rows_are_still_graded():
     text = f"# Plan\n\n## 1.6 -> 1.7\n\n{_HEADER}{_ROW_YES.format(affected='probably')}\n"
     ok, _ = check_verdict_has_evidence(text)
     assert not ok
+
+
+
+# --- cubic review on #159 ----------------------------------------------------
+
+
+def test_tilde_fenced_example_headings_are_not_hops():
+    example = "~~~markdown\n## 1.3 -> 1.4\n~~~\n"
+    text = f"# Plan\n\n## 1.9 -> 1.10\n\n{_HEADER}{_ROW_YES.format(affected='yes')}\n{example}"
+    ok, msg = check_sequential_hops(text, source="1.9", target="1.10")
+    assert ok, msg
+
+
+@pytest.mark.parametrize("action", ["Then `review the repo` before the window", "See `the release notes` and decide"])
+def test_backticked_prose_is_not_a_probe(action):
+    ok, _ = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action=action)))
+    assert not ok
+
+
+@pytest.mark.parametrize(
+    "action",
+    [
+        "Run `pip show infrahub-sdk` where the generators run",
+        "Run `git diff main -- schemas/` and check each changed attribute",
+        "Run `kubectl get pods -n infrahub` to read the image tags",
+    ],
+)
+def test_read_only_inspection_commands_are_probes(action):
+    ok, msg = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action=action)))
+    assert ok, msg
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["infrahub migrate", "infrahub data restore", "kubectl exec deploy/x -- infrahub migrate", "infrahubctl frobnicate"],
+)
+def test_invented_command_in_a_code_block_fails(line):
+    ok, msg = check_no_mutating_commands(_hop(f"```bash\n{line}\n```\n"))
+    assert not ok
+    assert "not a real command" in msg
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "kubectl exec -n infrahub infrahub-server-0 -- bash",
+        "docker compose exec infrahub infrahub upgrade --check",
+        "kubectl exec -n infrahub infrahub-server-0 -- infrahub upgrade --check",
+    ],
+)
+def test_wrapper_words_are_not_invented_commands(line):
+    ok, msg = check_no_mutating_commands(_hop(f"```bash\n{line}\n```\n"))
+    assert ok, msg
+
+
+def test_invented_command_named_in_prose_is_not_graded():
+    ok, msg = check_no_mutating_commands(_hop("Older plans name `infrahub migrate`, which never existed.\n"))
+    assert ok, msg
