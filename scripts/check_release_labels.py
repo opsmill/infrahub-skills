@@ -11,6 +11,7 @@ from typing import cast
 
 BUMP_LABELS = frozenset({"changes/major", "changes/minor", "changes/patch"})
 RELEASE_PR_PREFIX = "chore(release):"
+RELEASE_PR_AUTHOR = "opsmill-bot"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -19,6 +20,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--labels-json", required=True)
     parser.add_argument("--title", required=True)
     parser.add_argument("--head-ref", required=True)
+    parser.add_argument("--author-login", required=True)
+    parser.add_argument("--head-repository", required=True)
+    parser.add_argument("--repository", required=True)
     return parser
 
 
@@ -26,8 +30,12 @@ def main() -> int:
     """Validate that a normal pull request has exactly one release label."""
     args = build_parser().parse_args()
 
-    if args.title.startswith(RELEASE_PR_PREFIX) and args.head_ref.startswith(
-        "release/"
+    release_version = args.head_ref.removeprefix("release/")
+    if (
+        args.author_login == RELEASE_PR_AUTHOR
+        and args.head_repository == args.repository
+        and args.head_ref.startswith("release/v")
+        and args.title == f"{RELEASE_PR_PREFIX} {release_version}"
     ):
         sys.stdout.write("Skipping label check for generated release pull request.\n")
         return 0

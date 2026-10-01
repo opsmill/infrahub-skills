@@ -20,11 +20,17 @@ jobs:
       - uses: actions/checkout@v6
       - name: Validate release bump label
         env:
+          PR_AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
           PR_LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          REPOSITORY: ${{ github.repository }}
         run: >-
           python scripts/check_release_labels.py
+          --author-login "${PR_AUTHOR_LOGIN}"
+          --head-repository "${PR_HEAD_REPOSITORY}"
           --labels-json "${PR_LABELS_JSON}"
           --head-ref "${PR_HEAD_REF}"
+          --repository "${REPOSITORY}"
           --title "${PR_TITLE}"
