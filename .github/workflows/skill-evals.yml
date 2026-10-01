@@ -203,7 +203,7 @@ jobs:
     runs-on: ubuntu-latest
     if: always() && github.event.pull_request != null
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts/
           pattern: eval-results-*
