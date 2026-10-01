@@ -679,3 +679,56 @@ def test_db_migrate_without_a_report_flag_fails():
 def test_db_migrate_plan_resolves_an_unknown():
     ok, msg = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action="Run infrahub db migrate --plan in the target image")))
     assert ok, msg
+
+
+# --- Second review round on #159 (BeArchiTek) -------------------------------
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "kubectl exec deploy/x -- bash -l -c 'infrahub upgrade'",
+        "sh -e -c \"infrahub upgrade\"",
+        "ssh prod 'docker compose exec infrahub-server infrahub upgrade'",
+    ],
+    ids=["bash-l-c", "sh-e-c", "ssh"],
+)
+def test_quoted_command_behind_any_wrapper_is_graded(line):
+    ok, _ = check_no_mutating_commands(_hop(f"```bash\n{line}\n```\n"))
+    assert not ok
+
+
+def test_quoted_probe_behind_ssh_passes():
+    body = "```bash\nssh prod 'VERSION=1.11.0 docker compose run --rm --no-deps infrahub-server infrahub upgrade --check'\n```\n"
+    ok, msg = check_no_mutating_commands(_hop(body))
+    assert ok, msg
+
+
+@pytest.mark.parametrize("lang", ["text", "markdown", "yaml"])
+def test_upgrade_handed_over_in_a_non_shell_fence_fails(lang):
+    body = f"```{lang}\ndocker compose exec infrahub-server infrahub upgrade\n```\n"
+    ok, _ = check_no_mutating_commands(_hop(body))
+    assert not ok
+
+
+def test_non_shell_fence_with_other_commands_still_passes():
+    body = "```text\nDatabase needs to be updated (v69 -> v71), 2 migrations pending\ninfrahub git-agent start --debug\n```\n"
+    ok, msg = check_no_mutating_commands(_hop(body))
+    assert ok, msg
+
+
+def test_overview_summary_table_is_not_graded_as_findings():
+    summary = "| Hop | Notes |\n| --- | --- |\n| 1.6 -> 1.7 | see below |\n"
+    bad_summary = f"{_HEADER}| Roll-up | 1.6.0–1.9.0 | breaking | big | soon | maybe | lots | review | x |\n"
+    hops = "".join(f"## 1.{i} -> 1.{i + 1}\n\n{_HEADER}{_ROW_YES.format(affected='yes')}\n" for i in range(6, 9))
+    text = f"# Plan\n\n## Overview: 1.6.0 -> 1.9.0\n\n{summary}\n{bad_summary}\n{hops}"
+    for check in (check_verdict_has_evidence, check_finding_vocabulary):
+        ok, msg = check(text)
+        assert ok, msg
+    assert all(r["_hop"] != "Overview: 1.6.0 -> 1.9.0" for r in _mod.findings(text))
+
+
+def test_single_hop_section_rows_are_still_graded():
+    text = f"# Plan\n\n## 1.6 -> 1.7\n\n{_HEADER}{_ROW_YES.format(affected='probably')}\n"
+    ok, _ = check_verdict_has_evidence(text)
+    assert not ok

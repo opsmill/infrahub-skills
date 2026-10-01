@@ -259,13 +259,23 @@ def _minor_hops(sections: list[dict]) -> list[tuple[tuple[int, int], tuple[int, 
     and identical ranges collapse to one, so a title such as
     "## Upgrade plan: 1.9.2 to 1.10.0" above "## 1.9 -> 1.10" is one hop.
     """
+    overviews = _overview_ranges(sections)
     ranges = [(sec["from"], sec["to"]) for sec in sections if sec["from"] != sec["to"]]
-    distinct = list(dict.fromkeys(ranges))
+    return [r for r in dict.fromkeys(ranges) if r not in overviews]
+
+
+def _overview_ranges(sections: list[dict]) -> set[tuple[tuple[int, int], tuple[int, int]]]:
+    """Ranges that hold two or more other distinct minor hops: overviews, not hops.
+
+    Same-minor (patch) sections do not count towards the two, so patch roll-ups
+    either side of a hop never turn the hop itself into an overview.
+    """
+    distinct = list(dict.fromkeys((s["from"], s["to"]) for s in sections if s["from"] != s["to"]))
 
     def _inside(outer: tuple, inner: tuple) -> bool:
         return outer != inner and outer[0] <= inner[0] and inner[1] <= outer[1]
 
-    return [r for r in distinct if sum(1 for o in distinct if _inside(r, o)) < 2]
+    return {r for r in distinct if sum(1 for o in distinct if _inside(r, o)) >= 2}
 
 
 def tables(body: str) -> list[list[dict]]:
@@ -321,7 +331,13 @@ def _parse_table(block: list[str]) -> list[dict]:
 def findings(text: str) -> list[dict]:
     """Every findings row across every hop, each tagged with its hop heading."""
     out: list[dict] = []
-    for sec in hop_sections(text):
+    sections = hop_sections(text)
+    # A roll-up table under "## Overview: 1.6.0 -> 1.9.0" summarises the hops
+    # below it; grading it as a hop's findings failed correct plans.
+    overviews = _overview_ranges(sections)
+    for sec in sections:
+        if (sec["from"], sec["to"]) in overviews:
+            continue
         for table in tables(sec["body"]):
             for row in table:
                 if "change" in row and "affected" in row:
@@ -370,12 +386,11 @@ def _blank_quoting_cells(text: str) -> str:
 # not a handover; a review found `command: infrahub git-agent start` failed.
 _RUNNABLE_FENCES = {"", "sh", "bash", "zsh", "shell", "console", "shell-session"}
 _BINARY_WORD_RE = re.compile(r"(?<![\w-])infrahub(?:ctl)?(?![\w-])")
-_SHELLS = {"sh", "bash", "zsh"}
 _OPERATORS = {"&&", "||", ";", "|", "&", ";;", "|&"}
 
 
-def _split_code(text: str) -> tuple[list[str], str]:
-    """Runnable code lines, and the prose with every code block removed.
+def _split_code(text: str) -> tuple[list[str], str, list[str]]:
+    """Runnable code lines, the prose with every code block removed, and quoted lines.
 
     Code is a backtick or tilde fence at any indent (a fence inside a list item
     is indented), or an indented block: four or more spaces after a blank line,
@@ -383,9 +398,11 @@ def _split_code(text: str) -> tuple[list[str], str]:
     so a plan could hand over `infrahub upgrade` in one and pass. Only
     unlabelled and shell fences, and indented blocks, count as runnable. Inline
     spans are then read from the prose only, since a fence's backticks shifted
-    the pairing and made later prose read as code.
+    the pairing and made later prose read as code. Lines in other fences
+    (```text, ```yaml) come back as quoted: an output block or a quoted file.
     """
     code: list[str] = []
+    quoted: list[str] = []
     prose: list[str] = []
     fence: str | None = None
     runnable = False
@@ -398,6 +415,8 @@ def _split_code(text: str) -> tuple[list[str], str]:
                 fence = None
             elif runnable:
                 code.append(line)
+            else:
+                quoted.append(line)
             prose.append("")
             prev_blank = False
             continue
@@ -420,7 +439,7 @@ def _split_code(text: str) -> tuple[list[str], str]:
             in_indented = False
         prev_blank = line.strip() == ""
         prose.append(line)
-    return _join_continuations(code), "\n".join(prose)
+    return _join_continuations(code), "\n".join(prose), _join_continuations(quoted)
 
 
 def _join_continuations(lines: list[str]) -> list[str]:
@@ -446,7 +465,7 @@ def command_lines(text: str) -> list[tuple[str, bool]]:
     comment lines so a ``#`` annotation cannot be read as a command.
     """
     lines: list[tuple[str, bool]] = []
-    code, prose = _split_code(text)
+    code, prose, _quoted = _split_code(text)
     for raw in code:
         stripped = raw.strip().lstrip("$").strip()
         if not stripped or stripped.startswith("#"):
@@ -464,8 +483,10 @@ def _segments(line: str) -> list[list[str]]:
 
     Tokenising the whole line, rather than splitting on `&&`/`;`/`|` first, is
     what dev/guidelines/graders.md asks for: a pre-split cuts inside quotes.
-    `sh -c "..."` is opened up, so a command hidden in its string is still seen.
-    Raises ValueError when the line cannot be tokenised.
+    Any token that still holds a space and names a binary is a quoted command
+    (`sh -e -c "..."`, `bash -l -c '...'`, `ssh prod '...'`), and is
+    tokenised again whatever precedes it, so a wrapper cannot hide one.
+    Raises ValueError when the line, or a command inside it, cannot be tokenised.
     """
     lex = shlex.shlex(line, posix=True, punctuation_chars=True)
     lex.whitespace_split = True
@@ -478,15 +499,11 @@ def _segments(line: str) -> list[list[str]]:
             segments[-1].append(tok)
     out: list[list[str]] = []
     for seg in segments:
-        for i, tok in enumerate(seg):
-            is_shell = tok.rsplit("/", 1)[-1] in _SHELLS
-            has_script = i + 2 < len(seg) and seg[i + 1].startswith("-") and "c" in seg[i + 1]
-            if is_shell and has_script:
-                out.extend(_segments(seg[i + 2]))
-                break
-        else:
-            if seg:
-                out.append(seg)
+        if seg:
+            out.append(seg)
+        for tok in seg:
+            if any(c.isspace() for c in tok) and _BINARY_WORD_RE.search(tok):
+                out.extend(_segments(tok))
     return out
 
 
@@ -506,12 +523,30 @@ def invocations(text: str) -> list[tuple[str, tuple[str, ...], list[str], bool, 
     tokenised comes back as an ``<unparseable>`` invocation, so the check fails
     closed rather than reporting "no commands".
     """
+    return _invocations_from(command_lines(text), fail_closed=True)
+
+
+def quoted_invocations(text: str) -> list[tuple[str, tuple[str, ...], list[str], bool, str]]:
+    """Invocations inside non-shell fences (```text, ```yaml), never fail-closed.
+
+    An output block or a quoted file is not a handover, so only the upgrade
+    itself and the invented upgrade subcommand on infrahubctl are graded here; an output
+    line with an odd quote (`don't`) is skipped rather than failed.
+    """
+    _code, _prose, quoted = _split_code(text)
+    lines = [(ln.strip(), True) for ln in quoted if ln.strip() and not ln.strip().startswith("#")]
+    return _invocations_from(lines, fail_closed=False)
+
+
+def _invocations_from(
+    lines: list[tuple[str, bool]], fail_closed: bool
+) -> list[tuple[str, tuple[str, ...], list[str], bool, str]]:
     found: list[tuple[str, tuple[str, ...], list[str], bool, str]] = []
-    for line, fenced in command_lines(text):
+    for line, fenced in lines:
         try:
             segments = _segments(line)
         except ValueError:
-            if _BINARY_WORD_RE.search(line):
+            if fail_closed and _BINARY_WORD_RE.search(line):
                 found.append(("?", ("<unparseable>",), [], fenced, line))
             continue
         for tokens in segments:
@@ -733,6 +768,17 @@ def check_finding_vocabulary(text: str) -> tuple[bool, str]:
 
 def check_no_mutating_commands(text: str) -> tuple[bool, str]:
     """The plan shows only read-only probes, and no invented commands."""
+    # A non-shell fence is output or a quoted file, so only the upgrade itself
+    # and the invented command fail there; a review found the upgrade handed
+    # over in a ```text block passed once only shell fences were read.
+    for _binary, path, flags, _fenced, line in quoted_invocations(text):
+        where = f" (non-shell fence: {line[:120]!r})"
+        if path[: len(NONEXISTENT_INVOCATIONS[0])] == NONEXISTENT_INVOCATIONS[0]:
+            return False, f"'{' '.join(path)}'{where} is not a real command"
+        if path[:2] == ("infrahub", "upgrade") and not set(flags) & READ_ONLY_FLAGS[("infrahub", "upgrade")]:
+            return False, (
+                f"'{' '.join(path)}'{where} without --check is an upgrade command handed to the user"
+            )
     invoked = invocations(text)
     if not invoked:
         return True, f"{PLAN_FILE} shows no commands; nothing to execute"
