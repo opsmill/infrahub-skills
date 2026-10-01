@@ -6,16 +6,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from typing import cast
 
 BUMP_LABELS = frozenset({"changes/major", "changes/minor", "changes/patch"})
 RELEASE_PR_PREFIX = "chore(release):"
 RELEASE_PR_AUTHOR = "opsmill-bot"
-# Dependabot security updates open unlabeled and the bot cannot add labels;
-# its pull requests are dependency bumps by construction, as in
-# changelog-check.yml. An exact login match: bot logins cannot be registered.
-DEPENDABOT_AUTHOR = "dependabot[bot]"
+# The branch auto-bump.yml pushes: `release/v` plus the version string it
+# accepts, so no other branch name qualifies for the exemption.
+RELEASE_BRANCH = re.compile(r"release/v[0-9]+\.[0-9]+\.[0-9]+(?:[.-][0-9A-Za-z.-]+)?")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -40,20 +40,16 @@ def main() -> int:
     """Validate that a normal pull request has exactly one release label."""
     args = build_parser().parse_args()
 
-    # A prefix, not the exact generated title: editing the title re-runs this
-    # check, and the bot author, same repository and release branch already
-    # identify the pull request.
+    # A title prefix, not the exact generated title: editing the title re-runs
+    # this check, and the bot author, same repository and release branch
+    # already identify the pull request.
     if (
         args.author_login == RELEASE_PR_AUTHOR
         and args.head_repository == args.repository
-        and args.head_ref.startswith("release/v")
+        and RELEASE_BRANCH.fullmatch(args.head_ref)
         and args.title.startswith(RELEASE_PR_PREFIX)
     ):
         sys.stdout.write("Skipping label check for generated release pull request.\n")
-        return 0
-
-    if args.author_login == DEPENDABOT_AUTHOR:
-        sys.stdout.write("Skipping label check for Dependabot pull request.\n")
         return 0
 
     try:

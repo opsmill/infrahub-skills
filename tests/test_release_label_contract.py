@@ -7,9 +7,12 @@ from pathlib import Path
 import subprocess  # noqa: S404
 import sys
 
+import yaml
+
 ROOT = Path(__file__).parents[1]
 CONFIG_PATH = ROOT / ".github" / "version-drafter.yml"
 LABELS_PATH = ROOT / ".github" / "labels.yml"
+DEPENDABOT_PATH = ROOT / ".github" / "dependabot.yml"
 CHECKER_PATH = ROOT / "scripts" / "check_release_labels.py"
 REPOSITORY = "opsmill/infrahub-skills"
 
@@ -129,16 +132,44 @@ def test_release_label_contract() -> None:
     assert release_pr.returncode == 0, release_pr.stdout
     assert "generated release pull request" in release_pr.stdout
 
-    dependabot_pr = run_checker(
+    for head_ref in ("release/vnext", "release/v1.2.3/extra", "release/v1.2"):
+        loose_branch_release_pr = run_checker(
+            [],
+            title="chore(release): v1.2.3",
+            head_ref=head_ref,
+            author_login="opsmill-bot",
+            head_repository=REPOSITORY,
+        )
+        assert loose_branch_release_pr.returncode != 0, head_ref
+        assert "exactly one" in loose_branch_release_pr.stdout
+
+    prerelease_pr = run_checker(
+        [],
+        title="chore(release): v1.2.3-rc.1",
+        head_ref="release/v1.2.3-rc.1",
+        author_login="opsmill-bot",
+        head_repository=REPOSITORY,
+    )
+    assert prerelease_pr.returncode == 0, prerelease_pr.stdout
+
+    unlabeled_dependabot_pr = run_checker(
         [],
         title="chore(deps): bump example",
-        head_ref="dependabot/pip/example-1.2.3",
+        head_ref="dependabot/uv/example-1.2.3",
         author_login="dependabot[bot]",
         head_repository=REPOSITORY,
     )
-    assert dependabot_pr.returncode == 0, dependabot_pr.stdout
-    assert "Dependabot" in dependabot_pr.stdout
+    assert unlabeled_dependabot_pr.returncode != 0
+    assert "exactly one" in unlabeled_dependabot_pr.stdout
 
-    lookalike_bot_pr = run_checker([], author_login="dependabot")
-    assert lookalike_bot_pr.returncode != 0
-    assert "exactly one" in lookalike_bot_pr.stdout
+
+def test_dependabot_pull_requests_carry_a_bump_label() -> None:
+    declared_labels = LABELS_PATH.read_text()
+    updates = yaml.safe_load(DEPENDABOT_PATH.read_text())["updates"]
+    assert updates
+    for update in updates:
+        labels = update.get("labels", [])
+        bump_labels = [label for label in labels if label.startswith("changes/")]
+        assert bump_labels == ["changes/patch"], update["package-ecosystem"]
+        for label in labels:
+            assert f'name: "{label}"' in declared_labels, label
