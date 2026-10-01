@@ -157,6 +157,13 @@ def _gh_findings(bad: dict) -> list[str]:
     return [shown for shown in bad if shown.startswith("gh ")]
 
 
+def _assert_one_state_all(bad: dict) -> None:
+    """Exactly one finding, in the reported form: a wrong subcommand, a
+    second bogus form, or the same span reported twice all fail here."""
+    assert _gh_findings(bad) == ["gh search issues --state all"], bad
+    assert len(bad["gh search issues --state all"]) == 1, bad
+
+
 def test_gh_search_without_state_passes(monkeypatch, tmp_path: Path) -> None:
     lines = [
         "```bash",
@@ -189,7 +196,7 @@ def test_gh_search_state_all_on_one_line_is_flagged(monkeypatch, tmp_path: Path)
         "```",
     ]
     bad = _scan_only(monkeypatch, tmp_path, "one-line.mdx", lines)
-    assert [s for s in _gh_findings(bad) if "--state all" in s], bad
+    _assert_one_state_all(bad)
 
 
 def test_gh_search_state_all_after_line_continuation_is_flagged(
@@ -205,7 +212,7 @@ def test_gh_search_state_all_after_line_continuation_is_flagged(
         "```",
     ]
     bad = _scan_only(monkeypatch, tmp_path, "continuation.md", lines)
-    assert [s for s in _gh_findings(bad) if "--state all" in s], bad
+    _assert_one_state_all(bad)
 
 
 def test_gh_search_state_all_in_wrapped_code_span_is_flagged(
@@ -220,7 +227,7 @@ def test_gh_search_state_all_in_wrapped_code_span_is_flagged(
         "   user's description plus any error message strings.",
     ]
     bad = _scan_only(monkeypatch, tmp_path, "wrapped-span.md", lines)
-    assert [s for s in _gh_findings(bad) if "--state all" in s], bad
+    _assert_one_state_all(bad)
 
 
 def test_gh_search_state_all_after_inline_triple_backticks_is_flagged(
@@ -236,7 +243,63 @@ def test_gh_search_state_all_after_inline_triple_backticks_is_flagged(
         f'run {TICK}gh search issues --repo x --state {ALL} "kw"{TICK} first.',
     ]
     bad = _scan_only(monkeypatch, tmp_path, "triple-backtick.md", lines)
-    assert [s for s in _gh_findings(bad) if "--state all" in s], bad
+    _assert_one_state_all(bad)
+
+
+def test_state_all_inside_a_quoted_query_is_not_an_option(monkeypatch, tmp_path: Path) -> None:
+    """Shell tokenizing: the quoted query is one argument, so the
+    `--state all` inside it is search text, not a flag."""
+    lines = [
+        "```bash",
+        f'gh search issues --repo x "why does --state {ALL} fail"',
+        "```",
+    ]
+    bad = _scan_only(monkeypatch, tmp_path, "quoted-query.md", lines)
+    assert _gh_findings(bad) == []
+
+
+def test_state_equals_continued_onto_the_value_is_flagged(monkeypatch, tmp_path: Path) -> None:
+    """A shell drops the backslash-newline outright, so `--state=` then
+    `all` on the next line is `--state=all`."""
+    lines = [
+        "```bash",
+        "gh search issues --repo x --state=\\",
+        f'{ALL} "kw"',
+        "```",
+    ]
+    bad = _scan_only(monkeypatch, tmp_path, "equals-continuation.md", lines)
+    _assert_one_state_all(bad)
+
+
+def test_gh_ignore_marker_silences_its_own_line(monkeypatch, tmp_path: Path) -> None:
+    """The marker can name the invocation with its arguments, the way the
+    `IGNORE_MARKER` contract in `cli_tree.py` describes, or in the short
+    form the gate reports."""
+    lines = [
+        f'Run {TICK}gh search issues --repo x --state {ALL} "kw"{TICK}. '
+        f"<!-- cli-check: ignore gh search issues --repo x --state {ALL} -->",
+        "",
+        f'Run {TICK}gh search issues --repo x --state {ALL} "kw"{TICK}. '
+        f"<!-- cli-check: ignore gh search issues --state {ALL} -->",
+    ]
+    bad = _scan_only(monkeypatch, tmp_path, "gh-marker.md", lines)
+    assert _gh_findings(bad) == []
+
+
+def test_gh_ignore_marker_does_not_cover_its_whole_paragraph(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """A marker on one line of a paragraph silences only the span on that
+    line, not a second invalid command two lines down."""
+    lines = [
+        f"Run {TICK}gh search issues --state {ALL}{TICK}. "
+        f"<!-- cli-check: ignore gh search issues --state {ALL} -->",
+        "More prose here.",
+        f'Then {TICK}gh search issues --repo y --state {ALL} "kw"{TICK}.',
+    ]
+    bad = _scan_only(monkeypatch, tmp_path, "marker-scope.md", lines)
+    _assert_one_state_all(bad)
+    assert bad["gh search issues --state all"][0][1] == 3, bad
 
 
 def test_real_repo_has_no_unignored_invalid_invocations() -> None:

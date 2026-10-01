@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+import shlex
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -176,15 +177,43 @@ GH_SEARCH_STATES: dict[str, set[str]] = {
     "prs": {"open", "closed"},
 }
 _GH_SEARCH = re.compile(r"\bgh\s+search\s+(issues|prs)\b([^|;&]*)")
-_GH_STATE = re.compile(r"--state(?:=|\s+)(['\"]?)([^\s'\"]+)\1")
 # A span may wrap across lines inside one paragraph, as markdown allows.
 _GH_SPAN = re.compile(r"`([^`]+)`")
+
+
+def _gh_bad_forms(text: str) -> list[str]:
+    """Every `gh search <sub> --state <value>` in `text` whose value gh
+    rejects, in the form the gate reports.
+
+    The arguments are tokenized the way a shell would, so `--state all`
+    inside a quoted search query is part of the query, not an option. Text
+    `shlex` cannot tokenize (an unbalanced quote in prose) falls back to a
+    plain split.
+    """
+    forms: list[str] = []
+    for cmd in _GH_SEARCH.finditer(text):
+        sub = cmd.group(1)
+        try:
+            tokens = shlex.split(cmd.group(2))
+        except ValueError:
+            tokens = cmd.group(2).split()
+        for i, token in enumerate(tokens):
+            if token == "--state":
+                value = tokens[i + 1] if i + 1 < len(tokens) else ""
+            elif token.startswith("--state="):
+                value = token.removeprefix("--state=")
+            else:
+                continue
+            if value and value not in GH_SEARCH_STATES[sub]:
+                forms.append(f"gh search {sub} --state {value}")
+    return forms
 
 
 def _gh_regions(lines: list[str], suffix: str):
     """Yield (lineno, text, source lines) for every stretch of shell input
     a `gh` command could sit in, joined across the line breaks a command
-    survives.
+    survives. The source lines are only the ones the stretch covers, which
+    is what scopes an ignore marker to its own command.
 
     The infrahubctl scan reads one line at a time, which misses both shapes
     #136 was filed on: a fenced command continued with `\\` onto a line
@@ -201,27 +230,29 @@ def _gh_regions(lines: list[str], suffix: str):
     def flush_para():
         if not para:
             return
-        source = [line for _, line in para]
-        text = "\n".join(source)
-        spans = {
-            (para[0][0] + text.count("\n", 0, m.start()), m.group(1).replace("\n", " "))
-            for m in _GH_SPAN.finditer(text)
-        }
+        first = para[0][0]
+        text = "\n".join(line for _, line in para)
+        spans = set()
+        for m in _GH_SPAN.finditer(text):
+            lineno = first + text.count("\n", 0, m.start())
+            spans.add((lineno, lineno + m.group(1).count("\n"), m.group(1).replace("\n", " ")))
         # One stray backtick run (an inline ```python mention) shifts the
         # paragraph-wide pairing for everything after it, so each line is
         # also paired on its own. The union keeps both wrapped spans and
         # spans the paragraph pass misaligned.
         spans |= {
-            (lineno, m.group(1)) for lineno, line in para for m in _GH_SPAN.finditer(line)
+            (lineno, lineno, m.group(1)) for lineno, line in para for m in _GH_SPAN.finditer(line)
         }
-        for lineno, span in sorted(spans):
-            yield lineno, span, source
+        for start, stop, span in sorted(spans):
+            yield start, span, [line for n, line in para if start <= n <= stop]
         para.clear()
 
     def flush_cont():
         if not cont:
             return
-        text = " ".join(line.rstrip().rstrip("\\") for _, line in cont)
+        # A shell drops the backslash-newline outright, so `--state=\` then
+        # `all` reads as `--state=all`; spaces before the backslash stay.
+        text = "".join(line.rstrip().removesuffix("\\") for _, line in cont)
         yield cont[0][0], text, [line for _, line in cont]
         cont.clear()
 
@@ -247,14 +278,17 @@ def _gh_regions(lines: list[str], suffix: str):
 
 
 def _gh_ignored(source: list[str]) -> set[str]:
-    """Invocations a `cli-check: ignore <invocation>` marker names on any of
-    the lines a region spans, whitespace-normalized."""
+    """Forms a `cli-check: ignore <invocation>` marker names on the lines a
+    region covers.
+
+    The marker text goes through the same parser as the command, so it can
+    name the invocation as written, arguments included, or in the short
+    form the gate reports. Both reduce to the same form.
+    """
     named: set[str] = set()
     for line in source:
         for chunk in line.split(cli_tree.IGNORE_MARKER)[1:]:
-            text = " ".join(chunk.split("-->", 1)[0].split())
-            if text:
-                named.add(text)
+            named.update(_gh_bad_forms(chunk.split("-->", 1)[0]))
     return named
 
 
@@ -263,15 +297,9 @@ def _bad_gh_in_lines(lines: list[str], suffix: str) -> list[tuple[int, str, str]
     (lineno, shown form, line text)."""
     bad: list[tuple[int, str, str]] = []
     for lineno, text, source in _gh_regions(lines, suffix):
-        for cmd in _GH_SEARCH.finditer(text):
-            sub = cmd.group(1)
-            for flag in _GH_STATE.finditer(cmd.group(2)):
-                value = flag.group(2)
-                if value in GH_SEARCH_STATES[sub]:
-                    continue
-                shown = f"gh search {sub} --state {value}"
-                if shown in _gh_ignored(source):
-                    continue
+        ignored = _gh_ignored(source)
+        for shown in _gh_bad_forms(text):
+            if shown not in ignored:
                 bad.append((lineno, shown, lines[lineno - 1].strip()))
     return bad
 
