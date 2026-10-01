@@ -1,0 +1,31 @@
+.github/workflows/release-label-check.yml
+  s_7b740b0a09bab8::t_5981bb1408fd81 1-28
+.gitignore
+  s_7b740b0a09bab8::t_e1adc52eb4664f 3
+scripts/check_release_labels.py
+  s_7b740b0a09bab8::t_9b95bc137cbe8e 3-4
+  s_7b740b0a09bab8::t_ae4caf5cc85d4d 29,35,39,47-48,52
+  s_7b740b0a09bab8::t_5981bb1408fd81 1-2,5-28,30-34,36-38,40-46,49-51,53-57
+changelog/+release-bump-label-contract.housekeeping.md
+  s_7b740b0a09bab8::t_5981bb1408fd81 1
+.github/version-drafter.yml
+  s_7b740b0a09bab8::t_5cb5bb4a0dbefd 2-3,5,7
+AGENTS.md
+  s_7b740b0a09bab8::t_868a74fb44ca6e 210-214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c88bdec32bec86ebc4ff03243b5523b9637552b0",
+  "prompts": {},
+  "sessions": {
+    "s_7b740b0a09bab8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f3cf-b8e2-7472-8987-ae8cafa06948",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
