@@ -207,6 +207,15 @@ Skill and tooling work goes under `housekeeping`. Add a fragment in the same PR 
 - Label a PR `ci/skip-changelog` when it genuinely needs no entry (dependency bumps, typo fixes).
   CI fails a PR that adds neither a fragment nor that label.
 
+Every pull request targeting `main` must also carry exactly one release-intent
+label: `changes/major`, `changes/minor`, or `changes/patch`. These labels alone
+determine the automatic version bump. Generated `chore(release):` pull requests
+are exempt because they apply, rather than introduce, that release intent.
+Dependabot pull requests get `changes/patch` from `.github/dependabot.yml`, and
+any other workflow that opens a pull request into `main` must pass a
+`changes/*` label. The gate runs from `main` (`pull_request_target`), so a change to it
+applies only once merged.
+
 Do not run `towncrier build` or bump versions by hand. Merging to `main` does not prepare a
 release: dispatch the **Auto bump version** workflow from Actions with `main` selected, which
 opens a `chore(release): vX.Y.Z` pull request carrying the bump and the assembled changelog; the

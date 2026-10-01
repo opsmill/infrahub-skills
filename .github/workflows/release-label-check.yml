@@ -1,0 +1,56 @@
+---
+# yamllint disable rule:truthy
+name: Release bump label
+
+on:
+  # `pull_request_target`, not `pull_request`: under `pull_request` both this
+  # workflow and the checker come from the pull request's own head, so a branch
+  # could edit either to exit 0 and certify itself. Here the workflow and the
+  # checkout are the base branch's; nothing from the pull request is checked
+  # out or executed — the checker reads only the event payload. The flip side
+  # is that a change to this gate takes effect once it is merged, not on the
+  # pull request that makes it.
+  pull_request_target:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+
+permissions: {}
+
+# Adding several labels fires one `labeled` event each, and the runs race: an
+# early one that saw no `changes/*` label can finish last and leave a stale
+# red check. Only the newest run per pull request matters.
+concurrency:
+  group: label-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Require one release bump label
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Validate release bump label
+        env:
+          PR_AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          REPOSITORY: ${{ github.repository }}
+        run: >-
+          python scripts/check_release_labels.py
+          --author-login "${PR_AUTHOR_LOGIN}"
+          --head-repository "${PR_HEAD_REPOSITORY}"
+          --labels-json "${PR_LABELS_JSON}"
+          --head-ref "${PR_HEAD_REF}"
+          --repository "${REPOSITORY}"
+          --title "${PR_TITLE}"

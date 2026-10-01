@@ -1,0 +1,57 @@
+---
+# Composed from opsmill-cicd-workflows' managed standard
+# (`.github/dependabot/compose.py base uv`), with one deliberate difference:
+# the labels. Every pull request into `main` needs exactly one `changes/*`
+# label (release-label-check.yml), and labels.yml sync deletes any label it
+# does not declare, so these use this repository's declared labels instead of
+# the standard's `dependencies` / `github-actions` / `python`. Security
+# updates take their labels from the matching entry here too.
+
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 10
+    groups:
+      github-actions-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    labels:
+      - changes/patch
+      - type/housekeeping
+      - ci/skip-changelog
+    commit-message:
+      prefix: chore(deps)
+      prefix-development: chore(deps-dev)
+      include: scope
+
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 10
+    groups:
+      uv-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    labels:
+      - changes/patch
+      - type/housekeeping
+      - ci/skip-changelog
+    commit-message:
+      prefix: chore(deps)
+      prefix-development: chore(deps-dev)
+      include: scope
