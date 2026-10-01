@@ -212,8 +212,8 @@ label: `changes/major`, `changes/minor`, or `changes/patch`. These labels alone
 determine the automatic version bump. Generated `chore(release):` pull requests
 are exempt because they apply, rather than introduce, that release intent.
 Dependabot pull requests get `changes/patch` from `.github/dependabot.yml`, and
-any workflow that opens a pull request into `main` must pass a `changes/*`
-label. The gate runs from `main` (`pull_request_target`), so a change to it
+any other workflow that opens a pull request into `main` must pass a
+`changes/*` label. The gate runs from `main` (`pull_request_target`), so a change to it
 applies only once merged.
 
 Do not run `towncrier build` or bump versions by hand. Merging to `main` does not prepare a
