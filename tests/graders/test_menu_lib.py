@@ -1645,6 +1645,35 @@ class TestRemovedItemsChecks:
         assert not ok
         assert "no later infrahubctl menu load" in msg
 
+    def test_reload_later_in_the_same_fence_restores(self):
+        notes = """\
+```bash
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+infrahubctl object delete CoreMenuItem Campus/AccessPointMenu --yes
+infrahubctl object delete CoreMenuItem Campus/ControllerMenu --yes
+infrahubctl object delete CoreMenuItem Campus/WirelessMenu --yes
+infrahubctl object delete CoreMenuItem Campus/SwitchMenu --yes
+infrahubctl menu load menus/campus.yml
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_reload_earlier_in_the_same_fence_does_not_restore(self):
+        notes = """\
+```bash
+infrahubctl menu load menus/campus.yml
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+infrahubctl object delete CoreMenuItem Campus/AccessPointMenu --yes
+infrahubctl object delete CoreMenuItem Campus/ControllerMenu --yes
+infrahubctl object delete CoreMenuItem Campus/WirelessMenu --yes
+infrahubctl object delete CoreMenuItem Campus/SwitchMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "no later infrahubctl menu load" in msg
+
     def test_reload_after_purge_restores(self):
         ok, msg = self._deleted(_TARGETED_DELETES + _PURGE_KEPT + _LOAD)
         assert ok, msg
@@ -1804,7 +1833,7 @@ class TestRemoveSyncedItemsTask:
             f"infrahubctl object delete CoreMenuItem <{name}-id>\n"
             for name in ("AccessPointMenu", "ControllerMenu", "WirelessMenu", "FloorMenu", "LabMenu")
         )
-        ok, msg = self._deleted(f"```bash\ngit push origin main\n{lines}```\n")
+        ok, msg = self._deleted(f"```bash\ngit commit -am 'Retire wireless' && git push origin main\n{lines}```\n")
         assert not ok
         assert "the git sync removes on its own" in msg
         assert "[Campus, WirelessMenu]" in msg
@@ -1815,16 +1844,16 @@ class TestRemoveSyncedItemsTask:
             for name in ("AccessPointMenu", "ControllerMenu", "WirelessMenu", "FloorMenu")
         )
         lines += "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n"
-        ok, msg = self._deleted(f"```bash\ngit push origin main\n{lines}```\n")
+        ok, msg = self._deleted(f"```bash\ngit commit -am 'Retire wireless' && git push origin main\n{lines}```\n")
         assert not ok
         assert "the git sync removes on its own" in msg
         assert "[Campus, LabMenu]" not in msg
 
-    def test_shell_variable_hfid_is_not_a_resolved_delete(self):
-        """A loop over ``Campus/$n`` hand-deletes synced items the grader cannot name."""
+    def test_shell_loop_targets_are_unrolled_and_rejected(self):
+        """A loop over ``Campus/$n`` is unrolled, so each target resolves to a synced item."""
         notes = """\
 ```bash
-git push origin main
+git commit -am 'Retire wireless' && git push origin main
 for n in FloorMenu WirelessMenu; do infrahubctl object delete CoreMenuItem "Campus/$n" --yes; done
 infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
 ```
@@ -1836,7 +1865,7 @@ infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
     def test_unexpanded_variable_beyond_the_needed_deletes_fails(self):
         notes = """\
 ```bash
-git push origin main
+git commit -am 'Retire wireless' && git push origin main
 infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
 infrahubctl object delete CoreMenuItem "Campus/$ITEM" --yes
 ```
@@ -1848,7 +1877,7 @@ infrahubctl object delete CoreMenuItem "Campus/$ITEM" --yes
     def test_placeholder_never_satisfies_the_required_delete(self):
         for target in ("Campus/<LabMenu>", "Campus/{}", "<ns>/LabMenu"):
             notes = (
-                "```bash\ngit push origin main\n"
+                "```bash\ngit commit -am 'Retire wireless' && git push origin main\n"
                 f"infrahubctl object delete CoreMenuItem {target} --yes\n```\n"
             )
             ok, msg = self._deleted(notes)
@@ -1857,7 +1886,7 @@ infrahubctl object delete CoreMenuItem "Campus/$ITEM" --yes
 
     def test_placeholder_naming_a_synced_item_counts_as_deleting_it(self):
         notes = (
-            "```bash\ngit push origin main\n"
+            "```bash\ngit commit -am 'Retire wireless' && git push origin main\n"
             "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n"
             "infrahubctl object delete CoreMenuItem Campus/<FloorMenu> --yes\n```\n"
         )
@@ -1869,7 +1898,7 @@ infrahubctl object delete CoreMenuItem "Campus/$ITEM" --yes
         """The trial shape: delete Lab, plus a template for any children it has."""
         notes = """\
 ```bash
-git push origin main
+git commit -am 'Retire wireless' && git push origin main
 infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
 # only if Lab had entries nested under it:
 infrahubctl object delete CoreMenuItem Campus/<ChildName> --yes
@@ -1905,7 +1934,7 @@ infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
 1. Push the change:
 
    ```bash
-   git push origin main
+   git commit -am 'Retire wireless' && git push origin main
    ```
 
 2. Delete the hand-loaded entry:
@@ -1926,10 +1955,78 @@ infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
 ````
 
 ```bash
-git push origin main
+git commit -am 'Retire wireless' && git push origin main
 infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
 ```
 """
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_echoed_commands_do_not_run(self):
+        notes = """\
+```bash
+echo git commit -am retire && echo git push
+echo infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git push" in msg
+
+    def test_echoed_delete_of_a_synced_item_is_not_a_delete(self):
+        notes = """\
+```bash
+git commit -am retire && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+echo "not needed:" infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_git_push_must_be_the_subcommand(self):
+        for push_like in ("git stash push", "git commit -m push", "git archive --prefix push HEAD"):
+            notes = (
+                "```bash\ngit commit -am retire\n"
+                f"{push_like}\n"
+                "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert not ok, push_like
+            assert "No git push" in msg, push_like
+
+    def test_git_global_options_before_push_count(self):
+        notes = (
+            "```bash\ngit -C repo commit -am retire\n"
+            "git -C repo -c push.default=current push\n"
+            "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+        )
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_push_without_commit_fails(self):
+        notes = (
+            "```bash\ngit push origin main\n"
+            "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+        )
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git commit before the push" in msg
+
+    def test_commit_after_the_push_does_not_count(self):
+        notes = (
+            "```bash\ngit push origin main\ngit commit -am retire\n"
+            "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+        )
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git commit before the push" in msg
+
+    def test_longer_closing_fence_closes(self):
+        notes = (
+            "```bash\ngit commit -am retire && git push\n"
+            "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n````\n"
+        )
         ok, msg = self._deleted(notes)
         assert ok, msg
 

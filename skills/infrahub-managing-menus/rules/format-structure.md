@@ -101,6 +101,10 @@ Delete one item per command, by `namespace/name`
 infrahubctl object delete CoreMenuItem Dcim/RackMenu --yes
 ```
 
+On `No such command`, upgrade infrahubctl, or delete
+through GraphQL with
+`CoreMenuItemDelete(data: {hfid: ["Dcim", "RackMenu"]})`.
+
 Deleting a group header leaves its children behind, so
 delete each child too. Items in the `Builtin` namespace
 are protected and cannot be deleted.

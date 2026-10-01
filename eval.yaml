@@ -342,7 +342,8 @@ tasks:
           notes.md deletes Campus/LabMenu by [namespace, name] HFID, through
           GraphQL CoreMenuItemDelete (a graphql or untagged fence, a JSON
           request body, or a curl payload) or infrahubctl object delete
-          CoreMenuItem, runs a git push so the sync happens at all, deletes
+          CoreMenuItem, runs a git commit and then a git push so the sync
+          happens at all, deletes
           none of the four items the sync removes, no kept item, and no
           Builtin item
 
