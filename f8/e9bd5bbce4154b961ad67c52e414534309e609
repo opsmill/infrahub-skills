@@ -1,0 +1,21 @@
+scripts/check_release_labels.py
+  s_7e8bc0f59e77ac::t_de46e3c55f1bc3 17-21
+tests/test_release_label_contract.py
+  s_7e8bc0f59e77ac::t_3712e77b5c5757 5,8,18,179-195
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f8e9bd5bbce4154b961ad67c52e414534309e609",
+  "prompts": {},
+  "sessions": {
+    "s_7e8bc0f59e77ac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e8f58ef6-d8cb-4c10-9bd9-5e5f499aa838",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
