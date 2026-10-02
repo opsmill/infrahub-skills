@@ -65,4 +65,4 @@ kubectl scale deployment task-worker --replicas=0  # mutates
   to "poke around" instead of trusting
   `infrahub-collect create` to gather what's needed.
 
-Reference: [Install infrahub-collect](https://docs.infrahub.app/backup/guides/install-collect)
+Reference: [Install infrahub-collect](https://docs.infrahub.app/backup/collect/install)

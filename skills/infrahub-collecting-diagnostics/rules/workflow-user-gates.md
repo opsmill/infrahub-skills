@@ -56,4 +56,4 @@ silence or ambiguity.
   `infrahub-reporting-issues` rather than filing it
   from here.
 
-Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)

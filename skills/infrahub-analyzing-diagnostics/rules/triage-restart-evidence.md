@@ -67,4 +67,4 @@ The current log starts after the restart; the
 - Reporting the restart without a timestamp, so it
   cannot be correlated with the root incident.
 
-Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)
