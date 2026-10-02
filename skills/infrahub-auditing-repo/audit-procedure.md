@@ -589,6 +589,14 @@ markdown report — the two are different
 serialisations of the same finding set, ordered the
 same way.
 
+A finding about one registration in `.infrahub.yml`
+keeps `file: .infrahub.yml` and names the registration
+in an `entry` field: its `file_path` or
+`template_path`, or its `name` for an
+`artifact_definitions` entry, which has neither.
+`.infrahub.yml` alone does not say which of its
+entries is defective.
+
 Three further fields carry the finding's evidence. They
 are not YAGNI-specific; any phase's finding uses the
 ones that apply to it:

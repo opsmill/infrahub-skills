@@ -363,7 +363,10 @@ generics:
       - name: rack_u_position
         label: Rack Position (U)
         kind: Number
-        optional: true
+        # Mandatory because the uniqueness constraint above spans it: an
+        # optional attribute is compared as the literal "NULL", so two
+        # devices with no position would collide inside the same rack.
+        optional: false
         order_weight: 1300
       - name: rack_face
         kind: Dropdown
