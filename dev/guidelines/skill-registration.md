@@ -15,9 +15,11 @@ skill missing from one ships invisible to whichever
 audience reads that surface, and readers pick a skill
 from the router and the front page, not from its
 `description`. A skill with `user-invocable: false` in
-its frontmatter, like `infrahub-common`, is exempt: it
-goes on none of these surfaces and is left out of the
-router's count.
+its frontmatter, like `infrahub-common`, is exempt from
+the check and from the router's count. It still gets an
+entry in the `README.md` Project Structure tree, which
+lists every directory under `skills/`; nothing checks
+that entry, so add it by hand.
 
 `README.md` is one of those surfaces but not a trigger:
 a bare `README.md` glob would match every nested README
