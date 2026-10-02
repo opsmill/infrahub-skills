@@ -983,3 +983,10 @@ def test_kind_attribute_evidence_still_counts():
     row = _ROW_GIT_AGENT.format(evidence="InfraCircuit.node_metadata", action="Fix it")
     ok, msg = check_verdict_has_evidence(_plan(row))
     assert ok, msg
+
+
+@pytest.mark.parametrize("evidence", ["BGPCommunity.name", "IPPrefix.ip_address", "IpamIPPrefix.prefix"])
+def test_acronym_led_kind_attribute_evidence_counts(evidence):
+    row = _ROW_GIT_AGENT.format(evidence=evidence, action="Fix it")
+    ok, msg = check_verdict_has_evidence(_plan(row))
+    assert ok, msg

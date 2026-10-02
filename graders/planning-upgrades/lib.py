@@ -160,11 +160,11 @@ _LIST_ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 # A check that fails that answer is grading vocabulary. See
 # dev/guidelines/graders.md § "Verify both directions", false-fail half.
 _EV_PATH = re.compile(r"[\w./-]+\.(?:ya?ml|py|gql|graphql|j2|toml|json|cfg)\b")
-# A namespaced kind (two capitalised parts, as every Infrahub kind has) and an
-# attribute that is not a domain suffix: `GitHub.com` and `Docs.infrahub` are
-# not `InfraCircuit.node_metadata`.
+# A kind with two or more capitals (a namespaced `InfraCircuit`, or an
+# acronym-led `BGPCommunity`, `IPPrefix`) and an attribute that is not a domain
+# suffix: `GitHub.com` and the single word `Docs.infrahub` are not evidence.
 _EV_DOTTED_KIND = re.compile(
-    r"\b[A-Z][a-z0-9]+[A-Z][A-Za-z0-9]*\."
+    r"\b(?=[A-Z][A-Za-z0-9]*[A-Z])[A-Z][A-Za-z0-9]+\."
     r"(?!(?:com|org|net|io|app|dev|ai|co|gov|edu|cloud|sh)\b)[a-z_][A-Za-z0-9_]*\b"
 )
 # No bare-CamelCase pattern: `GitHub`, `GraphQL` and `PostgreSQL` read as
