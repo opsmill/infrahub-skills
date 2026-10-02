@@ -792,3 +792,53 @@ def test_wrapper_words_are_not_invented_commands(line):
 def test_invented_command_named_in_prose_is_not_graded():
     ok, msg = check_no_mutating_commands(_hop("Older plans name `infrahub migrate`, which never existed.\n"))
     assert ok, msg
+
+
+# --- Third review round on #159 (BeArchiTek): command position --------------
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "docker compose exec infrahub bash",
+        'docker compose exec infrahub sh -c "infrahub upgrade --check"',
+        'echo "back up infrahub before the window"',
+        'git commit -m "pin infrahub to 1.11"',
+    ],
+    ids=["exec-service-bash", "exec-service-sh-c-probe", "echo", "git-commit"],
+)
+def test_binary_outside_command_position_is_not_a_call(line):
+    ok, msg = check_no_mutating_commands(_hop(f"```bash\n{line}\n```\n"))
+    assert ok, msg
+
+
+def test_list_continuation_prose_is_not_a_code_block():
+    body = "1. Take the hop.\n\n    infrahub stays on 1.10 until the window opens.\n"
+    ok, msg = check_no_mutating_commands(_hop(body))
+    assert ok, msg
+
+
+def test_code_block_inside_a_list_item_is_still_graded():
+    body = "1. Take the hop.\n\n       docker compose exec infrahub-server infrahub upgrade\n"
+    ok, _ = check_no_mutating_commands(_hop(body))
+    assert not ok
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["sudo -E infrahub migrate", "docker compose run --rm infrahub migrate", "env FOO=1 infrahub migrate"],
+    ids=["sudo-E", "compose-run-service-binary", "env"],
+)
+def test_invented_command_behind_a_wrapper_fails(line):
+    ok, msg = check_no_mutating_commands(_hop(f"```bash\n{line}\n```\n"))
+    assert not ok
+    assert "not a real command" in msg
+
+
+@pytest.mark.parametrize(
+    "action",
+    ["Read the target's `upgrade --check` count line", "Run `docker compose ps` to read the image tags"],
+)
+def test_bare_probe_forms_resolve_an_unknown(action):
+    ok, msg = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action=action)))
+    assert ok, msg

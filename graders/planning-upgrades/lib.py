@@ -132,6 +132,7 @@ _VERSION_RE = re.compile(r"(?<![\d.])v?(\d+)\.(\d+)(?:\.(\d+))?(?!\d)")
 _INLINE_CODE_RE = re.compile(r"`([^`]+)`")
 _FENCE_OPEN_RE = re.compile(r"^\s*(```+|~~~+)")
 _LIST_MARKER_RE = re.compile(r"^(?:[-*+]|\d+[.)])\s")
+_LIST_ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 
 # Evidence that names something locatable, strongest first.
 #
@@ -182,7 +183,8 @@ _EV_GRAPHQL = re.compile(r"`\s*(?:query\b[^`{]*)?\{[^`]*\}\s*`")
 _EV_COMMAND = re.compile(
     r"`\s*(?:pip\s+(?:show|freeze|list)|uv\s+pip\s+(?:show|list)|grep|rg|git\s+(?:diff|log|show|grep|status)"
     r"|cat|ls|find|head|tail|jq|yq|docker(?:\s+compose)?\s+(?:ps|images|config|inspect)"
-    r"|kubectl\s+(?:get|describe)|helm\s+(?:get|list|history|status))\s[^`]*`"
+    r"|kubectl\s+(?:get|describe)|helm\s+(?:get|list|history|status)|upgrade\s+--check)"
+    r"(?:\s[^`]*)?`"
 )
 # A backticked span is a named artifact: a query, a command, a field, a value.
 _EV_CODE_SPAN = re.compile(r"`[^`]+`")
@@ -417,7 +419,16 @@ def _split_code(text: str) -> tuple[list[str], str, list[str]]:
     runnable = False
     in_indented = False
     prev_blank = True
+    # Content indent of the list item the text is in, if any. Inside a list an
+    # indented block needs four spaces beyond it, so continuation prose such as
+    # "    infrahub stays on 1.10" under "1. Take the hop." is not code.
+    list_indent = 0
     for line in text.splitlines():
+        marker = _LIST_ITEM_RE.match(line)
+        if marker:
+            list_indent = len(marker.group(0))
+        elif line.strip() and not line.startswith((" ", "\t")):
+            list_indent = 0
         opener = _FENCE_OPEN_RE.match(line)
         if fence is not None:
             if opener and opener.group(1)[0] == fence[0] and len(opener.group(1)) >= len(fence):
@@ -437,7 +448,10 @@ def _split_code(text: str) -> tuple[list[str], str, list[str]]:
             prose.append("")
             prev_blank = False
             continue
-        indented = line.startswith(("    ", "\t")) and line.strip() != ""
+        need = list_indent + 4
+        indented = line.strip() != "" and (
+            line.startswith("\t") or len(line) - len(line.lstrip(" ")) >= need
+        )
         if indented and (in_indented or prev_blank) and not _LIST_MARKER_RE.match(line.strip()):
             in_indented = True
             code.append(line)
@@ -487,32 +501,121 @@ def command_lines(text: str) -> list[tuple[str, bool]]:
     return lines
 
 
-def _segments(line: str) -> list[list[str]]:
+_ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_SHELLS = {"sh", "bash", "zsh", "ash", "dash"}
+_PREFIX_WRAPPERS = {"sudo", "doas", "env", "time", "nohup", "exec", "command"}
+_RUN_WRAPPERS = {"uv", "poetry", "pipenv", "pdm", "hatch", "rye"}
+# Programs that are not Infrahub: `docker compose exec infrahub bash` runs bash
+# in a service named `infrahub`.
+_PROGRAMS = _SHELLS | {"python", "python3", "cat", "ls", "echo", "env", "printenv", "true"}
+# Options that consume the next token, per wrapper.
+_VALUE_OPTS = {
+    "sudo": {"-u", "-g", "-h", "-p", "-C", "-D", "-r", "-t", "-U"},
+    "doas": {"-u", "-C"},
+    "env": {"-u", "-C", "-S"},
+    "docker": {
+        "-e", "--env", "--env-file", "-u", "--user", "-w", "--workdir", "--name",
+        "--entrypoint", "-v", "--volume", "-p", "--publish", "-l", "--label",
+        "--network", "-f", "--file", "--project-name", "--project-directory",
+        "--profile", "-c", "--context", "--index", "--platform",
+    },
+    "ssh": {
+        "-p", "-i", "-l", "-o", "-F", "-J", "-b", "-c", "-D", "-E", "-e", "-I",
+        "-L", "-m", "-O", "-Q", "-R", "-S", "-W", "-w",
+    },
+}
+
+
+def _split_ops(line: str) -> list[list[str]]:
     """The line's simple commands, tokenised once with shell operators kept apart.
 
     Tokenising the whole line, rather than splitting on `&&`/`;`/`|` first, is
     what dev/guidelines/graders.md asks for: a pre-split cuts inside quotes.
-    Any token that still holds a space and names a binary is a quoted command
-    (`sh -e -c "..."`, `bash -l -c '...'`, `ssh prod '...'`), and is
-    tokenised again whatever precedes it, so a wrapper cannot hide one.
-    Raises ValueError when the line, or a command inside it, cannot be tokenised.
+    Raises ValueError when the line cannot be tokenised.
     """
     lex = shlex.shlex(line, posix=True, punctuation_chars=True)
     lex.whitespace_split = True
-    tokens = list(lex)
     segments: list[list[str]] = [[]]
-    for tok in tokens:
+    for tok in lex:
         if tok in _OPERATORS:
             segments.append([])
         else:
             segments[-1].append(tok)
+    return [seg for seg in segments if seg]
+
+
+def _skip_opts(tokens: list[str], j: int, wrapper: str) -> int:
+    """Index of the first non-option token from j, stepping over option values."""
+    values = _VALUE_OPTS.get(wrapper, set())
+    while j < len(tokens) and tokens[j].startswith("-") and tokens[j] != "--":
+        j += 2 if tokens[j] in values else 1
+    return j
+
+
+def _commands(tokens: list[str]) -> list[list[str]]:
+    """The commands a simple command runs, each as an argv, wrappers peeled off.
+
+    Only a token in command position is a program: the segment's start, or past
+    a wrapper's options (`sudo -E`, `env FOO=1`, `uv run`), past the service of
+    `docker [compose] exec|run`, past `--` for `kubectl`, or inside the command
+    string of `sh -c '...'` and `ssh host '...'`, which are tokenised again. A
+    binary name anywhere else is an argument (`echo "back up infrahub"`, a
+    service or namespace named `infrahub`) and is not a call.
+    Raises ValueError when a command string cannot be tokenised.
+    """
+    i = 0
+    while i < len(tokens) and _ASSIGN_RE.match(tokens[i]):
+        i += 1
+    if i >= len(tokens):
+        return []
+    head = tokens[i].rsplit("/", 1)[-1]
+    if head in _PREFIX_WRAPPERS:
+        j = i + 1
+        while j < len(tokens) and (
+            (tokens[j].startswith("-") and tokens[j] != "--")
+            or (head == "env" and _ASSIGN_RE.match(tokens[j]))
+        ):
+            j += 2 if tokens[j] in _VALUE_OPTS.get(head, set()) else 1
+        return _commands(tokens[j:])
+    if head in _RUN_WRAPPERS and i + 1 < len(tokens) and tokens[i + 1] == "run":
+        return _commands(tokens[_skip_opts(tokens, i + 2, head):])
+    if head in _SHELLS:
+        for j in range(i + 1, len(tokens) - 1):
+            flag = tokens[j]
+            if flag.startswith("-") and not flag.startswith("--") and "c" in flag[1:]:
+                return _command_string(tokens[j + 1])
+        return []
+    if head == "ssh":
+        j = _skip_opts(tokens, i + 1, "ssh") + 1  # past the host
+        return _command_string(" ".join(tokens[j:])) if j < len(tokens) else []
+    if head == "docker":
+        j = i + 1
+        if j < len(tokens) and tokens[j] == "compose":
+            j = _skip_opts(tokens, j + 1, "docker")
+        if j >= len(tokens) or tokens[j] not in ("exec", "run"):
+            return []
+        j = _skip_opts(tokens, j + 1, "docker")
+        if j >= len(tokens):
+            return []
+        service, rest = tokens[j], tokens[j + 1 :]
+        # A service token that is itself a binary name, followed by something
+        # that is not a program, reads as the binary: `docker compose run --rm
+        # infrahub migrate` means `infrahub migrate`, while `exec infrahub bash`
+        # runs bash.
+        if service.rsplit("/", 1)[-1] in _BINARIES and rest and rest[0].rsplit("/", 1)[-1] not in (
+            _PROGRAMS | set(_BINARIES)
+        ):
+            return [[service, *rest]]
+        return _commands(rest)
+    if head == "kubectl":
+        return _commands(tokens[tokens.index("--") + 1 :]) if "--" in tokens else []
+    return [tokens[i:]]
+
+
+def _command_string(text: str) -> list[list[str]]:
     out: list[list[str]] = []
-    for seg in segments:
-        if seg:
-            out.append(seg)
-        for tok in seg:
-            if any(c.isspace() for c in tok) and _BINARY_WORD_RE.search(tok):
-                out.extend(_segments(tok))
+    for seg in _split_ops(text):
+        out.extend(_commands(seg))
     return out
 
 
@@ -524,13 +627,12 @@ def invocations(text: str) -> list[tuple[str, tuple[str, ...], list[str], bool, 
     ``("infrahubctl", "schema", "load", "x.yml")``. Keying on the first
     subcommand alone would read that as ``schema`` and miss the write.
 
-    The binary is found by scanning for its token, which sees through wrappers
-    (``docker compose run``, ``kubectl exec ... --``, ``sudo -E``). A token
-    only counts when the word after it is one of that binary's real
-    subcommands, so ``-n infrahub`` (a namespace) and a compose service named
-    ``infrahub`` are passed over. A line that names a binary but cannot be
-    tokenised comes back as an ``<unparseable>`` invocation, so the check fails
-    closed rather than reporting "no commands".
+    Only a binary in command position counts; see `_commands` for the
+    wrappers it sees through. In a code block, a subcommand-shaped word the
+    binary does not have is kept as an invented command so the check can fail
+    it. A line that names a binary but cannot be tokenised comes back as an
+    ``<unparseable>`` invocation, so the check fails closed rather than
+    reporting "no commands".
     """
     return _invocations_from(command_lines(text), fail_closed=True)
 
@@ -553,43 +655,26 @@ def _invocations_from(
     found: list[tuple[str, tuple[str, ...], list[str], bool, str]] = []
     for line, fenced in lines:
         try:
-            segments = _segments(line)
+            argvs = [argv for seg in _split_ops(line) for argv in _commands(seg)]
         except ValueError:
             if fail_closed and _BINARY_WORD_RE.search(line):
                 found.append(("?", ("<unparseable>",), [], fenced, line))
             continue
-        for tokens in segments:
-            for i, tok in enumerate(tokens):
-                base = tok.rsplit("/", 1)[-1]
-                if base not in _BINARIES:
-                    continue
-                rest = tokens[i + 1 :]
-                words = [t for t in rest if not t.startswith("-")]
-                flags = [t for t in rest if t.startswith("-")]
-                # A bare binary name, or one followed by a word that is not
-                # its subcommand, is prose or an option value, not a call.
-                if not words or words[0] not in _KNOWN_SUBCOMMANDS[base]:
-                    # In a code block, a subcommand-shaped word that the binary
-                    # does not have is an invented command (`infrahub migrate`),
-                    # unless it is an option's value (`-n infrahub`), a service
-                    # name followed by the binary, or a real call follows.
-                    prev = tokens[i - 1] if i else ""
-                    invented = (
-                        fenced
-                        and words
-                        and _SUBCOMMAND_RE.match(words[0])
-                        and words[0] not in _BINARIES
-                        and not (prev.startswith("-") and prev != "--")
-                        and not any(
-                            t.rsplit("/", 1)[-1] in _BINARIES for t in tokens[i + 1 :]
-                        )
-                    )
-                    if invented:
-                        found.append((base, tuple([base, *words]), flags, fenced, line))
-                        break
-                    continue
+        for argv in argvs:
+            base = argv[0].rsplit("/", 1)[-1]
+            if base not in _BINARIES:
+                continue
+            rest = argv[1:]
+            words = [t for t in rest if not t.startswith("-")]
+            flags = [t for t in rest if t.startswith("-")]
+            if not words:
+                continue
+            # In a code block, a subcommand-shaped word the binary does not
+            # have is an invented command (`infrahub migrate`). In prose the
+            # binary name may just be a word in a sentence, so it is skipped.
+            known = words[0] in _KNOWN_SUBCOMMANDS[base]
+            if known or (fenced and _SUBCOMMAND_RE.match(words[0])):
                 found.append((base, tuple([base, *words]), flags, fenced, line))
-                break
     return found
 
 

@@ -50,6 +50,7 @@ VERSION=1.9.0 docker compose run --rm --no-deps infrahub-server infrahub upgrade
 | Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | node_metadata is now a reserved attribute name | v1.10.0 | breaking | critical | before | no | `grep -rn node_metadata schemas/` has no match | None | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0 |
+| Restricted inheritance on internal Core generics | v1.10.0 | breaking | critical | before | unknown | Not determinable from the repo alone | Run get_schema against the instance to list nodes inheriting from the restricted Core generics, such as CoreGenericAccount | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0 |
 
 ```bash
 # read-only: the target image reports what the upgrade would do, writes nothing
