@@ -842,3 +842,38 @@ def test_invented_command_behind_a_wrapper_fails(line):
 def test_bare_probe_forms_resolve_an_unknown(action):
     ok, msg = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action=action)))
     assert ok, msg
+
+
+# --- cubic, round 3: wrapper options and the `--` terminator ---------------
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "uv run --group test infrahub upgrade",
+        "sudo --user root infrahub upgrade",
+        "sudo -- infrahub upgrade",
+        "env --chdir /srv infrahub upgrade",
+        "docker compose exec infrahub -- infrahub upgrade",
+    ],
+    ids=["uv-group", "sudo-long-user", "sudo-terminator", "env-long-chdir", "compose-terminator-upgrade"],
+)
+def test_upgrade_behind_wrapper_options_fails(line):
+    ok, _ = check_no_mutating_commands(_hop(f"```bash\n{line}\n```\n"))
+    assert not ok
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "uv run --group test infrahubctl info",
+        "sudo --user root infrahubctl info",
+        "sudo -- infrahubctl info",
+        "docker compose exec infrahub -- infrahubctl version",
+        "docker compose exec infrahub -it infrahubctl version",
+    ],
+    ids=["uv-group", "sudo-long-user", "sudo-terminator", "compose-terminator", "compose-flag-after-service"],
+)
+def test_probe_behind_wrapper_options_passes(line):
+    ok, msg = check_no_mutating_commands(_hop(f"```bash\n{line}\n```\n"))
+    assert ok, msg

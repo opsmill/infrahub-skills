@@ -510,9 +510,21 @@ _RUN_WRAPPERS = {"uv", "poetry", "pipenv", "pdm", "hatch", "rye"}
 _PROGRAMS = _SHELLS | {"python", "python3", "cat", "ls", "echo", "env", "printenv", "true"}
 # Options that consume the next token, per wrapper.
 _VALUE_OPTS = {
-    "sudo": {"-u", "-g", "-h", "-p", "-C", "-D", "-r", "-t", "-U"},
+    "sudo": {
+        "-u", "-g", "-h", "-p", "-C", "-D", "-r", "-t", "-U", "--user", "--group",
+        "--host", "--prompt", "--chdir", "--close-from", "--role", "--type",
+        "--other-user", "--login-class",
+    },
     "doas": {"-u", "-C"},
-    "env": {"-u", "-C", "-S"},
+    "env": {"-u", "-C", "-S", "--unset", "--chdir", "--split-string"},
+    "uv": {
+        "--group", "--only-group", "--extra", "--with", "--with-editable",
+        "--with-requirements", "-p", "--python", "--project", "--directory",
+        "--package", "--env-file", "--index", "--index-url", "--default-index",
+        "--extra-index-url", "-f", "--find-links",
+    },
+    "poetry": {"-C", "--directory", "-P", "--project"},
+    "pdm": {"-p", "--project"},
     "docker": {
         "-e", "--env", "--env-file", "-u", "--user", "-w", "--workdir", "--name",
         "--entrypoint", "-v", "--volume", "-p", "--publish", "-l", "--label",
@@ -547,7 +559,9 @@ def _split_ops(line: str) -> list[list[str]]:
 def _skip_opts(tokens: list[str], j: int, wrapper: str) -> int:
     """Index of the first non-option token from j, stepping over option values."""
     values = _VALUE_OPTS.get(wrapper, set())
-    while j < len(tokens) and tokens[j].startswith("-") and tokens[j] != "--":
+    while j < len(tokens) and tokens[j].startswith("-"):
+        if tokens[j] == "--":  # option terminator: what follows is not an option
+            return j + 1
         j += 2 if tokens[j] in values else 1
     return j
 
@@ -572,9 +586,11 @@ def _commands(tokens: list[str]) -> list[list[str]]:
     if head in _PREFIX_WRAPPERS:
         j = i + 1
         while j < len(tokens) and (
-            (tokens[j].startswith("-") and tokens[j] != "--")
-            or (head == "env" and _ASSIGN_RE.match(tokens[j]))
+            tokens[j].startswith("-") or (head == "env" and _ASSIGN_RE.match(tokens[j]))
         ):
+            if tokens[j] == "--":  # option terminator: the command follows
+                j += 1
+                break
             j += 2 if tokens[j] in _VALUE_OPTS.get(head, set()) else 1
         return _commands(tokens[j:])
     if head in _RUN_WRAPPERS and i + 1 < len(tokens) and tokens[i + 1] == "run":
@@ -598,11 +614,14 @@ def _commands(tokens: list[str]) -> list[list[str]]:
         if j >= len(tokens):
             return []
         service, rest = tokens[j], tokens[j + 1 :]
+        # A `--` or stray options after the service belong to the command line,
+        # not to the program: `exec infrahub -- infrahubctl version`.
+        rest = rest[_skip_opts(rest, 0, "docker"):]
         # A service token that is itself a binary name, followed by something
         # that is not a program, reads as the binary: `docker compose run --rm
         # infrahub migrate` means `infrahub migrate`, while `exec infrahub bash`
         # runs bash.
-        if service.rsplit("/", 1)[-1] in _BINARIES and rest and rest[0].rsplit("/", 1)[-1] not in (
+        if service.rsplit("/", 1)[-1] in _BINARIES and rest and not rest[0].startswith("-") and rest[0].rsplit("/", 1)[-1] not in (
             _PROGRAMS | set(_BINARIES)
         ):
             return [[service, *rest]]
