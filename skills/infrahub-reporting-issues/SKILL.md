@@ -198,7 +198,7 @@ Always search both bugs and features. Use the first
 available method:
 
 1. **`gh` CLI** — `gh search issues --repo <owner/repo>
-   --state all "<keywords>"`. Pull keywords from the
+   "<keywords>"`. Pull keywords from the
    user's description plus any error message strings.
    Run a second pass with synonyms if the first
    returns nothing.

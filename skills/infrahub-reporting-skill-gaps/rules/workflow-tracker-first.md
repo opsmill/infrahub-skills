@@ -31,8 +31,7 @@ Search first, using the friction in the user's own
 terms plus the implicated skill name:
 
 ```bash
-gh search issues --repo opsmill/infrahub-skills \
-  --state all "<skill name> <friction in plain terms>"
+gh search issues --repo opsmill/infrahub-skills "<skill name> <friction in plain terms>"
 ```
 
 Then take one of three paths:
