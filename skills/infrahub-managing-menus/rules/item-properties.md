@@ -79,4 +79,4 @@ group header (non-clickable):
 ```
 
 Reference:
-[Infrahub Menu Docs](https://docs.infrahub.app/topics/menu/)
+[Infrahub Menu Docs](https://docs.infrahub.app/menu/overview)

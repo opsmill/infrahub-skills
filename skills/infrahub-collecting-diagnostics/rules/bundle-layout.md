@@ -82,4 +82,4 @@ output.
   a recorded collection failure on a degraded
   deployment.
 
-Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)
