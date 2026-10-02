@@ -51,9 +51,12 @@ cli_invocations_all:
 documentation_all:
   - *doc_files
   - *markdown_all
-  # Registration surfaces that are neither docs nor Markdown, so a change to
-  # either still runs check-skill-registration.py in the docs-build job.
+  # Non-Markdown inputs to the docs-build job: the release manifest, a
+  # registration surface, and the three docs checks the job runs, so a change
+  # to any of them re-runs that job.
   - ".github/.release-manifest.json"
+  - "scripts/check-docs-sidebar.py"
+  - "scripts/check-docs-skill-names.py"
   - "scripts/check-skill-registration.py"
 
 # What the pytest suite covers: every Python file, the dependency declarations

@@ -39,8 +39,8 @@ ROUTER_COUNT = "docs/docs/choosing-a-skill.mdx skill count"
 MANIFEST = ".github/.release-manifest.json"
 PAGE_SECTIONS = "reference page sections"
 
-# The sections every skills-reference page carries, in this order. Pages may
-# add their own between or after them.
+# The first `##` sections every skills-reference page carries, in this order.
+# Pages add their own after them.
 SECTIONS = [
     "When to use",
     "What it produces",
@@ -54,14 +54,11 @@ SECTIONS = [
 NOT_SURE = "Not sure this is the right skill?"
 
 # The router opens with the count spelled out ("Fifteen skills is ...").
-_NUMBER_WORDS = {
-    word: value
-    for value, word in enumerate(
-        "zero one two three four five six seven eight nine ten eleven twelve "
-        "thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty "
-        "twenty-one twenty-two twenty-three twenty-four twenty-five".split()
-    )
-}
+_UNITS = (
+    "zero one two three four five six seven eight nine ten eleven twelve "
+    "thirteen fourteen fifteen sixteen seventeen eighteen nineteen"
+).split()
+_TENS = "twenty thirty forty fifty sixty seventy eighty ninety".split()
 
 # Same frontmatter handling as check-docs-skill-names.py: the exemption is
 # read from the skill's own frontmatter block, never from its body.
@@ -72,6 +69,25 @@ _HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
 _DELIMITER_ROW = re.compile(r"^\|[\s:|-]+\|$")
 _PAGE_LINK = re.compile(r"\[([^\]]+)\]\(\./skills-reference/([a-z0-9-]+)\.mdx\)")
 _TREE_ENTRY = re.compile(r"^[│\s]*[├└]──\s+([A-Za-z0-9._-]+)/")
+# A fence opens with three or more backticks or tildes, and closes on a run of
+# the same character at least as long.
+_FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
+
+
+def spelled_number(word: str) -> int | None:
+    """0 to 99 from its English spelling ("fifteen", "Twenty-six"), else None."""
+    word = word.lower()
+    if word in _UNITS:
+        return _UNITS.index(word)
+    tens, _, unit = word.partition("-")
+    if tens not in _TENS:
+        return None
+    value = 20 + 10 * _TENS.index(tens)
+    if not unit:
+        return value
+    if unit in _UNITS[1:10]:
+        return value + _UNITS.index(unit)
+    return None
 
 
 def user_invocable_skills(skills_dir: Path) -> list[str]:
@@ -98,30 +114,31 @@ def _strip_frontmatter(text: str) -> str:
     return _FRONTMATTER.sub("", text, count=1)
 
 
-def _outside_fences(text: str) -> list[str]:
-    """The lines of `text` that are not inside a fenced code block."""
-    lines: list[str] = []
-    in_fence = False
+def _split_fences(text: str) -> tuple[list[str], list[str]]:
+    """(lines outside fenced code blocks, lines inside them)."""
+    outside: list[str] = []
+    inside: list[str] = []
+    opener = ""
     for line in text.splitlines():
-        if line.lstrip().startswith("```"):
-            in_fence = not in_fence
-            continue
-        if not in_fence:
-            lines.append(line)
-    return lines
+        match = _FENCE.match(line)
+        if match:
+            marker = match.group(1)
+            if not opener:
+                opener = marker
+                continue
+            if marker[0] == opener[0] and len(marker) >= len(opener):
+                opener = ""
+                continue
+        (inside if opener else outside).append(line)
+    return outside, inside
+
+
+def _outside_fences(text: str) -> list[str]:
+    return _split_fences(text)[0]
 
 
 def _inside_fences(text: str) -> list[str]:
-    """The lines of `text` inside fenced code blocks."""
-    lines: list[str] = []
-    in_fence = False
-    for line in text.splitlines():
-        if line.lstrip().startswith("```"):
-            in_fence = not in_fence
-            continue
-        if in_fence:
-            lines.append(line)
-    return lines
+    return _split_fences(text)[1]
 
 
 def _section(lines: list[str], level: int, title: str) -> list[str]:
@@ -226,7 +243,7 @@ def _router(root: Path) -> tuple[set[str], set[str], int | None]:
                     paired.add(display[part.strip()])
 
     first = next((line for line in lines if line.strip()), "")
-    count = _NUMBER_WORDS.get(first.split(" ", 1)[0].lower())
+    count = spelled_number(first.split(" ", 1)[0])
     return routed, paired, count
 
 
@@ -245,9 +262,8 @@ def _page_ok(page: Path, paired: bool) -> bool:
         for line in _outside_fences(_strip_frontmatter(_read(page)))
         if (match := _HEADING.match(line)) and len(match.group(1)) == 2
     ]
-    remaining = iter(headings)
-    in_order = all(section in remaining for section in SECTIONS)
-    return in_order and (NOT_SURE in headings) == paired
+    opens_right = headings[: len(SECTIONS)] == SECTIONS
+    return opens_right and (NOT_SURE in headings) == paired
 
 
 def check_registration(root: Path) -> list[tuple[str, str]]:
@@ -304,7 +320,7 @@ def main() -> int:
             print(f"  {surface}: the opening count does not spell out {len(skills)}")
         elif surface == PAGE_SECTIONS:
             print(
-                f"  {name}: {surface} need {', '.join(SECTIONS)} in order, and "
+                f"  {name}: {surface} need to open with {', '.join(SECTIONS)} in order, and "
                 f"'{NOT_SURE}' exactly when the router has a pair table naming it"
             )
         else:

@@ -193,8 +193,10 @@ def test_compliant_tree_passes(mod, tmp_path: Path) -> None:
 
 
 def test_exempt_skill_is_required_nowhere(mod, tmp_path: Path) -> None:
-    """`infrahub-common` declares `user-invocable: false` and is on no surface.
-    The count word stays "Two": the exempt skill is not counted either."""
+    """`infrahub-common` declares `user-invocable: false`, so the check requires
+    it on no surface. The fixture still lists it in the README tree, as the real
+    README does; the check ignores that entry rather than requiring it. The
+    count word stays "Two": the exempt skill is not counted either."""
     root = _tree(tmp_path)
     failures = mod.check_registration(root)
     assert not [f for f in failures if f[0] == "infrahub-common"]
@@ -343,6 +345,38 @@ def test_unrecognized_router_count_is_reported(mod, tmp_path: Path) -> None:
     assert mod.check_registration(root) == [("", ROUTER_COUNT)]
 
 
+@pytest.mark.parametrize(
+    ("word", "value"),
+    [
+        ("Two", 2),
+        ("fifteen", 15),
+        ("Twenty", 20),
+        ("Twenty-six", 26),
+        ("ninety-nine", 99),
+        ("Many", None),
+        ("twenty-ten", None),
+        ("twenty-zero", None),
+    ],
+)
+def test_spelled_count_has_no_ceiling(mod, word: str, value: int | None) -> None:
+    """The count used to stop at twenty-five, so the twenty-sixth skill would
+    have failed lint with a correct "Twenty-six skills" opening."""
+    assert mod.spelled_number(word) == value
+
+
+def test_tilde_fenced_readme_tree_is_read(mod, tmp_path: Path) -> None:
+    """`~~~` opens a fence as validly as three backticks."""
+    root = _tree(tmp_path)
+    readme = root / "README.md"
+    text = readme.read_text(encoding="utf-8")
+    _edit(
+        readme, "## Project Structure\n\n```text\n", "## Project Structure\n\n~~~text\n"
+    )
+    _edit(readme, "└── LICENSE\n```\n", "└── LICENSE\n~~~\n")
+    assert readme.read_text(encoding="utf-8") != text
+    assert mod.check_registration(root) == []
+
+
 def test_pair_skill_without_not_sure_section_is_reported(mod, tmp_path: Path) -> None:
     root = _tree(tmp_path)
     _add_pair_table(root, "Widget Maker, Gadget Fixer")
@@ -485,8 +519,17 @@ def test_manifest_name_outside_the_skills_array_is_reported(
         # heading text present only inside a fenced block
         _page(WIDGETS, "Widget Maker").replace("\n## Key rules enforced\n\nText.\n", "")
         + "\n```markdown\n## Key rules enforced\n```\n",
+        # heading text inside a tilde-fenced block, in the position it belongs
+        _page(WIDGETS, "Widget Maker").replace(
+            "\n## Key rules enforced\n\nText.\n",
+            "\n~~~markdown\n## Key rules enforced\n~~~\n",
+        ),
+        # all five in order, but the page opens with its own section
+        _page(WIDGETS, "Widget Maker").replace(
+            "## When to use", "## Running it\n\nText.\n\n## When to use"
+        ),
     ],
-    ids=["out-of-order", "demoted", "prose", "fenced"],
+    ids=["out-of-order", "demoted", "prose", "fenced", "tilde-fenced", "leading-extra"],
 )
 def test_section_text_without_the_section_is_reported(
     mod, tmp_path: Path, page_body: str

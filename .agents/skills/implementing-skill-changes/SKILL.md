@@ -15,6 +15,8 @@ compatibility: >-
   Requires this repository checked out on the pipeline branch. `gh` and a GitHub
   remote are needed only for the PR path. `skillgrade` is needed for the
   targeted eval run and the discrimination proof on guidance-class changes.
+  Node.js with `npm`, and network access for `npm ci`, are needed to build the
+  docs when the change adds a new skill.
 user-invocable: true
 metadata:
   internal: true
@@ -126,8 +128,9 @@ table rather than restating it here; a second copy is the exact drift the
 guideline warns about. It comes before Verify so that `uv run invoke lint`
 and the docs build there run against the wired surfaces: lint fails a skill
 missing from any surface it checks, and the scenarios and pair tables are
-yours to judge.
-The report names each surface and what was added to it.
+yours to judge. In your report, name each surface you added to and what
+you added: the check's output only names the surfaces a skill is missing
+from.
 
 ## Verify
 
