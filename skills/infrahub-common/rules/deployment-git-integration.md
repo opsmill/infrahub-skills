@@ -69,7 +69,7 @@ Key differences from `CoreRepository`:
 - Does not push to remote (no worktree errors with
   local mounts)
 - No periodic sync: imports at creation, then again
-  only when its `commit` or `ref` is updated
+  only when told to import a new commit
 - Suitable for generators, checks, transforms, and
   schema code
 
@@ -123,9 +123,14 @@ services:
   `bootstrap/` directory
 - **Read-only repos don't follow pushes**:
   `CoreReadOnlyRepository` does not pick up new
-  commits on its own. Update its `commit` (or move
-  `ref`) to make it re-import; there is no need to
-  delete and re-create the registration
+  commits on its own. Run
+  `InfrahubReadOnlyRepositoryImportLastCommit`
+  (Infrahub 1.8+, see
+  [testing-commands.md](../../infrahub-managing-transforms/rules/testing-commands.md#read-only-repos-dont-auto-pull-on-push)),
+  or set its `commit` to the new SHA. An update only
+  re-imports when the value changes, so re-saving the
+  same `ref` does nothing. There is no need to delete
+  and re-create the registration
 
 Reference:
 [infrahub-yml-reference.md](../infrahub-yml-reference.md)

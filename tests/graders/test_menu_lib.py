@@ -2030,6 +2030,48 @@ echo "not needed:" infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
         ok, msg = self._deleted(notes)
         assert ok, msg
 
+    def test_launcher_wrapped_lab_delete_counts(self):
+        """``uv run infrahubctl`` is the form infrahub-common teaches."""
+        for launcher in ("uv run", "uv run --with infrahub-sdk", "poetry run", "pipx run"):
+            notes = (
+                "```bash\ngit commit -am retire && git push\n"
+                f"{launcher} infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert ok, f"{launcher}: {msg}"
+
+    def test_launcher_wrapped_delete_of_a_synced_item_fails(self):
+        notes = (
+            "```bash\ngit commit -am retire && git push\n"
+            "uv run infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n"
+            "sudo -u bot env INFRAHUB_ADDRESS=x uv run infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes\n```\n"
+        )
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, FloorMenu]" in msg
+
+    def test_wrapped_git_push_counts(self):
+        for push in ("(cd repo && git commit -am retire && git push)", "env GIT_SSH_COMMAND=ssh git commit -am retire && env X=y git push", "sudo -u bot git commit -am retire; sudo git push"):
+            notes = (
+                f"```bash\n{push}\n"
+                "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert ok, f"{push}: {msg}"
+
+    def test_multi_line_commit_message_keeps_the_commit(self):
+        notes = """\
+```bash
+git commit -am "Retire wireless and floors
+
+The sync removes the dropped entries; Lab goes by hand."
+git push origin main
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
     def test_task_script_scores_four_fixtures(self, tmp_path):
         """The task grader scores the four fixtures 1.0 / 1.0 / <1.0 / <1.0."""
         cases = [

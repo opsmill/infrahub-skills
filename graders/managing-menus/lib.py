@@ -800,39 +800,90 @@ def _json_variables(text: str) -> dict:
 _CURL_DATA_FLAGS = frozenset({"-d", "--data", "--data-raw", "--data-binary", "--json"})
 
 
-_SHELL_OPERATOR_CHARS = ";&|"
+_SHELL_OPERATOR_CHARS = ";&|()"
 # Words that precede a command without being it: ``if x; then git push``.
-_SHELL_PREFIX_WORDS = frozenset({"$", "then", "do", "else", "!", "time", "sudo", "command"})
+_SHELL_PREFIX_WORDS = frozenset(
+    {"$", "then", "do", "else", "!", "time", "command", "exec", "nohup"}
+)
 _ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_]\w*=")
+# Launchers that run the next word as the program: ``uv run infrahubctl``.
+_RUN_LAUNCHERS = frozenset({"uv", "poetry", "pdm", "hatch", "pipenv", "rye", "pipx"})
+# Options of sudo, env and the launchers' ``run`` that take a separate value.
+_PREFIX_VALUE_OPTIONS = frozenset(
+    {
+        "-u", "-g", "-h", "-C", "-D", "-p", "-r", "-t", "-U", "-T", "-S", "-P", "-w",
+        "--with", "--with-editable", "--with-requirements", "--project", "--directory",
+        "--group", "--only-group", "--no-group", "--extra", "--python", "--package",
+        "--env-file", "--index", "--index-url", "--default-index", "--extra-index-url",
+        "--config-file", "--cache-dir", "--spec", "--user", "--chdir", "--unset",
+    }
+)
+
+
+def _skip_options(argv: list[str]) -> list[str]:
+    """Drop leading options (and the values of those that take one)."""
+    while argv and argv[0].startswith("-"):
+        option = argv.pop(0)
+        if option == "--":
+            break
+        if option in _PREFIX_VALUE_OPTIONS and argv:
+            argv.pop(0)
+    return argv
+
+
+def _program_argv(argv: list[str]) -> list[str]:
+    """The argv of the program that actually runs, wrappers peeled off.
+
+    Drops prompts, words like ``then``, ``VAR=value`` assignments, ``sudo``
+    and ``env`` with their options, and ``uv run`` / ``poetry run`` style
+    launchers, so ``uv run infrahubctl ...`` is an ``infrahubctl`` call and
+    ``echo git push`` stays an ``echo``.
+    """
+    argv = list(argv)
+    while argv:
+        head = argv[0]
+        if head in _SHELL_PREFIX_WORDS or _ENV_ASSIGNMENT_RE.match(head):
+            argv.pop(0)
+        elif head in ("sudo", "env"):
+            argv = _skip_options(argv[1:])
+        elif head in _RUN_LAUNCHERS and argv[1:2] == ["run"]:
+            argv = _skip_options(argv[2:])
+        else:
+            break
+    return argv
+
+
+def _lex_line(line: str) -> list[str]:
+    """``shlex`` tokens of one shell line, operators as separate tokens."""
+    lexer = shlex.shlex(line, posix=True, punctuation_chars=_SHELL_OPERATOR_CHARS)
+    lexer.whitespace_split = True
+    lexer.commenters = "#"
+    return list(lexer)
 
 
 def _shell_commands(body: str) -> list[list[str]]:
-    """Each simple command of a shell fence, as its argv, in order.
+    """Each simple command of a shell fence, as the argv that runs, in order.
 
-    Lines are split on ``;``, ``&&``, ``||`` and ``|`` (quoted ones stay put),
-    after loops are unrolled and continuations joined. Prompts, leading
-    ``VAR=value`` assignments and words like ``then`` are dropped, so
-    ``argv[0]`` is the program that actually runs: ``echo git push`` is an
-    ``echo``, not a push.
+    Lines are split on ``;``, ``&&``, ``||``, ``|`` and subshell parentheses
+    (quoted ones stay put), after loops are unrolled and continuations
+    joined; a quote left open runs on into the next line, as in a multi-line
+    ``git commit -m``. ``_program_argv`` peels wrappers off each command.
     """
     commands: list[list[str]] = []
+    pending = ""
     for line in _expand_for_loops(body.replace("\\\n", " ")).splitlines():
-        lexer = shlex.shlex(line, posix=True, punctuation_chars=_SHELL_OPERATOR_CHARS)
-        lexer.whitespace_split = True
-        lexer.commenters = "#"
+        pending = f"{pending}\n{line}" if pending else line
         try:
-            tokens = list(lexer)
+            tokens = _lex_line(pending)
         except ValueError:
-            continue
+            continue  # unclosed quote: read the next line into it
+        pending = ""
         current: list[str] = []
         for token in tokens + [";"]:
             if token and set(token) <= set(_SHELL_OPERATOR_CHARS):
-                while current and (
-                    current[0] in _SHELL_PREFIX_WORDS or _ENV_ASSIGNMENT_RE.match(current[0])
-                ):
-                    current.pop(0)
-                if current:
-                    commands.append(current)
+                argv = _program_argv(current)
+                if argv:
+                    commands.append(argv)
                 current = []
             else:
                 current.append(token)
