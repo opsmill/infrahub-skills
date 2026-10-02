@@ -246,6 +246,32 @@ def test_gh_search_state_all_after_inline_triple_backticks_is_flagged(
     _assert_one_state_all(bad)
 
 
+def test_gh_search_prs_state_all_is_flagged(monkeypatch, tmp_path: Path) -> None:
+    """`prs` is checked against its own value set, not skipped and not
+    folded into a flat check."""
+    lines = [
+        "```bash",
+        f'gh search prs --repo opsmill/infrahub-skills --state {ALL} "kw"',
+        "```",
+    ]
+    bad = _scan_only(monkeypatch, tmp_path, "prs.md", lines)
+    assert _gh_findings(bad) == ["gh search prs --state all"], bad
+
+
+def test_gh_search_state_with_no_value_is_flagged(monkeypatch, tmp_path: Path) -> None:
+    """gh rejects an empty `--state=` (`invalid argument ""`) and a
+    trailing `--state` (`flag needs an argument`). Both are one form."""
+    lines = [
+        "```bash",
+        'gh search issues --repo x --state= "kw"',
+        'gh search issues --repo x "kw" --state',
+        "```",
+    ]
+    bad = _scan_only(monkeypatch, tmp_path, "no-value.md", lines)
+    assert _gh_findings(bad) == ['gh search issues --state ""'], bad
+    assert len(bad['gh search issues --state ""']) == 2, bad
+
+
 def test_state_all_inside_a_quoted_query_is_not_an_option(monkeypatch, tmp_path: Path) -> None:
     """Shell tokenizing: the quoted query is one argument, so the
     `--state all` inside it is search text, not a flag."""

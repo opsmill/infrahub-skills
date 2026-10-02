@@ -204,8 +204,11 @@ def _gh_bad_forms(text: str) -> list[str]:
                 value = token.removeprefix("--state=")
             else:
                 continue
-            if value and value not in GH_SEARCH_STATES[sub]:
-                forms.append(f"gh search {sub} --state {value}")
+            # An empty `--state=` and a trailing `--state` are both
+            # rejected by gh, so no value is a bad value too.
+            if value not in GH_SEARCH_STATES[sub]:
+                shown = value or '""'
+                forms.append(f"gh search {sub} --state {shown}")
     return forms
 
 
