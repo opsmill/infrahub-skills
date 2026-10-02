@@ -7496,15 +7496,14 @@ tasks:
         run: python graders/converting-netbox-device-types/check_bundled_scripts.py output_dir
         weight: 1.0
     expected_output: >-
-      A ./output_dir/ produced by the bundled converter: numeric attributes
-      are whole numbers (the 7.59 kg weight rounds rather than being written
-      as a float, which Infrahub's integer-backed Number attributes cannot
-      hold), no NetBox choice wrapper objects appear in the YAML, component
-      children nest under a kind + data wrapper, and a coverage report names
-      the console-ports and the dropped interface fields.
+      A ./output_dir/ produced by the bundled converter: the 7.59 kg weight
+      is carried through as the whole number 8, rather than written as a
+      float that Infrahub's integer-backed Number attributes cannot hold or
+      dropped to avoid the problem, component children nest under a kind +
+      data wrapper, and a coverage report names the console-ports and the
+      dropped interface fields.
     expectations:
-      - The device type weight is a whole number, not 7.59
-      - No emitted value is a NetBox choice object such as {value, label}
+      - The device type weight is the whole number 8, neither 7.59 nor absent
       - Component children nest under a kind + data wrapper
       - A coverage report is written naming what did not convert
       - The console-ports list and the interface type/poe_mode fields are accounted for
@@ -7519,8 +7518,16 @@ tasks:
           template_name
       - name: bundled-script-output
         check: >-
-          Numerics are integers, choice values are unwrapped, and a coverage
-          report exists — the guarantees a hand-rolled conversion loses
+          Numerics are integers and a coverage report exists — guarantees a
+          hand-rolled conversion loses. Its choice-object predicate cannot
+          fire here: the input is devicetype-library YAML, which carries no
+          {value, label} wrappers. Feeding this task API-shaped input to
+          exercise it would fail the correct answer instead, since unwrapping
+          is the exporter's job and the converter does not do it.
+      - name: weight-rounds-to-a-whole-number
+        check: >-
+          The weight is present and equals 8 — the registry check can only
+          reject a float, so dropping the field scored full marks
       - name: component-kind-wrapper
         check: >-
           Component children nest under a kind + data wrapper naming a

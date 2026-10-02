@@ -42,11 +42,11 @@ not merely unfixed — they are unstated.
 
 ```bash
 # from a running NetBox
-python scripts/netbox_export_device_types.py --url ... --output-dir ./netbox-export
+python "$SKILL/scripts/netbox_export_device_types.py" --url ... --output-dir ./netbox-export
 
 # from library YAML, whether cloned or exported above
-python scripts/netbox_to_infrahub_templates.py ./netbox-export/device-types \
-  --mapping scripts/mappings/<profile>.yml --output-dir ./generated
+python "$SKILL/scripts/netbox_to_infrahub_templates.py" ./netbox-export/device-types \
+  --mapping "$SKILL/scripts/mappings/<profile>.yml" --output-dir ./generated
 
 # resolve {module} once modules are installed in bays
 infrahubctl generator materialize_module_ports --branch <branch>

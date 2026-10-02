@@ -216,18 +216,26 @@ library file format:
 
 ```bash
 pip install 'pynetbox>=7.0'     # the official NetBox client
+# SKILL is this skill's own directory, wherever it is installed
+SKILL=/path/to/infrahub-converting-netbox-device-types
 export NETBOX_TOKEN=...
-python scripts/netbox_export_device_types.py \
+python "$SKILL/scripts/netbox_export_device_types.py" \
   --url https://netbox.example.com \
   --in-use \
   --module-types \
   --output-dir ./netbox-export
 ```
 
-Every command in this skill names its script relative to
-this skill's directory, so run them from there. Inputs
-and outputs (`./netbox-export`, `./generated`) are then
-relative to the same place.
+**Stay in the user's working directory and name the
+scripts by their full path.** `$SKILL` is wherever this
+skill is installed, which for a plugin install is under
+`~/.claude/plugins/cache/` — a directory reinstalling
+the plugin wipes. Running from there puts the export,
+the cloned library and the generated YAML inside it, so
+the next update deletes the user's data. Everything the
+commands below read or write (`./netbox-export`,
+`devicetype-library/`, `./generated`) stays relative to
+where the user actually is.
 
 `--in-use` keeps only device types with at least one
 device, which on a real instance is a much smaller and
@@ -277,9 +285,9 @@ When a schema does not fit, the answer is a mapping
 profile, not a different script.
 
 ```bash
-python scripts/netbox_to_infrahub_templates.py \
+python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
   devicetype-library/device-types/Cisco/ \
-  --mapping scripts/mappings/schema-library.yml \
+  --mapping "$SKILL/scripts/mappings/schema-library.yml" \
   --output-dir ./generated \
   --report ./generated/coverage-report.md
 ```

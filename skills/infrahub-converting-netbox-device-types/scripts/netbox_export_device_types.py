@@ -87,7 +87,9 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import sys
+import tempfile
 import urllib.parse
 from collections.abc import Iterable, Iterator
 from pathlib import Path
@@ -190,8 +192,12 @@ DEVICE_TYPE_FIELDS: tuple[str, ...] = (
     "weight",
     "weight_unit",
     "subdevice_role",
-    "front_image",
-    "rear_image",
+    # front_image / rear_image are deliberately absent. NetBox returns a URL
+    # to the uploaded elevation image; the library schema types both as
+    # booleans meaning "an image file sits beside this YAML in the repo".
+    # Carrying the URL writes a string where a boolean belongs, and writing
+    # `true` instead would assert a file this export does not produce. They
+    # are reported as uncarried, like any other field with no home.
     "description",
     "comments",
 )
@@ -307,17 +313,16 @@ RETRY_BACKOFF = 0.5
 RETRY_AFTER_CAP = 30.0
 
 
-def _build_retry() -> Any:
-    """Build the retry policy, bounded in wall-clock terms.
-
-    Returns:
-        A ``Retry`` that gives up inside ``RETRY_ATTEMPTS * RETRY_AFTER_CAP``
-        seconds in the worst case, rather than for as long as a server asks.
-    """
+def _bounded_retry_class() -> Any:
+    """Build the ``Retry`` subclass, imported lazily like the rest of the client."""
+    from urllib3.exceptions import ReadTimeoutError
     from urllib3.util.retry import Retry
 
     class BoundedRetry(Retry):
-        """``Retry`` that honours ``Retry-After`` only up to a ceiling."""
+        """``Retry`` bounded in wall-clock terms, and narrowed to real stalls.
+
+        Two overrides, for the two ways the stock policy overshoots here.
+        """
 
         def get_retry_after(self, response: Any) -> float | None:
             requested = super().get_retry_after(response)
@@ -325,13 +330,40 @@ def _build_retry() -> Any:
                 return None
             return min(requested, RETRY_AFTER_CAP)
 
-    return BoundedRetry(
+        def _is_read_error(self, err: Exception) -> bool:
+            """Count only a stalled read, not a dropped connection.
+
+            urllib3 classifies ``ProtocolError`` as a read error alongside
+            ``ReadTimeoutError``, on the reasoning that the server may have
+            begun processing. For a pooled connection the server closed
+            between requests, which is a ``RemoteDisconnected``, nothing was
+            processed and nothing is re-sent by trying again. Leaving them
+            together means ``read=0`` switches off the retry this adapter
+            exists for.
+            """
+            return isinstance(err, ReadTimeoutError)
+
+    return BoundedRetry
+
+
+def _build_retry() -> Any:
+    """Build the retry policy, bounded in wall-clock terms.
+
+    Returns:
+        A ``Retry`` whose sleeps total at most
+        ``RETRY_ATTEMPTS * RETRY_AFTER_CAP`` seconds, rather than running for
+        as long as a server asks. An unreachable host is bounded separately,
+        by ``--timeout`` per attempt.
+    """
+    return _bounded_retry_class()(
         total=RETRY_ATTEMPTS,
         # A read timeout means NetBox took the request and is still working on
         # it. Re-sending adds a second copy of a query that is already too
         # slow, to an instance already struggling, and multiplies --timeout by
         # the attempt count while it does so. Surface it instead: the export
-        # names the endpoint, and --timeout is the dial for it.
+        # names the endpoint, and --timeout is the dial for it. Narrowed by
+        # _is_read_error above, so dropped connections still fall back to
+        # total.
         read=0,
         backoff_factor=RETRY_BACKOFF,
         status_forcelist=RETRY_STATUSES,
@@ -418,16 +450,22 @@ class NetBoxSource:
                 to lose the whole export.
         """
         app, name = endpoint.split(".", 1)
+        yielded = 0
         try:
             source = getattr(getattr(self._api, app), name)
             for record in source.filter(**filters) if filters else source.all():
                 self._reached = True
+                yielded += 1
                 yield record
         except Exception as exc:  # noqa: BLE001 - re-raised with context below
-            # A 404 is ambiguous: this NetBox may not have the endpoint, or
-            # --url may be wrong. Treat it as "absent" only once something has
-            # answered, so a bad URL fails loudly instead of exporting nothing.
-            if self._is_missing_endpoint(exc) and self._reached:
+            # A 404 is ambiguous three ways, and the two flags separate them.
+            # Nothing has answered at all: --url is wrong, so fail loudly
+            # rather than export nothing. Something answered but not this
+            # endpoint: this NetBox does not have it, which is survivable.
+            # This endpoint answered and then 404ed part-way through its
+            # pages: that is a real failure, and swallowing it would return a
+            # silently truncated list, so it has to be raised.
+            if self._is_missing_endpoint(exc) and self._reached and not yielded:
                 self.missing_endpoints.add(endpoint)
                 return
             raise ExportError(self._explain(exc, endpoint)) from exc
@@ -591,6 +629,76 @@ def carry_fields(source: dict[str, Any], fields: tuple[str, ...]) -> dict[str, A
     return carried
 
 
+#: Keys that carry no device-type data: NetBox's own identity, timestamps,
+#: hyperlinks and custom-field bag, plus the attributes pynetbox hangs on its
+#: ``Record`` objects. Leaving these out of the library file is not a loss, so
+#: they are not reported as one. The reverse counts NetBox computes
+#: (``device_count``, ``*_template_count``) are filtered by suffix.
+NETBOX_PLUMBING_FIELDS = frozenset(
+    {
+        "id",
+        "url",
+        "display",
+        "display_url",
+        "created",
+        "last_updated",
+        "notes_url",
+        "custom_fields",
+        "custom_field_data",
+        # The parent back-reference on a component template. The library
+        # format expresses it by which file the component sits in, so it is
+        # carried structurally rather than lost.
+        "device_type",
+        "module_type",
+        # pynetbox's own, which arrive through vars() alongside the real ones.
+        "api",
+        "default_ret",
+        "endpoint",
+        "has_details",
+    }
+)
+
+
+def _field_names(source: Any) -> list[str]:
+    """Every field name an API object carries, mapping or pynetbox record."""
+    if isinstance(source, dict):
+        return list(source)
+    try:
+        return list(vars(source))
+    except TypeError:  # pragma: no cover - objects without __dict__
+        return []
+
+
+def unmapped_fields(source: Any, carried: dict[str, Any]) -> list[str]:
+    """Names NetBox populated that the library format has nowhere to put.
+
+    The export already reports a field the library requires and NetBox left
+    unset. This is the mirror: a field NetBox holds that the library format
+    does not define, which otherwise vanishes between the two formats with
+    nothing said. ``default_platform``, ``cooling_method``, ``end_of_life``
+    and ``tags`` all reach a real instance this way.
+
+    Only populated fields count. Reporting every null NetBox sends would bury
+    the real losses in noise.
+
+    Args:
+        source: One object from the API.
+        carried: The fields that did make it into the document.
+
+    Returns:
+        Sorted field names, empty when nothing was lost.
+    """
+    lost = []
+    for name in _field_names(source):
+        if name in carried or name in NETBOX_PLUMBING_FIELDS:
+            continue
+        if name.startswith("_") or name.endswith("_count"):
+            continue
+        if is_present(unwrap(field(source, name))):
+            lost.append(name)
+    return sorted(lost)
+
+
 def rear_port_links(front: Any) -> list[Any]:
     """Return one front port's rear-port links, whichever shape NetBox used.
 
@@ -717,6 +825,14 @@ def carry_components(
             notes.extend(back_fill_legacy_front_ports(entries, carried))
         document[list_name] = carried
         notes.extend(missing_required(carried, list_name))
+        lost: set[str] = set()
+        for raw, kept in zip(entries, carried):
+            lost.update(unmapped_fields(raw, kept))
+        if lost:
+            notes.append(
+                f"{list_name}: NetBox holds {', '.join(sorted(lost))}, which the "
+                "library format has no field for"
+            )
     return notes
 
 
@@ -747,8 +863,12 @@ def build_document(
     if mappings:
         document["port-mappings"] = mappings
 
-    if is_module and field(source, "attributes"):
-        notes.append("attributes — NetBox module-type profile data, no library field")
+    lost = unmapped_fields(source, document)
+    if lost:
+        notes.append(
+            f"NetBox holds {', '.join(lost)}, which the library format has no "
+            "field for"
+        )
     required = (
         REQUIRED_MODULE_TYPE_FIELDS if is_module else REQUIRED_DEVICE_TYPE_FIELDS
     )
@@ -986,6 +1106,82 @@ def fetch_components(
     return grouped
 
 
+def _select(
+    source: Source,
+    endpoint: str,
+    *,
+    filters: dict[str, Any],
+    in_use: bool,
+    is_module: bool,
+) -> tuple[list[Any], list[str]]:
+    """Fetch the objects one endpoint contributes, and say what narrowed them.
+
+    Args:
+        source: Where to read from.
+        endpoint: The dotted endpoint to read.
+        filters: Query filters selecting which types to export.
+        in_use: Restrict to types with at least one instance.
+        is_module: Whether this endpoint serves module types.
+
+    Returns:
+        ``(objects, notes)``.
+    """
+    notes: list[str] = []
+    # A module type has no slug, and NetBox's strict filtering rejects an
+    # unknown filter with a 400 rather than ignoring it — so passing the
+    # device-type slug filter here would abort the whole export.
+    applicable = {k: v for k, v in filters.items() if not (is_module and k == "slug")}
+    if is_module and "slug" in filters:
+        notes.append(
+            "--slug selects device types by slug, and a module type has none, "
+            "so it does not narrow them: every module type matching the "
+            "remaining filters is exported. Use --manufacturer to narrow "
+            "module types."
+        )
+    objects = list(source.records(endpoint, **applicable))
+    if in_use:
+        objects, unknown = _only_in_use(objects, is_module=is_module)
+        if unknown:
+            notes.append(
+                f"{endpoint}: {unknown} record(s) kept because this NetBox did not "
+                "report a usage count — --in-use could not judge them"
+            )
+    return objects, notes
+
+
+def _write_one(
+    obj: Any,
+    components: dict[str, list[dict[str, Any]]],
+    out_dir: Path,
+    taken: set[Path],
+    *,
+    is_module: bool,
+) -> tuple[Path, list[str]]:
+    """Build and write one library file, and report what it cost.
+
+    Args:
+        obj: The device-type or module-type object.
+        components: Its component templates, keyed by library list name.
+        out_dir: Directory to write the library tree into.
+        taken: Paths already used this run, for collision disambiguation.
+        is_module: Whether this is a module type.
+
+    Returns:
+        ``(path, notes)``, each note already prefixed with the model.
+    """
+    document, doc_notes = build_document(obj, components, is_module=is_module)
+    path = output_path(document, out_dir, is_module, taken)
+    if path.stem != _expected_stem(document):
+        doc_notes.append(
+            f"file name collided after sanitising; written as {path.name} "
+            "so it does not overwrite the record it collided with"
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_document(document), encoding="utf-8")
+    model = document.get("model", "?")
+    return path, [f"{model}: {note}" for note in doc_notes]
+
+
 def export(
     source: Source,
     out_dir: Path,
@@ -1013,18 +1209,10 @@ def export(
     for is_module, endpoint in ((False, DEVICE_TYPES), (True, MODULE_TYPES)):
         if is_module and not include_modules:
             continue
-        # A module type has no slug, and NetBox's strict filtering rejects an
-        # unknown filter with a 400 rather than ignoring it — so passing the
-        # device-type slug filter here would abort the whole export.
-        applicable = {k: v for k, v in filters.items() if not (is_module and k == "slug")}
-        objects = list(source.records(endpoint, **applicable))
-        if in_use:
-            objects, unknown = _only_in_use(objects, is_module=is_module)
-            if unknown:
-                notes.append(
-                    f"{endpoint}: {unknown} record(s) kept because this NetBox did not "
-                    "report a usage count — --in-use could not judge them"
-                )
+        objects, selection_notes = _select(
+            source, endpoint, filters=filters, in_use=in_use, is_module=is_module
+        )
+        notes.extend(selection_notes)
         if not objects:
             continue
 
@@ -1040,21 +1228,94 @@ def export(
 
         for obj in objects:
             owned = components.get(field(obj, "id")) or {}
-            document, doc_notes = build_document(obj, owned, is_module=is_module)
-            path = output_path(document, out_dir, is_module, taken)
-            if path.stem != _expected_stem(document):
-                doc_notes.append(
-                    f"file name collided after sanitising; written as {path.name} "
-                    "so it does not overwrite the record it collided with"
-                )
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(render_document(document), encoding="utf-8")
+            path, doc_notes = _write_one(
+                obj, owned, out_dir, taken, is_module=is_module
+            )
             written.append(path)
-            notes.extend(f"{document.get('model', '?')}: {note}" for note in doc_notes)
+            notes.extend(doc_notes)
 
     for endpoint in sorted(getattr(source, "missing_endpoints", ())):
         notes.append(f"{endpoint} — endpoint absent from this NetBox, list not exported")
     return written, notes
+
+
+#: Subdirectories of the output directory that this exporter owns. A run
+#: replaces the ones it produced and leaves anything else in the directory
+#: alone, so pointing ``--output-dir`` at a working directory is safe.
+LIBRARY_SUBTREES: tuple[str, ...] = ("device-types", "module-types")
+
+
+def _swap_in(stage: Path, out_dir: Path) -> list[str]:
+    """Replace each exported subtree with the staged one, and say what went.
+
+    Args:
+        stage: The staging directory holding this run's output.
+        out_dir: The directory the caller asked for.
+
+    Returns:
+        A note per subtree that had files this run did not reproduce.
+    """
+    notes: list[str] = []
+    for subtree in LIBRARY_SUBTREES:
+        staged = stage / subtree
+        if not staged.is_dir():
+            continue
+        live = out_dir / subtree
+        if live.is_dir():
+            fresh = {p.relative_to(staged) for p in staged.rglob("*") if p.is_file()}
+            stale = {p.relative_to(live) for p in live.rglob("*") if p.is_file()} - fresh
+            if stale:
+                notes.append(
+                    f"{subtree}: removed {len(stale)} file(s) left by an earlier "
+                    "export that this run did not produce; the converter would "
+                    "otherwise have read them as part of it"
+                )
+            shutil.rmtree(live)
+        staged.replace(live)
+    return notes
+
+
+def export_tree(
+    source: Source,
+    out_dir: Path,
+    *,
+    filters: dict[str, Any],
+    in_use: bool,
+    include_modules: bool,
+) -> tuple[list[Path], list[str]]:
+    """Export into a staging directory, then swap it in.
+
+    Writing in place leaves two kinds of wreckage. A narrower second run
+    (``--manufacturer juniper`` into a directory that already holds a full
+    export) leaves the earlier files beside the new ones, and the converter
+    reads the mixture without noticing. A run that fails half way leaves the
+    same mix. Staging makes the output directory change only on success, and
+    only into the state this run actually produced.
+
+    Args:
+        source: Where to read from.
+        out_dir: Directory to write the library tree into.
+        filters: Query filters selecting which types to export.
+        in_use: Restrict device types to those with at least one device.
+        include_modules: Also export module types.
+
+    Returns:
+        ``(written_paths, notes)``, the paths in their final location.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stage = Path(tempfile.mkdtemp(prefix=".netbox-export-", dir=out_dir))
+    try:
+        staged_paths, notes = export(
+            source,
+            stage,
+            filters=filters,
+            in_use=in_use,
+            include_modules=include_modules,
+        )
+        notes.extend(_swap_in(stage, out_dir))
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+    return [out_dir / p.relative_to(stage) for p in staged_paths], notes
 
 
 # --------------------------------------------------------------------------
@@ -1144,7 +1405,7 @@ def main(argv: list[str] | None = None) -> int:
         source = NetBoxSource(
             args.url, args.token, verify=not args.insecure, timeout=args.timeout
         )
-        written, notes = export(
+        written, notes = export_tree(
             source,
             args.output_dir,
             filters=selection_filters(args),

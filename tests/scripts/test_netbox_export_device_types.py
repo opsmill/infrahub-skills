@@ -34,6 +34,7 @@ field = _mod.field
 build_document = _mod.build_document
 carry_fields = _mod.carry_fields
 export = _mod.export
+export_tree = _mod.export_tree
 is_present = _mod.is_present
 main = _mod.main
 missing_required = _mod.missing_required
@@ -373,6 +374,52 @@ def test_the_current_front_port_shape_is_reported_as_nothing_unusual():
     assert not any("older than" in note for note in notes)
 
 
+def test_fields_netbox_holds_and_the_library_cannot_are_reported():
+    """The mirror of the "unset but required" note, and it was missing.
+
+    These four are what demo.netbox.dev actually populates on device types
+    109 and 5. Before this they vanished between the two formats silently,
+    while `reference.md` claimed the export reports what it cannot carry.
+    """
+    rich = {
+        **DEVICE_TYPE,
+        "default_platform": {"id": 2, "name": "ios"},
+        "cooling_method": "passive",
+        "end_of_life": "2030-01-01",
+        "tags": [{"id": 1, "name": "edge"}],
+    }
+
+    _, notes = build_document(rich, {}, is_module=False)
+
+    lost = next(n for n in notes if "no field for" in n)
+    for name in ("cooling_method", "default_platform", "end_of_life", "tags"):
+        assert name in lost
+
+
+def test_module_bay_fields_the_library_cannot_hold_are_reported():
+    """`enabled` on a module bay is the component-level case."""
+    bay = {
+        "id": 7,
+        "device_type": {"id": 3},
+        "name": "Slot 1",
+        "position": "1",
+        "enabled": True,
+    }
+
+    _, notes = build_document(DEVICE_TYPE, {"module-bays": [bay]}, is_module=False)
+
+    assert any("module-bays" in n and "enabled" in n for n in notes)
+
+
+def test_netbox_bookkeeping_is_not_reported_as_a_loss():
+    """A note naming `id`, `url` and `created` would bury the real losses."""
+    _, notes = build_document(DEVICE_TYPE, {}, is_module=False)
+
+    lost = [n for n in notes if "no field for" in n]
+    for noise in ("id", "url", "display", "created", "last_updated", "device_count"):
+        assert not any(f" {noise}," in n or n.endswith(f" {noise}") for n in lost)
+
+
 def test_a_complete_component_produces_no_note():
     _, notes = build_document(DEVICE_TYPE, {"interfaces": [INTERFACE]}, is_module=False)
 
@@ -523,6 +570,97 @@ def test_export_writes_one_file_per_type(tmp_path, tables):
     )
 
     assert sorted(p.name for p in written) == ["EX9200-32XS.yaml", "ap7901.yaml"]
+
+
+def test_a_narrower_second_export_does_not_leave_the_wider_one_behind(tmp_path, tables):
+    """The converter reads the directory, so a stale file is a silent wrong answer.
+
+    Writing in place, a second `--manufacturer juniper` run into a directory
+    holding a full export left the earlier files beside the new ones and the
+    converter took the mixture for one export.
+    """
+    export_tree(
+        FakeSource(tables), tmp_path, filters={}, in_use=False, include_modules=True
+    )
+    assert (tmp_path / "device-types/APC/ap7901.yaml").exists()
+
+    narrower = {"dcim.device_types": [{**DEVICE_TYPE, "id": 9, "slug": "c9200",
+                                       "model": "C9200",
+                                       "manufacturer": {"id": 1, "name": "Cisco"}}]}
+    written, notes = export_tree(
+        FakeSource(narrower), tmp_path, filters={}, in_use=False, include_modules=False
+    )
+
+    assert [p.name for p in written] == ["c9200.yaml"]
+    assert (tmp_path / "device-types/Cisco/c9200.yaml").exists()
+    assert not (tmp_path / "device-types/APC/ap7901.yaml").exists()
+    assert any("removed" in note and "earlier export" in note for note in notes)
+    # Only the subtrees this run produced are replaced.
+    assert (tmp_path / "module-types/Juniper/EX9200-32XS.yaml").exists()
+
+
+def test_a_failed_export_leaves_the_previous_one_intact(tmp_path, tables):
+    """Staging is what makes a half-finished run harmless."""
+    export_tree(
+        FakeSource(tables), tmp_path, filters={}, in_use=False, include_modules=False
+    )
+    before = (tmp_path / "device-types/APC/ap7901.yaml").read_text()
+
+    class Fails(FakeSource):
+        def records(self, endpoint, **filters):
+            raise _mod.ExportError("NetBox went away mid-export")
+
+    with pytest.raises(_mod.ExportError):
+        export_tree(
+            Fails(tables), tmp_path, filters={}, in_use=False, include_modules=False
+        )
+
+    assert (tmp_path / "device-types/APC/ap7901.yaml").read_text() == before
+    assert not [p for p in tmp_path.iterdir() if p.name.startswith(".netbox-export-")]
+
+
+def test_export_leaves_unrelated_contents_of_the_output_dir_alone(tmp_path, tables):
+    """`--output-dir .` is a reasonable thing to type."""
+    keep = tmp_path / "notes.md"
+    keep.write_text("mine")
+
+    export_tree(
+        FakeSource(tables), tmp_path, filters={}, in_use=False, include_modules=False
+    )
+
+    assert keep.read_text() == "mine"
+
+
+def test_slug_with_module_types_says_it_does_not_narrow_them(tmp_path, tables):
+    """A module type has no slug, so the filter is dropped and everything ships."""
+    _, notes = export_tree(
+        FakeSource(tables),
+        tmp_path,
+        filters={"slug": ["ap7901"]},
+        in_use=False,
+        include_modules=True,
+    )
+
+    assert any("--slug" in note and "does not narrow" in note for note in notes)
+
+
+def test_netbox_image_urls_are_reported_rather_than_written(tmp_path, tables):
+    """The library types front_image/rear_image as booleans, not URLs.
+
+    `true` would assert an elevation image file this export does not write,
+    and the URL is the wrong type outright, so neither is emitted.
+    """
+    tables["dcim.device_types"] = [
+        {**DEVICE_TYPE, "front_image": "http://nb/media/devicetype-images/a.png"}
+    ]
+
+    written, notes = export_tree(
+        FakeSource(tables), tmp_path, filters={}, in_use=False, include_modules=False
+    )
+    document = yaml.safe_load(written[0].read_text())
+
+    assert "front_image" not in document
+    assert any("front_image" in note and "no field for" in note for note in notes)
 
 
 def test_module_types_are_skipped_unless_asked_for(tmp_path, tables):
@@ -815,6 +953,64 @@ def test_retries_are_bounded_and_scoped_to_reads():
     # A read timeout means the query is still running server-side. Retrying it
     # sends a second copy and multiplies --timeout by the attempt count.
     assert retry.read == 0
+
+
+def test_a_dropped_connection_is_still_retried_despite_read_being_zero():
+    """`read=0` must not switch off the retry this adapter exists for.
+
+    urllib3 classifies `ProtocolError` as a read error alongside
+    `ReadTimeoutError`, so `read=0` on the stock policy also stops retrying a
+    pooled connection the server closed between requests. Nothing was
+    processed there and nothing is re-sent, so it falls back to `total`.
+    """
+    from urllib3.exceptions import ProtocolError, ReadTimeoutError
+
+    source = NetBoxSource("http://127.0.0.1:1", "t")
+    retry = source._api.http_session.get_adapter("http://127.0.0.1:1").max_retries
+
+    assert retry._is_read_error(ReadTimeoutError(None, "u", "stalled"))
+    assert not retry._is_read_error(ProtocolError("Connection aborted."))
+
+
+def test_a_server_that_drops_the_first_connection_still_exports(tmp_path):
+    """The dropped pooled connection is the case the adapter was added for."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from socketserver import ThreadingMixIn
+
+    seen = {"attempts": 0}
+
+    class Drops(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_GET(self):  # noqa: N802 - BaseHTTPRequestHandler's interface
+            seen["attempts"] += 1
+            if seen["attempts"] == 1:
+                self.close_connection = True
+                self.wfile.close()
+                return
+            body = b'{"count": 0, "next": null, "previous": null, "results": []}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    class Server(ThreadingMixIn, HTTPServer):
+        daemon_threads = True
+
+    server = Server(("127.0.0.1", 0), Drops)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        source = NetBoxSource(f"http://127.0.0.1:{server.server_port}", "t")
+        assert list(source.records("dcim.device_types")) == []
+    finally:
+        server.shutdown()
+
+    assert seen["attempts"] >= 2, "the dropped connection was not retried"
 
 
 def test_a_long_retry_after_is_capped_rather_than_slept_in_full():

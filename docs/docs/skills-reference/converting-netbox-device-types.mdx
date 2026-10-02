@@ -65,8 +65,9 @@ When the device types live in your own instance rather than in the published lib
 
 ```bash
 pip install 'pynetbox>=7.0'
+SKILL=/path/to/infrahub-converting-netbox-device-types
 export NETBOX_TOKEN=...
-python skills/infrahub-converting-netbox-device-types/scripts/netbox_export_device_types.py \
+python "$SKILL/scripts/netbox_export_device_types.py" \
   --url https://netbox.example.com \
   --in-use \
   --module-types \
@@ -93,12 +94,14 @@ This is a one-way snapshot into files. Continuous replication in both directions
 
 ## Running it
 
-The skill normally runs the converter for you. To run it manually, resolve the two `skills/...` paths against wherever your installation put the skill directory. The command below assumes the [manual copy](../installation-setup.mdx), which puts it under your project root; the `npx` installer and the Claude Code plugin place it elsewhere.
+The skill normally runs the converter for you. To run it manually, set `SKILL` to wherever your installation put the skill directory and stay in your own working directory. The [manual copy](../installation-setup.mdx) puts it under your project root; the `npx` installer and the Claude Code plugin place it elsewhere, under a cache that reinstalling wipes, so the outputs below are deliberately relative to you rather than to the skill.
 
 ```bash
-python skills/infrahub-converting-netbox-device-types/scripts/netbox_to_infrahub_templates.py \
+SKILL=/path/to/infrahub-converting-netbox-device-types
+
+python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
   devicetype-library/device-types/Cisco/ \
-  --mapping skills/infrahub-converting-netbox-device-types/scripts/mappings/schema-library.yml \
+  --mapping "$SKILL/scripts/mappings/schema-library.yml" \
   --output-dir ./generated \
   --report ./generated/coverage-report.md
 ```

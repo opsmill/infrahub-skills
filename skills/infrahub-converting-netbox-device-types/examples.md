@@ -54,9 +54,9 @@ That one line generates `TemplateDcimDevice`, plus
 ### Command
 
 ```bash
-python scripts/netbox_to_infrahub_templates.py \
+python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
   device-types/Cisco/C9300-48P.yaml \
-  --mapping scripts/mappings/schema-library.yml \
+  --mapping "$SKILL/scripts/mappings/schema-library.yml" \
   --output-dir ./generated
 ```
 
@@ -160,9 +160,9 @@ git clone --depth 1 --filter=blob:none --sparse \
   https://github.com/netbox-community/devicetype-library.git
 cd devicetype-library && git sparse-checkout set device-types && cd ..
 
-python scripts/netbox_to_infrahub_templates.py \
+python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
   devicetype-library/device-types/Juniper/ \
-  --mapping scripts/mappings/schema-library.yml \
+  --mapping "$SKILL/scripts/mappings/schema-library.yml" \
   --output-dir ./generated \
   --report ./generated/coverage-report.md
 ```
@@ -193,7 +193,7 @@ the whole path.
 
 ```bash
 export NETBOX_TOKEN=...
-python scripts/netbox_export_device_types.py \
+python "$SKILL/scripts/netbox_export_device_types.py" \
   --url https://netbox.example.com \
   --in-use --module-types \
   --output-dir ./netbox-export
@@ -223,9 +223,9 @@ The exported tree is the library format, so the
 converter takes it unchanged:
 
 ```bash
-python scripts/netbox_to_infrahub_templates.py \
+python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
   ./netbox-export/device-types ./netbox-export/module-types \
-  --mapping scripts/mappings/schema-library-modules.yml \
+  --mapping "$SKILL/scripts/mappings/schema-library-modules.yml" \
   --output-dir ./generated \
   --report ./generated/coverage-report.md
 ```
@@ -338,9 +338,9 @@ components:
 ### Re-run
 
 ```bash
-python scripts/netbox_to_infrahub_templates.py \
+python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
   device-types/Cisco/C9300-48P.yaml \
-  --mapping scripts/mappings/my-schema.yml \
+  --mapping "$SKILL/scripts/mappings/my-schema.yml" \
   --output-dir ./generated
 ```
 

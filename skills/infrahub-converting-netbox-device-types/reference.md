@@ -116,8 +116,9 @@ version, and the export names which one it found.
 | `--output-dir` | Writes `<dir>/device-types/<Manufacturer>/<slug>.yaml` |
 | `--in-use` | Only device types with at least one device |
 | `--manufacturer` | Restrict to a manufacturer slug; repeatable |
-| `--slug` | Restrict to a device-type slug; repeatable |
+| `--slug` | Restrict to a device-type slug; repeatable. Module types have no slug, so it does not narrow them |
 | `--module-types` | Also export module types |
+| `--timeout` | Per-request timeout in seconds, default 30 |
 | `--insecure` | Skip TLS verification |
 
 | Exit code | Meaning |
@@ -143,11 +144,19 @@ absent and false are different things.
 
 ### What it reports
 
-Five classes of note, on the same principle as the
+Six classes of note, on the same principle as the
 converter's coverage report:
 
 - **NetBox holds it, the library format has no field**
-  — module-type `attributes`, for instance.
+  — module-type `attributes` and `profile`, a device
+  type's `default_platform`, `cooling_method`,
+  `end_of_life` or `tags`, a module bay's `enabled`,
+  and the `front_image` / `rear_image` URLs, which the
+  library format types as booleans asserting an image
+  file this export does not write. Every populated
+  field with nowhere to go is named; NetBox's own
+  bookkeeping (`id`, `url`, timestamps, counts) is not,
+  since omitting it is no loss.
 - **NetBox left it unset, the library format requires
   it** — a power port with no `type` is valid in NetBox
   and invalid in the library. The file is still
@@ -155,6 +164,13 @@ converter's coverage report:
 - **The endpoint is absent from this NetBox** — component
   endpoints come and go across versions, so the list is
   skipped rather than the export failing.
+- **An earlier export left files behind** — the output
+  directory is built in a staging directory and swapped
+  in, so only the subtrees this run produced are
+  replaced and a failed run changes nothing. Files a
+  previous, wider export left are removed and counted,
+  because the converter would otherwise read them as
+  part of this one.
 - **Two records collided on one file name** — sanitising
   can collapse names NetBox considers distinct, so the
   second is written alongside the first with a numeric

@@ -777,12 +777,21 @@ CHECKS: dict[str, Callable[..., tuple[bool, str]]] = {
 }
 
 
-def run_checks(check_names: list[str], output_dir: Path) -> dict:
+def run_checks(
+    check_names: list[str],
+    output_dir: Path,
+    extra: list[tuple[str, Any]] | None = None,
+) -> dict:
     """Run named checks against the emitted output directory.
 
     Args:
         check_names: Assertion names from the ``CHECKS`` registry.
         output_dir: Directory holding the model's emitted files.
+        extra: Task-specific ``(name, function)`` pairs, for assertions that
+            depend on the task's own input and so do not belong in the shared
+            registry. A registry check can only test a property of any
+            output; knowing that this fixture's 7.59 kg must round to 8 is
+            the task grader's business.
 
     Returns:
         A dict with ``score`` (float 0.0-1.0), ``details`` (str), and
@@ -792,8 +801,9 @@ def run_checks(check_names: list[str], output_dir: Path) -> dict:
 
     entries: list[dict] = []
     passed_count = 0
-    for name in check_names:
-        fn = CHECKS[name]
+    named = [(name, CHECKS[name]) for name in check_names] + list(extra or [])
+    check_names = [name for name, _ in named]
+    for name, fn in named:
         try:
             ok, msg = fn(parsed, output_dir=output_dir)
         except Exception as exc:  # pragma: no cover - defensive
