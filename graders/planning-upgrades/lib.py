@@ -110,8 +110,19 @@ NONEXISTENT_INVOCATIONS = [("infrahubctl", "upgrade")]
 # `object delete`, `object update`, and `object create`.
 _WRITE_VERBS = {"create", "delete", "load", "merge", "rebase", "update", "add"}
 _WRITE_LEAVES = {"load", "generator", "run"}
+# `infrahub db` subcommands that only read (backend/infrahub/cli/db.py, 1.5 to
+# stable). Any other `infrahub db` subcommand, named in prose, is read as a
+# write, which also covers invented ones such as `infrahub db init`.
+_DB_READ_ONLY = {
+    "showmigrations", "showmigration", "check", "check-inheritance",
+    "check-duplicate-schema-fields", "selected-export",
+}
+_SERVER_WRITES = [
+    ("infrahub", "db", sub)
+    for sub in ("migrate", "update-core-schema", "reset", "reset-deployment-id", "delete-diffs", "constraint", "index")
+] + [("infrahub", "recover")]
 WRITE_INVOCATIONS = (
-    [("infrahub", "db", "migrate")]
+    _SERVER_WRITES
     + sorted(
         ("infrahubctl", group, sub)
         for group, subs in _cli_tree.GROUPS.items()
@@ -124,13 +135,19 @@ WRITE_INVOCATIONS = (
 # name, not a handover: the 1.11.0 notes say `pyarrow` stays available "for
 # `infrahubctl object load`", and a live trial quoting that was failed. A write
 # someone could run carries its target (`infrahubctl object load objects/`).
-BARE_RUNNABLE_WRITES = [("infrahub", "db", "migrate")]
+BARE_RUNNABLE_WRITES = _SERVER_WRITES
 
 # A leading `v` is allowed: upstream tags read `infrahub-v1.10.0`, so plans
 # write `v1.10` too, and `\b` alone never matched between `v` and the digit.
 _VERSION_RE = re.compile(r"(?<![\d.])v?(\d+)\.(\d+)(?:\.(\d+))?(?!\d)")
 _INLINE_CODE_RE = re.compile(r"`([^`]+)`")
 _FENCE_OPEN_RE = re.compile(r"^\s*(```+|~~~+)")
+def _closes(line: str, marker: str, fence: str) -> bool:
+    """CommonMark: a closing fence uses the opener's character, is at least as
+    long, and carries no info string, so a nested ```bash opens nothing new."""
+    return marker[0] == fence[0] and len(marker) >= len(fence) and line.strip() == marker
+
+
 _LIST_MARKER_RE = re.compile(r"^(?:[-*+]|\d+[.)])\s")
 _LIST_ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 
@@ -143,7 +160,13 @@ _LIST_ITEM_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 # A check that fails that answer is grading vocabulary. See
 # dev/guidelines/graders.md § "Verify both directions", false-fail half.
 _EV_PATH = re.compile(r"[\w./-]+\.(?:ya?ml|py|gql|graphql|j2|toml|json|cfg)\b")
-_EV_DOTTED_KIND = re.compile(r"\b[A-Z][A-Za-z0-9]+\.[a-z_][A-Za-z0-9_]*\b")
+# A namespaced kind (two capitalised parts, as every Infrahub kind has) and an
+# attribute that is not a domain suffix: `GitHub.com` and `Docs.infrahub` are
+# not `InfraCircuit.node_metadata`.
+_EV_DOTTED_KIND = re.compile(
+    r"\b[A-Z][a-z0-9]+[A-Z][A-Za-z0-9]*\."
+    r"(?!(?:com|org|net|io|app|dev|ai|co|gov|edu|cloud|sh)\b)[a-z_][A-Za-z0-9_]*\b"
+)
 # No bare-CamelCase pattern: `GitHub`, `GraphQL` and `PostgreSQL` read as
 # schema kinds, so "See the GitHub release notes" passed as evidence. A kind
 # meant as an artifact is backticked (_EV_CODE_SPAN) or dotted (_EV_DOTTED_KIND).
@@ -206,6 +229,15 @@ def _cell(value: str) -> str:
     return value.strip().strip("*_`").strip().lower()
 
 
+_MD_LINK_RE = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+
+
+def _release_text(cell: str) -> str:
+    """A Release cell with markdown links read as their text and markup stripped:
+    `[1.6.0](.../infrahub-v1.6.0)` is one release, not a range."""
+    return _cell(_MD_LINK_RE.sub(r"\1", cell))
+
+
 def _versions(text: str) -> list[tuple[int, int]]:
     """Every version in the text as (major, minor); patch is deliberately dropped."""
     return [(int(m.group(1)), int(m.group(2))) for m in _VERSION_RE.finditer(text)]
@@ -232,7 +264,7 @@ def hop_sections(text: str) -> list[dict]:
         # Both fence styles, closed only by the same character: a `~~~` example
         # holding "## 1.3 -> 1.4" was read as a hop.
         opener = _FENCE_OPEN_RE.match(line)
-        if opener and (fence is None or (opener.group(1)[0] == fence[0] and len(opener.group(1)) >= len(fence))):
+        if opener and (fence is None or _closes(line, opener.group(1), fence)):
             fence = None if fence is not None else opener.group(1)
             if current is not None:
                 current["lines"].append(line)
@@ -245,8 +277,11 @@ def hop_sections(text: str) -> list[dict]:
         if line.startswith("## "):
             heading = line[3:].strip()
             vs = _versions(heading)
-            if len(vs) >= 2:
-                current = {"heading": heading, "from": vs[0], "to": vs[-1], "lines": []}
+            # The hop is the first two versions: a note after them
+            # ("(requires Neo4j 5.26)") is not its target. A section that goes
+            # backwards ("Rollback: 1.10.0 -> 1.9.2") is not a hop.
+            if len(vs) >= 2 and vs[1] >= vs[0]:
+                current = {"heading": heading, "from": vs[0], "to": vs[1], "lines": []}
                 sections.append(current)
             else:
                 current = None
@@ -431,7 +466,7 @@ def _split_code(text: str) -> tuple[list[str], str, list[str]]:
             list_indent = 0
         opener = _FENCE_OPEN_RE.match(line)
         if fence is not None:
-            if opener and opener.group(1)[0] == fence[0] and len(opener.group(1)) >= len(fence):
+            if opener and _closes(line, opener.group(1), fence):
                 fence = None
             elif runnable:
                 code.append(line)
@@ -503,8 +538,11 @@ def command_lines(text: str) -> list[tuple[str, bool]]:
 
 _ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 _SHELLS = {"sh", "bash", "zsh", "ash", "dash"}
-_PREFIX_WRAPPERS = {"sudo", "doas", "env", "time", "nohup", "exec", "command"}
-_RUN_WRAPPERS = {"uv", "poetry", "pipenv", "pdm", "hatch", "rye"}
+_PREFIX_WRAPPERS = {"sudo", "doas", "env", "time", "nohup", "exec", "command", "nice", "ionice", "uvx"}
+# Wrappers whose first positional argument is not the command (`timeout 600`).
+_ARG_WRAPPERS = {"timeout": 1, "watch": 0}
+_RUN_WRAPPERS = {"uv", "poetry", "pipenv", "pdm", "hatch", "rye", "pipx"}
+_CONTAINER_TOOLS = {"docker", "podman", "nerdctl"}
 # Programs that are not Infrahub: `docker compose exec infrahub bash` runs bash
 # in a service named `infrahub`.
 _PROGRAMS = _SHELLS | {"python", "python3", "cat", "ls", "echo", "env", "printenv", "true"}
@@ -524,6 +562,12 @@ _VALUE_OPTS = {
         "--extra-index-url", "-f", "--find-links",
     },
     "poetry": {"-C", "--directory", "-P", "--project"},
+    "nice": {"-n", "--adjustment"},
+    "ionice": {"-c", "-n", "-p"},
+    "uvx": {"--from", "--with", "-p", "--python", "--index", "--index-url"},
+    "timeout": {"-s", "--signal", "-k", "--kill-after"},
+    "watch": {"-n", "--interval", "-d"},
+    "kubectl": {"-n", "--namespace", "-c", "--container", "-f", "--filename", "--context", "--pod-running-timeout"},
     "pdm": {"-p", "--project"},
     "docker": {
         "-e", "--env", "--env-file", "-u", "--user", "-w", "--workdir", "--name",
@@ -593,8 +637,15 @@ def _commands(tokens: list[str]) -> list[list[str]]:
                 break
             j += 2 if tokens[j] in _VALUE_OPTS.get(head, set()) else 1
         return _commands(tokens[j:])
-    if head in _RUN_WRAPPERS and i + 1 < len(tokens) and tokens[i + 1] == "run":
-        return _commands(tokens[_skip_opts(tokens, i + 2, head):])
+    if head in _ARG_WRAPPERS:
+        j = _skip_opts(tokens, i + 1, head) + _ARG_WRAPPERS[head]
+        return _commands(tokens[j:])
+    if head in _RUN_WRAPPERS:
+        # Options may sit before `run` (`poetry -C /srv run ...`) as well as after.
+        j = _skip_opts(tokens, i + 1, head)
+        if j < len(tokens) and tokens[j] == "run":
+            return _commands(tokens[_skip_opts(tokens, j + 1, head):])
+        return [tokens[i:]]
     if head in _SHELLS:
         for j in range(i + 1, len(tokens) - 1):
             flag = tokens[j]
@@ -604,9 +655,11 @@ def _commands(tokens: list[str]) -> list[list[str]]:
     if head == "ssh":
         j = _skip_opts(tokens, i + 1, "ssh") + 1  # past the host
         return _command_string(" ".join(tokens[j:])) if j < len(tokens) else []
-    if head == "docker":
+    if head in _CONTAINER_TOOLS or head == "docker-compose":
         j = i + 1
-        if j < len(tokens) and tokens[j] == "compose":
+        if head == "docker-compose":
+            j = _skip_opts(tokens, j, "docker")
+        elif j < len(tokens) and tokens[j] in ("compose", "container"):
             j = _skip_opts(tokens, j + 1, "docker")
         if j >= len(tokens) or tokens[j] not in ("exec", "run"):
             return []
@@ -627,8 +680,40 @@ def _commands(tokens: list[str]) -> list[list[str]]:
             return [[service, *rest]]
         return _commands(rest)
     if head == "kubectl":
-        return _commands(tokens[tokens.index("--") + 1 :]) if "--" in tokens else []
+        if "--" in tokens:
+            return _commands(tokens[tokens.index("--") + 1 :])
+        # The deprecated form without `--`: `kubectl exec POD CMD ...`.
+        if "exec" in tokens:
+            j = _skip_opts(tokens, tokens.index("exec") + 1, "kubectl") + 1
+            return _commands(tokens[j:]) if j < len(tokens) else []
+        return []
     return [tokens[i:]]
+
+
+def _adjacent_writes(line: str) -> list[list[str]]:
+    """Fail-closed backstop for runnable code: the upgrade, or a write, anywhere.
+
+    Command-position parsing has to know every wrapper (`docker-compose`,
+    `podman`, `timeout`, `uvx`, ...), and each review found one more it did not.
+    In a code block, a binary token directly followed by `upgrade` or by a
+    write's words is graded wherever it sits, so an unknown wrapper cannot hide
+    it. Read-only forms are not collected here, so this adds no false invented
+    commands; quoted strings stay single tokens, so `echo "... infrahub
+    upgrade ..."` is not matched.
+    """
+    try:
+        tokens = [t for seg in _split_ops(line) for t in seg]
+    except ValueError:
+        return []
+    out: list[list[str]] = []
+    for i, tok in enumerate(tokens):
+        if tok.rsplit("/", 1)[-1] not in _BINARIES:
+            continue
+        argv = [tok.rsplit("/", 1)[-1], *tokens[i + 1 :]]
+        words = tuple([argv[0], *[t for t in argv[1:] if not t.startswith("-")]])
+        if words[:2] == ("infrahub", "upgrade") or any(words[: len(w)] == w for w in WRITE_INVOCATIONS):
+            out.append(argv)
+    return out
 
 
 def _command_string(text: str) -> list[list[str]]:
@@ -679,6 +764,8 @@ def _invocations_from(
             if fail_closed and _BINARY_WORD_RE.search(line):
                 found.append(("?", ("<unparseable>",), [], fenced, line))
             continue
+        if fenced:
+            argvs = argvs + _adjacent_writes(line)
         for argv in argvs:
             base = argv[0].rsplit("/", 1)[-1]
             if base not in _BINARIES:
@@ -805,7 +892,7 @@ def check_every_hop_enumerated(text: str, releases: str = "") -> tuple[bool, str
     if not rows:
         return False, f"no findings rows parsed from {PLAN_FILE}"
 
-    ranged = [r for r in rows if len(_full_versions(r.get("release", ""))) > 1]
+    ranged = [r for r in rows if len(_full_versions(_release_text(r.get("release", "")))) > 1]
     if ranged:
         return False, (
             f"{len(ranged)} findings carry a version range in Release "
@@ -816,7 +903,7 @@ def check_every_hop_enumerated(text: str, releases: str = "") -> tuple[bool, str
     if not required:
         return True, f"{len(rows)} findings, all stamped with a single release"
 
-    seen = {r.get("release", "").strip() for r in rows}
+    seen = {_release_text(r.get("release", "")).strip() for r in rows}
     seen_mm = {tuple(_versions(s)[0]) for s in seen if _versions(s)}
     missing = []
     for req in required:
@@ -943,6 +1030,10 @@ def check_no_mutating_commands(text: str) -> tuple[bool, str]:
                 )
             return False, f"'{shown}'{where} writes to Infrahub; the plan runs read-only probes only"
         if not fenced:
+            # Any `infrahub db` subcommand outside the read-only set is a write
+            # in prose, including invented ones (`infrahub db init`).
+            if path[:2] == ("infrahub", "db") and len(path) > 2 and path[2] not in _DB_READ_ONLY:
+                return False, f"'{shown}'{where} writes to Infrahub; the plan runs read-only probes only"
             write = next((w for w in WRITE_INVOCATIONS if path[: len(w)] == w), None)
             if (
                 write is not None

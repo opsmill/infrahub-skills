@@ -877,3 +877,109 @@ def test_upgrade_behind_wrapper_options_fails(line):
 def test_probe_behind_wrapper_options_passes(line):
     ok, msg = check_no_mutating_commands(_hop(f"```bash\n{line}\n```\n"))
     assert ok, msg
+
+
+# --- /code-review round on #159, plus cubic on run-wrapper options ----------
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "docker-compose exec infrahub-server infrahub upgrade",
+        "docker container exec srv infrahub upgrade",
+        "podman exec srv infrahub upgrade",
+        "timeout 600 infrahub upgrade",
+        "nice -n 5 infrahub upgrade",
+        "uvx infrahubctl schema load s/",
+        "pipx run infrahubctl schema load s/",
+        "kubectl exec pod infrahub upgrade",
+        "poetry -C /srv run infrahub upgrade",
+        "pdm -p /srv run infrahub upgrade",
+        "uv --directory /srv run infrahub upgrade",
+        "watch -n 5 infrahub upgrade",
+    ],
+)
+def test_upgrade_or_write_behind_any_wrapper_fails(line):
+    ok, _ = check_no_mutating_commands(_hop(f"```bash\n{line}\n```\n"))
+    assert not ok
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "docker-compose run --rm infrahub-server infrahub upgrade --check",
+        "podman exec srv infrahub db showmigrations",
+        "timeout 600 infrahubctl info",
+        "uvx infrahubctl info",
+        "poetry -C /srv run infrahubctl info",
+        "kubectl exec pod infrahubctl version",
+    ],
+)
+def test_probe_behind_any_wrapper_passes(line):
+    ok, msg = check_no_mutating_commands(_hop(f"```bash\n{line}\n```\n"))
+    assert ok, msg
+
+
+@pytest.mark.parametrize(
+    "span",
+    ["`infrahub db update-core-schema`", "`infrahub db init`", "`infrahub db reset`", "`infrahub recover`"],
+)
+def test_server_write_named_in_prose_fails(span):
+    ok, _ = check_no_mutating_commands(_hop(f"Then run {span} on the server.\n"))
+    assert not ok
+
+
+def test_server_read_only_named_in_prose_passes():
+    body = "1.4.11 added `infrahub db check-duplicate-schema-fields`, and `infrahub db showmigrations` came in 1.10.0.\n"
+    ok, msg = check_no_mutating_commands(_hop(body))
+    assert ok, msg
+
+
+def test_linked_release_is_one_release():
+    row = _ROW_YES.format(affected="yes").replace(
+        "| 1.10.0 |", "| [1.10.0](https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0) |", 1
+    )
+    ok, msg = _mod.check_every_hop_enumerated(_plan(row), releases="1.10.0")
+    assert ok, msg
+
+
+def test_linked_range_is_still_a_range():
+    row = _ROW_YES.format(affected="yes").replace("| 1.10.0 |", "| [1.9.0](x)–[1.10.0](y) |", 1)
+    ok, _ = _mod.check_every_hop_enumerated(_plan(row))
+    assert not ok
+
+
+def test_rollback_section_is_not_a_hop():
+    body = f"{_HEADER}{_ROW_YES.format(affected='yes')}\n"
+    text = f"# Plan\n\n## 1.9 -> 1.10\n\n{body}\n## Rollback: 1.10.0 -> 1.9.2\n\nRestore the backup.\n"
+    ok, msg = check_sequential_hops(text, source="1.9", target="1.10")
+    assert ok, msg
+
+
+def test_heading_note_with_another_version_does_not_move_the_target():
+    ok, msg = check_sequential_hops(_hop("", heading="1.9 -> 1.10 (requires Neo4j 5.26)"), source="1.9", target="1.10")
+    assert ok, msg
+
+
+def test_heading_skip_is_still_caught_with_a_note():
+    ok, _ = check_sequential_hops(_hop("", heading="1.8 -> 1.10 (requires Neo4j 5.26)"), source="1.8", target="1.10")
+    assert not ok
+
+
+def test_fence_with_an_info_string_does_not_close_a_fence():
+    body = "```\nAn example plan:\n```bash\necho hi\n```\n\n```bash\ndocker compose exec infrahub-server infrahub upgrade\n```\n"
+    ok, _ = check_no_mutating_commands(_hop(body))
+    assert not ok
+
+
+@pytest.mark.parametrize("evidence", ["See GitHub.com release notes", "Docs.infrahub explain it"])
+def test_domain_names_are_not_kind_attribute_evidence(evidence):
+    row = _ROW_GIT_AGENT.format(evidence=evidence, action="Fix it")
+    ok, _ = check_verdict_has_evidence(_plan(row))
+    assert not ok
+
+
+def test_kind_attribute_evidence_still_counts():
+    row = _ROW_GIT_AGENT.format(evidence="InfraCircuit.node_metadata", action="Fix it")
+    ok, msg = check_verdict_has_evidence(_plan(row))
+    assert ok, msg
