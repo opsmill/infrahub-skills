@@ -2059,6 +2059,34 @@ echo "not needed:" infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
             ok, msg = self._deleted(notes)
             assert ok, f"{push}: {msg}"
 
+    def test_wrapper_flags_do_not_swallow_the_program(self):
+        """``sudo -S`` is a flag, so ``git`` after it is still the program."""
+        for push in ("sudo -S git commit -am retire && sudo -S git push", "sudo -E -n git commit -am retire && sudo -E -u bot git push", "env -i PATH=/usr/bin git commit -am retire && env -i git push"):
+            notes = (
+                f"```bash\n{push}\n"
+                "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert ok, f"{push}: {msg}"
+
+    def test_launcher_options_before_run_are_peeled(self):
+        for launcher in ("uv --directory repo run", "uv --color never run --frozen", "poetry -C repo run", "poetry --directory=repo run"):
+            notes = (
+                "```bash\ngit commit -am retire && git push\n"
+                f"{launcher} infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert ok, f"{launcher}: {msg}"
+
+    def test_launcher_without_run_is_not_peeled(self):
+        notes = (
+            "```bash\ngit commit -am retire && git push\n"
+            "uv sync infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+        )
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, LabMenu]" in msg
+
     def test_multi_line_commit_message_keeps_the_commit(self):
         notes = """\
 ```bash

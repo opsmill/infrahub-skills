@@ -808,25 +808,32 @@ _SHELL_PREFIX_WORDS = frozenset(
 _ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_]\w*=")
 # Launchers that run the next word as the program: ``uv run infrahubctl``.
 _RUN_LAUNCHERS = frozenset({"uv", "poetry", "pdm", "hatch", "pipenv", "rye", "pipx"})
-# Options of sudo, env and the launchers' ``run`` that take a separate value.
-_PREFIX_VALUE_OPTIONS = frozenset(
-    {
-        "-u", "-g", "-h", "-C", "-D", "-p", "-r", "-t", "-U", "-T", "-S", "-P", "-w",
-        "--with", "--with-editable", "--with-requirements", "--project", "--directory",
-        "--group", "--only-group", "--no-group", "--extra", "--python", "--package",
-        "--env-file", "--index", "--index-url", "--default-index", "--extra-index-url",
-        "--config-file", "--cache-dir", "--spec", "--user", "--chdir", "--unset",
-    }
+# Options that take a separate value, per wrapper. Each wrapper gets its own
+# set because one letter can mean different things: ``sudo -S`` is a flag,
+# ``env -S`` takes a string.
+_SUDO_VALUE_OPTIONS = frozenset(
+    {"-u", "-g", "-h", "-C", "-D", "-p", "-r", "-t", "-U", "-T",
+     "--user", "--group", "--host", "--close-from", "--chdir", "--prompt",
+     "--role", "--type", "--other-user", "--command-timeout"}
+)
+_ENV_VALUE_OPTIONS = frozenset({"-u", "--unset", "-C", "--chdir", "-S", "--split-string"})
+# Options a launcher takes before ``run`` (``uv --directory repo run``) and
+# after it (``uv run --with pkg``). Flags such as ``--frozen`` take no value.
+_LAUNCHER_VALUE_OPTIONS = frozenset(
+    {"-C", "-P", "-p", "-w", "--directory", "--project", "--config-file", "--cache-dir",
+     "--color", "--python", "--with", "--with-editable", "--with-requirements",
+     "--group", "--only-group", "--no-group", "--extra", "--package", "--env-file",
+     "--index", "--index-url", "--default-index", "--extra-index-url", "--spec"}
 )
 
 
-def _skip_options(argv: list[str]) -> list[str]:
-    """Drop leading options (and the values of those that take one)."""
+def _skip_options(argv: list[str], value_options: frozenset[str]) -> list[str]:
+    """Drop leading options, and the value of each one in ``value_options``."""
     while argv and argv[0].startswith("-"):
         option = argv.pop(0)
         if option == "--":
             break
-        if option in _PREFIX_VALUE_OPTIONS and argv:
+        if option in value_options and argv:
             argv.pop(0)
     return argv
 
@@ -836,18 +843,24 @@ def _program_argv(argv: list[str]) -> list[str]:
 
     Drops prompts, words like ``then``, ``VAR=value`` assignments, ``sudo``
     and ``env`` with their options, and ``uv run`` / ``poetry run`` style
-    launchers, so ``uv run infrahubctl ...`` is an ``infrahubctl`` call and
-    ``echo git push`` stays an ``echo``.
+    launchers (their options before and after ``run`` included), so
+    ``uv --directory repo run infrahubctl ...`` is an ``infrahubctl`` call
+    and ``echo git push`` stays an ``echo``.
     """
     argv = list(argv)
     while argv:
         head = argv[0]
         if head in _SHELL_PREFIX_WORDS or _ENV_ASSIGNMENT_RE.match(head):
             argv.pop(0)
-        elif head in ("sudo", "env"):
-            argv = _skip_options(argv[1:])
-        elif head in _RUN_LAUNCHERS and argv[1:2] == ["run"]:
-            argv = _skip_options(argv[2:])
+        elif head == "sudo":
+            argv = _skip_options(argv[1:], _SUDO_VALUE_OPTIONS)
+        elif head == "env":
+            argv = _skip_options(argv[1:], _ENV_VALUE_OPTIONS)
+        elif head in _RUN_LAUNCHERS:
+            rest = _skip_options(argv[1:], _LAUNCHER_VALUE_OPTIONS)
+            if rest[:1] != ["run"]:
+                break  # ``uv sync``, ``poetry install``: the launcher itself runs
+            argv = _skip_options(rest[1:], _LAUNCHER_VALUE_OPTIONS)
         else:
             break
     return argv
