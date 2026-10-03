@@ -47,8 +47,9 @@ written.
 
 ## A new skill sits above all of these
 
-A new skill costs five registration surfaces, which already include its docs page and its
-manifest entry, plus a version bump, none of which CI checks. A rule inside an existing skill is the default answer.
+A new skill costs every surface in `skill-registration.md`, from its docs page and router
+row to its manifest entry, plus a version bump. A rule inside an existing skill is the
+default answer.
 Propose a new skill only when the domain has no home, and name the surfaces in the same
 breath.
 

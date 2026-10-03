@@ -184,8 +184,11 @@ guidance changes what a skill does, and the pages describing that skill go on
 describing what it did before. Read
 [`../../../dev/guidelines/skill-registration.md`](../../../dev/guidelines/skill-registration.md)
 § "When behavior changes" and run the grep it gives. A new skill is the
-expensive case: it needs all five registration surfaces, and Lens 2 already
-made you argue for it. `none` is a complete answer; a blank field is not.
+expensive case, and Lens 2 already made you argue for it: its `Docs impact`
+names every surface in that file's table by path, with what goes on each, and
+the router's pair table if one applies. "The registration surfaces" is not an
+answer. `none` is a complete answer for a change to an existing skill; a
+blank field is not.
 
 ## Approval gate
 
@@ -201,7 +204,7 @@ approval.
 | Designing the rule before interviewing | The brief ends up describing your idea, not the user's |
 | Batching questions into one message | The interview degenerates into a form the user fills out once |
 | Accepting an idea no grader can parse | The rule ships advisory and stays silently unenforced |
-| Proposing a new skill when a rule would do | Pays five registration surfaces for a concern one file could hold |
+| Proposing a new skill when a rule would do | Pays every registration surface for a concern one file could hold |
 | Naming no violating near miss | The eventual check grades vocabulary, not the rule |
 | Writing rule text here instead of in the brief | `test-driving-skill-changes` and `implementing-skill-changes` read the brief, not this transcript |
 
