@@ -11,8 +11,9 @@ description: >-
   in the repository (use the infrahub-managing-* skills), a bundle has already
   been collected and the user wants
   it analyzed (use infrahub-analyzing-diagnostics), filing a public GitHub
-  issue (use infrahub-reporting-issues), or running operational queries
-  (use infrahub-analyzing-data).
+  issue (use infrahub-reporting-issues), running operational queries
+  (use infrahub-analyzing-data), or planning an upgrade that has not run yet
+  (use infrahub-planning-upgrades).
 allowed-tools:
   - Read
   - Bash

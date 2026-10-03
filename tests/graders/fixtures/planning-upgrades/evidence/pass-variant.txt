@@ -1,0 +1,13 @@
+# Upgrade plan: 1.9.2 to 1.10.0
+
+## 1.9 -> 1.10
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| node_metadata is now a reserved attribute name | 1.10.0 | breaking | critical | before | yes | GraphQL `{ InfraCircuit { node_metadata } }` resolves; the attribute is declared | Rename the attribute before upgrading | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0 |
+| Restricted inheritance on internal Core generics | 1.10.0 | breaking | critical | before | no | GraphQL `{ Branch { name } }` returns only `main`, and no schema extends it | Nothing to do | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0 |
+
+```bash
+# read-only: reports what the upgrade would do, writes nothing
+VERSION=1.10.0 docker compose run --rm --no-deps infrahub-server infrahub upgrade --check
+```
