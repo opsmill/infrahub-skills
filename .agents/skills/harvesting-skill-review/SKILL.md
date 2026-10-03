@@ -73,7 +73,7 @@ it has to be you, on every lesson you apply:
    `dev/guides/adding-a-rule.md`: sweep `skills/`, `graders/`, and `eval.yaml`
    for the claim the new rule contradicts.
 3. **Report added/removed line counts.** Zero deletions means you accreted.
-   Say so plainly rather than presenting it as a win.
+   Saying so does not discharge it: find the cut before reporting.
 4. **Raise the bar as the file grows.** "True but rarely needed" loses to
    keeping the doc readable.
 

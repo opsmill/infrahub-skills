@@ -162,7 +162,10 @@ diff, no fix code, no test code belongs here.
 
 Name what this fix contradicts. Every existing rule, example, claim, or
 command elsewhere in the repo that the fix corrects or supersedes goes in the
-handoff's `Sweep terms` as a literal string to grep for.
+handoff's `Sweep terms`. Seed them from the concept, not from the wording of
+the file you found: a grep for one file's phrasing finds only the files that
+already agree with it. Give the bare concept word, the opposite wording of
+the claim, and, when the fix extends a list, a member already on it.
 `implementing-skill-changes` iterates that field and fixes every hit, so an
 empty one turns its sweep into a no-op and leaves the old claim sitting next
 to the new rule. `none` is a complete answer when the fix genuinely

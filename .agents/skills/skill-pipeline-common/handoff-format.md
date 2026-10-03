@@ -44,11 +44,11 @@ re-deriving a slug that would drift from the original.
 - compliant: <sketch>
 - compliant variant: <sketch, refactored the way the check's traversal is vulnerable to>
 - violating: <sketch>
-- violating near miss: <sketch that satisfies the check keyword and breaks the rule>
+- violating near miss: <sketch carrying the check's tokens, bound to the wrong subject>
 
 ### Sweep terms
 
-- `<old claim, command, or field to grep for>`
+- `<concept word, opposite wording, or a member of a list the fix extends>`
 
 ### Do NOT
 

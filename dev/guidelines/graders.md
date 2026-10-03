@@ -1,6 +1,8 @@
 ---
 paths:
   - "graders/**/*.py"
+  - "scripts/check*.py"
+  - "tests/test_*.py"
 ---
 
 # Grader Rules
@@ -11,6 +13,12 @@ Full reference: `dev/guides/adding-a-rule.md` §2 and §5,
 Graders are deterministic: no LLM grading, no network
 calls. Inspect the parsed artifact and return a hard
 pass/fail.
+
+A gate is a grader too. A `scripts/check-*.py` or a
+pytest asserting something about this repository's own
+text (frontmatter, a reference against an upstream
+model) makes the same mistakes, and every rule below
+applies to it.
 
 ## Parse the answer; never substring-match it
 
@@ -23,7 +31,7 @@ that words it differently. Parse the artifact instead:
 | -------- | ---------- |
 | Schema / object / menu YAML | `yaml.safe_load`, then walk the structure |
 | Python (checks, generators, transforms) | `ast` |
-| Shell commands | `shlex.split` — never split on `[;\|&]`, which fabricates segments inside quotes |
+| Shell commands | `shlex` over the whole line, after joining `\` continuations; see "Reading commands out of Markdown" |
 | Prose reports | locate the section, then rank evidence — see "Grading prose" below |
 
 Three failure modes follow from matching raw text:
@@ -36,6 +44,64 @@ Three failure modes follow from matching raw text:
   is fenced.
 - **Adjacency is not structure.** A verb next to a path
   does not mean the command ran against that path.
+
+## Reading commands out of Markdown
+
+A check asking "did the answer run X" counts only a
+command that would run. Splitting on operators first and
+then tokenizing each piece is the tempting shape, and it
+fabricates segments inside quotes:
+
+```python
+# Non-compliant: "a; b" becomes two commands
+for piece in re.split(r"&&|\|\||;|\|", line):
+    tokens = shlex.split(piece)
+```
+
+```python
+# Compliant: operators become their own tokens
+lexer = shlex.shlex(line, posix=True, punctuation_chars=True)
+lexer.whitespace_split = True
+tokens = list(lexer)
+```
+
+Each case below shipped as a false pass or a false fail:
+
+- **Fences.** A fence may be indented under a list item.
+  It closes on a run of the same character at least as
+  long as the opener.
+- **Data is not a command.** Arguments to `echo` or
+  `printf`, quoted text, and heredoc bodies.
+- **The program is argv[0] after wrappers.** Peel
+  `sudo`, `env`, `VAR=value`, and `uv|poetry|pipx run`,
+  each with its own option table.
+- **The subcommand is positional.** It is the first
+  non-option argument: `git stash push` is not a push.
+- **A placeholder is not a value.** `<name>`, `{}`, and
+  an unexpanded `$var` never satisfy a required target.
+- **A `\` continuation joins with no separator**, as the
+  shell does.
+
+Build `infrahubctl` command sets from `GROUPS` and
+`LEAVES` in `graders/common/cli_tree.py`, never a
+hand-kept list.
+
+## A must-not check fails closed
+
+A check that fails on a forbidden shape passes whatever
+its parser cannot read: an unparseable line, an unknown
+wrapper, an empty input. That false pass reads as
+compliance, and enumerating wrappers one review round at
+a time never ends. Instead:
+
+- Treat an unparseable line that names the binary as a
+  violation.
+- Back the parser with a plain scan for the forbidden
+  pattern in runnable code.
+- Fail a gate that read zero inputs.
+- Assert over every item. Exempt by a named list with a
+  reason, never by a filter that decides what gets
+  checked.
 
 ## Grading prose: rank evidence, don't list phrasings
 
@@ -104,7 +170,12 @@ failure mode. Hand-craft **four** fixtures:
 | Compliant, written the way the rule shows | 1.0 |
 | Compliant, refactored the way the check's traversal is vulnerable to | 1.0 |
 | Violating, obviously | < 1.0 |
-| Violating **near-miss** — satisfies the check's keyword while breaking the rule | < 1.0 |
+| Violating **near-miss**: carries every token the check reads, bound to the wrong subject or holding the wrong value | < 1.0 |
+
+Build each violating fixture from a compliant one by
+changing one shape, and assert the failure message, not
+only the score. A fixture that fails for a reason other
+than the one it names proves nothing.
 
 The last of each pair finds the bugs:
 
@@ -113,14 +184,28 @@ The last of each pair finds the bugs:
   it walks the AST for call order, extract the calls
   into a helper; if it reads a comparison in a test
   position, hoist it into a variable; if it keys on a
-  node name, put two relationships on one node. Field
-  order and synonyms exercise nothing.
+  node name, put two relationships on one node; if it
+  reads an object-YAML attribute, use the
+  `{value: ..., source: ...}` form. Field order and
+  synonyms exercise nothing.
 - **Laundering.** A violating answer scores 1.0 because
   it mentions the right word, imports the right module,
-  or names the right helper somewhere in the file. Ask
-  what the smallest edit is that makes the violating
-  fixture pass — if a comment or a bare string is
-  enough, the check grades vocabulary, not substance.
+  or names the right helper somewhere in the file. Reach
+  the subject another way: another API spelling, an
+  aliased or rebound name, a helper two calls deep, a
+  same-named method on an unrelated receiver. If a
+  comment or a bare string makes the violating fixture
+  pass, the check grades vocabulary, not substance.
+- **Omission.** A check that reads a field only when
+  present passes the answer that deletes it. Where the
+  task's input guarantees the field, assert it is there.
+- **Boundaries.** Every boundary the check draws (a gap
+  width, a clause anchor, a function scope, a word edge)
+  gets a fixture on each side.
+
+Commit the four as accept and reject cases in
+`tests/graders/test_<skill>_lib.py`. Run once in a
+terminal, they protect nothing from the next refactor.
 
 ## Don't hold a second copy of the prose
 
