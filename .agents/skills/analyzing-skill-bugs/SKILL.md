@@ -128,10 +128,11 @@ version, and the SHA (or `UNVERIFIED`) go in the handoff header's
 | `grader` | A check function exists but cannot fail, or asserts the wrong thing | A pytest against the check function, run over four fixtures |
 | `script` | A bundled script, or a registration/category-prefix surface, has drifted | A pytest against the script |
 
-Registration drift (a skill missing from one of its five surfaces) and
-category-prefix drift (a rule file named outside its registered prefixes) are
-`script`, not a fourth class: both are detectable by comparing the tree
-against the five registration surfaces, and `check-cli-invocations.py`,
+Registration drift (a skill missing from one of its registration surfaces)
+and category-prefix drift (a rule file named outside its registered prefixes)
+are `script`, not a fourth class: both are detectable by comparing the tree
+against the surfaces in `skill-registration.md`, and
+`check-skill-registration.py`, `check-cli-invocations.py`,
 `check-plugin-freshness.py`, and `check-symlinks.py` already do exactly
 this kind of comparison. There is no defect class with no test surface.
 

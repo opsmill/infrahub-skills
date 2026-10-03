@@ -1395,7 +1395,13 @@ def _constraint_fields(entity: dict) -> list[str]:
 
 
 def _resolved_attributes(schema: dict, entity: dict) -> dict[str, dict]:
-    """Attribute definitions by name, including those inherited in-file."""
+    """Attribute definitions by name, including those inherited in-file.
+
+    The walk is one level deep, which is complete only because Infrahub's
+    schema model has no generic-inherits-generic: ``inherit_from`` names
+    generics, and generics have no ``inherit_from`` of their own. If that
+    ever changes upstream, this needs to recurse.
+    """
     generics_by_kind = {
         f"{g.get('namespace', '')}{g.get('name', '')}": g
         for g in (schema.get("generics") or [])
@@ -1422,6 +1428,11 @@ def _resolved_members(schema: dict, entity: dict) -> tuple[set[str], dict[str, d
     nor the relationship and silently checks nothing. Inherited members are
     merged in from every generic listed in ``inherit_from``, with the kind's
     own declarations winning.
+
+    One level is enough only because generics do not nest in Infrahub's
+    schema model — a generic carries no ``inherit_from`` — so there is no
+    grandparent to reach. If that ever changes upstream, this needs to
+    recurse.
     """
     generics_by_kind: dict[str, dict] = {}
     for generic in schema.get("generics") or []:

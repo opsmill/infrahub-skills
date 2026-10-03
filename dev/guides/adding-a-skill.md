@@ -280,10 +280,13 @@ case once a skill exists), see
 
 ### 7. Register in Documentation
 
-Five surfaces, none of them checked by CI. The list and
-what to add to each is in
+The surfaces, what to add to each, and the shape the
+skills-reference page takes are in
 [../guidelines/skill-registration.md](../guidelines/skill-registration.md),
 which loads on its own when you edit a `SKILL.md`.
+`uv run invoke lint` fails a skill missing from any of
+them. It does not judge the prose, and it does not build
+the docs: run `npm run build` in `docs/` too.
 
 Add a news fragment describing the skill — CI fails
 the pull request without one:
@@ -338,11 +341,12 @@ Review results with `skillgrade preview`.
 - [ ] `graders/my-skill/` with grader scripts
 - [ ] `python scripts/sync-evals.py` run and the
   regenerated `evaluations/*.json` committed
-- [ ] `CLAUDE.md` updated with the new skill
-- [ ] `README.md` updated (skills section + project
-  structure)
-- [ ] `AGENTS.md` quick reference table updated
+- [ ] Every surface in
+  [../guidelines/skill-registration.md](../guidelines/skill-registration.md)
+  wired, with the reference page in the shape it gives
   (see [Step 7](#7-register-in-documentation))
+- [ ] `uv run invoke lint` and `npm run build` in
+  `docs/` both pass
 - [ ] News fragment added under `changelog/`
 - [ ] PR labeled with `changes/*` so the version bump
   is calculated correctly

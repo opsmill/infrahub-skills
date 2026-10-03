@@ -28,7 +28,7 @@ jobs:
     name: News fragment present
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Require a news fragment
         env:
@@ -49,12 +49,11 @@ jobs:
               ;;
           esac
 
-          # This repo has no .github/dependabot.yml to label bumps at source,
-          # and Dependabot security updates open their pull requests with no
-          # label at all — so the moment they are switched on (alerts are
-          # already enabled here) this required check would block every one of
-          # them forever. Its PRs are dependency bumps by construction; exempt
-          # the author. Only this one bot is exempt — humans still need a
+          # .github/dependabot.yml labels bumps `ci/skip-changelog` at source,
+          # but only for the ecosystems it lists; a Dependabot pull request
+          # for anything else opens with no label at all, and this required
+          # check would block it forever. Its PRs are dependency bumps by
+          # construction; exempt the author. Only this one bot is exempt — humans still need a
           # fragment. A string equality, not a `case` glob: `[bot]` in a glob
           # pattern is a character class and would match far more than this.
           if [ "${AUTHOR}" = "dependabot[bot]" ]; then

@@ -20,6 +20,7 @@ CHECKS = [
     "watch-empty-for-self-contained",
     "watch-omitted-for-static-jinja2",
     "watch-declares-dynamic-jinja2-partials",
+    "watch-no-third-party",
 ]
 
 if __name__ == "__main__":

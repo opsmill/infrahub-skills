@@ -1980,6 +1980,7 @@ tasks:
       - "interface_names declares watch.files as an empty list"
       - "arista_startup_config carries no watch entries (its closure is complete)"
       - "cisco_startup_config declares templates/partials/"
+      - "No watch list names an installed package such as infrahub_sdk"
     assertions:
       - name: watch-present-on-python-transforms
         check: >-
@@ -2013,6 +2014,10 @@ tasks:
         check: >-
           cisco_startup_config declares templates/partials/, which its
           variable include can reach
+      - name: watch-no-third-party
+        check: >-
+          No watch list names an installed package such as infrahub_sdk,
+          which is not a tracked repository file
 
   # --- Transforms: pre-merge GraphQL dry-run --- #
   # Backs the shared rule

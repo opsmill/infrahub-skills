@@ -12,7 +12,7 @@ jobs:
   validate-and-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Extract version from tag
         id: tag
@@ -92,7 +92,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Update release with skills list
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           append_body: true
           body: |
