@@ -108,4 +108,4 @@ real signal (possible regression) is lost.
   and the release carrying the fix is usually later
   than the close.
 
-Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)
