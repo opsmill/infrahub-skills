@@ -7462,6 +7462,87 @@ tasks:
           A Markdown report names the NetBox component lists that did not
           convert
 
+  - name: netbox-convert-bundled-scripts
+    trials: 3
+    instruction: |
+      Read the skill at
+      skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Convert this NetBox device type into Infrahub object templates
+      for the OpsMill schema-library DCIM schema, which has
+      `generate_template: true` on `DcimDevice`.
+
+          ---
+          manufacturer: Cisco
+          model: Catalyst 9300-24P
+          slug: cisco-c9300-24p
+          part_number: C9300-24P
+          u_height: 1
+          is_full_depth: true
+          weight: 7.59
+          weight_unit: kg
+          airflow: front-to-rear
+          console-ports:
+            - name: con 0
+              type: rj-45
+          interfaces:
+            - name: GigabitEthernet1/0/1
+              type: 1000base-t
+              poe_mode: pse
+            - name: GigabitEthernet1/0/2
+              type: 1000base-t
+              poe_mode: pse
+
+      Write the emitted files under `./output_dir/` (create the directory),
+      and tell me what did not convert.
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_bundled_scripts.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/ produced by the bundled converter: the 7.59 kg weight
+      is carried through as the whole number 8, rather than written as a
+      float that Infrahub's integer-backed Number attributes cannot hold or
+      dropped to avoid the problem, component children nest under a kind +
+      data wrapper, and a coverage report names the console-ports and the
+      dropped interface fields.
+    expectations:
+      - The device type weight is the whole number 8, neither 7.59 nor absent
+      - Component children nest under a kind + data wrapper
+      - A coverage report is written naming what did not convert
+      - The console-ports list and the interface type/poe_mode fields are accounted for
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind,
+          and spec.data list
+      - name: template-kind
+        check: >-
+          Templates are authored under a Template<Kind> and every row has a
+          template_name
+      - name: bundled-script-output
+        check: >-
+          Numerics are integers and a coverage report exists — guarantees a
+          hand-rolled conversion loses. Its choice-object predicate cannot
+          fire here: the input is devicetype-library YAML, which carries no
+          {value, label} wrappers. Feeding this task API-shaped input to
+          exercise it would fail the correct answer instead, since unwrapping
+          is the exporter's job and the converter does not do it.
+      - name: weight-rounds-to-a-whole-number
+        check: >-
+          The device type's weight is present and equals 8, bare or in the
+          {value, source} form — the registry check can only reject a float,
+          so dropping the field scored full marks
+      - name: component-kind-wrapper
+        check: >-
+          Component children nest under a kind + data wrapper naming a
+          Template* kind
+      - name: coverage-report
+        check: >-
+          A Markdown report names the NetBox component lists that did not
+          convert
+
   - name: csv-import-up-front-interview
     trials: 3
     instruction: |

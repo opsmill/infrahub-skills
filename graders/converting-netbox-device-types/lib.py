@@ -495,6 +495,118 @@ def check_coverage_report(
     return True, f"Coverage report names {len(mentioned)} component list(s) as lost"
 
 
+def _every_row(parsed: dict[Path, list[dict]]) -> list[tuple[str, dict]]:
+    """Return ``(label, row)`` for every object row and component child.
+
+    Component children are rows too. Anything that inspects only one level
+    misses half the traps it is looking for.
+    """
+    rows: list[tuple[str, dict]] = []
+    for doc in _object_docs(parsed):
+        kind = doc["spec"].get("kind")
+        for row in _rows(doc):
+            name = row.get("name") or row.get("template_name")
+            rows.append((f"{kind} row {name!r}", row))
+            for relationship, child in component_children(row):
+                child_name = child.get("template_name") or child.get("name")
+                rows.append((f"{kind} {relationship} child {child_name!r}", child))
+    return rows
+
+
+#: Infrahub's own attribute-metadata form is a mapping carrying ``value``
+#: alongside lineage keys — see skills/infrahub-managing-objects/reference.md
+#: § Value Metadata. Stamping ``source: netbox-sync`` on an imported template
+#: is the most natural thing a correct answer to this skill does.
+_ATTRIBUTE_METADATA_KEYS = frozenset({"value", "source", "owner", "is_protected"})
+
+
+def _is_netbox_choice(value: Any) -> bool:
+    """Whether a value is a NetBox choice wrapper rather than Infrahub metadata.
+
+    Both are mappings carrying ``value``, so that key cannot tell them apart.
+    NetBox serializes a choice as ``{"value": ..., "label": ...}`` and a
+    related object with a ``display``; Infrahub's metadata form pairs ``value``
+    with ``source``, ``owner``, or ``is_protected``. Keying on ``value`` alone
+    failed a correct answer that recorded where its data came from.
+
+    ``{"value": "pse"}`` on its own is deliberately allowed: it is the
+    metadata form with no metadata, and it loads as the bare value.
+
+    ``display`` is tested on its own: a related object such as
+    ``{id, name, display}`` carries no ``value`` at all, so gating on
+    ``value`` first let it through.
+
+    Args:
+        value: Any value read from an emitted row.
+
+    Returns:
+        ``True`` only for the NetBox wrapper shape.
+    """
+    if not isinstance(value, dict) or set(value) <= _ATTRIBUTE_METADATA_KEYS:
+        return False
+    return "display" in value or ("value" in value and "label" in value)
+
+
+def attribute_value(value: Any) -> Any:
+    """The bare value of an attribute, unwrapping Infrahub's metadata form.
+
+    ``{value: 8, source: netbox}`` is the same attribute as ``8`` with
+    lineage attached, so any check on the value has to look inside it.
+    """
+    if isinstance(value, dict) and "value" in value and set(value) <= _ATTRIBUTE_METADATA_KEYS:
+        return value["value"]
+    return value
+
+
+def check_bundled_script_output(
+    parsed: dict[Path, list[dict]], output_dir: Path | None = None, **_: Any
+) -> tuple[bool, str]:
+    """The output carries the guarantees only the bundled converter makes.
+
+    Deliberately checks properties, not provenance: what matters is not that
+    a particular command ran but that the output has the correctness a
+    hand-rolled conversion loses. Each assertion below is a trap that cost a
+    real bug to find.
+
+    Three properties, and no more: every number is whole, no NetBox choice
+    wrapper survived into the YAML, and a coverage report exists. It does not
+    assert that the values are *right*, that every component list converted,
+    or that the mapping profile was the correct one — other checks cover
+    those, and a docstring claiming them here would be the same kind of
+    overreach as grading a metadata mapping as a choice wrapper.
+    """
+    docs = _object_docs(parsed)
+    if not docs:
+        return False, "No Infrahub object documents found"
+
+    # Both predicates run over both levels. Checking floats only on top-level
+    # rows and choice wrappers only on children left each trap invisible at
+    # the other level — a nested maximum_draw: 7.5, or a top-level
+    # weight_unit: {value: kg}, both slipped through.
+    for label, row in _every_row(parsed):
+        floats = [k for k, v in row.items() if isinstance(attribute_value(v), float)]
+        if floats:
+            return False, (
+                f"{label} has non-integer {floats}; Infrahub Number attributes hold "
+                "integers, so this cannot load. The bundled converter rounds these."
+            )
+        wrapped = [k for k, v in row.items() if _is_netbox_choice(v)]
+        if wrapped:
+            return False, (
+                f"{label} carries an unwrapped NetBox choice object in {wrapped}; "
+                "expected the bare value"
+            )
+
+    # 3. The coverage report is the mechanism for making loss visible.
+    text = _report_text(output_dir or Path("."))
+    if not text.strip():
+        return False, (
+            "No coverage report. The bundled converter always writes one; without it "
+            "any loss is unstated as well as unfixed."
+        )
+    return True, f"Output carries the bundled converter's guarantees across {len(docs)} document(s)"
+
+
 def check_shared_relationship_blocks(parsed: dict[Path, list[dict]], **_: Any) -> tuple[bool, str]:
     """Component lists sharing one relationship keep every child, in a loadable shape.
 
@@ -672,17 +784,27 @@ CHECKS: dict[str, Callable[..., tuple[bool, str]]] = {
     "load-order-numbering": check_load_order_numbering,
     "coverage-report": check_coverage_report,
     "shared-relationship-blocks": check_shared_relationship_blocks,
+    "bundled-script-output": check_bundled_script_output,
     "fallback-precedence": check_fallback_precedence,
     "generate-template-prerequisite": check_generate_template_prerequisite,
 }
 
 
-def run_checks(check_names: list[str], output_dir: Path) -> dict:
+def run_checks(
+    check_names: list[str],
+    output_dir: Path,
+    extra: list[tuple[str, Any]] | None = None,
+) -> dict:
     """Run named checks against the emitted output directory.
 
     Args:
         check_names: Assertion names from the ``CHECKS`` registry.
         output_dir: Directory holding the model's emitted files.
+        extra: Task-specific ``(name, function)`` pairs, for assertions that
+            depend on the task's own input and so do not belong in the shared
+            registry. A registry check can only test a property of any
+            output; knowing that this fixture's 7.59 kg must round to 8 is
+            the task grader's business.
 
     Returns:
         A dict with ``score`` (float 0.0-1.0), ``details`` (str), and
@@ -692,8 +814,9 @@ def run_checks(check_names: list[str], output_dir: Path) -> dict:
 
     entries: list[dict] = []
     passed_count = 0
-    for name in check_names:
-        fn = CHECKS[name]
+    named = [(name, CHECKS[name]) for name in check_names] + list(extra or [])
+    check_names = [name for name, _ in named]
+    for name, fn in named:
         try:
             ok, msg = fn(parsed, output_dir=output_dir)
         except Exception as exc:  # pragma: no cover - defensive

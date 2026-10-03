@@ -186,10 +186,10 @@ no published module type carries one — so a mixed tree
 converts in a single pass:
 
 ```bash
-python scripts/netbox_to_infrahub_templates.py \
+python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
   devicetype-library/device-types/Arista/ \
   devicetype-library/module-types/Arista/ \
-  --mapping scripts/mappings/schema-library-modules.yml \
+  --mapping "$SKILL/scripts/mappings/schema-library-modules.yml" \
   --output-dir ./generated
 ```
 

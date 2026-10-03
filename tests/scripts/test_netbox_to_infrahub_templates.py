@@ -982,6 +982,32 @@ def test_module_components_are_skipped_without_a_template(tmp_path, module_profi
     assert conversion.module_templates == []
 
 
+def test_module_port_mappings_are_reported_as_skipped(tmp_path, module_profile):
+    """The exporter writes `port-mappings` on module types too.
+
+    The device-type path already named them; the module path read only the
+    component lists, so a module's front-to-rear wiring vanished unreported.
+    """
+    wired = {
+        **MODULE_TYPE,
+        "front-ports": [{"name": "F1", "type": "lc", "positions": 1}],
+        "rear-ports": [{"name": "R1", "type": "lc", "positions": 1}],
+        "port-mappings": [
+            {
+                "front_port": "F1",
+                "front_port_position": 1,
+                "rear_port": "R1",
+                "rear_port_position": 1,
+            }
+        ],
+    }
+    module = parse_device_type(_write(tmp_path, "wired.yaml", wired))
+
+    coverage = convert_all([module], module_profile).coverage[0]
+
+    assert coverage.skipped_lists["port-mappings"] == 1
+
+
 def test_module_template_carries_components_when_configured(tmp_path):
     profile = _module_profile(
         tmp_path,

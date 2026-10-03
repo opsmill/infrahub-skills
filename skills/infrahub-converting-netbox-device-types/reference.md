@@ -64,6 +64,124 @@ Component lists, by share of files: `interfaces`
 bay-position token NetBox substitutes at install time.
 See `module_type.position_placeholder`.
 
+## Exporting from a live NetBox
+
+`scripts/netbox_export_device_types.py` reads a running
+instance through [pynetbox](https://github.com/netbox-community/pynetbox)
+and writes the library format. Field names on both sides
+were taken from NetBox's own serializers and the
+devicetype-library JSON schema, not inferred.
+
+Requires `pynetbox>=7.0`. Fields are read as attributes
+rather than via `Record.serialize()`, which flattens a
+related object to its primary key — an outlet's
+`power_port` would become `16` where the library needs
+the port's name.
+
+pynetbox supplies no timeout and no retries: it builds
+a bare `requests.Session` and mounts nothing, so the
+default is `Retry(0)`. Both are wired in by the script,
+because a full `--in-use` run is on the order of a
+thousand requests and one blip would otherwise abort it.
+GET is retried three times with exponential backoff on
+429, 502, 503 and 504. A 500 and the other 4xx statuses
+are not: those answer the same way next time, and the
+export explains them instead.
+
+Two bounds keep a retry from becoming its own outage:
+
+- **`Retry-After` is honoured up to 30 seconds**, not in
+  full. A proxy in maintenance answering
+  `Retry-After: 3600` would otherwise hang the export
+  for three hours. Short values, which is what a 429
+  actually sends, are still obeyed exactly.
+- **Read timeouts are not retried.** A read timeout
+  means NetBox took the query and is still working on
+  it, so re-sending adds a second copy to an instance
+  already struggling, and costs `--timeout` again for
+  each attempt. The export reports it instead, and
+  `--timeout` is the dial.
+
+NetBox 4.5 reshaped front ports: the singular
+`rear_port` / `rear_port_position` fields became a
+`rear_ports` list of mappings, and front ports gained
+their own `positions`. Both shapes are read, told apart
+by the shape itself rather than by asking the server its
+version, and the export names which one it found.
+
+| Option | Meaning |
+| ------ | ------- |
+| `--url` | Base URL of the instance, without `/api` |
+| `--token` | API token; defaults to `$NETBOX_TOKEN` |
+| `--output-dir` | Writes `<dir>/device-types/<Manufacturer>/<slug>.yaml`, and with `--module-types` also `<dir>/module-types/<Manufacturer>/<model>.yaml` |
+| `--in-use` | Only device types with at least one device, and module types with at least one module. A record whose NetBox reports no count is kept, and the report says how many |
+| `--manufacturer` | Restrict to a manufacturer slug; repeatable |
+| `--slug` | Restrict to a device-type slug; repeatable. Module types have no slug, so it does not narrow them |
+| `--module-types` | Also export module types |
+| `--timeout` | Per-request timeout in seconds, default 30 |
+| `--insecure` | Skip TLS verification |
+
+| Exit code | Meaning |
+| --------- | ------- |
+| 0 | Export completed |
+| 1 | Configuration, network, or authentication failure |
+| 2 | Nothing matched the filters |
+
+### Shape differences it reconciles
+
+| NetBox API | Library format |
+| ---------- | -------------- |
+| `type: {value, label}` | `type: <value>` |
+| `manufacturer: {id, name, slug, ...}` | `manufacturer: <name>` |
+| `power_port: {id, name}` | `power_port: <name>` |
+| `weight: "13.40"` (decimal as string) | `weight: 13.4` |
+| `airflow: null`, `description: ""` | field omitted |
+| `rear_ports: [{position, rear_port: <pk>}]` | `port-mappings` naming both ports |
+| `rear_port: <pk>` + `rear_port_position` (pre-4.5) | the same `port-mappings`, read from the older shape |
+
+`is_full_depth: false` and `u_height: 0` are kept:
+absent and false are different things.
+
+### What it reports
+
+Six classes of note, on the same principle as the
+converter's coverage report:
+
+- **NetBox holds it, the library format has no field**
+  — module-type `attributes` and `profile`, a device
+  type's `default_platform`, `cooling_method`,
+  `end_of_life` or `tags`, a module bay's `enabled`,
+  and the `front_image` / `rear_image` URLs, which the
+  library format types as booleans asserting an image
+  file this export does not write. Every populated
+  field with nowhere to go is named; NetBox's own
+  bookkeeping (`id`, `url`, timestamps, counts) is not,
+  since omitting it is no loss.
+- **NetBox left it unset, the library format requires
+  it** — a power port with no `type` is valid in NetBox
+  and invalid in the library. The file is still
+  written; the note names the component list and how
+  many of its entries lack the field.
+- **The endpoint is absent from this NetBox** — component
+  endpoints come and go across versions, so the list is
+  skipped rather than the export failing.
+- **An earlier export left files behind** — the output
+  directory is built in a staging directory and swapped
+  in, so only the subtrees this run produced are
+  replaced and a failed run changes nothing. Files a
+  previous, wider export left are removed and counted,
+  because the converter would otherwise read them as
+  part of this one.
+- **Two records collided on one file name** — sanitising
+  can collapse names NetBox considers distinct, so the
+  second is written alongside the first with a numeric
+  suffix rather than over it.
+- **This NetBox predates the 4.5 front-port shape** — the
+  older singular mapping is read instead, and front-port
+  `positions` is set to 1, which is what that model
+  means rather than a guess. Named so the difference is
+  visible in the output rather than inferred later.
+
 ## Infrahub object templates
 
 | Concept | Detail |

@@ -5,16 +5,16 @@ description: >-
   devicetype-library format, also published via the NetBox Data Exchange / NDX)
   into Infrahub object templates as Infrahub object YAML, using a bundled Python
   converter driven by a schema mapping profile.
-  TRIGGER when: importing NetBox device types or module types into Infrahub,
-  converting devicetype-library YAML, building object templates from vendor
-  device models, seeding Infrahub with device types from NDX, converting line
-  cards / PSUs / transceivers from NetBox module types, turning NetBox hardware
-  definitions into Template* objects, re-running a conversion after changing the
+  TRIGGER when: importing NetBox device types or module types, exporting device
+  types from a running NetBox instance, building object templates from vendor
+  device models, converting line cards / PSUs / transceivers from NetBox module
+  types into Template* objects, re-running a conversion after changing the
   mapping profile, debugging a wrong or failed conversion.
   DO NOT TRIGGER when: importing CSV/TSV data (use infrahub-importing-data),
   authoring schemas from scratch (use infrahub-managing-schemas), writing ordinary
-  object data files (use infrahub-managing-objects), or syncing live NetBox
-  instances (that is infrahub-sync, a separate product).
+  object data files (use infrahub-managing-objects), or setting up continuous
+  two-way replication with a live NetBox (that is infrahub-sync, a separate
+  product; a one-off export of device types is in scope here).
 allowed-tools:
   - Read
   - Write
@@ -127,7 +127,7 @@ these with links to the Infrahub docs.
 
 | Priority | Category | Prefix | Description |
 | -------- | -------- | ------ | ----------- |
-| CRITICAL | Workflow | `workflow-` | `generate_template` must be enabled first |
+| CRITICAL | Workflow | `workflow-` | `generate_template` must be enabled first; the bundled scripts do the work |
 | CRITICAL | Mapping | `mapping-` | Names come from the schema, never guessed; competing fields declare precedence |
 | CRITICAL | Format | `format-` | Envelope, `Template<Kind>`, nested components |
 | HIGH | Naming | `naming-` | Slug-based, parent-namespaced, unique |
@@ -177,8 +177,11 @@ name.
   `scripts/mappings/schema-library-modules.yml` if you
   also want module types.
 - Custom schema? Copy `scripts/mappings/_template.yml`
-  and fill it in **by reading the schema YAML**, kind
-  by kind and attribute by attribute.
+  into the working directory (say
+  `./mappings/my-schema.yml`, never inside `$SKILL`,
+  which a plugin reinstall wipes) and fill it in **by
+  reading the schema YAML**, kind by kind and attribute
+  by attribute.
 
 Read
 [rules/mapping-profile-driven.md](./rules/mapping-profile-driven.md)
@@ -205,8 +208,59 @@ provide.
 
 ### 3. Get the input
 
-The library is a git repo; NDX is its browsable front
-end. There is no public bulk API, so clone it — but
+Two sources, depending on where the device types live.
+
+**From a running NetBox.** The catalogue in someone's
+own instance is usually what they actually want to
+import, and it is not the same set as the published
+library. `scripts/netbox_export_device_types.py` reads
+a live instance over its REST API and writes the
+library file format:
+
+```bash
+pip install 'pynetbox>=7.0' pyyaml   # NetBox's client, and the file writer
+# SKILL is this skill's own directory, wherever it is installed
+SKILL=/path/to/infrahub-converting-netbox-device-types
+export NETBOX_TOKEN=...
+python "$SKILL/scripts/netbox_export_device_types.py" \
+  --url https://netbox.example.com \
+  --in-use \
+  --module-types \
+  --output-dir ./netbox-export
+```
+
+**Stay in the user's working directory and name the
+scripts by their full path.** `$SKILL` is wherever this
+skill is installed, which for a plugin install is under
+`~/.claude/plugins/cache/` — a directory reinstalling
+the plugin wipes. Running from there puts the export,
+the cloned library and the generated YAML inside it, so
+the next update deletes the user's data. Everything the
+commands below read or write (`./netbox-export`,
+`devicetype-library/`, `./generated`) stays relative to
+where the user actually is.
+
+`--in-use` keeps only device types with at least one
+device, and module types with at least one module,
+which on a real instance is a much smaller and more
+relevant set than the whole catalogue.
+
+It reports anything that did not come across cleanly:
+fields NetBox holds that the library format cannot
+carry, fields NetBox left unset that the library format
+requires, endpoints absent from that NetBox version,
+file names that collided after sanitising, and a NetBox
+older than the 4.5 front-port shape. Read that list
+before converting, the same way you read the conversion
+coverage report before loading.
+
+This is a one-way snapshot into files, not a sync.
+Continuous replication is
+[infrahub-sync](https://docs.infrahub.app/sync/), a
+separate product.
+
+**From the published library.** For seeding vendor
+models nobody has yet, clone the upstream repo — but
 sparsely. A plain `--depth 1` clone pulls 1.6 GB,
 almost all of it rack elevation images the converter
 never reads. Restricting to `device-types/` gets the
@@ -215,8 +269,7 @@ same 5,900+ definitions in 29 MB:
 ```bash
 git clone --depth 1 --filter=blob:none --sparse \
   https://github.com/netbox-community/devicetype-library.git
-cd devicetype-library
-git sparse-checkout set device-types module-types
+git -C devicetype-library sparse-checkout set device-types module-types
 ```
 
 Drop `module-types` from that list if you only want
@@ -227,10 +280,30 @@ recursively), and globs.
 
 ### 4. Run the converter
 
+Run it — do not reimplement it. Both scripts carry
+correctness that a hand-rolled equivalent silently
+loses, and the failure looks like success: valid YAML,
+no error, no coverage report, wrong data. Read
+[rules/workflow-use-the-bundled-scripts.md](./rules/workflow-use-the-bundled-scripts.md).
+When a schema does not fit, the answer is a mapping
+profile, not a different script.
+
 ```bash
-python skills/infrahub-converting-netbox-device-types/scripts/netbox_to_infrahub_templates.py \
+python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
   devicetype-library/device-types/Cisco/ \
-  --mapping skills/infrahub-converting-netbox-device-types/scripts/mappings/schema-library.yml \
+  --mapping "$SKILL/scripts/mappings/schema-library.yml" \
+  --output-dir ./generated \
+  --report ./generated/coverage-report.md
+```
+
+For a live export, point it at the export directory.
+It walks `device-types/` and `module-types/` together,
+which needs the profile that maps both:
+
+```bash
+python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
+  ./netbox-export/ \
+  --mapping "$SKILL/scripts/mappings/schema-library-modules.yml" \
   --output-dir ./generated \
   --report ./generated/coverage-report.md
 ```
@@ -329,6 +402,7 @@ uv run invoke test
 | File | Read it when |
 | ---- | ------------ |
 | [concepts.md](./concepts.md) | The Infrahub model is unfamiliar, or you need to explain it |
+| [reference.md](./reference.md) § Exporting from a live NetBox | The device types are in a running NetBox: the flags, the auth, and what the export reports |
 | [extending-your-schema.md](./extending-your-schema.md) | Turning a reported gap into a schema change |
 | [generators-module-ports.md](./generators-module-ports.md) | Module ports imported as declarations and the `{module}` token needs resolving into real device interfaces |
 | [reference.md](./reference.md) | Looking up a NetBox field or its Infrahub counterpart |
