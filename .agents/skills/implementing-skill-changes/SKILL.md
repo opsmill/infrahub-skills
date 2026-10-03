@@ -187,6 +187,9 @@ For every term in the handoff's `Sweep terms`:
 grep -rn "<sweep term>" skills/ graders/ eval.yaml dev/ README.md AGENTS.md docs/ .agents/skills/
 ```
 
+Then read every rule the changed one links to, and every rule linking to it. A
+linked rule that now says the opposite contains none of your terms.
+
 Skip `evaluations/`, which `sync-evals.py` regenerates from `eval.yaml`. Fix
 every hit, and delete what the change makes wrong. An impact or severity label
 bumped in a rule has to move in the skill's index too, or the index now
@@ -203,15 +206,14 @@ silence.
 ## Changelog
 
 ```bash
-uv run towncrier create -c "<one sentence describing the change>" <issue>.housekeeping.md
+uv run towncrier create -c "<one sentence describing the change>" <issue>.<type>.md
 # With no issue number, use a descriptive slug prefixed with +:
-uv run towncrier create -c "<one sentence>" +<slug>.housekeeping.md
+uv run towncrier create -c "<one sentence>" +<slug>.<type>.md
 ```
 
 Apply the matching `changes/*` label to the PR; it drives the version bump.
-Never edit `CHANGELOG.md` by hand and never run `towncrier build`. This
-repository assembles its changelog from fragments, and skill or tooling work
-goes under `housekeeping`.
+Never edit `CHANGELOG.md` by hand and never run `towncrier build`. Pick
+`<type>` with the rule in `AGENTS.md` § Changelog.
 
 ## Scope check
 

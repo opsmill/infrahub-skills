@@ -175,17 +175,50 @@ _PRINTS_TO_STDOUT = re.compile(r"\b(?:echo|printf|print)\b")
 # containing the word "echo" counted as one command, so a safe
 # `${TOKEN:-}` test operand quoted later in the same sentence was reported
 # as a leak — the very presence test the rule recommends.
-_COMMAND_BREAK = re.compile(r";|\|\||&&|\||\n|`|\bthen\b|\bdo\b|\bfi\b|\bdone\b")
+_LINE_BREAK = re.compile(r"\n|`")
+_COMMAND_BREAK = re.compile(r";|\|\||&&|\||\bthen\b|\bdo\b|\bfi\b|\bdone\b")
+
+
+def _quoted_spans(segment: str) -> list[tuple[int, int]] | None:
+    """Return the quoted spans of a shell segment, or None if quotes don't balance.
+
+    An apostrophe between two letters is a contraction ("don't", "it's"), not
+    a quote. Quotes that still do not balance mean prose; the caller then
+    splits on every separator as before.
+    """
+    spans: list[tuple[int, int]] = []
+    quote = None
+    start = 0
+    for i, ch in enumerate(segment):
+        if ch == "'" and 0 < i < len(segment) - 1 and segment[i - 1].isalpha() and segment[i + 1].isalpha():
+            continue
+        if quote is None and ch in "'\"":
+            quote, start = ch, i
+        elif ch == quote and not (quote == '"' and segment[i - 1] == "\\"):
+            spans.append((start, i))
+            quote = None
+    return None if quote else spans
 
 
 def _command_pieces(text: str) -> list[tuple[int, str]]:
-    """Split into command-sized pieces, keeping each piece's offset."""
+    """Split into command-sized pieces, keeping each piece's offset.
+
+    A separator inside quotes is data: `printf '%s; ' "$TOKEN"` is one
+    command, and splitting on its `;` cut the value away from the printf.
+    """
     pieces: list[tuple[int, str]] = []
-    pos = 0
-    for match in _COMMAND_BREAK.finditer(text):
-        pieces.append((pos, text[pos : match.start()]))
-        pos = match.end()
-    pieces.append((pos, text[pos:]))
+    seg_start = 0
+    for seg_end in [m.start() for m in _LINE_BREAK.finditer(text)] + [len(text)]:
+        segment = text[seg_start:seg_end]
+        spans = _quoted_spans(segment) or []
+        pos = 0
+        for match in _COMMAND_BREAK.finditer(segment):
+            if any(a < match.start() < b for a, b in spans):
+                continue
+            pieces.append((seg_start + pos, segment[pos : match.start()]))
+            pos = match.end()
+        pieces.append((seg_start + pos, segment[pos:]))
+        seg_start = seg_end + 1
     return pieces
 
 

@@ -41,6 +41,8 @@ Existing generators:
 - Implementing idempotent create-or-update workflows
 - Auto-generating infrastructure from high-level designs
 - Understanding the generator tracking system
+- Changing or extending what an existing generator produces
+- Debugging a generator that created, deleted, or left wrong objects or fields
 
 ## Rule Categories
 

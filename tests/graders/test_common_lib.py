@@ -45,6 +45,14 @@ TOKEN_LEAKS = [
     pytest.param(
         'Run `echo "${INFRAHUB_API_TOKEN-unset}"`.', id="plain-dash-fallback"
     ),
+    # A separator inside quotes is data. Splitting on it cut the value away
+    # from the command that prints it.
+    pytest.param(
+        "Run `printf '%s; ' \"$INFRAHUB_API_TOKEN\"`.", id="quoted-semicolon-in-format"
+    ),
+    pytest.param(
+        'Run `echo "token | ok: $INFRAHUB_API_TOKEN"`.', id="quoted-pipe-before-value"
+    ),
 ]
 
 
@@ -67,6 +75,12 @@ TOKEN_SAFE = [
         id="colon-question-aborts-to-stderr",
     ),
     pytest.param("Confirm INFRAHUB_API_TOKEN is exported.", id="named-in-prose-only"),
+    # An apostrophe in prose is not a quote: it must not merge the prose
+    # "echo" with a safe operand later on the same line.
+    pytest.param(
+        "Don't echo it; it's secret: [ -n \"${INFRAHUB_API_TOKEN:-}\" ] is enough.",
+        id="prose-apostrophes-around-a-separator",
+    ),
 ]
 
 

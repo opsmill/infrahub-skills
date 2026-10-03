@@ -87,6 +87,7 @@ Check these, in this order:
 
 | Surface | Goes stale when |
 | ------- | --------------- |
+| `skills/<name>/SKILL.md` `## When to Use` | The TRIGGER clauses changed. It must cover every request they now claim. |
 | `docs/docs/skills-reference/<name>.mdx` | Any behavior change. It describes the skill in prose, so it rots fastest. |
 | `AGENTS.md` | The one-line description changed |
 | `README.md` | The description changed, or the skill gained or lost files in the Project Structure tree |
@@ -94,13 +95,9 @@ Check these, in this order:
 | `docs/docs/choosing-a-skill.mdx` | What the skill starts from or produces changed (its row), or a new skill is easy to confuse with it (a pair table, plus "Not sure this is the right skill?" on both pages) |
 | `dev/guides/`, `dev/knowledges/`, `dev/guidelines/` | A page documents the behavior being changed |
 
-Find them rather than recalling them. Grep the old
-claim, and the skill name, across every surface at once:
-
-```bash
-grep -rn "<old claim or skill name>" \
-  README.md AGENTS.md docs/ dev/ .agents/skills/
-```
+Find them rather than recalling them. Run the sweep in
+[adding-a-rule.md](../guides/adding-a-rule.md#6-sweep-the-layers-the-rule-contradicts)
+with the old claim and with the skill name as terms.
 
 "Nothing to change" is a complete answer. The point is
 that somebody looked.
