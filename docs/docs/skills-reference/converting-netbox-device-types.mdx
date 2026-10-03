@@ -61,10 +61,10 @@ A Markdown coverage report names everything the profile could not map. It is wri
 
 ## Exporting from a running NetBox
 
-When the device types live in your own instance rather than in the published library, a second bundled script fetches them and writes the same file format, so the two steps chain without a conversion in between. It needs [pynetbox](https://github.com/netbox-community/pynetbox) 7.0 or later and a read-only API token.
+When the device types live in your own instance rather than in the published library, a second bundled script fetches them and writes the same file format, so the two steps chain without a conversion in between. It needs [pynetbox](https://github.com/netbox-community/pynetbox) 7.0 or later, PyYAML, and a read-only API token.
 
 ```bash
-pip install 'pynetbox>=7.0'
+pip install 'pynetbox>=7.0' pyyaml
 SKILL=/path/to/infrahub-converting-netbox-device-types
 export NETBOX_TOKEN=...
 python "$SKILL/scripts/netbox_export_device_types.py" \
@@ -74,7 +74,7 @@ python "$SKILL/scripts/netbox_export_device_types.py" \
   --output-dir ./netbox-export
 ```
 
-`--in-use` keeps only device types with at least one device racked against them, which on a real instance is a much smaller and more relevant set than the whole catalogue. `--manufacturer` and `--slug` narrow it further.
+`--in-use` keeps only device types with at least one device and module types with at least one module, going by the counts NetBox reports rather than by rack placement. On a real instance that is a much smaller and more relevant set than the whole catalogue. `--manufacturer` narrows both further; `--slug` narrows device types only, since module types have no slug.
 
 The export closes with its own report, in the same spirit as the coverage report: fields NetBox holds that the library format cannot carry, fields NetBox left unset that the library format requires, component endpoints absent from that NetBox version, file names that collided after sanitising, and whether the instance predates NetBox 4.5, whose front-port mapping shape differs. Read it before converting.
 

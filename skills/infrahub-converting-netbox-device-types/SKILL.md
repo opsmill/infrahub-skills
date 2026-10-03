@@ -177,8 +177,11 @@ name.
   `scripts/mappings/schema-library-modules.yml` if you
   also want module types.
 - Custom schema? Copy `scripts/mappings/_template.yml`
-  and fill it in **by reading the schema YAML**, kind
-  by kind and attribute by attribute.
+  into the working directory (say
+  `./mappings/my-schema.yml`, never inside `$SKILL`,
+  which a plugin reinstall wipes) and fill it in **by
+  reading the schema YAML**, kind by kind and attribute
+  by attribute.
 
 Read
 [rules/mapping-profile-driven.md](./rules/mapping-profile-driven.md)
@@ -215,7 +218,7 @@ a live instance over its REST API and writes the
 library file format:
 
 ```bash
-pip install 'pynetbox>=7.0'     # the official NetBox client
+pip install 'pynetbox>=7.0' pyyaml   # NetBox's client, and the file writer
 # SKILL is this skill's own directory, wherever it is installed
 SKILL=/path/to/infrahub-converting-netbox-device-types
 export NETBOX_TOKEN=...
@@ -238,8 +241,9 @@ commands below read or write (`./netbox-export`,
 where the user actually is.
 
 `--in-use` keeps only device types with at least one
-device, which on a real instance is a much smaller and
-more relevant set than the whole catalogue.
+device, and module types with at least one module,
+which on a real instance is a much smaller and more
+relevant set than the whole catalogue.
 
 It reports anything that did not come across cleanly:
 fields NetBox holds that the library format cannot
@@ -288,6 +292,18 @@ profile, not a different script.
 python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
   devicetype-library/device-types/Cisco/ \
   --mapping "$SKILL/scripts/mappings/schema-library.yml" \
+  --output-dir ./generated \
+  --report ./generated/coverage-report.md
+```
+
+For a live export, point it at the export directory.
+It walks `device-types/` and `module-types/` together,
+which needs the profile that maps both:
+
+```bash
+python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
+  ./netbox-export/ \
+  --mapping "$SKILL/scripts/mappings/schema-library-modules.yml" \
   --output-dir ./generated \
   --report ./generated/coverage-report.md
 ```

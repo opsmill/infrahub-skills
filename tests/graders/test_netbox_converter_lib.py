@@ -5,6 +5,8 @@ so a check that silently stops asserting anything fails here.
 """
 
 import importlib.util
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -889,3 +891,83 @@ def test_a_missing_coverage_report_is_rejected(tmp_path):
     ok, message = CHECKS["bundled-script-output"](load_output_dir(out), output_dir=out)
     assert not ok
     assert "coverage report" in message
+
+
+def test_a_related_object_without_a_value_key_is_rejected(tmp_path):
+    """Near-miss: NetBox's related-object shape carries ``display`` and no ``value``.
+
+    The check used to return early on a missing ``value``, so this passed.
+    """
+    device_type = {
+        **COMPLIANT_DEVICE_TYPE,
+        "manufacturer": {"id": 3, "name": "Cisco", "display": "Cisco"},
+    }
+    out = _bundled_dir(tmp_path, device_type=device_type)
+    ok, message = CHECKS["bundled-script-output"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "manufacturer" in message
+
+
+def test_a_float_inside_the_metadata_form_is_rejected(tmp_path):
+    """Near-miss: the float is wrapped in ``{value, source}``, and still cannot load."""
+    device_type = {**COMPLIANT_DEVICE_TYPE, "weight": {"value": 7.59, "source": "netbox"}}
+    out = _bundled_dir(tmp_path, device_type=device_type)
+    ok, message = CHECKS["bundled-script-output"](load_output_dir(out), output_dir=out)
+    assert not ok
+    assert "weight" in message
+
+
+def test_a_whole_number_inside_the_metadata_form_passes(tmp_path):
+    device_type = {**COMPLIANT_DEVICE_TYPE, "weight": {"value": 8, "source": "netbox"}}
+    out = _bundled_dir(tmp_path, device_type=device_type)
+    ok, message = CHECKS["bundled-script-output"](load_output_dir(out), output_dir=out)
+    assert ok, message
+
+
+# ---------------------------------------------------------------------------
+# check_bundled_scripts.py: the task's weight assertion
+# ---------------------------------------------------------------------------
+
+_BUNDLED_TASK_GRADER = _LIB_PATH.parent / "check_bundled_scripts.py"
+
+
+def _weight_check(out: Path) -> dict:
+    """Run the task grader as eval.yaml does and return the weight assertion.
+
+    A subprocess rather than an import: the script imports its sibling as
+    ``lib``, a name every skill's grader directory uses.
+    """
+    result = subprocess.run(
+        [sys.executable, str(_BUNDLED_TASK_GRADER), str(out)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    checks = json.loads(result.stdout)["checks"]
+    return next(c for c in checks if c["name"] == "weight-rounds-to-a-whole-number")
+
+
+@pytest.mark.parametrize(
+    "weight",
+    [8, {"value": 8, "source": "netbox"}],
+    ids=["bare", "metadata-form"],
+)
+def test_weight_check_passes_the_rounded_weight(tmp_path, weight):
+    out = _bundled_dir(tmp_path, device_type={**COMPLIANT_DEVICE_TYPE, "weight": weight})
+    check = _weight_check(out)
+    assert check["passed"], check["message"]
+
+
+def test_weight_check_fails_a_dropped_weight(tmp_path):
+    out = _bundled_dir(tmp_path)
+    check = _weight_check(out)
+    assert not check["passed"]
+    assert "carries no weight" in check["message"]
+
+
+def test_weight_check_fails_a_weight_on_the_template_only(tmp_path):
+    """Near-miss: ``weight: 8`` is in the output, on the wrong object."""
+    out = _bundled_dir(tmp_path, template={**COMPLIANT_TEMPLATE, "weight": 8})
+    check = _weight_check(out)
+    assert not check["passed"]
+    assert "carries no weight" in check["message"]

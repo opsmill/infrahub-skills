@@ -38,7 +38,10 @@ Read the target schema YAML (or query the live
 instance) and fill in the profile from it. Start from
 `scripts/mappings/_template.yml`, or from
 `scripts/mappings/schema-library.yml` if the project
-uses the OpsMill schema-library.
+uses the OpsMill schema-library. Copy it into the
+working directory before editing it, never edit it in
+place: the skill's own directory is wiped when the
+plugin is reinstalled.
 
 ```yaml
 device_type:

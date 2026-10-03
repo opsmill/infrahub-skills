@@ -68,8 +68,9 @@ Reach for the scripts first, but they are not sacred:
 - Reading data for analysis, rather than producing
   loadable objects, has no correctness contract to lose.
 
-The line is whether the output is meant to load into
-Infrahub. If it is, it goes through the scripts.
+The line is whether the output is a device or module
+type meant to load into Infrahub. If it is, it goes
+through the scripts.
 
 ### Common mistakes
 

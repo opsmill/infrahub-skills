@@ -19,7 +19,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from lib import _every_row, run_checks  # noqa: E402
+from lib import _object_docs, _rows, attribute_value, run_checks  # noqa: E402
 
 CHECKS = [
     "envelope",
@@ -38,27 +38,42 @@ EXPECTED_WEIGHT = 8
 def check_weight_is_the_rounded_value(
     parsed: dict[Path, list[dict]], **_: Any
 ) -> tuple[bool, str]:
-    """The weight survived conversion, as the rounded whole number.
+    """The device type's weight survived conversion, as the rounded whole number.
 
     The registry's ``bundled-script-output`` check can only reject a float,
     because it has no idea what any given input weighed. That left the
     cheapest wrong answer scoring full marks: drop ``weight`` altogether and
     there is no float to find. A hand-roll that cannot make 7.59 loadable is
     likeliest to do exactly that.
+
+    Only device-type rows are read, since that is where the attribute lives:
+    ``weight: 8`` on a template or a component would otherwise satisfy it
+    while the device type itself went without. A value in Infrahub's metadata
+    form, ``{value: 8, source: ...}``, is the same weight and is unwrapped.
     """
-    weights = [
-        (label, row["weight"]) for label, row in _every_row(parsed) if "weight" in row
+    device_types = [
+        row
+        for doc in _object_docs(parsed)
+        if "devicetype" in str(doc["spec"].get("kind", "")).lower()
+        for row in _rows(doc)
     ]
-    if not weights:
+    if not device_types:
+        return False, "No device type row found to carry the weight"
+    missing = [row.get("name") for row in device_types if "weight" not in row]
+    if missing:
         return False, (
-            "No row carries a weight. The input weighs 7.59 kg, so dropping the "
-            "field is a lost attribute, not a conversion."
+            f"Device type {', '.join(map(repr, missing))} carries no weight. The input "
+            "weighs 7.59 kg, so dropping the field is a lost attribute, not a conversion."
         )
-    wrong = [(label, value) for label, value in weights if value != EXPECTED_WEIGHT]
+    wrong = [
+        (row.get("name"), attribute_value(row["weight"]))
+        for row in device_types
+        if attribute_value(row["weight"]) != EXPECTED_WEIGHT
+    ]
     if wrong:
         return False, (
             f"Expected weight {EXPECTED_WEIGHT} from 7.59 kg rounded; found "
-            + ", ".join(f"{value!r} on {label}" for label, value in wrong)
+            + ", ".join(f"{value!r} on device type {name!r}" for name, value in wrong)
         )
     return True, f"Weight converted to {EXPECTED_WEIGHT}, rounded from 7.59 kg"
 

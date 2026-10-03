@@ -300,7 +300,7 @@
         },
         {
           "name": "weight-rounds-to-a-whole-number",
-          "check": "The weight is present and equals 8 \u2014 the registry check can only reject a float, so dropping the field scored full marks"
+          "check": "The device type's weight is present and equals 8, bare or in the {value, source} form \u2014 the registry check can only reject a float, so dropping the field scored full marks"
         },
         {
           "name": "component-kind-wrapper",

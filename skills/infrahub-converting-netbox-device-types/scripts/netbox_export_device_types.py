@@ -66,7 +66,7 @@ Usage
         --url https://netbox.example.com \\
         --output-dir ./device-types
 
-    # only what is actually racked, which is usually what you want
+    # only types with at least one device or module, usually what you want
     python netbox_export_device_types.py --url ... --in-use --output-dir ./device-types
 
     # a single vendor, plus the module types that go in them
@@ -669,7 +669,15 @@ def _field_names(source: Any) -> list[str]:
         return []
 
 
-def unmapped_fields(source: Any, carried: dict[str, Any]) -> list[str]:
+#: A front port's link to its rear ports, in both the 4.5 shape (``rear_ports``)
+#: and the older one. None of it lands on the front-port entry, because the
+#: library format carries it as the separate ``port-mappings`` list.
+FRONT_PORT_LINK_FIELDS = frozenset({"rear_ports", "rear_port", "rear_port_position"})
+
+
+def unmapped_fields(
+    source: Any, carried: dict[str, Any], exclude: frozenset[str] = frozenset()
+) -> list[str]:
     """Names NetBox populated that the library format has nowhere to put.
 
     The export already reports a field the library requires and NetBox left
@@ -684,13 +692,14 @@ def unmapped_fields(source: Any, carried: dict[str, Any]) -> list[str]:
     Args:
         source: One object from the API.
         carried: The fields that did make it into the document.
+        exclude: Fields carried somewhere other than this entry, so not lost.
 
     Returns:
         Sorted field names, empty when nothing was lost.
     """
     lost = []
     for name in _field_names(source):
-        if name in carried or name in NETBOX_PLUMBING_FIELDS:
+        if name in carried or name in NETBOX_PLUMBING_FIELDS or name in exclude:
             continue
         if name.startswith("_") or name.endswith("_count"):
             continue
@@ -825,9 +834,10 @@ def carry_components(
             notes.extend(back_fill_legacy_front_ports(entries, carried))
         document[list_name] = carried
         notes.extend(missing_required(carried, list_name))
+        exclude = FRONT_PORT_LINK_FIELDS if list_name == "front-ports" else frozenset()
         lost: set[str] = set()
         for raw, kept in zip(entries, carried):
-            lost.update(unmapped_fields(raw, kept))
+            lost.update(unmapped_fields(raw, kept, exclude))
         if lost:
             notes.append(
                 f"{list_name}: NetBox holds {', '.join(sorted(lost))}, which the "

@@ -340,7 +340,7 @@ components:
 ```bash
 python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
   device-types/Cisco/C9300-48P.yaml \
-  --mapping "$SKILL/scripts/mappings/my-schema.yml" \
+  --mapping ./mappings/my-schema.yml \
   --output-dir ./generated
 ```
 

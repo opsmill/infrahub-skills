@@ -7461,7 +7461,7 @@ tasks:
     trials: 3
     instruction: |
       Read the skill at
-      .agents/skills/infrahub-converting-netbox-device-types/SKILL.md and
+      skills/infrahub-converting-netbox-device-types/SKILL.md and
       follow its workflow and rules.
 
       Task: Convert this NetBox device type into Infrahub object templates
@@ -7526,8 +7526,9 @@ tasks:
           is the exporter's job and the converter does not do it.
       - name: weight-rounds-to-a-whole-number
         check: >-
-          The weight is present and equals 8 — the registry check can only
-          reject a float, so dropping the field scored full marks
+          The device type's weight is present and equals 8, bare or in the
+          {value, source} form — the registry check can only reject a float,
+          so dropping the field scored full marks
       - name: component-kind-wrapper
         check: >-
           Component children nest under a kind + data wrapper naming a

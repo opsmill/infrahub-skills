@@ -532,17 +532,30 @@ def _is_netbox_choice(value: Any) -> bool:
     ``{"value": "pse"}`` on its own is deliberately allowed: it is the
     metadata form with no metadata, and it loads as the bare value.
 
+    ``display`` is tested on its own: a related object such as
+    ``{id, name, display}`` carries no ``value`` at all, so gating on
+    ``value`` first let it through.
+
     Args:
         value: Any value read from an emitted row.
 
     Returns:
         ``True`` only for the NetBox wrapper shape.
     """
-    if not isinstance(value, dict) or "value" not in value:
+    if not isinstance(value, dict) or set(value) <= _ATTRIBUTE_METADATA_KEYS:
         return False
-    if set(value) <= _ATTRIBUTE_METADATA_KEYS:
-        return False
-    return "label" in value or "display" in value
+    return "display" in value or ("value" in value and "label" in value)
+
+
+def attribute_value(value: Any) -> Any:
+    """The bare value of an attribute, unwrapping Infrahub's metadata form.
+
+    ``{value: 8, source: netbox}`` is the same attribute as ``8`` with
+    lineage attached, so any check on the value has to look inside it.
+    """
+    if isinstance(value, dict) and "value" in value and set(value) <= _ATTRIBUTE_METADATA_KEYS:
+        return value["value"]
+    return value
 
 
 def check_bundled_script_output(
@@ -571,7 +584,7 @@ def check_bundled_script_output(
     # the other level — a nested maximum_draw: 7.5, or a top-level
     # weight_unit: {value: kg}, both slipped through.
     for label, row in _every_row(parsed):
-        floats = [k for k, v in row.items() if isinstance(v, float)]
+        floats = [k for k, v in row.items() if isinstance(attribute_value(v), float)]
         if floats:
             return False, (
                 f"{label} has non-integer {floats}; Infrahub Number attributes hold "

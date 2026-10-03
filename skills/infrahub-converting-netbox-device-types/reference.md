@@ -113,8 +113,8 @@ version, and the export names which one it found.
 | ------ | ------- |
 | `--url` | Base URL of the instance, without `/api` |
 | `--token` | API token; defaults to `$NETBOX_TOKEN` |
-| `--output-dir` | Writes `<dir>/device-types/<Manufacturer>/<slug>.yaml` |
-| `--in-use` | Only device types with at least one device |
+| `--output-dir` | Writes `<dir>/device-types/<Manufacturer>/<slug>.yaml`, and with `--module-types` also `<dir>/module-types/<Manufacturer>/<model>.yaml` |
+| `--in-use` | Only device types with at least one device, and module types with at least one module. A record whose NetBox reports no count is kept, and the report says how many |
 | `--manufacturer` | Restrict to a manufacturer slug; repeatable |
 | `--slug` | Restrict to a device-type slug; repeatable. Module types have no slug, so it does not narrow them |
 | `--module-types` | Also export module types |
@@ -160,7 +160,8 @@ converter's coverage report:
 - **NetBox left it unset, the library format requires
   it** — a power port with no `type` is valid in NetBox
   and invalid in the library. The file is still
-  written; the note says which entries and how many.
+  written; the note names the component list and how
+  many of its entries lack the field.
 - **The endpoint is absent from this NetBox** — component
   endpoints come and go across versions, so the list is
   skipped rather than the export failing.

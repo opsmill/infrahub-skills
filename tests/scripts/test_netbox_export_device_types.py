@@ -411,6 +411,21 @@ def test_module_bay_fields_the_library_cannot_hold_are_reported():
     assert any("module-bays" in n and "enabled" in n for n in notes)
 
 
+@pytest.mark.parametrize("front", [FRONT_PORT, LEGACY_FRONT_PORT], ids=["4.5", "pre-4.5"])
+def test_a_mapped_front_port_link_is_not_reported_as_a_loss(front):
+    """The link is carried as `port-mappings`, so naming it as lost is noise.
+
+    Every device type with front ports used to get "front-ports: NetBox holds
+    rear_ports", which masked any real front-port loss behind it.
+    """
+    document, notes = build_document(
+        DEVICE_TYPE, {"front-ports": [front], "rear-ports": [REAR_PORT]}, is_module=False
+    )
+
+    assert document["port-mappings"]
+    assert not any(n.startswith("front-ports:") and "no field for" in n for n in notes)
+
+
 def test_netbox_bookkeeping_is_not_reported_as_a_loss():
     """A note naming `id`, `url` and `created` would bury the real losses."""
     _, notes = build_document(DEVICE_TYPE, {}, is_module=False)

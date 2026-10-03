@@ -1191,7 +1191,7 @@ def convert_module_type(
                 )
 
     mapped = target.mapped_lists if target.emits_templates else set()
-    for list_name in NETBOX_COMPONENT_LISTS:
+    for list_name in (*NETBOX_COMPONENT_LISTS, *NETBOX_OTHER_LISTS):
         if list_name in mapped:
             continue
         entries = module.components(list_name)
