@@ -204,10 +204,15 @@ _EV_GRAPHQL = re.compile(r"`\s*(?:query\b[^`{]*)?\{[^`]*\}\s*`")
 # Restricted to read-only inspection commands: any backticked phrase with a
 # space (`review the repo`) used to pass as a probe.
 _EV_COMMAND = re.compile(
-    r"`\s*(?:pip\s+(?:show|freeze|list)|uv\s+pip\s+(?:show|list)|grep|rg|git\s+(?:diff|log|show|grep|status)"
-    r"|cat|ls|find|head|tail|jq|yq|docker(?:\s+compose)?\s+(?:ps|images|config|inspect)"
-    r"|kubectl\s+(?:get|describe)|helm\s+(?:get|list|history|status)|upgrade\s+--check)"
-    r"(?:\s[^`]*)?`"
+    r"`\s*(?:"
+    # Read-only inspection commands; each needs an argument to name what it
+    # inspects, so a bare `find` or `git status` is a name, not a probe.
+    r"(?:pip\s+(?:show|freeze|list)|uv\s+pip\s+(?:show|list)|grep|rg|git\s+(?:diff|log|show|grep|status)"
+    r"|cat|ls|find|head|tail|jq|yq|docker(?:\s+compose)?\s+(?:images|inspect)"
+    r"|kubectl\s+(?:get|describe)|helm\s+(?:get|list|history|status))\s[^`]+"
+    # Forms that inspect on their own: the deployment, and the target check.
+    r"|(?:upgrade\s+--check|docker(?:\s+compose)?\s+(?:ps|config))(?:\s[^`]*)?"
+    r")`"
 )
 # A backticked span is a named artifact: a query, a command, a field, a value.
 _EV_CODE_SPAN = re.compile(r"`[^`]+`")
@@ -543,9 +548,6 @@ _PREFIX_WRAPPERS = {"sudo", "doas", "env", "time", "nohup", "exec", "command", "
 _ARG_WRAPPERS = {"timeout": 1, "watch": 0}
 _RUN_WRAPPERS = {"uv", "poetry", "pipenv", "pdm", "hatch", "rye", "pipx"}
 _CONTAINER_TOOLS = {"docker", "podman", "nerdctl"}
-# Programs that are not Infrahub: `docker compose exec infrahub bash` runs bash
-# in a service named `infrahub`.
-_PROGRAMS = _SHELLS | {"python", "python3", "cat", "ls", "echo", "env", "printenv", "true"}
 # Options that consume the next token, per wrapper.
 _VALUE_OPTS = {
     "sudo": {
@@ -600,13 +602,21 @@ def _split_ops(line: str) -> list[list[str]]:
     return [seg for seg in segments if seg]
 
 
+def _takes_value(tok: str, wrapper: str) -> bool:
+    """Does this option consume the next token? A short-option cluster does when
+    its last letter does: `sudo -iu infrahub` ends in the value-taking `-u`."""
+    values = _VALUE_OPTS.get(wrapper, set())
+    if tok in values:
+        return True
+    return not tok.startswith("--") and len(tok) > 2 and "=" not in tok and f"-{tok[-1]}" in values
+
+
 def _skip_opts(tokens: list[str], j: int, wrapper: str) -> int:
     """Index of the first non-option token from j, stepping over option values."""
-    values = _VALUE_OPTS.get(wrapper, set())
     while j < len(tokens) and tokens[j].startswith("-"):
         if tokens[j] == "--":  # option terminator: what follows is not an option
             return j + 1
-        j += 2 if tokens[j] in values else 1
+        j += 2 if _takes_value(tokens[j], wrapper) else 1
     return j
 
 
@@ -635,7 +645,7 @@ def _commands(tokens: list[str]) -> list[list[str]]:
             if tokens[j] == "--":  # option terminator: the command follows
                 j += 1
                 break
-            j += 2 if tokens[j] in _VALUE_OPTS.get(head, set()) else 1
+            j += 2 if _takes_value(tokens[j], head) else 1
         return _commands(tokens[j:])
     if head in _ARG_WRAPPERS:
         j = _skip_opts(tokens, i + 1, head) + _ARG_WRAPPERS[head]
@@ -670,14 +680,15 @@ def _commands(tokens: list[str]) -> list[list[str]]:
         # A `--` or stray options after the service belong to the command line,
         # not to the program: `exec infrahub -- infrahubctl version`.
         rest = rest[_skip_opts(rest, 0, "docker"):]
-        # A service token that is itself a binary name, followed by something
-        # that is not a program, reads as the binary: `docker compose run --rm
-        # infrahub migrate` means `infrahub migrate`, while `exec infrahub bash`
-        # runs bash.
-        if service.rsplit("/", 1)[-1] in _BINARIES and rest and not rest[0].startswith("-") and rest[0].rsplit("/", 1)[-1] not in (
-            _PROGRAMS | set(_BINARIES)
-        ):
-            return [[service, *rest]]
+        # A service named like a binary reads as the binary only when one of its
+        # own subcommands follows (`docker compose run --rm infrahub upgrade`).
+        # Anything else is a program run in that service (`exec infrahub pip
+        # show ...`, `uname -a`), so no allow-list of programs is needed. An
+        # invented word after it (`infrahub migrate`) is ambiguous and is read
+        # as a program; the fail-closed backstop still catches the upgrade.
+        svc = service.rsplit("/", 1)[-1]
+        if svc in _BINARIES and rest and rest[0] in _KNOWN_SUBCOMMANDS[svc]:
+            return [[svc, *rest]]
         return _commands(rest)
     if head == "kubectl":
         if "--" in tokens:

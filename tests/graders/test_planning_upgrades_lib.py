@@ -826,13 +826,18 @@ def test_code_block_inside_a_list_item_is_still_graded():
 
 @pytest.mark.parametrize(
     "line",
-    ["sudo -E infrahub migrate", "docker compose run --rm infrahub migrate", "env FOO=1 infrahub migrate"],
-    ids=["sudo-E", "compose-run-service-binary", "env"],
+    ["sudo -E infrahub migrate", "env FOO=1 infrahub migrate"],
+    ids=["sudo-E", "env"],
 )
 def test_invented_command_behind_a_wrapper_fails(line):
     ok, msg = check_no_mutating_commands(_hop(f"```bash\n{line}\n```\n"))
     assert not ok
     assert "not a real command" in msg
+
+
+def test_service_named_like_the_binary_followed_by_its_subcommand_is_the_binary():
+    ok, _ = check_no_mutating_commands(_hop("```bash\ndocker compose run --rm infrahub upgrade\n```\n"))
+    assert not ok
 
 
 @pytest.mark.parametrize(
@@ -989,4 +994,42 @@ def test_kind_attribute_evidence_still_counts():
 def test_acronym_led_kind_attribute_evidence_counts(evidence):
     row = _ROW_GIT_AGENT.format(evidence=evidence, action="Fix it")
     ok, msg = check_verdict_has_evidence(_plan(row))
+    assert ok, msg
+
+
+
+# --- Fourth review round on #159 (BeArchiTek) -------------------------------
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "docker compose exec infrahub pip show infrahub-server",
+        "docker compose exec infrahub uname -a",
+        "docker compose exec infrahub grep -r version /source",
+        "sudo -iu infrahub infrahubctl info",
+    ],
+)
+def test_read_only_programs_in_a_service_or_as_a_user_pass(line):
+    ok, msg = check_no_mutating_commands(_hop(f"```bash\n{line}\n```\n"))
+    assert ok, msg
+
+
+def test_sudo_short_option_cluster_does_not_hide_the_upgrade():
+    ok, _ = check_no_mutating_commands(_hop("```bash\nsudo -iu infrahub infrahub upgrade\n```\n"))
+    assert not ok
+
+
+@pytest.mark.parametrize("action", ["Use `find` to locate them", "Run `git status` first"])
+def test_bare_inspection_command_without_an_argument_is_not_a_probe(action):
+    ok, _ = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action=action)))
+    assert not ok
+
+
+@pytest.mark.parametrize(
+    "action",
+    ["Run `docker compose config` to read the image tags", "Run `docker ps`", "Run `git status --short schemas/`"],
+)
+def test_bare_forms_that_inspect_on_their_own_are_probes(action):
+    ok, msg = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action=action)))
     assert ok, msg
