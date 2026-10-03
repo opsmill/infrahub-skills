@@ -874,32 +874,100 @@ def _lex_line(line: str) -> list[str]:
     return list(lexer)
 
 
+_HEREDOC_RE = re.compile(r"<<-?[ \t]*(['\"]?)([A-Za-z_]\w*)\1")
+
+
+def _open_quote(line: str) -> int | None:
+    """Index of the quote ``line`` leaves open, or None when every quote closes."""
+    quote: str | None = None
+    opened = 0
+    escaped = False
+    for index, char in enumerate(line):
+        if escaped:
+            escaped = False
+        elif quote is None:
+            if char == "\\":
+                escaped = True
+            elif char == "#" and (index == 0 or line[index - 1].isspace()):
+                return None  # the rest is a comment
+            elif char in "'\"":
+                quote, opened = char, index
+        elif char == quote:
+            quote = None
+        elif quote == '"' and char == "\\":
+            escaped = True
+    return opened if quote else None
+
+
+def _escape_word_apostrophes(line: str) -> str:
+    """Escape apostrophes inside a word (``Lab's``), which prose means as text.
+
+    Only an apostrophe that leaves a quote open and sits between two letters
+    is escaped, so a real quote (``-m 'msg``) still runs on into the next line.
+    """
+    while (index := _open_quote(line)) is not None:
+        if not (
+            line[index] == "'"
+            and 0 < index < len(line) - 1
+            and line[index - 1].isalnum()
+            and line[index + 1].isalnum()
+        ):
+            break
+        line = f"{line[:index]}\\{line[index:]}"
+    return line
+
+
+def _commands_from_tokens(tokens: list[str]) -> list[list[str]]:
+    """Split one line's tokens into argvs at shell operators."""
+    commands: list[list[str]] = []
+    current: list[str] = []
+    for token in tokens + [";"]:
+        if token and set(token) <= set(_SHELL_OPERATOR_CHARS):
+            argv = _program_argv(current)
+            if argv:
+                commands.append(argv)
+            current = []
+        else:
+            current.append(token)
+    return commands
+
+
+def _lex_or_skip(line: str) -> list[list[str]]:
+    try:
+        return _commands_from_tokens(_lex_line(line))
+    except ValueError:
+        return []
+
+
 def _shell_commands(body: str) -> list[list[str]]:
     """Each simple command of a shell fence, as the argv that runs, in order.
 
     Lines are split on ``;``, ``&&``, ``||``, ``|`` and subshell parentheses
     (quoted ones stay put), after loops are unrolled and continuations
-    joined; a quote left open runs on into the next line, as in a multi-line
-    ``git commit -m``. ``_program_argv`` peels wrappers off each command.
+    joined. A heredoc body is data, not commands, and is skipped. An
+    apostrophe inside a word (``Lab's``) is text; any other quote left open
+    runs on into the next line, as in a multi-line ``git commit -m``, and if
+    the fence ends with it still open, those lines are read one by one.
+    ``_program_argv`` peels wrappers off each command.
     """
     commands: list[list[str]] = []
-    pending = ""
-    for line in _expand_for_loops(body.replace("\\\n", " ")).splitlines():
-        pending = f"{pending}\n{line}" if pending else line
-        try:
-            tokens = _lex_line(pending)
-        except ValueError:
-            continue  # unclosed quote: read the next line into it
-        pending = ""
-        current: list[str] = []
-        for token in tokens + [";"]:
-            if token and set(token) <= set(_SHELL_OPERATOR_CHARS):
-                argv = _program_argv(current)
-                if argv:
-                    commands.append(argv)
-                current = []
-            else:
-                current.append(token)
+    pending: list[str] = []
+    heredoc_end: str | None = None
+    for raw in _expand_for_loops(body.replace("\\\n", " ")).splitlines():
+        if heredoc_end is not None:
+            if raw.strip() == heredoc_end:
+                heredoc_end = None
+            continue
+        line = _escape_word_apostrophes(raw)
+        pending.append(line)
+        if _open_quote("\n".join(pending)) is not None:
+            continue  # a real quote is open: read the next line into it
+        commands.extend(_lex_or_skip("\n".join(pending)))
+        pending = []
+        if heredoc := _HEREDOC_RE.search(line):
+            heredoc_end = heredoc.group(2)
+    for line in pending:  # a quote never closed: fall back to line by line
+        commands.extend(_lex_or_skip(line))
     return commands
 
 

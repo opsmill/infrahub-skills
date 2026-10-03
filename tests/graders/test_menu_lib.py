@@ -2087,6 +2087,60 @@ echo "not needed:" infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
         assert not ok
         assert "[Campus, LabMenu]" in msg
 
+    def test_apostrophe_in_echo_prose_does_not_hide_a_synced_delete(self):
+        """Two ``Lab's``-style apostrophes must not pair up across the delete."""
+        notes = """\
+```bash
+git commit -am retire && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+echo Lab's gone
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+echo Floor's gone
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, FloorMenu]" in msg
+
+    def test_apostrophe_in_a_heredoc_message_keeps_the_push(self):
+        notes = """\
+```bash
+git commit -F - <<'EOF'
+Retire wireless and floors
+
+what's dropped is left to the sync
+EOF
+git push origin main
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_heredoc_body_is_not_run(self):
+        notes = """\
+```bash
+cat > steps.txt <<EOF
+git commit -am retire && git push
+EOF
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git push" in msg
+
+    def test_quote_never_closed_falls_back_to_line_by_line(self):
+        notes = """\
+```bash
+echo 'start of a note that never ends
+git commit -am retire && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
     def test_multi_line_commit_message_keeps_the_commit(self):
         notes = """\
 ```bash
