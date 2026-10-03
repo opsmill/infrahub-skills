@@ -1414,6 +1414,7 @@ class TestGraderScripts:
             "check_hierarchical.py",
             "check_generic_kind.py",
             "check_builtin_sections.py",
+            "check_remove_synced_items.py",
         ]
         for script in scripts:
             result = self._run_script(script, str(tmp_path / "missing.yml"))
@@ -1421,3 +1422,760 @@ class TestGraderScripts:
             assert isinstance(result.get("score"), float)
             assert isinstance(result.get("details"), str)
             assert isinstance(result.get("checks"), list)
+
+
+# ---------------------------------------------------------------------------
+# Removing items from a menu already loaded with infrahubctl menu load
+# ---------------------------------------------------------------------------
+
+REMOVE_MENU_KEPT = """\
+# yaml-language-server: $schema=https://schema.infrahub.app/infrahub/menu/latest.json
+---
+apiVersion: infrahub.app/v1
+kind: Menu
+spec:
+  data:
+    - namespace: Campus
+      name: SitesMenu
+      label: Sites
+      icon: "mdi:office-building"
+      children:
+        data:
+          - namespace: Campus
+            name: BuildingMenu
+            label: Buildings
+            kind: CampusBuilding
+            icon: "mdi:domain"
+    - namespace: Campus
+      name: SwitchingMenu
+      label: Switching
+      icon: "mdi:switch"
+      children:
+        data:
+          - namespace: Campus
+            name: SwitchMenu
+            label: Switches
+            kind: CampusSwitch
+            icon: "mdi:switch"
+"""
+
+REMOVE_APPLY_PASS = """\
+# Apply
+
+1. Load the new file:
+
+```bash
+infrahubctl menu load menus/campus.yml
+```
+
+2. The load never deletes, so remove the dropped items:
+
+```graphql
+mutation RemoveRetiredMenuItems {
+  floors: CoreMenuItemDelete(data: {hfid: ["Campus", "FloorMenu"]}) { ok }
+  aps: CoreMenuItemDelete(data: {hfid: ["Campus", "AccessPointMenu"]}) { ok }
+  ctrl: CoreMenuItemDelete(data: {hfid: ["Campus", "ControllerMenu"]}) { ok }
+  wireless: CoreMenuItemDelete(data: {hfid: ["Campus", "WirelessMenu"]}) { ok }
+}
+```
+"""
+
+# Purge-and-reload, targets passed as variables from a json fence (one as the
+# whole ``data`` input), a query block ahead of it, comments inside the
+# mutation, and a continued ``console`` command.
+REMOVE_APPLY_PASS_VARIANT = """\
+Check what is there first:
+
+```graphql
+query { CoreMenuItem(namespace__value: "Campus") { edges { node { name { value } } } } }
+```
+
+Purge the project's namespace, then reload.
+
+```graphql
+# purge everything under Campus, children before headers
+mutation Purge($f: [String!]!, $ap: [String!]!, $c: [String!]!, $b: [String!]!, $sw: [String!]!, $w: GenericDeleteInput!, $s: [String!]!, $x: [String!]!) {
+  a: CoreMenuItemDelete(data: {hfid: $f}) { ok }
+  b: CoreMenuItemDelete(data: {hfid: $ap}) { ok }
+  c: CoreMenuItemDelete(data: {hfid: $c}) { ok }
+  d: CoreMenuItemDelete(data: {hfid: $b}) { ok }
+  e: CoreMenuItemDelete(data: {hfid: $sw}) { ok }
+  f: CoreMenuItemDelete(data: $w) { ok }
+  g: CoreMenuItemDelete(data: {hfid: $s}) { ok }
+  h: CoreMenuItemDelete(data: {hfid: $x}) { ok }
+}
+```
+
+```json
+{
+  "variables": {
+    "f": ["Campus", "FloorMenu"],
+    "ap": ["Campus", "AccessPointMenu"],
+    "c": ["Campus", "ControllerMenu"],
+    "b": ["Campus", "BuildingMenu"],
+    "sw": ["Campus", "SwitchMenu"],
+    "w": {"hfid": ["Campus", "WirelessMenu"]},
+    "s": ["Campus", "SitesMenu"],
+    "x": ["Campus", "SwitchingMenu"]
+  }
+}
+```
+
+```console
+$ infrahubctl menu load \\
+    menus/campus.yml --branch main
+```
+"""
+
+REMOVE_APPLY_FAIL = """\
+Reload the menu and the sidebar follows the file:
+
+```bash
+infrahubctl menu load menus/campus.yml
+```
+"""
+
+# Names CoreMenuItemDelete in prose and in comments, and deletes the Wireless
+# header on the belief that its children go with it; they do not.
+REMOVE_APPLY_FAIL_NEARMISS = """\
+Reload, then delete the retired section with CoreMenuItemDelete; its entries go with it.
+
+```bash
+infrahubctl menu load menus/campus.yml
+```
+
+```graphql
+mutation {
+  CoreMenuItemDelete(data: {hfid: ["Campus", "FloorMenu"]}) { ok }
+  CoreMenuItemDelete(data: {hfid: ["Campus", "WirelessMenu"]}) { ok }
+  # CoreMenuItemDelete(data: {hfid: ["Campus", "AccessPointMenu"]}) { ok }
+  # CoreMenuItemDelete(data: {hfid: ["Campus", "ControllerMenu"]}) { ok }
+}
+```
+
+Not needed: `CoreMenuItemDelete(data: {hfid: ["Campus", "AccessPointMenu"]})`.
+"""
+
+REMOVE_IDS = frozenset(
+    {
+        ("Campus", "FloorMenu"),
+        ("Campus", "WirelessMenu"),
+        ("Campus", "AccessPointMenu"),
+        ("Campus", "ControllerMenu"),
+    }
+)
+KEEP_IDS = frozenset(
+    {
+        ("Campus", "SitesMenu"),
+        ("Campus", "BuildingMenu"),
+        ("Campus", "SwitchingMenu"),
+        ("Campus", "SwitchMenu"),
+    }
+)
+
+_TARGETED_DELETES = """\
+```graphql
+mutation {
+  a: CoreMenuItemDelete(data: {hfid: ["Campus", "FloorMenu"]}) { ok }
+  b: CoreMenuItemDelete(data: {hfid: ["Campus", "AccessPointMenu"]}) { ok }
+  c: CoreMenuItemDelete(data: {hfid: ["Campus", "ControllerMenu"]}) { ok }
+  d: CoreMenuItemDelete(data: {hfid: ["Campus", "WirelessMenu"]}) { ok }
+}
+```
+"""
+
+_PURGE_KEPT = """\
+```graphql
+mutation {
+  CoreMenuItemDelete(data: {hfid: ["Campus", "SwitchMenu"]}) { ok }
+}
+```
+"""
+
+_LOAD = """\
+```bash
+infrahubctl menu load menus/campus.yml
+```
+"""
+
+
+class TestRemovedItemsChecks:
+    def _deleted(self, apply_md: str):
+        doc = yaml.safe_load(REMOVE_MENU_KEPT)
+        return CHECKS["removed-items-deleted"](
+            doc, apply_raw=apply_md, removed_ids=REMOVE_IDS, kept_ids=KEEP_IDS
+        )
+
+    @pytest.mark.parametrize(
+        ("apply_md", "should_pass"),
+        [
+            (REMOVE_APPLY_PASS, True),
+            (REMOVE_APPLY_PASS_VARIANT, True),
+            (REMOVE_APPLY_FAIL, False),
+            (REMOVE_APPLY_FAIL_NEARMISS, False),
+        ],
+        ids=["pass", "pass-variant", "fail", "fail-nearmiss"],
+    )
+    def test_four_fixtures(self, apply_md, should_pass):
+        ok, msg = self._deleted(apply_md)
+        assert ok is should_pass, msg
+
+    def test_nearmiss_names_the_uncascaded_children(self):
+        ok, msg = self._deleted(REMOVE_APPLY_FAIL_NEARMISS)
+        assert not ok
+        assert "[Campus, AccessPointMenu]" in msg
+        assert "[Campus, ControllerMenu]" in msg
+        assert "[Campus, WirelessMenu]" not in msg
+
+    def test_builtin_delete_fails(self):
+        apply_md = _LOAD + _TARGETED_DELETES + (
+            '```graphql\nmutation { CoreMenuItemDelete(data: {hfid: ["Builtin", "IPAM"]}) { ok } }\n```\n'
+        )
+        ok, msg = self._deleted(apply_md)
+        assert not ok
+        assert "protected built-in" in msg
+
+    def test_purging_kept_item_without_reload_fails(self):
+        ok, msg = self._deleted(_TARGETED_DELETES + _PURGE_KEPT)
+        assert not ok
+        assert "[Campus, SwitchMenu]" in msg
+
+    def test_reload_before_purge_does_not_restore(self):
+        ok, msg = self._deleted(_LOAD + _TARGETED_DELETES + _PURGE_KEPT)
+        assert not ok
+        assert "no later infrahubctl menu load" in msg
+
+    def test_reload_later_in_the_same_fence_restores(self):
+        notes = """\
+```bash
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+infrahubctl object delete CoreMenuItem Campus/AccessPointMenu --yes
+infrahubctl object delete CoreMenuItem Campus/ControllerMenu --yes
+infrahubctl object delete CoreMenuItem Campus/WirelessMenu --yes
+infrahubctl object delete CoreMenuItem Campus/SwitchMenu --yes
+infrahubctl menu load menus/campus.yml
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_reload_earlier_in_the_same_fence_does_not_restore(self):
+        notes = """\
+```bash
+infrahubctl menu load menus/campus.yml
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+infrahubctl object delete CoreMenuItem Campus/AccessPointMenu --yes
+infrahubctl object delete CoreMenuItem Campus/ControllerMenu --yes
+infrahubctl object delete CoreMenuItem Campus/WirelessMenu --yes
+infrahubctl object delete CoreMenuItem Campus/SwitchMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "no later infrahubctl menu load" in msg
+
+    def test_reload_after_purge_restores(self):
+        ok, msg = self._deleted(_TARGETED_DELETES + _PURGE_KEPT + _LOAD)
+        assert ok, msg
+
+    def test_id_delete_is_reported_unresolved(self):
+        apply_md = '```graphql\nmutation { CoreMenuItemDelete(data: {id: "1813"}) { ok } }\n```\n'
+        ok, msg = self._deleted(apply_md)
+        assert not ok
+        assert "unresolved deletes" in msg
+
+    def test_delete_outside_a_fence_does_not_count(self):
+        apply_md = _TARGETED_DELETES.replace("```graphql\n", "").replace("```\n", "")
+        ok, _ = self._deleted(apply_md)
+        assert not ok
+
+    def test_curl_payload_counts(self):
+        body = json.dumps(
+            {
+                "query": "mutation($f: [String!]!) { a: CoreMenuItemDelete(data: {hfid: $f}) { ok } "
+                'b: CoreMenuItemDelete(data: {hfid: ["Campus", "WirelessMenu"]}) { ok } '
+                'c: CoreMenuItemDelete(data: {hfid: ["Campus", "AccessPointMenu"]}) { ok } '
+                'd: CoreMenuItemDelete(data: {hfid: ["Campus", "ControllerMenu"]}) { ok } }',
+                "variables": {"f": ["Campus", "FloorMenu"]},
+            }
+        )
+        apply_md = (
+            "```bash\ncurl -s -X POST \"$INFRAHUB_ADDRESS/graphql\" \\\n"
+            f"  -H 'Content-Type: application/json' --data-raw '{body}'\n```\n"
+        )
+        ok, msg = self._deleted(apply_md)
+        assert ok, msg
+
+    def test_ctl_object_delete_counts(self):
+        apply_md = """\
+```bash
+cp output.yml menus/campus.yml
+infrahubctl object delete CoreMenuItem Campus/AccessPointMenu --yes
+infrahubctl object delete CoreMenuItem Campus/ControllerMenu --yes
+infrahubctl object delete --branch main CoreMenuItem Campus/WirelessMenu -y
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+infrahubctl menu load menus/campus.yml
+```
+"""
+        ok, msg = self._deleted(apply_md)
+        assert ok, msg
+
+    def test_ctl_object_delete_of_another_kind_does_not_count(self):
+        def script(kind: str) -> str:
+            lines = "".join(
+                f"infrahubctl object delete {kind} Campus/{name} --yes\n"
+                for name in ("FloorMenu", "WirelessMenu", "AccessPointMenu", "ControllerMenu")
+            )
+            return f"```bash\n{lines}```\n"
+
+        assert self._deleted(script("CoreMenuItem"))[0]
+        ok, _ = self._deleted(script("CampusFloor"))
+        assert not ok
+
+    def test_untagged_fence_counts(self):
+        ok, msg = self._deleted(_TARGETED_DELETES.replace("```graphql", "```"))
+        assert ok, msg
+
+    def test_dropped_check_catches_leftover_and_lost_items(self):
+        doc = yaml.safe_load(REMOVE_MENU_KEPT)
+        ok, _ = CHECKS["removed-items-dropped"](doc, removed_ids=REMOVE_IDS, kept_ids=KEEP_IDS)
+        assert ok
+        leftover = REMOVE_IDS | {("Campus", "SitesMenu")}
+        ok, msg = CHECKS["removed-items-dropped"](
+            doc, removed_ids=leftover, kept_ids=KEEP_IDS - {("Campus", "SitesMenu")}
+        )
+        assert not ok
+        assert "[Campus, SitesMenu]" in msg
+        ok, msg = CHECKS["removed-items-dropped"](
+            doc, removed_ids=REMOVE_IDS, kept_ids=KEEP_IDS | {("Campus", "FloorMenu")}
+        )
+        assert not ok
+        assert "missing from the menu file" in msg
+
+
+# The menu file is git-synced; LabMenu was loaded by hand and never committed.
+SYNC_NOTES_PASS = """\
+```bash
+cp output.yml menus/campus.yml
+git add menus/campus.yml
+git commit -m "Retire wireless and floors from the sidebar"
+git push origin main
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+
+# The sync-owned items are named only in prose, the git steps sit in an
+# untagged fence, and LabMenu goes through a JSON request body with variables.
+SYNC_NOTES_PASS_VARIANT = """\
+Leave `infrahubctl object delete CoreMenuItem Campus/WirelessMenu` alone: the
+sync deletes the items it loaded and no longer finds.
+
+```
+git commit -am "Retire wireless and floors" && git push
+```
+
+```json
+{
+  "query": "mutation Lab($h: [String!]!) { CoreMenuItemDelete(data: {hfid: $h}) { ok } }",
+  "variables": {"h": ["Campus", "LabMenu"]}
+}
+```
+"""
+
+SYNC_NOTES_FAIL = """\
+```bash
+git commit -am "Retire wireless and floors" && git push
+infrahubctl object delete CoreMenuItem Campus/AccessPointMenu --yes
+infrahubctl object delete CoreMenuItem Campus/ControllerMenu --yes
+infrahubctl object delete CoreMenuItem Campus/WirelessMenu --yes
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+
+# Names the Lab delete in a comment and in prose, and never runs it.
+SYNC_NOTES_FAIL_NEARMISS = """\
+Push, then delete LabMenu with CoreMenuItemDelete.
+
+```bash
+git commit -am "Retire wireless and floors" && git push
+# infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+
+
+class TestRemoveSyncedItemsTask:
+    def _deleted(self, notes_md: str):
+        doc = yaml.safe_load(REMOVE_MENU_KEPT)
+        return CHECKS["removed-items-deleted"](
+            doc,
+            apply_raw=notes_md,
+            removed_ids=REMOVE_IDS,
+            kept_ids=KEEP_IDS,
+            hand_delete_ids=frozenset({("Campus", "LabMenu")}),
+            sync_removed_ids=REMOVE_IDS,
+        )
+
+    def test_hand_deleting_sync_owned_items_fails(self):
+        ok, msg = self._deleted(SYNC_NOTES_FAIL)
+        assert not ok
+        assert "the git sync removes on its own" in msg
+        assert "[Campus, WirelessMenu]" in msg
+
+    def test_commented_lab_delete_does_not_count(self):
+        ok, msg = self._deleted(SYNC_NOTES_FAIL_NEARMISS)
+        assert not ok
+        assert "[Campus, LabMenu]" in msg
+
+    def test_id_deletes_beyond_the_hand_loaded_item_fail(self):
+        """The red-run shape: every item deleted by an id the grader cannot resolve."""
+        lines = "".join(
+            f"infrahubctl object delete CoreMenuItem <{name}-id>\n"
+            for name in ("AccessPointMenu", "ControllerMenu", "WirelessMenu", "FloorMenu", "LabMenu")
+        )
+        ok, msg = self._deleted(f"```bash\ngit commit -am 'Retire wireless' && git push origin main\n{lines}```\n")
+        assert not ok
+        assert "the git sync removes on its own" in msg
+        assert "[Campus, WirelessMenu]" in msg
+
+    def test_id_deletes_of_synced_items_beside_an_hfid_lab_delete_fail(self):
+        lines = "".join(
+            f"infrahubctl object delete CoreMenuItem <{name}-id>\n"
+            for name in ("AccessPointMenu", "ControllerMenu", "WirelessMenu", "FloorMenu")
+        )
+        lines += "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n"
+        ok, msg = self._deleted(f"```bash\ngit commit -am 'Retire wireless' && git push origin main\n{lines}```\n")
+        assert not ok
+        assert "the git sync removes on its own" in msg
+        assert "[Campus, LabMenu]" not in msg
+
+    def test_shell_loop_targets_are_unrolled_and_rejected(self):
+        """A loop over ``Campus/$n`` is unrolled, so each target resolves to a synced item."""
+        notes = """\
+```bash
+git commit -am 'Retire wireless' && git push origin main
+for n in FloorMenu WirelessMenu; do infrahubctl object delete CoreMenuItem "Campus/$n" --yes; done
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, FloorMenu], [Campus, WirelessMenu]" in msg
+
+    def test_unexpanded_variable_beyond_the_needed_deletes_fails(self):
+        notes = """\
+```bash
+git commit -am 'Retire wireless' && git push origin main
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+infrahubctl object delete CoreMenuItem "Campus/$ITEM" --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "Campus/$ITEM" in msg
+
+    def test_placeholder_never_satisfies_the_required_delete(self):
+        for target in ("Campus/<LabMenu>", "Campus/{}", "<ns>/LabMenu"):
+            notes = (
+                "```bash\ngit commit -am 'Retire wireless' && git push origin main\n"
+                f"infrahubctl object delete CoreMenuItem {target} --yes\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert not ok, target
+            assert "[Campus, LabMenu]" in msg, target
+
+    def test_placeholder_naming_a_synced_item_counts_as_deleting_it(self):
+        notes = (
+            "```bash\ngit commit -am 'Retire wireless' && git push origin main\n"
+            "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n"
+            "infrahubctl object delete CoreMenuItem Campus/<FloorMenu> --yes\n```\n"
+        )
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, FloorMenu]" in msg
+
+    def test_placeholder_for_unknown_children_is_ignored(self):
+        """The trial shape: delete Lab, plus a template for any children it has."""
+        notes = """\
+```bash
+git commit -am 'Retire wireless' && git push origin main
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+# only if Lab had entries nested under it:
+infrahubctl object delete CoreMenuItem Campus/<ChildName> --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_reload_instead_of_push_fails(self):
+        """A menu load runs no sync, so the dropped file items stay."""
+        notes = """\
+```bash
+infrahubctl menu load output.yml
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git push" in msg
+
+    def test_push_inside_a_chained_command_counts(self):
+        notes = """\
+```bash
+git add menus/campus.yml && git -C . commit -m "Retire wireless" && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_indented_fences_under_a_numbered_list_count(self):
+        notes = """\
+1. Push the change:
+
+   ```bash
+   git commit -am 'Retire wireless' && git push origin main
+   ```
+
+2. Delete the hand-loaded entry:
+
+   ```bash
+   infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+   ```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_shorter_backtick_run_does_not_close_a_longer_fence(self):
+        notes = """\
+````markdown
+```bash
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+```
+````
+
+```bash
+git commit -am 'Retire wireless' && git push origin main
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_echoed_commands_do_not_run(self):
+        notes = """\
+```bash
+echo git commit -am retire && echo git push
+echo infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git push" in msg
+
+    def test_echoed_delete_of_a_synced_item_is_not_a_delete(self):
+        notes = """\
+```bash
+git commit -am retire && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+echo "not needed:" infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_git_push_must_be_the_subcommand(self):
+        for push_like in ("git stash push", "git commit -m push", "git archive --prefix push HEAD"):
+            notes = (
+                "```bash\ngit commit -am retire\n"
+                f"{push_like}\n"
+                "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert not ok, push_like
+            assert "No git push" in msg, push_like
+
+    def test_git_global_options_before_push_count(self):
+        notes = (
+            "```bash\ngit -C repo commit -am retire\n"
+            "git -C repo -c push.default=current push\n"
+            "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+        )
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_push_without_commit_fails(self):
+        notes = (
+            "```bash\ngit push origin main\n"
+            "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+        )
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git commit before the push" in msg
+
+    def test_commit_after_the_push_does_not_count(self):
+        notes = (
+            "```bash\ngit push origin main\ngit commit -am retire\n"
+            "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+        )
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git commit before the push" in msg
+
+    def test_longer_closing_fence_closes(self):
+        notes = (
+            "```bash\ngit commit -am retire && git push\n"
+            "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n````\n"
+        )
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_launcher_wrapped_lab_delete_counts(self):
+        """``uv run infrahubctl`` is the form infrahub-common teaches."""
+        for launcher in ("uv run", "uv run --with infrahub-sdk", "poetry run", "pipx run"):
+            notes = (
+                "```bash\ngit commit -am retire && git push\n"
+                f"{launcher} infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert ok, f"{launcher}: {msg}"
+
+    def test_launcher_wrapped_delete_of_a_synced_item_fails(self):
+        notes = (
+            "```bash\ngit commit -am retire && git push\n"
+            "uv run infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n"
+            "sudo -u bot env INFRAHUB_ADDRESS=x uv run infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes\n```\n"
+        )
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, FloorMenu]" in msg
+
+    def test_wrapped_git_push_counts(self):
+        for push in ("(cd repo && git commit -am retire && git push)", "env GIT_SSH_COMMAND=ssh git commit -am retire && env X=y git push", "sudo -u bot git commit -am retire; sudo git push"):
+            notes = (
+                f"```bash\n{push}\n"
+                "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert ok, f"{push}: {msg}"
+
+    def test_wrapper_flags_do_not_swallow_the_program(self):
+        """``sudo -S`` is a flag, so ``git`` after it is still the program."""
+        for push in ("sudo -S git commit -am retire && sudo -S git push", "sudo -E -n git commit -am retire && sudo -E -u bot git push", "env -i PATH=/usr/bin git commit -am retire && env -i git push"):
+            notes = (
+                f"```bash\n{push}\n"
+                "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert ok, f"{push}: {msg}"
+
+    def test_launcher_options_before_run_are_peeled(self):
+        for launcher in ("uv --directory repo run", "uv --color never run --frozen", "poetry -C repo run", "poetry --directory=repo run"):
+            notes = (
+                "```bash\ngit commit -am retire && git push\n"
+                f"{launcher} infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert ok, f"{launcher}: {msg}"
+
+    def test_launcher_without_run_is_not_peeled(self):
+        notes = (
+            "```bash\ngit commit -am retire && git push\n"
+            "uv sync infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+        )
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, LabMenu]" in msg
+
+    def test_apostrophe_in_echo_prose_does_not_hide_a_synced_delete(self):
+        """Two ``Lab's``-style apostrophes must not pair up across the delete."""
+        notes = """\
+```bash
+git commit -am retire && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+echo Lab's gone
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+echo Floor's gone
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, FloorMenu]" in msg
+
+    def test_apostrophe_in_a_heredoc_message_keeps_the_push(self):
+        notes = """\
+```bash
+git commit -F - <<'EOF'
+Retire wireless and floors
+
+what's dropped is left to the sync
+EOF
+git push origin main
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_heredoc_body_is_not_run(self):
+        notes = """\
+```bash
+cat > steps.txt <<EOF
+git commit -am retire && git push
+EOF
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git push" in msg
+
+    def test_quote_never_closed_falls_back_to_line_by_line(self):
+        notes = """\
+```bash
+echo 'start of a note that never ends
+git commit -am retire && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_multi_line_commit_message_keeps_the_commit(self):
+        notes = """\
+```bash
+git commit -am "Retire wireless and floors
+
+The sync removes the dropped entries; Lab goes by hand."
+git push origin main
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_task_script_scores_four_fixtures(self, tmp_path):
+        """The task grader scores the four fixtures 1.0 / 1.0 / <1.0 / <1.0."""
+        cases = [
+            ("pass", SYNC_NOTES_PASS, True),
+            ("pass-variant", SYNC_NOTES_PASS_VARIANT, True),
+            ("fail", SYNC_NOTES_FAIL, False),
+            ("fail-nearmiss", SYNC_NOTES_FAIL_NEARMISS, False),
+        ]
+        for name, notes_md, should_pass in cases:
+            workdir = tmp_path / name
+            workdir.mkdir()
+            (workdir / "output.yml").write_text(REMOVE_MENU_KEPT)
+            (workdir / "notes.md").write_text(notes_md)
+            result = subprocess.run(
+                [sys.executable, str(_GRADERS_DIR / "check_remove_synced_items.py")],
+                capture_output=True,
+                text=True,
+                cwd=workdir,
+            )
+            assert result.returncode == 0, result.stderr
+            score = json.loads(result.stdout)["score"]
+            if should_pass:
+                assert score == 1.0, f"{name}: {result.stdout}"
+            else:
+                assert score < 1.0, f"{name} scored 1.0: {result.stdout}"
