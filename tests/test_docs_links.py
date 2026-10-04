@@ -43,6 +43,28 @@ _URL = re.compile(r"https://docs\.infrahub\.app/[^\s)\]>\"'`]*")
 _SECTION = re.compile(r"`(## [a-z0-9-]+)`")
 
 
+class _FollowPermanentRedirect(urllib.request.HTTPRedirectHandler):
+    """Follow HTTP 308 on every supported Python, not only 3.11 and later.
+
+    docs.infrahub.app answers a path without its trailing slash (and some
+    with one) with a 308. `urllib` learned to follow 308 in Python 3.11; on
+    3.10 it raises `HTTPError(308)`, which would report a live page as
+    dead. A 308 is a 307 that is also permanent, so it is followed the same
+    way.
+    """
+
+    http_error_308 = urllib.request.HTTPRedirectHandler.http_error_302
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        """Treat 308 as 307, which every supported `urllib` redirects."""
+        if code == 308:
+            code = 307
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_FollowPermanentRedirect)
+
+
 def _fetch(url: str) -> tuple[int, str]:
     """GET a URL, following redirects, and return its status and body.
 
@@ -57,7 +79,7 @@ def _fetch(url: str) -> tuple[int, str]:
         url, headers={"User-Agent": "infrahub-skills-tests"}
     )
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+        with _OPENER.open(request, timeout=TIMEOUT_SECONDS) as response:
             return response.status, response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as error:
         return error.code, ""
