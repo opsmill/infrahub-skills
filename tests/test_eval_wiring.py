@@ -58,8 +58,11 @@ def test_skill_path_reads_only_the_skill_line(instruction: str, expected: str | 
 def test_task_skill_path_exists(task: dict) -> None:
     path = skill_path(task.get("instruction", ""))
     assert path is not None, f"{task['name']}: no 'Read the skill at <path>' line"
-    assert path.startswith("skills/"), f"{task['name']}: {path} is outside the shipped skills/ tree"
-    assert (ROOT / path).is_file(), f"{task['name']}: {path} does not exist"
+    resolved = (ROOT / path).resolve()
+    assert resolved.is_relative_to((ROOT / "skills").resolve()), (
+        f"{task['name']}: {path} is outside the shipped skills/ tree"
+    )
+    assert resolved.is_file(), f"{task['name']}: {path} does not exist"
 
 
 @cache

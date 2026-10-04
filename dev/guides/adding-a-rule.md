@@ -258,13 +258,13 @@ reports the rule as covered forever.
 If the rule corrects something the repo said before,
 the prose layer is not the only place the old claim
 lives. This is the one sweep command; every other page
-that sweeps points here. Fix every hit in the same
+and skill that sweeps points here. Fix every hit in the same
 change, except `evaluations/`, which step 7 regenerates
 from `eval.yaml`:
 
 ```bash
-grep -rn "<term>" skills/ graders/ eval.yaml dev/ \
-  .agents/skills/ AGENTS.md README.md docs/docs/
+grep -rn "<term>" skills/ graders/ eval.yaml tests/ \
+  scripts/ dev/ .agents/skills/ AGENTS.md README.md docs/docs/
 ```
 
 Run it once per term, and pick terms from the concept,

@@ -97,7 +97,8 @@ Check these, in this order:
 
 Find them rather than recalling them. Run the sweep in
 [adding-a-rule.md](../guides/adding-a-rule.md#6-sweep-the-layers-the-rule-contradicts)
-with the old claim and with the skill name as terms.
+with terms picked the way that section says, plus the
+skill name.
 
 "Nothing to change" is a complete answer. The point is
 that somebody looked.

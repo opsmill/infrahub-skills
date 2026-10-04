@@ -191,9 +191,10 @@ On the `grader` class the four fixtures in
 compliant, compliant variant, violating, and near-miss artifacts, asserted
 directly against the check function instead of through a `skillgrade` run.
 
-On the `script` class, write one rejected case per condition the gate decides
-on: each key of an allowlist, each conjunct of an exemption, each input shape
-it parses, and an empty input. Assert the exact list of findings, not that
+On the `script` class, give every condition the gate decides on a case of its
+own: each allowlist key accepted and an unknown value rejected, each conjunct
+of an exemption broken on its own, each input shape it parses, and an empty
+input rejected. Assert the exact list of findings, not that
 some finding contains a substring, so a wrong or duplicated finding fails too.
 The separate four-fixture run and the red run do not apply here; the pytest is
 the whole test.

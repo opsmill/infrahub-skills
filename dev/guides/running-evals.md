@@ -277,7 +277,7 @@ the per-skill counts here, where they go stale
 silently, read them off the file:
 
 ```bash
-grep -oE 'Read the skill at skills/infrahub-[a-z-]+' eval.yaml |
+grep -oE 'skills/infrahub-[a-z-]+/SKILL\.md' eval.yaml |
   sort | uniq -c | sort -rn
 ```
 

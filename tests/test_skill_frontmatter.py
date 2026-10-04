@@ -278,6 +278,7 @@ def asks_for_request_as_args(description: str) -> bool:
     """True when one sentence tells the caller to pass the request verbatim as args."""
     return any(
         re.search(r"\bpass\b", sentence, re.I)
+        and not re.search(r"\b(?:not|never|don't|no need to)\b[^.]{0,20}\bpass\b", sentence, re.I)
         and re.search(r"\bverbatim\b", sentence, re.I)
         and re.search(r"\bas args\b", sentence, re.I)
         for sentence in re.split(r"(?<=[.!?])\s+", description)
@@ -292,6 +293,7 @@ def asks_for_request_as_args(description: str) -> bool:
         ("Audits a repository. TRIGGER when: reviewing compliance.", False),
         # Every token is present, but in two sentences about different things.
         ("Quote the error verbatim. Pass the file path as args.", False),
+        ("Do not pass the user's request verbatim as args.", False),
     ],
 )
 def test_args_instruction_detector_discriminates(description: str, expected: bool) -> None:

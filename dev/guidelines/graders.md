@@ -2,7 +2,7 @@
 paths:
   - "graders/**/*.py"
   - "scripts/check*.py"
-  - "tests/test_*.py"
+  - "tests/**/*.py"
 ---
 
 # Grader Rules
@@ -75,8 +75,9 @@ Each case below shipped as a false pass or a false fail:
 - **The program is argv[0] after wrappers.** Peel
   `sudo`, `env`, `VAR=value`, and `uv|poetry|pipx run`,
   each with its own option table.
-- **The subcommand is positional.** It is the first
-  non-option argument: `git stash push` is not a push.
+- **The subcommand follows the global options and their
+  values.** `git -C /repo push` is a push; `git stash
+  push` is not.
 - **A placeholder is not a value.** `<name>`, `{}`, and
   an unexpanded `$var` never satisfy a required target.
 - **A `\` continuation joins with no separator**, as the
@@ -204,8 +205,9 @@ The last of each pair finds the bugs:
   gets a fixture on each side.
 
 Commit the four as accept and reject cases in
-`tests/graders/test_<skill>_lib.py`. Run once in a
-terminal, they protect nothing from the next refactor.
+`tests/graders/test_<skill>_lib.py`. Fixtures you only
+run once in a terminal protect nothing from the next
+refactor.
 
 ## Don't hold a second copy of the prose
 

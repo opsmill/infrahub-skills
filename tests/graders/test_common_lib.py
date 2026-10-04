@@ -53,6 +53,10 @@ TOKEN_LEAKS = [
     pytest.param(
         'Run `echo "token | ok: $INFRAHUB_API_TOKEN"`.', id="quoted-pipe-before-value"
     ),
+    # An even run of backslashes escapes itself, not the closing quote.
+    pytest.param(
+        'Run `echo "label; $INFRAHUB_API_TOKEN\\\\"`.', id="escaped-backslash-before-close"
+    ),
 ]
 
 
@@ -80,6 +84,10 @@ TOKEN_SAFE = [
     pytest.param(
         "Don't echo it; it's secret: [ -n \"${INFRAHUB_API_TOKEN:-}\" ] is enough.",
         id="prose-apostrophes-around-a-separator",
+    ),
+    # Single quotes stop expansion, so this prints the name, not the value.
+    pytest.param(
+        "Run `echo 'a; $INFRAHUB_API_TOKEN'`.", id="single-quoted-name-does-not-expand"
     ),
 ]
 

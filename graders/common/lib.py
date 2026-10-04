@@ -179,14 +179,14 @@ _LINE_BREAK = re.compile(r"\n|`")
 _COMMAND_BREAK = re.compile(r";|\|\||&&|\||\bthen\b|\bdo\b|\bfi\b|\bdone\b")
 
 
-def _quoted_spans(segment: str) -> list[tuple[int, int]] | None:
+def _quoted_spans(segment: str) -> list[tuple[int, int, str]] | None:
     """Return the quoted spans of a shell segment, or None if quotes don't balance.
 
     An apostrophe between two letters is a contraction ("don't", "it's"), not
     a quote. Quotes that still do not balance mean prose; the caller then
     splits on every separator as before.
     """
-    spans: list[tuple[int, int]] = []
+    spans: list[tuple[int, int, str]] = []
     quote = None
     start = 0
     for i, ch in enumerate(segment):
@@ -194,10 +194,24 @@ def _quoted_spans(segment: str) -> list[tuple[int, int]] | None:
             continue
         if quote is None and ch in "'\"":
             quote, start = ch, i
-        elif ch == quote and not (quote == '"' and segment[i - 1] == "\\"):
-            spans.append((start, i))
+        elif ch == quote and not (quote == '"' and _escaped(segment, i)):
+            spans.append((start, i, quote))
             quote = None
     return None if quote else spans
+
+
+def _escaped(segment: str, i: int) -> bool:
+    """Whether the character at ``i`` follows an odd run of backslashes."""
+    run = len(segment[:i]) - len(segment[:i].rstrip("\\"))
+    return run % 2 == 1
+
+
+def _unquote_single(piece: str) -> str:
+    """Blank out single-quoted text, which the shell never expands."""
+    for start, end, quote in _quoted_spans(piece) or []:
+        if quote == "'":
+            piece = piece[:start] + " " * (end - start + 1) + piece[end + 1 :]
+    return piece
 
 
 def _command_pieces(text: str) -> list[tuple[int, str]]:
@@ -213,7 +227,7 @@ def _command_pieces(text: str) -> list[tuple[int, str]]:
         spans = _quoted_spans(segment) or []
         pos = 0
         for match in _COMMAND_BREAK.finditer(segment):
-            if any(a < match.start() < b for a, b in spans):
+            if any(a < match.start() < b for a, b, _ in spans):
                 continue
             pieces.append((seg_start + pos, segment[pos : match.start()]))
             pos = match.end()
@@ -257,7 +271,7 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
             continue
         if _is_negated(text, start):
             continue
-        offenders.update(m.group(0) for m in _TOKEN_VALUE.finditer(piece))
+        offenders.update(m.group(0) for m in _TOKEN_VALUE.finditer(_unquote_single(piece)))
     if offenders:
         return False, (
             f"expansion(s) that print the token's value: {sorted(offenders)}; "

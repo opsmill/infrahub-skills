@@ -169,7 +169,9 @@ an `eval.yaml` task and its task grader, four committed
 fixtures, contradicted claims swept, and
 `evaluations/*.json` regenerated. A verified rule that no
 prompt can make a current model break drops the task and
-its task grader together; nothing else qualifies.
+its task grader together. A rule correcting our reference
+against an upstream surface replaces them with a pytest
+asserting the reference both ways.
 
 The steps, the carve-out's bar, and what each step guards
 against are in

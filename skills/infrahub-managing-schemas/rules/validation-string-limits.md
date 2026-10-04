@@ -66,7 +66,7 @@ that into context, never the raw 66 KB schema or
 100 KB OpenAPI document.**
 
 ```bash
-# SKILL is this skill's own directory, wherever it is installed
+SKILL=/path/to/infrahub-managing-schemas   # this skill's own directory, wherever it is installed
 # Tier 1 — public JSON Schema (default)
 python "$SKILL/scripts/fetch_schema_limits.py"
 ```
@@ -165,11 +165,12 @@ it).
 `infrahubctl schema load` is too late: the branch is
 already pushed. The same script's `--check` mode
 validates files locally against the live caps. CI has
-no plugin install, so copy the script into the
-repository first and run it from there:
+no plugin install, so commit a copy of the script to the
+repository once, while the skill is available, and have
+CI run that copy:
 
 ```bash
-cp "$SKILL/scripts/fetch_schema_limits.py" scripts/
+mkdir -p scripts/ && cp "$SKILL/scripts/fetch_schema_limits.py" scripts/
 python scripts/fetch_schema_limits.py --check schemas/*.yml
 ```
 

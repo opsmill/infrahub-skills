@@ -206,7 +206,7 @@ and output, including a copied config or mapping file,
 in the user's working directory:
 
 ```bash
-# SKILL is this skill's own directory, wherever it is installed
+SKILL=/path/to/<skill>   # this skill's own directory, wherever it is installed
 python "$SKILL/scripts/convert.py" ./input/ --output-dir ./generated
 ```
 

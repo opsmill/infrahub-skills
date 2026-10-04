@@ -181,14 +181,9 @@ pass; an interruption is not evidence of anything.
 
 ## Sweep
 
-For every term in the handoff's `Sweep terms`:
-
-```bash
-grep -rn "<sweep term>" skills/ graders/ eval.yaml dev/ README.md AGENTS.md docs/ .agents/skills/
-```
-
-Then read every rule the changed one links to, and every rule linking to it. A
-linked rule that now says the opposite contains none of your terms.
+For every term in the handoff's `Sweep terms`, run the sweep command in
+[`../../../dev/guides/adding-a-rule.md`](../../../dev/guides/adding-a-rule.md)
+§6, then read every rule the changed one links to and every rule linking to it.
 
 Skip `evaluations/`, which `sync-evals.py` regenerates from `eval.yaml`. Fix
 every hit, and delete what the change makes wrong. An impact or severity label
