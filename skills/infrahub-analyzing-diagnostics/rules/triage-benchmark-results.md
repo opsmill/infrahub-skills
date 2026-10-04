@@ -140,4 +140,4 @@ code that isn't at fault.
   analysis instead of handing collection back to
   `infrahub-collecting-diagnostics`.
 
-Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)

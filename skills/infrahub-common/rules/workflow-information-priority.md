@@ -48,20 +48,36 @@ exists for exactly that case.
 Applies only when steps 1–2 do not cover the task and it is still an
 Infrahub question (e.g. deleting a node, git-integration semantics).
 
-1. **Find the page.** Use your web-fetch tool (WebFetch in Claude Code;
-   the equivalent in Cursor/Copilot/Windsurf) on
-   `https://docs.infrahub.app/llms.txt` with a *targeted* question —
-   "Which documentation page(s) cover <topic>?" — so only the matching
-   page path(s) come back, not the whole 157 KB index.
-2. **Read the page.** Fetch that page's Markdown twin at
-   `https://docs.infrahub.app<path>.md` (small and clean) and answer
-   from it.
+1. **Find the page.** Search the index at
+   `https://docs.infrahub.app/llms.txt`. With a shell, grep it, which
+   reads every line:
+
+   ```bash
+   curl -s https://docs.infrahub.app/llms.txt | grep -i '<topic>'
+   ```
+
+   Without a shell, use your web-fetch tool (WebFetch in Claude Code;
+   the equivalent in Cursor/Copilot/Windsurf) with a *targeted*
+   question: "Which page paths under the `## <section>` heading cover
+   <topic>?" The index is about 200 KB, and the core product sections
+   (`## branches`, `## generators`, `## menu`, `## schema`,
+   `## transformations`, ...) come after the satellite products
+   (ansible, backup, mcp, python-sdk, sync, ...). A web-fetch tool that
+   summarises a truncated copy can miss them and return a satellite
+   page instead, so name the section and check the path you get back
+   belongs to it.
+2. **Read the page.** Each index entry is already a Markdown path such
+   as `/branches/delete.md`. Fetch `https://docs.infrahub.app<path>`
+   and answer from it. Take the path from the index: adding `.md` to a
+   docs URL cited elsewhere fails for older `/topics/...` URLs, which
+   redirect and have no Markdown version.
 3. **Cite and caveat.** Cite the page URL and add a short note that the
    point is outside the skill's tested rules and should be verified, so
    the gap can later be folded into a skill.
 
-Do not fetch `llms-full.txt` — it is a ~4 MB bulk export that will not
-fit in context. The index-then-page path above is the supported route.
+Do not fetch `llms-full.txt`. It is a bulk export of about 6 MB that
+will not fit in context. The index-then-page path above is the
+supported route.
 
 If `llms.txt` or the page cannot be fetched (a network error, or an HTML
 404 shell whose body starts with `<!doctype` or contains `<html>`), say

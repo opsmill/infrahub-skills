@@ -1,0 +1,1 @@
+Updated the docs fallback in `infrahub-common` to search `llms.txt` with grep or a section-named question and take Markdown paths from the index, corrected the index and `llms-full.txt` sizes, fixed three dead docs.infrahub.app links, and added a test that checks every cited docs link still resolves.

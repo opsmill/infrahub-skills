@@ -103,4 +103,4 @@ is already present and on `PATH`.
   of asking the user to fetch the binary through
   their own channel.
 
-Reference: [Install infrahub-collect](https://docs.infrahub.app/backup/guides/install-collect)
+Reference: [Install infrahub-collect](https://docs.infrahub.app/backup/collect/install)
