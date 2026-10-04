@@ -877,6 +877,21 @@ def _lex_line(line: str) -> list[str]:
 _HEREDOC_DELIMITER_RE = re.compile(r"<<-?[ \t]*(['\"]?)([A-Za-z_]\w*)\1")
 
 
+def _starts_comment(line: str, index: int) -> bool:
+    """Whether the unquoted ``#`` at ``index`` starts a comment.
+
+    It does at the start of a word: the line start, or after whitespace that
+    is not itself escaped. In ``foo\\ #`` the space is part of the word, so
+    the ``#`` is text.
+    """
+    if index == 0:
+        return True
+    if not line[index - 1].isspace():
+        return False
+    backslashes = len(line[: index - 1]) - len(line[: index - 1].rstrip("\\"))
+    return backslashes % 2 == 0
+
+
 def _open_quote(line: str) -> int | None:
     """Index of the quote ``line`` leaves open, or None when every quote closes."""
     quote: str | None = None
@@ -888,7 +903,7 @@ def _open_quote(line: str) -> int | None:
         elif quote is None:
             if char == "\\":
                 escaped = True
-            elif char == "#" and (index == 0 or line[index - 1].isspace()):
+            elif char == "#" and _starts_comment(line, index):
                 return None  # the rest is a comment
             elif char in "'\"":
                 quote, opened = char, index
@@ -917,7 +932,7 @@ def _heredoc_delimiter(line: str) -> str | None:
                 escaped = True
         elif char == "\\":
             escaped = True
-        elif char == "#" and (index == 0 or line[index - 1].isspace()):
+        elif char == "#" and _starts_comment(line, index):
             return None
         elif char in "'\"":
             quote = char

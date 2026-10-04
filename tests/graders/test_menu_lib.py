@@ -2154,6 +2154,32 @@ infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
         assert not ok
         assert "[Campus, FloorMenu]" in msg
 
+    def test_escaped_space_before_hash_keeps_the_heredoc(self):
+        """In ``notes\\ #`` the space is escaped, so ``#`` is text and ``<<EOF`` opens a heredoc."""
+        notes = r"""```bash
+git commit -am retire && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+cat > notes\ # <<EOF
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+EOF
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_escaped_backslash_before_space_still_starts_a_comment(self):
+        """In ``x\\\\ #`` the backslash is escaped, the space is real, so ``#`` starts a comment."""
+        notes = r"""```bash
+git commit -am retire && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+echo x\\ # <<EOF
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, FloorMenu]" in msg
+
     def test_quote_never_closed_falls_back_to_line_by_line(self):
         notes = """\
 ```bash
