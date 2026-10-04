@@ -6,13 +6,15 @@ cover themselves, and `workflow-information-priority.md` sends them to the
 this repository does not own: the docs site is restructured independently,
 and a moved page turns a citation into a 404 with nothing here noticing.
 Three links had already died that way (`backup/guides/...` and
-`topics/menu/`), cited from 21 files between them.
+`topics/menu/`), cited from 21 files between them. Two more in `README.md`
+(`python-sdk/infrahubctl` and `integrations/mcp`) never existed on the site.
 
 This is reference drift rather than model behaviour, so it is asserted
 against the live site instead of through an eval: it fails on what has
 drifted, and again the next time upstream moves. Two directions:
 
-- every docs URL written under `skills/` resolves, after redirects;
+- every docs URL written under `skills/`, `docs/docs/`, or in `README.md`
+  resolves, after redirects;
 - every `## <section>` heading the information-priority rule tells agents
   to look for in `llms.txt` exists there.
 
@@ -32,6 +34,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "skills"
+PUBLISHED_DOCS = ROOT / "docs" / "docs"
+README = ROOT / "README.md"
 RULE = SKILLS / "infrahub-common" / "rules" / "workflow-information-priority.md"
 DOCS = "https://docs.infrahub.app"
 INDEX = f"{DOCS}/llms.txt"
@@ -85,8 +89,26 @@ def _fetch(url: str) -> tuple[int, str]:
         return error.code, ""
 
 
+def _scanned_files() -> list[Path]:
+    """List the files whose docs links reach a reader.
+
+    Returns:
+        Every text file under `skills/`, the published pages under
+        `docs/docs/`, and the top-level `README.md`.
+    """
+    skill_files = [
+        path
+        for path in SKILLS.rglob("*")
+        if path.is_file() and path.suffix in {".md", ".py", ".yaml", ".yml"}
+    ]
+    site_pages = [
+        path for path in PUBLISHED_DOCS.rglob("*") if path.suffix in {".md", ".mdx"}
+    ]
+    return [*skill_files, *site_pages, README]
+
+
 def _cited_urls() -> list[str]:
-    """Collect every distinct docs URL written under `skills/`.
+    """Collect every distinct docs URL written in the scanned files.
 
     Returns:
         Sorted URLs with anchors and trailing punctuation removed. The bare
@@ -94,9 +116,7 @@ def _cited_urls() -> list[str]:
         page.
     """
     urls: set[str] = set()
-    for path in SKILLS.rglob("*"):
-        if path.suffix not in {".md", ".py", ".yaml", ".yml"} or not path.is_file():
-            continue
+    for path in _scanned_files():
         for match in _URL.findall(path.read_text(encoding="utf-8")):
             url = match.split("#", 1)[0].rstrip(".,;:")
             if url.rstrip("/") == DOCS or "..." in url:
