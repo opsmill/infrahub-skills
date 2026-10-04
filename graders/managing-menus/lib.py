@@ -874,7 +874,7 @@ def _lex_line(line: str) -> list[str]:
     return list(lexer)
 
 
-_HEREDOC_RE = re.compile(r"<<-?[ \t]*(['\"]?)([A-Za-z_]\w*)\1")
+_HEREDOC_DELIMITER_RE = re.compile(r"<<-?[ \t]*(['\"]?)([A-Za-z_]\w*)\1")
 
 
 def _open_quote(line: str) -> int | None:
@@ -897,6 +897,36 @@ def _open_quote(line: str) -> int | None:
         elif quote == '"' and char == "\\":
             escaped = True
     return opened if quote else None
+
+
+def _heredoc_delimiter(line: str) -> str | None:
+    """The delimiter of a heredoc ``line`` opens, or None.
+
+    Only a ``<<`` outside quotes and comments counts, so ``echo '<<EOF'``
+    opens nothing; a here-string (``<<<``) is not a heredoc either.
+    """
+    quote: str | None = None
+    escaped = False
+    for index, char in enumerate(line):
+        if escaped:
+            escaped = False
+        elif quote is not None:
+            if char == quote:
+                quote = None
+            elif quote == '"' and char == "\\":
+                escaped = True
+        elif char == "\\":
+            escaped = True
+        elif char == "#" and (index == 0 or line[index - 1].isspace()):
+            return None
+        elif char in "'\"":
+            quote = char
+        elif line.startswith("<<", index) and not line.startswith("<<<", index):
+            if index > 0 and line[index - 1] == "<":
+                continue
+            if match := _HEREDOC_DELIMITER_RE.match(line, index):
+                return match.group(2)
+    return None
 
 
 def _escape_word_apostrophes(line: str) -> str:
@@ -964,8 +994,7 @@ def _shell_commands(body: str) -> list[list[str]]:
             continue  # a real quote is open: read the next line into it
         commands.extend(_lex_or_skip("\n".join(pending)))
         pending = []
-        if heredoc := _HEREDOC_RE.search(line):
-            heredoc_end = heredoc.group(2)
+        heredoc_end = _heredoc_delimiter(line)
     for line in pending:  # a quote never closed: fall back to line by line
         commands.extend(_lex_or_skip(line))
     return commands

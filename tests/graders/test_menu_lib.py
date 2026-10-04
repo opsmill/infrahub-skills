@@ -2130,6 +2130,30 @@ infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
         assert not ok
         assert "No git push" in msg
 
+    def test_quoted_or_commented_heredoc_marker_opens_no_heredoc(self):
+        """``<<EOF`` inside quotes or a comment must not swallow the commands after it."""
+        for marker in ("echo '<<EOF'", 'echo "write <<EOF to open one"', "cat notes.txt  # <<EOF", "cat <<<EOF"):
+            notes = (
+                f"```bash\n{marker}\n"
+                "git commit -am retire && git push\n"
+                "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert ok, f"{marker}: {msg}"
+
+    def test_quoted_heredoc_marker_does_not_hide_a_synced_delete(self):
+        notes = """\
+```bash
+git commit -am retire && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+echo '<<EOF'
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, FloorMenu]" in msg
+
     def test_quote_never_closed_falls_back_to_line_by_line(self):
         notes = """\
 ```bash
