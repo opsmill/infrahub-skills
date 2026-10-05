@@ -49,9 +49,12 @@ prefix. What a grader can check. What the violating near miss looks like.
 What eval prompt exercises it. What it contradicts. Ground truth. Scope.
 
 Both entrances search for a pull request that already covers the change
-before they analyse or design anything: by issue number at intake, and by
-the files to be changed once those are known. On a match they stop and ask
-whether to stop, continue on that PR's branch, or continue on a new one.
+before they write a root cause or a design brief: by issue number at
+intake, when the input has one, and by the files to be changed once those
+are known. `grilling-skill-features` runs the file search twice, after it
+picks the target skill and again on the brief's final paths. On a match
+the stage stops and asks whether to stop, continue on that PR's branch, or
+continue on a new one.
 
 Pick by whether the behavior is known-wrong. A defect goes left, an idea
 goes right. Either way the next stop is the same: the failing test comes
