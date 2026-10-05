@@ -114,7 +114,9 @@ passes.
 
 With the target skill picked, run Part B of the existing-PR search in
 [`../skill-pipeline-common/handoff-format.md`](../skill-pipeline-common/handoff-format.md)
-§ "Searching for existing pull requests" on its paths, before the next lens.
+§ "Searching for existing pull requests" on `skills/<skill>/` and
+`graders/<skill>/`, before the next lens. A duplicate found here saves the
+rest of the interview.
 
 ## Lens 4: What can a grader actually assert
 
@@ -176,10 +178,14 @@ needs a new file. Record the rung the idea stops at.
    [`../skill-pipeline-common/handoff-format.md`](../skill-pipeline-common/handoff-format.md).
    Record the SHA as `Based on`. If the fetch fails, stop and report the
    failure rather than writing a brief with a guessed baseline.
-2. Write the design brief to `.skill-change-<key>.md`, following the template
+2. Run Part B of the existing-PR search again, on every path the brief will
+   name in `Target`, `Rule path`, and `Test plan`. The later lenses often
+   add paths Lens 3 could not know, such as a `scripts/` check or a docs
+   page, and a PR touching only those was not searched yet.
+3. Write the design brief to `.skill-change-<key>.md`, following the template
    in the same file, with `Track: feature` and `Defect class` set to exactly
    one of `guidance` (a new rule) or `script` (a new consistency check).
-3. Confirm `.skill-change-*.md` is covered by `.gitignore`. It is a working
+4. Confirm `.skill-change-*.md` is covered by `.gitignore`. It is a working
    file for this pipeline, not a repository artifact.
 
 The `Test plan` section must name the eval task, the grader check and the
