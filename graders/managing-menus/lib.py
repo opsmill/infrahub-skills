@@ -984,32 +984,58 @@ def _lex_or_skip(line: str) -> list[list[str]]:
         return []
 
 
-def _shell_commands(body: str) -> list[list[str]]:
+# Programs that run a heredoc body as shell commands rather than read it as
+# data: ``docker compose exec -T server sh <<'EOF'``, ``ssh host <<EOF``.
+_SHELL_PROGRAMS = frozenset({"sh", "bash", "zsh", "dash", "ksh"})
+_CONSOLE_LANGS = frozenset({"console", "shell-session"})
+_CONTINUATION_PROMPT_RE = re.compile(r"^[ \t]*> ?")
+
+
+def _runs_heredoc_as_shell(commands: list[list[str]]) -> bool:
+    """Whether the line that opened a heredoc feeds its body to a shell."""
+    return any(
+        Path(argv[0]).name == "ssh" or any(Path(word).name in _SHELL_PROGRAMS for word in argv)
+        for argv in commands
+    )
+
+
+def _shell_commands(body: str, console: bool = False) -> list[list[str]]:
     """Each simple command of a shell fence, as the argv that runs, in order.
 
     Lines are split on ``;``, ``&&``, ``||``, ``|`` and subshell parentheses
     (quoted ones stay put), after loops are unrolled and continuations
-    joined. A heredoc body is data, not commands, and is skipped. An
-    apostrophe inside a word (``Lab's``) is text; any other quote left open
-    runs on into the next line, as in a multi-line ``git commit -m``, and if
-    the fence ends with it still open, those lines are read one by one.
-    ``_program_argv`` peels wrappers off each command.
+    joined. A heredoc body is data and is skipped, unless the line hands it
+    to a shell (``sh``, ``bash``, ``ssh host``), which runs it as commands.
+    In a ``console`` fence the ``> `` continuation prompt is dropped, so the
+    terminator reads ``EOF`` rather than ``> EOF``. An apostrophe inside a
+    word (``Lab's``) is text; any other quote left open runs on into the
+    next line, as in a multi-line ``git commit -m``, and if the fence ends
+    with it still open, those lines are read one by one. ``_program_argv``
+    peels wrappers off each command.
     """
     commands: list[list[str]] = []
     pending: list[str] = []
     heredoc_end: str | None = None
+    heredoc_runs = False
     for raw in _expand_for_loops(body.replace("\\\n", " ")).splitlines():
+        if console:
+            raw = _CONTINUATION_PROMPT_RE.sub("", raw, count=1)
         if heredoc_end is not None:
-            if raw.strip() == heredoc_end:
+            if _CONTINUATION_PROMPT_RE.sub("", raw, count=1).strip() == heredoc_end:
                 heredoc_end = None
-            continue
+                continue
+            if not heredoc_runs:
+                continue
         line = _escape_word_apostrophes(raw)
         pending.append(line)
         if _open_quote("\n".join(pending)) is not None:
             continue  # a real quote is open: read the next line into it
-        commands.extend(_lex_or_skip("\n".join(pending)))
+        line_commands = _lex_or_skip("\n".join(pending))
+        commands.extend(line_commands)
         pending = []
-        heredoc_end = _heredoc_delimiter(line)
+        if heredoc_end is None and (delimiter := _heredoc_delimiter(line)):
+            heredoc_end = delimiter
+            heredoc_runs = _runs_heredoc_as_shell(line_commands)
     for line in pending:  # a quote never closed: fall back to line by line
         commands.extend(_lex_or_skip(line))
     return commands
@@ -1025,7 +1051,7 @@ def _shell_invocations(text: str) -> list[tuple[tuple[int, int], list[str]]]:
     for index, (lang, body) in enumerate(_fences(text)):
         if lang not in _SHELL_LANGS and lang != "":
             continue
-        for number, argv in enumerate(_shell_commands(body)):
+        for number, argv in enumerate(_shell_commands(body, console=lang in _CONSOLE_LANGS)):
             invocations.append(((index, number), argv))
     return invocations
 
@@ -1078,7 +1104,7 @@ def _graphql_documents(text: str) -> list[tuple[tuple[int, int], str, dict, bool
             if request:
                 documents.append(((index, 0), request[0], request[1], True))
         elif lang in _SHELL_LANGS:
-            for number, words in enumerate(_shell_commands(body)):
+            for number, words in enumerate(_shell_commands(body, console=lang in _CONSOLE_LANGS)):
                 if not words or Path(words[0]).name != "curl":
                     continue
                 for pos, word in enumerate(words):

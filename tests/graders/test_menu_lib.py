@@ -2180,6 +2180,60 @@ infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
         assert not ok
         assert "[Campus, FloorMenu]" in msg
 
+    def test_heredoc_fed_to_a_shell_runs_its_commands(self):
+        """A body piped into ``sh`` runs, so a synced-item delete inside it counts."""
+        notes = """\
+```bash
+git commit -am retire && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+docker compose exec -T infrahub-server sh <<'EOF'
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+EOF
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, FloorMenu]" in msg
+
+    def test_heredoc_over_ssh_runs_the_lab_delete(self):
+        notes = """\
+```bash
+git commit -am retire && git push
+ssh infrahub-host <<EOF
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+EOF
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_console_heredoc_terminator_behind_a_prompt(self):
+        """In a console fence the terminator reads ``> EOF``."""
+        notes = """\
+```console
+$ git commit -F - <<'EOF'
+> Retire wireless and floors; what's dropped is left to the sync
+> EOF
+$ git push origin main
+$ infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_heredoc_fed_to_python_stays_data(self):
+        notes = """\
+```bash
+python - <<'EOF'
+print("git commit -am retire && git push")
+EOF
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git push" in msg
+
     def test_quote_never_closed_falls_back_to_line_by_line(self):
         notes = """\
 ```bash
