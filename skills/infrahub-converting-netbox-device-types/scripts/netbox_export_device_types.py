@@ -669,10 +669,15 @@ def _field_names(source: Any) -> list[str]:
         return []
 
 
-#: A front port's link to its rear ports, in both the 4.5 shape (``rear_ports``)
-#: and the older one. None of it lands on the front-port entry, because the
-#: library format carries it as the separate ``port-mappings`` list.
-FRONT_PORT_LINK_FIELDS = frozenset({"rear_ports", "rear_port", "rear_port_position"})
+#: The front-to-rear link, as each side of it serializes. A front port carries
+#: it as ``rear_ports`` (4.5) or ``rear_port`` / ``rear_port_position``
+#: (before), and since 4.5 a rear port carries the reverse as ``front_ports``.
+#: None of it lands on the port entry, because the library format carries the
+#: link once, as the separate ``port-mappings`` list.
+PORT_LINK_FIELDS: dict[str, frozenset[str]] = {
+    "front-ports": frozenset({"rear_ports", "rear_port", "rear_port_position"}),
+    "rear-ports": frozenset({"front_ports"}),
+}
 
 
 def unmapped_fields(
@@ -834,7 +839,7 @@ def carry_components(
             notes.extend(back_fill_legacy_front_ports(entries, carried))
         document[list_name] = carried
         notes.extend(missing_required(carried, list_name))
-        exclude = FRONT_PORT_LINK_FIELDS if list_name == "front-ports" else frozenset()
+        exclude = PORT_LINK_FIELDS.get(list_name, frozenset())
         lost: set[str] = set()
         for raw, kept in zip(entries, carried):
             lost.update(unmapped_fields(raw, kept, exclude))

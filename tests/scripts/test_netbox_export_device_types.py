@@ -128,6 +128,9 @@ REAR_PORT = {
     "type": {"value": "sc", "label": "SC"},
     "positions": 1,
     "color": "",
+    # 4.5's reverse of the front port's rear_ports, as RearPortTemplateSerializer
+    # sends it.
+    "front_ports": [{"position": 1, "front_port": 90, "front_port_position": 1}],
     "description": "",
 }
 
@@ -412,18 +415,21 @@ def test_module_bay_fields_the_library_cannot_hold_are_reported():
 
 
 @pytest.mark.parametrize("front", [FRONT_PORT, LEGACY_FRONT_PORT], ids=["4.5", "pre-4.5"])
-def test_a_mapped_front_port_link_is_not_reported_as_a_loss(front):
+def test_a_mapped_port_link_is_not_reported_as_a_loss(front):
     """The link is carried as `port-mappings`, so naming it as lost is noise.
 
-    Every device type with front ports used to get "front-ports: NetBox holds
-    rear_ports", which masked any real front-port loss behind it.
+    Both sides serialize it: a front port as `rear_ports` (or the pre-4.5
+    pair), a 4.5 rear port as `front_ports`. Each used to produce "NetBox
+    holds ..., which the library format has no field for" on every wired
+    port, masking any real loss on that list behind it.
     """
     document, notes = build_document(
         DEVICE_TYPE, {"front-ports": [front], "rear-ports": [REAR_PORT]}, is_module=False
     )
 
     assert document["port-mappings"]
-    assert not any(n.startswith("front-ports:") and "no field for" in n for n in notes)
+    port_notes = [n for n in notes if n.startswith(("front-ports:", "rear-ports:"))]
+    assert not any("no field for" in n for n in port_notes)
 
 
 def test_netbox_bookkeeping_is_not_reported_as_a_loss():
