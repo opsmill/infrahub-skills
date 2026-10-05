@@ -208,7 +208,12 @@ def _escaped(segment: str, i: int) -> bool:
 
 # A piece that hands its quoted text to another shell: that shell expands
 # what the single quotes protected here.
-_INNER_SHELL = re.compile(r"\b(?:ba|z|da|k)?sh\s+(?:-\w+\s+)*-\w*c\b|\beval\s|\bssh\s+[\w@-]")
+_INNER_SHELL = re.compile(
+    # A shell or `su`, then a single-dash option ending in c anywhere after
+    # it: `bash -o pipefail -c`, `su infrahub -c`, `sh -lc`.
+    r"\b(?:(?:ba|z|da|k)?sh|su)\b.*?(?<=\s)-[A-Za-z]*c\b"
+    r"|\beval\s|\bssh\s+[\w@-]"
+)
 
 
 def _unquote_single(piece: str) -> str:

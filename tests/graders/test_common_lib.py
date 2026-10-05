@@ -71,6 +71,14 @@ TOKEN_LEAKS = [
     pytest.param(
         "Run `eval 'echo $INFRAHUB_API_TOKEN'`.", id="inner-shell-eval"
     ),
+    # The -c can follow other options and their values.
+    pytest.param(
+        "Run `bash -o pipefail -c 'echo $INFRAHUB_API_TOKEN'`.",
+        id="inner-shell-c-after-option-value",
+    ),
+    pytest.param(
+        "Run `su infrahub -c 'echo $INFRAHUB_API_TOKEN'`.", id="inner-shell-su-c"
+    ),
 ]
 
 
