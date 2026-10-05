@@ -32,6 +32,7 @@ search to do the matching therefore prints the near misses and fails.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -188,7 +189,7 @@ def _run(tmp_path: Path, issue: str, targets: str) -> set[int]:
     script.write_text(block)
 
     env = {
-        "PATH": f"{bin_dir}:/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
         "HOME": str(tmp_path),
         "ISSUE": issue,
         "TARGETS": targets,
