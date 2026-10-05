@@ -27,6 +27,7 @@ re-deriving a slug that would drift from the original.
 **Defect class:** guidance | grader | script
 **Minimum change rung:** <1-6, and one line saying why it stopped there>
 **Docs impact:** <surfaces this change leaves stale, or: none>
+**Duplicate check:** <each matching PR with the user's choice and reason, or: none found>
 
 **Target:** skills/<skill>/ | graders/<skill>/ | scripts/
 **Rule path:** `skills/<skill>/rules/<category>-<concern>.md` (or: none, edits <existing file>)
@@ -63,13 +64,14 @@ re-deriving a slug that would drift from the original.
 ## Required fields
 
 A stage may not proceed past a handoff file missing any of: `Key`, `Branch`,
-`Defect class`, `Minimum change rung`, `Docs impact`, `Sweep terms`, or a
-non-empty `Test plan`. Find one missing, name it, and stop there rather than guessing a
-value forward.
+`Defect class`, `Minimum change rung`, `Docs impact`, `Duplicate check`,
+`Sweep terms`, or a non-empty `Test plan`. Find one missing, name it, and stop
+there rather than guessing a value forward.
 
-`Docs impact` and `Sweep terms` are both satisfied by `none`. An entrance that
-looked and found nothing has answered; an entrance that never looked has not,
-and the two are indistinguishable once the field is blank.
+`Docs impact` and `Sweep terms` are both satisfied by `none`, and `Duplicate
+check` by `none found`. An entrance that looked and found nothing has
+answered; an entrance that never looked has not, and the two are
+indistinguishable once the field is blank.
 
 `Ground truth` is satisfied by `n/a` when the defect lives entirely inside this
 repository and makes no claim about how Infrahub behaves. That is not the same
@@ -88,3 +90,55 @@ git rev-parse "origin/$DEFAULT_BRANCH"
 
 Shell state does not persist between separate Bash calls, so re-derive this in
 any snippet that needs it.
+
+## Searching for existing pull requests
+
+Before an entrance stage writes a root cause or a design brief, it searches
+for a pull request that already covers the change. The pipeline's other PR
+lookups, `gh pr list --head "$BRANCH"`, only find a PR on the pipeline's own
+branch. A PR opened by hand, by someone else, or by a run with a different
+slug is invisible to them, and the same change gets built twice.
+
+The search runs in two parts, because the stage learns its inputs at two
+different points:
+
+- **Part A**, at key derivation, when the input carries an issue number. Set
+  `ISSUE` and leave `TARGETS` empty.
+- **Part B**, as soon as the stage has named the files it will change. Set
+  `TARGETS` to their path prefixes (`skills/<skill>/`, `graders/<skill>/`,
+  `scripts/<file>`, `.agents/skills/<skill>/`), and keep `ISSUE` if there is
+  one.
+
+It prints open PRs, and merged PRs whose merge commit is not in `HEAD` yet,
+that close `ISSUE`, name `#ISSUE` in their title or body, or change a file
+under `TARGETS`. Closed, unmerged PRs are left out. It needs no fetch: a merge
+commit missing from the local repository is not in `HEAD` either.
+
+```bash
+ISSUE="<issue number, or empty>"
+TARGETS="<space-separated path prefixes, or empty>"
+TARGETS_JSON=$(printf '%s\n' $TARGETS | jq -R 'select(length > 0)' | jq -cs .)
+MATCH="(\"$ISSUE\" != \"\" and (any(.closingIssuesReferences[]; .number == ${ISSUE:-0}) or (((.title // \"\") + \" \" + (.body // \"\")) | test(\"(^|[^0-9A-Za-z])#${ISSUE:-0}([^0-9]|\$)\")))) or ([.files[].path] | any(. as \$p | $TARGETS_JSON | any(. as \$t | \$p | startswith(\$t))))"
+# Bounded: the 100 most recent open PRs and the 30 most recent merged ones.
+gh pr list --state open --limit 100 --json number,title,body,headRefName,closingIssuesReferences,files \
+  --jq ".[] | select($MATCH) | \"#\(.number)\topen\t\(.headRefName)\t\(.title)\""
+gh pr list --state merged --limit 30 --json number,title,body,headRefName,closingIssuesReferences,files,mergeCommit \
+  --jq ".[] | select($MATCH) | \"\(.number)\t\(.mergeCommit.oid)\t\(.headRefName)\t\(.title)\"" |
+  while IFS=$'\t' read -r n sha ref t; do
+    git merge-base --is-ancestor "$sha" HEAD 2>/dev/null || printf '#%s\tmerged, not in HEAD\t%s\t%s\n' "$n" "$ref" "$t"
+  done
+```
+
+No output: record `Duplicate check: none found` and continue.
+
+Any output: list each PR with its number, title, branch, state, and whether
+the issue or a file matched, then stop and ask the user to choose one of:
+
+- stop the pipeline here;
+- continue on that PR's branch instead of `ai-skill-pipeline-<key>`;
+- continue on a new branch, with a one-line reason the PR does not duplicate
+  this change.
+
+Do not choose for them. A file match is often a PR doing different work in
+the same files, and only the user can tell overlap from duplication. Record
+each PR and the choice in `Duplicate check`.

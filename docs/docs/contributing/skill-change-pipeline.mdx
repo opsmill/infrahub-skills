@@ -48,6 +48,11 @@ this and when. New rule or new skill. Which skill and which category
 prefix. What a grader can check. What the violating near miss looks like.
 What eval prompt exercises it. What it contradicts. Ground truth. Scope.
 
+Both entrances search for a pull request that already covers the change
+before they analyse or design anything: by issue number at intake, and by
+the files to be changed once those are known. On a match they stop and ask
+whether to stop, continue on that PR's branch, or continue on a new one.
+
 Pick by whether the behavior is known-wrong. A defect goes left, an idea
 goes right. Either way the next stop is the same: the failing test comes
 before the fix, and the dashed edge below marks the shortcut around it as
@@ -110,13 +115,15 @@ Stages pass work through one file per change at
 `.skill-change-<key>.md` in the repository root. It is never committed.
 
 A stage may not proceed past a handoff file missing any of `Key`,
-`Branch`, `Defect class`, `Minimum change rung`, `Docs impact`, `Sweep
-terms`, or a non-empty `Test plan`. Finding one missing, it names the
-field and stops there rather than guessing a value forward.
+`Branch`, `Defect class`, `Minimum change rung`, `Docs impact`,
+`Duplicate check`, `Sweep terms`, or a non-empty `Test plan`. Finding one
+missing, it names the field and stops there rather than guessing a value
+forward.
 
-`Docs impact` and `Sweep terms` are both satisfied by `none`. An entrance
-that looked and found nothing has answered; an entrance that never looked
-has not, and the two are indistinguishable once the field is blank.
+`Docs impact` and `Sweep terms` are both satisfied by `none`, and
+`Duplicate check` by `none found`. An entrance that looked and found nothing
+has answered; an entrance that never looked has not, and the two are
+indistinguishable once the field is blank.
 
 ## The ground truth ladder
 

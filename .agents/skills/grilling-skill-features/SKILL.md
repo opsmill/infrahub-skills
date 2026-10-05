@@ -66,6 +66,11 @@ are required; read what is present and skip the rest.
 | `skills/<candidate>/rules/_sections.md` | the category prefixes a new rule has to fit or extend |
 | `skills/<candidate>/SKILL.md` | the workflow step a new rule would be linked from |
 
+When the input carries an issue number, run Part A of
+[`../skill-pipeline-common/handoff-format.md`](../skill-pipeline-common/handoff-format.md)
+§ "Searching for existing pull requests" before the first question. An idea
+someone is already building does not need an interview.
+
 ## How to interview
 
 One question at a time, in your own message, never batched into a list the
@@ -106,6 +111,10 @@ prefixes already in use. A new prefix has to land in `_sections.md`, the
 `Rule Categories` table in `SKILL.md`, and any severity or ladder legend
 the skill keeps, or the skill never emits the rule while its eval still
 passes.
+
+With the target skill picked, run Part B of the existing-PR search in
+[`../skill-pipeline-common/handoff-format.md`](../skill-pipeline-common/handoff-format.md)
+§ "Searching for existing pull requests" on its paths, before the next lens.
 
 ## Lens 4: What can a grader actually assert
 
