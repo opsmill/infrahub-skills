@@ -836,7 +836,9 @@ def test_invented_command_behind_a_wrapper_fails(line):
 
 
 def test_service_named_like_the_binary_followed_by_its_subcommand_is_the_binary():
-    ok, _ = check_no_mutating_commands(_hop("```bash\ndocker compose run --rm infrahub upgrade\n```\n"))
+    # Inline, so the command-position parser is what catches it, not the
+    # fenced fail-closed backstop.
+    ok, _ = check_no_mutating_commands(_hop("Then run `docker compose run --rm infrahub upgrade`.\n"))
     assert not ok
 
 
@@ -1016,7 +1018,8 @@ def test_read_only_programs_in_a_service_or_as_a_user_pass(line):
 
 
 def test_sudo_short_option_cluster_does_not_hide_the_upgrade():
-    ok, _ = check_no_mutating_commands(_hop("```bash\nsudo -iu infrahub infrahub upgrade\n```\n"))
+    # Inline, so the option parser is what catches it, not the fenced backstop.
+    ok, _ = check_no_mutating_commands(_hop("Then run `sudo -iu infrahub infrahub upgrade`.\n"))
     assert not ok
 
 
@@ -1028,8 +1031,42 @@ def test_bare_inspection_command_without_an_argument_is_not_a_probe(action):
 
 @pytest.mark.parametrize(
     "action",
-    ["Run `docker compose config` to read the image tags", "Run `docker ps`", "Run `git status --short schemas/`"],
+    [
+        "Run `docker compose config` to read the image tags",
+        "Run `docker ps`",
+        "Run `git status --short schemas/`",
+        "Run `pip freeze` to read the installed SDK version",
+        "Run `pip list`",
+        "Run `uv pip list`",
+        "Run `helm list`",
+        "Run `docker compose images`",
+    ],
 )
 def test_bare_forms_that_inspect_on_their_own_are_probes(action):
     ok, msg = check_verdict_has_evidence(_plan(_ROW_UNKNOWN.format(action=action)))
+    assert ok, msg
+
+
+
+# --- Fifth review round on #159 (BeArchiTek): getopt-style option values ----
+
+
+@pytest.mark.parametrize(
+    "span",
+    ["`sudo -uroot infrahub upgrade`", "`timeout -k5s 600 infrahub upgrade`", "`sudo -iuroot infrahub upgrade`"],
+)
+def test_attached_option_value_does_not_hide_the_upgrade_inline(span):
+    ok, _ = check_no_mutating_commands(_hop(f"Then run {span}.\n"))
+    assert not ok
+
+
+def test_attached_option_value_does_not_hide_an_invented_command():
+    ok, msg = check_no_mutating_commands(_hop("```bash\nsudo -uroot infrahub migrate\n```\n"))
+    assert not ok
+    assert "not a real command" in msg
+
+
+@pytest.mark.parametrize("span", ["`sudo -uroot infrahubctl info`", "`sudo -iu infrahub infrahubctl info`"])
+def test_probe_after_short_options_passes_inline(span):
+    ok, msg = check_no_mutating_commands(_hop(f"Then run {span}.\n"))
     assert ok, msg

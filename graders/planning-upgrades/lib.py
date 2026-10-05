@@ -207,11 +207,13 @@ _EV_COMMAND = re.compile(
     r"`\s*(?:"
     # Read-only inspection commands; each needs an argument to name what it
     # inspects, so a bare `find` or `git status` is a name, not a probe.
-    r"(?:pip\s+(?:show|freeze|list)|uv\s+pip\s+(?:show|list)|grep|rg|git\s+(?:diff|log|show|grep|status)"
-    r"|cat|ls|find|head|tail|jq|yq|docker(?:\s+compose)?\s+(?:images|inspect)"
-    r"|kubectl\s+(?:get|describe)|helm\s+(?:get|list|history|status))\s[^`]+"
-    # Forms that inspect on their own: the deployment, and the target check.
-    r"|(?:upgrade\s+--check|docker(?:\s+compose)?\s+(?:ps|config))(?:\s[^`]*)?"
+    r"(?:pip\s+show|uv\s+pip\s+show|grep|rg|git\s+(?:diff|log|show|grep|status)"
+    r"|cat|ls|find|head|tail|jq|yq|docker(?:\s+compose)?\s+inspect"
+    r"|kubectl\s+(?:get|describe)|helm\s+(?:get|history|status))\s[^`]+"
+    # Forms that are a complete probe on their own: the target check, the
+    # deployment's containers and images, and the installed packages and releases.
+    r"|(?:upgrade\s+--check|docker(?:\s+compose)?\s+(?:ps|config|images)"
+    r"|pip\s+(?:freeze|list)|uv\s+pip\s+list|helm\s+list)(?:\s[^`]*)?"
     r")`"
 )
 # A backticked span is a named artifact: a query, a command, a field, a value.
@@ -603,12 +605,20 @@ def _split_ops(line: str) -> list[list[str]]:
 
 
 def _takes_value(tok: str, wrapper: str) -> bool:
-    """Does this option consume the next token? A short-option cluster does when
-    its last letter does: `sudo -iu infrahub` ends in the value-taking `-u`."""
+    """Does this option consume the next token? Short options parse getopt-style:
+    scanning left to right, the first value-taking letter takes the rest of the
+    token as its value (`-uroot`, `-k5s`), and takes the next token only when it
+    is the last letter (`-iu infrahub`)."""
     values = _VALUE_OPTS.get(wrapper, set())
     if tok in values:
         return True
-    return not tok.startswith("--") and len(tok) > 2 and "=" not in tok and f"-{tok[-1]}" in values
+    if tok.startswith("--") or "=" in tok:
+        return False
+    letters = tok[1:]
+    for pos, letter in enumerate(letters):
+        if f"-{letter}" in values:
+            return pos == len(letters) - 1
+    return False
 
 
 def _skip_opts(tokens: list[str], j: int, wrapper: str) -> int:
