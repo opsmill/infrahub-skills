@@ -206,8 +206,19 @@ def _escaped(segment: str, i: int) -> bool:
     return run % 2 == 1
 
 
+# A piece that hands its quoted text to another shell: that shell expands
+# what the single quotes protected here.
+_INNER_SHELL = re.compile(r"\b(?:ba|z|da|k)?sh\s+(?:-\w+\s+)*-\w*c\b|\beval\s|\bssh\s+[\w@-]")
+
+
 def _unquote_single(piece: str) -> str:
-    """Blank out single-quoted text, which the shell never expands."""
+    """Blank out single-quoted text, which the shell never expands.
+
+    Unless the piece runs that text in an inner shell (`sh -c '...'`,
+    `eval`, `ssh host '...'`), which does expand it.
+    """
+    if _INNER_SHELL.search(piece):
+        return piece
     for start, end, quote in _quoted_spans(piece) or []:
         if quote == "'":
             piece = piece[:start] + " " * (end - start + 1) + piece[end + 1 :]

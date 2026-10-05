@@ -143,8 +143,10 @@ Read `Defect class` from the handoff file: `guidance` follows
    unread, belongs to `implementing-skill-changes`: while the rule is absent
    the task scores below 1.0 whether the skill is read or not, so running it
    here proves nothing.
-8. Run `uv run python scripts/sync-evals.py` and commit `eval.yaml`, the
-   regenerated `evaluations/*.json`, and the grader files together. The
+8. Add the four fixtures as accept and reject parameter cases in
+   `tests/graders/test_<skill>_lib.py`, as the `grader` class does. Then run
+   `uv run python scripts/sync-evals.py` and commit `eval.yaml`, the
+   regenerated `evaluations/*.json`, the grader files, and that test together. The
    `evals-sync` job in CI regenerates them and fails the pull request on any
    diff, so skipping this turns into a red build rather than silent drift.
 9. Lint and run `uv run invoke test`.
@@ -167,6 +169,9 @@ for d in pass pass-variant fail fail-nearmiss; do
   (cd /tmp/skill-fixtures/$d && uv run --project "$REPO" python "$REPO/graders/<skill>/check_<task>.py")
 done
 ```
+
+The `/tmp` run is for iterating. What protects the check from the next
+refactor is the same four fixtures committed under `tests/graders/` (step 8).
 
 If the near miss scores 1.0, the check grades vocabulary, not substance:
 rewrite it before continuing. Check the failure message too, and confirm it

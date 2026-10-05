@@ -57,6 +57,20 @@ TOKEN_LEAKS = [
     pytest.param(
         'Run `echo "label; $INFRAHUB_API_TOKEN\\\\"`.', id="escaped-backslash-before-close"
     ),
+    # Single quotes stop expansion only until an inner shell runs the text.
+    pytest.param(
+        "Run `bash -c 'echo $INFRAHUB_API_TOKEN'`.", id="inner-shell-bash-c"
+    ),
+    pytest.param(
+        "Run `docker compose exec infrahub-server sh -c 'echo $INFRAHUB_API_TOKEN'`.",
+        id="inner-shell-exec-sh-c",
+    ),
+    pytest.param(
+        "Run `ssh host 'printf %s $INFRAHUB_API_TOKEN'`.", id="inner-shell-ssh"
+    ),
+    pytest.param(
+        "Run `eval 'echo $INFRAHUB_API_TOKEN'`.", id="inner-shell-eval"
+    ),
 ]
 
 
@@ -88,6 +102,10 @@ TOKEN_SAFE = [
     # Single quotes stop expansion, so this prints the name, not the value.
     pytest.param(
         "Run `echo 'a; $INFRAHUB_API_TOKEN'`.", id="single-quoted-name-does-not-expand"
+    ),
+    # Naming a shell inside the quotes does not run one.
+    pytest.param(
+        "Run `echo 'ssh: $INFRAHUB_API_TOKEN'`.", id="shell-name-inside-the-quotes"
     ),
 ]
 
