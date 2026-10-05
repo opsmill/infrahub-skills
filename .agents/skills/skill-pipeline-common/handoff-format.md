@@ -118,7 +118,7 @@ commit missing from the local repository is not in `HEAD` either.
 ISSUE="<issue number, or empty>"
 TARGETS="<space-separated path prefixes, or empty>"
 TARGETS_JSON=$(printf '%s\n' $TARGETS | jq -R 'select(length > 0)' | jq -cs .)
-MATCH="(\"$ISSUE\" != \"\" and (any(.closingIssuesReferences[]; .number == ${ISSUE:-0}) or (((.title // \"\") + \" \" + (.body // \"\")) | test(\"(^|[^0-9A-Za-z])#${ISSUE:-0}([^0-9]|\$)\")))) or ([.files[].path] | any(. as \$p | $TARGETS_JSON | any(. as \$t | \$p | startswith(\$t))))"
+MATCH="(\"$ISSUE\" != \"\" and (any(.closingIssuesReferences[]; .number == ${ISSUE:-0}) or (((.title // \"\") + \" \" + (.body // \"\")) | test(\"(^|[^0-9A-Za-z])#${ISSUE:-0}([^0-9A-Za-z_]|\$)\")))) or ([.files[].path] | any(. as \$p | $TARGETS_JSON | any(. as \$t | \$p | startswith(\$t))))"
 # Bounded: the 100 most recent open PRs and the 30 most recent merged ones.
 gh pr list --state open --limit 100 --json number,title,body,headRefName,closingIssuesReferences,files \
   --jq ".[] | select($MATCH) | \"#\(.number)\topen\t\(.headRefName)\t\(.title)\""

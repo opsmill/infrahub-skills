@@ -108,6 +108,8 @@ def _fixtures(head_sha: str) -> list[dict]:
             title="fix(menus): icons",
             files=("skills/infrahub-managing-menus/rules/menu-icons.md",),
         ),
+        # Open, #25 followed by letters is not the #25 token.
+        _pr(208, "OPEN", body="Tracked under #25abc and #25_old in the old tracker."),
         # Open, names #25 in the body without closing it.
         _pr(204, "OPEN", body="Follow-up to #25, which this partly addresses."),
         # Open, the body names a range that ends at #177, not #25.
@@ -239,7 +241,8 @@ def test_search_prints_exactly_the_matching_prs(
 ) -> None:
     """The block prints every matching PR and none of the near misses.
 
-    Near misses that must not print: digits containing 25 (#202), a range
+    Near misses that must not print: digits containing 25 (#202), #25 with
+    a letter or underscore suffix (#208), a range
     ending at another number (#205), a path that only starts like the target
     (#206), a closed PR (#207), a merge already in HEAD (#302), and an
     unrelated merge (#303).
