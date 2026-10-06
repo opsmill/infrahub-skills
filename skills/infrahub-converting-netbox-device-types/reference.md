@@ -32,7 +32,8 @@ Source of truth: the definitions schema in
 | `power-ports` | `name`, `label`, `type`, `maximum_draw`, `allocated_draw` |
 | `power-outlets` | `name`, `label`, `type`, `power_port`, `feed_leg` |
 | `interfaces` | `name`, `label`, `type`, `mgmt_only`, `poe_mode`, `poe_type` |
-| `front-ports` | `name`, `label`, `type`, `rear_port`, `rear_port_position` |
+| `front-ports` | `name`, `label`, `type`, `positions` |
+| `port-mappings` | `front_port`, `front_port_position`, `rear_port`, `rear_port_position` |
 | `rear-ports` | `name`, `label`, `type`, `positions` |
 | `module-bays` | `name`, `label`, `position` |
 | `device-bays` | `name`, `label` |
@@ -47,22 +48,23 @@ directory. Told apart from device types by carrying no
 | Field | Required | Notes |
 | ----- | -------- | ----- |
 | `manufacturer` | yes | 100% of published module types |
-| `model` | yes | Unique across all 1,909; stands in for the missing slug |
-| `part_number` | no | 93.8% |
-| `comments` | no | 68.6%, usually a datasheet link |
+| `model` | yes | Unique across all 2,020; stands in for the missing slug |
+| `part_number` | no | 94.4% |
+| `comments` | no | 68.4%, usually a datasheet link |
 | `description` | no | 29.0% |
-| `weight` / `weight_unit` | no | 23.0% |
-| `airflow` | no | 4.3% |
-| `profile` / `attribute_data` | no | NetBox module-type profiles; 4.2% / 2.4% |
+| `weight` / `weight_unit` | no | 23.3% |
+| `airflow` | no | 6.4% |
+| `profile` / `attribute_data` | no | NetBox module-type profiles; 4.2% / 2.5% |
 
 Component lists, by share of files: `interfaces`
-(41.7%), `power-ports` (35.4%), `rear-ports` (9.1%),
-`front-ports` (8.4%), `console-ports` (5.3%),
-`module-bays` (1.1%), `console-server-ports` (0.5%).
+(40.4%), `power-ports` (35.0%), `rear-ports` (10.1%),
+`front-ports` (9.6%), `console-ports` (5.1%),
+`module-bays` (1.5%), `console-server-ports` (0.5%).
 
-**93.9% of component names contain `{module}`**, the
+**94.8% of component names contain `{module}`**, the
 bay-position token NetBox substitutes at install time.
-See `module_type.position_placeholder`.
+See [generators-module-ports.md](./generators-module-ports.md),
+or `module_type.position_placeholder` for one fixed value.
 
 ## Exporting from a live NetBox
 
@@ -125,7 +127,7 @@ version, and the export names which one it found.
 | --------- | ------- |
 | 0 | Export completed |
 | 1 | Configuration, network, or authentication failure |
-| 2 | Nothing matched the filters |
+| 2 | Nothing matched the filters, including a `--manufacturer` or `--slug` NetBox does not recognise |
 
 ### Shape differences it reconciles
 
@@ -154,9 +156,12 @@ converter's coverage report:
   and the `front_image` / `rear_image` URLs, which the
   library format types as booleans asserting an image
   file this export does not write. Every populated
-  field with nowhere to go is named; NetBox's own
+  field with nowhere to go is named. NetBox's own
   bookkeeping (`id`, `url`, timestamps, counts) is not,
-  since omitting it is no loss.
+  and neither is a field left at NetBox's default
+  (`exclude_from_utilization: false`, a bay's
+  `enabled: true`), since NetBox assigns it again on
+  import and omitting it is no loss.
 - **NetBox left it unset, the library format requires
   it** — a power port with no `type` is valid in NetBox
   and invalid in the library. The file is still
@@ -167,11 +172,13 @@ converter's coverage report:
   skipped rather than the export failing.
 - **An earlier export left files behind** — the output
   directory is built in a staging directory and swapped
-  in, so only the subtrees this run produced are
-  replaced and a failed run changes nothing. Files a
-  previous, wider export left are removed and counted,
-  because the converter would otherwise read them as
-  part of this one.
+  in, so it ends in exactly the state this run produced
+  and a failed run changes nothing. Files a previous,
+  wider export left are removed and counted, including a
+  whole `module-types/` from a run with `--module-types`
+  when this one has none, because the converter would
+  otherwise read them as part of this one. A run that
+  matches nothing changes nothing.
 - **Two records collided on one file name** — sanitising
   can collapse names NetBox considers distinct, so the
   second is written alongside the first with a numeric
@@ -304,8 +311,8 @@ banker's rounding: `0.5` becomes `1`, not `0`.
 |                                     | `weight_kg` | `weight_g`                   |
 | ----------------------------------- | ----------- | ---------------------------- |
 | Fits schema-library's `Weight (kg)` | yes         | no — needs a grams attribute |
-| Published device types rounded to 0 | **302**     | 0                            |
-| Mean error under 1 kg               | 72.8%       | none                         |
+| Published device types rounded to 0 | **1,597**   | 0                            |
+| Mean error under 1 kg               | 71.6%       | none                         |
 | Mean error over 20 kg               | 0.6%        | none                         |
 
 Kilograms are fine for racked equipment and destroy

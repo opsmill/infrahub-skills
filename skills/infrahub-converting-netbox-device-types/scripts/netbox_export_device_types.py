@@ -253,14 +253,18 @@ NUMERIC_FIELDS = frozenset(
 #: back in one round trip; the cap keeps the URL inside the 2048 characters
 #: some proxies still enforce.
 #:
-#: This makes a *full* export chatty: 5,900 device types is ~120 batches
-#: across ten endpoints, so roughly 1,200 calls. Dropping the filter would
+#: This makes a *full* export chatty: 11,500 device types is ~230 batches
+#: across ten endpoints, so roughly 2,300 calls. Dropping the filter would
 #: make it ten calls plus pagination, but then every component in the
 #: instance is fetched even when exporting a handful of device types, and
 #: choosing between the two needs a heuristic that is wrong somewhere. The
 #: filtered path is predictable and is the one ``--in-use`` puts you on,
 #: which is the recommended way to run this.
 ID_BATCH = 50
+
+
+class NoMatch(Exception):
+    """The filters selected nothing in this NetBox: exit 2, not a failure."""
 
 
 class ExportError(Exception):
@@ -468,6 +472,9 @@ class NetBoxSource:
             if self._is_missing_endpoint(exc) and self._reached and not yielded:
                 self.missing_endpoints.add(endpoint)
                 return
+            rejected = self._rejected_filter(exc)
+            if rejected:
+                raise NoMatch(rejected) from exc
             raise ExportError(self._explain(exc, endpoint)) from exc
         self._reached = True
 
@@ -482,6 +489,30 @@ class NetBoxSource:
         diagnosed as something it is not.
         """
         return getattr(getattr(exc, "req", None), "status_code", None)
+
+    @classmethod
+    def _rejected_filter(cls, exc: Exception) -> str | None:
+        """Name the filter NetBox refused, when that is what a 400 says.
+
+        NetBox validates a filter value against its choices and answers 400,
+        keyed by the field, rather than returning an empty list. An unknown
+        ``--manufacturer`` therefore matched nothing, which is exit 2, but
+        surfaced as a generic read failure with NetBox's raw body.
+        """
+        if cls._status(exc) != 400:
+            return None
+        try:
+            body = exc.req.json()  # type: ignore[attr-defined]
+        except (AttributeError, ValueError):
+            return None
+        if not isinstance(body, dict):
+            return None
+        refused = [
+            f"--{name}: {' '.join(map(str, body[name]))}"
+            for name in FILTER_FLAGS
+            if isinstance(body.get(name), list)
+        ]
+        return "; ".join(refused) or None
 
     @classmethod
     def _is_missing_endpoint(cls, exc: Exception) -> bool:
@@ -669,6 +700,17 @@ def _field_names(source: Any) -> list[str]:
         return []
 
 
+#: Fields the library format has no home for, at the value NetBox assigns when
+#: nothing is set. Leaving a default out of the file loses nothing, because
+#: NetBox assigns it again when the file is imported, so naming it as lost is
+#: noise: on a clean NetBox 4.7 export these were every one of 620 notes.
+#: A non-default value is still reported.
+NETBOX_DEFAULTS: dict[str, Any] = {
+    "exclude_from_utilization": False,
+    "enabled": True,
+}
+
+
 #: The front-to-rear link, as each side of it serializes. A front port carries
 #: it as ``rear_ports`` (4.5) or ``rear_port`` / ``rear_port_position``
 #: (before), and since 4.5 a rear port carries the reverse as ``front_ports``.
@@ -691,8 +733,9 @@ def unmapped_fields(
     nothing said. ``default_platform``, ``cooling_method``, ``end_of_life``
     and ``tags`` all reach a real instance this way.
 
-    Only populated fields count. Reporting every null NetBox sends would bury
-    the real losses in noise.
+    Only populated fields count, and a field at its NetBox default does not
+    (see ``NETBOX_DEFAULTS``). Reporting every null or default NetBox sends
+    would bury the real losses in noise.
 
     Args:
         source: One object from the API.
@@ -708,7 +751,10 @@ def unmapped_fields(
             continue
         if name.startswith("_") or name.endswith("_count"):
             continue
-        if is_present(unwrap(field(source, name))):
+        value = unwrap(field(source, name))
+        if name in NETBOX_DEFAULTS and value == NETBOX_DEFAULTS[name]:
+            continue
+        if is_present(value):
             lost.append(name)
     return sorted(lost)
 
@@ -1290,6 +1336,36 @@ def _swap_in(stage: Path, out_dir: Path) -> list[str]:
     return notes
 
 
+def _remove_unproduced(stage: Path, out_dir: Path) -> list[str]:
+    """Remove each owned subtree this run did not produce at all.
+
+    ``_swap_in`` only visits subtrees the run staged, so a run without
+    ``--module-types`` used to leave an earlier run's ``module-types/`` in
+    place: this run's device types beside another run's module types, read
+    by the converter as one export.
+
+    Args:
+        stage: The staging directory holding this run's output.
+        out_dir: The directory the caller asked for.
+
+    Returns:
+        A note per subtree removed.
+    """
+    notes: list[str] = []
+    for subtree in LIBRARY_SUBTREES:
+        live = out_dir / subtree
+        if (stage / subtree).is_dir() or not live.is_dir():
+            continue
+        stale = sum(1 for p in live.rglob("*") if p.is_file())
+        shutil.rmtree(live)
+        notes.append(
+            f"{subtree}: removed {stale} file(s) left by an earlier export; this "
+            "run produced none, and the converter would otherwise have read them "
+            "as part of it"
+        )
+    return notes
+
+
 def export_tree(
     source: Source,
     out_dir: Path,
@@ -1327,6 +1403,10 @@ def export_tree(
             in_use=in_use,
             include_modules=include_modules,
         )
+        # A run that matched nothing exits 2 and changes nothing: removing the
+        # previous export because of a mistyped filter would be destructive.
+        if staged_paths:
+            notes.extend(_remove_unproduced(stage, out_dir))
         notes.extend(_swap_in(stage, out_dir))
     finally:
         shutil.rmtree(stage, ignore_errors=True)
@@ -1387,6 +1467,10 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+#: The selection flags, each named after the NetBox filter it sends.
+FILTER_FLAGS: tuple[str, ...] = ("manufacturer", "slug")
+
+
 def selection_filters(args: argparse.Namespace) -> dict[str, Any]:
     """Turn CLI selection arguments into pynetbox filters.
 
@@ -1427,6 +1511,9 @@ def main(argv: list[str] | None = None) -> int:
             in_use=args.in_use,
             include_modules=args.module_types,
         )
+    except NoMatch as exc:
+        print(f"NetBox matched nothing: {exc}", file=sys.stderr)
+        return 2
     except ExportError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

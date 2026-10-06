@@ -400,13 +400,17 @@ def test_fields_netbox_holds_and_the_library_cannot_are_reported():
 
 
 def test_module_bay_fields_the_library_cannot_hold_are_reported():
-    """`enabled` on a module bay is the component-level case."""
+    """`enabled` on a module bay is the component-level case.
+
+    False, because True is NetBox's default and leaving a default out loses
+    nothing; see test_netbox_defaults_with_no_library_field_are_not_reported.
+    """
     bay = {
         "id": 7,
         "device_type": {"id": 3},
         "name": "Slot 1",
         "position": "1",
-        "enabled": True,
+        "enabled": False,
     }
 
     _, notes = build_document(DEVICE_TYPE, {"module-bays": [bay]}, is_module=False)
@@ -1529,3 +1533,18 @@ def test_an_unknown_manufacturer_is_named_and_exits_2(tmp_path, capsys):
     err = capsys.readouterr().err
     assert code == 2
     assert "--manufacturer" in err and "nope" in err
+
+
+def test_a_run_that_matches_nothing_leaves_the_previous_export_alone(tmp_path, tables):
+    """Exit 2 means nothing happened; a mistyped filter must not wipe the last export."""
+    export_tree(
+        FakeSource(tables), tmp_path, filters={}, in_use=False, include_modules=True
+    )
+
+    written, _ = export_tree(
+        FakeSource({}), tmp_path, filters={}, in_use=False, include_modules=False
+    )
+
+    assert written == []
+    assert (tmp_path / "device-types/APC/ap7901.yaml").exists()
+    assert (tmp_path / "module-types/Juniper/EX9200-32XS.yaml").exists()

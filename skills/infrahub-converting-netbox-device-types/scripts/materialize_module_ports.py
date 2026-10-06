@@ -93,7 +93,7 @@ Registration
 
     queries:
       - name: module_ports_for_device
-        file_path: queries/module_ports_for_device.gql
+        file_path: queries/materialize_module_ports.gql
 
     generator_definitions:
       - name: materialize_module_ports

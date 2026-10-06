@@ -2,10 +2,10 @@
 # Mapping profile for the OpsMill schema-library DCIM schema
 # (https://github.com/opsmill/schema-library, base/dcim.yml).
 #
-# Prerequisite: DcimDevice must carry `generate_template: true` in your
-# schema. In the stock schema-library that line is commented out — the
-# Template* kinds below do not exist until you uncomment it and load the
-# schema.
+# Prerequisite: DcimDevice must carry `generate_template: true`.
+# schema-library v2 and later set it in base/dcim.yml; before v2 the line
+# shipped commented out, and the Template* kinds below do not exist until it
+# is uncommented and the schema reloaded.
 #
 # Coverage: schema-library models interfaces as the only device component,
 # and InterfacePhysical has no media-type or PoE attribute. The NetBox
@@ -27,7 +27,7 @@ device_type:
     part_number: part_number
     # NetBox has two free-text fields competing for one Infrahub attribute.
     # `description` is the semantic match, but only ~4% of the library sets
-    # it, while ~66% sets `comments` (usually a datasheet link) — so prefer
+    # it, while ~74% sets `comments` (usually a datasheet link) — so prefer
     # description and fall back to comments. When both are set the loser is
     # reported as shadowed.
     description:
@@ -41,7 +41,7 @@ device_type:
       transform: boolean
     # Infrahub has no float attribute kind — Number is integer-backed — so a
     # weight must be a whole number. Kilograms match schema-library's
-    # `Weight (kg)` attribute but round 302 published device types (sub-500g
+    # `Weight (kg)` attribute but round 1,597 published device types (sub-500g
     # transceivers and APs) to 0; the report calls each one out. If that
     # matters, add a grams attribute to your schema and switch to weight_g,
     # which keeps every value distinct.

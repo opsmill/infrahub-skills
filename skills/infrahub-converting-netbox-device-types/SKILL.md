@@ -65,11 +65,12 @@ Existing mapping profiles:
 - Building the mapping profile that binds NetBox
   fields to a custom Infrahub schema
 
-Not for syncing a **live** NetBox instance into
-Infrahub — that is
+Not for keeping a **live** NetBox and Infrahub in
+sync — that is
 [infrahub-sync](https://docs.infrahub.app/sync/),
-a separate product. This skill converts the static
-YAML definitions.
+a separate product. This skill converts device-type
+definitions, from the published library or from a
+one-off export of a running NetBox.
 
 ## The Shape of the Conversion
 
@@ -175,7 +176,10 @@ name.
 - Using the OpsMill schema-library? Start with
   `scripts/mappings/schema-library.yml`, or
   `scripts/mappings/schema-library-modules.yml` if you
-  also want module types.
+  also want module types, or
+  `scripts/mappings/schema-library-module-ports.yml` if
+  you want their ports too (see
+  [generators-module-ports.md](./generators-module-ports.md)).
 - Custom schema? Copy `scripts/mappings/_template.yml`
   into the working directory (say
   `./mappings/my-schema.yml`, never inside `$SKILL`,
@@ -263,8 +267,9 @@ separate product.
 models nobody has yet, clone the upstream repo — but
 sparsely. A plain `--depth 1` clone pulls 1.6 GB,
 almost all of it rack elevation images the converter
-never reads. Restricting to `device-types/` gets the
-same 5,900+ definitions in 29 MB:
+never reads. Restricting to the definitions gets all
+11,500+ device types and 2,000+ module types in about
+60 MB:
 
 ```bash
 git clone --depth 1 --filter=blob:none --sparse \
@@ -311,6 +316,13 @@ python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
 Exit codes: `0` converted, `1` bad profile or
 malformed input, `2` no files matched.
 
+It refuses two device types with the same `model` and
+lists every pair. A template names its device type by
+model, so loading both would overwrite one with the
+other without an error; the published library has a
+handful, shared between vendors. Leave one of each out
+of the input.
+
 Before writing or hand-editing any emitted file, read
 [rules/format-template-objects.md](./rules/format-template-objects.md)
 — the envelope, the `Template<Kind>` split, and the
@@ -349,8 +361,9 @@ Read
 Two cases worth flagging by name when they apply:
 
 - **Modular chassis** — their ports live in module
-  bays, so 13.5% of the published library converts to a
-  template with no interfaces. On schema-library **v2**
+  bays, so 414 published device types (3.6%) declare
+  bays and no interfaces, and convert to a template with
+  no interfaces. On schema-library **v2**
   the bays themselves convert (`TemplateDcimModuleBay`),
   which turns an empty template into a useful one; the
   `schema-library-modules.yml` profile maps them. On

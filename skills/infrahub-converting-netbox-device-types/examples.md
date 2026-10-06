@@ -153,7 +153,7 @@ spec:
 ## 2. A whole vendor directory
 
 Clone sparsely — the elevation images make a full
-clone 1.6 GB, against 29 MB for the definitions alone.
+clone 1.6 GB, against about 60 MB for the definitions alone.
 
 ```bash
 git clone --depth 1 --filter=blob:none --sparse \

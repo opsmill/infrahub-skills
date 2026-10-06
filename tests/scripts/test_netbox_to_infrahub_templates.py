@@ -285,7 +285,7 @@ def test_manufacturers_are_deduplicated_and_sorted(tmp_path, profile):
     devices = [
         parse_device_type(_write(tmp_path, "ex4300.yaml", EX4300)),
         parse_device_type(_write(tmp_path, "c9300.yaml", C9300)),
-        parse_device_type(_write(tmp_path, "c9300b.yaml", dict(C9300, slug="cisco-b"))),
+        parse_device_type(_write(tmp_path, "c9300b.yaml", dict(C9300, slug="cisco-b", model="Catalyst 9300-B"))),
     ]
     conversion = convert_all(devices, profile)
 
@@ -1194,7 +1194,7 @@ def test_weight_kg_always_yields_an_integer(tmp_path, weight, unit, expected):
 
 
 def test_weight_kg_rounding_to_zero_is_called_out(tmp_path):
-    """302 published device types are light enough to hit this."""
+    """1,597 published device types are light enough to hit this."""
     profile = _weight_profile(tmp_path, "weight_kg")
     obj, coverage = _weigh(tmp_path, profile, 120, "g")
 
@@ -1277,7 +1277,7 @@ def test_no_float_reaches_any_emitted_object(tmp_path, profile):
         parse_device_type(_write(tmp_path, "c9300.yaml", C9300)),
         parse_device_type(_write(tmp_path, "ex4300.yaml", EX4300)),
         parse_device_type(
-            _write(tmp_path, "half.yaml", dict(C9300, slug="half", u_height=1.5, weight=0.4))
+            _write(tmp_path, "half.yaml", dict(C9300, slug="half", model="Half", u_height=1.5, weight=0.4))
         ),
     ]
     conversion = convert_all(devices, profile)
@@ -1412,8 +1412,9 @@ def test_the_module_ports_profile_emits_port_declarations(tmp_path):
 
     template = conversion.module_templates[0]
     assert template["template_name"] == "mod-DCS-7500-SUP2"
-    ports = template["ports"]["data"] if isinstance(template["ports"], dict) else [
-        row for block in template["ports"] for row in block["data"]
-    ]
+    # Three lists share one relationship, so each child is its own
+    # {kind, data} entry rather than one block with a data list.
+    ports = [block["data"] for block in template["ports"]]
+    assert {block["kind"] for block in template["ports"]} == {"TemplateDcimModulePort"}
     assert {p["category"] for p in ports} == {"interface", "console", "power"}
     assert all("{module}" in p["name"] for p in ports)
