@@ -1390,25 +1390,36 @@ DOCS_RELATIONSHIPS = "https://docs.infrahub.app/schema/relationships"
 DOCS_ATTRIBUTES = "https://docs.infrahub.app/schema/nodes-and-attributes"
 
 
-def _render_gap_guidance(conversion: Conversion) -> list[str]:
+def _render_gap_guidance(conversion: Conversion, profile: Profile) -> list[str]:
     """Explain what each kind of gap means and how it is closed.
 
     A bare "Skipped console-ports" is only actionable to someone who
     already knows Infrahub generates component templates from Component
     relationships. This section states the reason and points at the fix.
+
+    Device-type and module-type skips are explained apart, because their
+    causes differ: a device list is skipped for want of a node, while a
+    module's lists are skipped when the profile has no module template to
+    hang them on. Merged, the device explanation was applied to module
+    ports, and an `interfaces` that converted on every device was listed as
+    skipped.
     """
     skipped: set[str] = set()
+    module_skipped: set[str] = set()
     dropped: set[str] = set()
     shadowed = 0
     zeroed = 0
     for entry in conversion.coverage:
-        skipped.update(entry.skipped_lists)
+        if entry.input_kind == MODULE_TYPES:
+            module_skipped.update(entry.skipped_lists)
+        else:
+            skipped.update(entry.skipped_lists)
         for owner, keys in entry.dropped_fields.items():
             dropped.update(f"{owner}.{key}" for key in keys)
         shadowed += len(entry.shadowed)
         zeroed += any(f"{ZERO_WEIGHT_NOTE} " in note for note in entry.notes)
 
-    if not (skipped or dropped or shadowed or zeroed):
+    if not (skipped or module_skipped or dropped or shadowed or zeroed):
         return []
 
     lines = ["", "## Closing these gaps", ""]
@@ -1423,6 +1434,24 @@ def _render_gap_guidance(conversion: Conversion) -> list[str]:
                 "",
             ]
         )
+    if module_skipped:
+        listed = ", ".join(f"`{n}`" for n in sorted(module_skipped))
+        has_template = profile.modules is not None and profile.modules.emits_templates
+        reason = (
+            [
+                "— the module template maps no component for these. Add each to",
+                "`module_type.components` in the profile.",
+            ]
+            if has_template
+            else [
+                "— the profile has no module template, so a module's components",
+                "have nowhere to go. `schema-library-module-ports.yml` carries",
+                "them as port declarations on a module template, once",
+                "`DcimModule` sets `generate_template: true`; see",
+                f"`{EXTENDING_GUIDE}`, Carrying the ports too.",
+            ]
+        )
+        lines.extend([f"**Skipped module-type component lists** ({listed})", *reason, ""])
     if dropped:
         shown = ", ".join(f"`{name}`" for name in sorted(dropped)[:8])
         more = "" if len(dropped) <= 8 else f" (and {len(dropped) - 8} more)"
@@ -1502,7 +1531,7 @@ def render_report(conversion: Conversion, profile: Profile) -> str:
         lines.extend(["", "Every field of every input mapped onto the target schema."])
         return "\n".join(lines) + "\n"
 
-    lines.extend(_render_gap_guidance(conversion))
+    lines.extend(_render_gap_guidance(conversion, profile))
     lines.extend(["", "## Details", ""])
     for entry in lossy:
         lines.append(f"### `{entry.slug}`")

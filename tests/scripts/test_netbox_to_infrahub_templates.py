@@ -1418,3 +1418,25 @@ def test_the_module_ports_profile_emits_port_declarations(tmp_path):
     assert {block["kind"] for block in template["ports"]} == {"TemplateDcimModulePort"}
     assert {p["category"] for p in ports} == {"interface", "console", "power"}
     assert all("{module}" in p["name"] for p in ports)
+
+
+def test_module_skips_are_explained_apart_from_device_skips(tmp_path):
+    """A module's ports are skipped for want of a module template, not a node.
+
+    The report merged both families under "the target schema has no node for
+    these", listing `interfaces` as skipped although every device interface
+    converted. An agent reading it told the user schema-library has no port
+    relationship for modules, which #76 added.
+    """
+    profile = load_profile(_SKILL_DIR / "scripts" / "mappings" / "schema-library-modules.yml")
+    device = parse_device_type(_write(tmp_path, "c9300.yaml", C9300))
+    module = parse_device_type(_write(tmp_path, "m.yaml", MODULE_TYPE))
+
+    report = render_report(convert_all([device, module], profile), profile)
+    guidance = report.split("## Closing these gaps", 1)[1].split("## Details", 1)[0]
+    device_line = next(line for line in guidance.splitlines() if line.startswith("**Skipped component lists**"))
+
+    assert "`interfaces`" not in device_line
+    assert "`console-ports`" in device_line
+    assert "module template" in guidance
+    assert "schema-library-module-ports.yml" in guidance
