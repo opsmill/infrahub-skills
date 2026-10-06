@@ -95,17 +95,20 @@ tree converts in one pass. They follow the same split
 and land in `04_module_types.yml` /
 `05_module_templates.yml`. Read
 [extending-your-schema.md](./extending-your-schema.md#converting-module-types)
-before promising much here: against the stock
-schema-library a module type has **no component
-relationships**, so its ports do not convert.
+before promising much here: a module's ports convert
+only onto a **module template**, and stock
+schema-library's `DcimModule` does not generate one.
+With `schema-library-modules.yml` they are reported as
+skipped; `schema-library-module-ports.yml` carries them
+once `DcimModule` sets `generate_template: true`.
 
 Module port names carry NetBox's `{module}` token, which
 no conversion can resolve — the bay position is only
-known once the module is installed. Once the
-schema-library module extensions are loaded so the ports
-import as `DcimModulePort` declarations, the bundled
-generator resolves the token per installed module and
-creates the real device interfaces. See
+known once the module is installed. Once the ports
+import as `DcimModulePort` declarations on a module
+template, the bundled generator resolves the token per
+installed module and creates the real device
+interfaces. See
 [generators-module-ports.md](./generators-module-ports.md).
 
 Three facts drive almost every surprise in this

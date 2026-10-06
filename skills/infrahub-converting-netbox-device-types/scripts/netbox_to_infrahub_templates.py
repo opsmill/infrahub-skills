@@ -245,9 +245,9 @@ class ModuleTarget:
     """How NetBox module types map onto Infrahub kinds.
 
     Structurally the same split as device types: a type object carrying the
-    model facts, and optionally a template carrying the components. Most
-    schemas can only do the first — the stock schema-library module type
-    has no component relationships — so the template half is optional.
+    model facts, and optionally a template carrying the components. Many
+    schemas can only do the first — stock schema-library's DcimModule
+    generates no module template — so the template half is optional.
 
     Args:
         kind: Concrete Infrahub kind for the module type object.
