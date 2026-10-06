@@ -260,7 +260,10 @@ Two changes, both additive.
 Verified against Infrahub 1.11.4 and schema-library
 `5dd97b2`: the templates load, a module created from one
 with `object_template` carries its port declarations,
-and the generator turns them into device interfaces.
+and the generator turns the interface ports into device
+interfaces. Console ports need a console interface kind
+in the schema, and power ports stay declarations; see
+[What it creates, and what it refuses to](./generators-module-ports.md#what-it-creates-and-what-it-refuses-to).
 
 **Map module ports to `DcimModulePort`, never to an
 interface kind.** Putting an `interfaces` Component on

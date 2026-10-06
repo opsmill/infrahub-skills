@@ -24,7 +24,8 @@
 #
 # Verified against Infrahub 1.11.4 and schema-library 5dd97b2: the templates
 # load, a module created from one carries its port declarations, and the
-# generator turns them into device interfaces.
+# generator turns the interface ports into device interfaces. Console ports
+# need a console interface kind in the schema; power ports stay declarations.
 version: 1
 name: schema-library-module-ports
 

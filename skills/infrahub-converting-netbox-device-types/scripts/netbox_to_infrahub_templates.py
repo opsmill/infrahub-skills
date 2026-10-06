@@ -749,8 +749,10 @@ def _to_number(value: Any) -> tuple[Any, str | None]:
 
 
 #: Marks the weight note for hardware too light for the target unit, so the
-#: report summary can count those apart from ordinary rounding.
-ZERO_WEIGHT_NOTE = "rounded to 0"
+#: report summary can count those apart from ordinary rounding. It has to be
+#: weight-specific: a Number field's note ("0.2 rounded to 0") would match a
+#: bare "rounded to 0" and be counted as a zero weight.
+ZERO_WEIGHT_NOTE = "too light to survive integer"
 
 
 def _to_weight(value: Any, unit: Any, target_unit: str) -> tuple[Any, str | None]:
@@ -775,8 +777,8 @@ def _to_weight(value: Any, unit: Any, target_unit: str) -> tuple[Any, str | None
 
     if result == 0 and scaled > 0:
         return result, (
-            f"weight {value} {unit_name} {ZERO_WEIGHT_NOTE} {target_unit} — too light to "
-            f"survive integer {target_unit}; map it to a grams attribute instead"
+            f"weight {value} {unit_name} rounded to 0 {target_unit} — {ZERO_WEIGHT_NOTE} "
+            f"{target_unit}; map it to a grams attribute instead"
         )
     if unit_name == target_unit and float(value).is_integer():
         return result, None
@@ -1417,7 +1419,7 @@ def _render_gap_guidance(conversion: Conversion, profile: Profile) -> list[str]:
         for owner, keys in entry.dropped_fields.items():
             dropped.update(f"{owner}.{key}" for key in keys)
         shadowed += len(entry.shadowed)
-        zeroed += any(f"{ZERO_WEIGHT_NOTE} " in note for note in entry.notes)
+        zeroed += any(ZERO_WEIGHT_NOTE in note for note in entry.notes)
 
     if not (skipped or module_skipped or dropped or shadowed or zeroed):
         return []

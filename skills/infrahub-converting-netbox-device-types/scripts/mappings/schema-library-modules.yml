@@ -11,7 +11,8 @@
 #
 # Three fields below depend on schema-library #76 (merged 2026-09-09), so a
 # schema-library checkout from before then needs the `label` line dropped
-# from module-bays and the `weight` line from module_type:
+# from module-bays and the `weight` line from module_type, and `position`
+# from module-bays too (or retyped to Text in the schema):
 #
 #   DcimModuleBay.position   Text since #76. Before it, Number with
 #                            min_value: 1, which rejects the free-form

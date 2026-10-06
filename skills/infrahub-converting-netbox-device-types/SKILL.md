@@ -108,7 +108,9 @@ known once the module is installed. Once the ports
 import as `DcimModulePort` declarations on a module
 template, the bundled generator resolves the token per
 installed module and creates the real device
-interfaces. See
+interfaces from the interface ports. Console ports need
+a console interface kind in the schema, and power ports
+stay declarations. See
 [generators-module-ports.md](./generators-module-ports.md).
 
 Three facts drive almost every surprise in this

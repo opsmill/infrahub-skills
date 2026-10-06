@@ -172,8 +172,10 @@ converter's coverage report:
   skipped rather than the export failing.
 - **An earlier export left files behind** — the output
   directory is built in a staging directory and swapped
-  in, so it ends in exactly the state this run produced
-  and a failed run changes nothing. Files a previous,
+  in, so the `device-types/` and `module-types/`
+  subtrees it owns end in exactly the state this run
+  produced, anything else in the directory is left
+  alone, and a failed run changes nothing. Files a previous,
   wider export left are removed and counted, including a
   whole `module-types/` from a run with `--module-types`
   when this one has none, because the converter would

@@ -106,12 +106,12 @@ python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
   --report ./generated/coverage-report.md
 ```
 
-Point it at a single file, a folder, or a mixed tree of device types and module types; the two families are told apart automatically, so a mixed tree converts in one pass. The skill includes four mapping profiles: `schema-library.yml` for device types, `schema-library-modules.yml` for module types as well, `schema-library-module-ports.yml` to carry each module's ports as declarations the bundled generator turns into device interfaces, and an annotated `_template.yml` to copy for a custom schema. The converter refuses `_template.yml` until its placeholder kinds are replaced, and refuses two device types that share a model, because loading both would overwrite one with the other.
+Point it at a single file, a folder, or a mixed tree of device types and module types; the two families are told apart automatically, so a mixed tree converts in one pass. The skill includes four mapping profiles: `schema-library.yml` for device types, `schema-library-modules.yml` for module types as well, `schema-library-module-ports.yml` to carry each module's ports as declarations, from which the bundled generator creates device interfaces for the interface ports, and an annotated `_template.yml` to copy for a custom schema. The converter refuses `_template.yml` until its placeholder kinds are replaced, and refuses two device types that share a model, because loading both would overwrite one with the other.
 
 :::warning
 Read the coverage report before loading anything. Against the stock `schema-library.yml` profile most NetBox component lists have no equivalent node, so a report full of unmapped entries is the normal path rather than an error: it is the list of schema changes a lossless conversion would need.
 :::
 
 :::tip
-Module port names contain NetBox's `{module}` token, which no conversion can resolve, because the bay position is known only once a module is installed. With the schema-library module extensions loaded, `generate_template: true` added to `DcimModule`, and the `schema-library-module-ports.yml` profile, each module template carries its ports as declarations, and a bundled generator resolves the token per installed module and creates the real device interfaces.
+Module port names contain NetBox's `{module}` token, which no conversion can resolve, because the bay position is known only once a module is installed. With the schema-library module extensions loaded, `generate_template: true` added to `DcimModule`, and the `schema-library-module-ports.yml` profile, each module template carries its ports as declarations, and a bundled generator resolves the token per installed module and creates the real device interfaces. Only interface ports become interfaces: console ports need a console interface kind in the schema, and power ports stay declarations.
 :::

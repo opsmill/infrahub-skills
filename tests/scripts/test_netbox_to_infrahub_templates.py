@@ -1440,3 +1440,37 @@ def test_module_skips_are_explained_apart_from_device_skips(tmp_path):
     assert "`console-ports`" in device_line
     assert "module template" in guidance
     assert "schema-library-module-ports.yml" in guidance
+
+
+def test_ordinary_rounding_to_zero_is_not_counted_as_a_zero_weight(tmp_path):
+    """A Number field rounding to 0 shared the zero-weight note's marker."""
+    profile = load_profile(
+        _write(
+            tmp_path,
+            "p.yml",
+            {
+                "version": 1,
+                "name": "numbers",
+                "manufacturer": {"kind": "OrganizationManufacturer", "name_field": "name"},
+                "device_type": {
+                    "kind": "DcimDeviceType",
+                    "manufacturer_relationship": "manufacturer",
+                    "fields": {"model": "name", "u_height": {"target": "height", "transform": "number"}},
+                },
+                "template": {
+                    "kind": "TemplateDcimDevice",
+                    "template_name": "{slug}",
+                    "device_type_relationship": "device_type",
+                },
+            },
+        )
+    )
+    device = parse_device_type(
+        _write(tmp_path, "d.yaml", {"manufacturer": "X", "model": "M", "slug": "m", "u_height": 0.2})
+    )
+    conversion = convert_all([device], profile)
+    assert any("rounded to 0" in note for note in conversion.coverage[0].notes)
+
+    report = render_report(conversion, profile)
+
+    assert "Weights rounded to 0" not in report
