@@ -1289,3 +1289,131 @@ def test_no_float_reaches_any_emitted_object(tmp_path, profile):
 
     for row in conversion.device_types + conversion.templates:
         assert not list(floats(row)), f"float leaked into {row}"
+
+
+# ---------------------------------------------------------------------------
+# Found running the skill end to end against Infrahub 1.11.4 and the full
+# devicetype-library
+# ---------------------------------------------------------------------------
+
+
+def _same_model(manufacturer: str, slug: str) -> dict:
+    return {
+        "manufacturer": manufacturer,
+        "model": "24 Port Keystone Patch Panel",
+        "slug": slug,
+        "interfaces": [{"name": "eth0"}],
+    }
+
+
+def test_one_model_under_two_manufacturers_is_refused(tmp_path, profile):
+    """A template names its device type by model, so two of them are ambiguous.
+
+    Real case: CMYKZONE and Cable Matters both publish a "24 Port Keystone
+    Patch Panel". schema-library keys DcimDeviceType on name alone, so the
+    second upsert overwrote the first, both templates pointed at the survivor,
+    and the load exited 0.
+    """
+    first = parse_device_type(_write(tmp_path, "a.yaml", _same_model("CMYKZONE", "cmyk-24")))
+    second = parse_device_type(_write(tmp_path, "b.yaml", _same_model("Cable Matters", "cm-24")))
+
+    with pytest.raises(ConversionError) as excinfo:
+        convert_all([first, second], profile)
+
+    message = str(excinfo.value)
+    assert "24 Port Keystone Patch Panel" in message
+    assert "a.yaml" in message and "b.yaml" in message
+
+
+def test_every_model_collision_is_listed_in_one_error(tmp_path, profile):
+    """The library has four; reporting one per run is four round trips."""
+    files = [
+        _write(tmp_path, f"{n}.yaml", {**_same_model(m, f"s{n}"), "model": model})
+        for n, (m, model) in enumerate(
+            [("A", "X1"), ("B", "X1"), ("C", "Y2"), ("D", "Y2")]
+        )
+    ]
+    devices = [parse_device_type(path) for path in files]
+
+    with pytest.raises(ConversionError) as excinfo:
+        convert_all(devices, profile)
+
+    assert "'X1'" in str(excinfo.value) and "'Y2'" in str(excinfo.value)
+
+
+def test_a_directory_walk_skips_dotfiles(tmp_path):
+    """Pointing at a clone root read the library's own .markdownlint.yaml."""
+    _write(tmp_path, ".markdownlint.yaml", {"default": True})
+    (tmp_path / ".github").mkdir()
+    _write(tmp_path / ".github", "labeler.yml", {"x": 1})
+    (tmp_path / "device-types").mkdir()
+    _write(tmp_path / "device-types", "c9300.yaml", C9300)
+
+    found = iter_input_files([str(tmp_path)])
+
+    assert [p.name for p in found] == ["c9300.yaml"]
+
+
+def test_the_unedited_profile_template_is_refused(tmp_path):
+    """Its kinds are placeholders, and they used to land in the output verbatim."""
+    with pytest.raises(ConversionError, match="placeholder"):
+        load_profile(_SKILL_DIR / "scripts" / "mappings" / "_template.yml")
+
+
+def test_the_module_token_note_names_the_generator(tmp_path):
+    """position_placeholder bakes one bay into every module; the generator resolves each."""
+    profile = _module_profile(
+        tmp_path,
+        template={"kind": "TemplateDcimModule", "template_name": "mod__{model}"},
+        components={
+            "interfaces": {
+                "kind": "TemplateDcimModulePort",
+                "relationship": "ports",
+                "template_name": "{template_name}__{name}",
+                "fields": {"name": "name"},
+            }
+        },
+    )
+    module = parse_device_type(_write(tmp_path, "m.yaml", MODULE_TYPE))
+    note = " ".join(convert_all([module], profile).coverage[0].notes)
+
+    assert "materialize_module_ports" in note
+
+
+def test_the_report_summary_counts_weights_rounded_to_zero(tmp_path):
+    """1,597 of them hid among 18,000 ordinary rounding notes."""
+    profile = _weight_profile(tmp_path, "weight_kg")
+    light = [
+        parse_device_type(
+            _write(tmp_path, f"{n}.yaml", {"manufacturer": "X", "model": f"M{n}",
+                                           "slug": f"m{n}", "weight": 120, "weight_unit": "g"})
+        )
+        for n in range(3)
+    ]
+    report = render_report(convert_all(light, profile), profile)
+    summary = report.split("## Details")[0]
+
+    assert "3 device types" in summary and "0 kg" in summary
+
+
+def test_the_module_ports_profile_emits_port_declarations(tmp_path):
+    """The working module-port path, shipped rather than left as copy-paste YAML."""
+    profile = load_profile(_SKILL_DIR / "scripts" / "mappings" / "schema-library-module-ports.yml")
+    sup = {
+        "manufacturer": "Arista",
+        "model": "DCS-7500-SUP2",
+        "console-ports": [{"name": "Console {module}", "type": "rj-45"}],
+        "interfaces": [{"name": "Management{module}/1", "type": "1000base-t", "mgmt_only": True}],
+        "power-ports": [{"name": "PSU {module}", "type": "iec-60320-c14", "maximum_draw": 320}],
+    }
+    module = parse_device_type(_write(tmp_path, "sup.yaml", sup))
+
+    conversion = convert_all([module], profile)
+
+    template = conversion.module_templates[0]
+    assert template["template_name"] == "mod-DCS-7500-SUP2"
+    ports = template["ports"]["data"] if isinstance(template["ports"], dict) else [
+        row for block in template["ports"] for row in block["data"]
+    ]
+    assert {p["category"] for p in ports} == {"interface", "console", "power"}
+    assert all("{module}" in p["name"] for p in ports)

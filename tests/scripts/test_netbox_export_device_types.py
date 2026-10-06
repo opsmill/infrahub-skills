@@ -616,8 +616,28 @@ def test_a_narrower_second_export_does_not_leave_the_wider_one_behind(tmp_path, 
     assert (tmp_path / "device-types/Cisco/c9200.yaml").exists()
     assert not (tmp_path / "device-types/APC/ap7901.yaml").exists()
     assert any("removed" in note and "earlier export" in note for note in notes)
-    # Only the subtrees this run produced are replaced.
+
+
+def test_a_subtree_this_run_did_not_produce_is_removed_too(tmp_path, tables):
+    """Without --module-types, an earlier run's module-types/ is just as stale.
+
+    The swap used to replace only the subtrees a run staged, so this run's
+    device types sat beside the earlier run's module types and the converter
+    read both as one export, with nothing said. That contradicted
+    export_tree's own promise: the directory ends "in the state this run
+    actually produced".
+    """
+    export_tree(
+        FakeSource(tables), tmp_path, filters={}, in_use=False, include_modules=True
+    )
     assert (tmp_path / "module-types/Juniper/EX9200-32XS.yaml").exists()
+
+    _, notes = export_tree(
+        FakeSource(tables), tmp_path, filters={}, in_use=False, include_modules=False
+    )
+
+    assert not (tmp_path / "module-types").exists()
+    assert any(n.startswith("module-types: removed") for n in notes)
 
 
 def test_a_failed_export_leaves_the_previous_one_intact(tmp_path, tables):
@@ -1435,3 +1455,77 @@ def test_a_reserved_slug_becomes_a_real_file_name(tmp_path, slug, expected):
     path = output_path({"manufacturer": "APC", "slug": slug}, tmp_path, False)
 
     assert path.name == expected
+
+
+# ---------------------------------------------------------------------------
+# Found running the exporter against a local NetBox 4.7.2
+# ---------------------------------------------------------------------------
+
+
+def test_netbox_defaults_with_no_library_field_are_not_reported():
+    """620 of 620 notes on a clean export were these three defaults.
+
+    `exclude_from_utilization: false` and a bay's `enabled: true` are what
+    NetBox assigns when nothing is set, and what it assigns again when the
+    file is imported back, so leaving them out of the file loses nothing.
+    """
+    bay = {"id": 7, "device_type": {"id": 8}, "name": "Slot 1", "position": "1", "enabled": True}
+    device_bay = {"id": 8, "device_type": {"id": 8}, "name": "Bay 1", "enabled": True}
+    source = {**DEVICE_TYPE, "exclude_from_utilization": False}
+
+    _, notes = build_document(
+        source, {"module-bays": [bay], "device-bays": [device_bay]}, is_module=False
+    )
+
+    assert not [n for n in notes if "no field for" in n]
+
+
+def test_a_non_default_value_with_no_library_field_is_still_reported():
+    bay = {"id": 7, "device_type": {"id": 8}, "name": "Slot 1", "position": "1", "enabled": False}
+    source = {**DEVICE_TYPE, "exclude_from_utilization": True}
+
+    _, notes = build_document(source, {"module-bays": [bay]}, is_module=False)
+
+    lost = " ".join(n for n in notes if "no field for" in n)
+    assert "exclude_from_utilization" in lost
+    assert "module-bays" in lost and "enabled" in lost
+
+
+def test_an_unknown_manufacturer_is_named_and_exits_2(tmp_path, capsys):
+    """reference.md documents exit 2 for "nothing matched"; this exited 1 with a raw 400.
+
+    NetBox validates a filter value against its choices and answers 400 with
+    the offending field, which is the body served here.
+    """
+    import json as _json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class BadChoice(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            self.send_response(400)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            body = {"manufacturer": ["Select a valid choice. nope is not one of the available choices."]}
+            self.wfile.write(_json.dumps(body).encode())
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), BadChoice)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        code = main(
+            [
+                "--url", f"http://127.0.0.1:{server.server_port}",
+                "--token", "t",
+                "--manufacturer", "nope",
+                "--output-dir", str(tmp_path),
+            ]
+        )
+    finally:
+        server.shutdown()
+
+    err = capsys.readouterr().err
+    assert code == 2
+    assert "--manufacturer" in err and "nope" in err
