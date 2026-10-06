@@ -59,6 +59,18 @@ A Markdown coverage report names everything the profile could not map. It is wri
 - **Template names are slug-based and parent-namespaced**: names stay unique across the whole library rather than colliding between vendors
 - **The skill offers schema changes; it does not make them**: enabling `generate_template` is a migration against your source of truth, so it is proposed for you to apply
 
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --------- | --------------------------- |
+| Assuming `Template*` kinds already exist | Checks the target schema for `generate_template: true` before converting |
+| Hand-transcribing a 48-port switch | Runs the script, which is exact and repeatable across thousands of device types |
+| Editing the script for a custom schema | Writes a new mapping profile, leaving the script untouched |
+| Reading a clean run as a lossless one | Points you at the coverage report, which names what did not convert |
+| Loading the output files in arbitrary order | Numbers them `01`–`05` in dependency order |
+| Expecting `{module}` port names to resolve | Explains that the bay position is known only once a module is installed |
+| Reaching for this to sync a live NetBox | Sends you to infrahub-sync, which is a different product |
+
 ## Exporting from a running NetBox
 
 When the device types live in your own instance rather than in the published library, a second bundled script fetches them and writes the same file format, so the two steps chain without a conversion in between. It needs [pynetbox](https://github.com/netbox-community/pynetbox) 7.0 or later, PyYAML, and a read-only API token.
@@ -79,18 +91,6 @@ python "$SKILL/scripts/netbox_export_device_types.py" \
 The export closes with its own report, in the same spirit as the coverage report: fields NetBox holds that the library format cannot carry, fields NetBox left unset that the library format requires, component endpoints absent from that NetBox version, file names that collided after sanitising, and whether the instance predates NetBox 4.5, whose front-port mapping shape differs. Read it before converting.
 
 This is a one-way snapshot into files. Continuous replication in both directions is [infrahub-sync](https://docs.infrahub.app/sync/).
-
-## Common mistakes it catches
-
-| Mistake | What the skill does instead |
-| --------- | --------------------------- |
-| Assuming `Template*` kinds already exist | Checks the target schema for `generate_template: true` before converting |
-| Hand-transcribing a 48-port switch | Runs the script, which is exact and repeatable across thousands of device types |
-| Editing the script for a custom schema | Writes a new mapping profile, leaving the script untouched |
-| Reading a clean run as a lossless one | Points you at the coverage report, which names what did not convert |
-| Loading the output files in arbitrary order | Numbers them `01`–`05` in dependency order |
-| Expecting `{module}` port names to resolve | Explains that the bay position is known only once a module is installed |
-| Reaching for this to sync a live NetBox | Sends you to infrahub-sync, which is a different product |
 
 ## Running it
 
