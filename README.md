@@ -50,6 +50,7 @@ For targeted changes, skip the ceremony. Describe what you want and the agent ha
 - *"Add a menu section for IP address management"* — the agent uses **managing-menus** and produces the YAML with correct icon references and hierarchy.
 - *"Import this `inventory.csv` into Infrahub"* — the agent uses **importing-data**, introspects the live schema, batches every ambiguity into one interview, and loads the result on a fresh branch.
 - *"Turn the NetBox device types for Arista into object templates"* — the agent uses **converting-netbox-device-types**, runs the bundled converter against a mapping profile built from your schema, and tells you which components the schema could not hold.
+- *"Plan our upgrade from 1.9.2 to 1.10.0"*: the agent uses **planning-upgrades**, reads the notes of every release in between, checks each breaking change against your repository, and writes `UPGRADE_PLAN.md` without running the upgrade.
 
 This is the fastest path for well-scoped work: adding attributes, writing a check, populating objects, creating a transform. No planning step needed. It's also how most people start — install the skills, describe what you need, and iterate from there.
 
@@ -115,6 +116,7 @@ A team already running Infrahub who needs to continue extending it — adding sc
 | **importing-data** | Convert CSV/TSV inputs into Infrahub object YAML, validate, and load onto a fresh branch |
 | **teaching-concepts** | Tutor for Infrahub concepts: probes what you know, teaches through your own repo and instance, sets verified hands-on exercises, and tracks progress across sessions |
 | **converting-netbox-device-types** | Convert NetBox device-type definitions (devicetype-library / NDX) into Infrahub object templates with a bundled converter, and report what the target schema could not hold |
+| **planning-upgrades** | Plan an Infrahub upgrade one minor version at a time, checking every release's breaking changes against your repository and instance, without running the upgrade |
 
 Each skill lives in `skills/infrahub-<name>/` with a `SKILL.md` entry point, reference docs, examples, and modular rules. Shared references (GraphQL patterns, `.infrahub.yml` format, git integration) are in `skills/infrahub-common/`. Skills use gerund-form names following the [Agent Skills best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
 
@@ -224,7 +226,8 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 │   ├── infrahub-analyzing-diagnostics/ # Bundle triage, correlation, and known-issue matching
 │   ├── infrahub-importing-data/    # CSV/TSV → Infrahub objects
 │   ├── infrahub-teaching-concepts/ # Guided tutor for Infrahub concepts
-│   └── infrahub-converting-netbox-device-types/ # NetBox device types → object templates
+│   ├── infrahub-converting-netbox-device-types/ # NetBox device types → object templates
+│   └── infrahub-planning-upgrades/ # Version-by-version upgrade plans
 ├── CLAUDE.md
 ├── README.md
 └── LICENSE                      # Apache 2.0

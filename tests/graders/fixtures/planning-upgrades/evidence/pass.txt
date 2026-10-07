@@ -1,0 +1,13 @@
+# Upgrade plan: 1.9.2 to 1.10.0
+
+## 1.9 -> 1.10
+
+| Change | Release | Kind | Severity | When | Affected | Evidence | Action | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| node_metadata is now a reserved attribute name | 1.10.0 | breaking | critical | before | yes | schemas/circuit.yml -> InfraCircuit.node_metadata | Rename the attribute before upgrading; Infrahub refuses to load the schema otherwise | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0 |
+| Restricted inheritance on internal Core generics | 1.10.0 | breaking | critical | before | unknown | Not determinable from the repo alone | Run get_schema against the instance to list nodes inheriting from the restricted Core generics, such as CoreGenericAccount | https://github.com/opsmill/infrahub/releases/tag/infrahub-v1.10.0 |
+
+```bash
+# read-only: reports what the upgrade would do, writes nothing
+VERSION=1.10.0 docker compose run --rm --no-deps infrahub-server infrahub upgrade --check
+```

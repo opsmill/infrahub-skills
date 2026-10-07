@@ -15,6 +15,7 @@
     "infrahub-analyzing-diagnostics",
     "infrahub-importing-data",
     "infrahub-teaching-concepts",
-    "infrahub-converting-netbox-device-types"
+    "infrahub-converting-netbox-device-types",
+    "infrahub-planning-upgrades"
   ]
 }
