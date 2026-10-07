@@ -115,6 +115,17 @@ TOKEN_SAFE = [
     pytest.param(
         "Run `echo 'ssh: $INFRAHUB_API_TOKEN'`.", id="shell-name-inside-the-quotes"
     ),
+    pytest.param(
+        "Run `echo 'su infrahub -c $INFRAHUB_API_TOKEN'`.", id="su-c-inside-the-quotes"
+    ),
+    pytest.param(
+        "Run `echo 'bash -o pipefail -c $INFRAHUB_API_TOKEN'`.",
+        id="bash-c-inside-the-quotes",
+    ),
+    # Outside the quotes but an argument to echo, so still only printed.
+    pytest.param(
+        "Run `echo sh -c 'x $INFRAHUB_API_TOKEN'`.", id="shell-words-as-echo-arguments"
+    ),
 ]
 
 

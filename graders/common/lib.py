@@ -216,13 +216,28 @@ _INNER_SHELL = re.compile(
 )
 
 
+def _runs_inner_shell(piece: str) -> bool:
+    """Whether the piece itself runs an inner shell.
+
+    Only the unquoted text counts, and a shell word after `echo` or
+    `printf` is an argument being printed: `echo 'su x -c ...'` and
+    `echo sh -c '...'` run nothing.
+    """
+    spans = _quoted_spans(piece)
+    bare = piece
+    for start, end, _ in spans or []:
+        bare = bare[:start] + " " * (end - start + 1) + bare[end + 1 :]
+    match = _INNER_SHELL.search(bare)
+    return bool(match) and not _PRINTS_TO_STDOUT.search(bare[: match.start()])
+
+
 def _unquote_single(piece: str) -> str:
     """Blank out single-quoted text, which the shell never expands.
 
     Unless the piece runs that text in an inner shell (`sh -c '...'`,
     `eval`, `ssh host '...'`), which does expand it.
     """
-    if _INNER_SHELL.search(piece):
+    if _runs_inner_shell(piece):
         return piece
     for start, end, quote in _quoted_spans(piece) or []:
         if quote == "'":
