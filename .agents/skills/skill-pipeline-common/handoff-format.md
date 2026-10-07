@@ -118,7 +118,8 @@ returns fewer PRs than it asked for, so an old PR is not dropped for being
 past the first page. Merged PRs are narrowed on the server to those merged
 since the date of this branch's base commit on the default branch, because
 anything merged earlier is already in `HEAD`. Without a local
-`origin/<default branch>` it reads every merged PR instead. It needs no
+`origin/<default branch>`, or when the default branch cannot be found, it
+reads every merged PR instead of guessing one. It needs no
 fetch: a merge commit missing from the local repository is not in `HEAD`
 either.
 
@@ -138,9 +139,12 @@ all_prs() {
     limit=$((limit * 2))
   done
 }
-# A PR merged before this branch's base commit is already in HEAD.
+# A PR merged before this branch's base commit is already in HEAD. With no
+# known default branch there is no base, and every merged PR is read.
 DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
-BASE=$(git merge-base HEAD "origin/${DEFAULT_BRANCH:-main}" 2>/dev/null)
+[ -z "$DEFAULT_BRANCH" ] && DEFAULT_BRANCH=$(git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')
+[ "$DEFAULT_BRANCH" = "(unknown)" ] && DEFAULT_BRANCH=""
+BASE=${DEFAULT_BRANCH:+$(git merge-base HEAD "origin/$DEFAULT_BRANCH" 2>/dev/null)}
 SINCE=${BASE:+--search merged:>=$(TZ=UTC git log -1 --date=format-local:%Y-%m-%d --format=%cd "$BASE")}
 OPEN=$(all_prs open) && MERGED=$(all_prs merged $SINCE) \
   || { echo "SEARCH FAILED: gh pr list did not complete, so nothing was searched"; exit 1; }
