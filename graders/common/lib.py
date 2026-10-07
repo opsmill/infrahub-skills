@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 from pathlib import Path
 
 
@@ -206,29 +207,48 @@ def _escaped(segment: str, i: int) -> bool:
     return run % 2 == 1
 
 
-# A piece that hands its quoted text to another shell: that shell expands
-# what the single quotes protected here.
-_INNER_SHELL = re.compile(
-    # A shell or `su`, then a single-dash option ending in c anywhere after
-    # it: `bash -o pipefail -c`, `su infrahub -c`, `sh -lc`.
-    r"\b(?:(?:ba|z|da|k)?sh|su)\b.*?(?<=\s)-[A-Za-z]*c\b"
-    r"|\beval\s|\bssh\s+[\w@-]"
-)
+# Programs that run a quoted argument as shell code, which expands what the
+# single quotes protected here.
+_SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "su"}
+_SHELL_RUN_OPTION = re.compile(r"-[A-Za-z]*c")
+_PRINT_COMMANDS = {"echo", "printf", "print"}
 
 
 def _runs_inner_shell(piece: str) -> bool:
-    """Whether the piece itself runs an inner shell.
+    """Whether the piece runs code the single quotes do not protect.
 
-    Only the unquoted text counts, and a shell word after `echo` or
-    `printf` is an argument being printed: `echo 'su x -c ...'` and
-    `echo sh -c '...'` run nothing.
+    Read from shell tokens, after quote removal, so `bash '-c' '...'` counts
+    and `echo 'su x -c ...'` does not. A shell word printed by `echo` or
+    `printf` is an argument, not a command. Fails closed: a command
+    substitution always runs, and a piece that does not tokenize keeps its
+    quoted text.
     """
-    spans = _quoted_spans(piece)
-    bare = piece
-    for start, end, _ in spans or []:
-        bare = bare[:start] + " " * (end - start + 1) + bare[end + 1 :]
-    match = _INNER_SHELL.search(bare)
-    return bool(match) and not _PRINTS_TO_STDOUT.search(bare[: match.start()])
+    unquoted = _blank_spans(piece, "'")
+    if "$(" in unquoted or "<(" in unquoted:
+        return True
+    try:
+        tokens = shlex.split(piece)
+    except ValueError:
+        return True
+    if not tokens or tokens[0] in _PRINT_COMMANDS:
+        return False
+    for i, token in enumerate(tokens):
+        name = token.rsplit("/", 1)[-1]
+        if name == "eval" or (name == "ssh" and i + 1 < len(tokens)):
+            return True
+        if name in _SHELLS and any(
+            _SHELL_RUN_OPTION.fullmatch(t) for t in tokens[i + 1 :]
+        ):
+            return True
+    return False
+
+
+def _blank_spans(piece: str, quotes: str) -> str:
+    """Blank out the text inside quotes of the given kinds."""
+    for start, end, quote in _quoted_spans(piece) or []:
+        if quote in quotes:
+            piece = piece[:start] + " " * (end - start + 1) + piece[end + 1 :]
+    return piece
 
 
 def _unquote_single(piece: str) -> str:
@@ -239,10 +259,7 @@ def _unquote_single(piece: str) -> str:
     """
     if _runs_inner_shell(piece):
         return piece
-    for start, end, quote in _quoted_spans(piece) or []:
-        if quote == "'":
-            piece = piece[:start] + " " * (end - start + 1) + piece[end + 1 :]
-    return piece
+    return _blank_spans(piece, "'")
 
 
 def _command_pieces(text: str) -> list[tuple[int, str]]:

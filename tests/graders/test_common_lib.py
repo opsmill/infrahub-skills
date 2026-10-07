@@ -79,6 +79,15 @@ TOKEN_LEAKS = [
     pytest.param(
         "Run `su infrahub -c 'echo $INFRAHUB_API_TOKEN'`.", id="inner-shell-su-c"
     ),
+    # Quote removal happens before the shell reads its options.
+    pytest.param(
+        "Run `bash '-c' 'echo $INFRAHUB_API_TOKEN'`.", id="inner-shell-quoted-option"
+    ),
+    # A command substitution runs, whatever prints its output.
+    pytest.param(
+        "Run `echo $(bash -c 'echo $INFRAHUB_API_TOKEN')`.",
+        id="inner-shell-in-command-substitution",
+    ),
 ]
 
 
