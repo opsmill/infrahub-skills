@@ -53,7 +53,9 @@ import json, os, subprocess, sys
 args = sys.argv[1:]
 if args[:2] != ["pr", "list"]:
     sys.exit(f"stub gh: only 'gh pr list' is supported, got {args!r}")
-state, jq = "open", None
+if os.environ.get("FAKE_GH_FAIL"):
+    sys.exit("stub gh: HTTP 401: Bad credentials")
+state, jq, limit = "open", None, 30
 for i, arg in enumerate(args):
     if arg == "--state":
         state = args[i + 1]
@@ -63,8 +65,12 @@ for i, arg in enumerate(args):
         jq = args[i + 1]
     elif arg.startswith("--jq="):
         jq = arg.split("=", 1)[1]
+    elif arg in ("--limit", "-L"):
+        limit = int(args[i + 1])
+    elif arg.startswith("--limit="):
+        limit = int(arg.split("=", 1)[1])
 prs = json.load(open(os.environ["FAKE_GH_FIXTURES"]))
-prs = [p for p in prs if state == "all" or p["state"].lower() == state]
+prs = [p for p in prs if state == "all" or p["state"].lower() == state][:limit]
 payload = json.dumps(prs)
 if jq is None:
     print(payload)
@@ -95,8 +101,12 @@ def _pr(
     }
 
 
-def _fixtures(head_sha: str) -> list[dict]:
-    return [
+def _fixtures(head_sha: str, filler: int = 0) -> list[dict]:
+    # gh lists newest first. Filler PRs match nothing and sit ahead of the
+    # real fixtures, so a block that stops at one page never reaches them.
+    newer = [_pr(1000 + n, "OPEN") for n in range(filler)]
+    newer += [_pr(2000 + n, "MERGED", merge_commit=head_sha) for n in range(filler)]
+    return newer + [
         # Open, on another branch, closes #25: the PR the own-branch lookup misses.
         _pr(201, "OPEN", title="fix(menus): removing items", closes=(25,)),
         # Open, the body digits contain 25 but no #25 token.
@@ -153,7 +163,9 @@ def _block() -> str:
     return match.group(1)
 
 
-def _run(tmp_path: Path, issue: str, targets: str) -> set[int]:
+def _execute(
+    tmp_path: Path, issue: str, targets: str, *, filler: int = 0, gh_fails: bool = False
+) -> subprocess.CompletedProcess[str]:
     if shutil.which("jq") is None:
         pytest.fail("jq is required to emulate gh --jq; install it")
     block = _block()
@@ -181,7 +193,7 @@ def _run(tmp_path: Path, issue: str, targets: str) -> set[int]:
     ).stdout.strip()
 
     fixtures = tmp_path / "prs.json"
-    fixtures.write_text(json.dumps(_fixtures(head)))
+    fixtures.write_text(json.dumps(_fixtures(head, filler)))
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     gh = bin_dir / "gh"
@@ -197,7 +209,9 @@ def _run(tmp_path: Path, issue: str, targets: str) -> set[int]:
         "TARGETS": targets,
         "FAKE_GH_FIXTURES": str(fixtures),
     }
-    result = subprocess.run(
+    if gh_fails:
+        env["FAKE_GH_FAIL"] = "1"
+    return subprocess.run(
         ["bash", str(script)],
         cwd=repo,
         env=env,
@@ -206,6 +220,10 @@ def _run(tmp_path: Path, issue: str, targets: str) -> set[int]:
         timeout=60,
         check=False,
     )
+
+
+def _run(tmp_path: Path, issue: str, targets: str, *, filler: int = 0) -> set[int]:
+    result = _execute(tmp_path, issue, targets, filler=filler)
     assert result.returncode == 0, f"the block failed:\n{result.stderr}"
     return {int(m) for m in re.findall(r"^#(\d+)\b", result.stdout, re.M)}
 
@@ -248,3 +266,30 @@ def test_search_prints_exactly_the_matching_prs(
     unrelated merge (#303).
     """
     assert _run(tmp_path, issue, targets) == expected
+
+
+def test_search_reads_past_the_first_page(tmp_path: Path) -> None:
+    """A match older than the newest page of PRs is still found.
+
+    150 open and 150 merged PRs that match nothing sit ahead of the real
+    fixtures. A block that stops at a fixed `--limit` never reaches #201,
+    #204 or #301, and would record `none found` for a PR that exists.
+    """
+    assert _run(tmp_path, "25", "skills/infrahub-managing-checks/", filler=150) == {
+        201,
+        204,
+        301,
+    }
+
+
+def test_search_fails_loudly_when_gh_fails(tmp_path: Path) -> None:
+    """A failed `gh` call is an error, not an empty result.
+
+    Printing nothing on failure reads exactly like "no matching PR", so the
+    stage would record `none found` without having searched.
+    """
+    result = _execute(tmp_path, "25", "", gh_fails=True)
+    assert result.returncode != 0, "the block exited 0 although gh failed"
+    assert "SEARCH FAILED" in result.stdout + result.stderr, (
+        "the block must say SEARCH FAILED so the stage does not record none found"
+    )

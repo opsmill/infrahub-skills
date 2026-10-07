@@ -111,25 +111,52 @@ different points:
 
 It prints open PRs, and merged PRs whose merge commit is not in `HEAD` yet,
 that close `ISSUE`, name `#ISSUE` in their title or body, or change a file
-under `TARGETS`. Closed, unmerged PRs are left out. It needs no fetch: a merge
-commit missing from the local repository is not in `HEAD` either.
+under `TARGETS`. Closed, unmerged PRs are left out.
+
+The search is complete, not a sample. It keeps doubling `--limit` until `gh`
+returns fewer PRs than it asked for, so an old PR is not dropped for being
+past the first page. Merged PRs are narrowed on the server to those merged
+since the date of this branch's base commit on the default branch, because
+anything merged earlier is already in `HEAD`. Without a local
+`origin/<default branch>` it reads every merged PR instead. It needs no
+fetch: a merge commit missing from the local repository is not in `HEAD`
+either.
 
 ```bash
 ISSUE="<issue number, or empty>"
 TARGETS="<space-separated path prefixes, or empty>"
 TARGETS_JSON=$(printf '%s\n' $TARGETS | jq -R 'select(length > 0)' | jq -cs .)
 MATCH="(\"$ISSUE\" != \"\" and (any(.closingIssuesReferences[]; .number == ${ISSUE:-0}) or (((.title // \"\") + \" \" + (.body // \"\")) | test(\"(^|[^0-9A-Za-z])#${ISSUE:-0}([^0-9A-Za-z_]|\$)\")))) or ([.files[].path] | any(. as \$p | $TARGETS_JSON | any(. as \$t | \$p | startswith(\$t))))"
-# Bounded: the 100 most recent open PRs and the 30 most recent merged ones.
-gh pr list --state open --limit 100 --json number,title,body,headRefName,closingIssuesReferences,files \
-  --jq ".[] | select($MATCH) | \"#\(.number)\topen\t\(.headRefName)\t\(.title)\""
-gh pr list --state merged --limit 30 --json number,title,body,headRefName,closingIssuesReferences,files,mergeCommit \
-  --jq ".[] | select($MATCH) | \"\(.number)\t\(.mergeCommit.oid)\t\(.headRefName)\t\(.title)\"" |
+FIELDS=number,title,body,headRefName,closingIssuesReferences,files,mergeCommit
+# Every PR in a state: double --limit until gh returns fewer than it was asked for.
+all_prs() {
+  local state=$1 limit=100 json
+  shift
+  while :; do
+    json=$(gh pr list --state "$state" --limit "$limit" "$@" --json "$FIELDS") || return 1
+    [ "$(printf '%s' "$json" | jq length)" -lt "$limit" ] && { printf '%s' "$json"; return 0; }
+    limit=$((limit * 2))
+  done
+}
+# A PR merged before this branch's base commit is already in HEAD.
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+BASE=$(git merge-base HEAD "origin/${DEFAULT_BRANCH:-main}" 2>/dev/null)
+SINCE=${BASE:+--search merged:>=$(TZ=UTC git log -1 --date=format-local:%Y-%m-%d --format=%cd "$BASE")}
+OPEN=$(all_prs open) && MERGED=$(all_prs merged $SINCE) \
+  || { echo "SEARCH FAILED: gh pr list did not complete, so nothing was searched"; exit 1; }
+printf '%s' "$OPEN" | jq -r ".[] | select($MATCH) | \"#\(.number)\topen\t\(.headRefName)\t\(.title)\""
+printf '%s' "$MERGED" | jq -r ".[] | select($MATCH) | \"\(.number)\t\(.mergeCommit.oid)\t\(.headRefName)\t\(.title)\"" |
   while IFS=$'\t' read -r n sha ref t; do
     git merge-base --is-ancestor "$sha" HEAD 2>/dev/null || printf '#%s\tmerged, not in HEAD\t%s\t%s\n' "$n" "$ref" "$t"
   done
 ```
 
-No output: record `Duplicate check: none found` and continue.
+No output and exit status 0: record `Duplicate check: none found` and
+continue.
+
+`SEARCH FAILED`, or any other non-zero exit: nothing was searched. Report the
+error and stop. Never record `none found` for a search that did not run,
+because the next stage cannot tell the two apart.
 
 Any output: list each PR with its number, title, branch, state, and whether
 the issue or a file matched, then stop and ask the user to choose one of:
