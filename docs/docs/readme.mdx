@@ -14,7 +14,8 @@ sides. You have a CSV export from the system Infrahub is replacing, and every co
 needs a home. You inherited a repository and cannot tell which of its files still follow
 current conventions. A generator runs, produces the wrong objects, and the traceback
 points at the SDK rather than at your code. An instance stops answering and support
-wants logs you have not collected before.
+wants logs you have not collected before. You are three minor versions behind, and nobody
+has read the release notes in between.
 
 Each of those is a skill. The AI reads the one that matches, applies its rules while it
 writes, and leaves the rest unread. That last part is what keeps the assistant accurate
@@ -47,6 +48,7 @@ For full lifecycle workflows. The AI generates files, loads them with `infrahubc
 | [Menu Manager](./skills-reference/managing-menus.mdx) | Designs and restructures custom navigation menus for the Infrahub web UI | `infrahub-managing-menus` |
 | [Data Analyzer](./skills-reference/analyzing-data.mdx) | Queries and analyzes live Infrahub data via MCP | `infrahub-analyzing-data` |
 | [Repo Auditor](./skills-reference/auditing-repo.mdx) | Audits a repository against Infrahub best practices | `infrahub-auditing-repo` |
+| [Upgrade Planner](./skills-reference/planning-upgrades.mdx) | Plans an upgrade one minor version at a time, checking every release's breaking changes against your repository and instance | `infrahub-planning-upgrades` |
 | [Data Importer](./skills-reference/importing-data.mdx) | Converts CSV/TSV inputs into Infrahub object YAML and loads onto a fresh branch | `infrahub-importing-data` |
 | [Diagnostics Collector](./skills-reference/collecting-diagnostics.mdx) | Guides `infrahub-collect` to gather a support bundle when Infrahub is misbehaving, and reviews it before hand-off | `infrahub-collecting-diagnostics` |
 | [Issue Reporter](./skills-reference/reporting-issues.mdx) | Routes a bug or feature request to the right Infrahub-ecosystem repository and prepares a sanitized draft for your review | `infrahub-reporting-issues` |

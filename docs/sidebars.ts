@@ -84,6 +84,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'skills-reference/analyzing-data',
         'skills-reference/auditing-repo',
+        'skills-reference/planning-upgrades',
       ],
     },
     {
