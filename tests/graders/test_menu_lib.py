@@ -2221,6 +2221,75 @@ $ infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
         ok, msg = self._deleted(notes)
         assert ok, msg
 
+    def test_heredoc_written_to_a_file_named_bash_stays_data(self):
+        """``cat > bash`` writes a file; ``bash`` here is a filename, not a shell."""
+        notes = """\
+```bash
+cat > bash <<'EOF'
+git commit -am retire && git push
+EOF
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git push" in msg
+
+    def test_heredoc_to_a_remote_file_over_ssh_stays_data(self):
+        """``ssh host 'cat > apply.sh'`` stores the body; it does not run it."""
+        notes = """\
+```bash
+ssh infrahub-host 'cat > apply.sh' <<'EOF'
+git commit -am retire && git push
+EOF
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git push" in msg
+
+    def test_heredoc_to_a_remote_shell_runs(self):
+        notes = """\
+```bash
+git commit -am retire && git push
+ssh -p 2222 infrahub-host bash -s <<'EOF'
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+EOF
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_heredoc_piped_through_cat_into_a_shell_runs(self):
+        notes = """\
+```bash
+git commit -am retire && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+cat <<'EOF' | sh
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+EOF
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, FloorMenu]" in msg
+
+    def test_prompt_shaped_line_does_not_end_a_heredoc_outside_console(self):
+        """In a bash fence ``> EOF`` is body text; only ``EOF`` ends the heredoc."""
+        notes = """\
+```bash
+cat > notes.txt <<'EOF'
+> EOF
+git commit -am retire && git push
+EOF
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git push" in msg
+
     def test_heredoc_fed_to_python_stays_data(self):
         notes = """\
 ```bash

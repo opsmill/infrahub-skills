@@ -991,12 +991,112 @@ _CONSOLE_LANGS = frozenset({"console", "shell-session"})
 _CONTINUATION_PROMPT_RE = re.compile(r"^[ \t]*> ?")
 
 
-def _runs_heredoc_as_shell(commands: list[list[str]]) -> bool:
-    """Whether the line that opened a heredoc feeds its body to a shell."""
-    return any(
-        Path(argv[0]).name == "ssh" or any(Path(word).name in _SHELL_PROGRAMS for word in argv)
-        for argv in commands
-    )
+_REDIRECTION_RE = re.compile(r"^\d*(?:<<-?|<<<|<>|>>|>&|<&|>\||[<>])")
+# ssh options that take a value, so the host and remote command are found.
+_SSH_VALUE_OPTIONS = frozenset(
+    {"-b", "-c", "-D", "-E", "-e", "-F", "-I", "-i", "-J", "-L", "-l", "-m",
+     "-O", "-o", "-p", "-Q", "-R", "-S", "-W", "-w", "-B"}
+)
+# Options of ``docker``/``podman`` ``exec`` that take a value.
+_EXEC_VALUE_OPTIONS = frozenset(
+    {"-e", "--env", "--env-file", "-u", "--user", "-w", "--workdir", "--index", "--detach-keys"}
+)
+
+
+def _strip_redirections(argv: list[str]) -> list[str]:
+    """Drop redirections (``> file``, ``2>&1``, ``<<EOF``) and their targets."""
+    kept: list[str] = []
+    words = iter(argv)
+    for word in words:
+        match = _REDIRECTION_RE.match(word)
+        if not match:
+            kept.append(word)
+        elif match.end() == len(word):
+            next(words, None)  # the operator stands alone: its target is the next word
+    return kept
+
+
+def _shell_reads_stdin(args: list[str]) -> bool:
+    """Whether ``sh``/``bash``/... with ``args`` runs its stdin as the script.
+
+    It does with no script file and no ``-c``, or with ``-s``.
+    """
+    words = iter(args)
+    for arg in words:
+        if arg == "-s":
+            return True
+        if arg == "-c":
+            return False
+        if arg in ("-o", "+o", "-O", "+O"):
+            next(words, None)
+        elif not arg.startswith(("-", "+")):
+            return False  # a script file: stdin is its data
+    return True
+
+
+def _stdin_runs_as_shell(argv: list[str]) -> bool:
+    """Whether the program ``argv`` runs what it reads on stdin as shell commands.
+
+    Follows the command that actually consumes stdin: a shell reading its
+    script from stdin, ``ssh host`` with no remote command (or a remote
+    command that is such a shell), and the command inside ``docker exec``,
+    ``docker compose exec``, ``podman exec`` or ``kubectl exec -- ...``.
+    Anything else (``cat > bash``, ``tee``, ``python -``) reads it as data.
+    """
+    argv = _program_argv(_strip_redirections(argv))
+    if not argv:
+        return False
+    program = Path(argv[0]).name
+    if program in _SHELL_PROGRAMS:
+        return _shell_reads_stdin(argv[1:])
+    if program == "ssh":
+        rest = _skip_options(argv[1:], _SSH_VALUE_OPTIONS)
+        remote = rest[1:]
+        if not remote:
+            return bool(rest)  # ``ssh host``: the remote login shell reads stdin
+        try:
+            return _stdin_runs_as_shell(shlex.split(" ".join(remote)))
+        except ValueError:
+            return False
+    if program in ("docker", "podman") and "exec" in argv:
+        rest = _skip_options(argv[argv.index("exec") + 1 :], _EXEC_VALUE_OPTIONS)
+        return _stdin_runs_as_shell(rest[1:])  # rest[0] is the container or service
+    if program == "kubectl" and "--" in argv:
+        return _stdin_runs_as_shell(argv[argv.index("--") + 1 :])
+    return False
+
+
+def _runs_heredoc_as_shell(line: str) -> bool:
+    """Whether the heredoc ``line`` opens has its body run as shell commands.
+
+    The command holding the ``<<`` consumes the body. It runs it when it is a
+    shell reading stdin (``_stdin_runs_as_shell``), or when it is a bare
+    ``cat`` piping it into one (``cat <<EOF | sh``).
+    """
+    try:
+        tokens = _lex_line(line)
+    except ValueError:
+        return False
+    pipelines: list[list[list[str]]] = [[[]]]
+    for token in tokens:
+        if token == "|":
+            pipelines[-1].append([])
+        elif token and set(token) <= set(_SHELL_OPERATOR_CHARS):
+            pipelines.append([[]])
+        else:
+            pipelines[-1][-1].append(token)
+    for pipeline in pipelines:
+        for position, argv in enumerate(pipeline):
+            if not any(w.startswith("<<") and not w.startswith("<<<") for w in argv):
+                continue
+            if _stdin_runs_as_shell(argv):
+                return True
+            consumer = _program_argv(_strip_redirections(argv))
+            passes_through = consumer[:1] == ["cat"] and len(consumer) == 1
+            return passes_through and any(
+                _stdin_runs_as_shell(after) for after in pipeline[position + 1 : position + 2]
+            )
+    return False
 
 
 def _shell_commands(body: str, console: bool = False) -> list[list[str]]:
@@ -1004,10 +1104,10 @@ def _shell_commands(body: str, console: bool = False) -> list[list[str]]:
 
     Lines are split on ``;``, ``&&``, ``||``, ``|`` and subshell parentheses
     (quoted ones stay put), after loops are unrolled and continuations
-    joined. A heredoc body is data and is skipped, unless the line hands it
-    to a shell (``sh``, ``bash``, ``ssh host``), which runs it as commands.
-    In a ``console`` fence the ``> `` continuation prompt is dropped, so the
-    terminator reads ``EOF`` rather than ``> EOF``. An apostrophe inside a
+    joined. A heredoc body is data and is skipped, unless the command that
+    consumes it runs it as a shell script (see ``_stdin_runs_as_shell``).
+    In a ``console`` fence, and only there, the ``> `` continuation prompt
+    is dropped, so the terminator reads ``EOF`` rather than ``> EOF``. An apostrophe inside a
     word (``Lab's``) is text; any other quote left open runs on into the
     next line, as in a multi-line ``git commit -m``, and if the fence ends
     with it still open, those lines are read one by one. ``_program_argv``
@@ -1021,7 +1121,7 @@ def _shell_commands(body: str, console: bool = False) -> list[list[str]]:
         if console:
             raw = _CONTINUATION_PROMPT_RE.sub("", raw, count=1)
         if heredoc_end is not None:
-            if _CONTINUATION_PROMPT_RE.sub("", raw, count=1).strip() == heredoc_end:
+            if raw.strip() == heredoc_end:
                 heredoc_end = None
                 continue
             if not heredoc_runs:
@@ -1030,12 +1130,11 @@ def _shell_commands(body: str, console: bool = False) -> list[list[str]]:
         pending.append(line)
         if _open_quote("\n".join(pending)) is not None:
             continue  # a real quote is open: read the next line into it
-        line_commands = _lex_or_skip("\n".join(pending))
-        commands.extend(line_commands)
+        commands.extend(_lex_or_skip("\n".join(pending)))
         pending = []
         if heredoc_end is None and (delimiter := _heredoc_delimiter(line)):
             heredoc_end = delimiter
-            heredoc_runs = _runs_heredoc_as_shell(line_commands)
+            heredoc_runs = _runs_heredoc_as_shell(line)
     for line in pending:  # a quote never closed: fall back to line by line
         commands.extend(_lex_or_skip(line))
     return commands
