@@ -1016,6 +1016,21 @@ def _strip_redirections(argv: list[str]) -> list[str]:
     return kept
 
 
+def _leading_options(argv: list[str], value_options: frozenset[str]) -> list[str]:
+    """The options ``_skip_options`` would drop, values included."""
+    return argv[: len(argv) - len(_skip_options(list(argv), value_options))]
+
+
+def _has_flag(options: list[str], short: str, long: str) -> bool:
+    """Whether ``options`` set ``-<short>`` (alone or bundled, ``-it``) or ``long``."""
+    return any(
+        option == long
+        or option.startswith(f"{long}=") and option.split("=", 1)[1].lower() != "false"
+        or (option.startswith("-") and not option.startswith("--") and short in option[1:])
+        for option in options
+    )
+
+
 def _shell_reads_stdin(args: list[str]) -> bool:
     """Whether ``sh``/``bash``/... with ``args`` runs its stdin as the script.
 
@@ -1058,11 +1073,21 @@ def _stdin_runs_as_shell(argv: list[str]) -> bool:
             return _stdin_runs_as_shell(shlex.split(" ".join(remote)))
         except ValueError:
             return False
-    if program in ("docker", "podman") and "exec" in argv:
-        rest = _skip_options(argv[argv.index("exec") + 1 :], _EXEC_VALUE_OPTIONS)
+    if program in ("docker", "podman", "docker-compose") and "exec" in argv:
+        exec_at = argv.index("exec")
+        options = _leading_options(argv[exec_at + 1 :], _EXEC_VALUE_OPTIONS)
+        rest = _skip_options(argv[exec_at + 1 :], _EXEC_VALUE_OPTIONS)
+        # Compose attaches stdin by default (``-T`` only drops the TTY);
+        # plain ``docker``/``podman exec`` passes it on only with ``-i``.
+        compose = program == "docker-compose" or "compose" in argv[1:exec_at]
+        if not compose and not _has_flag(options, "i", "--interactive"):
+            return False
         return _stdin_runs_as_shell(rest[1:])  # rest[0] is the container or service
-    if program == "kubectl" and "--" in argv:
-        return _stdin_runs_as_shell(argv[argv.index("--") + 1 :])
+    if program == "kubectl" and "exec" in argv and "--" in argv:
+        dash_dash = argv.index("--")
+        if not _has_flag(argv[argv.index("exec") + 1 : dash_dash], "i", "--stdin"):
+            return False  # without -i the heredoc never reaches the pod
+        return _stdin_runs_as_shell(argv[dash_dash + 1 :])
     return False
 
 

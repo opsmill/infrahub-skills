@@ -2290,6 +2290,28 @@ infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
         assert not ok
         assert "No git push" in msg
 
+    def test_exec_without_stdin_flag_does_not_run_the_heredoc(self):
+        """Without ``-i`` the body never reaches the shell, so the Lab delete does not happen."""
+        for wrapper in ("docker exec infrahub-server sh", "podman exec infrahub-server sh", "kubectl exec infrahub-0 -- sh"):
+            notes = (
+                "```bash\ngit commit -am retire && git push\n"
+                f"{wrapper} <<'EOF'\n"
+                "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\nEOF\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert not ok, wrapper
+            assert "[Campus, LabMenu]" in msg, wrapper
+
+    def test_exec_with_stdin_flag_runs_the_heredoc(self):
+        for wrapper in ("docker exec -i infrahub-server sh", "podman exec --interactive infrahub-server sh", "kubectl exec -it infrahub-0 -- sh", "docker-compose exec -T infrahub-server sh"):
+            notes = (
+                "```bash\ngit commit -am retire && git push\n"
+                f"{wrapper} <<'EOF'\n"
+                "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\nEOF\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert ok, f"{wrapper}: {msg}"
+
     def test_heredoc_fed_to_python_stays_data(self):
         notes = """\
 ```bash
