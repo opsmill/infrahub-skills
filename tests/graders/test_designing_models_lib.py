@@ -338,6 +338,16 @@ ALL_ROWS = F1_ROWS + """\
             brief(features=FEATURES.replace("| schema | F1 |", "| schema, objects, menu | F1 |"), sketch_rows=F1_ROWS),
             None, id="compliant-every-artifact-type",
         ),
+        pytest.param(
+            brief(
+                features=FEATURES.replace(
+                    "\n\nF1 prompt:",
+                    "\n| F5 | Menus | Group the new kinds in the sidebar | Menu items | menu | - | planned | |\n\nF1 prompt:",
+                ),
+                sketch_rows=F1_ROWS,
+            ),
+            None, id="compliant-independent-feature",
+        ),
         pytest.param(brief(features=None, sketch_rows=ALL_ROWS), "no '## Features' section", id="violating-no-split"),
         pytest.param(
             brief(
@@ -348,7 +358,11 @@ ALL_ROWS = F1_ROWS + """\
         ),
         pytest.param(
             brief(features=FEATURES.replace("| F1, F2 | planned |", "| | planned |"), sketch_rows=F1_ROWS),
-            "F3 has an empty 'Depends on'", id="near-miss-empty-depends-on",
+            "F3 has an empty 'Depends on'; write - when it has no prerequisite", id="near-miss-empty-depends-on",
+        ),
+        pytest.param(
+            brief(features=FEATURES.replace("| F1, F2 | planned |", "| TBD | planned |"), sketch_rows=F1_ROWS),
+            "F3 'Depends on' is 'TBD'", id="near-miss-depends-on-without-id",
         ),
         pytest.param(
             brief(features=FEATURES.replace("| schema | F1 |", "| schema | F0 |"), sketch_rows=F1_ROWS),

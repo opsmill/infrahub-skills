@@ -66,8 +66,11 @@ files pasted into the conversation.
   `check`, `transform`, `menu`. `schema` comes first
   whenever it is listed, because everything else reads
   it.
-- `Depends on` is `-` for F1 and names earlier IDs only
-  for every later feature.
+- `Depends on` names the earlier features a feature
+  needs, or `-` when it needs none. It is never empty,
+  and never names a later or unknown ID. A later
+  feature can be independent; write `-` rather than a
+  dependency it does not have.
 - `Status` starts as `planned`. `Spec` stays empty until
   a spec exists.
 

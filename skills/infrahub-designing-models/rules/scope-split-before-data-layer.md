@@ -28,8 +28,9 @@ data dependency, foundation first.
 The brief then shows the split in its shape:
 
 1. The `## Features` table has a row per feature, `F1`,
-   `F2`, ... in build order. Every feature after F1 has
-   a `Depends on` naming earlier IDs only.
+   `F2`, ... in build order. Each row's `Depends on`
+   names the earlier features it needs, or `-` when it
+   needs none, and never a later or unknown ID.
 2. Every row lists its `Artifacts` from `schema`,
    `objects`, `generator`, `check`, `transform`, `menu`,
    with `schema` first when listed.
@@ -96,5 +97,5 @@ before the schema it reads.
 | Mistake | Why it is wrong |
 | ------- | --------------- |
 | Sketching every feature | Decisions for later features are made before F1 teaches anything |
-| Empty `Depends on` after F1 | The build order is lost |
+| Empty `Depends on` | Reads as missing, not as "no prerequisite"; write `-` |
 | `python` or `script` as an artifact | Not a type the specify routing can act on |
