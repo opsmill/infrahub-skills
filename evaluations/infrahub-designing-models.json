@@ -46,22 +46,22 @@
     {
       "id": 3,
       "prompt": "Model our whole estate in Infrahub in one go: the fabric of our\ntwo data centres (spines, leafs, racks), IPAM for every prefix we own,\nfirewall policy between zones, and customer BGP peering at our edge. I\nwant the full model, not a plan for a plan.\n\nAnswers up front, since I won't be around to reply: outages come from IP\nclashes, firewall rules nobody can explain, and peering sessions typed by\nhand. NetOps, the security team and the pipeline that renders configs\nuse the data. Fabric data lives in a spreadsheet, prefixes in a phpIPAM\nwe want to retire, firewall rules in the firewall manager, peering in a\nwiki page. Customers order \"IP transit with BGP\"; internal teams order\n\"a new zone\". The DC team owns the fabric, the network team owns IPAM,\nsecurity owns the firewall rules, the peering team owns BGP.\n\nWrite the design brief.",
-      "expected_output": "A design brief that splits the estate into features, each depending only on earlier ones and listing the artifacts to specify with schema first, and a data model sketch for the first feature only.",
+      "expected_output": "A design brief that splits the estate into features, each depending only on earlier ones, listing the implementation artifacts with schema first, and carrying a workflow-neutral handoff, plus a data model sketch for the first feature only.",
       "files": [],
       "expectations": [
         "The brief says the scope is too big for one feature and why",
         "Features are ordered by data dependency, foundation first",
-        "Each feature has a ready-to-paste specify prompt",
+        "Each feature has a self-contained handoff for any downstream workflow",
         "Only the first feature is modelled in depth"
       ],
       "assertions": [
         {
           "name": "scope-split-f1-only",
-          "check": "Features F1..Fn with dependencies on earlier features only; sketch rows are F1 only"
+          "check": "Features F1..Fn have handoffs and dependencies on earlier features only; sketch rows are F1 only"
         },
         {
           "name": "features-artifacts",
-          "check": "Every feature lists routable artifact types, schema first"
+          "check": "Every feature lists supported artifact types, schema first"
         },
         {
           "name": "sketch-rows-complete",

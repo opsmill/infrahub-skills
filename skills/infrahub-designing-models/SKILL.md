@@ -102,9 +102,11 @@ does that from the brief.
    [rules/brief-sketch-rows-complete.md](./rules/brief-sketch-rows-complete.md);
    before writing the decision log, read
    [rules/brief-decision-provenance.md](./rules/brief-decision-provenance.md).
-9. **Name the next step and stop:** `/speckit.specify`
-   with the F1 prompt in a spec-kit repository, or
-   `infrahub-managing-schemas` with the brief otherwise.
+9. **Name the next step and stop.** Hand F1 to the
+   user's existing specification, planning or
+   implementation workflow. If none is established,
+   recommend `infrahub-managing-schemas` for the
+   schema-first implementation, but do not invoke it.
 
 ### When the user cannot reply
 

@@ -5,12 +5,10 @@ tables. The rules link here; none of them restate it.
 
 ## Location
 
-One brief per design, named `design-brief.md`:
-
-| Repository | Path |
-| ---------- | ---- |
-| Uses spec-kit (`.specify/` exists) | `specs/<design-slug>/design-brief.md` |
-| Does not | `docs/designs/<design-slug>/design-brief.md` |
+One brief per design, named `design-brief.md`. Follow an
+existing design-document location when the repository has
+one. Otherwise write
+`docs/designs/<design-slug>/design-brief.md`.
 
 `<design-slug>` is two to four lowercase words joined by
 hyphens, such as `oob-network`. Extending a design
@@ -53,10 +51,10 @@ files pasted into the conversation.
 ## Features table
 
 ```markdown
-| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Spec |
+| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | Fiber plant | Know which strand runs where | Site, FiberCable, Strand | schema, objects | - | planned | |
-| F2 | DWDM channels | Allocate channels without clashes | OpticalChannel, channel pool | schema | F1 | planned | |
+| F1 | Fiber plant | Know which strand runs where | Site, FiberCable, Strand | schema, objects | - | planned | Design and implement the fiber plant model sketched below, then populate its initial objects. |
+| F2 | DWDM channels | Allocate channels without clashes | OpticalChannel, channel pool | schema | F1 | planned | After F1, design the channel model and allocation pool using the decisions and open items in this brief. |
 ```
 
 - `ID` is `F1`, `F2`, ... in build order. An ID never
@@ -71,15 +69,12 @@ files pasted into the conversation.
   and never names a later or unknown ID. A later
   feature can be independent; write `-` rather than a
   dependency it does not have.
-- `Status` starts as `planned`. `Spec` stays empty until
-  a spec exists.
-
-Below the table, give each feature a ready-to-paste
-prompt:
-
-```markdown
-F1 prompt: `/speckit.specify Fiber plant: sites, cables and strands, as sketched in F1 of specs/metro-optical/design-brief.md`
-```
+- `Status` starts as `planned`.
+- `Handoff` is a self-contained description of the
+  outcome, scope, artifacts and dependencies. It does
+  not name a framework command. The user can paste it
+  into their existing specification, planning,
+  ticketing or implementation workflow.
 
 ## Data model sketch table
 

@@ -6,8 +6,8 @@ Two artifacts are graded:
 - ``output_dir/answer.md``: the next message of an interview, which must be
   exactly one question block (rule interview-one-question-recommended).
 - ``design-brief.md``: the design brief the skill writes at the end of a
-  session, under ``specs/<design-slug>/`` when the repository uses spec-kit
-  and ``docs/designs/<design-slug>/`` when it does not (rules
+  session, in an existing design-document location or under
+  ``docs/designs/<design-slug>/`` by default (rules
   interview-inputs-digested,
   scope-split-before-data-layer, brief-sketch-rows-complete,
   brief-decision-provenance).
@@ -30,8 +30,8 @@ from typing import Callable
 import yaml
 
 ANSWER_PATH = Path("output_dir") / "answer.md"
-# Either location is valid; which one is right depends on the repository,
-# and a session writes exactly one brief.
+# These cover the default and the established location used by existing
+# fixtures; a session writes exactly one brief.
 BRIEF_GLOBS = ("specs/*/design-brief.md", "docs/designs/*/design-brief.md")
 
 SKETCH_HEADING = "data model sketch"
@@ -41,9 +41,9 @@ DECISIONS_HEADING = "decision log"
 OPEN_ITEMS_HEADING = "open items"
 
 DECISION_TAGS = {"stated", "recommended", "open"}
-# The artifact types infrahub-speckit's route-specify routes to. The brief's
-# Artifacts column is the hook's input, so this is the hook contract, not a
-# copy of the skill's prose.
+# The artifact types the downstream Infrahub skills can produce. The brief's
+# Artifacts column is their routing input, so this is the integration contract,
+# not a copy of the skill's prose.
 ARTIFACT_TYPES = {"schema", "objects", "generator", "check", "transform", "menu"}
 BASIS_STRENGTHS = ("(strong)", "(medium)", "(weak basis)")
 # Mirrors the layers named in rules/interview-one-question-recommended.md.
@@ -403,7 +403,7 @@ def check_inputs_digested(ws: Path, inputs: dict[str, list[str]]) -> tuple[bool,
 
 
 def check_scope_split_f1_only(ws: Path) -> tuple[bool, str]:
-    """A split brief orders features by dependency and sketches F1 only."""
+    """A split brief orders features, hands each off, and sketches F1 only."""
     parts, err = _brief_sections(ws)
     if parts is None:
         return False, err
@@ -412,8 +412,9 @@ def check_scope_split_f1_only(ws: Path) -> tuple[bool, str]:
     headers, rows = first_table(parts[FEATURES_HEADING])
     id_col = _column(headers, "id")
     dep_col = _column(headers, "depends on")
-    if not rows or id_col is None or dep_col is None:
-        return False, "Features section has no table with 'ID' and 'Depends on' columns"
+    handoff_col = _column(headers, "handoff")
+    if not rows or id_col is None or dep_col is None or handoff_col is None:
+        return False, "Features section has no table with 'ID', 'Depends on', and 'Handoff' columns"
     if len(rows) < 2:
         return False, f"Features table has {len(rows)} row; a split needs at least 2"
 
@@ -424,14 +425,15 @@ def check_scope_split_f1_only(ws: Path) -> tuple[bool, str]:
         dep_cell = _clean(row[dep_col])
         if not dep_cell:
             return False, f"F{position} has an empty 'Depends on'; write - when it has no prerequisite"
-        if dep_cell.lower() in _NO_PREREQUISITE:
-            continue
-        deps = [int(d) for d in _FEATURE_ID.findall(dep_cell)]
-        if not deps:
-            return False, f"F{position} 'Depends on' is {dep_cell!r}; name earlier IDs, or write - for none"
-        for d in deps:
-            if d < 1 or d >= position:
-                return False, f"F{position} depends on F{d}, which is not an earlier feature"
+        if dep_cell.lower() not in _NO_PREREQUISITE:
+            deps = [int(d) for d in _FEATURE_ID.findall(dep_cell)]
+            if not deps:
+                return False, f"F{position} 'Depends on' is {dep_cell!r}; name earlier IDs, or write - for none"
+            for d in deps:
+                if d < 1 or d >= position:
+                    return False, f"F{position} depends on F{d}, which is not an earlier feature"
+        if not _clean(row[handoff_col]):
+            return False, f"F{position} has an empty Handoff cell"
 
     s_headers, s_rows, err = _sketch(parts)
     if err:
@@ -443,16 +445,16 @@ def check_scope_split_f1_only(ws: Path) -> tuple[bool, str]:
         ids = _FEATURE_ID.findall(_clean(row[feat_col]))
         if ids != ["1"]:
             return False, f"sketch has a row for {_clean(row[feat_col])!r}; only F1 is modelled in depth"
-    return True, f"{len(rows)} features in dependency order, sketch covers F1 only"
+    return True, f"{len(rows)} features have handoffs in dependency order, sketch covers F1 only"
 
 
 def check_features_artifacts(ws: Path) -> tuple[bool, str]:
-    """Every feature lists the artifacts to specify, in routable order.
+    """Every feature lists supported implementation artifacts in build order.
 
-    The Features table is present even for a single feature, so the hook
-    reads one shape. Each Artifacts cell is an ordered list of artifact
-    types, with schema first whenever it appears, because every other
-    artifact reads the schema.
+    The Features table is present even for a single feature, so downstream
+    workflows read one shape. Each Artifacts cell is an ordered list of
+    artifact types, with schema first whenever it appears, because every
+    other artifact reads the schema.
     """
     parts, err = _brief_sections(ws)
     if parts is None:
@@ -472,7 +474,7 @@ def check_features_artifacts(ws: Path) -> tuple[bool, str]:
             return False, f"{fid} has an empty Artifacts cell"
         unknown = [a for a in items if a not in ARTIFACT_TYPES]
         if unknown:
-            return False, f"{fid} lists {unknown}, which are not artifact types the hook can route"
+            return False, f"{fid} lists {unknown}, which are not supported artifact types"
         if "schema" in items and items[0] != "schema":
             return False, f"{fid} lists {items}; schema must come first"
     return True, "every feature lists routable artifacts, schema first"
