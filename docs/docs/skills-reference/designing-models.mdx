@@ -48,6 +48,74 @@ It writes no schema YAML.
 - "Sensible defaults" that look decided but were never confirmed
 - A generator chosen for a value that a computed attribute on the same node would give
 
+## Example: an L3VPN service
+
+You ask: "We want our L3VPN service in Infrahub. Where do we start?" You attach `vpn-customers.xlsx`, an export with one row per VPN and its sites.
+
+### The interview
+
+Each message is one question. The skill reads your file first, so the first business question already uses what is in it:
+
+```markdown
+**Q1 (business):** Which task fails today because VPN data is wrong or missing?
+
+- A. Provisioning: a new site gets a route distinguisher that is already in use  **(Recommended)**
+- B. Troubleshooting: nobody can tell which PE serves which customer site
+- C. Billing: VPNs stay billed after they are decommissioned
+
+**Basis:** vpn-customers.xlsx has duplicate values in its rd column (strong)
+```
+
+You answer "A". Later, a service question separates what the customer orders from what the network team derives:
+
+```markdown
+**Q3 (service):** What does the customer order?
+
+- A. One VPN, with sites added to it over time  **(Recommended)**
+- B. Each site as its own order, grouped into a VPN afterwards
+- C. Both, depending on the customer
+
+**Basis:** every row in vpn-customers.xlsx is one VPN with a site list (strong)
+```
+
+You answer "A, but the route targets are ours to choose, not the customer's". The skill records the first half as an accepted recommendation and the second as your own decision.
+
+### The brief
+
+The request covers the VPN service and the allocation of route distinguishers and route targets, so the skill splits it into two features and models only the first in depth. An excerpt of `specs/l3vpn/design-brief.md`:
+
+```markdown
+## Features
+
+| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Spec |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| F1 | VPN service | One object per ordered VPN, with its sites | L3Vpn, VpnSite | schema, objects | - | planned | |
+| F2 | RD and RT allocation | No duplicate distinguishers or targets | RD pool, RT pool | schema, objects | F1 | planned | |
+
+F1 prompt: `/speckit.specify VPN service: one L3Vpn per customer VPN and a VpnSite per site, as sketched in F1 of specs/l3vpn/design-brief.md`
+
+## Data model sketch
+
+| Feature | Node kind | Identified by | Key attributes (value class) | Peers (cardinality) | Source of truth | Owner | Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| F1 | L3Vpn | customer + vpn_name | bandwidth (stated) | VpnSite (many) | Infrahub | Network team | vpn-customers.xlsx:vpn_name |
+| F1 | VpnSite | vpn + site_code | access type (stated) | L3Vpn (one) | Infrahub | open: O1 | vpn-customers.xlsx:site_code |
+
+## Decision log
+
+| # | Decision | Tag | Basis |
+| --- | --- | --- | --- |
+| 1 | The customer orders one VPN, and sites are added to it | recommended | Every row in vpn-customers.xlsx is one VPN with a site list (strong) |
+| 2 | The network team chooses route targets, not the customer | stated | |
+| 3 | Who owns site records once a VPN is live | open | O1 |
+
+## Open items
+
+- O1: Who owns site records once a VPN is live? (owner: unknown, network or service desk)
+```
+
+The next step is `/speckit.specify` with the F1 prompt. Without spec-kit, the brief would be at `docs/designs/l3vpn/design-brief.md`, and the [Schema Manager](./managing-schemas.mdx) builds the schema from it.
+
 ## Using it with spec-kit
 
 In a spec-kit repository, the brief's Features table gives one `/speckit.specify` prompt per feature. Run them in order: each spec then starts from a model you have already worked through, rather than one guessed from a short prompt. See [Spec-Driven Development](../spec-driven-development.mdx).
