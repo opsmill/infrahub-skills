@@ -307,6 +307,17 @@ def check_one_question_recommended(ws: Path) -> tuple[bool, str]:
             continue
         if _SENTENCE_QUESTION.search(line):
             return False, f"a second question outside the block: {line.strip()[:80]!r}"
+
+    # The Basis paragraph ends the message. Walk the raw lines, fences
+    # included, so content hidden in a fenced block after it fails too.
+    marks = _fence_marks(text)
+    raw_start = [i for i, (kind, _) in enumerate(marks) if kind == "outside"][start]
+    raw_end = raw_start + 1
+    while raw_end < len(marks) and marks[raw_end][0] == "outside" and marks[raw_end][1].strip():
+        raw_end += 1
+    tail = [line.strip() for _, line in marks[raw_end:] if line.strip()]
+    if tail:
+        return False, f"content after the **Basis:** line, which must end the message: {tail[0][:60]!r}"
     return True, "one question block, one recommended option with a basis, no schema YAML"
 
 

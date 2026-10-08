@@ -145,7 +145,7 @@ Q_NEAR_TWO_RECOMMENDED = Q_COMPLIANT.replace(
 )
 Q_NEAR_EMPTY_BASIS = Q_COMPLIANT.split("**Basis:**")[0] + "**Basis:**\n"
 Q_STRONG = Q_COMPLIANT.replace("(weak basis).", "(strong).")
-Q_NESTED_FENCE = Q_COMPLIANT + """
+Q_NESTED_FENCE = """\
 ````markdown
 How a later question will look:
 ```
@@ -153,6 +153,13 @@ How a later question will look:
 ```
 Which cabinet types do you sell?
 ````
+
+""" + Q_COMPLIANT
+Q_NEAR_TRAILING_TEXT = Q_COMPLIANT + "\nReply with a letter and I will continue.\n"
+Q_NEAR_TRAILING_FENCE = Q_COMPLIANT + """
+```text
+Reply with a letter and I will continue.
+```
 """
 Q_NEAR_BROKEN_YAML = Q_COMPLIANT + """
 Draft so you can load it today:
@@ -177,6 +184,8 @@ nodes:
         pytest.param(Q_NEAR_SECOND_QUESTION, "a second question", id="near-miss-second-question"),
         pytest.param(Q_NEAR_TWO_RECOMMENDED, "found 2", id="near-miss-two-recommended"),
         pytest.param(Q_NEAR_EMPTY_BASIS, "line is empty", id="near-miss-empty-basis"),
+        pytest.param(Q_NEAR_TRAILING_TEXT, "must end the message", id="near-miss-text-after-basis"),
+        pytest.param(Q_NEAR_TRAILING_FENCE, "must end the message", id="near-miss-fence-after-basis"),
     ],
 )
 def test_one_question_recommended(tmp_path: Path, answer: str, expected: str | None) -> None:
