@@ -52,7 +52,7 @@ PLACEHOLDERS = {"", "-", "--", "?", "tbd", "tba", "todo", "unknown", "n/a",
                 "na", "none", "open", "pending"}
 
 _H2 = re.compile(r"^##\s+(.+?)\s*#*\s*$")
-_FENCE_EDGE = re.compile(r"^\s*(```|~~~)")
+_FENCE_OPEN = re.compile(r"^\s*(`{3,}|~{3,})")
 _QUESTION = re.compile(r"^\s*\*\*Q(\d+)\s*\(([^)]+)\):\*\*\s*(.*?)\s*$")
 _OPTION = re.compile(r"^\s*[-*]\s+([A-Z])\.\s+(.+?)\s*$")
 _BASIS = re.compile(r"^\s*\*\*Basis:\*\*\s*(.*?)\s*$")
@@ -62,6 +62,10 @@ _FEATURE_ID = re.compile(r"\bF(\d+)\b")
 _OPEN_REF = re.compile(r"\bopen:\s*(O\d+)\b", re.IGNORECASE)
 _OPEN_ITEM = re.compile(r"^\s*(?:[-*]|\d+[.)])?\s*\**\s*(O\d+)\s*\**\s*:", re.IGNORECASE)
 _TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
+_UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
+# A top-level schema key on its own line, whether or not the YAML parses.
+_SCHEMA_KEY_LINE = re.compile(r"^(nodes|generics):\s*$")
+_FILE_REF = re.compile(r"[\w.\-/]*\w\.[A-Za-z0-9]+")
 
 
 # --------------------------------------------------------------------------
@@ -69,32 +73,53 @@ _TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
 # --------------------------------------------------------------------------
 
 
+def _fence_marks(text: str) -> list[tuple[str, str]]:
+    """Label every line as 'edge', 'inside' or 'outside' a fenced block.
+
+    A fence may be indented (under a list item) and closes only on a run of
+    the same character at least as long as the one that opened it, so a
+    ``` line inside a ```` block is content, not a close.
+    """
+    marks: list[tuple[str, str]] = []
+    opener: str | None = None
+    for line in text.splitlines():
+        match = _FENCE_OPEN.match(line)
+        if opener is None:
+            if match:
+                opener = match.group(1)
+                marks.append(("edge", line))
+            else:
+                marks.append(("outside", line))
+            continue
+        run = match.group(1) if match else ""
+        closes = (
+            run[:1] == opener[0]
+            and len(run) >= len(opener)
+            and not line.strip()[len(run):].strip()
+        )
+        marks.append(("edge" if closes else "inside", line))
+        if closes:
+            opener = None
+    return marks
+
+
 def _lines_outside_fences(text: str) -> list[str]:
     """Every line that is not inside a fenced code block."""
-    out: list[str] = []
-    in_fence = False
-    for line in text.splitlines():
-        if _FENCE_EDGE.match(line):
-            in_fence = not in_fence
-            continue
-        if not in_fence:
-            out.append(line)
-    return out
+    return [line for kind, line in _fence_marks(text) if kind == "outside"]
 
 
 def fenced_blocks(text: str) -> list[str]:
-    """Every fenced block, not only the first."""
+    """Every fenced block, not only the first; an unclosed one counts too."""
     blocks: list[str] = []
     current: list[str] | None = None
-    for line in text.splitlines():
-        if _FENCE_EDGE.match(line):
+    for kind, line in _fence_marks(text):
+        if kind == "edge":
             if current is None:
                 current = []
             else:
                 blocks.append("\n".join(current))
                 current = None
-            continue
-        if current is not None:
+        elif kind == "inside" and current is not None:
             current.append(line)
     if current:
         blocks.append("\n".join(current))
@@ -105,11 +130,8 @@ def sections(text: str) -> dict[str, str]:
     """Map each `##` heading (lowercased) to its body, ignoring fenced headings."""
     parts: dict[str, str] = {}
     current: str | None = None
-    in_fence = False
-    for line in text.splitlines():
-        if _FENCE_EDGE.match(line):
-            in_fence = not in_fence
-        match = None if in_fence else _H2.match(line)
+    for kind, line in _fence_marks(text):
+        match = _H2.match(line) if kind == "outside" else None
         if match:
             current = _clean(match.group(1)).lower()
             parts[current] = ""
@@ -132,7 +154,7 @@ def _split_row(line: str) -> list[str]:
         body = body[1:]
     if body.endswith("|"):
         body = body[:-1]
-    return [c.strip() for c in body.split("|")]
+    return [c.strip().replace("\\|", "|") for c in _UNESCAPED_PIPE.split(body)]
 
 
 def first_table(section: str) -> tuple[list[str], list[dict[str, str]]]:
@@ -210,17 +232,24 @@ def _open_item_ids(parts: dict[str, str]) -> set[str]:
 
 
 def _schema_yaml_blocks(text: str) -> list[str]:
-    """Fenced blocks that parse as YAML with top-level nodes or generics."""
+    """Schema YAML anywhere in the reply, parseable or not.
+
+    A must-not check fails closed: a block that does not parse but carries a
+    top-level ``nodes:`` or ``generics:`` line is still a schema draft, and
+    so is the same line written outside any fence.
+    """
     hits = []
     for block in fenced_blocks(text):
+        if any(_SCHEMA_KEY_LINE.match(ln) for ln in block.splitlines()):
+            hits.append(block)
+            continue
         try:
             docs = list(yaml.safe_load_all(block))
         except yaml.YAMLError:
             continue
-        for doc in docs:
-            if isinstance(doc, dict) and ({"nodes", "generics"} & set(doc)):
-                hits.append(block)
-                break
+        if any(isinstance(d, dict) and {"nodes", "generics"} & set(d) for d in docs):
+            hits.append(block)
+    hits += [ln for ln in _lines_outside_fences(text) if _SCHEMA_KEY_LINE.match(ln)]
     return hits
 
 
@@ -286,11 +315,12 @@ def check_one_question_recommended(ws: Path) -> tuple[bool, str]:
 # --------------------------------------------------------------------------
 
 
-def _file_name(cell: str) -> str:
-    """The base file name a cell refers to, e.g. '`inputs/pops.csv`' -> 'pops.csv'."""
-    cleaned = _clean(cell)
-    match = re.search(r"[\w.\-/]+\.[A-Za-z0-9]+", cleaned)
-    return Path(match.group(0)).name.lower() if match else cleaned.lower()
+def _file_names(cell: str) -> set[str]:
+    """Base names of the files a cell names, e.g. '`inputs/pops.csv:pop_code`' -> {'pops.csv'}.
+
+    Compared whole, so ``old_pops.csv`` does not count as ``pops.csv``.
+    """
+    return {Path(m).name.lower() for m in _FILE_REF.findall(_clean(cell))}
 
 
 def check_inputs_digested(ws: Path, inputs: dict[str, list[str]]) -> tuple[bool, str]:
@@ -311,7 +341,10 @@ def check_inputs_digested(ws: Path, inputs: dict[str, list[str]]) -> tuple[bool,
     taken_col = _column(in_headers, "taken from it")
     if not in_rows or file_col is None or taken_col is None:
         return False, "Inputs section has no '| File | Taken from it |' table"
-    listed = {_file_name(r[file_col]): _clean(r[taken_col]) for r in in_rows}
+    listed = {}
+    for r in in_rows:
+        for name in _file_names(r[file_col]):
+            listed[name] = _clean(r[taken_col])
     for name in inputs:
         if name.lower() not in listed:
             return False, f"Inputs table does not list {name}"
@@ -328,8 +361,8 @@ def check_inputs_digested(ws: Path, inputs: dict[str, list[str]]) -> tuple[bool,
 
     cited: set[str] = set()
     for row in rows:
-        evidence = _clean(row.get(ev_col, ""))
-        cited_here = {n for n in inputs if n.lower() in evidence.lower()}
+        named = _file_names(row.get(ev_col, ""))
+        cited_here = {n for n in inputs if n.lower() in named}
         cited |= cited_here
         identity_tokens = set(re.findall(r"[a-z0-9_]+", _clean(row.get(id_col, "")).lower()))
         for name, columns in inputs.items():
@@ -457,21 +490,36 @@ def check_sketch_rows_complete(ws: Path) -> tuple[bool, str]:
     return True, "every sketch row has identity, source of truth and owner, or an open item"
 
 
-def check_open_item_referenced(ws: Path) -> tuple[bool, str]:
-    """At least one sketch cell defers to an open item (the task leaves one unknown)."""
+def check_open_item_for(ws: Path, kind: re.Pattern, column: str) -> tuple[bool, str]:
+    """The value the user left unknown is an open item on its own row.
+
+    Bound to the subject: a brief that invents the unknown value and parks an
+    open item on some other row still fails. ``kind`` matches the node kind
+    the task left unknown; ``column`` names the sketch column.
+    """
     parts, err = _brief_sections(ws)
     if parts is None:
         return False, err
     headers, rows, err = _sketch(parts)
     if err:
         return False, err
+    kind_col = _column(headers, "node kind")
+    value_col = _column(headers, column)
+    if kind_col is None or value_col is None:
+        return False, f"sketch table lacks a 'Node kind' or '{column}' column"
+    subject = [r for r in rows if kind.search(_clean(r[kind_col]))]
+    if not subject:
+        return False, f"no sketch row for the node kind matching {kind.pattern!r}"
     open_ids = _open_item_ids(parts)
-    for row in rows:
-        for cell in row.values():
-            ref = _OPEN_REF.search(_clean(cell))
-            if ref and ref.group(1).upper() in open_ids:
-                return True, f"sketch defers to open item {ref.group(1).upper()}"
-    return False, "the user left a value unknown, but no sketch cell references an open item"
+    for row in subject:
+        value = _clean(row[value_col])
+        ref = _OPEN_REF.search(value)
+        if not ref or ref.group(1).upper() not in open_ids:
+            return False, (
+                f"{_clean(row[kind_col])}: {column} is {value!r}; the user did not "
+                "know it, so it must reference an open item"
+            )
+    return True, f"the unknown {column} is deferred to an open item"
 
 
 # --------------------------------------------------------------------------
@@ -507,19 +555,31 @@ def check_decision_provenance(ws: Path) -> tuple[bool, str]:
     return True, f"{len(rows)} decisions, each tagged with its provenance"
 
 
-def check_both_provenances(ws: Path) -> tuple[bool, str]:
-    """The log separates stated decisions from accepted recommendations."""
+def check_decision_tags_for(ws: Path, subjects: dict[str, tuple[re.Pattern, str]]) -> tuple[bool, str]:
+    """Each named decision carries the tag the transcript gives it.
+
+    Bound to the subject: swapping tags between a stated decision and an
+    accepted recommendation fails, although both tags still appear.
+    ``subjects`` maps a label to (pattern on the Decision cell, expected tag).
+    """
     parts, err = _brief_sections(ws)
     if parts is None:
         return False, err
     rows, tag_col, _, err = _decision_rows(parts)
     if err:
         return False, err
-    tags = {_clean(r[tag_col]).lower() for r in rows}
-    missing = {"stated", "recommended"} - tags
-    if missing:
-        return False, f"the user both stated decisions and accepted recommendations, but no row is tagged {sorted(missing)}"
-    return True, "stated and recommended decisions are told apart"
+    headers, _ = first_table(parts[DECISIONS_HEADING])
+    dec_col = _column(headers, "decision")
+    if dec_col is None:
+        return False, "Decision log has no 'Decision' column"
+    for label, (pattern, tag) in subjects.items():
+        matching = [r for r in rows if pattern.search(_clean(r[dec_col]))]
+        if not matching:
+            return False, f"no decision about {label}"
+        wrong = [_clean(r[tag_col]).lower() for r in matching if _clean(r[tag_col]).lower() != tag]
+        if wrong:
+            return False, f"the decision about {label} is tagged {wrong[0]!r}; the transcript makes it {tag!r}"
+    return True, "each decision carries the provenance the transcript gives it"
 
 
 # --------------------------------------------------------------------------
@@ -531,9 +591,7 @@ CHECKS: dict[str, Callable[[Path], tuple[bool, str]]] = {
     "scope-split-f1-only": check_scope_split_f1_only,
     "features-artifacts": check_features_artifacts,
     "sketch-rows-complete": check_sketch_rows_complete,
-    "open-item-referenced": check_open_item_referenced,
     "decision-provenance": check_decision_provenance,
-    "both-provenances": check_both_provenances,
 }
 
 
