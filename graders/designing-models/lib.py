@@ -63,6 +63,7 @@ _SENTENCE_QUESTION = re.compile(r"\?(?=[\s*_)\"'”]|$)")
 _FEATURE_ID = re.compile(r"\bF(\d+)\b")
 _NO_PREREQUISITE = {"-", "none"}
 _OPEN_REF = re.compile(r"\bopen:\s*(O\d+)\b", re.IGNORECASE)
+_OPEN_ID = re.compile(r"\b(O\d+)\b", re.IGNORECASE)
 _OPEN_ITEM = re.compile(r"^\s*(?:[-*]|\d+[.)])?\s*\**\s*(O\d+)\s*\**\s*:", re.IGNORECASE)
 _TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
 _UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
@@ -563,19 +564,31 @@ def _decision_rows(parts: dict[str, str]) -> tuple[list[dict[str, str]], str, st
 
 
 def check_decision_provenance(ws: Path) -> tuple[bool, str]:
-    """Every decision is tagged stated, recommended or open; recommended ones carry a basis."""
+    """Every decision is tagged stated, recommended or open.
+
+    A recommended row carries a basis; an open row names its open item
+    (``O<n>``) in Basis, and that item is listed under Open items.
+    """
     parts, err = _brief_sections(ws)
     if parts is None:
         return False, err
     rows, tag_col, basis_col, err = _decision_rows(parts)
     if err:
         return False, err
+    open_ids = _open_item_ids(parts)
     for number, row in enumerate(rows, start=1):
         tag = _clean(row[tag_col]).lower()
         if tag not in DECISION_TAGS:
             return False, f"decision {number} has tag {tag!r}; expected stated, recommended or open"
-        if tag == "recommended" and _clean(row[basis_col]).lower() in PLACEHOLDERS:
+        basis = _clean(row[basis_col])
+        if tag == "recommended" and basis.lower() in PLACEHOLDERS:
             return False, f"decision {number} is recommended but has no basis"
+        if tag == "open":
+            ref = _OPEN_ID.search(basis)
+            if not ref:
+                return False, f"decision {number} is open but its Basis names no open item (O<n>)"
+            if ref.group(1).upper() not in open_ids:
+                return False, f"decision {number} is open but {ref.group(1).upper()} is not in Open items"
     return True, f"{len(rows)} decisions, each tagged with its provenance"
 
 

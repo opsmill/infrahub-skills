@@ -16,7 +16,9 @@ log`, tagged with where it came from:
 - `recommended`: you recommended it and the user
   accepted. The `Basis` column keeps the reason it was
   recommended.
-- `open`: not decided. It also appears in Open items.
+- `open`: not decided. The `Basis` column names the
+  open item that tracks it (`O1`), and that item is
+  listed in Open items.
 
 No other tags. A recommendation the user has not
 accepted is `open`, not `recommended`.
@@ -46,6 +48,11 @@ the same, and the review checks neither.
 | --- | --- | --- | --- |
 | 1 | Console ports are identified by server and port number | stated | |
 | 4 | Console servers and PDUs share a generic | recommended | Both have numbered ports and a management address (medium) |
+| 5 | Who approves new console servers | open | O1 |
+
+## Open items
+
+- O1: Who approves new console servers? (owner: unknown)
 ```
 
 ## Incorrect
@@ -67,3 +74,4 @@ decision, and the reason for it is lost.
 | `recommended` with an empty Basis | The reason to re-check it is gone |
 | Tags like `agreed` or `decided` | Hide whether the user or you made the call |
 | A proposed default tagged `recommended` | The user never accepted it |
+| `open` with no `O<n>` in Basis | The question drops off the follow-up list |
