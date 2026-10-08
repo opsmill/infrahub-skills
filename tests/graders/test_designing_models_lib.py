@@ -139,6 +139,10 @@ Does this look right?
 """
 
 Q_NEAR_SECOND_QUESTION = Q_COMPLIANT + "\nAlso, which system owns cabinet records today?\n"
+Q_NEAR_BASIS_QUESTION = Q_COMPLIANT.replace(
+    "you named cross-connects first, and billing errors are the usual reason this data gets modelled",
+    "you named outages first; or is billing the bigger problem?",
+)
 Q_NEAR_TWO_RECOMMENDED = Q_COMPLIANT.replace(
     "- A. Capacity planning: we sell power we do not have",
     "- A. Capacity planning: we sell power we do not have  **(Recommended)**",
@@ -182,6 +186,7 @@ nodes:
         pytest.param(Q_VIOLATING, "schema YAML", id="violating-yaml"),
         pytest.param(Q_NEAR_BROKEN_YAML, "schema YAML", id="near-miss-unparseable-yaml"),
         pytest.param(Q_NEAR_SECOND_QUESTION, "a second question", id="near-miss-second-question"),
+        pytest.param(Q_NEAR_BASIS_QUESTION, "a second question", id="near-miss-question-in-basis"),
         pytest.param(Q_NEAR_TWO_RECOMMENDED, "found 2", id="near-miss-two-recommended"),
         pytest.param(Q_NEAR_EMPTY_BASIS, "line is empty", id="near-miss-empty-basis"),
         pytest.param(Q_NEAR_TRAILING_TEXT, "must end the message", id="near-miss-text-after-basis"),
