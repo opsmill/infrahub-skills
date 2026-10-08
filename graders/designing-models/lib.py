@@ -61,6 +61,7 @@ _BASIS = re.compile(r"^\s*\*\*Basis:\*\*\s*(.*?)\s*$")
 _RECOMMENDED = re.compile(r"\*\*\(Recommended\)\*\*")
 _SENTENCE_QUESTION = re.compile(r"\?(?=[\s*_)\"'”]|$)")
 _FEATURE_ID = re.compile(r"\bF(\d+)\b")
+_NO_PREREQUISITE = {"-", "none"}
 _OPEN_REF = re.compile(r"\bopen:\s*(O\d+)\b", re.IGNORECASE)
 _OPEN_ITEM = re.compile(r"^\s*(?:[-*]|\d+[.)])?\s*\**\s*(O\d+)\s*\**\s*:", re.IGNORECASE)
 _TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
@@ -419,9 +420,14 @@ def check_scope_split_f1_only(ws: Path) -> tuple[bool, str]:
         ids = _FEATURE_ID.findall(_clean(row[id_col]))
         if ids != [str(position)]:
             return False, f"Features row {position} has ID {_clean(row[id_col])!r}, expected F{position}"
-        deps = [int(d) for d in _FEATURE_ID.findall(_clean(row[dep_col]))]
-        if position > 1 and not deps:
-            return False, f"F{position} has an empty 'Depends on'"
+        dep_cell = _clean(row[dep_col])
+        if not dep_cell:
+            return False, f"F{position} has an empty 'Depends on'; write - when it has no prerequisite"
+        if dep_cell.lower() in _NO_PREREQUISITE:
+            continue
+        deps = [int(d) for d in _FEATURE_ID.findall(dep_cell)]
+        if not deps:
+            return False, f"F{position} 'Depends on' is {dep_cell!r}; name earlier IDs, or write - for none"
         for d in deps:
             if d < 1 or d >= position:
                 return False, f"F{position} depends on F{d}, which is not an earlier feature"
