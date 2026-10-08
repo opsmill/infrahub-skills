@@ -8792,3 +8792,210 @@ tasks:
       - Any upgrade dry run is shown as server-side `infrahub upgrade --check`
       - "`infrahubctl upgrade` does not appear; it is not a real command"  # cli-check: ignore infrahubctl upgrade
       - The 1.11.0 removal of `infrahub git-agent` is flagged against tasks.py
+
+  # --- Model Designer --- #
+  - name: design-one-question-recommended
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: I'm in a hurry. We run a colocation business and I need it in
+      Infrahub by Friday: cabinets, power feeds and cross-connects. Just give
+      me the schema so I can load it. I'll answer questions later if I really
+      have to.
+
+      I can't reply during this run. Write exactly the next message you would
+      send me to ./output_dir/answer.md and nothing else.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_one_question_recommended.py
+        weight: 1.0
+    expected_output: >-
+      One question block: a single question, two to four options with their
+      consequence in Infrahub, exactly one option marked as recommended, and a
+      basis line with its strength. No schema YAML.
+    expectations:
+      - The reply asks one question instead of writing a schema
+      - One option is recommended and the reason names what it rests on
+      - The question is about why the data matters or what is ordered, not a field name
+    assertions:
+      - name: one-question-recommended
+        check: Exactly one question block with one recommended option, a basis, and no schema YAML
+
+  - name: design-inputs-digested
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: We want our backbone in Infrahub. Two files describe what we have.
+
+      pops.csv:
+      ```csv
+      pop_code,name,city,region
+      AMS1,Amsterdam Science Park,Amsterdam,EU-West
+      AMS2,Amsterdam Schiphol,Amsterdam,EU-West
+      FRA1,Frankfurt Kleyer,Frankfurt,EU-Central
+      FRA2,Frankfurt Hanauer,Frankfurt,EU-Central
+      LON1,London Docklands,London,UK
+      PAR1,Paris Aubervilliers,Paris,EU-West
+      ```
+
+      backbone.txt:
+      ```text
+      Each PoP has two core routers, cr1 and cr2.
+      AMS1-cr1 <-> FRA1-cr1   100G
+      AMS1-cr2 <-> LON1-cr2   400G
+      FRA1-cr2 <-> PAR1-cr1   100G
+      LON1-cr1 <-> PAR1-cr2   100G
+      AMS2-cr1 <-> FRA2-cr1   400G
+      ```
+
+      I can't do a back-and-forth today, so here is everything you would ask:
+      capacity planning breaks because nobody knows which links are 100G and
+      which are 400G. The backbone team and a weekly capacity report use the
+      data. Customer services and IPAM are out of scope. PoP data comes from
+      the facilities team's sheet; Infrahub becomes the source of truth for
+      routers and links. The facilities team owns PoPs and regions, the
+      backbone team owns routers and links and enters link capacity.
+
+      I already explained everything above, so you can skip the files. Write
+      the design brief.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_inputs_digested.py
+        weight: 1.0
+    expected_output: >-
+      A design brief whose Inputs section lists pops.csv and backbone.txt with
+      what was taken from each, and whose data model sketch cites them as
+      evidence: PoPs identified by pop_code from pops.csv, links from
+      backbone.txt.
+    expectations:
+      - Both files are read and listed even though the user said to skip them
+      - The PoP and region rows cite pops.csv as evidence
+      - The link rows cite backbone.txt as evidence
+    assertions:
+      - name: inputs-digested
+        check: Every provided file is listed in Inputs and cited as evidence in the sketch
+      - name: sketch-rows-complete
+        check: Every sketch row has identity, source of truth and owner, or an open item
+      - name: decision-provenance
+        check: Every decision is tagged stated, recommended or open
+
+  - name: design-scope-split
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: Model our whole estate in Infrahub in one go: the fabric of our
+      two data centres (spines, leafs, racks), IPAM for every prefix we own,
+      firewall policy between zones, and customer BGP peering at our edge. I
+      want the full model, not a plan for a plan.
+
+      Answers up front, since I won't be around to reply: outages come from IP
+      clashes, firewall rules nobody can explain, and peering sessions typed by
+      hand. NetOps, the security team and the pipeline that renders configs
+      use the data. Fabric data lives in a spreadsheet, prefixes in a phpIPAM
+      we want to retire, firewall rules in the firewall manager, peering in a
+      wiki page. Customers order "IP transit with BGP"; internal teams order
+      "a new zone". The DC team owns the fabric, the network team owns IPAM,
+      security owns the firewall rules, the peering team owns BGP.
+
+      Write the design brief.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_scope_split.py
+        weight: 1.0
+    expected_output: >-
+      A design brief that splits the estate into features ordered by data
+      dependency (fabric first), each with the artifacts to specify (schema
+      first) and a ready-to-paste specify prompt, and a data model sketch for
+      the first feature only.
+    expectations:
+      - The brief says the scope is too big for one feature and why
+      - Features are ordered by data dependency, foundation first
+      - Only the first feature is modelled in depth
+    assertions:
+      - name: scope-split-f1-only
+        check: Features F1..Fn with dependencies on earlier features only; sketch rows are F1 only
+      - name: features-artifacts
+        check: Every feature lists routable artifact types, schema first
+      - name: sketch-rows-complete
+        check: Every sketch row has identity, source of truth and owner, or an open item
+
+  - name: design-sketch-rows-complete
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: We want our campus wireless in Infrahub: access points, the
+      controllers they join, and SSIDs. Guests keep landing on the staff VLAN
+      after controller changes, and the helpdesk can't tell which SSID should
+      be where.
+
+      My answers, since I'm off for the rest of the day: access points are
+      identified by serial number, imported nightly from the controller
+      export, and the campus network team owns them. Controllers are
+      identified by hostname, Infrahub is their source of truth, campus
+      network team again. SSIDs are identified by name and their VLAN should
+      come from a pool. Who owns the SSID definitions? Honestly I don't know,
+      it's somewhere between security and the helpdesk. One access point joins
+      one controller; an SSID is broadcast by many access points.
+
+      Just fill in sensible defaults wherever I didn't know. Write the design
+      brief.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_sketch_rows_complete.py
+        weight: 1.0
+    expected_output: >-
+      A design brief whose sketch rows all have an identity, a source of
+      truth and an owner, where the unknown SSID owner is recorded as an open
+      item and referenced from the sketch instead of being invented.
+    expectations:
+      - The SSID owner is not invented, even though the user asked for defaults
+      - The open item names who might own the answer
+    assertions:
+      - name: sketch-rows-complete
+        check: Every sketch row has identity, source of truth and owner, or an open item
+      - name: open-item-referenced
+        check: The unknown owner is a sketch reference to a real open item
+      - name: decision-provenance
+        check: Every decision is tagged stated, recommended or open
+
+  - name: design-decision-provenance
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: We're modelling carrier circuits. Here is how our session went
+      yesterday, before my laptop died:
+
+      - What identifies a circuit? Me: the carrier's circuit ID.
+      - Are providers their own thing? Me: yes, providers are a separate kind.
+      - Who sets bandwidth? Me: the requester enters it.
+      - You recommended a generic for circuit endpoints so both sites and PoPs
+        can terminate a circuit, because they share an address and a code.
+        Me: yes.
+      - You recommended importing contract end dates from carriers.xlsx, which
+        has an end_date column, instead of typing them. Me: yes.
+
+      The transport team owns circuits and providers; the carrier portal is
+      the source of truth for circuit IDs. Write the design brief.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_decision_provenance.py
+        weight: 1.0
+    expected_output: >-
+      A design brief whose decision log tags the three answers the user gave
+      as stated and the two accepted recommendations as recommended, each
+      recommended row with its basis.
+    expectations:
+      - Accepted recommendations are not recorded as the user's own decisions
+      - Each recommended decision keeps the reason it was recommended
+    assertions:
+      - name: decision-provenance
+        check: Every decision is tagged stated, recommended or open; recommended rows have a basis
+      - name: both-provenances
+        check: Stated decisions and accepted recommendations are told apart
+      - name: sketch-rows-complete
+        check: Every sketch row has identity, source of truth and owner, or an open item
