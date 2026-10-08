@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "I'm in a hurry. We run a colocation business and I need it in\nInfrahub by Friday: cabinets, power feeds and cross-connects. Just give\nme the schema so I can load it. I'll answer questions later if I really\nhave to.\n\nI can't reply during this run. Write exactly the next message you would\nsend me to ./output_dir/answer.md and nothing else.",
-      "expected_output": "One question block: a single question, two to four options with their consequence in Infrahub, exactly one option marked as recommended, and a basis line with its strength. No schema YAML.",
+      "expected_output": "One question block: a single question, two to four options, exactly one option marked as recommended, and a basis line with its strength. No schema YAML.",
       "files": [],
       "expectations": [
         "The reply asks one question instead of writing a schema",
@@ -46,11 +46,12 @@
     {
       "id": 3,
       "prompt": "Model our whole estate in Infrahub in one go: the fabric of our\ntwo data centres (spines, leafs, racks), IPAM for every prefix we own,\nfirewall policy between zones, and customer BGP peering at our edge. I\nwant the full model, not a plan for a plan.\n\nAnswers up front, since I won't be around to reply: outages come from IP\nclashes, firewall rules nobody can explain, and peering sessions typed by\nhand. NetOps, the security team and the pipeline that renders configs\nuse the data. Fabric data lives in a spreadsheet, prefixes in a phpIPAM\nwe want to retire, firewall rules in the firewall manager, peering in a\nwiki page. Customers order \"IP transit with BGP\"; internal teams order\n\"a new zone\". The DC team owns the fabric, the network team owns IPAM,\nsecurity owns the firewall rules, the peering team owns BGP.\n\nWrite the design brief.",
-      "expected_output": "A design brief that splits the estate into features ordered by data dependency (fabric first), each with the artifacts to specify (schema first) and a ready-to-paste specify prompt, and a data model sketch for the first feature only.",
+      "expected_output": "A design brief that splits the estate into features, each depending only on earlier ones and listing the artifacts to specify with schema first, and a data model sketch for the first feature only.",
       "files": [],
       "expectations": [
         "The brief says the scope is too big for one feature and why",
         "Features are ordered by data dependency, foundation first",
+        "Each feature has a ready-to-paste specify prompt",
         "Only the first feature is modelled in depth"
       ],
       "assertions": [
@@ -71,7 +72,7 @@
     {
       "id": 4,
       "prompt": "We want our campus wireless in Infrahub: access points, the\ncontrollers they join, and SSIDs. Guests keep landing on the staff VLAN\nafter controller changes, and the helpdesk can't tell which SSID should\nbe where.\n\nMy answers, since I'm off for the rest of the day: access points are\nidentified by serial number, imported nightly from the controller\nexport, and the campus network team owns them. Controllers are\nidentified by hostname, Infrahub is their source of truth, campus\nnetwork team again. SSIDs are identified by name and their VLAN should\ncome from a pool. Who owns the SSID definitions? Honestly I don't know,\nit's somewhere between security and the helpdesk. One access point joins\none controller; an SSID is broadcast by many access points.\n\nJust fill in sensible defaults wherever I didn't know. Write the design\nbrief.",
-      "expected_output": "A design brief whose sketch rows all have an identity, a source of truth and an owner, where the unknown SSID owner is recorded as an open item and referenced from the sketch instead of being invented.",
+      "expected_output": "A design brief whose sketch rows all have an identity, a source of truth and an owner, where the SSID row's unknown owner references an open item instead of an invented value.",
       "files": [],
       "expectations": [
         "The SSID owner is not invented, even though the user asked for defaults",
@@ -83,8 +84,8 @@
           "check": "Every sketch row has identity, source of truth and owner, or an open item"
         },
         {
-          "name": "open-item-referenced",
-          "check": "The unknown owner is a sketch reference to a real open item"
+          "name": "unknown-owner-open",
+          "check": "The SSID row's owner references a real open item instead of an invented value"
         },
         {
           "name": "decision-provenance",
@@ -107,8 +108,8 @@
           "check": "Every decision is tagged stated, recommended or open; recommended rows have a basis"
         },
         {
-          "name": "both-provenances",
-          "check": "Stated decisions and accepted recommendations are told apart"
+          "name": "decision-tags-match",
+          "check": "The three answers are tagged stated and the two accepted recommendations recommended"
         },
         {
           "name": "sketch-rows-complete",

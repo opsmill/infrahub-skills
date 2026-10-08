@@ -8811,9 +8811,9 @@ tasks:
         run: python graders/designing-models/check_one_question_recommended.py
         weight: 1.0
     expected_output: >-
-      One question block: a single question, two to four options with their
-      consequence in Infrahub, exactly one option marked as recommended, and a
-      basis line with its strength. No schema YAML.
+      One question block: a single question, two to four options, exactly one
+      option marked as recommended, and a basis line with its strength. No
+      schema YAML.
     expectations:
       - The reply asks one question instead of writing a schema
       - One option is recommended and the reason names what it rests on
@@ -8906,13 +8906,13 @@ tasks:
         run: python graders/designing-models/check_scope_split.py
         weight: 1.0
     expected_output: >-
-      A design brief that splits the estate into features ordered by data
-      dependency (fabric first), each with the artifacts to specify (schema
-      first) and a ready-to-paste specify prompt, and a data model sketch for
-      the first feature only.
+      A design brief that splits the estate into features, each depending only
+      on earlier ones and listing the artifacts to specify with schema first,
+      and a data model sketch for the first feature only.
     expectations:
       - The brief says the scope is too big for one feature and why
       - Features are ordered by data dependency, foundation first
+      - Each feature has a ready-to-paste specify prompt
       - Only the first feature is modelled in depth
     assertions:
       - name: scope-split-f1-only
@@ -8949,16 +8949,16 @@ tasks:
         weight: 1.0
     expected_output: >-
       A design brief whose sketch rows all have an identity, a source of
-      truth and an owner, where the unknown SSID owner is recorded as an open
-      item and referenced from the sketch instead of being invented.
+      truth and an owner, where the SSID row's unknown owner references an
+      open item instead of an invented value.
     expectations:
       - The SSID owner is not invented, even though the user asked for defaults
       - The open item names who might own the answer
     assertions:
       - name: sketch-rows-complete
         check: Every sketch row has identity, source of truth and owner, or an open item
-      - name: open-item-referenced
-        check: The unknown owner is a sketch reference to a real open item
+      - name: unknown-owner-open
+        check: The SSID row's owner references a real open item instead of an invented value
       - name: decision-provenance
         check: Every decision is tagged stated, recommended or open
 
@@ -8995,7 +8995,7 @@ tasks:
     assertions:
       - name: decision-provenance
         check: Every decision is tagged stated, recommended or open; recommended rows have a basis
-      - name: both-provenances
-        check: Stated decisions and accepted recommendations are told apart
+      - name: decision-tags-match
+        check: The three answers are tagged stated and the two accepted recommendations recommended
       - name: sketch-rows-complete
         check: Every sketch row has identity, source of truth and owner, or an open item
