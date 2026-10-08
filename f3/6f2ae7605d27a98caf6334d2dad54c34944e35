@@ -1,0 +1,42 @@
+skills/infrahub-designing-models/SKILL.md
+  s_0c3f8cb947110f::t_11f36ae41e48f4 105-109
+eval.yaml
+  s_0c3f8cb947110f::t_f967858be2dd26 8920
+  s_0c3f8cb947110f::t_11f36ae41e48f4 8910-8912,8916,8922
+skills/infrahub-designing-models/rules/scope-split-before-data-layer.md
+  s_0c3f8cb947110f::t_11f36ae41e48f4 33-35,53-56,67-69,76,78-80,89,105-106
+  s_0c3f8cb947110f::t_f967858be2dd26 92
+changelog/+designing-models.added.md
+  s_0c3f8cb947110f::t_2d63292f587213 1
+evaluations/infrahub-designing-models.json
+  s_0c3f8cb947110f::t_6c61f395ec7923 49,54,60,64
+tests/graders/test_designing_models_lib.py
+  s_0c3f8cb947110f::t_f967858be2dd26 550,553,573,575,587
+  s_0c3f8cb947110f::t_88a0ce3adf9a28 97,245,335-336,355-361
+  s_0c3f8cb947110f::t_2e6a0936f78e81 288,290-293,299,301-304,354,362-363,382
+docs/docs/spec-driven-development.mdx
+  s_0c3f8cb947110f::t_11f36ae41e48f4 25
+docs/docs/skills-reference/designing-models.mdx
+  s_0c3f8cb947110f::t_11f36ae41e48f4 18,21,85,90,92-93,115,117,119
+graders/designing-models/lib.py
+  s_0c3f8cb947110f::t_11f36ae41e48f4 9-10,33-34,44-46
+  s_0c3f8cb947110f::t_2e6a0936f78e81 406,415-417,428-436,448,452,454-457,477
+skills/infrahub-designing-models/references/brief-format.md
+  s_0c3f8cb947110f::t_11f36ae41e48f4 8-11,54,56-57,72-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f36f2ae7605d27a98caf6334d2dad54c34944e35",
+  "prompts": {},
+  "sessions": {
+    "s_0c3f8cb947110f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11ce3-ed56-7d93-9863-d9b8cede510a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Benoit Kohler <benoit+claude@opsmill.com>"
+    }
+  }
+}
