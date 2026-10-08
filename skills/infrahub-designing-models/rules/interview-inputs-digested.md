@@ -13,9 +13,10 @@ the conversation, is read and appears in the brief:
 
 1. One row in the `## Inputs` table, named as the user
    named it, saying what was taken from it.
-2. Each sketch row whose identity, peers or source of
-   truth came from a file names that file in its
-   `Evidence` cell, as `file:column` or `file:element`.
+2. Each sketch row with any fact that came from a file,
+   whether identity, attributes, peers, source of truth
+   or owner, names that file in its `Evidence` cell, as
+   `file:column` or `file:element`.
    A row identified by a spreadsheet column cites that
    spreadsheet. When the identity combines facts from
    several files, such as a console server named by its

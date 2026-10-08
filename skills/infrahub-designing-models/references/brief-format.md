@@ -78,7 +78,7 @@ Below the table, give each feature a ready-to-paste
 prompt:
 
 ```markdown
-F1 prompt: `/speckit.specify Fiber plant: sites, cables and strands, as sketched in F1 of docs/designs/metro-optical/design-brief.md`
+F1 prompt: `/speckit.specify Fiber plant: sites, cables and strands, as sketched in F1 of specs/metro-optical/design-brief.md`
 ```
 
 ## Data model sketch table
@@ -87,7 +87,7 @@ F1 prompt: `/speckit.specify Fiber plant: sites, cables and strands, as sketched
 | Feature | Node kind | Identified by | Key attributes (value class) | Peers (cardinality) | Source of truth | Owner | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | F1 | LocationSite | site_code | name, country (imported) | ConsoleServer (many) | Sites sheet | Facilities team | sites.xlsx:site_code |
-| F1 | OpticalChannel | channel number | frequency (pool) | Strand (two) | Infrahub | open: O1 | answer Q5 |
+| F1 | FiberCable | cable ID | length (stated) | Strand (many) | Infrahub | open: O1 | answer Q5 |
 ```
 
 - Value classes: `stated` (the requester gives it),
@@ -119,6 +119,6 @@ F1 prompt: `/speckit.specify Fiber plant: sites, cables and strands, as sketched
 ## Open items
 
 ```markdown
-- O1: Who owns the channel plan? (owner: unknown, optical or planning team)
+- O1: Who owns cable records? (owner: unknown, field operations or planning team)
 - O2: Who approves new OOB sites? (owner: network operations)
 ```

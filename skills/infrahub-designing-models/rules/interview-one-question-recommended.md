@@ -22,8 +22,10 @@ and nothing else that asks anything:
    `(strong)`, `(medium)` or `(weak basis)`. The Basis
    line is the last line of the message.
 
-A one-line lead-in before the block is fine if it asks
-nothing. No schema YAML, ever, even when the user asks
+A lead-in before the block is fine if it asks nothing:
+one line during the interview, or the restated brief
+before the final confirmation question (SKILL.md step
+7). No schema YAML, ever, even when the user asks
 for it: the schema is written from the finished brief.
 
 ## Why it matters
@@ -60,7 +62,7 @@ guess, and every answer after it only adjusts the guess.
 - B. Audits: nobody can prove which devices have console access
 - C. Provisioning: new devices are cabled to ports already in use
 
-**Basis:** you said console access is checked by hand after every incident (medium).
+**Basis:** you said console access is checked by hand after every incident (medium)
 ```
 
 ## Incorrect
