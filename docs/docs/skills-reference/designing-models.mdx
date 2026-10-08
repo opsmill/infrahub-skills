@@ -15,10 +15,10 @@ The Model Designer works out what to model before any schema exists. It reads th
 
 ## What it produces
 
-`design-brief.md`, in `specs/<design-slug>/` when your repository uses spec-kit and in `docs/designs/<design-slug>/` otherwise. It holds:
+`design-brief.md`, in your repository's existing design-document location or `docs/designs/<design-slug>/` by default. It holds:
 
 - **Business and service**: who uses the data, the incident it prevents, what is ordered, and the service lifecycle
-- **Features**: one row per feature in build order, with the artifacts each one needs (schema, objects, generator, check, transform, menu), its dependencies, and a ready-to-paste `/speckit.specify` prompt
+- **Features**: one row per feature in build order, with the artifacts each one needs (schema, objects, generator, check, transform, menu), its dependencies, and a portable handoff for any downstream workflow
 - **Data model sketch**: for the first feature, each node kind with how it is identified, its key attributes, its peers, its source of truth, its owner, and where each fact came from
 - **Mechanisms**: whether each behavior is a computed attribute, a resource pool, a check, a transform or a generator, and why
 - **Decision log and open items**: every decision tagged as stated by you, accepted from a recommendation, or open, and every unknown with who owes the answer
@@ -82,17 +82,15 @@ You answer "A, but the route targets are ours to choose, not the customer's". Th
 
 ### The brief
 
-The request covers the VPN service and the allocation of route distinguishers and route targets, so the skill splits it into two features and models only the first in depth. An excerpt of `specs/l3vpn/design-brief.md`:
+The request covers the VPN service and the allocation of route distinguishers and route targets, so the skill splits it into two features and models only the first in depth. An excerpt of `docs/designs/l3vpn/design-brief.md`:
 
 ```markdown
 ## Features
 
-| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Spec |
+| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | VPN service | One object per ordered VPN, with its sites | L3Vpn, VpnSite | schema, objects | - | planned | |
-| F2 | RD and RT allocation | No duplicate distinguishers or targets | RD pool, RT pool | schema, objects | F1 | planned | |
-
-F1 prompt: `/speckit.specify VPN service: one L3Vpn per customer VPN and a VpnSite per site, as sketched in F1 of specs/l3vpn/design-brief.md`
+| F1 | VPN service | One object per ordered VPN, with its sites | L3Vpn, VpnSite | schema, objects | - | planned | Design and implement the L3Vpn and VpnSite model sketched below, then populate it from the customer export. |
+| F2 | RD and RT allocation | No duplicate distinguishers or targets | RD pool, RT pool | schema, objects | F1 | planned | After F1, design the RD and RT pools and populate the initial allocations using this brief's decisions. |
 
 ## Data model sketch
 
@@ -114,11 +112,11 @@ F1 prompt: `/speckit.specify VPN service: one L3Vpn per customer VPN and a VpnSi
 - O1: Who owns site records once a VPN is live? (owner: unknown, network or service desk)
 ```
 
-The next step is `/speckit.specify` with the F1 prompt. Without spec-kit, the brief would be at `docs/designs/l3vpn/design-brief.md`, and the [Schema Manager](./managing-schemas.mdx) builds the schema from it.
+The next step is to take the F1 handoff into the team's existing specification, planning or implementation workflow. If the team has no established workflow, the [Schema Manager](./managing-schemas.mdx) can implement the schema from the brief.
 
-## Using it with spec-kit
+## Using it with your workflow
 
-In a spec-kit repository, the brief's Features table gives one `/speckit.specify` prompt per feature. Run them in order: each spec then starts from a model you have already worked through, rather than one guessed from a short prompt. See [Spec-Driven Development](../spec-driven-development.mdx).
+The brief does not assume a particular framework. Paste each feature's handoff into your existing specification, planning, ticketing or implementation workflow in dependency order. For a spec-driven flow, use the handoff as the input to its Specify step. See [Spec-Driven Development](../spec-driven-development.mdx).
 
 ## Not sure this is the right skill?
 

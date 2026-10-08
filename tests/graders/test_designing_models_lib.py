@@ -94,7 +94,7 @@ def brief(
 
 
 BRIEF = "docs/designs/test/design-brief.md"
-SPEC_KIT_BRIEF = "specs/test-design/design-brief.md"
+EXISTING_BRIEF = "specs/test-design/design-brief.md"
 
 
 # --------------------------------------------------------------------------
@@ -242,7 +242,7 @@ INPUT_VARIANT_ROWS = """\
     [
         pytest.param(BRIEF, brief(inputs=INPUTS_TABLE, sketch_rows=INPUT_ROWS), None, id="compliant"),
         pytest.param(
-            SPEC_KIT_BRIEF,
+            EXISTING_BRIEF,
             brief(inputs=INPUTS_VARIANT_TABLE, sketch_rows=INPUT_VARIANT_ROWS),
             None, id="compliant-variant",
         ),
@@ -285,32 +285,23 @@ def test_inputs_digested(tmp_path: Path, rel: str, text: str, expected: str | No
 # --------------------------------------------------------------------------
 
 FEATURES = """\
-| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Spec |
+| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | DC fabric | Know what is racked where | Site, Rack, Device, Interface | schema, objects | - | planned | |
-| F2 | IPAM | Allocate prefixes without clashes | Prefix, IP pool | schema | F1 | planned | |
-| F3 | Firewall policy | Rules follow zones | Zone, Rule | schema, check, transform | F1, F2 | planned | |
-| F4 | Customer peering | Sessions per customer | Peer, Session | schema, generator | F2 | planned | |
-
-F1 prompt: `/speckit.specify DC fabric: sites, racks, devices and interfaces.`
+| F1 | DC fabric | Know what is racked where | Site, Rack, Device, Interface | schema, objects | - | planned | Design the fabric model and populate it from the rack inventory. |
+| F2 | IPAM | Allocate prefixes without clashes | Prefix, IP pool | schema | F1 | planned | After F1, design the prefix and pool model. |
+| F3 | Firewall policy | Rules follow zones | Zone, Rule | schema, check, transform | F1, F2 | planned | After F2, model zones, validate policy, and render the rules. |
+| F4 | Customer peering | Sessions per customer | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |
 """
 
 FEATURES_VARIANT = """\
 The estate splits into four features, built in this order.
 
-| Depends on | ID | Feature | Intent | Scope boundary | Status | Spec | Artifacts |
+| Depends on | ID | Feature | Intent | Scope boundary | Status | Handoff | Artifacts |
 |---|---|---|---|---|---|---|---|
-| none | `F1` | DC fabric | Know what is racked where | Site, Rack, Device | planned | | `schema` |
-| after F1 | `F2` | IPAM | Prefixes without clashes | Prefix, IP pool | planned | | Schema; Objects |
-| after F1 and F2 | `F3` | Firewall policy | Rules follow zones | Zone, Rule | planned | | check and transform |
-| F2 | `F4` | Customer peering | Sessions per customer | Peer, Session | planned | | schema -> generator |
-
-Ready-to-paste prompts:
-
-```text
-| F2 | IPAM | /speckit.specify IPAM: prefixes and pools for the fabric |
-| F3 | Firewall | /speckit.specify Firewall policy on top of F1 and F2 |
-```
+| none | `F1` | DC fabric | Know what is racked where | Site, Rack, Device | planned | Build the fabric model. | `schema` |
+| after F1 | `F2` | IPAM | Prefixes without clashes | Prefix, IP pool | planned | Add prefixes and pools after the fabric. | Schema; Objects |
+| after F1 and F2 | `F3` | Firewall policy | Rules follow zones | Zone, Rule | planned | Add policy validation and rendering after IPAM. | check and transform |
+| F2 | `F4` | Customer peering | Sessions per customer | Peer, Session | planned | Add automated peering after IPAM. | schema -> generator |
 """
 
 F1_ROWS = """\
@@ -341,8 +332,8 @@ ALL_ROWS = F1_ROWS + """\
         pytest.param(
             brief(
                 features=FEATURES.replace(
-                    "\n\nF1 prompt:",
-                    "\n| F5 | Menus | Group the new kinds in the sidebar | Menu items | menu | - | planned | |\n\nF1 prompt:",
+                    "| F4 | Customer peering | Sessions per customer | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |",
+                    "| F4 | Customer peering | Sessions per customer | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |\n| F5 | Menus | Group the new kinds in the sidebar | Menu items | menu | - | planned | Add navigation for the new kinds. |",
                 ),
                 sketch_rows=F1_ROWS,
             ),
@@ -359,6 +350,16 @@ ALL_ROWS = F1_ROWS + """\
         pytest.param(
             brief(features=FEATURES.replace("| F1, F2 | planned |", "| | planned |"), sketch_rows=F1_ROWS),
             "F3 has an empty 'Depends on'; write - when it has no prerequisite", id="near-miss-empty-depends-on",
+        ),
+        pytest.param(
+            brief(
+                features=FEATURES.replace(
+                    "| F1 | planned | After F1, design the prefix and pool model. |",
+                    "| F1 | planned | |",
+                ),
+                sketch_rows=F1_ROWS,
+            ),
+            "F2 has an empty Handoff cell", id="near-miss-empty-handoff",
         ),
         pytest.param(
             brief(features=FEATURES.replace("| F1, F2 | planned |", "| TBD | planned |"), sketch_rows=F1_ROWS),
@@ -378,7 +379,7 @@ ALL_ROWS = F1_ROWS + """\
         ),
         pytest.param(
             brief(features=FEATURES.replace("| schema, check, transform |", "| schema, python |"), sketch_rows=F1_ROWS),
-            "not artifact types the hook can route", id="near-miss-unroutable-artifact",
+            "not supported artifact types", id="near-miss-unroutable-artifact",
         ),
     ],
 )
@@ -546,10 +547,10 @@ def test_decision_provenance(tmp_path: Path, text: str, expected: str | None) ->
 
 
 def test_two_briefs_fail(tmp_path: Path) -> None:
-    """A session writes one brief; two leave the hook unable to choose."""
+    """A session writes one brief; two leave the grader unable to choose."""
     text = brief(sketch_rows=WIFI_ROWS, open_items=WIFI_OPEN)
     write(tmp_path, BRIEF, text)
-    write(tmp_path, SPEC_KIT_BRIEF, text)
+    write(tmp_path, EXISTING_BRIEF, text)
     result = run_grader("check_sketch_rows_complete.py", tmp_path)
     assert result["score"] == 0.0, result["details"]
 
@@ -569,9 +570,9 @@ def test_every_grader_has_a_task() -> None:
 
 
 SINGLE_FEATURE = """\
-| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Spec |
+| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | Campus wireless | Guests stay off staff VLANs | AccessPoint, Controller, Ssid | schema | - | planned | |
+| F1 | Campus wireless | Guests stay off staff VLANs | AccessPoint, Controller, Ssid | schema | - | planned | Design the wireless model from this brief. |
 """
 
 
@@ -583,7 +584,7 @@ SINGLE_FEATURE = """\
     ],
 )
 def test_features_table_always_present(tmp_path: Path, features: str | None, should_pass: bool) -> None:
-    """A brief with one feature still carries the table the hook reads."""
+    """A brief with one feature still carries the table downstream workflows read."""
     write(tmp_path, BRIEF, brief(features=features, sketch_rows=WIFI_ROWS, open_items=WIFI_OPEN))
     passed, message = LIB.check_features_artifacts(tmp_path)
     assert passed is should_pass, message
