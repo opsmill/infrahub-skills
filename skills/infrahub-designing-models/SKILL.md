@@ -87,10 +87,15 @@ does that from the brief.
    the answers to your next three questions. At about
    25 questions, turn the remaining gaps into open
    items.
-7. **Restate and confirm.** Restate the brief and ask
-   for an explicit yes; "sounds good" is not one. Ask
-   again, in one batch, about every accepted
-   recommendation whose basis was weak.
+7. **Restate and confirm,** only when the user can
+   reply (otherwise see "When the user cannot reply").
+   First ask again about each accepted recommendation
+   whose basis was weak, one question block per
+   message, in the layout from the one-question rule.
+   Then restate the brief and end that message with one
+   question block asking for an explicit yes, with
+   options such as `A. Yes, write the brief` and
+   `B. Change something`; "sounds good" is not a yes.
 8. **Write the brief** in the format in
    [references/brief-format.md](./references/brief-format.md).
    Before writing the sketch, read
@@ -105,9 +110,11 @@ does that from the brief.
 
 Some requests come with every answer up front, or say
 the user is away. Do not ask: take the answers as
-given, record each decision with its provenance, turn
-whatever they did not answer into an open item rather
-than a default, and write the brief. When there are no
+given, record each decision with its provenance, and
+skip step 7. Turn whatever they did not answer, and
+every recommendation they did not confirm, into an
+`open` decision with an open item rather than a
+default, and write the brief. When there are no
 answers at all, write only the next question block.
 
 ## Rule Categories
