@@ -143,6 +143,7 @@ Q_NEAR_BASIS_QUESTION = Q_COMPLIANT.replace(
     "you named cross-connects first, and billing errors are the usual reason this data gets modelled",
     "you named outages first; or is billing the bigger problem?",
 )
+Q_NEAR_UNKNOWN_LAYER = Q_COMPLIANT.replace("(business)", "(storage)")
 Q_NEAR_TWO_RECOMMENDED = Q_COMPLIANT.replace(
     "- A. Capacity planning: we sell power we do not have",
     "- A. Capacity planning: we sell power we do not have  **(Recommended)**",
@@ -183,10 +184,15 @@ nodes:
         pytest.param(Q_VARIANT, None, id="compliant-variant-medium-basis"),
         pytest.param(Q_STRONG, None, id="compliant-strong-basis"),
         pytest.param(Q_NESTED_FENCE, None, id="compliant-nested-fence"),
+        *(
+            pytest.param(Q_COMPLIANT.replace("(business)", f"({layer})"), None, id=f"compliant-layer-{layer}")
+            for layer in ("inputs", "business", "service", "scope", "data")
+        ),
         pytest.param(Q_VIOLATING, "schema YAML", id="violating-yaml"),
         pytest.param(Q_NEAR_BROKEN_YAML, "schema YAML", id="near-miss-unparseable-yaml"),
         pytest.param(Q_NEAR_SECOND_QUESTION, "a second question", id="near-miss-second-question"),
         pytest.param(Q_NEAR_BASIS_QUESTION, "a second question", id="near-miss-question-in-basis"),
+        pytest.param(Q_NEAR_UNKNOWN_LAYER, "is not one of", id="near-miss-unknown-layer"),
         pytest.param(Q_NEAR_TWO_RECOMMENDED, "found 2", id="near-miss-two-recommended"),
         pytest.param(Q_NEAR_EMPTY_BASIS, "line is empty", id="near-miss-empty-basis"),
         pytest.param(Q_NEAR_TRAILING_TEXT, "must end the message", id="near-miss-text-after-basis"),

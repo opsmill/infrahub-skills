@@ -46,6 +46,8 @@ DECISION_TAGS = {"stated", "recommended", "open"}
 # copy of the skill's prose.
 ARTIFACT_TYPES = {"schema", "objects", "generator", "check", "transform", "menu"}
 BASIS_STRENGTHS = ("(strong)", "(medium)", "(weak basis)")
+# Mirrors the layers named in rules/interview-one-question-recommended.md.
+QUESTION_LAYERS = {"inputs", "business", "service", "scope", "data"}
 # Cell values that stand in for an answer without being one. An unknown
 # value has to become an `open: O<n>` reference to a real open item.
 PLACEHOLDERS = {"", "-", "--", "?", "tbd", "tba", "todo", "unknown", "n/a",
@@ -268,6 +270,9 @@ def check_one_question_recommended(ws: Path) -> tuple[bool, str]:
     if len(q_idx) != 1:
         return False, f"expected exactly one '**Q<n> (<layer>):**' line, found {len(q_idx)}"
     q_line = _QUESTION.match(lines[q_idx[0]])
+    layer = q_line.group(2).strip().lower()
+    if layer not in QUESTION_LAYERS:
+        return False, f"question layer {layer!r} is not one of inputs, business, service, scope, data"
     if not q_line.group(3).rstrip().endswith("?"):
         return False, "the question line does not end with '?'"
 
