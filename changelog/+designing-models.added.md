@@ -1,0 +1,1 @@
+Added the infrahub-designing-models skill: an interview about the business, the service and the data that writes a design brief with a model sketch, splits a large scope into ordered features with the artifacts each needs, and recommends an answer for every question.

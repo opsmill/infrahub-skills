@@ -2,7 +2,7 @@
 title: Which skill do I use?
 ---
 
-Sixteen skills is a lot to hold in your head. You do not have to: start from whatever
+Seventeen skills is a lot to hold in your head. You do not have to: start from whatever
 you already have in front of you, and each row names the skill that takes it from there.
 
 ## Start from what you have
@@ -21,7 +21,8 @@ the stage you are at. Each skill's `infrahub-*` name is in the
 
 | You have | You want | Go to |
 | --- | --- | --- |
-| A data model in your head or on a whiteboard | Valid schema YAML | [Schema Manager](./skills-reference/managing-schemas.mdx) |
+| A problem to solve, or a model in your head or on a whiteboard | A design brief: the service, a model sketch, ordered features | [Model Designer](./skills-reference/designing-models.mdx) |
+| A design brief or a model you have already worked out | Valid schema YAML | [Schema Manager](./skills-reference/managing-schemas.mdx) |
 | A schema, and no data in it yet | Object YAML you can load | [Object Manager](./skills-reference/managing-objects.mdx) |
 | A crowded web UI sidebar | A grouped custom menu | [Menu Manager](./skills-reference/managing-menus.mdx) |
 
@@ -93,6 +94,17 @@ All three look at an existing deployment. They differ in the question they answe
 None of the three plans a move between Community and Enterprise, in either direction.
 The Upgrade Planner covers version upgrades within one edition. For an edition change, see
 [Community vs Enterprise: Migration path](https://docs.infrahub.app/overview/community-vs-enterprise#migration-path).
+
+### Model Designer, Schema Manager
+
+Sequential, not alternatives. Design first, then write the schema.
+
+| Use the Model Designer when... | Use the Schema Manager when... |
+| --- | --- |
+| You know the problem but not yet what to model | You know which node kinds, attributes and peers you need |
+| The request spans several domains and may need splitting | The change fits in one schema file or one feature |
+| You have diagrams or exports to turn into a design | You have a design brief, or a schema to change |
+| Output is a design brief with a model sketch | Output is schema YAML that loads |
 
 ### Concept Tutor, the managing skills, Data Analyzer
 

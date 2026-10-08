@@ -50,6 +50,7 @@ For targeted changes, skip the ceremony. Describe what you want and the agent ha
 - *"Add a menu section for IP address management"* — the agent uses **managing-menus** and produces the YAML with correct icon references and hierarchy.
 - *"Import this `inventory.csv` into Infrahub"* — the agent uses **importing-data**, introspects the live schema, batches every ambiguity into one interview, and loads the result on a fresh branch.
 - *"Turn the NetBox device types for Arista into object templates"* — the agent uses **converting-netbox-device-types**, runs the bundled converter against a mapping profile built from your schema, and tells you which components the schema could not hold.
+- *"We want our L3VPN service in Infrahub, where do we start?"*: the agent uses **designing-models**, reads any diagrams or exports you have, asks one question at a time with a recommended answer, and writes a design brief that **managing-schemas** turns into schema YAML.
 - *"Plan our upgrade from 1.9.2 to 1.10.0"*: the agent uses **planning-upgrades**, reads the notes of every release in between, checks each breaking change against your repository, and writes `UPGRADE_PLAN.md` without running the upgrade.
 
 This is the fastest path for well-scoped work: adding attributes, writing a check, populating objects, creating a transform. No planning step needed. It's also how most people start — install the skills, describe what you need, and iterate from there.
@@ -62,7 +63,7 @@ The SDD workflow forces the agent to reason before it builds. You write a natura
 
 A typical SDD workflow looks like:
 
-1. **Specify** — describe the feature. The agent captures requirements and selects the appropriate workflow (schema, objects, checks, generators, transforms, or menus).
+1. **Specify** — describe the feature. The agent captures requirements and selects the appropriate workflow (schema, objects, checks, generators, transforms, or menus). When the design is not settled yet, run **designing-models** first and specify one feature of its brief at a time.
 2. **Plan** — the agent creates an implementation plan and validates design artifacts against Infrahub skills.
 3. **Tasks** — the plan is broken into discrete tasks, each annotated with which skill to use.
 4. **Implement** — the agent executes each task, invoking the correct Infrahub skill for each one.
@@ -117,6 +118,7 @@ A team already running Infrahub who needs to continue extending it — adding sc
 | **teaching-concepts** | Tutor for Infrahub concepts: probes what you know, teaches through your own repo and instance, sets verified hands-on exercises, and tracks progress across sessions |
 | **converting-netbox-device-types** | Convert NetBox device-type definitions (devicetype-library / NDX) into Infrahub object templates with a bundled converter, and report what the target schema could not hold |
 | **planning-upgrades** | Plan an Infrahub upgrade one minor version at a time, checking every release's breaking changes against your repository and instance, without running the upgrade |
+| **designing-models** | Work out what to model before any schema exists: an interview about the business, the service and the data, with a recommended answer per question, that writes a design brief and splits a large scope into ordered features |
 
 Each skill lives in `skills/infrahub-<name>/` with a `SKILL.md` entry point, reference docs, examples, and modular rules. Shared references (GraphQL patterns, `.infrahub.yml` format, git integration) are in `skills/infrahub-common/`. Skills use gerund-form names following the [Agent Skills best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
 
@@ -227,7 +229,8 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 │   ├── infrahub-importing-data/    # CSV/TSV → Infrahub objects
 │   ├── infrahub-teaching-concepts/ # Guided tutor for Infrahub concepts
 │   ├── infrahub-converting-netbox-device-types/ # NetBox device types → object templates
-│   └── infrahub-planning-upgrades/ # Version-by-version upgrade plans
+│   ├── infrahub-planning-upgrades/ # Version-by-version upgrade plans
+│   └── infrahub-designing-models/ # Design interview → design brief
 ├── CLAUDE.md
 ├── README.md
 └── LICENSE                      # Apache 2.0

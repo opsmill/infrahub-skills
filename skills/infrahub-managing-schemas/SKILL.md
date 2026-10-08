@@ -1,9 +1,9 @@
 ---
 name: infrahub-managing-schemas
 description: >-
-  Creates, validates, formats, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions. Also checks the Infrahub Marketplace for an existing published schema to reuse before modelling a domain from scratch.
-  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations, modifying or extending an existing schema, changing an attribute or relationship on a node kind, debugging why a schema fails to load or a migration is rejected, checking the marketplace for an off-the-shelf schema, modeling file objects / attachments / uploads (PDFs, images, certificates, documents), formatting schema files, canonicalising schema key order, or running `infrahubctl schema format` (including as a CI gate).
-  DO NOT TRIGGER when: populating or editing object data files (use infrahub-managing-objects), writing checks/generators/transforms, querying live data, planning an Infrahub version upgrade (use infrahub-planning-upgrades).
+  Creates, validates, formats, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions. Also checks the Infrahub Marketplace for a schema to reuse.
+  TRIGGER when: turning a design into schema YAML, adding schema nodes, validating schema definitions, planning schema migrations, modifying or extending an existing schema, changing an attribute or relationship on a node kind, debugging why a schema fails to load or a migration is rejected, checking the marketplace for an off-the-shelf schema, modeling file objects / attachments / uploads (PDFs, images, certificates, documents), formatting schema files, canonicalising schema key order, or running `infrahubctl schema format` (including as a CI gate).
+  DO NOT TRIGGER when: populating or editing object data files (use infrahub-managing-objects), writing checks/generators/transforms, querying live data, planning an Infrahub version upgrade (use infrahub-planning-upgrades), no design yet (use infrahub-designing-models).
 allowed-tools:
   - Read
   - Write
@@ -141,6 +141,10 @@ Follow these steps when creating or modifying a schema:
 1. **Gather requirements** — Identify the node types,
    their attributes, and how they relate to each other.
    Ask about hierarchies, dropdowns, and display needs.
+   When the user cannot yet name the node kinds, or the
+   request spans several domains, run
+   `infrahub-designing-models` first and build from its
+   design brief.
 2. **Check the marketplace first** — Before modelling
    *any* domain from scratch, search the whole Infrahub
    Marketplace and reuse a published schema when one
