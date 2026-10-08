@@ -301,9 +301,10 @@ def check_one_question_recommended(ws: Path) -> tuple[bool, str]:
     if start < max(options):
         return False, "the '**Basis:**' line comes before the last option"
 
-    basis_lines = set(range(start, end))
+    # The Basis paragraph is scanned too: a question in the rationale is
+    # still a second question.
     for i, line in enumerate(lines):
-        if i == q_idx[0] or i in options or i in basis_lines:
+        if i == q_idx[0] or i in options:
             continue
         if _SENTENCE_QUESTION.search(line):
             return False, f"a second question outside the block: {line.strip()[:80]!r}"
