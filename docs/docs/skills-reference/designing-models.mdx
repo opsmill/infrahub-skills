@@ -1,0 +1,57 @@
+---
+title: Model Designer
+---
+
+Skill: `infrahub-designing-models`
+
+The Model Designer works out what to model before any schema exists. It reads the diagrams, spreadsheets or documents you have, then interviews you one question at a time: first why the data matters, then what is delivered or ordered, and only then the data itself. Each question comes with a recommended answer and the reason for it. The result is a design brief that the [Schema Manager](./managing-schemas.mdx) turns into schema YAML.
+
+## When to use
+
+- You know what is broken or missing, but not yet which node kinds you need
+- You have diagrams, inventory exports or a requirements document to turn into a design
+- A request spans several domains, such as a fiber plant, DWDM channels and a wavelength service, and needs to be split
+- A design brief exists and needs another feature or a changed decision
+
+## What it produces
+
+`design-brief.md`, in `specs/<design-slug>/` when your repository uses spec-kit and in `docs/designs/<design-slug>/` otherwise. It holds:
+
+- **Business and service**: who uses the data, the incident it prevents, what is ordered, and the service lifecycle
+- **Features**: one row per feature in build order, with the artifacts each one needs (schema, objects, generator, check, transform, menu), its dependencies, and a ready-to-paste `/speckit.specify` prompt
+- **Data model sketch**: for the first feature, each node kind with how it is identified, its key attributes, its peers, its source of truth, its owner, and where each fact came from
+- **Mechanisms**: whether each behavior is a computed attribute, a resource pool, a check, a transform or a generator, and why
+- **Decision log and open items**: every decision tagged as stated by you, accepted from a recommendation, or open, and every unknown with who owes the answer
+
+It writes no schema YAML.
+
+## Example prompts
+
+- "We want our L3VPN service in Infrahub. Where do we start?"
+- "Here's our sites spreadsheet and the out-of-band diagram. What should the model look like?"
+- "Model our whole optical network: fiber plant, DWDM channels and customer wavelengths"
+- "Add a peering feature to our existing design brief"
+
+## Key rules enforced
+
+- **One question at a time, with a recommendation**: each message is a single question with two to four options, one marked as recommended, and the basis for it with its strength
+- **Your files are evidence**: every file you provide is listed in the brief, and model rows built from it name it as their source
+- **Split before modelling**: a scope that covers several domains or many node kinds is split into ordered features, and only the first is modelled in depth
+- **No invented values**: a node kind's identity, source of truth or owner is either answered or recorded as an open item
+- **Provenance on every decision**: the brief separates what you decided from what you accepted on the skill's recommendation
+
+## Common mistakes it catches
+
+- Writing a schema before anyone has asked what service it models
+- A model built around devices with no service object
+- Two systems both treated as the source of truth for the same data
+- "Sensible defaults" that look decided but were never confirmed
+- A generator chosen for behavior that creates no objects
+
+## Using it with spec-kit
+
+In a spec-kit repository, the brief's Features table gives one `/speckit.specify` prompt per feature. Run them in order: each spec then starts from a model you have already worked through, rather than one guessed from a short prompt. See [Spec-Driven Development](../spec-driven-development.mdx).
+
+## Not sure this is the right skill?
+
+See [Which skill do I use?](../choosing-a-skill.mdx) for how the Model Designer differs from the Schema Manager.
