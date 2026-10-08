@@ -8879,7 +8879,7 @@ tasks:
       - name: sketch-rows-complete
         check: Every sketch row has identity, source of truth and owner, or an open item
       - name: decision-provenance
-        check: Every decision is tagged stated, recommended or open
+        check: Every decision is tagged stated, recommended or open; open decisions name an open item
 
   - name: design-scope-split
     trials: 3
@@ -8960,7 +8960,7 @@ tasks:
       - name: unknown-owner-open
         check: The SSID row's owner references a real open item instead of an invented value
       - name: decision-provenance
-        check: Every decision is tagged stated, recommended or open
+        check: Every decision is tagged stated, recommended or open; open decisions name an open item
 
   - name: design-decision-provenance
     trials: 3
@@ -8994,7 +8994,7 @@ tasks:
       - Each recommended decision keeps the reason it was recommended
     assertions:
       - name: decision-provenance
-        check: Every decision is tagged stated, recommended or open; recommended rows have a basis
+        check: Each decision is tagged stated, recommended or open; recommended has a basis; open names an open item
       - name: decision-tags-match
         check: The three answers are tagged stated and the two accepted recommendations recommended
       - name: sketch-rows-complete

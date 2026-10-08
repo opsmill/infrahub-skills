@@ -108,11 +108,17 @@ F1 prompt: `/speckit.specify Fiber plant: sites, cables and strands, as sketched
 | --- | --- | --- | --- |
 | 1 | Console ports are identified by server and port number | stated | |
 | 2 | Channel numbers come from a number pool | recommended | Pool avoids clashes; you allocate by hand today (strong) |
-| 3 | Who approves new OOB sites | open | |
+| 3 | Who approves new OOB sites | open | O2 |
 ```
+
+- `Basis` on a `recommended` row is the reason you
+  recommended it. On an `open` row it is the open item
+  that tracks the question, `O<n>`, which must be a real
+  entry in Open items.
 
 ## Open items
 
 ```markdown
 - O1: Who owns the channel plan? (owner: unknown, optical or planning team)
+- O2: Who approves new OOB sites? (owner: network operations)
 ```

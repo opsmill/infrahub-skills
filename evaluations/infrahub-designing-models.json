@@ -39,7 +39,7 @@
         },
         {
           "name": "decision-provenance",
-          "check": "Every decision is tagged stated, recommended or open"
+          "check": "Every decision is tagged stated, recommended or open; open decisions name an open item"
         }
       ]
     },
@@ -89,7 +89,7 @@
         },
         {
           "name": "decision-provenance",
-          "check": "Every decision is tagged stated, recommended or open"
+          "check": "Every decision is tagged stated, recommended or open; open decisions name an open item"
         }
       ]
     },
@@ -105,7 +105,7 @@
       "assertions": [
         {
           "name": "decision-provenance",
-          "check": "Every decision is tagged stated, recommended or open; recommended rows have a basis"
+          "check": "Each decision is tagged stated, recommended or open; recommended has a basis; open names an open item"
         },
         {
           "name": "decision-tags-match",

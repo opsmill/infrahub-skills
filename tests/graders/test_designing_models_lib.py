@@ -465,11 +465,16 @@ CIRCUIT_DECISIONS_VARIANT = """\
 |---|---|---|---|
 | 5 | Contract end dates are imported | `recommended` | [carriers.xlsx](carriers.xlsx) has an end_date column (strong) |
 | 1 | Circuits are identified by the carrier's circuit ID | Stated | |
-| 6 | Who approves new carriers | open | |
+| 6 | Who approves new carriers | open | see **o1** |
 | 3 | The requester enters bandwidth | **stated** | |
 | 4 | Endpoints use a generic | recommended | Sites and PoPs share address and code (medium) |
 | 2 | Providers are their own node kind | stated | |
 """
+
+CIRCUIT_VARIANT_OPEN = "1. **O1**: Who approves new carriers? (owner: procurement)\n"
+
+CIRCUIT_OPEN_ROW = "| 6 | How circuit IDs get into Infrahub | open | O1 |\n"
+CIRCUIT_OPEN = "- O1: How do circuit IDs get into Infrahub? (owner: transport team)\n"
 
 CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
     "| 1 | Circuits are identified by the carrier's circuit ID | stated | |",
@@ -484,18 +489,34 @@ CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
     ("text", "expected"),
     [
         pytest.param(brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS), None, id="compliant"),
-        pytest.param(brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS_VARIANT), None, id="compliant-variant"),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS_VARIANT, open_items=CIRCUIT_VARIANT_OPEN),
+            None, id="compliant-variant",
+        ),
         pytest.param(brief(sketch_rows=CIRCUIT_ROWS, decisions=None), "no '## Decision log' section", id="violating-no-log"),
         pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace("| recommended |", "| stated |")),
             "the transcript makes it 'recommended'", id="violating-all-stated",
         ),
         pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS + CIRCUIT_OPEN_ROW, open_items=CIRCUIT_OPEN),
+            None, id="compliant-open-follow-up-on-same-subject",
+        ),
+        pytest.param(
             brief(
                 sketch_rows=CIRCUIT_ROWS,
-                decisions=CIRCUIT_DECISIONS + "| 6 | How circuit IDs get into Infrahub | open | |\n",
+                decisions=CIRCUIT_DECISIONS + CIRCUIT_OPEN_ROW.replace("| O1 |", "| |"),
+                open_items=CIRCUIT_OPEN,
             ),
-            None, id="compliant-open-follow-up-on-same-subject",
+            "names no open item", id="violating-open-without-item",
+        ),
+        pytest.param(
+            brief(
+                sketch_rows=CIRCUIT_ROWS,
+                decisions=CIRCUIT_DECISIONS + CIRCUIT_OPEN_ROW.replace("| O1 |", "| O9 |"),
+                open_items=CIRCUIT_OPEN,
+            ),
+            "is not in Open items", id="near-miss-open-item-not-listed",
         ),
         pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS_SWAPPED),
