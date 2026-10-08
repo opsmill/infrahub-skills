@@ -49,9 +49,12 @@ block layout from
 - **Source of truth.** Which system is authoritative for
   this node kind? Does Infrahub write to it or read from
   it?
-- **Mechanism.** Does this behavior create new nodes?
-  Only then is it a generator; otherwise a computed
-  attribute, a check or a transform.
+- **Mechanism.** Does this behavior create or maintain
+  other nodes from a design: create them, update their
+  attributes or peers, or remove them? Then it is a
+  generator. A value derived on the same node is a
+  computed attribute, a pass or fail rule is a check,
+  and a rendered output is a transform.
 - **Hierarchy.** Is there a parent and child tree
   (region, site, rack) that queries walk?
 
@@ -64,6 +67,7 @@ user's own material gives none:
   before a custom one.
 - A resource pool before code that allocates values.
 - A computed attribute, a check or a transform before a
-  generator, unless the behavior creates nodes.
+  generator, unless the behavior creates or maintains
+  other nodes.
 - One generic before copies of the same attributes on
   several kinds.
