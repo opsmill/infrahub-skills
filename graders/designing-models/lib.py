@@ -297,7 +297,7 @@ def check_one_question_recommended(ws: Path) -> tuple[bool, str]:
     if not basis:
         return False, "the '**Basis:**' line is empty"
     if not basis.lower().endswith(BASIS_STRENGTHS):
-        return False, "the Basis does not end with (strong), (medium) or (weak basis)"
+        return False, f"the Basis does not end with (strong), (medium) or (weak basis): {basis[-80:]!r}"
     if start < max(options):
         return False, "the '**Basis:**' line comes before the last option"
 
@@ -559,8 +559,11 @@ def check_decision_tags_for(ws: Path, subjects: dict[str, tuple[re.Pattern, str]
     """Each named decision carries the tag the transcript gives it.
 
     Bound to the subject: swapping tags between a stated decision and an
-    accepted recommendation fails, although both tags still appear.
-    ``subjects`` maps a label to (pattern on the Decision cell, expected tag).
+    accepted recommendation fails, although both tags still appear. A related
+    `open` row (a follow-up question about the same subject) is allowed, as
+    the rule allows open decisions; at least one row must carry the expected
+    tag and none the swapped one. ``subjects`` maps a label to (pattern on
+    the Decision cell, expected tag).
     """
     parts, err = _brief_sections(ws)
     if parts is None:
@@ -576,9 +579,11 @@ def check_decision_tags_for(ws: Path, subjects: dict[str, tuple[re.Pattern, str]
         matching = [r for r in rows if pattern.search(_clean(r[dec_col]))]
         if not matching:
             return False, f"no decision about {label}"
-        wrong = [_clean(r[tag_col]).lower() for r in matching if _clean(r[tag_col]).lower() != tag]
-        if wrong:
-            return False, f"the decision about {label} is tagged {wrong[0]!r}; the transcript makes it {tag!r}"
+        tags = {_clean(r[tag_col]).lower() for r in matching}
+        swapped = (tags - {tag, "open"})
+        if swapped or tag not in tags:
+            found = sorted(swapped) or sorted(tags)
+            return False, f"the decision about {label} is tagged {found[0]!r}; the transcript makes it {tag!r}"
     return True, "each decision carries the provenance the transcript gives it"
 
 

@@ -18,8 +18,9 @@ and nothing else that asks anything:
    means in Infrahub.
 3. Exactly one option ends with `**(Recommended)**`.
 4. One `**Basis:**` line saying what the recommendation
-   rests on, ending with its strength: `(strong)`,
-   `(medium)` or `(weak basis)`.
+   rests on, ending with its strength, written exactly
+   `(strong)`, `(medium)` or `(weak basis)`. The Basis
+   line is the last line of the message.
 
 A one-line lead-in before the block is fine if it asks
 nothing. No schema YAML, ever, even when the user asks

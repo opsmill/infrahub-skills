@@ -449,6 +449,13 @@ CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
             "the transcript makes it 'recommended'", id="violating-all-stated",
         ),
         pytest.param(
+            brief(
+                sketch_rows=CIRCUIT_ROWS,
+                decisions=CIRCUIT_DECISIONS + "| 6 | How circuit IDs get into Infrahub | open | |\n",
+            ),
+            None, id="compliant-open-follow-up-on-same-subject",
+        ),
+        pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS_SWAPPED),
             "the transcript makes it", id="near-miss-tags-swapped",
         ),
