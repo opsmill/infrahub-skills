@@ -422,8 +422,9 @@ def check_scope_split_f1_only(ws: Path) -> tuple[bool, str]:
         deps = [int(d) for d in _FEATURE_ID.findall(_clean(row[dep_col]))]
         if position > 1 and not deps:
             return False, f"F{position} has an empty 'Depends on'"
-        if any(d >= position for d in deps):
-            return False, f"F{position} depends on a later or same feature: {deps}"
+        for d in deps:
+            if d < 1 or d >= position:
+                return False, f"F{position} depends on F{d}, which is not an earlier feature"
 
     s_headers, s_rows, err = _sketch(parts)
     if err:

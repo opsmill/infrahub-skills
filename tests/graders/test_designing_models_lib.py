@@ -351,6 +351,14 @@ ALL_ROWS = F1_ROWS + """\
             "F3 has an empty 'Depends on'", id="near-miss-empty-depends-on",
         ),
         pytest.param(
+            brief(features=FEATURES.replace("| schema | F1 |", "| schema | F0 |"), sketch_rows=F1_ROWS),
+            "F2 depends on F0, which is not an earlier feature", id="near-miss-unknown-dependency",
+        ),
+        pytest.param(
+            brief(features=FEATURES.replace("| schema | F1 |", "| schema | F3 |"), sketch_rows=F1_ROWS),
+            "F2 depends on F3, which is not an earlier feature", id="near-miss-later-dependency",
+        ),
+        pytest.param(
             brief(features=FEATURES.replace("| schema, generator |", "| generator, schema |"), sketch_rows=F1_ROWS),
             "schema must come first", id="near-miss-generator-before-schema",
         ),
