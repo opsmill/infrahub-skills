@@ -219,13 +219,10 @@ def _runs_inner_shell(piece: str) -> bool:
 
     Read from shell tokens, after quote removal, so `bash '-c' '...'` counts
     and `echo 'su x -c ...'` does not. A shell word printed by `echo` or
-    `printf` is an argument, not a command. Fails closed: a command
-    substitution always runs, and a piece that does not tokenize keeps its
-    quoted text.
+    `printf` is an argument, not a command. Fails closed: a piece that does
+    not tokenize keeps its quoted text. Substitutions are cut out before
+    this runs, by ``_split_substitutions``, and checked on their own.
     """
-    unquoted = _blank_spans(piece, "'")
-    if "$(" in unquoted or "<(" in unquoted:
-        return True
     try:
         tokens = shlex.split(piece)
     except ValueError:
@@ -241,6 +238,45 @@ def _runs_inner_shell(piece: str) -> bool:
         ):
             return True
     return False
+
+
+_SUBSTITUTION_OPEN = re.compile(r"[$<>]\(")
+
+
+def _split_substitutions(piece: str) -> tuple[str, list[str]] | None:
+    """Cut out `$(...)`, `<(...)` and `>(...)` outside single quotes.
+
+    Returns the piece with each substitution blanked, and the text each one
+    runs. A substitution runs its own text only, so quoted literals elsewhere
+    in the piece stay protected. None when the parentheses do not balance;
+    the caller then reads the piece whole, quoted text included.
+    """
+    single = [(a, b) for a, b, q in _quoted_spans(piece) or [] if q == "'"]
+    outer, inner = piece, []
+    pos = 0
+    while match := _SUBSTITUTION_OPEN.search(piece, pos):
+        if any(a < match.start() < b for a, b in single):
+            pos = match.end()
+            continue
+        depth, quote, i = 1, None, match.end()
+        while i < len(piece) and depth:
+            ch = piece[i]
+            if quote:
+                if ch == quote:
+                    quote = None
+            elif ch in "'\"":
+                quote = ch
+            elif ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            i += 1
+        if depth:
+            return None
+        inner.append(piece[match.end() : i - 1])
+        outer = outer[: match.start()] + " " * (i - match.start()) + outer[i:]
+        pos = i
+    return outer, inner
 
 
 def _blank_spans(piece: str, quotes: str) -> str:
@@ -314,12 +350,20 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
         for m in _TOKEN_FALLBACK.finditer(text)
         if not _is_negated(text, m.start())
     }
-    for start, piece in _command_pieces(text):
-        if not _PRINTS_TO_STDOUT.search(piece):
-            continue
+    pending = list(_command_pieces(text))
+    while pending:
+        start, piece = pending.pop()
         if _is_negated(text, start):
             continue
-        offenders.update(m.group(0) for m in _TOKEN_VALUE.finditer(_unquote_single(piece)))
+        split = _split_substitutions(piece)
+        if split is None:
+            outer = piece
+        else:
+            outer, inner = split
+            pending.extend((start, p) for body in inner for _, p in _command_pieces(body))
+            outer = _unquote_single(outer)
+        if _PRINTS_TO_STDOUT.search(piece):
+            offenders.update(m.group(0) for m in _TOKEN_VALUE.finditer(outer))
     if offenders:
         return False, (
             f"expansion(s) that print the token's value: {sorted(offenders)}; "
