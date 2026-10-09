@@ -91,12 +91,13 @@ files pasted into the conversation.
   specification, planning, ticketing or implementation
   workflow, together with the brief it names.
 
-## Plan map
+### Plan map
 
-A Mermaid graph right after the Features table, so a
-reader sees the build order at a glance. It is drawn
-from the table, and the table stays the source: change
-the table first, then redraw the map.
+A Mermaid graph inside the brief's `## Features`
+section, right after the table, with no heading of its
+own. A reader sees the build order at a glance. It is
+drawn from the table, and the table stays the source:
+change the table first, then redraw the map.
 
 - One node per feature, labelled with its ID, its name
   and its artifacts.
@@ -138,11 +139,12 @@ graph LR
 - A value nobody knows is written `open: O<n>`, pointing
   at a real entry in Open items.
 
-## Model map
+### Model map
 
-A Mermaid graph right after the sketch table. Like the
-plan map, it is drawn from the table and the table stays
-the source.
+A Mermaid graph inside the brief's `## Data model
+sketch` section, right after the table, with no heading
+of its own. Like the plan map, it is drawn from the
+table and the table stays the source.
 
 - One node per node kind in the sketch, labelled with
   the node kind.
