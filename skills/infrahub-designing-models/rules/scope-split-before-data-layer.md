@@ -31,8 +31,8 @@ The brief then shows the split in its shape:
    `F2`, ... in build order. Each row's `Depends on`
    names the earlier features it needs, or `-` when it
    needs none, and never a later or unknown ID. Its
-   `Handoff` is a self-contained description that can
-   enter any downstream workflow.
+   `Handoff` names the brief and the feature ID and
+   can enter any downstream workflow.
 2. Every row lists its `Artifacts` from `schema`,
    `objects`, `generator`, `check`, `transform`, `menu`,
    with `schema` first when listed.
@@ -50,9 +50,9 @@ A request like "model the whole optical network in one go" yields
 a spec too big to review and a model nobody has thought
 through past its first domain. The data questions for
 later features are worth asking only once F1 is built,
-because building F1 changes their answers. A portable
-handoff for each feature lets the user preserve that
-order in whichever specification, planning, ticketing or
+because building F1 changes their answers. A handoff for
+each feature, naming the brief it comes from, lets the
+user preserve that order in whichever specification, planning, ticketing or
 implementation workflow they already use.
 
 ## How to apply
@@ -64,9 +64,10 @@ implementation workflow they already use.
   Give later features an intent, a scope boundary naming
   their node kinds, their artifacts and their open
   items.
-- Write one self-contained `Handoff` per feature. State
-  the outcome, scope, artifacts and dependencies without
-  assuming a particular command or workflow framework.
+- Write one `Handoff` per feature. State the outcome,
+  scope, artifacts and dependencies, and name the
+  brief's path and the feature ID, without assuming a
+  particular command or workflow framework.
 - Table format:
   [../references/brief-format.md](../references/brief-format.md).
 
@@ -75,9 +76,9 @@ implementation workflow they already use.
 ```markdown
 | ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | Fiber plant | Know which strand runs where | Site, FiberCable, Strand | schema, objects | - | planned | Design and implement the fiber plant model sketched below, then populate its initial objects. |
-| F2 | DWDM channels | Allocate channels without clashes | OpticalChannel, channel pool | schema | F1 | planned | After F1, design the channel model and allocation pool using the decisions and open items in this brief. |
-| F3 | Wavelength service | One service per customer wavelength | WavelengthService | schema, generator | F2 | planned | After F2, design the service model and automate service creation from the channel pool. |
+| F1 | Fiber plant | Know which strand runs where | Site, FiberCable, Strand | schema, objects | - | planned | Design and implement the fiber plant model, then populate its initial objects, as designed in F1 of docs/designs/metro-optical/design-brief.md. |
+| F2 | DWDM channels | Allocate channels without clashes | OpticalChannel, channel pool | schema | F1 | planned | After F1, design the channel model and allocation pool, as designed in F2 of docs/designs/metro-optical/design-brief.md. |
+| F3 | Wavelength service | One service per customer wavelength | WavelengthService | schema, generator | F2 | planned | After F2, design the service model and automate service creation from the channel pool, as designed in F3 of docs/designs/metro-optical/design-brief.md. |
 ```
 
 ## Incorrect

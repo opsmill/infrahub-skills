@@ -55,8 +55,8 @@ files pasted into the conversation.
 ```markdown
 | ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | Fiber plant | Know which strand runs where | Site, FiberCable, Strand | schema, objects | - | planned | Design and implement the fiber plant model sketched below, then populate its initial objects. |
-| F2 | DWDM channels | Allocate channels without clashes | OpticalChannel, channel pool | schema | F1 | planned | After F1, design the channel model and allocation pool using the decisions and open items in this brief. |
+| F1 | Fiber plant | Know which strand runs where | Site, FiberCable, Strand | schema, objects | - | planned | Design and implement the fiber plant model, then populate its initial objects, as designed in F1 of docs/designs/metro-optical/design-brief.md. |
+| F2 | DWDM channels | Allocate channels without clashes | OpticalChannel, channel pool | schema | F1 | planned | After F1, design the channel model and allocation pool, as designed in F2 of docs/designs/metro-optical/design-brief.md. |
 ```
 
 - `ID` is `F1`, `F2`, ... in build order. An ID never
@@ -83,11 +83,13 @@ files pasted into the conversation.
   feature can be independent; write `-` rather than a
   dependency it does not have.
 - `Status` starts as `planned`.
-- `Handoff` is a self-contained description of the
-  outcome, scope, artifacts and dependencies. It does
-  not name a framework command. The user can paste it
-  into their existing specification, planning,
-  ticketing or implementation workflow.
+- `Handoff` states the outcome, scope, artifacts and
+  dependencies, and names the brief's path and the
+  feature ID, so the downstream workflow reads the
+  details from the brief. It does not name a framework
+  command. The user can paste it into their existing
+  specification, planning, ticketing or implementation
+  workflow, together with the brief it names.
 
 ## Plan map
 
