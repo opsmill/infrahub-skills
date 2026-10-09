@@ -1,38 +1,33 @@
 ---
-# Mapping profile for the OpsMill schema-library **v2** DCIM schema, covering
-# NetBox device types AND module types.
+# Mapping profile for the OpsMill schema-library DCIM schema, covering NetBox
+# device types AND module types, with each module type's ports carried as
+# DcimModulePort declarations on a module template.
 #
-# Schema prerequisites, all on schema-library main:
+# It is schema-library-modules.yml plus the module template. Use it when the
+# bundled materialize_module_ports generator should create the real device
+# interfaces once a module is installed; see ../../generators-module-ports.md.
 #
-#   base/dcim.yml                              DcimDevice carries
-#                                              generate_template: true
-#   extensions/device_module/device_module.yml DcimModuleBay, DcimModule,
-#                                              DcimModuleType (concrete nodes)
+# Schema prerequisites, in load order:
 #
-# Three fields below depend on schema-library #76 (merged 2026-09-09), so a
-# schema-library checkout from before then needs the `label` line dropped
-# from module-bays and the `weight` line from module_type, and `position`
-# from module-bays too (or retyped to Text in the schema):
+#   base/dcim.yml
+#   extensions/device_module/device_module.yml
+#   extensions/module_port/module_port.yml     DcimModulePort, and the `ports`
+#                                              Component on DcimGenericModule
+#   generate_template: true on DcimModule      not in schema-library; see
+#                                              ../../extending-your-schema.md
+#                                              § Carrying the ports too
 #
-#   DcimModuleBay.position   Text since #76. Before it, Number with
-#                            min_value: 1, which rejects the free-form
-#                            positions NetBox uses (`F1`, `PSU-1`, `'0'` — 15
-#                            of the DCS-7508N's 24 bays) at load, not at
-#                            conversion.
-#   DcimModuleBay.bay_label  added by #76
-#   DcimGenericModuleType.weight_grams  added by #76
+# Port names keep NetBox's {module} token. It cannot be resolved at conversion
+# time, because a template is not bound to a bay; the generator resolves it
+# from the bay a module is installed in. Do not set position_placeholder with
+# this profile: it would write one fixed position into every module.
 #
-# What converts:
-#
-#   device types  -> DcimDeviceType + TemplateDcimDevice (+ interfaces, bays)
-#   module types  -> DcimModuleType records
-#
-# Module ports are NOT converted here; they are reported as skipped. To carry
-# them, use schema-library-module-ports.yml, which emits module templates with
-# their ports as DcimModulePort declarations for the bundled generator to
-# resolve. See ../../generators-module-ports.md.
+# Verified against Infrahub 1.11.4 and schema-library 5dd97b2: the templates
+# load, a module created from one carries its port declarations, and the
+# generator turns the interface ports into device interfaces. Console ports
+# need a console interface kind in the schema; power ports stay declarations.
 version: 1
-name: schema-library-modules
+name: schema-library-module-ports
 
 manufacturer:
   kind: OrganizationManufacturer
@@ -127,6 +122,44 @@ module_type:
       target: weight_grams
       transform: weight_g
 
-  # No module template: schema-library's DcimModule does not set
-  # generate_template, so TemplateDcimModule does not exist. See
-  # schema-library-module-ports.yml for the profile that adds one.
+  template:
+    kind: TemplateDcimModule
+    template_name: "mod-{model}"
+    module_type_relationship: module_type
+  # Three NetBox lists share the module's one `ports` relationship and are
+  # told apart by `category`, which the generator routes on. Each list gets
+  # its own template_name prefix so their names cannot collide.
+  components:
+    interfaces:
+      kind: TemplateDcimModulePort
+      relationship: ports
+      template_name: "{template_name}__{name}"
+      fields:
+        name: name
+        type: port_type
+        mgmt_only:
+          target: mgmt_only
+          transform: boolean
+      defaults:
+        category: interface
+    console-ports:
+      kind: TemplateDcimModulePort
+      relationship: ports
+      template_name: "{template_name}__console__{name}"
+      fields:
+        name: name
+        type: port_type
+      defaults:
+        category: console
+    power-ports:
+      kind: TemplateDcimModulePort
+      relationship: ports
+      template_name: "{template_name}__power__{name}"
+      fields:
+        name: name
+        type: port_type
+        maximum_draw:
+          target: maximum_draw
+          transform: number
+      defaults:
+        category: power

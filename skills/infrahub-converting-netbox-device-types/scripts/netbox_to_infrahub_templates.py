@@ -53,6 +53,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import re
 import string
 import sys
 from dataclasses import dataclass, field
@@ -84,6 +85,13 @@ NETBOX_COMPONENT_LISTS: tuple[str, ...] = (
     "device-bays",
     "inventory-items",
 )
+
+#: Library keys that are neither a component list nor a scalar field. They
+#: are structural rather than convertible — `port-mappings` wires front ports
+#: to rear ports, which no Infrahub schema here models — but they still have
+#: to be named, or a file carrying one is silently ignored rather than
+#: reported as skipped.
+NETBOX_OTHER_LISTS: tuple[str, ...] = ("port-mappings",)
 
 #: Every top-level scalar field a NetBox device-type file may declare.
 NETBOX_TOP_LEVEL_FIELDS: tuple[str, ...] = (
@@ -130,7 +138,7 @@ DEVICE_TYPES = "device-types"
 MODULE_TYPES = "module-types"
 
 #: Token NetBox substitutes with the bay position when a module is
-#: installed. It appears in 93.9% of published module-type component names
+#: installed. It appears in 94.8% of published module-type component names
 #: and cannot be resolved at template time, because a template is not bound
 #: to a bay.
 MODULE_POSITION_TOKEN = "{module}"
@@ -237,9 +245,9 @@ class ModuleTarget:
     """How NetBox module types map onto Infrahub kinds.
 
     Structurally the same split as device types: a type object carrying the
-    model facts, and optionally a template carrying the components. Most
-    schemas can only do the first — the stock schema-library module type
-    has no component relationships — so the template half is optional.
+    model facts, and optionally a template carrying the components. Many
+    schemas can only do the first — stock schema-library's DcimModule
+    generates no module template — so the template half is optional.
 
     Args:
         kind: Concrete Infrahub kind for the module type object.
@@ -507,7 +515,7 @@ def load_profile(path: Path) -> Profile:
         if not section.get(key):
             raise ConversionError(f"Mapping profile: missing required key '{key}'")
 
-    return Profile(
+    profile = Profile(
         name=str(root.get("name", path.stem)),
         manufacturer_kind=manufacturer["kind"],
         manufacturer_name_field=manufacturer["name_field"],
@@ -524,6 +532,34 @@ def load_profile(path: Path) -> Profile:
         components=_parse_components(root.get("components")),
         modules=_parse_module_target(root.get("module_type")),
     )
+    _refuse_placeholder_kinds(profile)
+    return profile
+
+
+#: An Infrahub kind is a namespace and a name run together, letters and digits.
+KIND_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9]*")
+
+
+def _refuse_placeholder_kinds(profile: Profile) -> None:
+    """Refuse a profile whose kinds are not real Infrahub kind names.
+
+    ``_template.yml`` ships with ``<DeviceTypeKind>`` and
+    ``Template<DeviceKind>`` for the reader to fill in. Converted unedited,
+    those went into every output file verbatim and the conversion exited 0,
+    leaving the failure for load time.
+    """
+    kinds = [profile.manufacturer_kind, profile.device_type_kind, profile.template_kind]
+    kinds += [component.kind for component in profile.components]
+    if profile.modules is not None:
+        kinds += [profile.modules.kind, profile.modules.template_kind or ""]
+        kinds += [component.kind for component in profile.modules.components]
+    bad = sorted({kind for kind in kinds if kind and not KIND_PATTERN.fullmatch(kind)})
+    if bad:
+        raise ConversionError(
+            f"Mapping profile {profile.name!r}: {', '.join(map(repr, bad))} "
+            "are placeholders, not Infrahub kinds. Replace each with the kind "
+            "from your schema."
+        )
 
 
 # --------------------------------------------------------------------------
@@ -598,8 +634,9 @@ def iter_input_files(paths: list[str]) -> list[Path]:
     """Expand CLI inputs into a sorted, de-duplicated list of YAML files.
 
     Directories are walked recursively; glob patterns are expanded. Files
-    whose suffix is not ``.yaml``/``.yml`` are ignored when they arrive via
-    a directory walk, and rejected when named explicitly.
+    whose suffix is not ``.yaml``/``.yml``, and hidden files or directories,
+    are ignored when they arrive via a directory walk; a non-YAML file named
+    explicitly is rejected.
 
     Args:
         paths: Raw file, directory, or glob arguments from the CLI.
@@ -614,8 +651,15 @@ def iter_input_files(paths: list[str]) -> list[Path]:
     for raw in paths:
         candidate = Path(raw)
         if candidate.is_dir():
+            # Hidden files and directories are tooling, never definitions: a
+            # clone root carries .markdownlint.yaml and .github/*.yml.
             for suffix in ("*.yaml", "*.yml"):
-                found.update(p for p in candidate.rglob(suffix) if p.is_file())
+                found.update(
+                    p
+                    for p in candidate.rglob(suffix)
+                    if p.is_file()
+                    and not any(part.startswith(".") for part in p.relative_to(candidate).parts)
+                )
         elif candidate.is_file():
             found.add(candidate)
         else:
@@ -704,6 +748,13 @@ def _to_number(value: Any) -> tuple[Any, str | None]:
     return rounded, (f"{number} rounded to {rounded} — Infrahub Number attributes hold integers")
 
 
+#: Marks the weight note for hardware too light for the target unit, so the
+#: report summary can count those apart from ordinary rounding. It has to be
+#: weight-specific: a Number field's note ("0.2 rounded to 0") would match a
+#: bare "rounded to 0" and be counted as a zero weight.
+ZERO_WEIGHT_NOTE = "too light to survive integer"
+
+
 def _to_weight(value: Any, unit: Any, target_unit: str) -> tuple[Any, str | None]:
     """Convert a NetBox weight to an integer in ``target_unit``.
 
@@ -726,8 +777,8 @@ def _to_weight(value: Any, unit: Any, target_unit: str) -> tuple[Any, str | None
 
     if result == 0 and scaled > 0:
         return result, (
-            f"weight {value} {unit_name} rounded to 0 {target_unit} — too light to "
-            f"survive integer {target_unit}; map it to a grams attribute instead"
+            f"weight {value} {unit_name} rounded to 0 {target_unit} — {ZERO_WEIGHT_NOTE} "
+            f"{target_unit}; map it to a grams attribute instead"
         )
     if unit_name == target_unit and float(value).is_integer():
         return result, None
@@ -1096,7 +1147,7 @@ def convert_device_type(device: DeviceType, profile: Profile) -> tuple[dict[str,
         coverage.converted[component.netbox_list] = len(children)
         _record_dropped_component_fields(component, entries, coverage)
 
-    for list_name in NETBOX_COMPONENT_LISTS:
+    for list_name in (*NETBOX_COMPONENT_LISTS, *NETBOX_OTHER_LISTS):
         if list_name in profile.mapped_lists:
             continue
         entries = device.components(list_name)
@@ -1179,12 +1230,14 @@ def convert_module_type(
             if unresolved:
                 coverage.notes.append(
                     f"{_plural(unresolved, 'component name', 'component names')} keep the "
-                    f"literal {MODULE_POSITION_TOKEN} bay-position token; set "
-                    "module_type.position_placeholder to substitute it"
+                    f"literal {MODULE_POSITION_TOKEN} bay-position token. The bundled "
+                    "materialize_module_ports generator resolves it per installed "
+                    "module; module_type.position_placeholder substitutes one fixed "
+                    "value for every bay instead"
                 )
 
     mapped = target.mapped_lists if target.emits_templates else set()
-    for list_name in NETBOX_COMPONENT_LISTS:
+    for list_name in (*NETBOX_COMPONENT_LISTS, *NETBOX_OTHER_LISTS):
         if list_name in mapped:
             continue
         entries = module.components(list_name)
@@ -1212,11 +1265,13 @@ def convert_all(devices: list[DeviceType], profile: Profile) -> Conversion:
         The aggregated conversion result.
 
     Raises:
-        ConversionError: If two definitions produce the same template name.
+        ConversionError: If two definitions produce the same template name,
+            or two device types share a model.
     """
     result = Conversion()
     seen_manufacturers: set[str] = set()
     seen_names: dict[str, Path] = {}
+    models: dict[str, list[DeviceType]] = {}
 
     modules = [device for device in devices if device.is_module]
     if modules and profile.modules is None:
@@ -1238,6 +1293,7 @@ def convert_all(devices: list[DeviceType], profile: Profile) -> Conversion:
         else:
             template, coverage = convert_device_type(entry, profile)
             _claim_name(seen_names, template["template_name"], entry.source, "template")
+            models.setdefault(entry.model, []).append(entry)
             result.device_types.append(_build_device_type(entry, profile, coverage))
             result.templates.append(template)
 
@@ -1246,8 +1302,35 @@ def convert_all(devices: list[DeviceType], profile: Profile) -> Conversion:
             result.manufacturers.append({profile.manufacturer_name_field: entry.manufacturer})
         result.coverage.append(coverage)
 
+    _refuse_shared_models(models)
     result.manufacturers.sort(key=lambda obj: obj[profile.manufacturer_name_field])
     return result
+
+
+def _refuse_shared_models(models: dict[str, list[DeviceType]]) -> None:
+    """Refuse device types a template could not tell apart.
+
+    A template names its device type by ``model``, so two device types with
+    one model leave that reference ambiguous whatever the target schema keys
+    on. NetBox only requires a model to be unique within its manufacturer,
+    and the published library has several shared across vendors. Against
+    schema-library, which keys ``DcimDeviceType`` on its name alone, the
+    second load overwrote the first and exited 0. Every collision is listed
+    at once, so fixing them is one pass rather than one run each.
+    """
+    shared = {model: entries for model, entries in models.items() if len(entries) > 1}
+    if not shared:
+        return
+    lines = [
+        f"  {model!r}: " + ", ".join(f"{e.manufacturer} ({e.source})" for e in entries)
+        for model, entries in sorted(shared.items())
+    ]
+    raise ConversionError(
+        f"{len(shared)} model name(s) are used by more than one device type. A template "
+        "names its device type by model, so these cannot be told apart, and loading "
+        "them overwrites one with another. Leave all but one of each out of the input:\n"
+        + "\n".join(lines)
+    )
 
 
 def _claim_name(seen: dict[str, Path], name: str, source: Path, label: str) -> None:
@@ -1309,23 +1392,36 @@ DOCS_RELATIONSHIPS = "https://docs.infrahub.app/schema/relationships"
 DOCS_ATTRIBUTES = "https://docs.infrahub.app/schema/nodes-and-attributes"
 
 
-def _render_gap_guidance(conversion: Conversion) -> list[str]:
+def _render_gap_guidance(conversion: Conversion, profile: Profile) -> list[str]:
     """Explain what each kind of gap means and how it is closed.
 
     A bare "Skipped console-ports" is only actionable to someone who
     already knows Infrahub generates component templates from Component
     relationships. This section states the reason and points at the fix.
+
+    Device-type and module-type skips are explained apart, because their
+    causes differ: a device list is skipped for want of a node, while a
+    module's lists are skipped when the profile has no module template to
+    hang them on. Merged, the device explanation was applied to module
+    ports, and an `interfaces` that converted on every device was listed as
+    skipped.
     """
     skipped: set[str] = set()
+    module_skipped: set[str] = set()
     dropped: set[str] = set()
     shadowed = 0
+    zeroed = 0
     for entry in conversion.coverage:
-        skipped.update(entry.skipped_lists)
+        if entry.input_kind == MODULE_TYPES:
+            module_skipped.update(entry.skipped_lists)
+        else:
+            skipped.update(entry.skipped_lists)
         for owner, keys in entry.dropped_fields.items():
             dropped.update(f"{owner}.{key}" for key in keys)
         shadowed += len(entry.shadowed)
+        zeroed += any(ZERO_WEIGHT_NOTE in note for note in entry.notes)
 
-    if not (skipped or dropped or shadowed):
+    if not (skipped or module_skipped or dropped or shadowed or zeroed):
         return []
 
     lines = ["", "## Closing these gaps", ""]
@@ -1340,6 +1436,24 @@ def _render_gap_guidance(conversion: Conversion) -> list[str]:
                 "",
             ]
         )
+    if module_skipped:
+        listed = ", ".join(f"`{n}`" for n in sorted(module_skipped))
+        has_template = profile.modules is not None and profile.modules.emits_templates
+        reason = (
+            [
+                "— the module template maps no component for these. Add each to",
+                "`module_type.components` in the profile.",
+            ]
+            if has_template
+            else [
+                "— the profile has no module template, so a module's components",
+                "have nowhere to go. `schema-library-module-ports.yml` carries",
+                "them as port declarations on a module template, once",
+                "`DcimModule` sets `generate_template: true`; see",
+                f"`{EXTENDING_GUIDE}`, Carrying the ports too.",
+            ]
+        )
+        lines.extend([f"**Skipped module-type component lists** ({listed})", *reason, ""])
     if dropped:
         shown = ", ".join(f"`{name}`" for name in sorted(dropped)[:8])
         more = "" if len(dropped) <= 8 else f" (and {len(dropped) - 8} more)"
@@ -1348,6 +1462,17 @@ def _render_gap_guidance(conversion: Conversion) -> list[str]:
                 f"**Dropped fields** ({shown}{more}) — the node exists but has no",
                 "attribute to hold the value. Each needs one attribute added, most",
                 f"simply via a schema extension. See {DOCS_ATTRIBUTES}",
+                "",
+            ]
+        )
+    if zeroed:
+        noun = "device type" if zeroed == 1 else "device types"
+        lines.extend(
+            [
+                f"**Weights rounded to 0** ({zeroed} {noun}) — too light for an integer",
+                "attribute in the profile's unit, so each now claims to weigh nothing",
+                "(0 kg with `weight_kg`). Map the weight to a grams attribute with",
+                "`weight_g` to keep them distinct.",
                 "",
             ]
         )
@@ -1408,7 +1533,7 @@ def render_report(conversion: Conversion, profile: Profile) -> str:
         lines.extend(["", "Every field of every input mapped onto the target schema."])
         return "\n".join(lines) + "\n"
 
-    lines.extend(_render_gap_guidance(conversion))
+    lines.extend(_render_gap_guidance(conversion, profile))
     lines.extend(["", "## Details", ""])
     for entry in lossy:
         lines.append(f"### `{entry.slug}`")
