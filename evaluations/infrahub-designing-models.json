@@ -1,0 +1,129 @@
+{
+  "skill_name": "infrahub-designing-models",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm in a hurry. We run a colocation business and I need it in\nInfrahub by Friday: cabinets, power feeds and cross-connects. Just give\nme the schema so I can load it. I'll answer questions later if I really\nhave to.\n\nI can't reply during this run. Write exactly the next message you would\nsend me to ./output_dir/answer.md and nothing else.",
+      "expected_output": "One question block: a single question, two to four options, exactly one option marked as recommended, and a basis line with its strength. No schema YAML.",
+      "files": [],
+      "expectations": [
+        "The reply asks one question instead of writing a schema",
+        "One option is recommended and the reason names what it rests on",
+        "The question is about why the data matters or what is ordered, not a field name"
+      ],
+      "assertions": [
+        {
+          "name": "one-question-recommended",
+          "check": "Exactly one question block with one recommended option, a basis, and no schema YAML"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "We want our backbone in Infrahub. Two files describe what we have.\n\npops.csv:\n```csv\npop_code,name,city,region\nAMS1,Amsterdam Science Park,Amsterdam,EU-West\nAMS2,Amsterdam Schiphol,Amsterdam,EU-West\nFRA1,Frankfurt Kleyer,Frankfurt,EU-Central\nFRA2,Frankfurt Hanauer,Frankfurt,EU-Central\nLON1,London Docklands,London,UK\nPAR1,Paris Aubervilliers,Paris,EU-West\n```\n\nbackbone.txt:\n```text\nEach PoP has two core routers, cr1 and cr2.\nAMS1-cr1 <-> FRA1-cr1   100G\nAMS1-cr2 <-> LON1-cr2   400G\nFRA1-cr2 <-> PAR1-cr1   100G\nLON1-cr1 <-> PAR1-cr2   100G\nAMS2-cr1 <-> FRA2-cr1   400G\n```\n\nI can't do a back-and-forth today, so here is everything you would ask:\ncapacity planning breaks because nobody knows which links are 100G and\nwhich are 400G. The backbone team and a weekly capacity report use the\ndata. Customer services and IPAM are out of scope. PoP data comes from\nthe facilities team's sheet; Infrahub becomes the source of truth for\nrouters and links. The facilities team owns PoPs and regions, the\nbackbone team owns routers and links and enters link capacity.\n\nI already explained everything above, so you can skip the files. Write\nthe design brief.",
+      "expected_output": "A design brief whose Inputs section lists pops.csv and backbone.txt with what was taken from each, and whose data model sketch cites them as evidence: PoPs identified by pop_code from pops.csv, links from backbone.txt.",
+      "files": [],
+      "expectations": [
+        "Both files are read and listed even though the user said to skip them",
+        "The PoP and region rows cite pops.csv as evidence",
+        "The router and link rows cite backbone.txt as evidence, each with a locator"
+      ],
+      "assertions": [
+        {
+          "name": "inputs-digested",
+          "check": "Every provided file is listed in Inputs; each sketch fact cites its own file with a locator"
+        },
+        {
+          "name": "sketch-rows-complete",
+          "check": "Every sketch row has identity, source of truth and owner, or an open item"
+        },
+        {
+          "name": "decision-provenance",
+          "check": "Every decision is tagged stated, recommended or open; open decisions name an open item"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Model our whole estate in Infrahub in one go: the fabric of our\ntwo data centres (spines, leafs, racks), IPAM for every prefix we own,\nfirewall policy between zones, and customer BGP peering at our edge. I\nwant the full model, not a plan for a plan.\n\nAnswers up front, since I won't be around to reply: outages come from IP\nclashes, firewall rules nobody can explain, and peering sessions typed by\nhand. NetOps, the security team and the pipeline that renders configs\nuse the data. Fabric data lives in a spreadsheet, prefixes in a phpIPAM\nwe want to retire, firewall rules in the firewall manager, peering in a\nwiki page. Customers order \"IP transit with BGP\"; internal teams order\n\"a new zone\". The DC team owns the fabric, the network team owns IPAM,\nsecurity owns the firewall rules, the peering team owns BGP.\n\nWrite the design brief.",
+      "expected_output": "A design brief that splits the estate into features, each depending only on earlier ones, listing the implementation artifacts with schema first, and carrying a workflow-neutral handoff, plus a data model sketch for the first feature only.",
+      "files": [],
+      "expectations": [
+        "The brief says the scope is too big for one feature and why",
+        "Features are ordered by data dependency, each after the features it depends on",
+        "Each feature has a handoff that names the brief and the feature ID, for any downstream workflow",
+        "Only the first feature is modelled in depth"
+      ],
+      "assertions": [
+        {
+          "name": "scope-split-f1-only",
+          "check": "Features F1..Fn have handoffs and dependencies on earlier features only; sketch rows are F1 only"
+        },
+        {
+          "name": "features-artifacts",
+          "check": "Every feature lists supported artifact types, schema first"
+        },
+        {
+          "name": "plan-map-matches",
+          "check": "The Features mermaid map has one node per feature with its artifacts and one arrow per dependency"
+        },
+        {
+          "name": "sketch-rows-complete",
+          "check": "Every sketch row has identity, source of truth and owner, or an open item"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "We want our campus wireless in Infrahub: access points, the\ncontrollers they join, and SSIDs. Guests keep landing on the staff VLAN\nafter controller changes, and the helpdesk can't tell which SSID should\nbe where.\n\nMy answers, since I'm off for the rest of the day: access points are\nidentified by serial number, imported nightly from the controller\nexport, and the campus network team owns them. Controllers are\nidentified by hostname, Infrahub is their source of truth, campus\nnetwork team again. SSIDs are identified by name and their VLAN should\ncome from a pool. Who owns the SSID definitions? Honestly I don't know,\nit's somewhere between security and the helpdesk. One access point joins\none controller; an SSID is broadcast by many access points.\n\nJust fill in sensible defaults wherever I didn't know. Write the design\nbrief.",
+      "expected_output": "A design brief whose sketch rows all have an identity, a source of truth and an owner, where the SSID row's unknown owner references an open item instead of an invented value.",
+      "files": [],
+      "expectations": [
+        "The SSID owner is not invented, even though the user asked for defaults",
+        "The open item names who might own the answer"
+      ],
+      "assertions": [
+        {
+          "name": "sketch-rows-complete",
+          "check": "Every sketch row has identity, source of truth and owner, or an open item"
+        },
+        {
+          "name": "unknown-owner-open",
+          "check": "The SSID row's owner references a real open item instead of an invented value"
+        },
+        {
+          "name": "model-map-matches",
+          "check": "The sketch mermaid map has one node per node kind and one line per peer in the Peers column"
+        },
+        {
+          "name": "decision-provenance",
+          "check": "Every decision is tagged stated, recommended or open; open decisions name an open item"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "We're modelling carrier circuits. Here is how our session went\nyesterday, before my laptop died:\n\n- What identifies a circuit? Me: the carrier's circuit ID.\n- Are providers their own thing? Me: yes, providers are a separate kind.\n- Who sets bandwidth? Me: the requester enters it.\n- You recommended a generic for circuit endpoints so both sites and PoPs\n  can terminate a circuit, because they share an address and a code.\n  Me: yes.\n- You recommended importing contract end dates from carriers.xlsx, which\n  has an end_date column, instead of typing them. Me: yes.\n\nThe transport team owns circuits and providers; the carrier portal is\nthe source of truth for circuit IDs. Write the design brief.",
+      "expected_output": "A design brief whose decision log tags the three answers the user gave as stated and the two accepted recommendations as recommended, each recommended row with its basis.",
+      "files": [],
+      "expectations": [
+        "Accepted recommendations are not recorded as the user's own decisions",
+        "Each recommended decision keeps the reason it was recommended"
+      ],
+      "assertions": [
+        {
+          "name": "decision-provenance",
+          "check": "Each decision is tagged stated, recommended or open; recommended has a basis; open names an open item"
+        },
+        {
+          "name": "decision-tags-match",
+          "check": "The three answers are tagged stated and the two accepted recommendations recommended"
+        },
+        {
+          "name": "sketch-rows-complete",
+          "check": "Every sketch row has identity, source of truth and owner, or an open item"
+        }
+      ]
+    }
+  ]
+}

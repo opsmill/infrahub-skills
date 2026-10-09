@@ -9,8 +9,8 @@ generators, transforms, checks, and menus, ready to load into a running instance
 
 ## When you would reach for it
 
-You are modelling a new domain and the relationship identifiers have to match on both
-sides. You have a CSV export from the system Infrahub is replacing, and every column
+You know what is broken but not yet what to model. You are modelling a new domain and
+the relationship identifiers have to match on both sides. You have a CSV export from the system Infrahub is replacing, and every column
 needs a home. You inherited a repository and cannot tell which of its files still follow
 current conventions. A generator runs, produces the wrong objects, and the traceback
 points at the SDK rather than at your code. An instance stops answering and support
@@ -40,6 +40,7 @@ For full lifecycle workflows. The AI generates files, loads them with `infrahubc
 
 | Skill | What it does | Skill name |
 | ------- | ------------- | ------- |
+| [Model Designer](./skills-reference/designing-models.mdx) | Interviews you about the business, the service and the data, and writes a design brief with a model sketch and ordered features | `infrahub-designing-models` |
 | [Schema Manager](./skills-reference/managing-schemas.mdx) | Creates, validates, and modifies Infrahub schema YAML from natural language | `infrahub-managing-schemas` |
 | [Object Manager](./skills-reference/managing-objects.mdx) | Produces and updates YAML data files for infrastructure objects | `infrahub-managing-objects` |
 | [Check Manager](./skills-reference/managing-checks.mdx) | Builds and debugs Python validation checks for proposed change pipelines | `infrahub-managing-checks` |

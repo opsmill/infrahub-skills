@@ -1,0 +1,793 @@
+"""Four-fixture tests for the infrahub-designing-models task graders.
+
+Each task grader is run as a subprocess, the way skillgrade runs it, against
+four hand-written workspaces: compliant, a compliant variant shaped the way
+the check's parsing is vulnerable to, violating, and a violating near miss
+that carries the check's tokens bound to the wrong subject. Compliant cases
+score 1.0. Every violating case scores below 1.0 *and* names the assertion it
+was built to break, so a fixture failing for some other reason is caught.
+Each allowlist value appears in at least one accepted case.
+"""
+from __future__ import annotations
+
+import importlib.util
+import json
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+import yaml
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+GRADER_DIR = REPO_ROOT / "graders" / "designing-models"
+EVAL_YAML = REPO_ROOT / "eval.yaml"
+
+# Every grader directory has a module named `lib`; load this one by path so a
+# test elsewhere that imported another skill's `lib` first cannot shadow it.
+_SPEC = importlib.util.spec_from_file_location("designing_models_lib", GRADER_DIR / "lib.py")
+LIB = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(LIB)
+
+
+def run_grader(script: str, workspace: Path) -> dict:
+    proc = subprocess.run(
+        [sys.executable, str(GRADER_DIR / script), str(workspace)],
+        capture_output=True, text=True, check=True, cwd=workspace,
+    )
+    return json.loads(proc.stdout)
+
+
+def assert_outcome(result: dict, expected: str | None) -> None:
+    """None means compliant; otherwise the failure details must name `expected`."""
+    if expected is None:
+        assert result["score"] == 1.0, result["details"]
+    else:
+        assert result["score"] < 1.0, f"expected a failure naming {expected!r}"
+        assert expected in result["details"], result["details"]
+
+
+def write(ws: Path, rel: str, text: str) -> None:
+    path = ws / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+
+
+SKETCH_HEADER = (
+    "| Feature | Node kind | Identified by | Key attributes (value class) "
+    "| Peers (cardinality) | Source of truth | Owner | Evidence |\n"
+    "| --- | --- | --- | --- | --- | --- | --- | --- |\n"
+)
+
+DECISIONS = """\
+| # | Decision | Tag | Basis |
+| --- | --- | --- | --- |
+| 1 | Sites are imported from the facilities sheet | stated | |
+| 2 | VLAN IDs come from a number pool | recommended | Pool avoids clashes; you allocate by hand today (strong) |
+"""
+
+
+def brief(
+    *,
+    inputs: str = "none\n",
+    sketch_rows: str,
+    features: str | None = None,
+    decisions: str | None = DECISIONS,
+    open_items: str = "none\n",
+    plan_map: str = "",
+    model_map: str = "",
+) -> str:
+    parts = [
+        "# Design brief: test\n",
+        "## Summary\n\nWhat the team needs and what is not decided.\n",
+        f"## Inputs\n\n{inputs}",
+        "## Business\n\nWho uses the data and why.\n",
+        "## Service\n\nWhat is ordered.\n",
+    ]
+    if features is not None:
+        parts.append(f"## Features\n\n{features}\n{plan_map}")
+    parts.append(f"## Data model sketch\n\n{SKETCH_HEADER}{sketch_rows}\n{model_map}")
+    parts.append("## Mechanisms\n\nNo generator: nothing creates objects.\n")
+    if decisions is not None:
+        parts.append(f"## Decision log\n\n{decisions}")
+    parts.append(f"## Open items\n\n{open_items}")
+    return "\n".join(parts)
+
+
+BRIEF = "docs/designs/test/design-brief.md"
+EXISTING_BRIEF = "specs/test-design/design-brief.md"
+
+
+# --------------------------------------------------------------------------
+# interview-one-question-recommended
+# --------------------------------------------------------------------------
+
+Q_COMPLIANT = """\
+**Q1 (business):** Which decision or report fails today because cabinet or power data is wrong?
+
+- A. Capacity planning: we sell power we do not have
+- B. Billing: cross-connects are invoiced late or not at all  **(Recommended)**
+- C. Field work: technicians patch the wrong cabinet
+
+**Basis:** you named cross-connects first, and billing errors are the usual reason this data gets modelled (weak basis).
+"""
+
+Q_VARIANT = """\
+Before I sketch anything, one question about why this data matters (background: https://docs.infrahub.app/topics/schema?tab=design).
+
+**Q1 (business):** Who stops work today when cabinet data is wrong?
+
+* A. Sales, because quotes promise space that is taken
+* B. Facilities, because power budgets are exceeded
+* C. Field engineers, because cross-connect records are stale
+* D. Billing, because cross-connects are not invoiced **(Recommended)**
+
+**Basis:** your request lists three things you sell, and
+cross-connects are the only one billed per item (medium).
+"""
+
+Q_VIOLATING = """\
+Here is a first draft:
+
+```yaml
+version: "1.0"
+nodes:
+  - name: Cabinet
+    namespace: Colo
+```
+
+Does this look right?
+"""
+
+Q_NEAR_SECOND_QUESTION = Q_COMPLIANT + "\nAlso, which system owns cabinet records today?\n"
+Q_NEAR_BASIS_QUESTION = Q_COMPLIANT.replace(
+    "you named cross-connects first, and billing errors are the usual reason this data gets modelled",
+    "you named outages first; or is billing the bigger problem?",
+)
+Q_NEAR_UNKNOWN_LAYER = Q_COMPLIANT.replace("(business)", "(storage)")
+Q_NEAR_TWO_RECOMMENDED = Q_COMPLIANT.replace(
+    "- A. Capacity planning: we sell power we do not have",
+    "- A. Capacity planning: we sell power we do not have  **(Recommended)**",
+)
+Q_NEAR_EMPTY_BASIS = Q_COMPLIANT.split("**Basis:**")[0] + "**Basis:**\n"
+Q_STRONG = Q_COMPLIANT.replace("(weak basis).", "(strong).")
+Q_NESTED_FENCE = """\
+````markdown
+How a later question will look:
+```
+**Q2 (service):** What does a customer order?
+```
+Which cabinet types do you sell?
+````
+
+""" + Q_COMPLIANT
+Q_NEAR_TRAILING_TEXT = Q_COMPLIANT + "\nReply with a letter and I will continue.\n"
+Q_NEAR_TRAILING_FENCE = Q_COMPLIANT + """
+```text
+Reply with a letter and I will continue.
+```
+"""
+Q_NEAR_BROKEN_YAML = Q_COMPLIANT + """
+Draft so you can load it today:
+
+```yaml
+nodes:
+  - name: Cabinet
+   namespace: Colo
+```
+"""
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        pytest.param(Q_COMPLIANT, None, id="compliant-weak-basis"),
+        pytest.param(Q_VARIANT, None, id="compliant-variant-medium-basis"),
+        pytest.param(Q_STRONG, None, id="compliant-strong-basis"),
+        pytest.param(Q_NESTED_FENCE, None, id="compliant-nested-fence"),
+        *(
+            pytest.param(Q_COMPLIANT.replace("(business)", f"({layer})"), None, id=f"compliant-layer-{layer}")
+            for layer in ("inputs", "business", "service", "scope", "data")
+        ),
+        pytest.param(Q_VIOLATING, "schema YAML", id="violating-yaml"),
+        pytest.param(Q_NEAR_BROKEN_YAML, "schema YAML", id="near-miss-unparseable-yaml"),
+        pytest.param(Q_NEAR_SECOND_QUESTION, "a second question", id="near-miss-second-question"),
+        pytest.param(Q_NEAR_BASIS_QUESTION, "a second question", id="near-miss-question-in-basis"),
+        pytest.param(Q_NEAR_UNKNOWN_LAYER, "is not one of", id="near-miss-unknown-layer"),
+        pytest.param(Q_NEAR_TWO_RECOMMENDED, "found 2", id="near-miss-two-recommended"),
+        pytest.param(Q_NEAR_EMPTY_BASIS, "line is empty", id="near-miss-empty-basis"),
+        pytest.param(Q_NEAR_TRAILING_TEXT, "must end the message", id="near-miss-text-after-basis"),
+        pytest.param(Q_NEAR_TRAILING_FENCE, "must end the message", id="near-miss-fence-after-basis"),
+    ],
+)
+def test_one_question_recommended(tmp_path: Path, answer: str, expected: str | None) -> None:
+    write(tmp_path, "output_dir/answer.md", answer)
+    assert_outcome(run_grader("check_one_question_recommended.py", tmp_path), expected)
+
+
+# --------------------------------------------------------------------------
+# interview-inputs-digested
+# --------------------------------------------------------------------------
+
+INPUTS_TABLE = """\
+| File | Taken from it |
+| --- | --- |
+| pops.csv | pop_code identifies each PoP; region becomes the parent |
+| backbone.txt | PoP routers and the links between PoPs |
+"""
+
+INPUT_ROWS = """\
+| F1 | LocationRegion | region | name (imported) | PoP (many) | Facilities sheet | Facilities | pops.csv:region |
+| F1 | LocationPop | pop_code | name, city (imported) | Region (one) | Facilities sheet | Facilities | pops.csv:pop_code |
+| F1 | NetworkRouter | pop_code + role | model (stated) | LocationPop (one) | Infrahub | Backbone team | pops.csv:pop_code; backbone.txt:cr1/cr2 |
+| F1 | NetworkBackboneLink | endpoints a and b | capacity (stated) | Router (two) | Infrahub | Backbone team | backbone.txt:links |
+"""
+
+INPUTS_VARIANT_TABLE = """\
+Two files came with the request.
+
+| Taken from it | File |
+|:--|:--|
+| routers per PoP and inter-PoP links | `backbone.txt` |
+| region hierarchy and the PoP code | `inputs/pops.csv` |
+"""
+
+INPUT_VARIANT_ROWS = """\
+| F1 | NetworkBackboneLink | endpoints a and b | capacity (stated) | Router (two) | Infrahub | Backbone team | `backbone.txt` (link lines) |
+| F1 | LocationPop | `pop_code` | name, city (imported) | Region (one) | Facilities sheet | Facilities | pops.csv (pop_code column) |
+| F1 | LocationRegion | `region` | name (imported) | PoP (many) | Facilities sheet | Facilities | pops.csv (region column) |
+| F1 | NetworkRouter | `pop_code` and role | model (stated) | LocationPop (one) | Infrahub | Backbone team | pops.csv (pop_code, city columns), `backbone.txt` (cr1/cr2 per PoP) |
+"""
+
+
+@pytest.mark.parametrize(
+    ("rel", "text", "expected"),
+    [
+        pytest.param(BRIEF, brief(inputs=INPUTS_TABLE, sketch_rows=INPUT_ROWS), None, id="compliant"),
+        pytest.param(
+            EXISTING_BRIEF,
+            brief(inputs=INPUTS_VARIANT_TABLE, sketch_rows=INPUT_VARIANT_ROWS),
+            None, id="compliant-variant",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(inputs=INPUTS_TABLE, sketch_rows=INPUT_ROWS.replace("| Router (two) |", "| Router (1 \\| 2) |")),
+            None, id="compliant-escaped-pipe-in-cell",
+        ),
+        pytest.param(
+            BRIEF, brief(inputs="none\n", sketch_rows=INPUT_ROWS),
+            "Taken from it", id="violating-no-inputs",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(
+                inputs=INPUTS_TABLE.replace("| backbone.txt | PoP routers and the links between PoPs |\n", ""),
+                sketch_rows=INPUT_ROWS,
+            ),
+            "does not list backbone.txt", id="near-miss-file-missing",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(inputs=INPUTS_TABLE, sketch_rows=INPUT_ROWS.replace("pops.csv:pop_code", "user")),
+            "Evidence does not name pops.csv", id="near-miss-evidence-user",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(inputs=INPUTS_TABLE, sketch_rows=INPUT_ROWS.replace("pops.csv:pop_code", "old_pops.csv:pop_code")),
+            "Evidence does not name pops.csv", id="near-miss-evidence-other-file",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(
+                inputs=INPUTS_TABLE,
+                sketch_rows=INPUT_ROWS.replace("pops.csv:pop_code; backbone.txt:cr1/cr2", "pops.csv:pop_code"),
+            ),
+            "NetworkRouter is a backbone.txt fact but its Evidence does not cite backbone.txt",
+            id="near-miss-citation-on-wrong-row",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(inputs=INPUTS_TABLE, sketch_rows=INPUT_ROWS.replace("backbone.txt:links", "backbone.txt")),
+            "Evidence for NetworkBackboneLink cites backbone.txt without a locator",
+            id="near-miss-citation-without-locator",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(
+                inputs=INPUTS_TABLE,
+                sketch_rows="".join(
+                    line + "\n" for line in INPUT_ROWS.splitlines() if "NetworkRouter" not in line
+                ).replace("NetworkBackboneLink", "NetworkHop"),
+            ),
+            "no sketch row has a node kind matching", id="violating-no-backbone-kind",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(
+                inputs=INPUTS_TABLE,
+                sketch_rows=INPUT_ROWS.replace("NetworkRouter", "CoreBox").replace("NetworkBackboneLink", "NetworkSpan"),
+            ),
+            None, id="compliant-other-kind-names",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(inputs=INPUTS_TABLE, sketch_rows=INPUT_ROWS.replace("NetworkBackboneLink", "SiteLink")),
+            None, id="compliant-overlapping-words-bind-first-match",
+        ),
+    ],
+)
+def test_inputs_digested(tmp_path: Path, rel: str, text: str, expected: str | None) -> None:
+    write(tmp_path, rel, text)
+    assert_outcome(run_grader("check_inputs_digested.py", tmp_path), expected)
+
+
+# --------------------------------------------------------------------------
+# scope-split-before-data-layer
+# --------------------------------------------------------------------------
+
+FEATURES = """\
+| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| F1 | DC fabric | Know what is racked where | Site, Rack, Device, Interface | schema, objects | - | planned | Design the fabric model and populate it from the rack inventory. |
+| F2 | IPAM | Allocate prefixes without clashes | Prefix, IP pool | schema | F1 | planned | After F1, design the prefix and pool model. |
+| F3 | Firewall policy | Rules follow zones | Zone, Rule | schema, check, transform | F1, F2 | planned | After F2, model zones, validate policy, and render the rules. |
+| F4 | Customer peering | Sessions per customer | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |
+"""
+
+FEATURES_VARIANT = """\
+The estate splits into four features, built in this order.
+
+| Depends on | ID | Feature | Intent | Scope boundary | Status | Handoff | Artifacts |
+|---|---|---|---|---|---|---|---|
+| none | `F1` | DC fabric | Know what is racked where | Site, Rack, Device | planned | Build the fabric model. | `schema` |
+| after F1 | `F2` | IPAM | Prefixes without clashes | Prefix, IP pool | planned | Add prefixes and pools after the fabric. | Schema; Objects |
+| after F1 and F2 | `F3` | Firewall policy | Rules follow zones | Zone, Rule | planned | Add policy validation and rendering after IPAM. | check and transform |
+| F2 | `F4` | Customer peering | Sessions per customer | Peer, Session | planned | Add automated peering after IPAM. | schema -> generator |
+"""
+
+PLAN_MAP = """\
+```mermaid
+graph LR
+  F1["F1 DC fabric
+  schema, objects"]
+  F2["F2 IPAM
+  schema"]
+  F3["F3 Firewall policy
+  schema, check, transform"]
+  F4["F4 Customer peering
+  schema, generator"]
+  F1 --> F2
+  F1 --> F3
+  F2 --> F3
+  F2 --> F4
+```
+"""
+
+# Other ids, a quoted label on one line, an unquoted label, a class, a
+# comment, a chained arrow and an arrow label: what the parser must read.
+PLAN_MAP_VARIANT = """\
+```mermaid
+flowchart TD
+  %% build order
+  classDef feature fill:#eef
+  a["F1 DC fabric
+  schema"]:::feature
+  b["F2 IPAM: schema, objects"]
+  c[F3 Firewall policy check transform]
+  d["F4 Customer peering
+  schema, generator"]
+  a --> b --> c
+  a --> c
+  b -->|prefixes| d
+```
+"""
+
+F1_ROWS = """\
+| F1 | LocationSite | site_code | name (stated) | Rack (many) | Infrahub | DC team | answer Q4 |
+| F1 | DcimDevice | hostname | role (stated) | Interface (many) | Infrahub | DC team | answer Q6 |
+"""
+
+F1_VARIANT_ROWS = """\
+| `F1` | LocationSite | site_code | name (stated) | Rack (many) | Infrahub | DC team | answer Q4 |
+| F1 (fabric) | DcimDevice | hostname | role (stated) | Interface (many) | Infrahub | DC team | answer Q6 |
+"""
+
+ALL_ROWS = F1_ROWS + """\
+| F1 | IpamPrefix | prefix | status (stated) | VRF (one) | Infrahub | Network team | answer Q8 |
+| F1 | SecurityRule | name | action (stated) | Zone (two) | Infrahub | Security | answer Q9 |
+"""
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        pytest.param(brief(features=FEATURES, sketch_rows=F1_ROWS, plan_map=PLAN_MAP), None, id="compliant"),
+        pytest.param(brief(features=FEATURES_VARIANT, sketch_rows=F1_VARIANT_ROWS, plan_map=PLAN_MAP_VARIANT), None, id="compliant-variant"),
+        pytest.param(
+            brief(
+                features=FEATURES.replace("| schema | F1 |", "| schema, objects, menu | F1 |"),
+                sketch_rows=F1_ROWS,
+                plan_map=PLAN_MAP.replace('F2["F2 IPAM\n  schema"]', 'F2["F2 IPAM\n  schema, objects, menu"]'),
+            ),
+            None, id="compliant-every-artifact-type",
+        ),
+        pytest.param(
+            brief(
+                features=FEATURES.replace(
+                    "| F4 | Customer peering | Sessions per customer | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |",
+                    "| F4 | Customer peering | Sessions per customer | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |\n| F5 | Menus | Group the new kinds in the sidebar | Menu items | menu | - | planned | Add navigation for the new kinds. |",
+                ),
+                sketch_rows=F1_ROWS,
+                plan_map=PLAN_MAP.replace("  F1 --> F2\n", '  F5["F5 Menus\n  menu"]\n  F1 --> F2\n'),
+            ),
+            None, id="compliant-independent-feature",
+        ),
+        pytest.param(brief(features=None, sketch_rows=ALL_ROWS), "no '## Features' section", id="violating-no-split"),
+        pytest.param(
+            brief(
+                features=FEATURES,
+                plan_map=PLAN_MAP,
+                sketch_rows=F1_ROWS + "| F2 | IpamPrefix | prefix | status (stated) | VRF (one) | Infrahub | Network team | answer Q8 |\n",
+            ),
+            "sketch has a row for 'F2'", id="near-miss-f2-sketched",
+        ),
+        pytest.param(
+            brief(features=FEATURES.replace("| F1, F2 | planned |", "| | planned |"), sketch_rows=F1_ROWS, plan_map=PLAN_MAP),
+            "F3 has an empty 'Depends on'; write - when it has no prerequisite", id="near-miss-empty-depends-on",
+        ),
+        pytest.param(
+            brief(
+                features=FEATURES.replace(
+                    "| F1 | planned | After F1, design the prefix and pool model. |",
+                    "| F1 | planned | |",
+                ),
+                sketch_rows=F1_ROWS,
+                plan_map=PLAN_MAP,
+            ),
+            "F2 has an empty Handoff cell", id="near-miss-empty-handoff",
+        ),
+        pytest.param(
+            brief(
+                features=FEATURES.replace(
+                    "| planned | After F2, model zones, validate policy, and render the rules. |",
+                    "| planned | TBD |",
+                ),
+                sketch_rows=F1_ROWS,
+                plan_map=PLAN_MAP,
+            ),
+            "F3 has a placeholder Handoff cell: 'TBD'", id="near-miss-placeholder-handoff",
+        ),
+        pytest.param(
+            brief(
+                features=FEATURES.replace(
+                    "| F1 | planned | After F1, design the prefix and pool model. |",
+                    "| F1 | planned | - |",
+                ),
+                sketch_rows=F1_ROWS,
+                plan_map=PLAN_MAP,
+            ),
+            "F2 has a placeholder Handoff cell: '-'", id="near-miss-dash-handoff",
+        ),
+        pytest.param(
+            brief(features=FEATURES.replace("| F1, F2 | planned |", "| TBD | planned |"), sketch_rows=F1_ROWS, plan_map=PLAN_MAP),
+            "F3 'Depends on' is 'TBD'", id="near-miss-depends-on-without-id",
+        ),
+        pytest.param(
+            brief(features=FEATURES.replace("| schema | F1 |", "| schema | F0 |"), sketch_rows=F1_ROWS, plan_map=PLAN_MAP),
+            "F2 depends on F0, which is not an earlier feature", id="near-miss-unknown-dependency",
+        ),
+        pytest.param(
+            brief(features=FEATURES.replace("| schema | F1 |", "| schema | F3 |"), sketch_rows=F1_ROWS, plan_map=PLAN_MAP),
+            "F2 depends on F3, which is not an earlier feature", id="near-miss-later-dependency",
+        ),
+        pytest.param(
+            brief(features=FEATURES.replace("| schema, generator |", "| generator, schema |"), sketch_rows=F1_ROWS, plan_map=PLAN_MAP),
+            "schema must come first", id="near-miss-generator-before-schema",
+        ),
+        pytest.param(
+            brief(features=FEATURES.replace("| schema, check, transform |", "| schema, python |"), sketch_rows=F1_ROWS, plan_map=PLAN_MAP),
+            "not supported artifact types", id="near-miss-unroutable-artifact",
+        ),
+    ],
+)
+def test_scope_split(tmp_path: Path, text: str, expected: str | None) -> None:
+    write(tmp_path, BRIEF, text)
+    assert_outcome(run_grader("check_scope_split.py", tmp_path), expected)
+
+
+# --------------------------------------------------------------------------
+# brief-sketch-rows-complete
+# --------------------------------------------------------------------------
+
+WIFI_ROWS = """\
+| F1 | WirelessAccessPoint | serial number | model (imported) | WirelessController (one) | Controller export | Campus network | answer Q3 |
+| F1 | WirelessSsid | name | vlan (pool) | WirelessAccessPoint (many) | Infrahub | open: O1 | answer Q5 |
+"""
+
+WIFI_MODEL_MAP = """\
+```mermaid
+graph LR
+  WirelessAccessPoint --> WirelessController
+  WirelessSsid -->|many| WirelessAccessPoint
+```
+"""
+
+# Labelled nodes, undirected lines, the other direction.
+WIFI_VARIANT_MODEL_MAP = """\
+```mermaid
+flowchart TB
+  ap["WirelessAccessPoint
+  serial number"]
+  ctl["WirelessController"]
+  ssid[WirelessSsid]
+  ap --- ctl
+  ap --- ssid
+```
+"""
+
+WIFI_OPEN = "- O1: Who owns SSID definitions? (owner: unknown)\n"
+
+WIFI_VARIANT_ROWS = """\
+| F1 | WirelessController | hostname | version (imported) | WirelessAccessPoint (many) | open: O1 | Campus network | answer Q2 |
+| F1 | WirelessSsid | name | vlan (pool) | WirelessAccessPoint (many) | Infrahub | `open: O2` | answer Q5 |
+"""
+
+WIFI_VARIANT_OPEN = """\
+1. **O1**: Is the controller or Infrahub authoritative for firmware versions? (owner: campus team)
+2. **O2**: Who owns SSID definitions? (owner: unknown)
+"""
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        pytest.param(brief(sketch_rows=WIFI_ROWS, open_items=WIFI_OPEN, model_map=WIFI_MODEL_MAP), None, id="compliant"),
+        pytest.param(brief(sketch_rows=WIFI_VARIANT_ROWS, open_items=WIFI_VARIANT_OPEN, model_map=WIFI_VARIANT_MODEL_MAP), None, id="compliant-variant"),
+        pytest.param(
+            brief(sketch_rows=WIFI_ROWS.replace("open: O1", "NetOps"), open_items="none\n", model_map=WIFI_MODEL_MAP),
+            "must reference an open item", id="violating-invented-owner",
+        ),
+        pytest.param(
+            brief(
+                sketch_rows=WIFI_ROWS.replace("open: O1", "Security").replace(
+                    "| Controller export |", "| open: O1 |"
+                ),
+                open_items=WIFI_OPEN,
+                model_map=WIFI_MODEL_MAP,
+            ),
+            "must reference an open item", id="near-miss-open-item-on-wrong-row",
+        ),
+        pytest.param(
+            brief(sketch_rows=WIFI_ROWS.replace("open: O1", "TBD"), open_items=WIFI_OPEN, model_map=WIFI_MODEL_MAP),
+            "owner is 'TBD'", id="near-miss-tbd",
+        ),
+        pytest.param(
+            brief(sketch_rows=WIFI_ROWS.replace("open: O1", "open: O3"), open_items=WIFI_OPEN, model_map=WIFI_MODEL_MAP),
+            "references O3", id="near-miss-dangling-reference",
+        ),
+    ],
+)
+def test_sketch_rows_complete(tmp_path: Path, text: str, expected: str | None) -> None:
+    write(tmp_path, BRIEF, text)
+    assert_outcome(run_grader("check_sketch_rows_complete.py", tmp_path), expected)
+
+
+# --------------------------------------------------------------------------
+# brief-decision-provenance
+# --------------------------------------------------------------------------
+
+CIRCUIT_ROWS = """\
+| F1 | CircuitCircuit | carrier circuit ID | bandwidth (stated) | Provider (one) | Carrier portal | Transport team | answer Q2 |
+"""
+
+CIRCUIT_DECISIONS = """\
+| # | Decision | Tag | Basis |
+| --- | --- | --- | --- |
+| 1 | Circuits are identified by the carrier's circuit ID | stated | |
+| 2 | Providers are a separate node kind | stated | |
+| 3 | Bandwidth is entered by the requester | stated | |
+| 4 | Circuit endpoints use a generic for sites and PoPs | recommended | Both endpoint kinds share address and code (medium) |
+| 5 | Contract end dates are imported, not typed | recommended | Your carrier export has the dates (strong) |
+"""
+
+CIRCUIT_DECISIONS_VARIANT = """\
+| # | Decision | Tag | Basis |
+|---|---|---|---|
+| 5 | Contract end dates are imported | `recommended` | [carriers.xlsx](carriers.xlsx) has an end_date column (strong) |
+| 1 | Circuits are identified by the carrier's circuit ID | Stated | |
+| 6 | Who approves new carriers | open | see **o1** |
+| 3 | The requester enters bandwidth | **stated** | |
+| 4 | Endpoints use a generic | recommended | Sites and PoPs share address and code (medium) |
+| 2 | Providers are their own node kind | stated | |
+"""
+
+CIRCUIT_VARIANT_OPEN = "1. **O1**: Who approves new carriers? (owner: procurement)\n"
+
+CIRCUIT_OPEN_ROW = "| 6 | How circuit IDs get into Infrahub | open | O1 |\n"
+CIRCUIT_OPEN = "- O1: How do circuit IDs get into Infrahub? (owner: transport team)\n"
+
+CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
+    "| 1 | Circuits are identified by the carrier's circuit ID | stated | |",
+    "| 1 | Circuits are identified by the carrier's circuit ID | recommended | Carrier IDs are unique per carrier (medium) |",
+).replace(
+    "| 4 | Circuit endpoints use a generic for sites and PoPs | recommended |",
+    "| 4 | Circuit endpoints use a generic for sites and PoPs | stated |",
+)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        pytest.param(brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS), None, id="compliant"),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS_VARIANT, open_items=CIRCUIT_VARIANT_OPEN),
+            None, id="compliant-variant",
+        ),
+        pytest.param(brief(sketch_rows=CIRCUIT_ROWS, decisions=None), "no '## Decision log' section", id="violating-no-log"),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace("| recommended |", "| stated |")),
+            "the transcript makes it 'recommended'", id="violating-all-stated",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS + CIRCUIT_OPEN_ROW, open_items=CIRCUIT_OPEN),
+            None, id="compliant-open-follow-up-on-same-subject",
+        ),
+        pytest.param(
+            brief(
+                sketch_rows=CIRCUIT_ROWS,
+                decisions=CIRCUIT_DECISIONS + CIRCUIT_OPEN_ROW.replace("| O1 |", "| |"),
+                open_items=CIRCUIT_OPEN,
+            ),
+            "names no open item", id="violating-open-without-item",
+        ),
+        pytest.param(
+            brief(
+                sketch_rows=CIRCUIT_ROWS,
+                decisions=CIRCUIT_DECISIONS + CIRCUIT_OPEN_ROW.replace("| O1 |", "| O9 |"),
+                open_items=CIRCUIT_OPEN,
+            ),
+            "is not in Open items", id="near-miss-open-item-not-listed",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS_SWAPPED),
+            "the transcript makes it", id="near-miss-tags-swapped",
+        ),
+        pytest.param(
+            brief(
+                sketch_rows=CIRCUIT_ROWS,
+                decisions=CIRCUIT_DECISIONS.replace("Your carrier export has the dates (strong)", ""),
+            ),
+            "recommended but has no basis", id="near-miss-empty-basis",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace("| 3 | Bandwidth is entered by the requester | stated |", "| 3 | Bandwidth is entered by the requester | agreed |")),
+            "has tag 'agreed'", id="near-miss-invented-tag",
+        ),
+    ],
+)
+def test_decision_provenance(tmp_path: Path, text: str, expected: str | None) -> None:
+    write(tmp_path, BRIEF, text)
+    assert_outcome(run_grader("check_decision_provenance.py", tmp_path), expected)
+
+
+# --------------------------------------------------------------------------
+# Wiring
+# --------------------------------------------------------------------------
+
+
+def test_two_briefs_fail(tmp_path: Path) -> None:
+    """A session writes one brief; two leave the grader unable to choose."""
+    text = brief(sketch_rows=WIFI_ROWS, open_items=WIFI_OPEN)
+    write(tmp_path, BRIEF, text)
+    write(tmp_path, EXISTING_BRIEF, text)
+    result = run_grader("check_sketch_rows_complete.py", tmp_path)
+    assert result["score"] == 0.0, result["details"]
+
+
+@pytest.mark.parametrize("script", sorted(p.name for p in GRADER_DIR.glob("check_*.py")))
+def test_empty_workspace_scores_zero(tmp_path: Path, script: str) -> None:
+    assert run_grader(script, tmp_path)["score"] == 0.0
+
+
+def test_every_grader_has_a_task() -> None:
+    """A task grader with no eval.yaml task is dead coverage (#147)."""
+    tasks = yaml.safe_load(EVAL_YAML.read_text())["tasks"]
+    runs = [shlex.split(g.get("run", "")) for t in tasks for g in t.get("graders", [])]
+    for script in GRADER_DIR.glob("check_*.py"):
+        wanted = f"graders/designing-models/{script.name}"
+        assert any(wanted in argv for argv in runs), script.name
+
+
+SINGLE_FEATURE = """\
+| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| F1 | Campus wireless | Guests stay off staff VLANs | AccessPoint, Controller, Ssid | schema | - | planned | Design the wireless model from this brief. |
+"""
+
+
+@pytest.mark.parametrize(
+    ("features", "should_pass"),
+    [
+        pytest.param(SINGLE_FEATURE, True, id="single-feature-table"),
+        pytest.param(None, False, id="no-features-section"),
+    ],
+)
+def test_features_table_always_present(tmp_path: Path, features: str | None, should_pass: bool) -> None:
+    """A brief with one feature still carries the table downstream workflows read."""
+    write(tmp_path, BRIEF, brief(features=features, sketch_rows=WIFI_ROWS, open_items=WIFI_OPEN))
+    passed, message = LIB.check_features_artifacts(tmp_path)
+    assert passed is should_pass, message
+
+
+# --------------------------------------------------------------------------
+# brief-maps-match-tables
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("plan_map", "expected"),
+    [
+        pytest.param(PLAN_MAP, None, id="compliant"),
+        pytest.param("", "needs exactly one mermaid map, found 0", id="violating-no-map"),
+        pytest.param(PLAN_MAP.replace("  F2 --> F4\n", ""), "arrows differ", id="near-miss-arrow-missing"),
+        pytest.param(PLAN_MAP.replace("  F2 --> F4\n", "  F2 --> F4\n  F3 --> F4\n"), "arrows differ", id="near-miss-extra-arrow"),
+        pytest.param(PLAN_MAP.replace("  F1 --> F2\n", "  F2 --> F1\n"), "arrows differ", id="near-miss-arrow-reversed"),
+        pytest.param(
+            PLAN_MAP.replace('F4["F4 Customer peering\n  schema, generator"]', 'F4["F4 Customer peering\n  schema"]'),
+            "does not show its artifacts", id="near-miss-artifact-missing",
+        ),
+        pytest.param(
+            PLAN_MAP.replace('F4["F4 Customer peering\n  schema, generator"]', 'F4["F4\n  schema, generator"]'),
+            "plan map node for F4 does not name the feature 'Customer peering'", id="near-miss-label-without-name",
+        ),
+        pytest.param(
+            PLAN_MAP.replace('F2["F2 IPAM\n  schema"]', 'F2["F2 IPAM\n  schema, objects"]'),
+            "plan map node for F2 shows artifacts ['objects'] the table does not list", id="near-miss-extra-artifact",
+        ),
+        pytest.param(PLAN_MAP.replace('  F4["F4 Customer peering\n  schema, generator"]\n', ""), "plan map", id="near-miss-feature-missing"),
+        pytest.param(PLAN_MAP.replace("  F1 --> F2\n", "  F1 => F2\n"), "cannot read", id="violating-unreadable-line"),
+    ],
+)
+def test_plan_map(tmp_path: Path, plan_map: str, expected: str | None) -> None:
+    write(tmp_path, BRIEF, brief(features=FEATURES, sketch_rows=F1_ROWS, plan_map=plan_map))
+    assert_outcome(run_grader("check_scope_split.py", tmp_path), expected)
+
+
+@pytest.mark.parametrize(
+    ("rows", "model_map", "expected"),
+    [
+        pytest.param(WIFI_ROWS, WIFI_MODEL_MAP, None, id="compliant"),
+        pytest.param(WIFI_VARIANT_ROWS, WIFI_VARIANT_MODEL_MAP, None, id="compliant-variant"),
+        pytest.param(WIFI_ROWS, "", "needs exactly one mermaid map, found 0", id="violating-no-map"),
+        pytest.param(
+            WIFI_ROWS, WIFI_MODEL_MAP.replace("  WirelessSsid -->|many| WirelessAccessPoint\n", ""),
+            "model map has no node for WirelessSsid", id="near-miss-node-missing",
+        ),
+        pytest.param(
+            WIFI_ROWS, WIFI_MODEL_MAP.replace("WirelessSsid -->|many| WirelessAccessPoint", "WirelessSsid -->|many| WirelessController"),
+            "lines differ from the Peers column", id="near-miss-line-to-wrong-peer",
+        ),
+        pytest.param(
+            WIFI_ROWS,
+            WIFI_MODEL_MAP.replace(
+                "  WirelessSsid -->|many| WirelessAccessPoint\n",
+                "  WirelessSsid -->|many| WirelessAccessPoint\n  WirelessSsid --- WirelessController\n",
+            ),
+            "lines differ from the Peers column", id="near-miss-extra-line",
+        ),
+        pytest.param(
+            WIFI_ROWS, WIFI_MODEL_MAP.replace("graph LR\n", "graph LR\n  WirelessGuest\n"),
+            "model map shows WirelessGuest, which is not in the sketch table", id="near-miss-extra-node",
+        ),
+        pytest.param(
+            WIFI_VARIANT_ROWS,
+            WIFI_VARIANT_MODEL_MAP.replace('  ctl["WirelessController"]\n', '  ctl["WirelessController"]\n  ctl2["WirelessController"]\n'),
+            "model map draws WirelessController twice", id="near-miss-duplicate-node",
+        ),
+    ],
+)
+def test_model_map(tmp_path: Path, rows: str, model_map: str, expected: str | None) -> None:
+    open_items = WIFI_VARIANT_OPEN if rows is WIFI_VARIANT_ROWS else WIFI_OPEN
+    write(tmp_path, BRIEF, brief(sketch_rows=rows, open_items=open_items, model_map=model_map))
+    assert_outcome(run_grader("check_sketch_rows_complete.py", tmp_path), expected)
