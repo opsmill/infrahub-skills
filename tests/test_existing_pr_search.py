@@ -18,6 +18,8 @@ The stub answers the way GitHub does, including the parts that caused misses:
   `merged:>=<date>` term in `--search`, ignores other search terms, and cuts
   each PR's `files` to 100 while `changedFiles` keeps the true count.
 - `gh api --paginate repos/{owner}/{repo}/pulls/<n>/files` returns every file.
+- `gh repo view` answers `opsmill/infrahub-skills`, and each closing reference
+  carries its repository, as `gh pr list` returns it.
 - `FAKE_GH_FAIL` makes every call fail, like a lost token.
 
 A search that leans on a GitHub text search, stops at one page, narrows merged
@@ -50,6 +52,10 @@ if os.environ.get("FAKE_GH_FAIL"):
     sys.exit("stub gh: HTTP 401: Bad credentials")
 args = sys.argv[1:]
 prs = json.load(open(os.environ["FAKE_GH_FIXTURES"]))
+
+if args[:2] == ["repo", "view"]:
+    print("opsmill/infrahub-skills")
+    sys.exit(0)
 
 if args[:1] == ["api"]:
     number = int(re.search(r"pulls/(\d+)/files", " ".join(args)).group(1))
@@ -89,6 +95,7 @@ def _pr(
     title: str = "chore: unrelated",
     body: str = "",
     closes: tuple[int, ...] = (),
+    closes_in: str = "opsmill/infrahub-skills",
     files: tuple[str, ...] = ("README.md",),
     merge_commit: str | None = None,
     merged_at: str = "2099-01-01T00:00:00Z",
@@ -100,7 +107,16 @@ def _pr(
         "title": title,
         "body": body,
         "headRefName": f"someone/branch-{number}",
-        "closingIssuesReferences": [{"number": n} for n in closes],
+        "closingIssuesReferences": [
+            {
+                "number": n,
+                "repository": {
+                    "owner": {"login": closes_in.split("/")[0]},
+                    "name": closes_in.split("/")[1],
+                },
+            }
+            for n in closes
+        ],
         "files": [{"path": f} for f in files],
         "mergeCommit": {"oid": merge_commit} if merge_commit else None,
         "mergedAt": merged_at if state == "MERGED" else None,
@@ -377,3 +393,16 @@ def test_search_fails_loudly_on_data_it_cannot_read(tmp_path: Path) -> None:
     broken["files"] = None
     result = _execute(tmp_path, "", "skills/infrahub-managing-checks/", extra=(broken,))
     _assert_fails_loudly(result, "a PR could not be read")
+
+
+def test_search_ignores_an_issue_closed_in_another_repository(tmp_path: Path) -> None:
+    """Closing issue 25 of another repository is not closing issue 25 here.
+
+    #211 closes `opsmill/infrahub#25` and does not mention `#25` itself. A
+    search that compares only the number lists it, and the stage stops to ask
+    about a PR unrelated to the change.
+    """
+    elsewhere = _pr(211, "OPEN", closes=(25,), closes_in="opsmill/infrahub")
+    assert _run(
+        tmp_path, "25", "skills/infrahub-managing-checks/", extra=(elsewhere,)
+    ) == {201, 204, 301, 305}

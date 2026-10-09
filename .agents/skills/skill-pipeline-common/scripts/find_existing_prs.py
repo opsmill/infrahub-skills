@@ -13,7 +13,8 @@ Usage
 A PR is printed when it is open, or merged with a merge commit that is not an
 ancestor of `HEAD`, and it does at least one of:
 
-* lists issue N among the issues it closes;
+* lists issue N of this repository among the issues it closes (a PR that
+  closes issue N of another repository does not count);
 * names `#N` as a whole token in its title or body (`#25`, not `#250`,
   `#25abc` or `#25_old`);
 * changes a file under one of the `--target` path prefixes.
@@ -95,8 +96,29 @@ def all_files(pr: dict) -> list[str]:
     return out.splitlines()
 
 
+_REPO: list[str] = []
+
+
+def this_repo() -> str:
+    """`owner/name` of the repository gh works in, looked up once."""
+    if not _REPO:
+        out = _gh("repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner")
+        _REPO.append(out.strip().lower())
+    return _REPO[0]
+
+
+def closes_here(ref: dict, issue: int) -> bool:
+    """Whether a closing reference is issue N in this repository, not N elsewhere."""
+    if ref["number"] != issue:
+        return False
+    repo = ref.get("repository")
+    if not repo:
+        return True
+    return f"{repo['owner']['login']}/{repo['name']}".lower() == this_repo()
+
+
 def names_issue(pr: dict, issue: int) -> bool:
-    if any(ref["number"] == issue for ref in pr["closingIssuesReferences"]):
+    if any(closes_here(ref, issue) for ref in pr["closingIssuesReferences"]):
         return True
     text = f"{pr.get('title') or ''} {pr.get('body') or ''}"
     return re.search(rf"(^|[^0-9A-Za-z])#{issue}([^0-9A-Za-z_]|$)", text) is not None
