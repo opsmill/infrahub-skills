@@ -47,6 +47,7 @@ The Menu Manager produces and restructures YAML menu definition files that custo
 | Setting both `kind` and `path` on one item | Uses exactly one; both together fail the whole menu file to load, and the sidebar falls back to the auto-generated menu |
 | Leaving the menu unregistered in `.infrahub.yml` | Includes the registration comment in the output file so it isn't missed |
 | Deviating from the fixed envelope | Always emits `apiVersion`, `kind: Menu`, and `spec.data`; a deviation fails to load and falls back to the auto-generated menu |
+| Deleting an entry from the file and expecting it to leave the sidebar | Leaves entries dropped from a git-synced file to the next sync, and deletes by hand only the entries a sync never loaded, including everything loaded with `infrahubctl menu load` |
 
 ## Loading it
 
@@ -55,3 +56,13 @@ Load a menu file into a running Infrahub instance:
 ```bash
 infrahubctl menu load <menu-file>
 ```
+
+The load creates and updates entries but never deletes one. An entry you take out of the file stays in the sidebar until you delete it:
+
+```bash
+infrahubctl object delete CoreMenuItem <namespace>/<name> --yes
+```
+
+This needs infrahubctl 1.20 or later. On an older client, delete the entry through GraphQL with `CoreMenuItemDelete(data: {hfid: ["<namespace>", "<name>"]})`.
+
+A menu file registered under `menus:` in a git-synced repository is different: from Infrahub 1.3, the next sync deletes the entries it loaded before and no longer finds. A read-only repository does not sync on push: after pushing, run the `InfrahubReadOnlyRepositoryImportLastCommit` mutation (Infrahub 1.8+), or set the repository's `commit` to the pushed SHA. Saving the same `ref` again does nothing.
