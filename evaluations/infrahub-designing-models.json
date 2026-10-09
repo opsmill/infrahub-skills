@@ -50,7 +50,7 @@
       "files": [],
       "expectations": [
         "The brief says the scope is too big for one feature and why",
-        "Features are ordered by data dependency, foundation first",
+        "Features are ordered by data dependency, each after the features it depends on",
         "Each feature has a handoff that names the brief and the feature ID, for any downstream workflow",
         "Only the first feature is modelled in depth"
       ],
