@@ -8920,6 +8920,8 @@ tasks:
         check: Features F1..Fn have handoffs and dependencies on earlier features only; sketch rows are F1 only
       - name: features-artifacts
         check: Every feature lists supported artifact types, schema first
+      - name: plan-map-matches
+        check: The Features mermaid map has one node per feature with its artifacts and one arrow per dependency
       - name: sketch-rows-complete
         check: Every sketch row has identity, source of truth and owner, or an open item
 
@@ -8960,6 +8962,8 @@ tasks:
         check: Every sketch row has identity, source of truth and owner, or an open item
       - name: unknown-owner-open
         check: The SSID row's owner references a real open item instead of an invented value
+      - name: model-map-matches
+        check: The sketch mermaid map has one node per node kind and one line per peer in the Peers column
       - name: decision-provenance
         check: Every decision is tagged stated, recommended or open; open decisions name an open item
 

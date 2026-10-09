@@ -19,7 +19,7 @@ from lib import check_open_item_for, run_checks  # noqa: E402
 
 SSID = re.compile(r"ssid", re.IGNORECASE)
 
-CHECK_NAMES = ["sketch-rows-complete", "unknown-owner-open", "decision-provenance"]
+CHECK_NAMES = ["sketch-rows-complete", "unknown-owner-open", "model-map-matches", "decision-provenance"]
 
 
 def main() -> None:

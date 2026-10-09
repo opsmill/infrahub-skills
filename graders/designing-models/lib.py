@@ -627,6 +627,194 @@ def check_decision_tags_for(ws: Path, subjects: dict[str, tuple[re.Pattern, str]
 
 
 # --------------------------------------------------------------------------
+# Rule: brief-maps-match-tables  (artifact: the brief)
+# --------------------------------------------------------------------------
+
+# Arrows and lines a flowchart can draw between two nodes, with an optional
+# |label|. Direction is read from the order of the two endpoints.
+_ARROW = re.compile(r"\s*(?:-{2,3}>|-{3}|={2,3}>|-\.+->|-\.+-)(?:\|[^|]*\|)?\s*")
+_NODE_DEF = re.compile(r'([A-Za-z_][\w-]*)\s*\[\s*"(.*?)"\s*\]|([A-Za-z_][\w-]*)\s*\[([^\]"]*)\]', re.S)
+_KIND = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
+
+
+def _mermaid_blocks(section: str) -> list[str]:
+    """Every fenced block in a section whose opener names mermaid."""
+    blocks: list[str] = []
+    current: list[str] | None = None
+    is_mermaid = False
+    for kind, line in _fence_marks(section):
+        if kind == "edge":
+            if current is None:
+                current = []
+                is_mermaid = line.strip().lstrip("`~").strip().lower().startswith("mermaid")
+            else:
+                if is_mermaid:
+                    blocks.append("\n".join(current))
+                current = None
+        elif kind == "inside" and current is not None:
+            current.append(line)
+    if current is not None and is_mermaid:
+        blocks.append("\n".join(current))
+    return blocks
+
+
+def parse_flowchart(block: str) -> tuple[dict[str, str], set[tuple[str, str]], str]:
+    """Nodes (id -> label) and directed edges of a Mermaid flowchart.
+
+    Labels may span lines inside quotes. Returns an error string, never a
+    partial graph, when the block is not a flowchart this parser reads, so
+    a check built on it fails closed.
+    """
+    lines = [ln for ln in block.splitlines() if ln.strip() and not ln.strip().startswith("%%")]
+    if not lines or not re.match(r"^\s*(graph|flowchart)\b", lines[0]):
+        return {}, set(), "the map is not a Mermaid graph or flowchart"
+    body = "\n".join(lines[1:])
+    nodes: dict[str, str] = {}
+
+    def keep(match: re.Match) -> str:
+        node_id = match.group(1) or match.group(3)
+        label = match.group(2) if match.group(1) else match.group(4)
+        nodes[node_id] = re.sub(r"\s+", " ", label).strip()
+        return node_id
+
+    body = _NODE_DEF.sub(keep, body)
+    edges: set[tuple[str, str]] = set()
+    for line in body.splitlines():
+        line = re.sub(r":::\w+", "", line).strip()
+        if not line or re.match(r"^(classDef|class|style|linkStyle|subgraph|end|direction)\b", line):
+            continue
+        parts = [x.strip() for x in _ARROW.split(line)]
+        if len(parts) == 1:
+            if not re.fullmatch(r"[A-Za-z_][\w-]*", parts[0]):
+                return {}, set(), f"the map has a line it cannot read: {line[:60]!r}"
+            nodes.setdefault(parts[0], parts[0])
+            continue
+        if not all(re.fullmatch(r"[A-Za-z_][\w-]*", x) for x in parts):
+            return {}, set(), f"the map has a line it cannot read: {line[:60]!r}"
+        for a, b in zip(parts, parts[1:]):
+            nodes.setdefault(a, a)
+            nodes.setdefault(b, b)
+            edges.add((a, b))
+    return nodes, edges, ""
+
+
+def _one_map(parts: dict[str, str], heading: str, what: str) -> tuple[dict[str, str], set[tuple[str, str]], str]:
+    blocks = _mermaid_blocks(parts.get(heading, ""))
+    if len(blocks) != 1:
+        return {}, set(), f"the {what} section needs exactly one mermaid map, found {len(blocks)}"
+    return parse_flowchart(blocks[0])
+
+
+def check_plan_map_matches(ws: Path) -> tuple[bool, str]:
+    """The Features map shows each feature with its artifacts and each dependency.
+
+    The table is the source; the map must agree with it exactly: one node per
+    feature, labelled with its ID and its artifacts, and one arrow from each
+    feature it depends on.
+    """
+    parts, err = _brief_sections(ws)
+    if parts is None:
+        return False, err
+    headers, rows = first_table(parts.get(FEATURES_HEADING, ""))
+    id_col = _column(headers, "id")
+    art_col = _column(headers, "artifacts")
+    dep_col = _column(headers, "depends on")
+    if not rows or None in (id_col, art_col, dep_col):
+        return False, "Features table has no 'ID', 'Artifacts' and 'Depends on' columns"
+    nodes, edges, err = _one_map(parts, FEATURES_HEADING, "Features")
+    if err:
+        return False, f"plan map: {err}"
+
+    by_feature: dict[str, str] = {}
+    for node_id, label in nodes.items():
+        ids = _FEATURE_ID.findall(label) or _FEATURE_ID.findall(node_id)
+        if len(ids) != 1:
+            return False, f"plan map node {node_id!r} names {len(ids)} feature IDs, expected one"
+        fid = f"F{ids[0]}"
+        if fid in by_feature:
+            return False, f"plan map shows {fid} twice"
+        by_feature[fid] = node_id
+
+    table_ids = []
+    want_edges: set[tuple[str, str]] = set()
+    for row in rows:
+        fid = "F" + _FEATURE_ID.findall(_clean(row[id_col]))[0] if _FEATURE_ID.findall(_clean(row[id_col])) else "?"
+        table_ids.append(fid)
+        for dep in _FEATURE_ID.findall(_clean(row[dep_col])):
+            want_edges.add((f"F{dep}", fid))
+        if fid in by_feature:
+            label_words = set(re.findall(r"[a-z]+", nodes[by_feature[fid]].lower()))
+            want = {a.strip() for a in re.split(r"[,;]|\band\b|->|→", _clean(row[art_col]).lower()) if a.strip()}
+            missing = sorted(want - label_words)
+            if missing:
+                return False, f"plan map node for {fid} does not show its artifacts {missing}"
+    if sorted(by_feature) != sorted(table_ids):
+        return False, f"plan map shows {sorted(by_feature)}, the Features table has {sorted(table_ids)}"
+
+    to_fid = {v: k for k, v in by_feature.items()}
+    got_edges = {(to_fid[a], to_fid[b]) for a, b in edges}
+    if got_edges != want_edges:
+        extra = sorted(got_edges - want_edges)
+        missing = sorted(want_edges - got_edges)
+        return False, f"plan map arrows differ from 'Depends on': missing {missing}, extra {extra}"
+    return True, "plan map matches the Features table"
+
+
+def _peer_kinds(cell: str) -> set[str]:
+    """Node kinds named in a Peers cell such as 'Rack (many), Site (one)'."""
+    kinds = set()
+    for item in re.split(r"[,;]", _clean(cell)):
+        match = _KIND.match(item.strip())
+        if match and match.group(0).lower() not in PLACEHOLDERS:
+            kinds.add(match.group(0))
+    return kinds
+
+
+def check_model_map_matches(ws: Path) -> tuple[bool, str]:
+    """The sketch map shows each node kind and one line per peer in the table.
+
+    The table is the source. Each sketch row is a node; each kind in its
+    Peers cell is a line between the two, in either direction. A line the
+    table does not have, or a peer with no line, fails.
+    """
+    parts, err = _brief_sections(ws)
+    if parts is None:
+        return False, err
+    headers, rows, err = _sketch(parts)
+    if err:
+        return False, err
+    kind_col = _column(headers, "node kind")
+    peer_col = _column(headers, "peers")
+    if kind_col is None or peer_col is None:
+        return False, "sketch table lacks a 'Node kind' or 'Peers' column"
+    nodes, edges, err = _one_map(parts, SKETCH_HEADING, "Data model sketch")
+    if err:
+        return False, f"model map: {err}"
+
+    def kind_of(node_id: str) -> str:
+        match = _KIND.match(nodes[node_id])
+        return match.group(0) if match else node_id
+
+    shown = {kind_of(n) for n in nodes}
+    want: set[frozenset] = set()
+    for row in rows:
+        kind = _KIND.match(_clean(row[kind_col]))
+        if not kind:
+            continue
+        kind = kind.group(0)
+        if kind not in shown:
+            return False, f"model map has no node for {kind}"
+        for peer in _peer_kinds(row[peer_col]):
+            want.add(frozenset((kind, peer)))
+    got = {frozenset((kind_of(a), kind_of(b))) for a, b in edges}
+    missing = sorted(tuple(sorted(e)) for e in want - got)
+    extra = sorted(tuple(sorted(e)) for e in got - want)
+    if missing or extra:
+        return False, f"model map lines differ from the Peers column: missing {missing}, extra {extra}"
+    return True, "model map matches the sketch table"
+
+
+# --------------------------------------------------------------------------
 # Registry
 # --------------------------------------------------------------------------
 
@@ -634,6 +822,8 @@ CHECKS: dict[str, Callable[[Path], tuple[bool, str]]] = {
     "one-question-recommended": check_one_question_recommended,
     "scope-split-f1-only": check_scope_split_f1_only,
     "features-artifacts": check_features_artifacts,
+    "plan-map-matches": check_plan_map_matches,
+    "model-map-matches": check_model_map_matches,
     "sketch-rows-complete": check_sketch_rows_complete,
     "decision-provenance": check_decision_provenance,
 }

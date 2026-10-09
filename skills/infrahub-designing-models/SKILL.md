@@ -102,6 +102,10 @@ does that from the brief.
    [rules/brief-sketch-rows-complete.md](./rules/brief-sketch-rows-complete.md);
    before writing the decision log, read
    [rules/brief-decision-provenance.md](./rules/brief-decision-provenance.md).
+   Last, draw the plan map and the model map from the
+   finished tables; read
+   [rules/brief-maps-match-tables.md](./rules/brief-maps-match-tables.md)
+   first.
 9. **Name the next step and stop.** Hand F1 to the
    user's existing specification, planning or
    implementation workflow. If none is established,
@@ -125,7 +129,7 @@ answers at all, write only the next question block.
 | -------- | -------- | ------ | ----------- |
 | CRITICAL | Interview | `interview-` | One question per message with a recommended answer; every input used as evidence |
 | HIGH | Scope | `scope-` | Split a too-big scope into ordered features before the data questions; sketch F1 only |
-| HIGH | Brief | `brief-` | Complete sketch rows or open items; every decision tagged with its provenance |
+| HIGH | Brief | `brief-` | Complete sketch rows or open items; every decision tagged with its provenance; plan and model maps that match their tables |
 
 Full scope per prefix is in `rules/_sections.md`.
 
