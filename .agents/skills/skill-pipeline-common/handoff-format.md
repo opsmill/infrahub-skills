@@ -102,60 +102,31 @@ slug is invisible to them, and the same change gets built twice.
 The search runs in two parts, because the stage learns its inputs at two
 different points:
 
-- **Part A**, at key derivation, when the input carries an issue number. Set
-  `ISSUE` and leave `TARGETS` empty.
-- **Part B**, as soon as the stage has named the files it will change. Set
-  `TARGETS` to their path prefixes (`skills/<skill>/`, `graders/<skill>/`,
-  `scripts/<file>`, `.agents/skills/<skill>/`), and keep `ISSUE` if there is
-  one.
+- **Part A**, at key derivation, when the input carries an issue number. Pass
+  `--issue` and no `--target`.
+- **Part B**, as soon as the stage has named the files it will change. Pass a
+  `--target` for each path prefix (`skills/<skill>/`, `graders/<skill>/`,
+  `scripts/<file>`, `.agents/skills/<skill>/`), and keep `--issue` if there
+  is one.
 
-It prints open PRs, and merged PRs whose merge commit is not in `HEAD` yet,
-that close `ISSUE`, name `#ISSUE` in their title or body, or change a file
-under `TARGETS`. Closed, unmerged PRs are left out.
-
-The search is complete, not a sample. It keeps doubling `--limit` until `gh`
-returns fewer PRs than it asked for, so an old PR is not dropped for being
-past the first page. It reads every merged PR, not only recent ones: a PR
-merged into a branch other than the default one can be old and still be
-missing from `HEAD`, so the ancestry check is the only filter. It needs no
-fetch: a merge commit missing from the local repository is not in `HEAD`
-either.
+Run the search script from the repository root:
 
 ```bash
-ISSUE="<issue number, or empty>"
-TARGETS="<space-separated path prefixes, or empty>"
-TARGETS_JSON=$(printf '%s\n' $TARGETS | jq -R 'select(length > 0)' | jq -cs .)
-MATCH="(\"$ISSUE\" != \"\" and (any(.closingIssuesReferences[]; .number == ${ISSUE:-0}) or (((.title // \"\") + \" \" + (.body // \"\")) | test(\"(^|[^0-9A-Za-z])#${ISSUE:-0}([^0-9A-Za-z_]|\$)\")))) or ([.files[].path] | any(. as \$p | $TARGETS_JSON | any(. as \$t | \$p | startswith(\$t))))"
-FIELDS=number,title,body,headRefName,closingIssuesReferences,files,mergeCommit
-# Every PR in a state: double --limit until gh returns fewer than it was asked for.
-all_prs() {
-  local state=$1 limit=100 json count
-  shift
-  while :; do
-    json=$(gh pr list --state "$state" --limit "$limit" "$@" --json "$FIELDS") || return 1
-    count=$(printf '%s' "$json" | jq length) || return 1
-    [ "$count" -lt "$limit" ] && { printf '%s' "$json"; return 0; }
-    limit=$((limit * 2))
-  done
-}
-# Every step that can fail stops the search: an empty result must mean no match.
-fail() { echo "SEARCH FAILED: $1, so nothing was searched"; exit 1; }
-OPEN=$(all_prs open) || fail "gh pr list --state open did not complete"
-MERGED=$(all_prs merged) || fail "gh pr list --state merged did not complete"
-OPEN_HITS=$(printf '%s' "$OPEN" | jq -r ".[] | select($MATCH) | \"#\(.number)\topen\t\(.headRefName)\t\(.title)\"") \
-  || fail "jq could not match the open PRs"
-MERGED_HITS=$(printf '%s' "$MERGED" | jq -r ".[] | select($MATCH) | \"\(.number)\t\(.mergeCommit.oid)\t\(.headRefName)\t\(.title)\"") \
-  || fail "jq could not match the merged PRs"
-[ -z "$OPEN_HITS" ] || printf '%s\n' "$OPEN_HITS"
-[ -z "$MERGED_HITS" ] || while IFS=$'\t' read -r n sha ref t; do
-  git merge-base --is-ancestor "$sha" HEAD 2>/dev/null || printf '#%s\tmerged, not in HEAD\t%s\t%s\n' "$n" "$ref" "$t"
-done <<< "$MERGED_HITS"
+uv run python .agents/skills/skill-pipeline-common/scripts/find_existing_prs.py \
+  --issue "<issue number>" --target "<path prefix>" --target "<another path prefix>"
 ```
+
+Leave out `--issue` when there is no issue number, and `--target` when no
+files are named yet. It prints one line per open PR, and per merged PR whose
+merge commit is not in `HEAD` yet, that closes the issue, names `#<issue>` in
+its title or body, or changes a file under a target. Closed, unmerged PRs are
+left out. The search reads every PR, not the newest page, and the full file
+list of large PRs; the script's docstring states exactly what it checks.
 
 No output and exit status 0: record `Duplicate check: none found` and
 continue.
 
-`SEARCH FAILED`, or any other non-zero exit: nothing was searched. Report the
+`SEARCH FAILED` and exit status 1: nothing was searched. Report the
 error and stop. Never record `none found` for a search that did not run,
 because the next stage cannot tell the two apart.
 
