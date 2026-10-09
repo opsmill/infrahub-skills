@@ -21,9 +21,13 @@ several. Split when any of these holds:
 - several mechanisms, such as a generator plus imports
   plus checks.
 
-Merge features that share a data dependency or more
-than about 30% of their node kinds. Order features by
-data dependency, foundation first.
+Merge two candidate features only when they cannot be
+built apart, because each needs the other's node kinds,
+or when they share more than about 30% of their node
+kinds. Depending on the same earlier feature is not a
+reason to merge: F3 and F4 can both depend on F2 and
+stay separate. Order features by data dependency,
+foundation first.
 
 The brief then shows the split in its shape:
 
