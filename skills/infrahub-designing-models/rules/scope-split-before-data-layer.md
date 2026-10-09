@@ -23,20 +23,24 @@ several. Consider a split when any of these holds:
 - several mechanisms, such as a generator plus imports
   plus checks.
 
-Then keep a split only if every feature, F1 included,
+These signals only propose a split. Whatever the
+signal, keep a split only if every feature, F1 included,
 delivers part of the business outcome on its own. A
-foundation such as locations or a hierarchy is not a
-feature by itself: it goes into the first feature that
-needs it. If the request has one business problem and
-all of it needs the same node kinds, it is one feature.
+split by mechanism passes that test when, for example,
+F1 delivers the inventory and F2 the automation built on
+it. A foundation such as locations or a hierarchy does
+not pass it: it is not a feature by itself and goes into
+the first feature that needs it.
 
 Merge two candidate features only when they cannot be
 built apart, because each needs the other's node kinds,
-or when they share more than about 30% of their node
-kinds. Depending on the same earlier feature is not a
+or when more than about 30% of the node kinds they
+define are the same. A feature that adds a generator, a
+check or a transform to an earlier feature's node kinds
+defines none of them, so it is not merged for that. Depending on the same earlier feature is not a
 reason to merge: F3 and F4 can both depend on F2 and
-stay separate. Order features by data dependency,
-foundation first.
+stay separate. Order features by data dependency: a
+feature comes after every feature it depends on.
 
 The brief then shows the split in its shape:
 
