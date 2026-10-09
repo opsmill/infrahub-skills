@@ -94,7 +94,7 @@ tasks:
   - name: my-rule-task
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/<skill>/SKILL.md
+      Read the skill at skills/<skill>/SKILL.md
       and follow its workflow and rules.
 
       Task: <realistic prompt that naturally requires
@@ -223,7 +223,7 @@ reaching the grader.
 
 **Prove the task discriminates.** Every task's
 `instruction` opens with a `Read the skill at
-.agents/skills/<skill>/SKILL.md` line. Delete that
+skills/<skill>/SKILL.md` line. Delete that
 line for the run and restore it afterwards. Do not
 comment it out: `instruction:` is a literal block
 scalar, so a `#` is body text and the model still
@@ -277,7 +277,7 @@ the per-skill counts here, where they go stale
 silently, read them off the file:
 
 ```bash
-grep -oE '\.agents/skills/infrahub-[a-z-]+' eval.yaml |
+grep -oE 'skills/infrahub-[a-z-]+/SKILL\.md' eval.yaml |
   sort | uniq -c | sort -rn
 ```
 

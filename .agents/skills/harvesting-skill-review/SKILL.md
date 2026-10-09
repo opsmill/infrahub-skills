@@ -69,11 +69,11 @@ it has to be you, on every lesson you apply:
    under 500 lines (`dev/knowledges/skill-writing-guide.md`). A rule file
    covers one concern; a second concern is a second file, not a longer one.
 2. **Cut what the new rule supersedes.** Rewrite the section around the new
-   rule instead of bolting it on the end. This is also step 6 of
-   `dev/guides/adding-a-rule.md`: sweep `skills/`, `graders/`, and `eval.yaml`
+   rule instead of bolting it on the end, then run the sweep in
+   [`dev/guides/adding-a-rule.md`](../../../dev/guides/adding-a-rule.md) §6
    for the claim the new rule contradicts.
 3. **Report added/removed line counts.** Zero deletions means you accreted.
-   Say so plainly rather than presenting it as a win.
+   Saying so does not discharge it: find the cut before reporting.
 4. **Raise the bar as the file grows.** "True but rarely needed" loses to
    keeping the doc readable.
 
@@ -97,9 +97,8 @@ belongs in `skills/<skill>/rules/`, and prose alone is not a landing:
 That means a check function in `graders/<skill>/lib.py` registered in `CHECKS`,
 an `eval.yaml` task run with the instruction's `Read the skill at ...` line
 deleted and then restored before `sync-evals.py`, scoring below 1.0 or
-meeting its reading's disposition, a task grader run against four fixtures,
-and
-`python scripts/sync-evals.py`. Budget for it before proposing the rule, and
+meeting its reading's disposition, a task grader, four fixtures committed
+under `tests/graders/`, and `python scripts/sync-evals.py`. Budget for it before proposing the rule, and
 say in the report that this is the expensive track. Full procedure:
 `dev/guides/adding-a-rule.md`.
 

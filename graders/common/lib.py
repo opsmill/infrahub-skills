@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 from pathlib import Path
 
 
@@ -175,17 +176,147 @@ _PRINTS_TO_STDOUT = re.compile(r"\b(?:echo|printf|print)\b")
 # containing the word "echo" counted as one command, so a safe
 # `${TOKEN:-}` test operand quoted later in the same sentence was reported
 # as a leak — the very presence test the rule recommends.
-_COMMAND_BREAK = re.compile(r";|\|\||&&|\||\n|`|\bthen\b|\bdo\b|\bfi\b|\bdone\b")
+_LINE_BREAK = re.compile(r"\n|`")
+_COMMAND_BREAK = re.compile(r";|\|\||&&|\||\bthen\b|\bdo\b|\bfi\b|\bdone\b")
+
+
+def _quoted_spans(segment: str) -> list[tuple[int, int, str]] | None:
+    """Return the quoted spans of a shell segment, or None if quotes don't balance.
+
+    An apostrophe between two letters is a contraction ("don't", "it's"), not
+    a quote. Quotes that still do not balance mean prose; the caller then
+    splits on every separator as before.
+    """
+    spans: list[tuple[int, int, str]] = []
+    quote = None
+    start = 0
+    for i, ch in enumerate(segment):
+        if ch == "'" and 0 < i < len(segment) - 1 and segment[i - 1].isalpha() and segment[i + 1].isalpha():
+            continue
+        if quote is None and ch in "'\"":
+            quote, start = ch, i
+        elif ch == quote and not (quote == '"' and _escaped(segment, i)):
+            spans.append((start, i, quote))
+            quote = None
+    return None if quote else spans
+
+
+def _escaped(segment: str, i: int) -> bool:
+    """Whether the character at ``i`` follows an odd run of backslashes."""
+    run = len(segment[:i]) - len(segment[:i].rstrip("\\"))
+    return run % 2 == 1
+
+
+# Programs that run a quoted argument as shell code, which expands what the
+# single quotes protected here.
+_SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "su"}
+_SHELL_RUN_OPTION = re.compile(r"-[A-Za-z]*c")
+_PRINT_COMMANDS = {"echo", "printf", "print"}
+
+
+def _runs_inner_shell(piece: str) -> bool:
+    """Whether the piece runs code the single quotes do not protect.
+
+    Read from shell tokens, after quote removal, so `bash '-c' '...'` counts
+    and `echo 'su x -c ...'` does not. A shell word printed by `echo` or
+    `printf` is an argument, not a command. Fails closed: a piece that does
+    not tokenize keeps its quoted text. Substitutions are cut out before
+    this runs, by ``_split_substitutions``, and checked on their own.
+    """
+    try:
+        tokens = shlex.split(piece)
+    except ValueError:
+        return True
+    if not tokens or tokens[0] in _PRINT_COMMANDS:
+        return False
+    for i, token in enumerate(tokens):
+        name = token.rsplit("/", 1)[-1]
+        if name == "eval" or (name == "ssh" and i + 1 < len(tokens)):
+            return True
+        if name in _SHELLS and any(
+            _SHELL_RUN_OPTION.fullmatch(t) for t in tokens[i + 1 :]
+        ):
+            return True
+    return False
+
+
+_SUBSTITUTION_OPEN = re.compile(r"[$<>]\(")
+
+
+def _split_substitutions(piece: str) -> tuple[str, list[str]] | None:
+    """Cut out `$(...)`, `<(...)` and `>(...)` outside single quotes.
+
+    Returns the piece with each substitution blanked, and the text each one
+    runs. A substitution runs its own text only, so quoted literals elsewhere
+    in the piece stay protected. None when the parentheses do not balance;
+    the caller then reads the piece whole, quoted text included.
+    """
+    single = [(a, b) for a, b, q in _quoted_spans(piece) or [] if q == "'"]
+    outer, inner = piece, []
+    pos = 0
+    while match := _SUBSTITUTION_OPEN.search(piece, pos):
+        if any(a < match.start() < b for a, b in single):
+            pos = match.end()
+            continue
+        depth, quote, i = 1, None, match.end()
+        while i < len(piece) and depth:
+            ch = piece[i]
+            if quote:
+                if ch == quote:
+                    quote = None
+            elif ch in "'\"":
+                quote = ch
+            elif ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            i += 1
+        if depth:
+            return None
+        inner.append(piece[match.end() : i - 1])
+        outer = outer[: match.start()] + " " * (i - match.start()) + outer[i:]
+        pos = i
+    return outer, inner
+
+
+def _blank_spans(piece: str, quotes: str) -> str:
+    """Blank out the text inside quotes of the given kinds."""
+    for start, end, quote in _quoted_spans(piece) or []:
+        if quote in quotes:
+            piece = piece[:start] + " " * (end - start + 1) + piece[end + 1 :]
+    return piece
+
+
+def _unquote_single(piece: str) -> str:
+    """Blank out single-quoted text, which the shell never expands.
+
+    Unless the piece runs that text in an inner shell (`sh -c '...'`,
+    `eval`, `ssh host '...'`), which does expand it.
+    """
+    if _runs_inner_shell(piece):
+        return piece
+    return _blank_spans(piece, "'")
 
 
 def _command_pieces(text: str) -> list[tuple[int, str]]:
-    """Split into command-sized pieces, keeping each piece's offset."""
+    """Split into command-sized pieces, keeping each piece's offset.
+
+    A separator inside quotes is data: `printf '%s; ' "$TOKEN"` is one
+    command, and splitting on its `;` cut the value away from the printf.
+    """
     pieces: list[tuple[int, str]] = []
-    pos = 0
-    for match in _COMMAND_BREAK.finditer(text):
-        pieces.append((pos, text[pos : match.start()]))
-        pos = match.end()
-    pieces.append((pos, text[pos:]))
+    seg_start = 0
+    for seg_end in [m.start() for m in _LINE_BREAK.finditer(text)] + [len(text)]:
+        segment = text[seg_start:seg_end]
+        spans = _quoted_spans(segment) or []
+        pos = 0
+        for match in _COMMAND_BREAK.finditer(segment):
+            if any(a < match.start() < b for a, b, _ in spans):
+                continue
+            pieces.append((seg_start + pos, segment[pos : match.start()]))
+            pos = match.end()
+        pieces.append((seg_start + pos, segment[pos:]))
+        seg_start = seg_end + 1
     return pieces
 
 
@@ -219,12 +350,31 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
         for m in _TOKEN_FALLBACK.finditer(text)
         if not _is_negated(text, m.start())
     }
-    for start, piece in _command_pieces(text):
-        if not _PRINTS_TO_STDOUT.search(piece):
-            continue
+    pending = list(_command_pieces(text))
+    while pending:
+        start, piece = pending.pop()
         if _is_negated(text, start):
             continue
-        offenders.update(m.group(0) for m in _TOKEN_VALUE.finditer(piece))
+        split = _split_substitutions(piece)
+        if split is None:
+            outer, inner_pieces = piece, []
+        else:
+            outer, inner = split
+            inner_pieces = [p for body in inner for _, p in _command_pieces(body)]
+            pending.extend((start, p) for p in inner_pieces)
+        # Only the piece's own text decides whether it prints: a `printf`
+        # inside a substitution prints into the argument, not to stdout.
+        if not _PRINTS_TO_STDOUT.search(outer):
+            continue
+        if split is not None:
+            outer = _unquote_single(outer)
+        offenders.update(m.group(0) for m in _TOKEN_VALUE.finditer(outer))
+        # A substitution's output becomes an argument of this print, so a
+        # value it expands is printed even when its own command does not print.
+        for inner_piece in inner_pieces:
+            offenders.update(
+                m.group(0) for m in _TOKEN_VALUE.finditer(_unquote_single(inner_piece))
+            )
     if offenders:
         return False, (
             f"expansion(s) that print the token's value: {sorted(offenders)}; "

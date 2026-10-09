@@ -171,7 +171,7 @@ tasks:
 
   - name: builtin-menu-sections
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
 
       Task: I run a service provider platform on Infrahub. My schema has IpamPrefix
       (which inherits BuiltinIPPrefix), IpamVlan, IpamVrf, DcimDevice, DcimInterface,
@@ -2516,7 +2516,7 @@ tasks:
   - name: common-graphql-schema-generated
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-common/SKILL.md and follow
+      Read the skill at skills/infrahub-common/SKILL.md and follow
       its rules.
 
       Task: I added a `serial_number` attribute to `DcimDevice` in
@@ -5194,7 +5194,7 @@ tasks:
       Save ONLY the JSON findings to: output.json
     graders:
       - type: deterministic
-        run: python graders/auditing-repo/check_yagni_rule.py yagni-missing-inverse-forces-python-filter MEDIUM 3
+        run: python graders/auditing-repo/check_yagni_missing_inverse.py
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-missing-inverse-forces-python-filter

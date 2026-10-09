@@ -181,11 +181,9 @@ pass; an interruption is not evidence of anything.
 
 ## Sweep
 
-For every term in the handoff's `Sweep terms`:
-
-```bash
-grep -rn "<sweep term>" skills/ graders/ eval.yaml dev/ README.md AGENTS.md docs/ .agents/skills/
-```
+For every term in the handoff's `Sweep terms`, run the sweep command in
+[`../../../dev/guides/adding-a-rule.md`](../../../dev/guides/adding-a-rule.md)
+§6, then read every rule the changed one links to and every rule linking to it.
 
 Skip `evaluations/`, which `sync-evals.py` regenerates from `eval.yaml`. Fix
 every hit, and delete what the change makes wrong. An impact or severity label
@@ -203,15 +201,14 @@ silence.
 ## Changelog
 
 ```bash
-uv run towncrier create -c "<one sentence describing the change>" <issue>.housekeeping.md
+uv run towncrier create -c "<one sentence describing the change>" <issue>.<type>.md
 # With no issue number, use a descriptive slug prefixed with +:
-uv run towncrier create -c "<one sentence>" +<slug>.housekeeping.md
+uv run towncrier create -c "<one sentence>" +<slug>.<type>.md
 ```
 
 Apply the matching `changes/*` label to the PR; it drives the version bump.
-Never edit `CHANGELOG.md` by hand and never run `towncrier build`. This
-repository assembles its changelog from fragments, and skill or tooling work
-goes under `housekeeping`.
+Never edit `CHANGELOG.md` by hand and never run `towncrier build`. Pick
+`<type>` with the rule in `AGENTS.md` § Changelog.
 
 ## Scope check
 

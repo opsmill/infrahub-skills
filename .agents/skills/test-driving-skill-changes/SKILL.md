@@ -143,8 +143,10 @@ Read `Defect class` from the handoff file: `guidance` follows
    unread, belongs to `implementing-skill-changes`: while the rule is absent
    the task scores below 1.0 whether the skill is read or not, so running it
    here proves nothing.
-8. Run `uv run python scripts/sync-evals.py` and commit `eval.yaml`, the
-   regenerated `evaluations/*.json`, and the grader files together. The
+8. Add the four fixtures as accept and reject parameter cases in
+   `tests/graders/test_<skill>_lib.py`, as the `grader` class does. Then run
+   `uv run python scripts/sync-evals.py` and commit `eval.yaml`, the
+   regenerated `evaluations/*.json`, the grader files, and that test together. The
    `evals-sync` job in CI regenerates them and fails the pull request on any
    diff, so skipping this turns into a red build rather than silent drift.
 9. Lint and run `uv run invoke test`.
@@ -168,6 +170,9 @@ for d in pass pass-variant fail fail-nearmiss; do
 done
 ```
 
+The `/tmp` run is for iterating. What protects the check from the next
+refactor is the same four fixtures committed under `tests/graders/` (step 8).
+
 If the near miss scores 1.0, the check grades vocabulary, not substance:
 rewrite it before continuing. Check the failure message too, and confirm it
 names the assertion that actually broke. A check that cannot fail is worse
@@ -190,6 +195,12 @@ On the `grader` class the four fixtures in
 [## Four fixtures](#four-fixtures) are the pytest's parameter cases: the same
 compliant, compliant variant, violating, and near-miss artifacts, asserted
 directly against the check function instead of through a `skillgrade` run.
+
+On the `script` class, give every condition the gate decides on a case of its
+own: each allowlist key accepted and an unknown value rejected, each conjunct
+of an exemption broken on its own, each input shape it parses, and an empty
+input rejected. Assert the exact list of findings, not that
+some finding contains a substring, so a wrong or duplicated finding fails too.
 The separate four-fixture run and the red run do not apply here; the pytest is
 the whole test.
 
