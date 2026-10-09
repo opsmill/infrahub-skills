@@ -702,6 +702,14 @@ def test_features_table_always_present(tmp_path: Path, features: str | None, sho
             PLAN_MAP.replace('F4["F4 Customer peering\n  schema, generator"]', 'F4["F4 Customer peering\n  schema"]'),
             "does not show its artifacts", id="near-miss-artifact-missing",
         ),
+        pytest.param(
+            PLAN_MAP.replace('F4["F4 Customer peering\n  schema, generator"]', 'F4["F4\n  schema, generator"]'),
+            "plan map node for F4 does not name the feature 'Customer peering'", id="near-miss-label-without-name",
+        ),
+        pytest.param(
+            PLAN_MAP.replace('F2["F2 IPAM\n  schema"]', 'F2["F2 IPAM\n  schema, objects"]'),
+            "plan map node for F2 shows artifacts ['objects'] the table does not list", id="near-miss-extra-artifact",
+        ),
         pytest.param(PLAN_MAP.replace('  F4["F4 Customer peering\n  schema, generator"]\n', ""), "plan map", id="near-miss-feature-missing"),
         pytest.param(PLAN_MAP.replace("  F1 --> F2\n", "  F1 => F2\n"), "cannot read", id="violating-unreadable-line"),
     ],
