@@ -1050,28 +1050,36 @@ def _has_flag(options: list[str], short: str, long: str, value_shorts: str = "")
 def _shell_reads_stdin(args: list[str]) -> bool:
     """Whether ``sh``/``bash``/... with ``args`` runs its stdin as the script.
 
-    It does with ``-s``, or with no script file and no ``-c``. Short options
-    may be bundled (``-es``, ``-ec``); an ``o`` among them takes the next
-    word as its value. After ``--`` the next word is a script file unless
-    ``-s`` came first; a lone ``-`` works the same way.
+    All options are read before deciding, because ``-c`` wins wherever it
+    sits: with it the commands come from its string, even beside ``-s``
+    (``bash -sc 'cmd'``). Otherwise ``-s`` means stdin, and so does having
+    no script file left once the options end. Short options may be bundled
+    (``-es``); an ``o`` among them takes the next word as its value. ``--``
+    and a lone ``-`` end the options, and the word after them, if any, is a
+    script file.
     """
+    reads_command_string = reads_stdin_flag = False
     words = iter(args)
+    script_follows = False
     for arg in words:
-        if arg in ("--", "-"):  # a lone ``-`` also ends the options
-            return next(words, None) is None
+        if arg in ("--", "-"):  # a lone ``-`` ends the options like ``--``
+            script_follows = next(words, None) is not None
+            break
         if arg.startswith("--"):
             continue  # long options: --norc, --login
         if arg[:1] in ("-", "+") and len(arg) > 1:
             letters = arg[1:]
-            if "c" in letters:
-                return False
-            if "s" in letters:
-                return True
+            if arg[0] == "-":
+                reads_command_string = reads_command_string or "c" in letters
+                reads_stdin_flag = reads_stdin_flag or "s" in letters
             if letters[-1] in "oO":
                 next(words, None)
         else:
-            return False  # a script file: stdin is its data
-    return True
+            script_follows = True  # the first operand: a script file, or -c's string
+            break
+    if reads_command_string:
+        return False
+    return reads_stdin_flag or not script_follows
 
 
 def _stdin_runs_as_shell(argv: list[str]) -> bool:

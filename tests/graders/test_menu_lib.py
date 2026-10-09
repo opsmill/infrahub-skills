@@ -2353,6 +2353,32 @@ EOF
         assert not ok
         assert "[Campus, FloorMenu]" in msg
 
+    def test_c_option_wins_over_s_wherever_it_sits(self):
+        """With ``-c`` the commands come from its string, so the heredoc stays data."""
+        for shell in ("bash -sc 'cat > /tmp/steps'", "bash -s -c 'cat > /tmp/steps'", "bash -cs 'cat > /tmp/steps'"):
+            notes = (
+                "```bash\ngit commit -am retire && git push\n"
+                "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n"
+                f"{shell} <<'EOF'\n"
+                "infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes\nEOF\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert ok, f"{shell}: {msg}"
+
+    def test_lone_dash_reads_stdin_only_without_a_script(self):
+        """``bash -`` runs the heredoc; ``bash - script.sh`` runs the file instead."""
+        runs = (
+            "```bash\ngit commit -am retire && git push\n"
+            "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n"
+            "bash - <<'EOF'\n"
+            "infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes\nEOF\n```\n"
+        )
+        ok, msg = self._deleted(runs)
+        assert not ok
+        assert "[Campus, FloorMenu]" in msg
+        ok, msg = self._deleted(runs.replace("bash - <<", "bash - apply.sh <<"))
+        assert ok, msg
+
     def test_bundled_c_option_leaves_the_heredoc_as_data(self):
         notes = """\
 ```bash
