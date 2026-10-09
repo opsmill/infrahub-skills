@@ -25,7 +25,9 @@ INPUTS = {
 }
 
 # File name -> the node kinds whose facts the task's prompt puts in that file.
-# The words come from the task's prompt; they are the task's fixture.
+# This is the task's fixture, not a copy of the prompt: it holds the prompt's
+# own terms plus common other names for the same kinds, so a model that
+# renames a kind is still bound. Revisit it when the prompt changes.
 SOURCES = {
     # Checked in this order; a row is bound to the first file whose pattern
     # its node kind matches, so a SiteLink is a backbone.txt fact.
