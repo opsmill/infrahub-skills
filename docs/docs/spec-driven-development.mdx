@@ -24,6 +24,18 @@ Describe the feature or requirement in plain language. The AI captures requireme
 
 When you do not yet know what to model, or the work spans several domains, use the [Model Designer](./skills-reference/designing-models.mdx) to work through the business, the service and the data. Its design brief splits the work into ordered features, gives each one a handoff that names the brief and the feature, and draws the build order as a plan map you can review at a glance. Use the F1 handoff as the input to this workflow's Specify step, then continue in dependency order.
 
+#### Starting from a design brief
+
+With spec-kit, each feature's `Handoff` cell becomes the input to `/speckit.specify`. Taking the brief from the [L3VPN example](./skills-reference/designing-models.mdx#example-an-l3vpn-service), you specify F1 first:
+
+```text
+/speckit.specify Design and implement the L3Vpn and VpnSite model, then populate it from the customer export, as designed in F1 of docs/designs/l3vpn-service/design-brief.md.
+```
+
+The handoff names the brief, so the spec draws on its data model sketch, decisions and open items rather than on the one sentence. When F1 is built, specify F2 the same way with its own handoff. Follow the `Depends on` column for the order: a feature runs only after the features it names.
+
+`/speckit.specify` does not offer the Model Designer by itself. Run the Model Designer first when the design is not settled, then paste the handoffs one at a time.
+
 ### 2. Plan
 
 The AI produces an implementation plan. For each component to be built (schema nodes, generators, checks, transforms), it identifies which skill to use, what the inputs and outputs are, and what dependencies exist between steps. The plan is validated against Infrahub skill rules before it's presented.
