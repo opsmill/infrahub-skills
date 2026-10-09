@@ -10,16 +10,25 @@ tags: scope, features, split, dependencies, artifacts
 
 After the service questions and before the data
 questions, decide whether the request is one feature or
-several. Split when any of these holds:
+several. Consider a split when any of these holds:
 
 - more than about 10 functional requirements;
 - more than about 8 to 10 new node kinds;
 - several domains, such as a fiber plant plus DWDM
   channels plus a wavelength service catalog;
-- different systems are the source of truth for
-  different parts;
+- different systems are the source of truth for parts
+  that serve different business outcomes (importing
+  reference data, such as sites from a facilities
+  sheet, is not one of them);
 - several mechanisms, such as a generator plus imports
   plus checks.
+
+Then keep a split only if every feature, F1 included,
+delivers part of the business outcome on its own. A
+foundation such as locations or a hierarchy is not a
+feature by itself: it goes into the first feature that
+needs it. If the request has one business problem and
+all of it needs the same node kinds, it is one feature.
 
 Merge two candidate features only when they cannot be
 built apart, because each needs the other's node kinds,
@@ -61,6 +70,10 @@ implementation workflow they already use.
 
 ## How to apply
 
+- Before recommending a split, write each feature's
+  intent as the part of the business problem it solves.
+  A feature whose intent is only "so a later feature can
+  use it" is a foundation; fold it into that feature.
 - Recommend the split like any other answer: a question
   block with the proposed features, their order and
   why.
