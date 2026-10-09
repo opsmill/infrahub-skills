@@ -114,8 +114,9 @@ passes.
 
 With the target skill picked, run Part B of the existing-PR search in
 [`../skill-pipeline-common/handoff-format.md`](../skill-pipeline-common/handoff-format.md)
-§ "Searching for existing pull requests" on `skills/<skill>/` and
-`graders/<skill>/`, before the next lens. A match is a candidate, not a
+§ "Searching for existing pull requests" on `skills/<skill>/` and the
+skill's grader directory (`graders/<skill>/` without the `infrahub-` prefix),
+before the next lens. A match is a candidate, not a
 confirmed duplicate: if the user chooses to stop, the interview ends here;
 if they choose to continue, resume at Lens 4.
 

@@ -107,7 +107,10 @@ different points:
 - **Part B**, as soon as the stage has named the files it will change. Pass a
   `--target` for each path prefix (`skills/<skill>/`, `graders/<skill>/`,
   `scripts/<file>`, `.agents/skills/<skill>/`), and keep `--issue` if there
-  is one.
+  is one. Grader directories drop the `infrahub-` prefix: the graders for
+  `skills/infrahub-managing-menus/` are under `graders/managing-menus/`. A
+  target that names no real directory matches nothing, and the search
+  reports `none found` without saying why.
 
 Run the search script from the repository root:
 
@@ -139,5 +142,8 @@ the issue or a file matched, then stop and ask the user to choose one of:
   this change.
 
 Do not choose for them. A file match is often a PR doing different work in
-the same files, and only the user can tell overlap from duplication. Record
-each PR and the choice in `Duplicate check`.
+the same files, and only the user can tell overlap from duplication. A PR
+merged into a side branch that later reached the default branch as one
+squashed commit is also listed as merged and not in `HEAD`, on every run,
+because its own merge commit never lands there; its changes may already be
+in `HEAD`. Record each PR and the choice in `Duplicate check`.
