@@ -21,12 +21,13 @@ The contract the block has to meet:
   ancestor of `HEAD`, and it either closes `ISSUE`, names `#ISSUE` as a whole
   token in its title or body, or changes a file under one of `TARGETS`.
   Closed, unmerged PRs never match.
-- It does not fetch. The stage fetches the default branch before running it.
+- It does not fetch.
 
-The stub `gh` supports `gh pr list` only. It ignores `--search`, `--head` and
-`--limit`, returns the fixture PRs for the requested `--state`, and applies
-`--jq` with `jq -r`, the way `gh` does. A block that leans on a GitHub text
-search to do the matching therefore prints the near misses and fails.
+The stub `gh` emulates `gh pr list` the way GitHub answers it: it returns the
+fixture PRs for the requested `--state`, honours `--limit` and a
+`merged:>=<date>` term in `--search`, ignores every other search term and
+`--head`, and applies `--jq` with `jq -r`. A block that leans on a GitHub
+text search to do the matching therefore prints the near misses and fails.
 """
 
 from __future__ import annotations
@@ -48,14 +49,14 @@ SECTION = "## Searching for existing pull requests"
 NOT_IN_HEAD = "0123456789abcdef0123456789abcdef01234567"
 
 STUB_GH = r"""#!/usr/bin/env python3
-import json, os, subprocess, sys
+import json, os, re, subprocess, sys
 
 args = sys.argv[1:]
 if args[:2] != ["pr", "list"]:
     sys.exit(f"stub gh: only 'gh pr list' is supported, got {args!r}")
 if os.environ.get("FAKE_GH_FAIL"):
     sys.exit("stub gh: HTTP 401: Bad credentials")
-state, jq, limit = "open", None, 30
+state, jq, limit, search = "open", None, 30, ""
 for i, arg in enumerate(args):
     if arg == "--state":
         state = args[i + 1]
@@ -69,8 +70,14 @@ for i, arg in enumerate(args):
         limit = int(args[i + 1])
     elif arg.startswith("--limit="):
         limit = int(arg.split("=", 1)[1])
+    elif arg in ("--search", "-S"):
+        search = args[i + 1]
 prs = json.load(open(os.environ["FAKE_GH_FIXTURES"]))
-prs = [p for p in prs if state == "all" or p["state"].lower() == state][:limit]
+prs = [p for p in prs if state == "all" or p["state"].lower() == state]
+since = re.search(r"merged:>=(\S+)", search)
+if since:
+    prs = [p for p in prs if (p.get("mergedAt") or "")[:10] >= since.group(1)]
+prs = prs[:limit]
 payload = json.dumps(prs)
 if jq is None:
     print(payload)
@@ -88,6 +95,8 @@ def _pr(
     closes: tuple[int, ...] = (),
     files: tuple[str, ...] = ("README.md",),
     merge_commit: str | None = None,
+    merged_at: str = "2099-01-01T00:00:00Z",
+    base: str = "main",
 ) -> dict:
     return {
         "number": number,
@@ -98,6 +107,8 @@ def _pr(
         "closingIssuesReferences": [{"number": n} for n in closes],
         "files": [{"path": f} for f in files],
         "mergeCommit": {"oid": merge_commit} if merge_commit else None,
+        "mergedAt": merged_at if state == "MERGED" else None,
+        "baseRefName": base,
     }
 
 
@@ -203,6 +214,12 @@ def _execute(
     head = subprocess.run(
         [*git, "rev-parse", "HEAD"], check=True, capture_output=True, text=True
     ).stdout.strip()
+    # A checkout with a known default branch, as the entrance stages have.
+    subprocess.run([*git, "update-ref", "refs/remotes/origin/main", head], check=True)
+    subprocess.run(
+        [*git, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"],
+        check=True,
+    )
 
     fixtures = tmp_path / "prs.json"
     fixtures.write_text(json.dumps(_fixtures(head, filler, extra)))
@@ -323,3 +340,24 @@ def test_search_fails_loudly_when_jq_fails(tmp_path: Path) -> None:
     assert "SEARCH FAILED" in result.stdout + result.stderr, (
         "the block must say SEARCH FAILED so the stage does not record none found"
     )
+
+
+def test_search_keeps_old_prs_merged_into_another_branch(tmp_path: Path) -> None:
+    """A PR merged into a non-default branch, long ago, is still a candidate.
+
+    Narrowing merged PRs to those merged since this branch's base commit
+    assumes every older merge landed on the default branch. #304 was merged
+    into another branch years before the base commit, so it is not in HEAD,
+    and a date cutoff drops it before the ancestry check ever sees it.
+    """
+    old_elsewhere = _pr(
+        304,
+        "MERGED",
+        closes=(25,),
+        merge_commit=NOT_IN_HEAD,
+        merged_at="2020-01-01T00:00:00Z",
+        base="feature/long-running",
+    )
+    assert _run(
+        tmp_path, "25", "skills/infrahub-managing-checks/", extra=(old_elsewhere,)
+    ) == {201, 204, 301, 304}
