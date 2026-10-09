@@ -402,7 +402,8 @@ def check_inputs_digested(
     ``sources`` optionally binds a file to the sketch rows whose facts the
     task put in it: every row whose Node kind matches the file's pattern must
     cite that file, and at least one row must match, so a brief cannot pass
-    by leaving those rows out.
+    by leaving those rows out. Patterns are tried in order and the first
+    match binds the row, so overlapping words cannot demand two files.
     """
     parts, err = _brief_sections(ws)
     if parts is None:
@@ -454,12 +455,17 @@ def check_inputs_digested(
                 matched.add(name)
                 if name not in cited_here:
                     return False, f"{kind} is a {name} fact but its Evidence does not cite {name}"
+                break  # first match binds the row; later patterns do not apply
     for name in inputs:
         if name not in cited:
             return False, f"no sketch row cites {name} as evidence"
     for name, pattern in sources.items():
         if name not in matched:
-            return False, f"no sketch row has a node kind matching {pattern.pattern!r}, the facts {name} holds"
+            kinds = sorted({_clean(r.get(kind_col, "")) for r in rows})
+            return False, (
+                f"no sketch row has a node kind matching {pattern.pattern!r}, the facts {name} holds; "
+                f"the sketch has {kinds}"
+            )
     return True, "every input listed, and each fact cites its own file with a locator"
 
 

@@ -25,9 +25,15 @@ INPUTS = {
 }
 
 # File name -> the node kinds whose facts the task's prompt puts in that file.
+# The words come from the task's prompt; they are the task's fixture.
 SOURCES = {
+    # Checked in this order; a row is bound to the first file whose pattern
+    # its node kind matches, so a SiteLink is a backbone.txt fact.
+    "backbone.txt": re.compile(
+        r"router|device|core|\bpe\b|link|connection|span|path|circuit|trunk|adjacency|backbone",
+        re.IGNORECASE,
+    ),
     "pops.csv": re.compile(r"pop|region|location|site", re.IGNORECASE),
-    "backbone.txt": re.compile(r"router|device|link|circuit|backbone", re.IGNORECASE),
 }
 
 CHECK_NAMES = ["inputs-digested", "sketch-rows-complete", "decision-provenance"]

@@ -298,9 +298,22 @@ INPUT_VARIANT_ROWS = """\
                 inputs=INPUTS_TABLE,
                 sketch_rows="".join(
                     line + "\n" for line in INPUT_ROWS.splitlines() if "NetworkRouter" not in line
-                ).replace("NetworkBackboneLink", "NetworkPath"),
+                ).replace("NetworkBackboneLink", "NetworkHop"),
             ),
             "no sketch row has a node kind matching", id="violating-no-backbone-kind",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(
+                inputs=INPUTS_TABLE,
+                sketch_rows=INPUT_ROWS.replace("NetworkRouter", "CoreBox").replace("NetworkBackboneLink", "NetworkSpan"),
+            ),
+            None, id="compliant-other-kind-names",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(inputs=INPUTS_TABLE, sketch_rows=INPUT_ROWS.replace("NetworkBackboneLink", "SiteLink")),
+            None, id="compliant-overlapping-words-bind-first-match",
         ),
     ],
 )
