@@ -75,6 +75,8 @@ def brief(
     features: str | None = None,
     decisions: str | None = DECISIONS,
     open_items: str = "none\n",
+    plan_map: str = "",
+    model_map: str = "",
 ) -> str:
     parts = [
         "# Design brief: test\n",
@@ -84,8 +86,8 @@ def brief(
         "## Service\n\nWhat is ordered.\n",
     ]
     if features is not None:
-        parts.append(f"## Features\n\n{features}")
-    parts.append(f"## Data model sketch\n\n{SKETCH_HEADER}{sketch_rows}")
+        parts.append(f"## Features\n\n{features}\n{plan_map}")
+    parts.append(f"## Data model sketch\n\n{SKETCH_HEADER}{sketch_rows}\n{model_map}")
     parts.append("## Mechanisms\n\nNo generator: nothing creates objects.\n")
     if decisions is not None:
         parts.append(f"## Decision log\n\n{decisions}")
@@ -304,6 +306,43 @@ The estate splits into four features, built in this order.
 | F2 | `F4` | Customer peering | Sessions per customer | Peer, Session | planned | Add automated peering after IPAM. | schema -> generator |
 """
 
+PLAN_MAP = """\
+```mermaid
+graph LR
+  F1["F1 DC fabric
+  schema, objects"]
+  F2["F2 IPAM
+  schema"]
+  F3["F3 Firewall policy
+  schema, check, transform"]
+  F4["F4 Customer peering
+  schema, generator"]
+  F1 --> F2
+  F1 --> F3
+  F2 --> F3
+  F2 --> F4
+```
+"""
+
+# Other ids, a quoted label on one line, an unquoted label, a class, a
+# comment, a chained arrow and an arrow label: what the parser must read.
+PLAN_MAP_VARIANT = """\
+```mermaid
+flowchart TD
+  %% build order
+  classDef feature fill:#eef
+  a["F1 DC fabric
+  schema"]:::feature
+  b["F2 IPAM: schema, objects"]
+  c[F3 Firewall policy check transform]
+  d["F4 Customer peering
+  schema, generator"]
+  a --> b --> c
+  a --> c
+  b -->|prefixes| d
+```
+"""
+
 F1_ROWS = """\
 | F1 | LocationSite | site_code | name (stated) | Rack (many) | Infrahub | DC team | answer Q4 |
 | F1 | DcimDevice | hostname | role (stated) | Interface (many) | Infrahub | DC team | answer Q6 |
@@ -323,10 +362,14 @@ ALL_ROWS = F1_ROWS + """\
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        pytest.param(brief(features=FEATURES, sketch_rows=F1_ROWS), None, id="compliant"),
-        pytest.param(brief(features=FEATURES_VARIANT, sketch_rows=F1_VARIANT_ROWS), None, id="compliant-variant"),
+        pytest.param(brief(features=FEATURES, sketch_rows=F1_ROWS, plan_map=PLAN_MAP), None, id="compliant"),
+        pytest.param(brief(features=FEATURES_VARIANT, sketch_rows=F1_VARIANT_ROWS, plan_map=PLAN_MAP_VARIANT), None, id="compliant-variant"),
         pytest.param(
-            brief(features=FEATURES.replace("| schema | F1 |", "| schema, objects, menu | F1 |"), sketch_rows=F1_ROWS),
+            brief(
+                features=FEATURES.replace("| schema | F1 |", "| schema, objects, menu | F1 |"),
+                sketch_rows=F1_ROWS,
+                plan_map=PLAN_MAP.replace('F2["F2 IPAM\n  schema"]', 'F2["F2 IPAM\n  schema, objects, menu"]'),
+            ),
             None, id="compliant-every-artifact-type",
         ),
         pytest.param(
@@ -336,6 +379,7 @@ ALL_ROWS = F1_ROWS + """\
                     "| F4 | Customer peering | Sessions per customer | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |\n| F5 | Menus | Group the new kinds in the sidebar | Menu items | menu | - | planned | Add navigation for the new kinds. |",
                 ),
                 sketch_rows=F1_ROWS,
+                plan_map=PLAN_MAP.replace("  F1 --> F2\n", '  F5["F5 Menus\n  menu"]\n  F1 --> F2\n'),
             ),
             None, id="compliant-independent-feature",
         ),
@@ -343,12 +387,13 @@ ALL_ROWS = F1_ROWS + """\
         pytest.param(
             brief(
                 features=FEATURES,
+                plan_map=PLAN_MAP,
                 sketch_rows=F1_ROWS + "| F2 | IpamPrefix | prefix | status (stated) | VRF (one) | Infrahub | Network team | answer Q8 |\n",
             ),
             "sketch has a row for 'F2'", id="near-miss-f2-sketched",
         ),
         pytest.param(
-            brief(features=FEATURES.replace("| F1, F2 | planned |", "| | planned |"), sketch_rows=F1_ROWS),
+            brief(features=FEATURES.replace("| F1, F2 | planned |", "| | planned |"), sketch_rows=F1_ROWS, plan_map=PLAN_MAP),
             "F3 has an empty 'Depends on'; write - when it has no prerequisite", id="near-miss-empty-depends-on",
         ),
         pytest.param(
@@ -358,27 +403,28 @@ ALL_ROWS = F1_ROWS + """\
                     "| F1 | planned | |",
                 ),
                 sketch_rows=F1_ROWS,
+                plan_map=PLAN_MAP,
             ),
             "F2 has an empty Handoff cell", id="near-miss-empty-handoff",
         ),
         pytest.param(
-            brief(features=FEATURES.replace("| F1, F2 | planned |", "| TBD | planned |"), sketch_rows=F1_ROWS),
+            brief(features=FEATURES.replace("| F1, F2 | planned |", "| TBD | planned |"), sketch_rows=F1_ROWS, plan_map=PLAN_MAP),
             "F3 'Depends on' is 'TBD'", id="near-miss-depends-on-without-id",
         ),
         pytest.param(
-            brief(features=FEATURES.replace("| schema | F1 |", "| schema | F0 |"), sketch_rows=F1_ROWS),
+            brief(features=FEATURES.replace("| schema | F1 |", "| schema | F0 |"), sketch_rows=F1_ROWS, plan_map=PLAN_MAP),
             "F2 depends on F0, which is not an earlier feature", id="near-miss-unknown-dependency",
         ),
         pytest.param(
-            brief(features=FEATURES.replace("| schema | F1 |", "| schema | F3 |"), sketch_rows=F1_ROWS),
+            brief(features=FEATURES.replace("| schema | F1 |", "| schema | F3 |"), sketch_rows=F1_ROWS, plan_map=PLAN_MAP),
             "F2 depends on F3, which is not an earlier feature", id="near-miss-later-dependency",
         ),
         pytest.param(
-            brief(features=FEATURES.replace("| schema, generator |", "| generator, schema |"), sketch_rows=F1_ROWS),
+            brief(features=FEATURES.replace("| schema, generator |", "| generator, schema |"), sketch_rows=F1_ROWS, plan_map=PLAN_MAP),
             "schema must come first", id="near-miss-generator-before-schema",
         ),
         pytest.param(
-            brief(features=FEATURES.replace("| schema, check, transform |", "| schema, python |"), sketch_rows=F1_ROWS),
+            brief(features=FEATURES.replace("| schema, check, transform |", "| schema, python |"), sketch_rows=F1_ROWS, plan_map=PLAN_MAP),
             "not supported artifact types", id="near-miss-unroutable-artifact",
         ),
     ],
@@ -393,15 +439,36 @@ def test_scope_split(tmp_path: Path, text: str, expected: str | None) -> None:
 # --------------------------------------------------------------------------
 
 WIFI_ROWS = """\
-| F1 | WirelessAccessPoint | serial number | model (imported) | Controller (one) | Controller export | Campus network | answer Q3 |
-| F1 | WirelessSsid | name | vlan (pool) | AccessPoint (many) | Infrahub | open: O1 | answer Q5 |
+| F1 | WirelessAccessPoint | serial number | model (imported) | WirelessController (one) | Controller export | Campus network | answer Q3 |
+| F1 | WirelessSsid | name | vlan (pool) | WirelessAccessPoint (many) | Infrahub | open: O1 | answer Q5 |
+"""
+
+WIFI_MODEL_MAP = """\
+```mermaid
+graph LR
+  WirelessAccessPoint --> WirelessController
+  WirelessSsid -->|many| WirelessAccessPoint
+```
+"""
+
+# Labelled nodes, undirected lines, the other direction.
+WIFI_VARIANT_MODEL_MAP = """\
+```mermaid
+flowchart TB
+  ap["WirelessAccessPoint
+  serial number"]
+  ctl["WirelessController"]
+  ssid[WirelessSsid]
+  ap --- ctl
+  ap --- ssid
+```
 """
 
 WIFI_OPEN = "- O1: Who owns SSID definitions? (owner: unknown)\n"
 
 WIFI_VARIANT_ROWS = """\
-| F1 | WirelessController | hostname | version (imported) | AccessPoint (many) | open: O1 | Campus network | answer Q2 |
-| F1 | WirelessSsid | name | vlan (pool) | AccessPoint (many) | Infrahub | `open: O2` | answer Q5 |
+| F1 | WirelessController | hostname | version (imported) | WirelessAccessPoint (many) | open: O1 | Campus network | answer Q2 |
+| F1 | WirelessSsid | name | vlan (pool) | WirelessAccessPoint (many) | Infrahub | `open: O2` | answer Q5 |
 """
 
 WIFI_VARIANT_OPEN = """\
@@ -413,10 +480,10 @@ WIFI_VARIANT_OPEN = """\
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        pytest.param(brief(sketch_rows=WIFI_ROWS, open_items=WIFI_OPEN), None, id="compliant"),
-        pytest.param(brief(sketch_rows=WIFI_VARIANT_ROWS, open_items=WIFI_VARIANT_OPEN), None, id="compliant-variant"),
+        pytest.param(brief(sketch_rows=WIFI_ROWS, open_items=WIFI_OPEN, model_map=WIFI_MODEL_MAP), None, id="compliant"),
+        pytest.param(brief(sketch_rows=WIFI_VARIANT_ROWS, open_items=WIFI_VARIANT_OPEN, model_map=WIFI_VARIANT_MODEL_MAP), None, id="compliant-variant"),
         pytest.param(
-            brief(sketch_rows=WIFI_ROWS.replace("open: O1", "NetOps"), open_items="none\n"),
+            brief(sketch_rows=WIFI_ROWS.replace("open: O1", "NetOps"), open_items="none\n", model_map=WIFI_MODEL_MAP),
             "must reference an open item", id="violating-invented-owner",
         ),
         pytest.param(
@@ -425,15 +492,16 @@ WIFI_VARIANT_OPEN = """\
                     "| Controller export |", "| open: O1 |"
                 ),
                 open_items=WIFI_OPEN,
+                model_map=WIFI_MODEL_MAP,
             ),
             "must reference an open item", id="near-miss-open-item-on-wrong-row",
         ),
         pytest.param(
-            brief(sketch_rows=WIFI_ROWS.replace("open: O1", "TBD"), open_items=WIFI_OPEN),
+            brief(sketch_rows=WIFI_ROWS.replace("open: O1", "TBD"), open_items=WIFI_OPEN, model_map=WIFI_MODEL_MAP),
             "owner is 'TBD'", id="near-miss-tbd",
         ),
         pytest.param(
-            brief(sketch_rows=WIFI_ROWS.replace("open: O1", "open: O3"), open_items=WIFI_OPEN),
+            brief(sketch_rows=WIFI_ROWS.replace("open: O1", "open: O3"), open_items=WIFI_OPEN, model_map=WIFI_MODEL_MAP),
             "references O3", id="near-miss-dangling-reference",
         ),
     ],
@@ -588,3 +656,59 @@ def test_features_table_always_present(tmp_path: Path, features: str | None, sho
     write(tmp_path, BRIEF, brief(features=features, sketch_rows=WIFI_ROWS, open_items=WIFI_OPEN))
     passed, message = LIB.check_features_artifacts(tmp_path)
     assert passed is should_pass, message
+
+
+# --------------------------------------------------------------------------
+# brief-maps-match-tables
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("plan_map", "expected"),
+    [
+        pytest.param(PLAN_MAP, None, id="compliant"),
+        pytest.param("", "needs exactly one mermaid map, found 0", id="violating-no-map"),
+        pytest.param(PLAN_MAP.replace("  F2 --> F4\n", ""), "arrows differ", id="near-miss-arrow-missing"),
+        pytest.param(PLAN_MAP.replace("  F2 --> F4\n", "  F2 --> F4\n  F3 --> F4\n"), "arrows differ", id="near-miss-extra-arrow"),
+        pytest.param(PLAN_MAP.replace("  F1 --> F2\n", "  F2 --> F1\n"), "arrows differ", id="near-miss-arrow-reversed"),
+        pytest.param(
+            PLAN_MAP.replace('F4["F4 Customer peering\n  schema, generator"]', 'F4["F4 Customer peering\n  schema"]'),
+            "does not show its artifacts", id="near-miss-artifact-missing",
+        ),
+        pytest.param(PLAN_MAP.replace('  F4["F4 Customer peering\n  schema, generator"]\n', ""), "plan map", id="near-miss-feature-missing"),
+        pytest.param(PLAN_MAP.replace("  F1 --> F2\n", "  F1 => F2\n"), "cannot read", id="violating-unreadable-line"),
+    ],
+)
+def test_plan_map(tmp_path: Path, plan_map: str, expected: str | None) -> None:
+    write(tmp_path, BRIEF, brief(features=FEATURES, sketch_rows=F1_ROWS, plan_map=plan_map))
+    assert_outcome(run_grader("check_scope_split.py", tmp_path), expected)
+
+
+@pytest.mark.parametrize(
+    ("rows", "model_map", "expected"),
+    [
+        pytest.param(WIFI_ROWS, WIFI_MODEL_MAP, None, id="compliant"),
+        pytest.param(WIFI_VARIANT_ROWS, WIFI_VARIANT_MODEL_MAP, None, id="compliant-variant"),
+        pytest.param(WIFI_ROWS, "", "needs exactly one mermaid map, found 0", id="violating-no-map"),
+        pytest.param(
+            WIFI_ROWS, WIFI_MODEL_MAP.replace("  WirelessSsid -->|many| WirelessAccessPoint\n", ""),
+            "model map has no node for WirelessSsid", id="near-miss-node-missing",
+        ),
+        pytest.param(
+            WIFI_ROWS, WIFI_MODEL_MAP.replace("WirelessSsid -->|many| WirelessAccessPoint", "WirelessSsid -->|many| WirelessController"),
+            "lines differ from the Peers column", id="near-miss-line-to-wrong-peer",
+        ),
+        pytest.param(
+            WIFI_ROWS,
+            WIFI_MODEL_MAP.replace(
+                "  WirelessSsid -->|many| WirelessAccessPoint\n",
+                "  WirelessSsid -->|many| WirelessAccessPoint\n  WirelessSsid --- WirelessController\n",
+            ),
+            "lines differ from the Peers column", id="near-miss-extra-line",
+        ),
+    ],
+)
+def test_model_map(tmp_path: Path, rows: str, model_map: str, expected: str | None) -> None:
+    open_items = WIFI_VARIANT_OPEN if rows is WIFI_VARIANT_ROWS else WIFI_OPEN
+    write(tmp_path, BRIEF, brief(sketch_rows=rows, open_items=open_items, model_map=model_map))
+    assert_outcome(run_grader("check_sketch_rows_complete.py", tmp_path), expected)

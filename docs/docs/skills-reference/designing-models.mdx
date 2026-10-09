@@ -21,6 +21,7 @@ The Model Designer works out what to model before any schema exists. It reads th
 - **Features**: one row per feature in build order, with the artifacts each one needs (schema, objects, generator, check, transform, menu), its dependencies, and a portable handoff for any downstream workflow
 - **Data model sketch**: for the first feature, each node kind with how it is identified, its key attributes, its peers, its source of truth, its owner, and where each fact came from
 - **Mechanisms**: whether each behavior is a computed attribute, a resource pool, a check, a transform or a generator, and why
+- **Plan map and model map**: two Mermaid diagrams drawn from the Features table and the sketch, showing the build order and how the F1 node kinds relate
 - **Decision log and open items**: every decision tagged as stated by you, accepted from a recommendation, or open, and every unknown with who owes the answer
 
 It writes no schema YAML.
@@ -39,6 +40,7 @@ It writes no schema YAML.
 - **Split before modelling**: a scope that covers several domains or many node kinds is split into ordered features, and only the first is modelled in depth
 - **No invented values**: a node kind's identity, source of truth or owner is either answered or recorded as an open item
 - **Provenance on every decision**: the brief separates what you decided from what you accepted on the skill's recommendation
+- **Maps that match their tables**: the plan map and the model map show exactly the features, dependencies, node kinds and peers in their tables, nothing more
 
 ## Common mistakes it catches
 
@@ -84,7 +86,7 @@ You answer "A, but the route targets are ours to choose, not the customer's". Th
 
 The request covers the VPN service and the allocation of route distinguishers and route targets, so the skill splits it into two features and models only the first in depth. An excerpt of `docs/designs/l3vpn/design-brief.md`:
 
-```markdown
+````markdown
 ## Features
 
 | ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
@@ -92,12 +94,26 @@ The request covers the VPN service and the allocation of route distinguishers an
 | F1 | VPN service | One object per ordered VPN, with its sites | L3Vpn, VpnSite | schema, objects | - | planned | Design and implement the L3Vpn and VpnSite model sketched below, then populate it from the customer export. |
 | F2 | RD and RT allocation | No duplicate distinguishers or targets | RD pool, RT pool | schema, objects | F1 | planned | After F1, design the RD and RT pools and populate the initial allocations using this brief's decisions. |
 
+```mermaid
+graph LR
+  F1["F1 VPN service
+  schema, objects"]
+  F2["F2 RD and RT allocation
+  schema, objects"]
+  F1 --> F2
+```
+
 ## Data model sketch
 
 | Feature | Node kind | Identified by | Key attributes (value class) | Peers (cardinality) | Source of truth | Owner | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | F1 | L3Vpn | customer + vpn_name | bandwidth (stated) | VpnSite (many) | Infrahub | Network team | vpn-customers.xlsx:vpn_name |
 | F1 | VpnSite | vpn + site_code | access type (stated) | L3Vpn (one) | Infrahub | open: O1 | vpn-customers.xlsx:site_code |
+
+```mermaid
+graph LR
+  L3Vpn ---|many| VpnSite
+```
 
 ## Decision log
 
@@ -110,6 +126,26 @@ The request covers the VPN service and the allocation of route distinguishers an
 ## Open items
 
 - O1: Who owns site records once a VPN is live? (owner: unknown, network or service desk)
+````
+
+### The maps
+
+The brief draws each table as a map, so the plan and the model can be read at a glance. The tables stay the source, and the skill checks that each map agrees with its table. The plan map shows the build order and what each feature produces:
+
+```mermaid
+graph LR
+  F1["F1 VPN service
+  schema, objects"]
+  F2["F2 RD and RT allocation
+  schema, objects"]
+  F1 --> F2
+```
+
+The model map shows the F1 node kinds and how they relate:
+
+```mermaid
+graph LR
+  L3Vpn ---|many| VpnSite
 ```
 
 The next step is to take the F1 handoff into the team's existing specification, planning or implementation workflow. If the team has no established workflow, the [Schema Manager](./managing-schemas.mdx) can implement the schema from the brief.

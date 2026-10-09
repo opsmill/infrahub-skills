@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import run_checks  # noqa: E402
 
-CHECK_NAMES = ["scope-split-f1-only", "features-artifacts", "sketch-rows-complete"]
+CHECK_NAMES = ["scope-split-f1-only", "features-artifacts", "plan-map-matches", "sketch-rows-complete"]
 
 
 def main() -> None:

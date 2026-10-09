@@ -28,8 +28,10 @@ These `##` headings, spelled and ordered exactly like this:
    orders, what the requester decides compared with
    what the network team derives, and the lifecycle
    states with who moves each one.
-5. `## Features`: always present, one row per feature.
-6. `## Data model sketch`: the node kinds of F1.
+5. `## Features`: always present, one row per feature,
+   then the plan map.
+6. `## Data model sketch`: the node kinds of F1, then
+   the model map.
 7. `## Mechanisms`: for each behavior, a computed
    attribute, a resource pool, a check, a transform or
    a generator, and why.
@@ -76,6 +78,30 @@ files pasted into the conversation.
   into their existing specification, planning,
   ticketing or implementation workflow.
 
+## Plan map
+
+A Mermaid graph right after the Features table, so a
+reader sees the build order at a glance. It is drawn
+from the table, and the table stays the source: change
+the table first, then redraw the map.
+
+- One node per feature, labelled with its ID, its name
+  and its artifacts.
+- One arrow from each feature in `Depends on` to the
+  feature that depends on it. A feature with `-` has no
+  incoming arrow.
+- Break a label over two lines inside the quotes, never
+  with `<br>`.
+
+```mermaid
+graph LR
+  F1["F1 Fiber plant
+  schema, objects"]
+  F2["F2 DWDM channels
+  schema"]
+  F1 --> F2
+```
+
 ## Data model sketch table
 
 ```markdown
@@ -93,8 +119,29 @@ files pasted into the conversation.
   for the node kind. `Evidence` is where you learned the
   row's facts: `file:column`, `file:element`, or
   `answer Q<n>`.
+- `Peers` names each peer node kind spelled exactly as
+  its `Node kind`, followed by the cardinality:
+  `Strand (many)`.
 - A value nobody knows is written `open: O<n>`, pointing
   at a real entry in Open items.
+
+## Model map
+
+A Mermaid graph right after the sketch table. Like the
+plan map, it is drawn from the table and the table stays
+the source.
+
+- One node per node kind in the sketch, labelled with
+  the node kind.
+- One line between a node kind and each peer in its
+  `Peers` cell. Direction does not matter; a line the
+  table does not have is a mistake.
+
+```mermaid
+graph LR
+  LocationSite --- ConsoleServer
+  FiberCable ---|many| Strand
+```
 
 ## Decision log table
 
