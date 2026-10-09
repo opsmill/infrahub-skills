@@ -775,18 +775,19 @@ def check_plan_map_matches(ws: Path) -> tuple[bool, str]:
     """The Features map shows each feature with its artifacts and each dependency.
 
     The table is the source; the map must agree with it exactly: one node per
-    feature, labelled with its ID and its artifacts, and one arrow from each
-    feature it depends on.
+    feature, labelled with its ID, its Feature name and exactly its artifacts,
+    and one arrow from each feature it depends on.
     """
     parts, err = _brief_sections(ws)
     if parts is None:
         return False, err
     headers, rows = first_table(parts.get(FEATURES_HEADING, ""))
     id_col = _column(headers, "id")
+    name_col = _column(headers, "feature")
     art_col = _column(headers, "artifacts")
     dep_col = _column(headers, "depends on")
-    if not rows or None in (id_col, art_col, dep_col):
-        return False, "Features table has no 'ID', 'Artifacts' and 'Depends on' columns"
+    if not rows or None in (id_col, name_col, art_col, dep_col):
+        return False, "Features table has no 'ID', 'Feature', 'Artifacts' and 'Depends on' columns"
     nodes, edges, err = _one_map(parts, FEATURES_HEADING, "Features")
     if err:
         return False, f"plan map: {err}"
@@ -809,11 +810,21 @@ def check_plan_map_matches(ws: Path) -> tuple[bool, str]:
         for dep in _FEATURE_ID.findall(_clean(row[dep_col])):
             want_edges.add((f"F{dep}", fid))
         if fid in by_feature:
-            label_words = set(re.findall(r"[a-z]+", nodes[by_feature[fid]].lower()))
+            label = nodes[by_feature[fid]].lower()
+            name = _clean(row[name_col]).lower()
+            named = re.search(r"(?<!\w)" + re.escape(name) + r"(?!\w)", label) if name else None
+            if not named:
+                return False, f"plan map node for {fid} does not name the feature '{_clean(row[name_col])}'"
+            # Read artifacts from what is left once the name is removed, so
+            # a feature called 'Menus' or 'Policy check' cannot supply them.
+            label_words = set(re.findall(r"[a-z]+", label[: named.start()] + " " + label[named.end():]))
             want = {a.strip() for a in re.split(r"[,;]|\band\b|->|→", _clean(row[art_col]).lower()) if a.strip()}
             missing = sorted(want - label_words)
             if missing:
                 return False, f"plan map node for {fid} does not show its artifacts {missing}"
+            extra = sorted((label_words & ARTIFACT_TYPES) - want)
+            if extra:
+                return False, f"plan map node for {fid} shows artifacts {extra} the table does not list"
     if sorted(by_feature) != sorted(table_ids):
         return False, f"plan map shows {sorted(by_feature)}, the Features table has {sorted(table_ids)}"
 
