@@ -435,6 +435,28 @@ ALL_ROWS = F1_ROWS + """\
             "F2 has an empty Handoff cell", id="near-miss-empty-handoff",
         ),
         pytest.param(
+            brief(
+                features=FEATURES.replace(
+                    "| planned | After F2, model zones, validate policy, and render the rules. |",
+                    "| planned | TBD |",
+                ),
+                sketch_rows=F1_ROWS,
+                plan_map=PLAN_MAP,
+            ),
+            "F3 has a placeholder Handoff cell: 'TBD'", id="near-miss-placeholder-handoff",
+        ),
+        pytest.param(
+            brief(
+                features=FEATURES.replace(
+                    "| F1 | planned | After F1, design the prefix and pool model. |",
+                    "| F1 | planned | - |",
+                ),
+                sketch_rows=F1_ROWS,
+                plan_map=PLAN_MAP,
+            ),
+            "F2 has a placeholder Handoff cell: '-'", id="near-miss-dash-handoff",
+        ),
+        pytest.param(
             brief(features=FEATURES.replace("| F1, F2 | planned |", "| TBD | planned |"), sketch_rows=F1_ROWS, plan_map=PLAN_MAP),
             "F3 'Depends on' is 'TBD'", id="near-miss-depends-on-without-id",
         ),

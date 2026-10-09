@@ -498,8 +498,11 @@ def check_scope_split_f1_only(ws: Path) -> tuple[bool, str]:
             for d in deps:
                 if d < 1 or d >= position:
                     return False, f"F{position} depends on F{d}, which is not an earlier feature"
-        if not _clean(row[handoff_col]):
+        handoff = _clean(row[handoff_col])
+        if not handoff:
             return False, f"F{position} has an empty Handoff cell"
+        if handoff.lower().rstrip(".") in PLACEHOLDERS:
+            return False, f"F{position} has a placeholder Handoff cell: {handoff!r}"
 
     s_headers, s_rows, err = _sketch(parts)
     if err:
