@@ -98,6 +98,10 @@ TOKEN_LEAKS = [
         'Run `echo "$(base64 <<< "$INFRAHUB_API_TOKEN")"`.',
         id="value-in-substitution-printed-by-outer-echo",
     ),
+    pytest.param(
+        'Run `echo $(cat <<< "$INFRAHUB_API_TOKEN")`.',
+        id="value-in-unquoted-substitution-printed-by-outer-echo",
+    ),
 ]
 
 
