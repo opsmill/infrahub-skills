@@ -131,11 +131,12 @@ MATCH="(\"$ISSUE\" != \"\" and (any(.closingIssuesReferences[]; .number == ${ISS
 FIELDS=number,title,body,headRefName,closingIssuesReferences,files,mergeCommit
 # Every PR in a state: double --limit until gh returns fewer than it was asked for.
 all_prs() {
-  local state=$1 limit=100 json
+  local state=$1 limit=100 json count
   shift
   while :; do
     json=$(gh pr list --state "$state" --limit "$limit" "$@" --json "$FIELDS") || return 1
-    [ "$(printf '%s' "$json" | jq length)" -lt "$limit" ] && { printf '%s' "$json"; return 0; }
+    count=$(printf '%s' "$json" | jq length) || return 1
+    [ "$count" -lt "$limit" ] && { printf '%s' "$json"; return 0; }
     limit=$((limit * 2))
   done
 }
@@ -146,13 +147,18 @@ DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@
 [ "$DEFAULT_BRANCH" = "(unknown)" ] && DEFAULT_BRANCH=""
 BASE=${DEFAULT_BRANCH:+$(git merge-base HEAD "origin/$DEFAULT_BRANCH" 2>/dev/null)}
 SINCE=${BASE:+--search merged:>=$(TZ=UTC git log -1 --date=format-local:%Y-%m-%d --format=%cd "$BASE")}
-OPEN=$(all_prs open) && MERGED=$(all_prs merged $SINCE) \
-  || { echo "SEARCH FAILED: gh pr list did not complete, so nothing was searched"; exit 1; }
-printf '%s' "$OPEN" | jq -r ".[] | select($MATCH) | \"#\(.number)\topen\t\(.headRefName)\t\(.title)\""
-printf '%s' "$MERGED" | jq -r ".[] | select($MATCH) | \"\(.number)\t\(.mergeCommit.oid)\t\(.headRefName)\t\(.title)\"" |
-  while IFS=$'\t' read -r n sha ref t; do
-    git merge-base --is-ancestor "$sha" HEAD 2>/dev/null || printf '#%s\tmerged, not in HEAD\t%s\t%s\n' "$n" "$ref" "$t"
-  done
+# Every step that can fail stops the search: an empty result must mean no match.
+fail() { echo "SEARCH FAILED: $1, so nothing was searched"; exit 1; }
+OPEN=$(all_prs open) || fail "gh pr list --state open did not complete"
+MERGED=$(all_prs merged $SINCE) || fail "gh pr list --state merged did not complete"
+OPEN_HITS=$(printf '%s' "$OPEN" | jq -r ".[] | select($MATCH) | \"#\(.number)\topen\t\(.headRefName)\t\(.title)\"") \
+  || fail "jq could not match the open PRs"
+MERGED_HITS=$(printf '%s' "$MERGED" | jq -r ".[] | select($MATCH) | \"\(.number)\t\(.mergeCommit.oid)\t\(.headRefName)\t\(.title)\"") \
+  || fail "jq could not match the merged PRs"
+[ -z "$OPEN_HITS" ] || printf '%s\n' "$OPEN_HITS"
+[ -z "$MERGED_HITS" ] || while IFS=$'\t' read -r n sha ref t; do
+  git merge-base --is-ancestor "$sha" HEAD 2>/dev/null || printf '#%s\tmerged, not in HEAD\t%s\t%s\n' "$n" "$ref" "$t"
+done <<< "$MERGED_HITS"
 ```
 
 No output and exit status 0: record `Duplicate check: none found` and

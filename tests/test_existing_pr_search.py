@@ -101,51 +101,57 @@ def _pr(
     }
 
 
-def _fixtures(head_sha: str, filler: int = 0) -> list[dict]:
+def _fixtures(head_sha: str, filler: int = 0, extra: tuple = ()) -> list[dict]:
     # gh lists newest first. Filler PRs match nothing and sit ahead of the
     # real fixtures, so a block that stops at one page never reaches them.
     newer = [_pr(1000 + n, "OPEN") for n in range(filler)]
     newer += [_pr(2000 + n, "MERGED", merge_commit=head_sha) for n in range(filler)]
-    return newer + [
-        # Open, on another branch, closes #25: the PR the own-branch lookup misses.
-        _pr(201, "OPEN", title="fix(menus): removing items", closes=(25,)),
-        # Open, the body digits contain 25 but no #25 token.
-        _pr(202, "OPEN", body="Bumps the limit from 25 to 50, see #250 and #1255."),
-        # Open, no issue, changes a file under the menus skill.
-        _pr(
-            203,
-            "OPEN",
-            title="fix(menus): icons",
-            files=("skills/infrahub-managing-menus/rules/menu-icons.md",),
-        ),
-        # Open, #25 followed by letters is not the #25 token.
-        _pr(208, "OPEN", body="Tracked under #25abc and #25_old in the old tracker."),
-        # Open, names #25 in the body without closing it.
-        _pr(204, "OPEN", body="Follow-up to #25, which this partly addresses."),
-        # Open, the body names a range that ends at #177, not #25.
-        _pr(205, "OPEN", body="Harvest review lessons from #142-#177."),
-        # Open, a path that only starts like the target.
-        _pr(206, "OPEN", files=("skills/infrahub-managing-menus-extra/SKILL.md",)),
-        # Closed, not merged, closes #25: never a match.
-        _pr(
-            207,
-            "CLOSED",
-            closes=(25,),
-            files=("skills/infrahub-managing-menus/SKILL.md",),
-        ),
-        # Merged after HEAD, closes #25: the fix exists but the tree lacks it.
-        _pr(301, "MERGED", closes=(25,), merge_commit=NOT_IN_HEAD),
-        # Merged and already in HEAD, closes #25: nothing to warn about.
-        _pr(
-            302,
-            "MERGED",
-            closes=(25,),
-            merge_commit=head_sha,
-            files=("skills/infrahub-managing-menus/SKILL.md",),
-        ),
-        # Merged after HEAD, unrelated.
-        _pr(303, "MERGED", merge_commit=NOT_IN_HEAD),
-    ]
+    return (
+        newer
+        + list(extra)
+        + [
+            # Open, on another branch, closes #25: the PR the own-branch lookup misses.
+            _pr(201, "OPEN", title="fix(menus): removing items", closes=(25,)),
+            # Open, the body digits contain 25 but no #25 token.
+            _pr(202, "OPEN", body="Bumps the limit from 25 to 50, see #250 and #1255."),
+            # Open, no issue, changes a file under the menus skill.
+            _pr(
+                203,
+                "OPEN",
+                title="fix(menus): icons",
+                files=("skills/infrahub-managing-menus/rules/menu-icons.md",),
+            ),
+            # Open, #25 followed by letters is not the #25 token.
+            _pr(
+                208, "OPEN", body="Tracked under #25abc and #25_old in the old tracker."
+            ),
+            # Open, names #25 in the body without closing it.
+            _pr(204, "OPEN", body="Follow-up to #25, which this partly addresses."),
+            # Open, the body names a range that ends at #177, not #25.
+            _pr(205, "OPEN", body="Harvest review lessons from #142-#177."),
+            # Open, a path that only starts like the target.
+            _pr(206, "OPEN", files=("skills/infrahub-managing-menus-extra/SKILL.md",)),
+            # Closed, not merged, closes #25: never a match.
+            _pr(
+                207,
+                "CLOSED",
+                closes=(25,),
+                files=("skills/infrahub-managing-menus/SKILL.md",),
+            ),
+            # Merged after HEAD, closes #25: the fix exists but the tree lacks it.
+            _pr(301, "MERGED", closes=(25,), merge_commit=NOT_IN_HEAD),
+            # Merged and already in HEAD, closes #25: nothing to warn about.
+            _pr(
+                302,
+                "MERGED",
+                closes=(25,),
+                merge_commit=head_sha,
+                files=("skills/infrahub-managing-menus/SKILL.md",),
+            ),
+            # Merged after HEAD, unrelated.
+            _pr(303, "MERGED", merge_commit=NOT_IN_HEAD),
+        ]
+    )
 
 
 def _block() -> str:
@@ -164,7 +170,13 @@ def _block() -> str:
 
 
 def _execute(
-    tmp_path: Path, issue: str, targets: str, *, filler: int = 0, gh_fails: bool = False
+    tmp_path: Path,
+    issue: str,
+    targets: str,
+    *,
+    filler: int = 0,
+    extra: tuple = (),
+    gh_fails: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     if shutil.which("jq") is None:
         pytest.fail("jq is required to emulate gh --jq; install it")
@@ -193,7 +205,7 @@ def _execute(
     ).stdout.strip()
 
     fixtures = tmp_path / "prs.json"
-    fixtures.write_text(json.dumps(_fixtures(head, filler)))
+    fixtures.write_text(json.dumps(_fixtures(head, filler, extra)))
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     gh = bin_dir / "gh"
@@ -222,8 +234,10 @@ def _execute(
     )
 
 
-def _run(tmp_path: Path, issue: str, targets: str, *, filler: int = 0) -> set[int]:
-    result = _execute(tmp_path, issue, targets, filler=filler)
+def _run(
+    tmp_path: Path, issue: str, targets: str, *, filler: int = 0, extra: tuple = ()
+) -> set[int]:
+    result = _execute(tmp_path, issue, targets, filler=filler, extra=extra)
     assert result.returncode == 0, f"the block failed:\n{result.stderr}"
     return {int(m) for m in re.findall(r"^#(\d+)\b", result.stdout, re.M)}
 
@@ -290,6 +304,22 @@ def test_search_fails_loudly_when_gh_fails(tmp_path: Path) -> None:
     """
     result = _execute(tmp_path, "25", "", gh_fails=True)
     assert result.returncode != 0, "the block exited 0 although gh failed"
+    assert "SEARCH FAILED" in result.stdout + result.stderr, (
+        "the block must say SEARCH FAILED so the stage does not record none found"
+    )
+
+
+def test_search_fails_loudly_when_jq_fails(tmp_path: Path) -> None:
+    """A jq error while matching is an error, not an empty result.
+
+    The match runs inside a pipeline whose last command is a `while` loop, so
+    a jq failure upstream of it used to leave exit status 0 with nothing
+    printed. A PR whose `files` is null makes the file match fail.
+    """
+    broken = _pr(209, "OPEN")
+    broken["files"] = None
+    result = _execute(tmp_path, "", "skills/infrahub-managing-checks/", extra=(broken,))
+    assert result.returncode != 0, "the block exited 0 although jq failed"
     assert "SEARCH FAILED" in result.stdout + result.stderr, (
         "the block must say SEARCH FAILED so the stage does not record none found"
     )
