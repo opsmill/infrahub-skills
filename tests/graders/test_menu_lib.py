@@ -2428,3 +2428,38 @@ infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
                 assert score == 1.0, f"{name}: {result.stdout}"
             else:
                 assert score < 1.0, f"{name} scored 1.0: {result.stdout}"
+
+
+class TestShellParserEdgeCases:
+    """Regressions for the apply-step shell and GraphQL readers."""
+
+    def test_loop_value_with_backslash_does_not_crash(self):
+        commands = _mod._shell_commands("for i in 'a\\1' b; do echo $i; done")
+        # The value is substituted as text, not as a re.sub template.
+        assert [argv[0] for argv in commands] == ["echo", "echo"]
+        assert commands[1] == ["echo", "b"]
+
+    def test_curl_payload_in_untagged_fence_is_read(self):
+        text = (
+            "```\n"
+            "curl -X POST http://localhost:8000/graphql -d "
+            '\'{"query": "mutation { CoreMenuItemDelete(data: {hfid: [\\"Campus\\", '
+            '\\"LabMenu\\"]}) { ok } }"}\'\n'
+            "```\n"
+        )
+        deletes, _, _ = _mod._menu_item_deletes(text)
+        assert [hfid for _, hfid in deletes] == [("Campus", "LabMenu")]
+
+    def test_lone_dash_shell_runs_heredoc(self):
+        commands = _mod._shell_commands("sh - <<'EOF'\ngit push\nEOF")
+        assert ["git", "push"] in commands
+
+    def test_heredoc_written_inside_running_heredoc_is_data(self):
+        body = "ssh host <<'EOF'\ncat > /tmp/x <<'IN'\ngit push\nIN\nEOF"
+        assert ["git", "push"] not in _mod._shell_commands(body)
+
+    def test_attached_option_value_is_not_a_flag(self):
+        body = "docker exec -uinfrahub server sh <<'EOF'\ngit push\nEOF"
+        assert ["git", "push"] not in _mod._shell_commands(body)
+        body = "docker exec -iuinfrahub server sh <<'EOF'\ngit push\nEOF"
+        assert ["git", "push"] in _mod._shell_commands(body)

@@ -1021,12 +1021,28 @@ def _leading_options(argv: list[str], value_options: frozenset[str]) -> list[str
     return argv[: len(argv) - len(_skip_options(list(argv), value_options))]
 
 
-def _has_flag(options: list[str], short: str, long: str) -> bool:
+def _bundle_sets(option: str, short: str, value_shorts: str) -> bool:
+    """Whether the short-option bundle ``option`` sets ``-<short>``.
+
+    Letters after one in ``value_shorts`` are that option's value, so
+    ``-uinfrahub`` sets ``-u`` and no ``-i``.
+    """
+    if not option.startswith("-") or option.startswith("--"):
+        return False
+    for letter in option[1:]:
+        if letter == short:
+            return True
+        if letter in value_shorts:
+            return False
+    return False
+
+
+def _has_flag(options: list[str], short: str, long: str, value_shorts: str = "") -> bool:
     """Whether ``options`` set ``-<short>`` (alone or bundled, ``-it``) or ``long``."""
     return any(
         option == long
         or option.startswith(f"{long}=") and option.split("=", 1)[1].lower() != "false"
-        or (option.startswith("-") and not option.startswith("--") and short in option[1:])
+        or _bundle_sets(option, short, value_shorts)
         for option in options
     )
 
@@ -1037,11 +1053,11 @@ def _shell_reads_stdin(args: list[str]) -> bool:
     It does with ``-s``, or with no script file and no ``-c``. Short options
     may be bundled (``-es``, ``-ec``); an ``o`` among them takes the next
     word as its value. After ``--`` the next word is a script file unless
-    ``-s`` came first.
+    ``-s`` came first; a lone ``-`` works the same way.
     """
     words = iter(args)
     for arg in words:
-        if arg == "--":
+        if arg in ("--", "-"):  # a lone ``-`` also ends the options
             return next(words, None) is None
         if arg.startswith("--"):
             continue  # long options: --norc, --login
@@ -1089,12 +1105,12 @@ def _stdin_runs_as_shell(argv: list[str]) -> bool:
         # Compose attaches stdin by default (``-T`` only drops the TTY);
         # plain ``docker``/``podman exec`` passes it on only with ``-i``.
         compose = program == "docker-compose" or "compose" in argv[1:exec_at]
-        if not compose and not _has_flag(options, "i", "--interactive"):
+        if not compose and not _has_flag(options, "i", "--interactive", "euw"):
             return False
         return _stdin_runs_as_shell(rest[1:])  # rest[0] is the container or service
     if program == "kubectl" and "exec" in argv and "--" in argv:
         dash_dash = argv.index("--")
-        if not _has_flag(argv[argv.index("exec") + 1 : dash_dash], "i", "--stdin"):
+        if not _has_flag(argv[argv.index("exec") + 1 : dash_dash], "i", "--stdin", "cfns"):
             return False  # without -i the heredoc never reaches the pod
         return _stdin_runs_as_shell(argv[dash_dash + 1 :])
     return False
@@ -1156,16 +1172,18 @@ def _shell_commands(body: str, console: bool = False) -> list[list[str]]:
     """
     commands: list[list[str]] = []
     pending: list[str] = []
-    heredoc_end: str | None = None
-    heredoc_runs = False
+    # Open heredocs, innermost last, as ``(terminator, body runs as shell)``.
+    # A heredoc a running body opens (``ssh host <<EOF`` holding
+    # ``cat > f <<IN``) nests inside it.
+    heredocs: list[tuple[str, bool]] = []
     for raw in _expand_for_loops(body.replace("\\\n", " ")).splitlines():
         if console:
             raw = _CONTINUATION_PROMPT_RE.sub("", raw, count=1)
-        if heredoc_end is not None:
-            if raw.strip() == heredoc_end:
-                heredoc_end = None
+        if heredocs:
+            if raw.strip() == heredocs[-1][0]:
+                heredocs.pop()
                 continue
-            if not heredoc_runs:
+            if not heredocs[-1][1]:
                 continue
         line = _escape_word_apostrophes(raw)
         pending.append(line)
@@ -1173,9 +1191,8 @@ def _shell_commands(body: str, console: bool = False) -> list[list[str]]:
             continue  # a real quote is open: read the next line into it
         commands.extend(_lex_or_skip("\n".join(pending)))
         pending = []
-        if heredoc_end is None and (delimiter := _heredoc_delimiter(line)):
-            heredoc_end = delimiter
-            heredoc_runs = _runs_heredoc_as_shell(line)
+        if delimiter := _heredoc_delimiter(line):
+            heredocs.append((delimiter, _runs_heredoc_as_shell(line)))
     for line in pending:  # a quote never closed: fall back to line by line
         commands.extend(_lex_or_skip(line))
     return commands
@@ -1230,20 +1247,23 @@ def _graphql_documents(text: str) -> list[tuple[tuple[int, int], str, dict, bool
 
     Returns ``(position, document, variables, declared)`` for ``graphql`` /
     ``gql`` fences, untagged fences, JSON request bodies, and the ``-d`` /
-    ``--data*`` / ``--json`` payload of a ``curl`` in a shell fence.
+    ``--data*`` / ``--json`` payload of a ``curl`` in a shell or untagged
+    fence.
     ``declared`` is false for an untagged fence, which may hold anything.
     """
     documents: list[tuple[tuple[int, int], str, dict, bool]] = []
     for index, (lang, body) in enumerate(_fences(text)):
         if lang in _GRAPHQL_LANGS:
             documents.append(((index, 0), body, {}, True))
-        elif lang == "":
-            documents.append(((index, 0), body, {}, False))
         elif lang == "json":
             request = _request_body(body)
             if request:
                 documents.append(((index, 0), request[0], request[1], True))
-        elif lang in _SHELL_LANGS:
+        if lang == "":
+            # An untagged fence may hold a document or shell commands, so
+            # read it both ways, as ``_shell_invocations`` does.
+            documents.append(((index, 0), body, {}, False))
+        if lang in _SHELL_LANGS or lang == "":
             for number, words in enumerate(_shell_commands(body, console=lang in _CONSOLE_LANGS)):
                 if not words or Path(words[0]).name != "curl":
                     continue
@@ -1303,7 +1323,8 @@ def _expand_for_loops(body: str) -> str:
             return match.group(0)
         loop_body = match.group("body").strip()
         return "\n".join(
-            re.sub(rf"\$\{{{var}\}}|\${var}\b", value, loop_body) for value in values
+            re.sub(rf"\$\{{{var}\}}|\${var}\b", lambda _, v=value: v, loop_body)
+            for value in values
         )
 
     return _FOR_LOOP_RE.sub(unroll, body)
