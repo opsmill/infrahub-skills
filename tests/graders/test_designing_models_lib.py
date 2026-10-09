@@ -220,6 +220,7 @@ INPUTS_TABLE = """\
 INPUT_ROWS = """\
 | F1 | LocationRegion | region | name (imported) | PoP (many) | Facilities sheet | Facilities | pops.csv:region |
 | F1 | LocationPop | pop_code | name, city (imported) | Region (one) | Facilities sheet | Facilities | pops.csv:pop_code |
+| F1 | NetworkRouter | pop_code + role | model (stated) | LocationPop (one) | Infrahub | Backbone team | pops.csv:pop_code; backbone.txt:cr1/cr2 |
 | F1 | NetworkBackboneLink | endpoints a and b | capacity (stated) | Router (two) | Infrahub | Backbone team | backbone.txt:links |
 """
 
@@ -236,6 +237,7 @@ INPUT_VARIANT_ROWS = """\
 | F1 | NetworkBackboneLink | endpoints a and b | capacity (stated) | Router (two) | Infrahub | Backbone team | `backbone.txt` (link lines) |
 | F1 | LocationPop | `pop_code` | name, city (imported) | Region (one) | Facilities sheet | Facilities | pops.csv (pop_code column) |
 | F1 | LocationRegion | `region` | name (imported) | PoP (many) | Facilities sheet | Facilities | pops.csv (region column) |
+| F1 | NetworkRouter | `pop_code` and role | model (stated) | LocationPop (one) | Infrahub | Backbone team | pops.csv (pop_code, city columns), `backbone.txt` (cr1/cr2 per PoP) |
 """
 
 
@@ -274,6 +276,31 @@ INPUT_VARIANT_ROWS = """\
             BRIEF,
             brief(inputs=INPUTS_TABLE, sketch_rows=INPUT_ROWS.replace("pops.csv:pop_code", "old_pops.csv:pop_code")),
             "Evidence does not name pops.csv", id="near-miss-evidence-other-file",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(
+                inputs=INPUTS_TABLE,
+                sketch_rows=INPUT_ROWS.replace("pops.csv:pop_code; backbone.txt:cr1/cr2", "pops.csv:pop_code"),
+            ),
+            "NetworkRouter is a backbone.txt fact but its Evidence does not cite backbone.txt",
+            id="near-miss-citation-on-wrong-row",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(inputs=INPUTS_TABLE, sketch_rows=INPUT_ROWS.replace("backbone.txt:links", "backbone.txt")),
+            "Evidence for NetworkBackboneLink cites backbone.txt without a locator",
+            id="near-miss-citation-without-locator",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(
+                inputs=INPUTS_TABLE,
+                sketch_rows="".join(
+                    line + "\n" for line in INPUT_ROWS.splitlines() if "NetworkRouter" not in line
+                ).replace("NetworkBackboneLink", "NetworkPath"),
+            ),
+            "no sketch row has a node kind matching", id="violating-no-backbone-kind",
         ),
     ],
 )

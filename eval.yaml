@@ -8872,10 +8872,10 @@ tasks:
     expectations:
       - Both files are read and listed even though the user said to skip them
       - The PoP and region rows cite pops.csv as evidence
-      - The link rows cite backbone.txt as evidence
+      - The router and link rows cite backbone.txt as evidence, each with a locator
     assertions:
       - name: inputs-digested
-        check: Every provided file is listed in Inputs and cited as evidence in the sketch
+        check: Every provided file is listed in Inputs; each sketch fact cites its own file with a locator
       - name: sketch-rows-complete
         check: Every sketch row has identity, source of truth and owner, or an open item
       - name: decision-provenance

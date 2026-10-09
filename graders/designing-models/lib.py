@@ -342,13 +342,67 @@ def _file_names(cell: str) -> set[str]:
     return {Path(m).name.lower() for m in _FILE_REF.findall(_clean(cell))}
 
 
-def check_inputs_digested(ws: Path, inputs: dict[str, list[str]]) -> tuple[bool, str]:
+_LOCATOR = re.compile(r"^(?::\s*[^\s:]|\s*\(\s*[^)\s][^)]*\))")
+
+
+def _citations(cell: str) -> list[str]:
+    """Split an Evidence cell into its citations on ';' and ',' outside parentheses.
+
+    ``pops.csv (pop_code, region columns); backbone.txt:links`` gives two
+    citations, not three.
+    """
+    out, depth, current = [], 0, ""
+    for ch in _clean(cell):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(depth - 1, 0)
+        if ch in ";," and depth == 0:
+            out.append(current.strip())
+            current = ""
+            continue
+        current += ch
+    out.append(current.strip())
+    return [c for c in out if c]
+
+
+def _cited_files(cell: str, inputs: dict[str, list[str]]) -> tuple[set[str], set[str]]:
+    """Input files a cell cites, and those cited without a locator.
+
+    A locator follows the file name as ``file:column`` / ``file:element`` or
+    ``file (column)`` / ``file (element)``.
+    """
+    wanted = {n.lower(): n for n in inputs}
+    cited: set[str] = set()
+    bare: set[str] = set()
+    for citation in _citations(cell):
+        for match in _FILE_REF.finditer(citation):
+            name = wanted.get(Path(match.group(0)).name.lower())
+            if name is None:
+                continue
+            cited.add(name)
+            if not _LOCATOR.match(citation[match.end():]):
+                bare.add(name)
+    return cited, bare
+
+
+def check_inputs_digested(
+    ws: Path,
+    inputs: dict[str, list[str]],
+    sources: dict[str, re.Pattern] | None = None,
+) -> tuple[bool, str]:
     """Every input file is listed and used as evidence for the sketch.
 
     ``inputs`` maps each file the task provided to its CSV column headers
     (empty for files that are not tables). A sketch row identified by one of
-    a file's columns must name that file in its Evidence cell, and every
-    file must be the evidence for at least one row.
+    a file's columns must cite that file in its Evidence cell, every citation
+    of an input file carries a locator, and every file must be the evidence
+    for at least one row.
+
+    ``sources`` optionally binds a file to the sketch rows whose facts the
+    task put in it: every row whose Node kind matches the file's pattern must
+    cite that file, and at least one row must match, so a brief cannot pass
+    by leaving those rows out.
     """
     parts, err = _brief_sections(ws)
     if parts is None:
@@ -375,26 +429,38 @@ def check_inputs_digested(ws: Path, inputs: dict[str, list[str]]) -> tuple[bool,
         return False, err
     ev_col = _column(headers, "evidence")
     id_col = _column(headers, "identified by")
+    kind_col = _column(headers, "node kind") or ""
     if ev_col is None or id_col is None:
         return False, "sketch table lacks an 'Identified by' or 'Evidence' column"
 
+    sources = sources or {}
+    matched: set[str] = set()
     cited: set[str] = set()
     for row in rows:
-        named = _file_names(row.get(ev_col, ""))
-        cited_here = {n for n in inputs if n.lower() in named}
+        kind = _clean(row.get(kind_col, "")) or "?"
+        cited_here, bare = _cited_files(row.get(ev_col, ""), inputs)
         cited |= cited_here
         identity_tokens = set(re.findall(r"[a-z0-9_]+", _clean(row.get(id_col, "")).lower()))
         for name, columns in inputs.items():
             if identity_tokens & {c.lower() for c in columns} and name not in cited_here:
-                kind = _clean(row.get(_column(headers, "node kind") or "", ""))
                 return False, (
-                    f"sketch row {kind or '?'} is identified by a {name} column "
+                    f"sketch row {kind} is identified by a {name} column "
                     f"but its Evidence does not name {name}"
                 )
+        for name in sorted(bare):
+            return False, f"Evidence for {kind} cites {name} without a locator (file:column or file:element)"
+        for name, pattern in sources.items():
+            if pattern.search(kind):
+                matched.add(name)
+                if name not in cited_here:
+                    return False, f"{kind} is a {name} fact but its Evidence does not cite {name}"
     for name in inputs:
         if name not in cited:
             return False, f"no sketch row cites {name} as evidence"
-    return True, "every input listed and cited as evidence"
+    for name, pattern in sources.items():
+        if name not in matched:
+            return False, f"no sketch row has a node kind matching {pattern.pattern!r}, the facts {name} holds"
+    return True, "every input listed, and each fact cites its own file with a locator"
 
 
 # --------------------------------------------------------------------------

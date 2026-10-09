@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Grader for eval task: design-inputs-digested.
 
-Every file the task provided is listed in the brief's Inputs and cited as
-evidence for the sketch. INPUTS mirrors the files in the task's prompt, not
-the skill's prose: it is the task's own fixture.
+Every file the task provided is listed in the brief's Inputs, and each sketch
+row cites the file its facts came from, with a locator. INPUTS and SOURCES
+mirror the files in the task's prompt, not the skill's prose: they are the
+task's own fixture.
 Usage: python check_inputs_digested.py [workspace_dir]
 Prints skillgrade JSON to stdout.
 """
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -22,12 +24,18 @@ INPUTS = {
     "backbone.txt": [],
 }
 
+# File name -> the node kinds whose facts the task's prompt puts in that file.
+SOURCES = {
+    "pops.csv": re.compile(r"pop|region|location|site", re.IGNORECASE),
+    "backbone.txt": re.compile(r"router|device|link|circuit|backbone", re.IGNORECASE),
+}
+
 CHECK_NAMES = ["inputs-digested", "sketch-rows-complete", "decision-provenance"]
 
 
 def main() -> None:
     workspace = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
-    extra = {"inputs-digested": lambda ws: check_inputs_digested(ws, INPUTS)}
+    extra = {"inputs-digested": lambda ws: check_inputs_digested(ws, INPUTS, SOURCES)}
     print(json.dumps(run_checks(CHECK_NAMES, workspace, extra)))
 
 
