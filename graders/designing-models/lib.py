@@ -841,7 +841,8 @@ def check_model_map_matches(ws: Path) -> tuple[bool, str]:
 
     The table is the source. Each sketch row is a node; each kind in its
     Peers cell is a line between the two, in either direction. A line the
-    table does not have, or a peer with no line, fails.
+    table does not have, or a peer with no line, fails. So does a node whose
+    kind is neither a sketch row nor a peer, and a kind drawn twice.
     """
     parts, err = _brief_sections(ws)
     if parts is None:
@@ -861,17 +862,28 @@ def check_model_map_matches(ws: Path) -> tuple[bool, str]:
         match = _KIND.match(nodes[node_id])
         return match.group(0) if match else node_id
 
-    shown = {kind_of(n) for n in nodes}
+    shown: set[str] = set()
+    for node_id in nodes:
+        kind = kind_of(node_id)
+        if kind in shown:
+            return False, f"model map draws {kind} twice"
+        shown.add(kind)
     want: set[frozenset] = set()
+    allowed: set[str] = set()
     for row in rows:
         kind = _KIND.match(_clean(row[kind_col]))
         if not kind:
             continue
         kind = kind.group(0)
+        allowed.add(kind)
         if kind not in shown:
             return False, f"model map has no node for {kind}"
         for peer in _peer_kinds(row[peer_col]):
+            allowed.add(peer)
             want.add(frozenset((kind, peer)))
+    unknown = sorted(shown - allowed)
+    if unknown:
+        return False, f"model map shows {unknown[0]}, which is not in the sketch table"
     got = {frozenset((kind_of(a), kind_of(b))) for a, b in edges}
     missing = sorted(tuple(sorted(e)) for e in want - got)
     extra = sorted(tuple(sorted(e)) for e in got - want)
