@@ -15,8 +15,9 @@ the conversation, is read and appears in the brief:
    named it, saying what was taken from it.
 2. Each sketch row with any fact that came from a file,
    whether identity, attributes, peers, source of truth
-   or owner, names that file in its `Evidence` cell, as
-   `file:column` or `file:element`.
+   or owner, names that file in its `Evidence` cell with
+   a locator: `file:column` or `file:element`, never the
+   bare file name.
    A row identified by a spreadsheet column cites that
    spreadsheet. When the identity combines facts from
    several files, such as a console server named by its
