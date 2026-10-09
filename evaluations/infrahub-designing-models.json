@@ -51,7 +51,7 @@
       "expectations": [
         "The brief says the scope is too big for one feature and why",
         "Features are ordered by data dependency, foundation first",
-        "Each feature has a self-contained handoff for any downstream workflow",
+        "Each feature has a handoff that names the brief and the feature ID, for any downstream workflow",
         "Only the first feature is modelled in depth"
       ],
       "assertions": [

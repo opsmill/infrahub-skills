@@ -18,7 +18,7 @@ The Model Designer works out what to model before any schema exists. It reads th
 `design-brief.md`, in your repository's existing design-document location or `docs/designs/<design-slug>/` by default. It holds:
 
 - **Business and service**: who uses the data, the incident it prevents, what is ordered, and the service lifecycle
-- **Features**: one row per feature in build order, with the artifacts each one needs (schema, objects, generator, check, transform, menu), its dependencies, and a portable handoff for any downstream workflow
+- **Features**: one row per feature in build order, with the artifacts each one needs (schema, objects, generator, check, transform, menu), its dependencies, and a handoff that names the brief and the feature ID, for any downstream workflow
 - **Data model sketch**: for the first feature, each node kind with how it is identified, its key attributes, its peers, its source of truth, its owner, and where each fact came from
 - **Mechanisms**: whether each behavior is a computed attribute, a resource pool, a check, a transform or a generator, and why
 - **Plan map and model map**: two Mermaid diagrams drawn from the Features table and the sketch, showing the build order and how the F1 node kinds relate
@@ -91,8 +91,8 @@ The request covers the VPN service and the allocation of route distinguishers an
 
 | ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | VPN service | One object per ordered VPN, with its sites | L3Vpn, VpnSite | schema, objects | - | planned | Design and implement the L3Vpn and VpnSite model sketched below, then populate it from the customer export. |
-| F2 | RD and RT allocation | No duplicate distinguishers or targets | RD pool, RT pool | schema, objects | F1 | planned | After F1, design the RD and RT pools and populate the initial allocations using this brief's decisions. |
+| F1 | VPN service | One object per ordered VPN, with its sites | L3Vpn, VpnSite | schema, objects | - | planned | Design and implement the L3Vpn and VpnSite model, then populate it from the customer export, as designed in F1 of docs/designs/l3vpn/design-brief.md. |
+| F2 | RD and RT allocation | No duplicate distinguishers or targets | RD pool, RT pool | schema, objects | F1 | planned | After F1, design the RD and RT pools and populate the initial allocations, as designed in F2 of docs/designs/l3vpn/design-brief.md. |
 
 ```mermaid
 graph LR
@@ -165,7 +165,7 @@ A later feature that lists `schema, generator`, for example, goes to the Schema 
 
 ## Using it with your workflow
 
-The brief does not assume a particular framework. Paste each feature's handoff into your existing specification, planning, ticketing or implementation workflow in dependency order. For a spec-driven flow, use the handoff as the input to its Specify step. See [Spec-Driven Development](../spec-driven-development.mdx).
+The brief does not assume a particular framework. Paste each feature's handoff into your existing specification, planning, ticketing or implementation workflow in dependency order, together with the brief it names. The handoff names the brief and the feature ID, and the workflow reads the details from the brief. For a spec-driven flow, use the handoff as the input to its Specify step. See [Spec-Driven Development](../spec-driven-development.mdx).
 
 ## Not sure this is the right skill?
 
