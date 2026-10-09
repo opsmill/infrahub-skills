@@ -66,6 +66,17 @@ files pasted into the conversation.
   `check`, `transform`, `menu`. `schema` comes first
   whenever it is listed, because everything else reads
   it.
+- Each artifact is built by one skill:
+
+  | Artifact | Skill |
+  | -------- | ----- |
+  | `schema` | `infrahub-managing-schemas` |
+  | `objects` | `infrahub-managing-objects` |
+  | `generator` | `infrahub-managing-generators` |
+  | `check` | `infrahub-managing-checks` |
+  | `transform` | `infrahub-managing-transforms` |
+  | `menu` | `infrahub-managing-menus` |
+
 - `Depends on` names the earlier features a feature
   needs, or `-` when it needs none. It is never empty,
   and never names a later or unknown ID. A later
