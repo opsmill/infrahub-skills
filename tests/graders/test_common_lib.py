@@ -92,6 +92,12 @@ TOKEN_LEAKS = [
         "Run `echo >(bash -c 'echo $INFRAHUB_API_TOKEN')`.",
         id="inner-shell-in-output-process-substitution",
     ),
+    # A substitution's output is an argument of the print around it, even
+    # when the command inside the substitution prints nothing itself.
+    pytest.param(
+        'Run `echo "$(base64 <<< "$INFRAHUB_API_TOKEN")"`.',
+        id="value-in-substitution-printed-by-outer-echo",
+    ),
 ]
 
 
@@ -143,6 +149,12 @@ TOKEN_SAFE = [
     pytest.param(
         "Run `echo 'literal $INFRAHUB_API_TOKEN' \"$(printf fixed)\"`.",
         id="single-quoted-literal-beside-a-substitution",
+    ),
+    # A print command inside a substitution prints into the argument, not to
+    # stdout, so the command around it does not print the token.
+    pytest.param(
+        'Run `curl -H "Authorization: Bearer $INFRAHUB_API_TOKEN" "$(printf %s https://x)"`.',
+        id="printf-only-inside-a-substitution",
     ),
 ]
 

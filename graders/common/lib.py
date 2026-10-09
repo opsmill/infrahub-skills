@@ -357,13 +357,24 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
             continue
         split = _split_substitutions(piece)
         if split is None:
-            outer = piece
+            outer, inner_pieces = piece, []
         else:
             outer, inner = split
-            pending.extend((start, p) for body in inner for _, p in _command_pieces(body))
+            inner_pieces = [p for body in inner for _, p in _command_pieces(body)]
+            pending.extend((start, p) for p in inner_pieces)
+        # Only the piece's own text decides whether it prints: a `printf`
+        # inside a substitution prints into the argument, not to stdout.
+        if not _PRINTS_TO_STDOUT.search(outer):
+            continue
+        if split is not None:
             outer = _unquote_single(outer)
-        if _PRINTS_TO_STDOUT.search(piece):
-            offenders.update(m.group(0) for m in _TOKEN_VALUE.finditer(outer))
+        offenders.update(m.group(0) for m in _TOKEN_VALUE.finditer(outer))
+        # A substitution's output becomes an argument of this print, so a
+        # value it expands is printed even when its own command does not print.
+        for inner_piece in inner_pieces:
+            offenders.update(
+                m.group(0) for m in _TOKEN_VALUE.finditer(_unquote_single(inner_piece))
+            )
     if offenders:
         return False, (
             f"expansion(s) that print the token's value: {sorted(offenders)}; "
