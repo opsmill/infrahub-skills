@@ -2312,6 +2312,60 @@ infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
             ok, msg = self._deleted(notes)
             assert ok, f"{wrapper}: {msg}"
 
+    def test_explicit_stdin_descriptor_heredoc_runs(self):
+        """``bash 0<<'EOF'`` runs the body; a synced-item delete inside it counts."""
+        for operator in ("0<<'EOF'", "0<<-EOF"):
+            notes = (
+                "```bash\ngit commit -am retire && git push\n"
+                "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n"
+                f"bash {operator}\n"
+                "infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes\nEOF\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert not ok, operator
+            assert "[Campus, FloorMenu]" in msg, operator
+
+    def test_heredoc_on_another_descriptor_stays_data(self):
+        notes = """\
+```bash
+git commit -am retire && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+bash 3<<'EOF'
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+EOF
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_bundled_s_option_reads_the_heredoc(self):
+        """``bash -es -- ignored`` reads stdin; ``ignored`` is a positional argument."""
+        notes = """\
+```bash
+git commit -am retire && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+bash -es -- ignored <<'EOF'
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+EOF
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "[Campus, FloorMenu]" in msg
+
+    def test_bundled_c_option_leaves_the_heredoc_as_data(self):
+        notes = """\
+```bash
+git commit -am retire && git push
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+bash -ec 'cat > /tmp/steps' <<'EOF'
+infrahubctl object delete CoreMenuItem Campus/FloorMenu --yes
+EOF
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
     def test_heredoc_fed_to_python_stays_data(self):
         notes = """\
 ```bash

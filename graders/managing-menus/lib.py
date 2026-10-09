@@ -1034,17 +1034,26 @@ def _has_flag(options: list[str], short: str, long: str) -> bool:
 def _shell_reads_stdin(args: list[str]) -> bool:
     """Whether ``sh``/``bash``/... with ``args`` runs its stdin as the script.
 
-    It does with no script file and no ``-c``, or with ``-s``.
+    It does with ``-s``, or with no script file and no ``-c``. Short options
+    may be bundled (``-es``, ``-ec``); an ``o`` among them takes the next
+    word as its value. After ``--`` the next word is a script file unless
+    ``-s`` came first.
     """
     words = iter(args)
     for arg in words:
-        if arg == "-s":
-            return True
-        if arg == "-c":
-            return False
-        if arg in ("-o", "+o", "-O", "+O"):
-            next(words, None)
-        elif not arg.startswith(("-", "+")):
+        if arg == "--":
+            return next(words, None) is None
+        if arg.startswith("--"):
+            continue  # long options: --norc, --login
+        if arg[:1] in ("-", "+") and len(arg) > 1:
+            letters = arg[1:]
+            if "c" in letters:
+                return False
+            if "s" in letters:
+                return True
+            if letters[-1] in "oO":
+                next(words, None)
+        else:
             return False  # a script file: stdin is its data
     return True
 
@@ -1091,6 +1100,10 @@ def _stdin_runs_as_shell(argv: list[str]) -> bool:
     return False
 
 
+# A heredoc operator token: ``<<EOF``, ``0<<-EOF``, ``3<<EOF``; not ``<<<``.
+_HEREDOC_OPERATOR_RE = re.compile(r"^(\d*)<<(?!<)-?")
+
+
 def _runs_heredoc_as_shell(line: str) -> bool:
     """Whether the heredoc ``line`` opens has its body run as shell commands.
 
@@ -1112,8 +1125,11 @@ def _runs_heredoc_as_shell(line: str) -> bool:
             pipelines[-1][-1].append(token)
     for pipeline in pipelines:
         for position, argv in enumerate(pipeline):
-            if not any(w.startswith("<<") and not w.startswith("<<<") for w in argv):
+            heredocs = [m for w in argv if (m := _HEREDOC_OPERATOR_RE.match(w))]
+            if not heredocs:
                 continue
+            if all(m.group(1) not in ("", "0") for m in heredocs):
+                return False  # ``3<<EOF`` feeds another descriptor, not stdin
             if _stdin_runs_as_shell(argv):
                 return True
             consumer = _program_argv(_strip_redirections(argv))
