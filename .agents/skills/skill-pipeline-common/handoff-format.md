@@ -27,6 +27,7 @@ re-deriving a slug that would drift from the original.
 **Defect class:** guidance | grader | script
 **Minimum change rung:** <1-6, and one line saying why it stopped there>
 **Docs impact:** <surfaces this change leaves stale, or: none>
+**Duplicate check:** <each matching PR with the user's choice and reason, or: none found>
 
 **Target:** skills/<skill>/ | graders/<skill>/ | scripts/
 **Rule path:** `skills/<skill>/rules/<category>-<concern>.md` (or: none, edits <existing file>)
@@ -63,13 +64,14 @@ re-deriving a slug that would drift from the original.
 ## Required fields
 
 A stage may not proceed past a handoff file missing any of: `Key`, `Branch`,
-`Defect class`, `Minimum change rung`, `Docs impact`, `Sweep terms`, or a
-non-empty `Test plan`. Find one missing, name it, and stop there rather than guessing a
-value forward.
+`Defect class`, `Minimum change rung`, `Docs impact`, `Duplicate check`,
+`Sweep terms`, or a non-empty `Test plan`. Find one missing, name it, and stop
+there rather than guessing a value forward.
 
-`Docs impact` and `Sweep terms` are both satisfied by `none`. An entrance that
-looked and found nothing has answered; an entrance that never looked has not,
-and the two are indistinguishable once the field is blank.
+`Docs impact` and `Sweep terms` are both satisfied by `none`, and `Duplicate
+check` by `none found`. An entrance that looked and found nothing has
+answered; an entrance that never looked has not, and the two are
+indistinguishable once the field is blank.
 
 `Ground truth` is satisfied by `n/a` when the defect lives entirely inside this
 repository and makes no claim about how Infrahub behaves. That is not the same
@@ -88,3 +90,60 @@ git rev-parse "origin/$DEFAULT_BRANCH"
 
 Shell state does not persist between separate Bash calls, so re-derive this in
 any snippet that needs it.
+
+## Searching for existing pull requests
+
+Before an entrance stage writes a root cause or a design brief, it searches
+for a pull request that already covers the change. The pipeline's other PR
+lookups, `gh pr list --head "$BRANCH"`, only find a PR on the pipeline's own
+branch. A PR opened by hand, by someone else, or by a run with a different
+slug is invisible to them, and the same change gets built twice.
+
+The search runs in two parts, because the stage learns its inputs at two
+different points:
+
+- **Part A**, at key derivation, when the input carries an issue number. Pass
+  `--issue` and no `--target`.
+- **Part B**, as soon as the stage has named the files it will change. Pass a
+  `--target` for each path prefix (`skills/<skill>/`, `graders/<skill>/`,
+  `scripts/<file>`, `.agents/skills/<skill>/`), and keep `--issue` if there
+  is one. Grader directories drop the `infrahub-` prefix: the graders for
+  `skills/infrahub-managing-menus/` are under `graders/managing-menus/`. A
+  target that names no real directory matches nothing, and the search
+  reports `none found` without saying why.
+
+Run the search script from the repository root:
+
+```bash
+uv run python .agents/skills/skill-pipeline-common/scripts/find_existing_prs.py \
+  --issue "<issue number>" --target "<path prefix>" --target "<another path prefix>"
+```
+
+Leave out `--issue` when there is no issue number, and `--target` when no
+files are named yet. It prints one line per open PR, and per merged PR whose
+merge commit is not in `HEAD` yet, that closes the issue, names `#<issue>` in
+its title or body, or changes a file under a target. Closed, unmerged PRs are
+left out. The search reads every PR, not the newest page, and the full file
+list of large PRs; the script's docstring states exactly what it checks.
+
+No output and exit status 0: record `Duplicate check: none found` and
+continue.
+
+`SEARCH FAILED` and exit status 1: nothing was searched. Report the
+error and stop. Never record `none found` for a search that did not run,
+because the next stage cannot tell the two apart.
+
+Any output: list each PR with its number, title, branch, state, and whether
+the issue or a file matched, then stop and ask the user to choose one of:
+
+- stop the pipeline here;
+- continue on that PR's branch instead of `ai-skill-pipeline-<key>`;
+- continue on a new branch, with a one-line reason the PR does not duplicate
+  this change.
+
+Do not choose for them. A file match is often a PR doing different work in
+the same files, and only the user can tell overlap from duplication. A PR
+merged into a side branch that later reached the default branch as one
+squashed commit is also listed as merged and not in `HEAD`, on every run,
+because its own merge commit never lands there; its changes may already be
+in `HEAD`. Record each PR and the choice in `Duplicate check`.
