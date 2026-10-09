@@ -36,8 +36,8 @@ the model is, so the schema written later models the
 service rather than guessing node kinds from a short
 prompt. It recommends an answer to every question,
 splits a scope that is too big into ordered features,
-and writes no schema YAML: `infrahub-managing-schemas`
-does that from the brief.
+and writes no YAML or code: the `infrahub-managing-*`
+skill for each artifact builds it from the brief.
 
 ## When to Use
 
@@ -109,8 +109,11 @@ does that from the brief.
 9. **Name the next step and stop.** Hand F1 to the
    user's existing specification, planning or
    implementation workflow. If none is established,
-   recommend `infrahub-managing-schemas` for the
-   schema-first implementation, but do not invoke it.
+   recommend the skill for each of F1's artifacts, in
+   the order its `Artifacts` cell lists them (schema
+   first), using the mapping in
+   [references/brief-format.md](./references/brief-format.md).
+   Do not invoke them.
 
 ### When the user cannot reply
 
@@ -139,7 +142,7 @@ Full scope per prefix is in `rules/_sections.md`.
   sections and tables. The single home for that format.
 - `references/question-bank.md`: questions by layer, and
   the Infrahub defaults a recommendation can rest on.
-- `../infrahub-managing-schemas/`: turns the finished
-  brief into schema YAML.
+- `../infrahub-managing-*/`: build each feature's
+  artifacts from the finished brief, schema first.
 - `../infrahub-common/marketplace-reference.md`: the
   Marketplace commands and their minimum SDK version.

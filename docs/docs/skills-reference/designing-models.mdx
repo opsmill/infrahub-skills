@@ -4,7 +4,7 @@ title: Model Designer
 
 Skill: `infrahub-designing-models`
 
-The Model Designer works out what to model before any schema exists. It reads the diagrams, spreadsheets or documents you have, then interviews you one question at a time: first why the data matters, then what is delivered or ordered, and only then the data itself. Each question comes with a recommended answer and the reason for it. The result is a design brief that the [Schema Manager](./managing-schemas.mdx) turns into schema YAML.
+The Model Designer works out what to model before any schema exists. It reads the diagrams, spreadsheets or documents you have, then interviews you one question at a time: first why the data matters, then what is delivered or ordered, and only then the data itself. Each question comes with a recommended answer and the reason for it. The result is a design brief that the managing skills build from: the [Schema Manager](./managing-schemas.mdx) first, then the skill for each other artifact the brief lists.
 
 ## When to use
 
@@ -148,7 +148,20 @@ graph LR
   L3Vpn ---|many| VpnSite
 ```
 
-The next step is to take the F1 handoff into the team's existing specification, planning or implementation workflow. If the team has no established workflow, the [Schema Manager](./managing-schemas.mdx) can implement the schema from the brief.
+The next step is to take the F1 handoff into the team's existing specification, planning or implementation workflow. If the team has no established workflow, each artifact in F1's `Artifacts` cell goes to its managing skill, in the listed order. Here F1 lists `schema, objects`: the [Schema Manager](./managing-schemas.mdx) writes the L3Vpn and VpnSite schema, then the [Object Manager](./managing-objects.mdx) loads the VPNs from the customer export.
+
+### From artifact to skill
+
+| Artifact in the brief | Skill that builds it |
+| --- | --- |
+| `schema` | [Schema Manager](./managing-schemas.mdx) |
+| `objects` | [Object Manager](./managing-objects.mdx) |
+| `generator` | [Generator Manager](./managing-generators.mdx) |
+| `check` | [Check Manager](./managing-checks.mdx) |
+| `transform` | [Transform Manager](./managing-transforms.mdx) |
+| `menu` | [Menu Manager](./managing-menus.mdx) |
+
+A later feature that lists `schema, generator`, for example, goes to the Schema Manager and then the Generator Manager.
 
 ## Using it with your workflow
 
