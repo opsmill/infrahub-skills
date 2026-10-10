@@ -101,6 +101,17 @@ ip = await self.client.allocate_next_ip_address(
   `id`, not HFID — the server returns "Unable to find
   the node" when the string is not a valid UUID. See
   [python-relationship-references.md](./python-relationship-references.md).
+- `client.create()` keeps only the keys that are
+  attributes or relationships of the kind. Any other
+  key, passed as a keyword or in `data`, is dropped
+  with no error, so the saved node lacks that field.
+  A typo or a field copied from a sibling kind is the
+  usual cause. Check each field name against the
+  kind's schema before you write the call. A generated
+  protocol class as `kind` does not catch this,
+  because the field arguments are untyped. Current as
+  of infrahub-sdk 1.23.2
+  ([infrahub-sdk-python#1413](https://github.com/opsmill/infrahub-sdk-python/issues/1413)).
 - Treat optional GraphQL fields defensively —
   `None` for a missing relationship is normal, and
   unguarded `["value"]` access raises `TypeError`

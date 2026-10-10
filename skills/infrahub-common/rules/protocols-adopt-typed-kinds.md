@@ -9,8 +9,9 @@ tags: protocols, infrahubctl, type-safety, generators, transforms, checks
 When Python — a generator, transform, or check — reads or writes schema
 objects through the SDK, pass a generated protocol class as the `kind` instead
 of a string. You get dev-time type checking and IDE autocomplete on the
-object's attributes, and a later schema change becomes a type error on the
-exact line rather than a runtime failure.
+object's attributes, and a later schema change makes every read of a renamed
+or retyped attribute a type error on the exact line rather than a runtime
+failure. Field names passed to `create()` are not checked.
 
 ### Generate the protocols
 
@@ -49,6 +50,7 @@ from lib.protocols import NetworkDevice   # or a protocols.py beside the script
 
 device = await client.create(NetworkDevice, hostname="spine-1", role="spine")
 device.hostname.value            # type-checked and autocompleted
+# the create() keywords above are not type-checked
 ```
 
 For core and internal kinds you generate nothing — import them straight from
@@ -56,6 +58,9 @@ the SDK: `from infrahub_sdk.protocols import CoreIPPrefixPool`.
 
 ### Caveats
 
+- **Reads, not `create()` fields.** `create()` accepts any keyword or `data`
+  key, so a misspelled field, or one from another kind, passes the type
+  checker, and the SDK drops it without an error.
 - **Attributes only.** Relationships are `RelatedNode` / `RelationshipManager`
   with no peer type; re-`get(Peer, ...)` when you need typed peer access.
 - **Regenerate after any schema change** and commit the file — it does not

@@ -99,8 +99,9 @@ for the legitimate cases.
 
 When the transform reads objects through the SDK, type those calls with
 generated protocol classes rather than string kinds — `client.filters(NetworkLink, ...)`,
-not `kind="NetworkLink"` — so schema drift fails type-check instead of at
-runtime. See
+not `kind="NetworkLink"` — so schema drift breaks attribute reads on the
+returned objects at type-check time. Field names passed to `create()` are not
+type-checked. See
 [protocols-adopt-typed-kinds](../infrahub-common/rules/protocols-adopt-typed-kinds.md).
 
 ## Transform Basics
