@@ -910,3 +910,204 @@ class TestRunChecks:
         schema_file.write_text(yaml.dump(GOOD_SIMPLE_SCHEMA))
         with pytest.raises(KeyError):
             run_checks(["nonexistent-check"], schema_file)
+
+
+# ---------------------------------------------------------------------------
+# ip-reference-not-cascade (service-cascade task)
+#
+# The task says the frontend IP is shared and must survive the VIPService.
+# What Infrahub acts on is the resolved on_delete: an explicit value wins, an
+# omitted one is cascade on kind: Component and no-action on every other
+# kind. Each violating fixture changes one shape of a compliant one.
+# ---------------------------------------------------------------------------
+
+_SERVICE_CASCADE_CHECKS = [
+    "schema-version",
+    "on-delete-cascade-present",
+    "ip-reference-not-cascade",
+    "parent-rel-optional-false",
+    "matching-identifiers",
+    "full-kind-references",
+    "human-friendly-id",
+]
+
+# Written the way the rule shows: explicit no-action on the shared IP.
+_VIP_COMPLIANT = """
+version: "1.0"
+nodes:
+  - name: VIPService
+    namespace: ServiceLB
+    human_friendly_id: ["name__value"]
+    attributes:
+      - name: name
+        kind: Text
+    relationships:
+      - name: frontend_ip
+        peer: IpamIPAddress
+        kind: Attribute
+        cardinality: one
+        on_delete: no-action
+      - name: health_checks
+        peer: ServiceLBHealthCheck
+        kind: Component
+        cardinality: many
+        identifier: vipservice__healthchecks
+        on_delete: cascade
+  - name: HealthCheck
+    namespace: ServiceLB
+    human_friendly_id: ["name__value"]
+    attributes:
+      - name: name
+        kind: Text
+    relationships:
+      - name: vip_service
+        peer: ServiceLBVIPService
+        kind: Parent
+        cardinality: one
+        optional: false
+        identifier: vipservice__healthchecks
+"""
+
+# Refactored where the check could miss it: the IP relationship lives on a
+# generic, omits both kind and on_delete (Generic, so no-action), and a
+# second IP reference sits on an extension of another node.
+_VIP_COMPLIANT_VARIANT = """
+version: "1.0"
+generics:
+  - name: Frontend
+    namespace: ServiceLB
+    relationships:
+      - name: frontend_ip
+        peer: IpamIPAddress
+        cardinality: one
+nodes:
+  - name: VIPService
+    namespace: ServiceLB
+    inherit_from: ["ServiceLBFrontend"]
+    human_friendly_id: ["name__value"]
+    attributes:
+      - name: name
+        kind: Text
+    relationships:
+      - name: health_checks
+        peer: ServiceLBHealthCheck
+        kind: Component
+        cardinality: many
+        identifier: vipservice__healthchecks
+        on_delete: cascade
+  - name: HealthCheck
+    namespace: ServiceLB
+    human_friendly_id: ["name__value"]
+    attributes:
+      - name: name
+        kind: Text
+    relationships:
+      - name: vip_service
+        peer: ServiceLBVIPService
+        kind: Parent
+        cardinality: one
+        optional: false
+        identifier: vipservice__healthchecks
+extensions:
+  nodes:
+    - kind: DcimGenericDevice
+      relationships:
+        - name: management_ip
+          peer: IpamIPAddress
+          kind: Attribute
+          cardinality: one
+          on_delete: no-action
+"""
+
+
+def _vip(text: str, old: str, new: str) -> dict:
+    assert old in text, f"fixture edit target missing: {old!r}"
+    return yaml.safe_load(text.replace(old, new, 1))
+
+
+class TestCheckIpReferenceNotCascade:
+    check = staticmethod(CHECKS["ip-reference-not-cascade"])
+
+    def test_compliant(self):
+        ok, msg = self.check(yaml.safe_load(_VIP_COMPLIANT))
+        assert ok, msg
+        assert msg == "IP references resolve to no-action: ServiceLBVIPService.frontend_ip"
+
+    def test_compliant_variant(self):
+        ok, msg = self.check(yaml.safe_load(_VIP_COMPLIANT_VARIANT))
+        assert ok, msg
+        assert msg == (
+            "IP references resolve to no-action: "
+            "ServiceLBFrontend.frontend_ip, DcimGenericDevice.management_ip"
+        )
+
+    def test_violating_explicit_cascade(self):
+        schema = _vip(_VIP_COMPLIANT, "on_delete: no-action", "on_delete: cascade")
+        assert self.check(schema) == (
+            False,
+            "IP reference deletes the shared IP: "
+            "ServiceLBVIPService.frontend_ip resolves to on_delete 'cascade' (explicit)",
+        )
+
+    def test_near_miss_component_without_on_delete(self):
+        """The #190 failure: no on_delete, no cascade token, still cascades."""
+        schema = _vip(
+            _VIP_COMPLIANT_VARIANT,
+            "peer: IpamIPAddress\n        cardinality: one",
+            "peer: IpamIPAddress\n        kind: Component\n        cardinality: one",
+        )
+        assert self.check(schema) == (
+            False,
+            "IP reference deletes the shared IP: "
+            "ServiceLBFrontend.frontend_ip resolves to on_delete 'cascade' "
+            "(omitted on kind Component)",
+        )
+
+    def test_near_miss_on_extension(self):
+        schema = _vip(
+            _VIP_COMPLIANT_VARIANT,
+            "kind: Attribute\n          cardinality: one\n          on_delete: no-action",
+            "kind: Component\n          cardinality: one",
+        )
+        assert self.check(schema) == (
+            False,
+            "IP reference deletes the shared IP: "
+            "DcimGenericDevice.management_ip resolves to on_delete 'cascade' "
+            "(omitted on kind Component)",
+        )
+
+    def test_unknown_value_fails_closed(self):
+        schema = _vip(_VIP_COMPLIANT, "on_delete: no-action", "on_delete: keep")
+        assert self.check(schema) == (
+            False,
+            "IP reference deletes the shared IP: "
+            "ServiceLBVIPService.frontend_ip resolves to on_delete 'keep' (explicit)",
+        )
+
+    def test_missing_ip_reference_fails(self):
+        schema = _vip(_VIP_COMPLIANT, "peer: IpamIPAddress", "peer: IpamPrefix")
+        assert self.check(schema) == (
+            False,
+            "No relationship references an IP address node",
+        )
+
+    def test_task_grader_scores_compliant_fixtures_one(self, tmp_path):
+        for text in (_VIP_COMPLIANT, _VIP_COMPLIANT_VARIANT):
+            path = tmp_path / "output.yml"
+            path.write_text(text)
+            result = run_checks(_SERVICE_CASCADE_CHECKS, path)
+            assert result["score"] == 1.0, result
+
+    def test_task_grader_matches_check_list(self):
+        """Read the task grader's list without importing it (it imports ``lib``)."""
+        import ast
+
+        grader = _REPO_ROOT / "graders" / "managing-schemas" / "check_service_cascade.py"
+        tree = ast.parse(grader.read_text(encoding="utf-8"))
+        lists = [
+            ast.literal_eval(node.value)
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id == "CHECKS" for t in node.targets)
+        ]
+        assert lists == [_SERVICE_CASCADE_CHECKS]

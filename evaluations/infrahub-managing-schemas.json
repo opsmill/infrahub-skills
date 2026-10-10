@@ -272,11 +272,11 @@
     {
       "id": 8,
       "prompt": "Create an Infrahub schema for a load-balancer VIP service. A VIPService has a\nname (Text) and references a frontend IP (IpamIPAddress). The VIPService owns a list\nof HealthCheck objects \u2014 health checks have no meaning on their own and should be\ndeleted when their VIPService is deleted. The frontend IP, however, is shared\ninfrastructure: deleting a VIPService must NOT delete its IP. Use namespace 'ServiceLB'.",
-      "expected_output": "A schema where the VIPService \u2192 HealthCheck Component relationship sets on_delete: cascade explicitly (so health checks are removed when the parent VIP is deleted), and the VIPService \u2192 IP relationship either omits on_delete or sets on_delete: no-action (so the shared IP is preserved). Any kind: Parent relationship has optional: false.",
+      "expected_output": "A schema where the VIPService \u2192 HealthCheck Component relationship sets on_delete: cascade explicitly (so health checks are removed when the parent VIP is deleted), and the VIPService \u2192 IP relationship either sets on_delete: no-action or omits on_delete on a non-Component kind (so the shared IP is preserved). Any kind: Parent relationship has optional: false.",
       "files": [],
       "expectations": [
         "At least one relationship sets on_delete: cascade \u2014 the owned HealthCheck children whose existence has no meaning without the VIPService",
-        "The IP-address reference does NOT set on_delete: cascade (no-action or omitted, since the IP is shared infrastructure)",
+        "The IP-address reference does NOT set on_delete: cascade (no-action, or omitted on a non-Component kind, since the IP is shared infrastructure)",
         "Any kind: Parent relationship has optional: false and cardinality: one",
         "Component/Parent identifier pairs match on both sides",
         "All peer references use the full namespace+name kind (e.g., IpamIPAddress, not IPAddress)",
@@ -291,6 +291,10 @@
         {
           "name": "on-delete-cascade-present",
           "check": "At least one relationship sets on_delete: cascade for owned children"
+        },
+        {
+          "name": "ip-reference-not-cascade",
+          "check": "Every relationship to the IP address resolves to on_delete: no-action (explicit value, or omitted on a non-Component kind)"
         },
         {
           "name": "parent-rel-optional-false",
