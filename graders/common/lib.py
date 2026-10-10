@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 from pathlib import Path
 
 
@@ -70,7 +71,7 @@ def check_docs_fallback(text: str) -> tuple[bool, str]:
 # question of the repository's own prose.
 # ---------------------------------------------------------------------------
 
-from cli_tree import code_regions, invalid_invocations  # noqa: E402
+from cli_tree import FENCE, SPAN, code_regions, invalid_invocations  # noqa: E402
 
 
 def check_cli_commands_exist(text: str) -> tuple[bool, str]:
@@ -520,6 +521,154 @@ def check_graphql_schema_regenerated(text: str) -> tuple[bool, str]:
     )
 
 
+# ---------------------------------------------------------------------------
+# The committed protocol file is regenerated from the server
+# ---------------------------------------------------------------------------
+
+# `infrahubctl protocols` writes here when no `--out` is given.
+_PROTOCOLS_DEFAULT_OUT = "schema_protocols.py"
+
+# Tokens that end one shell command and start the next. shlex with
+# `punctuation_chars` emits these as tokens of their own, so a quoted `;`
+# stays inside its argument instead of fabricating a second command.
+_SHELL_OPERATORS = {";", "&&", "||", "|", "&", "(", ")"}
+
+
+def _code_regions_with_offsets(text: str) -> list[tuple[int, str, bool]]:
+    """Fenced blocks and inline spans, each with its offset into ``text``.
+
+    The same regions `code_regions` returns, but with offsets, so a span
+    can be read against the prose just before it. The flag says whether
+    the region is an inline span: only a span sits inside a sentence that
+    can introduce it as something to avoid.
+    """
+    regions: list[tuple[int, str, bool]] = []
+    blanked = list(text)
+    for match in FENCE.finditer(text):
+        regions.append((match.start(1), match.group(1), False))
+        for i in range(match.start(), match.end()):
+            if blanked[i] != "\n":
+                blanked[i] = " "
+    for match in SPAN.finditer("".join(blanked)):
+        regions.append((match.start(1), match.group(1), True))
+    return regions
+
+
+def _shell_tokens(line: str) -> list[str]:
+    """Split one shell line into words and operators, dropping comments."""
+    lexer = shlex.shlex(line, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    try:
+        return list(lexer)
+    except ValueError:
+        # An unbalanced quote: fall back to whitespace, which is wrong only
+        # inside the quote, and cut the comment by hand.
+        return line.split("#", 1)[0].split()
+
+
+def _protocols_invocations(region: str) -> list[dict]:
+    """Every `infrahubctl protocols` command in one code region, parsed.
+
+    Each result records whether the command reads local files
+    (`--schemas`) and the file it writes (`--out`, or the CLI default).
+    A runner prefix (`uv run`, `poetry run`) and an `ENV=value` prefix sit
+    before `infrahubctl` and are skipped by looking for the program name
+    rather than parsing from the first word.
+    """
+    found: list[dict] = []
+    folded = _LINE_CONTINUATION.sub(" ", region)
+    for line in folded.splitlines():
+        tokens = _shell_tokens(line)
+        for i, token in enumerate(tokens[:-1]):
+            if Path(token).name != "infrahubctl" or tokens[i + 1] != "protocols":
+                continue
+            schemas = False
+            out = _PROTOCOLS_DEFAULT_OUT
+            args = tokens[i + 2 :]
+            j = 0
+            while j < len(args) and args[j] not in _SHELL_OPERATORS:
+                flag, eq, value = args[j].partition("=")
+                if flag == "--schemas":
+                    schemas = True
+                elif flag == "--out":
+                    if not eq and j + 1 < len(args):
+                        j += 1
+                        value = args[j]
+                    out = value
+                j += 1
+            found.append({"schemas": schemas, "out": out, "line": " ".join(tokens[i:i + 2 + j])})
+    return found
+
+
+def _same_path(a: str, b: str) -> bool:
+    """Whether two relative paths name the same file (`./lib/x` is `lib/x`)."""
+    return Path(a.strip()).as_posix().removeprefix("./") == Path(b.strip()).as_posix().removeprefix("./")
+
+
+def check_protocols_regenerated_from_server(
+    text: str, committed: str = "lib/protocols.py"
+) -> tuple[bool, str]:
+    """The committed protocol file is regenerated from a running server.
+
+    `infrahubctl protocols --schemas <dir>` builds the module from the local
+    YAML alone. It reads only `nodes` and `generics`, so it emits no Profile
+    or Template classes and none of the relationships that another schema
+    file adds through `extensions`. Writing that output over a committed,
+    server-generated file deletes classes and fields the repository's code
+    imports. The answer has to regenerate the committed file with the
+    server form: `infrahubctl protocols` without `--schemas`.
+
+    The check parses the `infrahubctl protocols` commands in fenced blocks
+    and inline code. It passes when at least one recommended command
+    writes the committed file without `--schemas`. It fails when no command
+    writes that file, or when every command that does reads local files.
+    `--schemas` named in prose, as the offline option with its limits, is
+    not a command and does not count either way.
+
+    An inline span introduced as something to avoid ("do not run `...`")
+    is a contrast, not a recommendation, so it is skipped. A fenced block
+    is always a recommendation: it is the text a reader copies and runs.
+
+    Known gap, accepted: an answer that gives the server form and then the
+    `--schemas` form as an equal alternative for the same file passes.
+
+    No eval task runs this check. Every trial scored 1.0 with the current
+    prose (#192), so the task was dropped under the carve-out in
+    `dev/guidelines/rule-equals-test.md` § "When no task can score the
+    rule". This check and its fixtures in `tests/graders/test_common_lib.py`
+    guard the check's contract, not the skill's prose. They are what a
+    future task would wire.
+
+    The committed path is a check parameter
+    (`protocols-regenerated-from-server:<path>`), so a task with a
+    different layout does not have to reuse this one's.
+    """
+    if not text.strip():
+        return False, "no output to check"
+
+    writes_committed: list[dict] = []
+    for start, region, is_span in _code_regions_with_offsets(text):
+        if is_span and _is_negated(text, start - 1):
+            continue
+        for inv in _protocols_invocations(region):
+            if _same_path(inv["out"], committed):
+                writes_committed.append(inv)
+
+    if not writes_committed:
+        return False, (
+            f"no `infrahubctl protocols` command writes {committed}, so the "
+            "committed protocol file is never regenerated"
+        )
+    if any(not inv["schemas"] for inv in writes_committed):
+        return True, f"regenerates {committed} from the server, without --schemas"
+    return False, (
+        f"every command that writes {committed} uses --schemas: "
+        f"{sorted({inv['line'] for inv in writes_committed})}; offline output "
+        "has no Profile or Template classes and no `extensions` relationships, "
+        "so it must not overwrite the committed, server-generated file"
+    )
+
+
 # A name may carry colon-separated arguments, e.g.
 # `python-transform-dry-run:spine_config`, so a check that depends on a task
 # fixture is not pinned to one task by its registry entry.
@@ -531,6 +680,7 @@ CHECKS = {
     "token-not-printed": check_token_not_printed,
     "generator-target-is-key-value": check_generator_target_is_key_value,
     "graphql-schema-regenerated": check_graphql_schema_regenerated,
+    "protocols-regenerated-from-server": check_protocols_regenerated_from_server,
 }
 
 

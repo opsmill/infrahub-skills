@@ -26,6 +26,7 @@ check_preflight_write_probe = _mod.check_preflight_write_probe
 check_generator_target_is_key_value = _mod.check_generator_target_is_key_value
 check_token_not_printed = _mod.check_token_not_printed
 check_graphql_schema_regenerated = _mod.check_graphql_schema_regenerated
+check_protocols_regenerated_from_server = _mod.check_protocols_regenerated_from_server
 invalid_invocations = _mod.invalid_invocations
 
 
@@ -557,6 +558,107 @@ SCHEMA_REJECTED = [
 def test_graphql_schema_regenerated_rejects(text):
     ok, _ = check_graphql_schema_regenerated(text)
     assert not ok
+
+
+# --- protocols-regenerated-from-server -----------------------------------
+
+# The first two are the compliant pair of the four-fixture set: the form the
+# rule shows, then the same command reshaped where the parser is weakest (an
+# env prefix, a runner prefix, a line continuation, `--out=`, a `./` path,
+# and `--schemas` named in prose as the offline option).
+PROTOCOLS_ACCEPTED = [
+    pytest.param(
+        "Load the schema, then run "
+        "`infrahubctl protocols --branch circuit-commit-rate --out lib/protocols.py` "
+        "and diff it against the committed file.",
+        id="compliant-server-form-inline",
+    ),
+    pytest.param(
+        "```bash\nexport INFRAHUB_ADDRESS=http://localhost:8000\n"
+        "INFRAHUB_DEFAULT_BRANCH=circuit-commit-rate uv run infrahubctl protocols \\\n"
+        "  --out=./lib/protocols.py\ngit diff lib/protocols.py\n```\n\n"
+        "`--schemas schemas/` also works without a server, but it leaves out "
+        "`TemplateNetworkCircuit` and the `provider` relationship that "
+        "`schemas/provider.yml` adds through `extensions`.",
+        id="compliant-variant-prefixes-continuation-and-prose-mention",
+    ),
+    # A contrast span introduced as something to avoid is not a
+    # recommendation, so it must not cost a correct answer anything.
+    pytest.param(
+        "Do not run `infrahubctl protocols --schemas schemas/ --out lib/protocols.py` "
+        "here. Use the server form:\n\n"
+        "```bash\nuv run infrahubctl protocols --branch circuit-commit-rate "
+        "--out lib/protocols.py\n```",
+        id="negated-offline-span-then-server-fence",
+    ),
+    # A shell comment holding an offline command is prose, not a command.
+    pytest.param(
+        "```bash\n# not: infrahubctl protocols --schemas schemas/ --out lib/protocols.py\n"
+        "poetry run infrahubctl protocols --branch=circuit-commit-rate "
+        "--out lib/protocols.py && git diff --stat lib/protocols.py\n```",
+        id="offline-command-only-in-a-comment",
+    ),
+]
+
+# The first two are the violating pair of the four-fixture set. The second
+# names the server and passes `--branch`, yet the command reads local files.
+PROTOCOLS_REJECTED = [
+    pytest.param(
+        "```bash\ninfrahubctl protocols --schemas schemas/ --out lib/protocols.py\n```",
+        id="violating-offline-only",
+    ),
+    pytest.param(
+        "Regenerate against the running server so the templates are "
+        "included:\n\n```bash\ninfrahubctl protocols --schemas schemas/ "
+        "--branch circuit-commit-rate --out lib/protocols.py\n```",
+        id="near-miss-names-the-server-but-reads-local-files",
+    ),
+    # The server form aimed at a scratch file does not regenerate the
+    # committed one; the offline form still overwrites it.
+    pytest.param(
+        "Preview with `infrahubctl protocols --out /tmp/protocols_check.py`, "
+        "then write the real file:\n\n```bash\ninfrahubctl protocols "
+        "--schemas=schemas/ --out=lib/protocols.py\n```",
+        id="server-form-to-a-scratch-file-offline-to-the-committed-one",
+    ),
+    # A server command in a comment is not a command.
+    pytest.param(
+        "```bash\n# infrahubctl protocols --out lib/protocols.py\n"
+        "infrahubctl protocols --schemas schemas/ --out lib/protocols.py\n```",
+        id="server-command-only-in-a-comment",
+    ),
+    pytest.param(
+        "Regenerate the protocols from the server and commit them.",
+        id="no-command-at-all",
+    ),
+    # No `--out` writes the CLI default, schema_protocols.py, not the
+    # committed file.
+    pytest.param(
+        "Run `infrahubctl protocols --branch circuit-commit-rate`.",
+        id="server-form-without-out-writes-the-default-file",
+    ),
+]
+
+
+@pytest.mark.parametrize("text", PROTOCOLS_ACCEPTED)
+def test_protocols_regenerated_from_server_accepts(text):
+    ok, msg = check_protocols_regenerated_from_server(text)
+    assert ok, msg
+
+
+@pytest.mark.parametrize("text", PROTOCOLS_REJECTED)
+def test_protocols_regenerated_from_server_rejects(text):
+    ok, _ = check_protocols_regenerated_from_server(text)
+    assert not ok
+
+
+def test_protocols_failure_names_the_offline_command():
+    """The message has to say which command broke the constraint."""
+    ok, msg = check_protocols_regenerated_from_server(
+        "```bash\ninfrahubctl protocols --schemas schemas/ --out lib/protocols.py\n```"
+    )
+    assert not ok
+    assert "--schemas" in msg and "lib/protocols.py" in msg
 
 
 def test_the_export_command_is_matched_in_full():
