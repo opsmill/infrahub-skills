@@ -17,19 +17,19 @@ group, a GraphQL query, and a Python class.
 The dispatcher links these three by name: the target
 group's members trigger the run, the named query
 fetches the design payload, and the Python class
-processes it. If the target group is a
-`CoreStandardGroup` instead of `CoreGeneratorGroup`,
-the dispatcher never sees it and the generator
-silently never fires — the proposed change appears
-to "do nothing". The query and class are decoupled
+processes it. If the target group is missing or
+empty, the generator silently never fires, and the
+proposed change appears to "do nothing". The query and class are decoupled
 on purpose so the same design data can feed multiple
 generators, but each piece has to be present and
 named correctly for the chain to resolve.
 
 ### Three Components
 
-1. **Target group** -- a `CoreGeneratorGroup` containing
-   objects that trigger generation
+1. **Target group** -- a group, of any kind, containing
+   objects that trigger generation (use a
+   `CoreStandardGroup`; see
+   [registration-config.md](registration-config.md))
 2. **GraphQL query** (`.gql` file) -- fetches the
    design/template data
 3. **Python class** -- inherits from `InfrahubGenerator`,

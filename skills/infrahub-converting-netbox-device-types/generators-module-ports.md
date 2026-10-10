@@ -246,9 +246,7 @@ generator_definitions:
 ```
 
 `generator_definitions` carries a top-level `query:` —
-the opposite of `check_definitions`. `targets` must be
-a **`CoreGeneratorGroup`**; a `CoreStandardGroup` of
-the same name parses fine and then never triggers. See
+the opposite of `check_definitions`. See
 [registration-config.md](../infrahub-managing-generators/rules/registration-config.md).
 
 ### The `parameters` key is doing two jobs

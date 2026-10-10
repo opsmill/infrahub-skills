@@ -325,7 +325,6 @@ convention).
 - All `targets` referenced in `.infrahub.yml` should
   be documented or exist as `CoreStandardGroup` /
   `CoreGeneratorGroup`
-- Generator targets must be `CoreGeneratorGroup`
 
 ### 5.3 Artifact → Transform linkage
 

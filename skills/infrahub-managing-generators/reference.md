@@ -13,7 +13,7 @@ quick-reference.
 - [Object Creation API](#object-creation-api)
 - [Idempotency Contract](#idempotency-contract)
 - [.infrahub.yml Registration](#infrahubyml-registration)
-- [Target Group: CoreGeneratorGroup vs CoreStandardGroup](#target-group-coregeneratorgroup-vs-corestandardgroup)
+- [Target Group and Output Group](#target-group-and-output-group)
 - [Testing Locally](#testing-locally)
 
 ---
@@ -22,7 +22,7 @@ quick-reference.
 
 A generator turns one "design" object into many
 "realised" objects, idempotently. Triggered by
-membership in a `CoreGeneratorGroup`, the dispatcher
+membership in the target group, the dispatcher
 runs `generate()` for each design, and the tracking
 system reconciles created/updated/deleted objects on
 every run — so removing a child from the design,
@@ -175,7 +175,7 @@ generator_definitions:
   - name: pop_topology
     file_path: generators/pop_topology.py
     class_name: PopTopology
-    targets: pop_designs                 # CoreGeneratorGroup name
+    targets: pop_designs                 # Group name, any group kind
     query: pop_topology                  # REQUIRED at this level (unlike check_definitions)
     parameters:
       design: name__value
@@ -191,14 +191,14 @@ registration error.
 
 ---
 
-## Target Group: CoreGeneratorGroup vs CoreStandardGroup
+## Target Group and Output Group
 
-The `targets:` group must be a `CoreGeneratorGroup`,
-not a `CoreStandardGroup`. The dispatcher only
-schedules generators for groups of the
-`CoreGeneratorGroup` kind; pointing at a
-`CoreStandardGroup` makes the generator load
-successfully but never run.
+The `targets:` group is the input: its members drive
+the generator, and any group kind works. Use a
+`CoreStandardGroup`. A `CoreGeneratorGroup` is the
+output group the generator creates to track what it
+produced. See
+[rules/registration-config.md](./rules/registration-config.md).
 
 Group membership is set from the **member** side
 via `member_of_groups: [...]` — see
