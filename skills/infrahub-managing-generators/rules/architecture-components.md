@@ -27,9 +27,9 @@ named correctly for the chain to resolve.
 ### Three Components
 
 1. **Target group** -- a group, of any kind, containing
-   objects that trigger generation (use a
-   `CoreStandardGroup`; see
-   [registration-config.md](registration-config.md))
+   objects that trigger generation (reuse the existing
+   group; create a `CoreStandardGroup` only when none
+   exists; see [registration-config.md](registration-config.md))
 2. **GraphQL query** (`.gql` file) -- fetches the
    design/template data
 3. **Python class** -- inherits from `InfrahubGenerator`,

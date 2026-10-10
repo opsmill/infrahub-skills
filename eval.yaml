@@ -3649,9 +3649,11 @@ tasks:
     expected_output: >-
       A generator_definitions entry for DCTopologyGenerator whose targets is
       the existing topologies_dc group, with parameters mapping name to
-      name__value and a watch block. No new group object file and no change
-      to topologies_dc: targets accepts any CoreGroup kind, so the existing
-      CoreStandardGroup is the target as it is.
+      name__value and a watch block. No second group and no change to the
+      kind of topologies_dc: targets accepts any CoreGroup kind, so the
+      existing CoreStandardGroup is the target as it is. The answer may
+      restate topologies_dc as a CoreStandardGroup, and no object file
+      declares a CoreGeneratorGroup.
     expectations:
       - "The generator_definitions entry has targets: topologies_dc"
       - "No object file declares a CoreGeneratorGroup"

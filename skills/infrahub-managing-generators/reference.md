@@ -194,8 +194,9 @@ registration error.
 ## Target Group and Output Group
 
 The `targets:` group is the input: its members drive
-the generator, and any group kind works. Use a
-`CoreStandardGroup`. A `CoreGeneratorGroup` is the
+the generator, and any group kind works. Reuse the
+existing group; create a `CoreStandardGroup` only
+when none exists. A `CoreGeneratorGroup` is the
 output group the generator creates to track what it
 produced. See
 [rules/registration-config.md](./rules/registration-config.md).

@@ -297,8 +297,9 @@ infrahubctl generator materialize_module_ports name=lon-dc1-chassis-01 --branch 
 
 ### Populating the target group
 
-The target group is a `CoreStandardGroup`. Its `members`
-relationship, inherited from `CoreGroup`, peers `CoreNode`,
+`targets` can name any `CoreGroup`. This example creates a
+`CoreStandardGroup` because no group holds these devices
+yet. Its `members` relationship, inherited from `CoreGroup`, peers `CoreNode`,
 which has no `human_friendly_id`, so members cannot be
 named in an object file. This looks reasonable and does
 not work:
