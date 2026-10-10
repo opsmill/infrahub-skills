@@ -575,7 +575,8 @@ _PRINT_WORDS = {"echo", "printf", "print"}
 _PLACEHOLDER = re.compile(r"<[A-Za-z][\w.-]*>")
 _PLACEHOLDER_WORD = "__placeholder__"
 
-_HEREDOC = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?")
+# Characters that end an unquoted shell word.
+_WORD_END = set(" \t;&|<>()")
 
 
 def _code_regions_with_offsets(text: str) -> list[tuple[int, str, bool]]:
@@ -598,25 +599,98 @@ def _code_regions_with_offsets(text: str) -> list[tuple[int, str, bool]]:
     return regions
 
 
-def _shell_lines(region: str) -> list[str]:
-    """The region's lines as the shell reads them.
+def _read_word(line: str, i: int) -> tuple[str, int]:
+    """The shell word starting at ``line[i]``, with its quotes removed."""
+    word: list[str] = []
+    while i < len(line) and line[i] not in _WORD_END:
+        char = line[i]
+        if char in "'\"":
+            end = line.find(char, i + 1)
+            if end == -1:
+                return "", len(line)
+            word.append(line[i + 1 : end])
+            i = end + 1
+        elif char == "\\":
+            word.append(line[i + 1 : i + 2])
+            i += 2
+        else:
+            word.append(char)
+            i += 1
+    return "".join(word), i
+
+
+def _heredoc_delimiters(line: str) -> list[str]:
+    """The delimiter of every heredoc the line opens, in order.
+
+    Each delimiter is the full shell word after `<<` or `<<-`, quoted or
+    not, so `EOF-marker` stays `EOF-marker`. A `<<<` here-string opens no
+    heredoc, and `<<` inside quotes or a comment is not an operator. A
+    `<<` with no word after it yields an empty string, which no line can
+    terminate.
+    """
+    delimiters: list[str] = []
+    quote = None
+    i = 0
+    while i < len(line):
+        char = line[i]
+        if quote:
+            if char == quote:
+                quote = None
+            elif char == "\\" and quote == '"':
+                i += 1
+            i += 1
+        elif char in "'\"":
+            quote = char
+            i += 1
+        elif char == "\\":
+            i += 2
+        elif char == "#" and (i == 0 or line[i - 1] in _WORD_END):
+            break
+        elif line.startswith("<<<", i):
+            i += 3
+        elif line.startswith("<<", i):
+            i += 2
+            if line[i : i + 1] == "-":
+                i += 1
+            while line[i : i + 1] in (" ", "\t"):
+                i += 1
+            word, i = _read_word(line, i)
+            delimiters.append(word)
+        else:
+            i += 1
+    return delimiters
+
+
+def _shell_lines(region: str) -> tuple[list[str], list[str]]:
+    """The region's lines as the shell reads them, and the heredocs that never end.
 
     A `\\` continuation joins with no separator, as the shell does, and a
-    heredoc body is data, so it is dropped.
+    heredoc body is data, so it is dropped. A heredoc whose terminator never
+    comes takes the rest of the region with it; it is returned by its
+    opening line, with the body it swallowed, so the caller can fail closed
+    instead of reading the hidden lines as data.
     """
     joined = region.replace("\\\n", "")
     lines: list[str] = []
-    delimiter = None
+    unterminated: list[str] = []
+    pending: list[str] = []
+    opener = ""
+    body: list[str] = []
     for line in joined.splitlines():
-        if delimiter is not None:
-            if line.strip() == delimiter:
-                delimiter = None
+        if pending:
+            if pending[0] and line.strip() == pending[0]:
+                pending.pop(0)
+                body = []
+            else:
+                body.append(line)
             continue
         lines.append(line)
-        match = _HEREDOC.search(line)
-        if match:
-            delimiter = match.group(1)
-    return lines
+        pending = _heredoc_delimiters(line)
+        opener = line.strip()
+        body = []
+    if pending:
+        unterminated.append("\n".join([opener, *body]))
+    return lines, unterminated
 
 
 def _split_commands(tokens: list[str]) -> list[list[str]]:
@@ -675,7 +749,13 @@ def _protocols_invocations(region: str) -> tuple[list[dict], list[str]]:
     """
     found: list[dict] = []
     unreadable: list[str] = []
-    for line in _shell_lines(region):
+    lines, unterminated = _shell_lines(region)
+    # A heredoc that never ends swallows the lines after it. If those lines
+    # name the command, the parser cannot tell data from a hidden command.
+    for swallowed in unterminated:
+        if "infrahubctl" in swallowed and _PROTOCOLS in swallowed:
+            unreadable.append(f"{swallowed.splitlines()[0]} (heredoc never ends)")
+    for line in lines:
         lexer = shlex.shlex(
             _PLACEHOLDER.sub(_PLACEHOLDER_WORD, line), posix=True, punctuation_chars=True
         )

@@ -613,6 +613,21 @@ PROTOCOLS_ACCEPTED = [
         "infrahubctl protocols --branch <branch> --out lib/protocols.py\n```",
         id="offline-to-scratch-server-to-committed-with-placeholder-branch",
     ),
+    # A here-string (`<<<`) is not a heredoc: the lines after it are
+    # commands, not a body waiting for a terminator.
+    pytest.param(
+        "```bash\nread -r BRANCH <<< circuit-commit-rate\n"
+        'infrahubctl protocols --branch "$BRANCH" --out lib/protocols.py\n```',
+        id="here-string-is-not-a-heredoc",
+    ),
+    # The heredoc ends at its full delimiter, hyphen included, and the
+    # command after it is read.
+    pytest.param(
+        "```bash\ncat <<'EOF-marker' > NOTES.md\nRegenerated from the server.\n"
+        "EOF-marker\n"
+        "infrahubctl protocols --branch circuit-commit-rate --out lib/protocols.py\n```",
+        id="hyphenated-heredoc-terminated-then-server-command",
+    ),
 ]
 
 # Each case names the fragment its failure message must carry, so a fixture
@@ -706,6 +721,31 @@ PROTOCOLS_REJECTED = [
         "infrahubctl protocols --out lib/protocols.py\nEOF\n```",
         "no `infrahubctl protocols` command writes",
         id="server-command-in-a-heredoc-body",
+    ),
+    # A delimiter is the whole shell word. Cutting `EOF-marker` to `EOF`
+    # would swallow every later line as heredoc body, hiding the overwrite.
+    pytest.param(
+        "```bash\ninfrahubctl protocols --branch circuit-commit-rate --out lib/protocols.py\n"
+        "cat <<EOF-marker > NOTES.md\nRegenerated from the server.\nEOF-marker\n"
+        "infrahubctl protocols --schemas schemas/ --out lib/protocols.py\n```",
+        "with --schemas",
+        id="hyphenated-heredoc-delimiter-then-offline-overwrite",
+    ),
+    pytest.param(
+        "```bash\ninfrahubctl protocols --branch circuit-commit-rate --out lib/protocols.py\n"
+        'cat <<"EOF-marker" > NOTES.md\nRegenerated from the server.\nEOF-marker\n'
+        "infrahubctl protocols --schemas schemas/ --out lib/protocols.py\n```",
+        "with --schemas",
+        id="quoted-hyphenated-heredoc-delimiter-then-offline-overwrite",
+    ),
+    # Fail closed: a heredoc that never ends would hide the command inside
+    # it, so it is unreadable rather than data.
+    pytest.param(
+        "```bash\ninfrahubctl protocols --branch circuit-commit-rate --out lib/protocols.py\n"
+        "cat <<EOF > NOTES.md\nRegenerated from the server.\n"
+        "infrahubctl protocols --schemas schemas/ --out lib/protocols.py\n```",
+        "cannot read",
+        id="unterminated-heredoc-fails-closed",
     ),
     # Fail closed: a line the parser cannot read is not a pass.
     pytest.param(
