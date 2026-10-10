@@ -2598,6 +2598,113 @@ tasks:
       - name: cli-commands-exist
         check: No invented infrahubctl subcommand appears in the answer
 
+  - name: common-protocols-regenerate-from-server
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-common/SKILL.md and follow
+      its rules.
+
+      Task: I added two attributes to `NetworkCircuit` in
+      `schemas/circuit.yml`: `commit_rate` and `circuit_ref`. My
+      repository keeps its generated protocol module in
+      `lib/protocols.py`, checked into git. These are the two schema
+      files:
+
+      ```yaml
+      # schemas/circuit.yml
+      ---
+      version: "1.0"
+      nodes:
+        - name: Circuit
+          namespace: Network
+          generate_template: true
+          attributes:
+            - name: name
+              kind: Text
+              unique: true
+            - name: commit_rate
+              kind: Number
+            - name: circuit_ref
+              kind: Text
+              optional: true
+      ```
+
+      ```yaml
+      # schemas/provider.yml
+      ---
+      version: "1.0"
+      nodes:
+        - name: Provider
+          namespace: Organization
+          attributes:
+            - name: name
+              kind: Text
+              unique: true
+      extensions:
+        nodes:
+          - kind: NetworkCircuit
+            relationships:
+              - name: provider
+                peer: OrganizationProvider
+                cardinality: one
+                optional: true
+      ```
+
+      Regenerate `lib/protocols.py` for this change. Give me the
+      commands, so I can commit the regenerated file together with the
+      schema change.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/common/check_protocols_regenerated.py
+        weight: 0.7
+      # As with the other common tasks, the deterministic half cannot see a
+      # command written as bare prose.
+      - type: llm_rubric
+        provider: anthropic
+        weight: 0.3
+        rubric: |
+          Read output.md. Score each criterion 0.0 or 1.0; return the
+          average.
+
+          1. The command that writes `lib/protocols.py` reads the schema
+             from a running Infrahub server that has the change loaded,
+             not from the local files with `--schemas`. An answer that
+             writes `lib/protocols.py` with `--schemas`, as the main
+             command or as an alternative, scores 0.0.
+          2. The answer says why the local `--schemas` form is wrong for
+             the committed file: it emits no Template (or Profile)
+             classes, so `TemplateNetworkCircuit` would disappear, and it
+             leaves out the `provider` relationship that
+             `schemas/provider.yml` adds through `extensions`.
+    expected_output: >-
+      An answer that loads the schema change into Infrahub (on a branch or
+      the default branch) and then regenerates the committed file from the
+      server, for example `infrahubctl protocols --branch <branch> --out
+      lib/protocols.py`, then diffs it against the committed file before
+      committing. It does not write `lib/protocols.py` with
+      `infrahubctl protocols --schemas schemas/`, because that output has
+      no `TemplateNetworkCircuit` class and no `provider` relationship from
+      the `extensions` block.
+    expectations:
+      - >-
+        The command that writes `lib/protocols.py` reads the schema from a
+        running server, not from the local files with `--schemas`
+      - >-
+        Says the `--schemas` output drops `TemplateNetworkCircuit` and the
+        `provider` relationship added through `extensions`
+      - Every infrahubctl command named in the answer actually exists
+    assertions:
+      - name: protocols-regenerated-from-server
+        check: >-
+          Writes `lib/protocols.py` with an `infrahubctl protocols` command
+          that has no `--schemas`, after an `infrahubctl schema load` of the
+          same branch, and no recommended command writes it with
+          `--schemas`
+      - name: cli-commands-exist
+        check: No invented infrahubctl subcommand appears in the answer
+
   # --- Issue Reporter --- #
   - name: bug-sanitization
     instruction: |

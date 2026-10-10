@@ -93,6 +93,27 @@
           "check": "No invented infrahubctl subcommand appears in the answer"
         }
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "I added two attributes to `NetworkCircuit` in\n`schemas/circuit.yml`: `commit_rate` and `circuit_ref`. My\nrepository keeps its generated protocol module in\n`lib/protocols.py`, checked into git. These are the two schema\nfiles:\n\n```yaml\n# schemas/circuit.yml\n---\nversion: \"1.0\"\nnodes:\n  - name: Circuit\n    namespace: Network\n    generate_template: true\n    attributes:\n      - name: name\n        kind: Text\n        unique: true\n      - name: commit_rate\n        kind: Number\n      - name: circuit_ref\n        kind: Text\n        optional: true\n```\n\n```yaml\n# schemas/provider.yml\n---\nversion: \"1.0\"\nnodes:\n  - name: Provider\n    namespace: Organization\n    attributes:\n      - name: name\n        kind: Text\n        unique: true\nextensions:\n  nodes:\n    - kind: NetworkCircuit\n      relationships:\n        - name: provider\n          peer: OrganizationProvider\n          cardinality: one\n          optional: true\n```\n\nRegenerate `lib/protocols.py` for this change. Give me the\ncommands, so I can commit the regenerated file together with the\nschema change.\n\nSave your answer to: output.md",
+      "expected_output": "An answer that loads the schema change into Infrahub (on a branch or the default branch) and then regenerates the committed file from the server, for example `infrahubctl protocols --branch <branch> --out lib/protocols.py`, then diffs it against the committed file before committing. It does not write `lib/protocols.py` with `infrahubctl protocols --schemas schemas/`, because that output has no `TemplateNetworkCircuit` class and no `provider` relationship from the `extensions` block.",
+      "files": [],
+      "expectations": [
+        "The command that writes `lib/protocols.py` reads the schema from a running server, not from the local files with `--schemas`",
+        "Says the `--schemas` output drops `TemplateNetworkCircuit` and the `provider` relationship added through `extensions`",
+        "Every infrahubctl command named in the answer actually exists"
+      ],
+      "assertions": [
+        {
+          "name": "protocols-regenerated-from-server",
+          "check": "Writes `lib/protocols.py` with an `infrahubctl protocols` command that has no `--schemas`, after an `infrahubctl schema load` of the same branch, and no recommended command writes it with `--schemas`"
+        },
+        {
+          "name": "cli-commands-exist",
+          "check": "No invented infrahubctl subcommand appears in the answer"
+        }
+      ]
     }
   ]
 }

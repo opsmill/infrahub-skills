@@ -48,17 +48,19 @@ Infrahub schema. Common indicators:
 
 ### Generating Protocols
 
-Use `infrahubctl protocols` to create or update protocol
-files. It can read from a **running Infrahub instance**
-or directly from **local schema files**:
+Regenerate the committed protocol file with
+`infrahubctl protocols` against a **running Infrahub
+instance that has the schema change loaded**. The
+server's schema includes the Profile and Template
+classes, and the relationships that one schema file
+adds to another through `extensions`.
 
 ```bash
-# From a running Infrahub instance (async client, default) — reads the
-# configured INFRAHUB_ADDRESS (defaults to http://localhost:8000)
+# Schema loaded on the default branch (async client, default)
 infrahubctl protocols --out lib/protocols.py
 
-# From local schema files (no instance needed)
-infrahubctl protocols --schemas schemas/ --out lib/protocols.py
+# Schema loaded on a branch: generate from that branch
+infrahubctl protocols --branch <branch> --out lib/protocols.py
 ```
 
 The instance address is not hardcoded — it comes from
@@ -69,12 +71,6 @@ your project's Python runner (`uv run` / `poetry run`).
 See
 [connectivity-server-check](./connectivity-server-check.md).
 
-Using `--schemas` is especially useful during
-development when iterating on schema changes without
-loading them into Infrahub first. Note: local-directory
-generation does not emit Profile or Object-Template
-protocols.
-
 The async client is the default. Generate the **sync**
 variant with `--sync` when your code uses the sync SDK
 client; a project mixing sync utilities with async
@@ -82,10 +78,35 @@ generators may need both.
 
 ```bash
 # Sync protocols
-infrahubctl protocols --schemas schemas/ --sync --out lib/protocols_sync.py
+infrahubctl protocols --branch <branch> --sync --out lib/protocols_sync.py
 
 # Async protocols (default)
-infrahubctl protocols --schemas schemas/ --out lib/protocols.py
+infrahubctl protocols --branch <branch> --out lib/protocols.py
+```
+
+### Offline Generation With `--schemas`
+
+`--schemas <dir>` builds the module from the local YAML
+files, with no server. Use it only for a quick type
+check while you iterate, and write it to a scratch path.
+Its output leaves out:
+
+- Profile and Template classes
+- relationships and attributes that another schema file
+  adds through `extensions`
+- the relationships the server adds to nodes for
+  profiles and templates
+
+Checked against infrahub-sdk 1.23.0 and 1.23.2.
+
+Never write it over the committed, server-generated
+file. The classes and fields it leaves out disappear
+from that file, and the checks, generators, and
+transforms that import them break.
+
+```bash
+# Scratch check only, never the committed file
+infrahubctl protocols --schemas schemas/ --out /tmp/protocols_check.py
 ```
 
 ### The GraphQL Schema File
@@ -123,13 +144,22 @@ hand-edited protocol does, one layer down.
 When the schema changes, the correct sequence is:
 
 1. **Update the schema** files (YAML in `schemas/`)
-2. **Regenerate protocols**:
-   `infrahubctl protocols --schemas schemas/ --out lib/protocols.py`
-3. **Re-export `schema.graphql`** if the repository
+2. **Load the schema** into Infrahub, on a branch if
+   you work on one:
+   `infrahubctl schema load schemas/ --branch <branch>`
+3. **Regenerate protocols** from that branch:
+   `infrahubctl protocols --branch <branch> --out lib/protocols.py`
+4. **Check the diff**: `git diff lib/protocols.py`. Your
+   change should add or change lines. Investigate any
+   class or field that disappears before you commit: a
+   removal the schema change does not explain means the
+   file came from incomplete input, such as `--schemas`
+   or the wrong branch.
+5. **Re-export `schema.graphql`** if the repository
    keeps one: `infrahubctl graphql export-schema`
-4. **Use the updated protocols** in checks,
+6. **Use the updated protocols** in checks,
    generators, and transforms
-5. **Commit** the regenerated files alongside the
+7. **Commit** the regenerated files alongside the
    schema changes
 
 ### Common Mistakes
@@ -140,6 +170,7 @@ When the schema changes, the correct sequence is:
 | Editing protocols to fix a type | Masks a schema issue |
 | Creating protocol classes by hand | Missing fields, wrong types |
 | Forgetting to regen after changes | Stale types in code |
+| Regenerating the committed file with `--schemas` | Profile and Template classes and `extensions` relationships disappear, and code that imports them breaks |
 | Adding a field to `schema.graphql` by hand | Discarded at the next export, and queries validate against a schema the server does not serve |
 
 ### Prevention

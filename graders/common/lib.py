@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 from pathlib import Path
 
 
@@ -70,7 +71,14 @@ def check_docs_fallback(text: str) -> tuple[bool, str]:
 # question of the repository's own prose.
 # ---------------------------------------------------------------------------
 
-from cli_tree import code_regions, invalid_invocations  # noqa: E402
+from cli_tree import (  # noqa: E402
+    FENCE,
+    GROUPS,
+    LEAVES,
+    SPAN,
+    code_regions,
+    invalid_invocations,
+)
 
 
 def check_cli_commands_exist(text: str) -> tuple[bool, str]:
@@ -520,6 +528,439 @@ def check_graphql_schema_regenerated(text: str) -> tuple[bool, str]:
     )
 
 
+# ---------------------------------------------------------------------------
+# The committed protocol file is regenerated from the server
+# ---------------------------------------------------------------------------
+
+# The command this check reads, taken from the pinned CLI tree so a rename
+# there fails loudly here instead of leaving the check reading nothing.
+_PROTOCOLS = "protocols"
+assert _PROTOCOLS in LEAVES, "cli_tree.LEAVES no longer has `protocols`"
+
+# The server generates from the schema it holds, so the check also reads
+# the command that loads the change: `infrahubctl schema load`.
+_SCHEMA_LOAD = ("schema", "load")
+assert _SCHEMA_LOAD[1] in GROUPS[_SCHEMA_LOAD[0]], "cli_tree.GROUPS no longer has `schema load`"
+
+# Options of `infrahubctl schema load` that take a value (infrahub-sdk 1.23.2).
+# `--debug` takes none; the schema paths are positional.
+_SCHEMA_LOAD_VALUE_OPTIONS = {"--branch", "--wait", "--config-file"}
+
+# Without `--branch`, both commands use the SDK's default branch, which this
+# variable sets (`INFRAHUB_` prefix on `Config.default_branch`).
+_DEFAULT_BRANCH_VAR = "INFRAHUB_DEFAULT_BRANCH"
+
+# `infrahubctl protocols` writes here when no `--out` is given.
+_PROTOCOLS_DEFAULT_OUT = "schema_protocols.py"
+
+# Options of `infrahubctl protocols` that take a value (infrahub-sdk 1.23.2).
+# `--sync` / `--no-sync` take none. infrahubctl has no root options, so the
+# subcommand is always the word right after the binary.
+_PROTOCOLS_VALUE_OPTIONS = {"--schemas", "--branch", "--out", "--config-file"}
+
+# Tokens that end one shell command and start the next. shlex with
+# `punctuation_chars` emits these as tokens of their own, so a quoted `;`
+# stays inside its argument instead of fabricating a second command.
+_SHELL_OPERATORS = {";", "&&", "||", "|", "&", "(", ")", ";;", "|&"}
+
+# A redirection takes the next word as its target, never as an argument.
+_REDIRECTIONS = {"<", ">", ">>", "<<", "<<<", ">&", "<&", ">|", "&>", "&>>"}
+
+# Programs that run another program, and, for each, the options that take a
+# value. Any other option is read as a flag. A wrong guess leaves the binary
+# somewhere other than argv[0], and the command is then unreadable, which
+# fails the check rather than passing it.
+_WRAPPERS: dict[tuple[str, ...], set[str]] = {
+    ("sudo",): {"-u", "-g", "-C", "-D", "-h", "-p", "-r", "-t", "-U", "-T",
+                "--user", "--group", "--chdir", "--host", "--prompt"},
+    ("env",): {"-u", "--unset", "-C", "--chdir", "-S", "--split-string"},
+    ("uv", "run"): {"--with", "--with-editable", "--with-requirements", "--python",
+                    "-p", "--project", "--directory", "--group", "--no-group",
+                    "--extra", "--env-file", "--package", "--index",
+                    "--default-index", "--from"},
+    ("uvx",): {"--with", "--with-editable", "--with-requirements", "--python",
+               "-p", "--from", "--index", "--default-index"},
+    ("poetry", "run"): {"-C", "--directory", "-P", "--project"},
+    ("pipx", "run"): {"--spec", "--python", "--pip-args", "--index-url"},
+}
+
+_ENV_ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
+
+# Words that print their arguments: `infrahubctl` after one of these is data.
+_PRINT_WORDS = {"echo", "printf", "print"}
+
+# `<path>`, `<branch>`: a placeholder, not a value. Swapped for one opaque
+# word before lexing, because `<` and `>` would otherwise read as
+# redirections and swallow the words around them.
+_PLACEHOLDER = re.compile(r"<[A-Za-z][\w.-]*>")
+_PLACEHOLDER_WORD = "__placeholder__"
+
+# Characters that end an unquoted shell word.
+_WORD_END = set(" \t;&|<>()")
+
+
+def _code_regions_with_offsets(text: str) -> list[tuple[int, str, bool]]:
+    """Fenced blocks and inline spans, each with its offset into ``text``.
+
+    The same regions `code_regions` returns, but with offsets, so a span
+    can be read against the prose just before it. The flag says whether
+    the region is an inline span: only a span sits inside a sentence that
+    can introduce it as something to avoid.
+    """
+    regions: list[tuple[int, str, bool]] = []
+    blanked = list(text)
+    for match in FENCE.finditer(text):
+        regions.append((match.start(1), match.group(1), False))
+        for i in range(match.start(), match.end()):
+            if blanked[i] != "\n":
+                blanked[i] = " "
+    for match in SPAN.finditer("".join(blanked)):
+        regions.append((match.start(1), match.group(1), True))
+    return regions
+
+
+def _read_word(line: str, i: int) -> tuple[str, int]:
+    """The shell word starting at ``line[i]``, with its quotes removed."""
+    word: list[str] = []
+    while i < len(line) and line[i] not in _WORD_END:
+        char = line[i]
+        if char in "'\"":
+            end = line.find(char, i + 1)
+            if end == -1:
+                return "", len(line)
+            word.append(line[i + 1 : end])
+            i = end + 1
+        elif char == "\\":
+            word.append(line[i + 1 : i + 2])
+            i += 2
+        else:
+            word.append(char)
+            i += 1
+    return "".join(word), i
+
+
+def _heredoc_delimiters(line: str) -> list[str]:
+    """The delimiter of every heredoc the line opens, in order.
+
+    Each delimiter is the full shell word after `<<` or `<<-`, quoted or
+    not, so `EOF-marker` stays `EOF-marker`. A `<<<` here-string opens no
+    heredoc, and `<<` inside quotes or a comment is not an operator. A
+    `<<` with no word after it yields an empty string, which no line can
+    terminate.
+    """
+    delimiters: list[str] = []
+    quote = None
+    i = 0
+    while i < len(line):
+        char = line[i]
+        if quote:
+            if char == quote:
+                quote = None
+            elif char == "\\" and quote == '"':
+                i += 1
+            i += 1
+        elif char in "'\"":
+            quote = char
+            i += 1
+        elif char == "\\":
+            i += 2
+        elif char == "#" and (i == 0 or line[i - 1] in _WORD_END):
+            break
+        elif line.startswith("<<<", i):
+            i += 3
+        elif line.startswith("<<", i):
+            i += 2
+            if line[i : i + 1] == "-":
+                i += 1
+            while line[i : i + 1] in (" ", "\t"):
+                i += 1
+            word, i = _read_word(line, i)
+            delimiters.append(word)
+        else:
+            i += 1
+    return delimiters
+
+
+def _shell_lines(region: str) -> tuple[list[str], list[str]]:
+    """The region's lines as the shell reads them, and the heredocs that never end.
+
+    A `\\` continuation joins with no separator, as the shell does, and a
+    heredoc body is data, so it is dropped. A heredoc whose terminator never
+    comes takes the rest of the region with it; it is returned by its
+    opening line, with the body it swallowed, so the caller can fail closed
+    instead of reading the hidden lines as data.
+    """
+    joined = region.replace("\\\n", "")
+    lines: list[str] = []
+    unterminated: list[str] = []
+    pending: list[str] = []
+    opener = ""
+    body: list[str] = []
+    for line in joined.splitlines():
+        if pending:
+            if pending[0] and line.strip() == pending[0]:
+                pending.pop(0)
+                body = []
+            else:
+                body.append(line)
+            continue
+        lines.append(line)
+        pending = _heredoc_delimiters(line)
+        opener = line.strip()
+        body = []
+    if pending:
+        unterminated.append("\n".join([opener, *body]))
+    return lines, unterminated
+
+
+def _split_commands(tokens: list[str]) -> list[list[str]]:
+    """Cut a token list into commands, dropping redirections and their targets."""
+    commands: list[list[str]] = [[]]
+    skip = False
+    for token in tokens:
+        if skip:
+            skip = False
+            continue
+        if token in _SHELL_OPERATORS:
+            commands.append([])
+        elif token in _REDIRECTIONS:
+            skip = True
+        else:
+            commands[-1].append(token)
+    return [c for c in commands if c]
+
+
+def _peel_wrappers(argv: list[str]) -> int:
+    """Index of the program that actually runs, after wrappers and `VAR=value`."""
+    i = 0
+    while i < len(argv):
+        if _ENV_ASSIGNMENT.match(argv[i]):
+            i += 1
+            continue
+        for wrapper, value_options in _WRAPPERS.items():
+            names = [Path(w).name for w in argv[i : i + len(wrapper)]]
+            if tuple(names) == wrapper:
+                i += len(wrapper)
+                while i < len(argv) and argv[i].startswith("-"):
+                    if argv[i] == "--":
+                        i += 1
+                        break
+                    flag, eq, _ = argv[i].partition("=")
+                    i += 2 if flag in value_options and not eq else 1
+                break
+        else:
+            return i
+    return i
+
+
+def _protocols_invocations(region: str) -> tuple[list[dict], list[str]]:
+    """Every `infrahubctl protocols` and `schema load` command in one region, parsed.
+
+    Returns the readable commands in line order, each with its `command`,
+    the branch it acts on (`--branch`, else an `INFRAHUB_DEFAULT_BRANCH=`
+    prefix, else None for the default branch), and, for `protocols`,
+    whether it reads local files (`--schemas`) and the file it writes
+    (`--out`, or the CLI default). Also returns the lines naming
+    `protocols` that could not be read. An unreadable `schema load` is not
+    returned at all, which leaves the protocols command unpaired and fails
+    the check.
+
+    The program is argv[0] after wrappers (`sudo`, `env`, `VAR=value`,
+    `uv run`, `uvx`, `poetry run`, `pipx run`). `infrahubctl` anywhere
+    else is data when a print word runs it (`echo infrahubctl ...`), and
+    unreadable otherwise (`time infrahubctl ...`, an unknown wrapper). An
+    unreadable line fails the check: a parser gap must not read as a
+    compliant answer.
+    """
+    found: list[dict] = []
+    unreadable: list[str] = []
+    lines, unterminated = _shell_lines(region)
+    # A heredoc that never ends swallows the lines after it. If those lines
+    # name the command, the parser cannot tell data from a hidden command.
+    for swallowed in unterminated:
+        if "infrahubctl" in swallowed and _PROTOCOLS in swallowed:
+            unreadable.append(f"{swallowed.splitlines()[0]} (heredoc never ends)")
+    for line in lines:
+        lexer = shlex.shlex(
+            _PLACEHOLDER.sub(_PLACEHOLDER_WORD, line), posix=True, punctuation_chars=True
+        )
+        lexer.whitespace_split = True
+        try:
+            tokens = list(lexer)
+        except ValueError:
+            if "infrahubctl" in line and _PROTOCOLS in line:
+                unreadable.append(line.strip())
+            continue
+        for argv in _split_commands(tokens):
+            names = [Path(t).name for t in argv]
+            if "infrahubctl" not in names:
+                continue
+            start = _peel_wrappers(argv)
+            if start >= len(argv) or names[start] != "infrahubctl":
+                if start < len(argv) and names[start] in _PRINT_WORDS:
+                    continue
+                at = names.index("infrahubctl")
+                if names[at + 1 : at + 2] == [_PROTOCOLS]:
+                    unreadable.append(" ".join(argv))
+                continue
+            if names[start + 1 : start + 2] == [_PROTOCOLS]:
+                command, args, value_options = _PROTOCOLS, argv[start + 2 :], _PROTOCOLS_VALUE_OPTIONS
+            elif tuple(names[start + 1 : start + 3]) == _SCHEMA_LOAD:
+                command, args, value_options = " ".join(_SCHEMA_LOAD), argv[start + 3 :], _SCHEMA_LOAD_VALUE_OPTIONS
+            else:
+                continue
+            branch = None
+            for word in argv[:start]:
+                name, eq, value = word.partition("=")
+                if eq and name == _DEFAULT_BRANCH_VAR:
+                    branch = value
+            schemas = False
+            out = _PROTOCOLS_DEFAULT_OUT
+            j = 0
+            while j < len(args):
+                flag, eq, value = args[j].partition("=")
+                if flag in value_options and not eq:
+                    value = args[j + 1] if j + 1 < len(args) else ""
+                    j += 1
+                if flag == "--schemas":
+                    schemas = True
+                elif flag == "--out":
+                    out = value
+                elif flag == "--branch":
+                    branch = value
+                j += 1
+            found.append({
+                "command": command,
+                "branch": branch,
+                "schemas": schemas,
+                "out": out,
+                "line": " ".join(argv[start:]),
+            })
+    return found, unreadable
+
+
+def _branch_name(branch: str | None) -> str:
+    return "the default branch" if branch is None else f"branch {branch}"
+
+
+def _same_path(a: str, b: str) -> bool:
+    """Whether two relative paths name the same file (`./lib/x` is `lib/x`)."""
+    return Path(a.strip()).as_posix().removeprefix("./") == Path(b.strip()).as_posix().removeprefix("./")
+
+
+def check_protocols_regenerated_from_server(
+    text: str, committed: str = "lib/protocols.py"
+) -> tuple[bool, str]:
+    """The committed protocol file is regenerated from a running server.
+
+    `infrahubctl protocols --schemas <dir>` builds the module from the local
+    YAML alone. It emits no Profile or Template classes and none of the
+    relationships that another schema file adds through `extensions`.
+    Writing that output over a committed, server-generated file deletes
+    classes and fields the repository's code imports.
+    `skills/infrahub-common/rules/protocols-generated.md` therefore keeps
+    `--schemas` for a scratch path only.
+
+    The check parses the `infrahubctl protocols` commands in fenced blocks
+    and inline code. It passes when a recommended command writes the
+    committed file without `--schemas`, and no recommended command writes
+    it with `--schemas`. It fails when no command writes that file, when
+    any command that does reads local files, or when a line naming the
+    command cannot be read. `--schemas` named in prose, as the offline
+    option with its limits, is not a command and does not count either way.
+
+    The server generates from the schema it holds, so a server-form command
+    counts only when an `infrahubctl schema load` comes before it in the
+    answer, on the same branch. A command with no `--branch` acts on the
+    default branch, unless an `INFRAHUB_DEFAULT_BRANCH=` prefix names
+    another. The check fails when no server-form command has a matching
+    load before it, and names both branches when the only loads before it
+    are of another branch. A server-form command with no matching load is
+    otherwise ignored, so a conditional alternative ("if you loaded on the
+    default branch, drop `--branch`") does not cost an answer its paired
+    command.
+
+    An inline span introduced as something to avoid ("do not run `...`")
+    is a contrast, not a recommendation, so it is skipped. A fenced block
+    is always a recommendation: it is the text a reader copies and runs.
+
+    The eval task `common-protocols-regenerate-from-server` runs this check
+    through `check_protocols_regenerated.py`, and that task is what guards
+    the skill's prose. The fixtures in `tests/graders/test_common_lib.py`
+    guard the check's own contract.
+
+    The committed path is a check parameter
+    (`protocols-regenerated-from-server:<path>`), so a task with a
+    different layout does not have to reuse this one's.
+    """
+    if not text.strip():
+        return False, "no output to check"
+
+    # Regions in answer order, so a load can be read as coming first.
+    commands: list[dict] = []
+    unreadable: list[str] = []
+    for start, region, is_span in sorted(_code_regions_with_offsets(text)):
+        if is_span and _is_negated(text, start - 1):
+            continue
+        found, bad = _protocols_invocations(region)
+        unreadable.extend(bad)
+        commands.extend(found)
+    writes_committed = [
+        inv for inv in commands
+        if inv["command"] == _PROTOCOLS and _same_path(inv["out"], committed)
+    ]
+
+    if unreadable:
+        return False, (
+            f"cannot read these `infrahubctl {_PROTOCOLS}` lines: {sorted(set(unreadable))}; "
+            "give the command with infrahubctl as the program"
+        )
+    if not writes_committed:
+        return False, (
+            f"no `infrahubctl {_PROTOCOLS}` command writes {committed}, so the "
+            "committed protocol file is never regenerated"
+        )
+    offline = sorted({inv["line"] for inv in writes_committed if inv["schemas"]})
+    if offline:
+        return False, (
+            f"command(s) that write {committed} with --schemas: {offline}; offline "
+            "output has no Profile or Template classes and no `extensions` "
+            "relationships, so it must not overwrite the committed, "
+            "server-generated file"
+        )
+    loaded: list[str | None] = []
+    paired = False
+    mismatch = ""
+    for inv in commands:
+        if inv["command"] != _PROTOCOLS:
+            loaded.append(inv["branch"])
+        elif inv in writes_committed:
+            if inv["branch"] in loaded:
+                paired = True
+                break
+            if loaded and not mismatch:
+                mismatch = (
+                    f"`infrahubctl schema load` puts the change on "
+                    f"{', '.join(sorted({_branch_name(b) for b in loaded}))}, but "
+                    f"`{inv['line']}` generates from {_branch_name(inv['branch'])}"
+                )
+    if not paired:
+        if mismatch:
+            return False, (
+                f"{mismatch}; the server generates from the schema on that "
+                "branch, so the protocols would not carry the change"
+            )
+        return False, (
+            f"no `infrahubctl schema load` comes before the command that writes "
+            f"{committed}; the server generates from the schema it holds, so "
+            "load the change first"
+        )
+    return True, (
+        f"loads the schema, then regenerates {committed} from the server on "
+        "the same branch, without --schemas"
+    )
+
+
 # A name may carry colon-separated arguments, e.g.
 # `python-transform-dry-run:spine_config`, so a check that depends on a task
 # fixture is not pinned to one task by its registry entry.
@@ -531,6 +972,7 @@ CHECKS = {
     "token-not-printed": check_token_not_printed,
     "generator-target-is-key-value": check_generator_target_is_key_value,
     "graphql-schema-regenerated": check_graphql_schema_regenerated,
+    "protocols-regenerated-from-server": check_protocols_regenerated_from_server,
 }
 
 
