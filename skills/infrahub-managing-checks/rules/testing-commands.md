@@ -19,12 +19,12 @@ fetches an empty payload — every failed iteration
 costs a branch push and a pipeline run, and the
 traceback shows up to reviewers rather than to the
 author. Running `infrahubctl check` locally exercises
-the same SDK path the pipeline uses, so a check that
-passes locally on a representative branch will behave
-the same way in the pipeline, and one that explodes
-locally never reaches a reviewer. The local run uses
-your working copy; the pipeline uses the code at the
-source branch's repository commit (see
+the same SDK path the pipeline uses, and one that
+explodes locally never reaches a reviewer. A local pass
+carries over to the pipeline only when both run the
+same check code: the local run uses your working copy,
+and the pipeline uses the code at the source branch's
+repository commit (see
 [testing-proposed-change-commit.md](./testing-proposed-change-commit.md)).
 
 ### Prerequisites
