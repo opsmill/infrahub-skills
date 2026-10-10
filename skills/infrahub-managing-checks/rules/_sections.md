@@ -35,4 +35,4 @@
    so the module must be installed into the worker
    image).
 
-6. **Testing (testing-)** -- HIGH. Resources Testing Framework (YAML-driven pytest tests: smoke, unit, integration), infrahubctl check commands. Always create tests alongside new checks.
+6. **Testing (testing-)** -- HIGH. Resources Testing Framework (YAML-driven pytest tests: smoke, unit, integration), infrahubctl check commands, and which repository commit a proposed change's checks run. Always create tests alongside new checks.

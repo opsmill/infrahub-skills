@@ -11,7 +11,9 @@ field on `check_definitions`) lives.
 from __future__ import annotations
 
 import ast
+import importlib.util
 import re
+import shlex
 import sys
 import textwrap
 from pathlib import Path
@@ -704,6 +706,585 @@ def check_targeted_has_targets_and_parameters(
 
 
 # ---------------------------------------------------------------------------
+# Shell script checks: re-validating open proposed changes
+# ---------------------------------------------------------------------------
+#
+# A proposed change runs its checks with the code at the repository commit
+# recorded on its source branch. On a branch synced with Git, neither
+# `infrahubctl branch rebase` nor `CoreProposedChangeRunCheck` moves that
+# commit; pushing main into the branch's own Git branch does, and so does
+# opening a new branch and proposed change. The script is tokenized with
+# shlex, so comments, prose and echoed strings do not count as commands.
+
+# A fence may be indented under a list item, and closes on a run of the same
+# character at least as long as the one that opened it.
+_FENCE_RE = re.compile(r"^[ \t]*((`|~)\2{2,})[^\n]*\n(.*?)^[ \t]*\1\2*[ \t]*$", re.S | re.M)
+_HEREDOC_RE = re.compile(r"(?<!<)<<(?!<)-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
+_SHELL_PUNCT = ";&|()<>\n"
+_SHELL_KEYWORDS = {
+    "if", "then", "elif", "else", "while", "until", "do", "!", "{", "}",
+    "time", "exec", "command", "nohup", "export", "local", "readonly",
+}
+# Wrappers peeled off before argv[0], each with the options that take a value.
+_PREFIX_WRAPPERS: dict[str, set[str]] = {
+    "sudo": {"-u", "-g", "-h", "-p", "-C", "-D", "-r", "-t", "-U"},
+    "env": {"-u", "--unset", "-C", "--chdir", "-S", "--split-string"},
+}
+_RUN_WRAPPERS: dict[str, set[str]] = {
+    "uv": {"--project", "--directory", "--python", "-p", "--with", "--group", "--extra", "--package"},
+    "poetry": {"-C", "--directory", "-P", "--project"},
+    "pipx": {"--spec", "--python"},
+}
+
+# The infrahubctl tree is the one the CLI gate pins, loaded by path (the eval
+# harness puts only this directory on sys.path), so this grader and
+# scripts/check-cli-invocations.py cannot disagree about it.
+_TREE_SPEC = importlib.util.spec_from_file_location(
+    "managing_checks_cli_tree", Path(__file__).resolve().parent.parent / "common" / "cli_tree.py"
+)
+_cli_tree = importlib.util.module_from_spec(_TREE_SPEC)
+_TREE_SPEC.loader.exec_module(_cli_tree)
+_BRANCH_GROUP = "branch"
+_BRANCH_CREATE = "create"
+_BRANCH_REBASE = "rebase"
+assert {_BRANCH_CREATE, _BRANCH_REBASE} <= _cli_tree.GROUPS[_BRANCH_GROUP], (
+    "graders/common/cli_tree.py no longer lists `infrahubctl branch create|rebase`"
+)
+_SHELL_ASSIGN_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.S)
+_SHELL_VAR_RE = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*|[0-9@*])")
+_PARAM_DEFAULT_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*):?[-=]([^}]*)\}")
+_DEFAULT_BRANCHES = {"main", "master"}
+_GIT_GLOBAL_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace"}
+_GIT_VALUE_OPTS: dict[str, set[str]] = {
+    "merge": {"-m", "-F", "--file", "-s", "--strategy", "-X", "--strategy-option"},
+    "rebase": {"--onto", "-s", "--strategy", "-X", "--strategy-option", "-x", "--exec"},
+    "pull": {"-s", "--strategy", "-X", "--strategy-option", "--depth", "--upload-pack"},
+    "push": {"-o", "--push-option", "--repo", "--receive-pack", "--exec"},
+    "checkout": {"-b", "-B", "--orphan", "--conflict"},
+    "switch": {"-c", "-C", "--orphan", "--conflict"},
+    "worktree": {"-b", "-B", "--reason"},
+    "clone": {
+        "-b", "--branch", "-o", "--origin", "--depth", "-c", "--config", "--reference",
+        "-u", "--upload-pack", "--separate-git-dir", "-j", "--jobs", "--filter",
+    },
+}
+# Programs that send a GraphQL document or SDK call to Infrahub. A mutation name
+# counts only where one of these, or a script function that calls one, sends it.
+_SENDERS = {"curl", "wget", "http", "https", "xh", "infrahubctl"}
+_BRANCH_CREATE_GQL_RE = re.compile(r"\bBranchCreate\s*\(|\.branch\.create\s*\(")
+_PC_CREATE_GQL_RE = re.compile(
+    r"\bCoreProposedChangeCreate\s*\(|\bcreate\s*\(\s*(?:kind\s*=\s*)?[\"']CoreProposedChange[\"']"
+)
+
+
+def _shell_script_text(raw: str) -> str:
+    """The script itself: every fenced block when the answer is fenced, else the file."""
+    blocks = [m.group(3) for m in _FENCE_RE.finditer(raw)]
+    return "\n".join(blocks) if blocks else raw
+
+
+def _split_heredocs(text: str) -> tuple[list[str], list[tuple[int, str, int]]]:
+    """Script lines with heredoc bodies blanked, plus each body line.
+
+    Each body line comes with its own index and the index of the line that
+    opened the heredoc. A heredoc body is data (a GraphQL document, a Python
+    snippet), not shell, so tokenizing it as commands would fabricate calls and
+    trip on its quotes.
+    """
+    lines = text.split("\n")
+    shell: list[str] = []
+    bodies: list[tuple[int, str, int]] = []
+    pending: list[tuple[str, int]] = []
+    for idx, line in enumerate(lines):
+        if pending:
+            bodies.append((idx, line, pending[0][1]))
+            shell.append("")
+            if line.strip() == pending[0][0]:
+                pending.pop(0)
+            continue
+        shell.append(line)
+        if not line.lstrip().startswith("#"):
+            pending.extend((m.group(2), idx) for m in _HEREDOC_RE.finditer(line))
+    return shell, bodies
+
+
+def _shell_tokens(line: str) -> list[str]:
+    """Tokens of a logical line; a newline outside quotes is an operator token."""
+    lex = shlex.shlex(line, posix=True, punctuation_chars=_SHELL_PUNCT)
+    lex.whitespace = " \t\r"
+    lex.whitespace_split = True
+    lex.commenters = "#"
+    return list(lex)
+
+
+def _logical_lines(shell_lines: list[str]) -> list[tuple[int, list[str]]]:
+    """Tokenized logical lines, each with the index of the line it starts on.
+
+    Backslash continuations are joined, and a line whose quote is still open is
+    joined with the following lines until it closes (a multi-line GraphQL string
+    assigned to a variable). A quote that never closes drops that line only.
+    """
+    joined: list[tuple[int, str]] = []
+    buf, start = "", 0
+    for idx, line in enumerate(shell_lines):
+        if not buf:
+            start = idx
+        if line.endswith("\\"):
+            buf += line[:-1]  # the shell joins a continuation with no separator
+            continue
+        joined.append((start, buf + line))
+        buf = ""
+    if buf:
+        joined.append((start, buf))
+
+    out: list[tuple[int, list[str]]] = []
+    i = 0
+    while i < len(joined):
+        start, text = joined[i]
+        j = i
+        while True:
+            try:
+                out.append((start, _shell_tokens(text)))
+                i = j + 1
+                break
+            except ValueError:
+                j += 1
+                if j >= len(joined):
+                    i += 1
+                    break
+                text = text + "\n" + joined[j][1]
+    return out
+
+
+def _simple_commands(tokens: list[str]) -> list[list[str]]:
+    """Split a logical line on shell operators, dropping redirections."""
+    segments: list[list[str]] = [[]]
+    k = 0
+    while k < len(tokens):
+        tok = tokens[k]
+        if tok and set(tok) <= set(_SHELL_PUNCT):
+            if "<" in tok or ">" in tok:
+                if segments[-1] and segments[-1][-1].isdigit():
+                    segments[-1].pop()
+                k += 2  # the operator and its target
+                continue
+            segments.append([])
+            k += 1
+            continue
+        segments[-1].append(tok)
+        k += 1
+    return [seg for seg in segments if seg]
+
+
+def _peel(seg: list[str], assigns: dict[str, list[str]]) -> list[str]:
+    """The argv a simple command runs, after keywords, assignments and wrappers.
+
+    Peels `VAR=value`, shell keywords, `sudo` and `env` with their options, and
+    `uv|poetry|pipx run` with theirs, so argv[0] is the program that runs.
+    """
+    i = 0
+    while i < len(seg):
+        tok = seg[i]
+        m = _SHELL_ASSIGN_RE.match(tok)
+        if m:
+            assigns.setdefault(m.group(1), []).append(m.group(2))
+            i += 1
+        elif tok in _SHELL_KEYWORDS:
+            i += 1
+        elif tok in _PREFIX_WRAPPERS:
+            opts = _PREFIX_WRAPPERS[tok]
+            i += 1
+            while i < len(seg) and seg[i].startswith("-"):
+                if seg[i] == "--":
+                    i += 1
+                    break
+                i += 2 if seg[i] in opts else 1
+        elif tok in _RUN_WRAPPERS:
+            opts = _RUN_WRAPPERS[tok]
+            j = i + 1
+            while j < len(seg) and seg[j].startswith("-"):
+                j += 2 if seg[j] in opts else 1
+            if j < len(seg) and seg[j] == "run":
+                j += 1
+                while j < len(seg) and seg[j].startswith("-"):
+                    j += 2 if seg[j] in opts else 1
+                i = j
+            else:
+                break
+        else:
+            break
+    return seg[i:]
+
+
+# Builtins that bind their operands, with the options that take a value.
+_BINDING_BUILTINS: dict[str, set[str]] = {
+    "read": {"-d", "-i", "-n", "-N", "-p", "-t", "-u"},
+    "mapfile": {"-d", "-n", "-O", "-s", "-u", "-C", "-c"},
+    "readarray": {"-d", "-n", "-O", "-s", "-u", "-C", "-c"},
+}
+
+
+def _bound_vars(argv: list[str], bound: set[str]) -> None:
+    """Record the names a `for`, `select`, `read` or `mapfile` binds at run time."""
+    if not argv:
+        return
+    if argv[0] in {"for", "select"} and len(argv) > 1:
+        bound.add(argv[1])
+    elif argv[0] in _BINDING_BUILTINS:
+        value_opts = _BINDING_BUILTINS[argv[0]]
+        j = 1
+        while j < len(argv):
+            a = argv[j]
+            if a == "-a" and j + 1 < len(argv):  # read -a NAME
+                bound.add(argv[j + 1])
+                j += 2
+            elif a.startswith("-"):
+                j += 2 if a in value_opts else 1
+            else:
+                bound.add(a)
+                j += 1
+
+
+def _positionals(args: list[str], value_opts: set[str]) -> list[str]:
+    out: list[str] = []
+    j = 0
+    while j < len(args):
+        a = args[j]
+        if a == "--":
+            out.extend(args[j + 1 :])
+            break
+        if a.startswith("-") and len(a) > 1:
+            j += 2 if a in value_opts else 1
+            continue
+        out.append(a)
+        j += 1
+    return out
+
+
+def _option_value(args: list[str], names: set[str]) -> str | None:
+    for j, a in enumerate(args):
+        if a in names and j + 1 < len(args):
+            return args[j + 1]
+        for n in names:
+            if n.startswith("--") and a.startswith(n + "="):
+                return a[len(n) + 1 :]
+    return None
+
+
+def _git_subcommand(argv: list[str]) -> tuple[str | None, list[str]]:
+    if not argv or argv[0].rsplit("/", 1)[-1] != "git":
+        return None, []
+    j = 1
+    while j < len(argv) and argv[j].startswith("-"):
+        j += 2 if argv[j] in _GIT_GLOBAL_VALUE_OPTS else 1
+    if j >= len(argv):
+        return None, []
+    return argv[j], argv[j + 1 :]
+
+
+def _short_ref(ref: str) -> str:
+    ref = ref.lstrip("+")
+    for prefix in ("refs/heads/", "refs/remotes/"):
+        if ref.startswith(prefix):
+            return ref[len(prefix) :]
+    return ref
+
+
+def _is_default_ref(ref: str, default_vars: set[str]) -> bool:
+    """`main`, `origin/main`, `refs/heads/main`, or a variable that holds it."""
+    parts = _short_ref(ref).split("/")
+    name = parts[-1]
+    if len(parts) <= 2 and name in _DEFAULT_BRANCHES:
+        return True
+    m = re.fullmatch(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)(?::?[-=]([^}]*))?\}?", name)
+    return bool(m and (m.group(1) in default_vars or (m.group(2) or "") in _DEFAULT_BRANCHES))
+
+
+def _default_vars(assigns: dict[str, list[str]], all_tokens: list[str]) -> set[str]:
+    found: set[str] = set()
+    for tok in all_tokens:
+        for m in _PARAM_DEFAULT_RE.finditer(tok):
+            if m.group(2) in _DEFAULT_BRANCHES:
+                found.add(m.group(1))
+    for _ in range(3):  # BASE=main; UPSTREAM=origin/$BASE
+        for name, values in assigns.items():
+            if any(_is_default_ref(v, found) for v in values):
+                found.add(name)
+    return found
+
+
+def _names_a_source_branch(
+    dst: str, assigns: dict[str, list[str]], bound: set[str], default_vars: set[str]
+) -> bool:
+    """A push destination that can be each proposed change's source branch.
+
+    Fourteen branches cannot be one literal, so the destination has to expand a
+    variable the script binds at run time: a loop or `read` variable, a function
+    argument, or an assignment from a command. A placeholder (`<branch>`), an
+    unbound `$var`, main, or a variable holding only a fixed literal does not.
+    """
+    if not dst or _is_default_ref(dst, default_vars) or dst.startswith("refs/tags/"):
+        return False
+    for name in (m.group(1) for m in _SHELL_VAR_RE.finditer(dst)):
+        if name.isdigit() or name in {"@", "*"}:
+            return True  # a function argument
+        values = assigns.get(name, [])
+        if values and any("$" in v or "`" in v for v in values):
+            return True
+        if name in bound and not values:
+            return True
+    return False
+
+
+_BRACED_VAR_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*|[0-9@*])\}")
+
+
+def _branch_ref(ref: str) -> str:
+    """A ref as a branch name, with `${b}` and `$b` spelled the same way."""
+    return _BRACED_VAR_RE.sub(r"$\1", _short_ref(ref))
+
+
+def _function_name(tokens: list[str]) -> str | None:
+    """The name a `name() {` or `function name {` line defines, if it is one."""
+    if len(tokens) >= 2 and tokens[0] == "function":
+        return tokens[1].removesuffix("()") or None
+    if len(tokens) >= 2 and tokens[1] == "()" and re.fullmatch(r"[A-Za-z_][\w-]*", tokens[0]):
+        return tokens[0]
+    if len(tokens) >= 3 and tokens[1:3] == ["(", ")"] and re.fullmatch(r"[A-Za-z_][\w-]*", tokens[0]):
+        return tokens[0]
+    return None
+
+
+def _function_bodies(lines: list[tuple[int, list[str]]]) -> dict[str, list[int]]:
+    """Each function's name, with the positions in ``lines`` its body spans."""
+    bodies: dict[str, list[int]] = {}
+    current: str | None = None
+    depth, opened = 0, False
+    for pos, (_, tokens) in enumerate(lines):
+        if current is None:
+            current = _function_name(tokens)
+            if current is None:
+                continue
+            bodies[current] = []
+            depth, opened = 0, False
+        bodies[current].append(pos)
+        depth += tokens.count("{") - tokens.count("}")
+        opened = opened or "{" in tokens
+        if opened and depth <= 0:
+            current = None
+    return bodies
+
+
+def _sent_graphql_lines(
+    line_info: list[tuple[int, list[str], list[list[str]], set[str]]],
+    assigns: dict[str, list[str]],
+    bodies: list[tuple[int, str, int]],
+    pattern: re.Pattern[str],
+) -> list[int]:
+    """Line indexes where ``pattern`` appears in text the script sends.
+
+    Text counts on a line that runs a sender (curl, wget, httpie, infrahubctl,
+    python, or a script function that calls one), in a variable such a line
+    expands, and in a heredoc opened on such a line or assigned to such a
+    variable. Text that is only echoed or printed is not a request.
+    """
+    funcs = _function_bodies([(idx, tokens) for idx, tokens, _, _ in line_info])
+
+    def _program(argv: list[str]) -> str:
+        return argv[0].rsplit("/", 1)[-1]
+
+    sender_funcs: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for name, positions in funcs.items():
+            if name in sender_funcs:
+                continue
+            for pos in positions:
+                for argv in line_info[pos][2]:
+                    prog = _program(argv)
+                    if prog != name and (
+                        prog in _SENDERS or prog.startswith("python") or prog in sender_funcs
+                    ):
+                        sender_funcs.add(name)
+                        changed = True
+                        break
+                if name in sender_funcs:
+                    break
+
+    def _sends(argvs: list[list[str]]) -> bool:
+        return any(
+            (p := _program(a)) in _SENDERS or p.startswith("python") or p in sender_funcs
+            for a in argvs
+        )
+
+    sender_pos = [pos for pos, (_, _, argvs, _) in enumerate(line_info) if _sends(argvs)]
+    sent_vars = {
+        m.group(1)
+        for pos in sender_pos
+        for tok in line_info[pos][1]
+        for m in _SHELL_VAR_RE.finditer(tok)
+    }
+
+    found: list[int] = []
+    for pos in sender_pos:
+        idx, tokens, _, _ = line_info[pos]
+        if pattern.search(" ".join(tokens)):
+            found.append(idx)
+    for idx, _, _, assigned in line_info:
+        if any(pattern.search(v) for name in assigned & sent_vars for v in assigns[name]):
+            found.append(idx)
+
+    starts = [idx for idx, _, _, _ in line_info]
+    sender_idx = {line_info[pos][0] for pos in sender_pos}
+    for body_idx, body_line, opener in bodies:
+        if not pattern.search(body_line):
+            continue
+        k = max((i for i, start in enumerate(starts) if start <= opener), default=None)
+        if k is None:
+            continue
+        start, _, _, assigned = line_info[k]
+        if start in sender_idx or assigned & sent_vars:
+            found.append(body_idx)
+    return found
+
+
+def check_moves_source_branch_commit(
+    config: dict, *, sh_raw: str = "", **_: Any
+) -> tuple[bool, str]:
+    """The script moves the repository commit each proposed change runs.
+
+    Passes when a source branch has main merged, rebased or pulled into it and
+    a later `git push` sends that branch to a source branch, or when the script
+    opens a new branch and then a new proposed change. Rebasing the Infrahub
+    branch and retrying the checks alone reruns the old commit on a branch
+    synced with Git, and so does merging main into a branch other than the one
+    pushed.
+    """
+    text = _shell_script_text(sh_raw or "")
+    if not text.strip():
+        return False, "output.sh is missing or empty"
+    shell_lines, bodies = _split_heredocs(text)
+    logical = _logical_lines(shell_lines)
+
+    assigns: dict[str, list[str]] = {}
+    bound: set[str] = set()
+    commands: list[tuple[int, list[str]]] = []
+    all_tokens: list[str] = []
+    line_info: list[tuple[int, list[str], list[list[str]], set[str]]] = []
+    for line_idx, tokens in logical:
+        all_tokens.extend(tokens)
+        line_assigns: dict[str, list[str]] = {}
+        argvs: list[list[str]] = []
+        for seg in _simple_commands(tokens):
+            argv = _peel(seg, line_assigns)
+            if argv:
+                _bound_vars(argv, bound)
+                commands.append((line_idx, argv))
+                argvs.append(argv)
+        for name, values in line_assigns.items():
+            assigns.setdefault(name, []).extend(values)
+        line_info.append((line_idx, tokens, argvs, set(line_assigns)))
+    default_vars = _default_vars(assigns, all_tokens)
+
+    current: str | None = None
+    merged: set[str] = set()  # branches main was merged, rebased or pulled into
+    qualifying_push: str | None = None
+    pushes_seen: list[str] = []
+    rebases = 0
+    branch_create_lines: list[int] = []
+
+    def _merged_into(target: str | None) -> None:
+        if target and not _is_default_ref(target, default_vars):
+            merged.add(target)
+
+    for line_idx, argv in commands:
+        if argv[0].rsplit("/", 1)[-1] == "infrahubctl" and argv[1:2] == [_BRANCH_GROUP]:
+            verb = argv[2] if len(argv) > 2 else ""
+            if verb == _BRANCH_CREATE:
+                branch_create_lines.append(line_idx)
+            elif verb == _BRANCH_REBASE:
+                rebases += 1
+        sub, args = _git_subcommand(argv)
+        if sub is None:
+            continue
+        opts = _GIT_VALUE_OPTS.get(sub, set())
+        pos = _positionals(args, opts)
+        if sub in {"checkout", "switch"}:
+            named = _option_value(args, {"-b", "-B", "-c", "-C"})
+            if named:
+                current = _branch_ref(named)
+            elif pos:
+                ref = pos[-1]
+                if ("-t" in args or "--track" in args) and "/" in ref:
+                    ref = ref.split("/", 1)[1]
+                current = _branch_ref(ref)
+        elif sub == "clone":
+            named = _option_value(args, {"-b", "--branch"})
+            current = _branch_ref(named) if named else None
+        elif sub == "worktree" and pos[:1] == ["add"]:
+            named = _option_value(args, {"-b", "-B"})
+            ref = named or (pos[2] if len(pos) > 2 else None)
+            current = _branch_ref(ref) if ref else current
+        elif sub in {"merge", "rebase"}:
+            refs = list(pos)
+            if sub == "rebase" and len(pos) >= 2:
+                # `git rebase <upstream> <branch>` checks out <branch> first.
+                current = _branch_ref(pos[1])
+                refs = [pos[0]]
+            onto = _option_value(args, {"--onto"})
+            if onto:
+                refs.append(onto)
+            if any(_is_default_ref(r, default_vars) for r in refs):
+                _merged_into(current)
+        elif sub == "pull":
+            if any(_is_default_ref(r, default_vars) for r in pos[1:]):
+                _merged_into(current)
+        elif sub == "push":
+            if {"--delete", "-d", "--all", "--mirror", "--tags"} & set(args):
+                continue
+            refspecs = pos[1:] or ["HEAD"]
+            for spec in refspecs:
+                if spec.startswith(":"):
+                    continue
+                src, dst = spec.split(":", 1) if ":" in spec else (spec, spec)
+                src, dst = _branch_ref(src), _branch_ref(dst)
+                if src == "HEAD":
+                    src = current or ""
+                if dst == "HEAD":
+                    dst = current or ""
+                pushes_seen.append(dst or "HEAD (branch unknown)")
+                if (
+                    qualifying_push is None
+                    and src in merged
+                    and _names_a_source_branch(dst, assigns, bound, default_vars)
+                ):
+                    qualifying_push = dst
+
+    if qualifying_push:
+        return True, (
+            f"Pushes main into each source branch's Git branch (`git push` to {qualifying_push}), "
+            "so the repository sync records a new commit on the branch"
+        )
+
+    # Second accepted route: a new branch, then a new proposed change on it.
+    gql_branch = _sent_graphql_lines(line_info, assigns, bodies, _BRANCH_CREATE_GQL_RE)
+    pc_create = _sent_graphql_lines(line_info, assigns, bodies, _PC_CREATE_GQL_RE)
+    first_branch = min(branch_create_lines + gql_branch, default=None)
+    if first_branch is not None and any(i >= first_branch for i in pc_create):
+        return True, "Opens a new branch and a new proposed change, which run the current commit"
+
+    seen = ", ".join(pushes_seen) if pushes_seen else "none"
+    into = ", ".join(sorted(merged)) if merged else "none"
+    return False, (
+        "No `git push` to a source branch after merging or rebasing main into it, and no new "
+        "branch plus new proposed change: the open proposed changes keep running the old "
+        f"repository commit (git push destinations: {seen}; infrahubctl branch rebase calls: "
+        f"{rebases}; branches main was merged into: {into})"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Check registry
 # ---------------------------------------------------------------------------
 
@@ -722,6 +1303,7 @@ CHECKS: dict[str, Any] = {
     "queries-section-present": check_queries_section_present,
     "check-def-required-fields": check_check_def_required_fields,
     "targeted-has-targets-and-parameters": check_targeted_has_targets_and_parameters,
+    "moves-source-branch-commit": check_moves_source_branch_commit,
 }
 
 
@@ -735,13 +1317,15 @@ def run_checks(
     output_path: Path,
     py_path: Path | None = None,
     dockerfile_path: Path | None = None,
+    sh_path: Path | None = None,
 ) -> dict:
     """Run named checks against an .infrahub.yml output and return skillgrade JSON.
 
-    ``py_path`` and ``dockerfile_path`` are optional: error-surface checks
-    inspect a Python check file, received as ``tree`` / ``py_raw``, and
+    ``py_path``, ``dockerfile_path`` and ``sh_path`` are optional: error-surface
+    checks inspect a Python check file, received as ``tree`` / ``py_raw``,
     shared-module checks also inspect a Dockerfile, received as
-    ``dockerfile_raw``.
+    ``dockerfile_raw``, and the proposed-change commit check inspects a shell
+    script, received as ``sh_raw``.
     """
     config, _ = load_output(output_path)
     tree, py_raw = load_output_py(py_path) if py_path else (None, "")
@@ -751,13 +1335,25 @@ def run_checks(
             dockerfile_raw = Path(dockerfile_path).read_text(encoding="utf-8")
         except (FileNotFoundError, OSError):
             dockerfile_raw = ""
+    sh_raw = ""
+    if sh_path:
+        try:
+            sh_raw = Path(sh_path).read_text(encoding="utf-8")
+        except (FileNotFoundError, OSError):
+            sh_raw = ""
 
     entries: list[dict] = []
     passed_count = 0
     for name in check_names:
         fn = CHECKS[name]
         try:
-            ok, msg = fn(config, tree=tree, py_raw=py_raw, dockerfile_raw=dockerfile_raw)
+            ok, msg = fn(
+                config,
+                tree=tree,
+                py_raw=py_raw,
+                dockerfile_raw=dockerfile_raw,
+                sh_raw=sh_raw,
+            )
         except Exception as exc:  # pragma: no cover
             ok, msg = False, f"Error running check: {exc}"
         if ok:

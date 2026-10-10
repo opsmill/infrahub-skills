@@ -36,6 +36,7 @@ Three files that must be used together:
 - **GraphQL query naming**: the query name in the `.gql` file must match the `query` class attribute exactly
 - **Parameter mapping**: if the check accepts parameters (e.g., to parameterize a naming pattern), the parameters are declared in both the Python class and the `.infrahub.yml` registration
 - **Error collection before logging**: errors are collected across all objects first, then logged together, rather than short-circuiting on the first error
+- **Which code a proposed change runs**: a proposed change runs the check code at its source branch's repository commit. On a branch synced with Git, a branch rebase or a retry of the checks reruns that same commit, so the skill updates and pushes the branch's Git branch instead
 
 ## Common mistakes it catches
 
@@ -45,10 +46,11 @@ Three files that must be used together:
 | Query name mismatch between `.gql` and Python class | Uses the same name in both |
 | Missing `.infrahub.yml` registration | Generates the registration entry alongside the check |
 | Short-circuiting on first error | Collects all errors before logging |
+| Rebasing a branch synced with Git to pick up a check fix merged to `main` | Merges `main` into the source branch's Git branch and pushes it, then reruns the checks |
 
 ## Running it
 
-Checks run automatically in the proposed change pipeline when a change is submitted to Infrahub. To test a check locally:
+Checks run automatically in the proposed change pipeline when a change is submitted to Infrahub. The pipeline runs the code at the repository commit recorded on the source branch, not the latest commit on `main`. To test a check locally:
 
 ```bash
 infrahubctl check <check-name>
