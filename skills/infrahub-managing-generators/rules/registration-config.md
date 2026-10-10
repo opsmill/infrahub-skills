@@ -38,11 +38,16 @@ typed as a plain string, so an inline GraphQL document
 passes validation and gets listed. It fails later, at
 dispatch, when no query of that name is found.
 
-`targets:` resolves
-strictly against `CoreGeneratorGroup`; pointing it
-at a `CoreStandardGroup` of the same name parses
-fine but the dispatcher never enqueues runs, so the
-generator looks broken with no error message.
+`targets:` names the group whose members drive the
+generator: Infrahub runs it once per member. Any group
+kind works, so when the design objects are already in
+a group, target that group as it is. Do not create a
+second group or change the existing group's kind. When
+no group exists yet, create a `CoreStandardGroup`.
+`CoreGeneratorGroup` is the group a generator creates
+to track the objects it produced, so it is not the
+input group. Verified against Infrahub 1.11.5.
+
 Parameter paths like `name__value` are evaluated on
 each member of the target group at dispatch time —
 a typo here surfaces as the query running with
@@ -60,7 +65,7 @@ generator_definitions:
     file_path: generators/generate_dc.py
     # Must match query name
     query: topology_dc
-    # CoreGeneratorGroup name
+    # Group whose members drive the generator
     targets: topologies_dc
     class_name: DCTopologyGenerator
     parameters:
@@ -81,7 +86,7 @@ generator_definitions:
 | `name`       | Yes      | Unique Generator identifier           |
 | `file_path`  | Yes      | Path to Python file                   |
 | `query`      | Yes      | Query name (must match queries entry) |
-| `targets`    | Yes      | CoreGeneratorGroup name               |
+| `targets`    | Yes      | Group name (any group kind)           |
 | `class_name` | Yes      | Python class name                     |
 | `parameters` | Yes      | Maps query variables to attributes    |
 
@@ -91,10 +96,9 @@ generator_definitions:
   `queries` block; a mismatch (or a missing
   `queries` entry) makes the dispatcher report an
   unknown query and skip the run.
-- `targets` resolves only against
-  `CoreGeneratorGroup`; pointing it at a different
-  group kind parses but never triggers, so the
-  generator looks dead with no log line.
+- `targets` accepts any group kind. Reuse the group
+  the design objects are already in; create a
+  `CoreStandardGroup` only when there is none.
 - `parameters` maps GraphQL `$variable` names to
   target attribute paths (`name__value`,
   `site__node__name__value`); the path is evaluated
@@ -132,7 +136,7 @@ In object data, **write it from the member side**:
 
 ```yaml
 # DOES NOT RESOLVE: the peer is CoreNode
-- kind: CoreGeneratorGroup
+- kind: CoreStandardGroup
   data:
     - name: topologies_dc
       members:
@@ -169,8 +173,9 @@ things commonly leave the group empty on a clean install:
 So check it rather than assuming:
 
 ```bash
-# Does the group exist, and what is in it?
-infrahubctl object get CoreGeneratorGroup --branch mybranch
+# Does the group exist, and what is in it? Use the
+# group's kind.
+infrahubctl object get CoreStandardGroup --branch mybranch
 
 # Is the generator registered, and which group does it target?
 infrahubctl generator --list

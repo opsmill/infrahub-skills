@@ -166,7 +166,7 @@ queries:
 generator_definitions:
   - name: create_pop
     file_path: generators/generate_pop.py
-    # CoreGeneratorGroup containing topology objects
+    # Group containing topology objects
     targets: topologies_pop
     query: topology_pop
     class_name: PopTopologyGenerator

@@ -108,8 +108,7 @@ Registration
 the variable the query declares — ``infrahubctl generator`` uses it for both,
 which is why the query's variable is ``$name`` and not ``$device_name``.
 
-``targets`` must be a ``CoreGeneratorGroup``; a ``CoreStandardGroup`` of the
-same name parses but never triggers. Its ``members`` cannot be populated from
+The target group's ``members`` cannot be populated from
 an object file, and an installed module needs ``object_template`` set at
 creation or it has no ports for this generator to resolve. Both are covered in
 ``generators-module-ports.md`` → Registration / Installing a module. See also

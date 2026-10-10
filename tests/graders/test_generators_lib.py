@@ -2,6 +2,10 @@
 
 import ast
 import importlib.util
+import json
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -1146,3 +1150,92 @@ def test_gen_watch_no_third_party_leaves_first_party_paths_alone(watch):
 def test_gen_watch_no_third_party_catches_installed_packages(watch):
     ok, _ = check_gen_watch_no_third_party(_gen_manifest(watch))
     assert ok is False
+
+
+# ---------------------------------------------------------------------------
+# generator-targets-existing-group (generator-target-standard-group task)
+# ---------------------------------------------------------------------------
+
+_TARGET_FIXTURES = (
+    _REPO_ROOT / "tests" / "graders" / "fixtures" / "generator-target-standard-group"
+)
+_TARGET_GRADER_PATH = (
+    _REPO_ROOT / "graders" / "managing-generators" / "check_generator_target_standard_group.py"
+)
+
+
+def _run_target_grader(fixture: str, tmp_path: Path) -> dict:
+    """Drive the task grader the way skillgrade does: output.md in the cwd."""
+    shutil.copy(_TARGET_FIXTURES / f"{fixture}.md", tmp_path / "output.md")
+    result = subprocess.run(
+        [sys.executable, str(_TARGET_GRADER_PATH)],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+@pytest.mark.parametrize(
+    ("fixture", "passes"),
+    [
+        ("pass", True),
+        ("pass-variant", True),
+        ("fail", False),
+        ("fail-nearmiss", False),
+    ],
+)
+def test_generator_targets_existing_group_four_fixtures(fixture, passes, tmp_path):
+    result = _run_target_grader(fixture, tmp_path)
+    check = next(c for c in result["checks"] if c["name"] == "generator-targets-existing-group")
+    assert check["passed"] is passes, check["message"]
+    assert (result["score"] == 1.0) is passes, result["details"]
+
+
+def _target_answer(tmp_path, body: str) -> dict:
+    path = tmp_path / "output.md"
+    path.write_text(body, encoding="utf-8")
+    return _mod.load_output(path)
+
+
+_TARGET_MANIFEST = """```yaml
+generator_definitions:
+  - name: create_dc
+    file_path: generators/generate_dc.py
+    query: topology_dc
+    targets: topologies_dc
+    class_name: DCTopologyGenerator
+    parameters:
+      name: name__value
+    watch:
+      files: []
+```
+"""
+
+
+def test_generator_targets_existing_group_fails_on_group_converted_to_other_kind(tmp_path):
+    body = _TARGET_MANIFEST + (
+        "\n```yaml\n- kind: CoreGraphQLQueryGroup\n  data:\n    - name: topologies_dc\n```\n"
+    )
+    ok, msg = _mod.CHECKS["generator-targets-existing-group"](_target_answer(tmp_path, body))
+    assert ok is False
+    assert "redeclares topologies_dc" in msg
+
+
+def test_generator_targets_existing_group_ignores_kind_named_only_in_a_comment(tmp_path):
+    body = _TARGET_MANIFEST.replace(
+        "    targets: topologies_dc\n",
+        "    # any CoreGroup kind works; no CoreGeneratorGroup needed\n"
+        "    targets: topologies_dc\n",
+    )
+    ok, msg = _mod.CHECKS["generator-targets-existing-group"](_target_answer(tmp_path, body))
+    assert ok is True, msg
+
+
+def test_generator_targets_existing_group_fails_without_a_manifest(tmp_path):
+    ok, msg = _mod.CHECKS["generator-targets-existing-group"](
+        _target_answer(tmp_path, "targets: topologies_dc\n")
+    )
+    assert ok is False
+    assert "no generator_definitions" in msg

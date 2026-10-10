@@ -18,8 +18,8 @@ actually needs to act on, typically as a workaround for a missing
 schema inverse or a conflation between the trigger contract and the
 data contract. Three patterns:
 
-1. The generator's trigger group (`CoreGeneratorGroup`) appears
-   inside its data query — the membership that dispatched the
+1. The generator's trigger group (the group its `targets:` names,
+   of any `CoreGroup` kind) appears inside its data query — the membership that dispatched the
    generator is being re-fetched as data.
 2. The generator's Python contains a focal-exclude loop:
    `for X in data[Kind][edges]: if X.attr.value == focal.attr.value: continue` —
@@ -31,8 +31,8 @@ data contract. Three patterns:
 
 ## Why it matters
 
-A generator that pulls its own `CoreGeneratorGroup` membership inside
-the data query is asking the platform to compute, on every dispatch,
+A generator that pulls its own trigger-group membership inside the
+data query is asking the platform to compute, on every dispatch,
 the very fact that just triggered it. The cost compounds: for `M`
 triggered nodes the query returns an `M × N` matrix where the `M`
 axis is already known. More importantly it signals a design
@@ -57,11 +57,13 @@ both the `.gql` and the Python need to change together.
 
 ## Checks
 
-1. **No `CoreGeneratorGroup` in the data query**: the generator's
+1. **No trigger group in the data query**: the generator's
    `.gql` file (resolved via the generator's `query` class attribute
    → the matching `queries` entry in `.infrahub.yml` → its
-   `file_path`) must not name `CoreGeneratorGroup` as a top-level
-   field or as a nested traversal target. The trigger group belongs
+   `file_path`) must not name the trigger group as a top-level
+   field or as a nested traversal target, whatever its kind
+   (`CoreStandardGroup(name__value: "<targets>")`,
+   `CoreGeneratorGroup(...)`, or another `CoreGroup` kind). The trigger group belongs
    only in `.infrahub.yml` `targets:`.
 2. **No focal-exclude loops in the generator's Python**: scan the
    generator file for an outer loop over `data[<Kind>]["edges"]` (or
@@ -86,7 +88,7 @@ both the `.gql` and the Python need to change together.
 - Generators that intentionally fetch the focal's siblings to
   compute a position-dependent value (rank within group, neighbour
   count) — that's an aggregate, not a filter-and-discard.
-- Generators where the `CoreGeneratorGroup` appears only inside a
+- Generators where the trigger group appears only inside a
   fragment used by other queries and the inclusion is incidental
   (rare; verify before suppressing).
 
