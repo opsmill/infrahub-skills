@@ -1476,9 +1476,10 @@ tasks:
       (`git@git.example.com:netops/infra-repo.git`), and Infrahub's `main`
       branch already shows the new repository commit. Fourteen proposed
       changes are still open and still fail with the old message. All of
-      their branches were created by our intake bot with the Python SDK's
-      `client.branch.create`. Our runbook says "to refresh a branch, run
-      `infrahubctl branch rebase <branch>`, then retry the checks".
+      their branches were created by our intake bot, which calls the GraphQL
+      `BranchCreate` mutation with only a name and a description. Our
+      runbook says "to refresh a branch, run `infrahubctl branch rebase
+      <branch>`, then retry the checks".
 
       Write a bash script that gets every open proposed change re-validated
       with the fixed check. Our Infrahub address is in `INFRAHUB_ADDRESS`
@@ -1502,9 +1503,8 @@ tasks:
         Explains that the proposed change pipeline runs the check code at
         the repository commit recorded on the source branch
       - >-
-        States that on branches synced with Git, as `client.branch.create`
-        creates them, a rebase plus a retry of the checks reruns the old
-        commit
+        States that on branches synced with Git, as the intake bot creates
+        them, a rebase plus a retry of the checks reruns the old commit
       - >-
         Merges or rebases main into each source branch's Git branch and
         pushes it, or opens a new branch and proposed change instead

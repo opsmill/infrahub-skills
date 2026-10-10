@@ -182,12 +182,12 @@
     },
     {
       "id": 6,
-      "prompt": "We fixed a false positive in our `check_rack_power_budget`\ncheck. The fix is merged to `main` in our Git repository\n(`git@git.example.com:netops/infra-repo.git`), and Infrahub's `main`\nbranch already shows the new repository commit. Fourteen proposed\nchanges are still open and still fail with the old message. All of\ntheir branches were created by our intake bot with the Python SDK's\n`client.branch.create`. Our runbook says \"to refresh a branch, run\n`infrahubctl branch rebase <branch>`, then retry the checks\".\n\nWrite a bash script that gets every open proposed change re-validated\nwith the fixed check. Our Infrahub address is in `INFRAHUB_ADDRESS`\nand the API token in `INFRAHUB_API_TOKEN`.\n\nSave the script to: output.sh",
+      "prompt": "We fixed a false positive in our `check_rack_power_budget`\ncheck. The fix is merged to `main` in our Git repository\n(`git@git.example.com:netops/infra-repo.git`), and Infrahub's `main`\nbranch already shows the new repository commit. Fourteen proposed\nchanges are still open and still fail with the old message. All of\ntheir branches were created by our intake bot, which calls the GraphQL\n`BranchCreate` mutation with only a name and a description. Our\nrunbook says \"to refresh a branch, run `infrahubctl branch rebase\n<branch>`, then retry the checks\".\n\nWrite a bash script that gets every open proposed change re-validated\nwith the fixed check. Our Infrahub address is in `INFRAHUB_ADDRESS`\nand the API token in `INFRAHUB_API_TOKEN`.\n\nSave the script to: output.sh",
       "expected_output": "A script that moves the repository commit each proposed change runs: for each open proposed change it merges or rebases main into the Git branch that has the same name as the source branch, and pushes that branch. Opening a new branch and then a new proposed change after the fix is on main is also correct. A loop of `infrahubctl branch rebase` and `CoreProposedChangeRunCheck` alone is wrong, because on branches synced with Git it reruns the old commit.",
       "files": [],
       "expectations": [
         "Explains that the proposed change pipeline runs the check code at the repository commit recorded on the source branch",
-        "States that on branches synced with Git, as `client.branch.create` creates them, a rebase plus a retry of the checks reruns the old commit",
+        "States that on branches synced with Git, as the intake bot creates them, a rebase plus a retry of the checks reruns the old commit",
         "Merges or rebases main into each source branch's Git branch and pushes it, or opens a new branch and proposed change instead",
         "Waits for the repository sync to record the new commit before rerunning the checks",
         "Recommends `infrahubctl check <name> --branch <branch>` as the fast loop while editing a check, since it runs the local code with no commit"

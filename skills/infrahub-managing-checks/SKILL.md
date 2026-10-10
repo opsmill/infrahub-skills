@@ -58,7 +58,7 @@ Existing queries:
 | HIGH | API Reference | `api-` | Class attributes, instance properties, methods, lifecycle, and which API surfaces a rejection (a GraphQL error is a 200) |
 | HIGH | Registration | `registration-` | .infrahub.yml config, query name matching, parameters |
 | MEDIUM (HIGH for `patterns-shared-module`) | Patterns | `patterns-` | Error collection, shared utilities, scoped validation, relationship-traversal validation, sharing a module across artifact types |
-| HIGH | Testing | `testing-` | Resources Testing Framework (YAML-driven tests), infrahubctl check commands |
+| HIGH | Testing | `testing-` | Resources Testing Framework (YAML-driven tests), infrahubctl check commands, which repository commit a proposed change's checks run |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -186,6 +186,12 @@ Follow these steps when creating a check:
 6. **Test locally** — Run `infrahubctl check` to validate
    against a feature branch. See
    [rules/testing-commands.md](./rules/testing-commands.md).
+   To run a changed check against an existing proposed
+   change, read
+   [rules/testing-proposed-change-commit.md](./rules/testing-proposed-change-commit.md):
+   the pipeline runs the code at the source branch's
+   repository commit, not `main`'s, and a branch rebase
+   does not move it on a branch synced with Git.
 
 ## Supporting References
 

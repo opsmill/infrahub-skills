@@ -22,7 +22,10 @@ author. Running `infrahubctl check` locally exercises
 the same SDK path the pipeline uses, so a check that
 passes locally on a representative branch will behave
 the same way in the pipeline, and one that explodes
-locally never reaches a reviewer.
+locally never reaches a reviewer. The local run uses
+your working copy; the pipeline uses the code at the
+source branch's repository commit (see
+[testing-proposed-change-commit.md](./testing-proposed-change-commit.md)).
 
 ### Prerequisites
 
