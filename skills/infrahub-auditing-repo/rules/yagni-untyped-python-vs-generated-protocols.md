@@ -42,10 +42,9 @@ protocols is paid later, and in a worse place.
    protocol class available — a repo module (`protocols.py`,
    `schema_protocols.py`, a `*_sync.py` / `*_async.py` protocols file) or
    `infrahub_sdk.protocols`.
-2. Node payloads hand-built as untyped `dict`s and passed to `create` /
-   `update` with a string kind. A protocol class as the kind types attribute
-   reads on the returned node; the payload's field names stay unchecked
-   either way.
+2. Node payloads hand-built as untyped `dict`s and passed to `create` with a
+   string kind. A protocol class as the kind types attribute reads on the
+   returned node; the payload's field names stay unchecked either way.
 3. Multiple such call sites, or one file reading/writing many attributes or
    several kinds — i.e. non-trivial schema-coupled Python, not a one-off.
 
