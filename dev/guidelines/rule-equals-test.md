@@ -144,6 +144,24 @@ to reach hydration through `.add()`, so the sample looked
 like the cause. Name the mechanism from what the scenarios
 share, not from what the ones you happened to write share.
 
+Taken again, for the `client.create()` bullet in
+`skills/infrahub-managing-generators/rules/python-generate.md`
+(#193). Three scenarios, five trials, all 1.00: the schema
+inline in the prompt, a modification task with the schema
+inline, and the schema as `schemas/interfaces.yml` in the
+workspace.
+
+The bug needs a field the kind does not have. A grader can
+only score that against the kind's schema, and any task that
+gives the model the schema hands it the answer: in every
+trial the model read the schema and left the field out. Its
+reasoning still showed the false belief the rule corrects,
+that the SDK rejects the field rather than dropping it, but
+the grader reads code, not reasoning.
+`check_create_fields_exist_on_kind` and its fixtures stay in
+`tests/graders/test_generators_create_fields.py`, guarding
+the check.
+
 ## When the grader and the rule disagree, decide which side moves
 
 A check that encodes a stricter contract than the rule

@@ -1,0 +1,20 @@
+from infrahub_sdk.generator import InfrahubGenerator
+
+from .protocols import DcimPhysicalInterface, DcimVirtualInterface
+
+
+class DeviceInterfacesGenerator(InfrahubGenerator):
+    async def generate(self, data: dict) -> None:
+        device = await self.client.get(kind="DcimDevice", id=data["DcimDevice"]["edges"][0]["node"]["id"])
+        lag = await self.client.get(kind="DcimLagInterface", device__ids=[device.id], name__value="po1")
+
+        for name in ("eth1", "eth2"):
+            payload = {"name": name, "mtu": 9000, "device": device}
+            payload["lag"] = lag
+            uplink = await self.client.create(DcimPhysicalInterface, data=payload)
+            await uplink.save(allow_upsert=True)
+
+        loopback_payload = dict(name="lo0", mtu=9000)
+        loopback_payload.update({"device": device})
+        loopback = await self.client.create(DcimVirtualInterface, data=loopback_payload)
+        await loopback.save(allow_upsert=True)

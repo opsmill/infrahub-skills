@@ -63,7 +63,7 @@ delete data via the tracking cleanup.
 
 | If the generator... | The schema must... | See |
 | ------------------- | ------------------ | --- |
-| Creates objects of kind X | Have node X defined with the attributes the generator sets — extra attributes silently fail validation, missing required ones abort the create | [../infrahub-managing-schemas/rules/attribute-defaults-and-types.md](../infrahub-managing-schemas/rules/attribute-defaults-and-types.md) |
+| Creates objects of kind X | Have node X defined with the attributes the generator sets — a field the kind does not have is dropped before the request is sent, with no error; missing required ones abort the create | [../infrahub-managing-schemas/rules/attribute-defaults-and-types.md](../infrahub-managing-schemas/rules/attribute-defaults-and-types.md) |
 | Links the created object to a parent | Have a Component/Parent relationship pair with matching identifiers and `optional: false` on the Parent side | [../infrahub-managing-schemas/rules/relationship-component-parent.md](../infrahub-managing-schemas/rules/relationship-component-parent.md) |
 | Reads a "design" node to drive output | Define that node's `human_friendly_id` so the generator's tracking key stays stable across runs | [../infrahub-managing-schemas/rules/display-human-friendly-id.md](../infrahub-managing-schemas/rules/display-human-friendly-id.md) |
 | Is triggered by membership in a group | The target group must be a `CoreGeneratorGroup` (not `CoreStandardGroup`) — the dispatcher only recognizes the former | [rules/registration-config.md](./rules/registration-config.md) |
@@ -102,8 +102,9 @@ for the legitimate cases.
 
 Once you *are* writing Python, type your SDK calls with generated protocol
 classes rather than string kinds — `client.create(NetworkDevice, ...)`, not
-`kind="NetworkDevice"` — so a schema change fails type-check instead of at
-runtime. See
+`kind="NetworkDevice"` — so a schema change breaks attribute reads on the
+returned object at type-check time. Field names passed to `create()` are not
+type-checked. See
 [protocols-adopt-typed-kinds](../infrahub-common/rules/protocols-adopt-typed-kinds.md).
 
 ## Generator Basics
