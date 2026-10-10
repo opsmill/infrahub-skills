@@ -297,13 +297,15 @@ infrahubctl generator materialize_module_ports name=lon-dc1-chassis-01 --branch 
 
 ### Populating the target group
 
-`CoreGeneratorGroup.members` peers `CoreNode`, which has
-no `human_friendly_id`, so members cannot be named in an
-object file. This looks reasonable and does not work:
+The target group is a `CoreStandardGroup`. Its `members`
+relationship, inherited from `CoreGroup`, peers `CoreNode`,
+which has no `human_friendly_id`, so members cannot be
+named in an object file. This looks reasonable and does
+not work:
 
 ```yaml
 spec:
-  kind: CoreGeneratorGroup
+  kind: CoreStandardGroup
   data:
     - name: devices_with_modules
       members:
@@ -311,7 +313,7 @@ spec:
 ```
 
 ```text
-['CoreGeneratorGroupUpsert'] Unable to find the node
+['CoreStandardGroupUpsert'] Unable to find the node
 lon-dc1-chassis-01 / CoreNode in the database.
 ```
 
@@ -323,7 +325,7 @@ per call** — see
 
 ```python
 group = await client.get(
-    kind="CoreGeneratorGroup", name__value="devices_with_modules", branch=branch
+    kind="CoreStandardGroup", name__value="devices_with_modules", branch=branch
 )
 await group.members.fetch()   # without this: UninitializedError — "Must call
                               # fetch() on RelationshipManager before editing members"
