@@ -489,8 +489,9 @@ def check_on_delete_cascade_present(schema: dict, **_: Any) -> tuple[bool, str]:
     """At least one relationship sets on_delete: cascade.
 
     Used in evals where the prompt describes owned children whose existence
-    has no meaning without the parent. Cascade is opt-in; defaults to
-    no-action.
+    has no meaning without the parent. An omitted on_delete resolves to
+    cascade on kind: Component and to no-action on every other kind; this
+    check accepts only an explicit on_delete: cascade.
     """
     all_items = _all_nodes(schema) + _all_generics(schema)
     cascading: list[str] = []
