@@ -504,6 +504,52 @@ def check_on_delete_cascade_present(schema: dict, **_: Any) -> tuple[bool, str]:
     return False, "No relationship sets on_delete: cascade"
 
 
+def _resolved_on_delete(rel: dict) -> str:
+    """The on_delete Infrahub applies to a relationship.
+
+    An explicit value wins. An omitted one resolves from the kind: cascade on
+    Component, no-action on every other kind. A relationship with no kind is
+    Generic.
+    """
+    explicit = rel.get("on_delete")
+    if explicit is not None:
+        return str(explicit)
+    return "cascade" if rel.get("kind", "Generic") == "Component" else "no-action"
+
+
+def check_ip_reference_not_cascade(schema: dict, **_: Any) -> tuple[bool, str]:
+    """Every relationship to an IP address node resolves to on_delete: no-action.
+
+    Used in evals where the prompt says the IP is shared and must survive the
+    owner's deletion. The resolved value is what Infrahub acts on, so a
+    kind: Component relationship that omits on_delete fails: it cascades.
+    Any value other than no-action fails, so an unknown value is not a pass.
+    """
+    containers = _all_nodes(schema) + _all_generics(schema)
+    extensions = schema.get("extensions") or {}
+    containers += extensions.get("nodes", []) or []
+    refs: list[str] = []
+    bad: list[str] = []
+    for node in containers:
+        owner = node.get("kind") or _full_kind(node)
+        for rel in _all_rels(node):
+            if not str(rel.get("peer", "")).endswith("IPAddress"):
+                continue
+            ref = f"{owner}.{rel.get('name', '')}"
+            refs.append(ref)
+            resolved = _resolved_on_delete(rel)
+            if resolved != "no-action":
+                source = "explicit" if rel.get("on_delete") is not None else (
+                    f"omitted on kind {rel.get('kind', 'Generic')}"
+                )
+                bad.append(f"{ref} resolves to on_delete {resolved!r} ({source})")
+    if not refs:
+        return False, "No relationship references an IP address node"
+    if bad:
+        return False, "IP reference deletes the shared IP: " + "; ".join(bad)
+    return True, f"IP references resolve to no-action: {', '.join(refs)}"
+
+
 def check_generate_template_concrete_only(schema: dict, **_: Any) -> tuple[bool, str]:
     """generate_template: true must only appear on concrete nodes, never generics.
 
@@ -2427,6 +2473,7 @@ CHECKS: dict[str, Any] = {
     "computed-jinja2-readonly": check_computed_jinja2_readonly,
     "computed-jinja2-kind": check_computed_jinja2_kind,
     "on-delete-cascade-present": check_on_delete_cascade_present,
+    "ip-reference-not-cascade": check_ip_reference_not_cascade,
     "generate-template-concrete-only": check_generate_template_concrete_only,
     "generate-profile-concrete-only": check_generate_profile_concrete_only,
     "core-artifact-target-concrete": check_core_artifact_target_concrete,

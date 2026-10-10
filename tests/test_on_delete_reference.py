@@ -25,15 +25,22 @@ Upstream, in two parts:
   at infrahub-v1.11.4 (`e0ac367be9`), lines 1693-1711. It has been present
   since infrahub-v0.13.0, the first release with `on_delete`.
 
+The pin is the limit of this test. It does not read the server, so it does
+not fail on its own when the server changes which kind defaults to what.
+Only a new kind or value in `infrahub-sdk` reaches it without an edit here.
+
 What the rule must carry, checked both ways:
 
 1. A Markdown table with a kind column and a default column. Every SDK kind
    resolves through it, by its own row or an "every other kind" row, to the
    upstream default. No row names a kind or a value the SDK does not define.
-2. No prose sentence outside that table states an omitted-`on_delete`
-   default that contradicts upstream, or states one without naming the kind
-   it applies to. That second part is what catches "If omitted, behavior
-   defaults to `no-action`", which is wrong for exactly one kind.
+2. Every other unit of the rule (sentence, list item, heading, table row,
+   comment inside a fence) that states a default states the upstream one,
+   for a named kind. That catches "If omitted, behavior defaults to
+   `no-action`", which is wrong for exactly one kind, and negated forms such
+   as "does not resolve to `cascade`".
+3. The parser fails closed: a unit about the omitted default that names no
+   value is a failure, unless `EXEMPT` lists it with a reason.
 """
 
 from __future__ import annotations
@@ -68,75 +75,248 @@ def upstream_default(kind: str) -> str:
 
 # ---------------------------------------------------------------------------
 # Parsing the rule
+#
+# The parser fails closed. Every unit of text (a prose sentence, a list item,
+# a heading, a table row, a comment inside a fence) that talks about the
+# omitted or default `on_delete`, or that names a kind next to a value, is
+# classified. A unit about the default that names a kind but no value, or
+# names nothing at all, is a failure, unless it is on EXEMPT with a reason.
 # ---------------------------------------------------------------------------
 
-_FENCE = re.compile(r"^```.*?^```[ \t]*$", re.DOTALL | re.MULTILINE)
 _FRONTMATTER = re.compile(r"\A---\n.*?\n---\n", re.DOTALL)
-_VALUE = "|".join(re.escape(v) for v in VALUES)
+_FENCE_OPEN = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})(?P<info>.*)$")
 _KIND_NAMES = "|".join(re.escape(k) for k in KINDS)
 
-# A kind named in prose: `kind: Component`, `Component`, or the bare word.
-_KIND_MENTION = re.compile(
-    rf"(?:`kind:\s*({_KIND_NAMES})`|`({_KIND_NAMES})`|\b({_KIND_NAMES})\b)"
-)
-# "every other kind", "any other kind", "all other kinds", "non-Component".
+# A kind named in prose or code: `kind: Component`, `Component`, the bare
+# word. "non-Component" is not a mention of Component.
+_KIND_MENTION = re.compile(rf"(?<![\w-])({_KIND_NAMES})(?![\w-])")
+# "every other kind", "other relationship kinds", "non-Component".
 _OTHER_MENTION = re.compile(
-    r"\b(?:every|any|all)\s+other\s+(?:relationship\s+)?kinds?\b|\bnon-Component\b",
-    re.I,
+    r"\bother\s+(?:relationship\s+)?kinds?\b|(?<![\w-])non-Component\b", re.I
 )
-# A statement of the value applied when on_delete is omitted.
-_DEFAULT_CLAIM = re.compile(
-    rf"\b(?:defaults?|defaulted|resolves?|resolved)\s+(?:to\s+|is\s+)?`?({_VALUE})`?"
-    rf"|\bdefault\s+(?:value\s+)?is\s+`?({_VALUE})`?",
-    re.I,
-)
+
+
+def _value_pattern(value: str) -> str:
+    """A value, or for a verb-like value its inflections ("cascades")."""
+    if value.endswith("e"):
+        return rf"{re.escape(value[:-1])}(?:e|es|ed|ing)"
+    return re.escape(value)
+
+
+# A value in prose, backticked or bare.
+_VALUES = [
+    (re.compile(rf"(?<![\w-]){_value_pattern(v)}(?![\w-])", re.I), v) for v in VALUES
+]
+_VALUE_ALT = "|".join(re.escape(v) for v in VALUES)
+# `on_delete: <value>` sets a value; it states no default.
+_SETTING = re.compile(rf"\bon_delete\s*[:=]\s*[\"']?(?:{_VALUE_ALT})[\"']?", re.I)
 # "cascade ... is opt-in": a claim that nothing cascades unless declared.
 _OPT_IN_CLAIM = re.compile(r"\bcascade\b[^.]*?\bopt-in\b", re.I)
-# A value in its own backticks, as opposed to inside `on_delete: <value>`.
-_CODED_VALUE = re.compile(rf"`({_VALUE})`", re.I)
+# Words that put a unit on the subject of the omitted or default on_delete.
+_TOPIC = re.compile(
+    r"\bomit\w*|\bdefault\w*|\bunless\s+(?:it\s+is\s+|explicitly\s+)?set\b"
+    r"|\bnot\s+set\b|\bleft\s+(?:out|unset)\b|\bfall(?:s|ing)?\s+back\b"
+    r"|\babsent\b|\bwithout\s+(?:an?\s+)?`?on_delete\b|\bno\s+`?on_delete\b"
+    r"|\bfill(?:s|ed)?\s+(?:it\s+)?in\b|\bfilled-in\b|\bresolv\w*|\bimplicit\w*"
+    r"|\bopt-in\b",
+    re.I,
+)
+_NEGATION = re.compile(
+    r"\bnot\b|n't\b|\bnever\b|\bno\s+longer\b|\brather\s+than\b|\binstead\s+of\b",
+    re.I,
+)
+# A negation reaches back only to the start of its clause.
+_CLAUSE_BREAK = re.compile(r"[;:,()|]")
 
 OTHER = "*other*"
 
+# Units of the rule that talk about the omitted default but state no value,
+# each with the reason it is allowed to.
+EXEMPT = {
+    "When a relationship omits it, Infrahub fills it in from the relationship "
+    "kind at schema load, and the schema it serves carries that value:": (
+        "introduces the default table, which states the values"
+    ),
+}
 
-def prose(text: str) -> str:
-    """The rule without frontmatter and fenced blocks."""
-    return _FENCE.sub("", _FRONTMATTER.sub("", text))
+
+def split_fences(text: str) -> tuple[list[str], list[str]]:
+    """Split Markdown into prose lines and fenced code lines.
+
+    Reads fences as Markdown does: a run of three or more backticks or tildes,
+    indented or not (a fence under a list item is still a fence), closed by a
+    run of the same character at least as long. An unclosed fence runs to the
+    end of the text.
+    """
+    prose_lines: list[str] = []
+    code_lines: list[str] = []
+    fence: str | None = None
+    for line in text.splitlines():
+        if fence is None:
+            m = _FENCE_OPEN.match(line)
+            if m and not (m["fence"][0] == "`" and "`" in m["info"]):
+                fence = m["fence"]
+                prose_lines.append("")
+                continue
+            prose_lines.append(line)
+        else:
+            closer = re.fullmatch(
+                rf"[ \t]*{re.escape(fence[0])}{{{len(fence)},}}[ \t]*", line
+            )
+            if closer:
+                fence = None
+                prose_lines.append("")
+                continue
+            code_lines.append(line)
+    return prose_lines, code_lines
+
+
+def _table_rows(lines: list[str]) -> list[tuple[list[str], bool]]:
+    """Every table row as (cells, is_header), separator rows left out."""
+    rows: list[tuple[list[str], bool]] = []
+    first = True
+    for line in lines:
+        if not line.lstrip().startswith("|"):
+            first = True
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if all(re.fullmatch(r":?-{3,}:?", c) for c in cells if c):
+            continue
+        rows.append((cells, first))
+        first = False
+    return rows
+
+
+def units(text: str) -> list[tuple[str, bool]]:
+    """Every unit of text the rule states, as (text, is_table_header)."""
+    body = _FRONTMATTER.sub("", text)
+    prose_lines, code_lines = split_fences(body)
+    out: list[tuple[str, bool]] = []
+    out += [(" | ".join(cells), header) for cells, header in _table_rows(prose_lines)]
+    paras: list[list[str]] = [[]]
+    for line in prose_lines:
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            out.append((stripped.lstrip("#").strip(), False))
+            paras.append([])
+        elif not stripped or stripped.startswith("|"):
+            paras.append([])
+        else:
+            paras[-1].append(line)
+    for para in paras:
+        items = re.split(r"\n\s*(?:[-*]|\d+\.)\s+", "\n" + "\n".join(para))
+        for item in items:
+            flat = " ".join(item.split())
+            out += [
+                (s, False) for s in re.split(r"(?<=[.!?])\s+(?=[A-Z`*])", flat) if s
+            ]
+    # A comment in a fence is prose; the code on its line gives it a scope.
+    out += [
+        (line.strip(), False) for line in code_lines if re.search(r"(?:^|\s)#", line)
+    ]
+    return out
+
+
+def sentence_claims(sentence: str) -> list[tuple[str, str, bool]]:
+    """The (scope, value, negated) default claims a unit makes.
+
+    A unit makes claims when it is about the omitted default or names a kind.
+    Every value in it, except one inside `on_delete: <value>`, is a claim.
+    Each kind mention is assigned to the claim nearest to it, so a sentence
+    stating both defaults pairs each value with its own kind. A claim no kind
+    is assigned to has scope "" (unscoped). A claim is negated when "not" (or
+    similar) stands between it and the start of its clause.
+    """
+    masked = _SETTING.sub(lambda m: " " * len(m.group()), sentence)
+    hits: list[tuple[int, int, str]] = []
+    for m in _OPT_IN_CLAIM.finditer(masked):
+        hits.append((m.end(), m.end(), RelationshipDeleteBehavior.NO_ACTION.value))
+        masked = masked[: m.start()] + " " * (m.end() - m.start()) + masked[m.end() :]
+    for pattern, value in _VALUES:
+        hits += [(m.start(), m.end(), value) for m in pattern.finditer(masked)]
+    hits.sort()
+    mentions = [(m.start(), m.group(1)) for m in _KIND_MENTION.finditer(masked)]
+    mentions += [(m.start(), OTHER) for m in _OTHER_MENTION.finditer(masked)]
+    if not hits or not (mentions or _TOPIC.search(sentence)):
+        return []
+    claims: list[tuple[int, str, bool]] = []
+    prev_end = 0
+    for start, end, value in hits:
+        window = masked[prev_end:start]
+        breaks = list(_CLAUSE_BREAK.finditer(window))
+        if breaks:
+            window = window[breaks[-1].end() :]
+        claims.append((start, value, bool(_NEGATION.search(window))))
+        prev_end = end
+    scopes: dict[int, set[str]] = {n: set() for n in range(len(claims))}
+    for pos, kind in mentions:
+        nearest = min(range(len(claims)), key=lambda n: abs(claims[n][0] - pos))
+        scopes[nearest].add(kind)
+    result: list[tuple[str, str, bool]] = []
+    for n, (_, value, negated) in enumerate(claims):
+        for kind in sorted(scopes[n]) or [""]:
+            result.append((kind, value, negated))
+    return result
+
+
+def unit_problems(unit: str, header: bool = False) -> list[str]:
+    """What is wrong with one unit, or nothing."""
+    claims = sentence_claims(unit)
+    if not claims:
+        if header or unit in EXEMPT or not _TOPIC.search(unit):
+            return []
+        masked = _SETTING.sub("", unit)
+        if _KIND_MENTION.search(masked) or _OTHER_MENTION.search(masked):
+            return [f"names a kind but no value for its default: {unit!r}"]
+        return [f"talks about the default but names no kind or value: {unit!r}"]
+    problems: list[str] = []
+    for scope, value, negated in claims:
+        verb = "does not default to" if negated else "defaults to"
+        if scope == "":
+            problems.append(f"says it {verb} {value!r} without naming a kind: {unit!r}")
+            continue
+        upstream = UPSTREAM_OTHER if scope == OTHER else upstream_default(scope)
+        if (value == upstream) == negated:
+            label = "other kinds" if scope == OTHER else scope
+            problems.append(
+                f"says {label} {verb} {value!r}, upstream applies {upstream!r}: {unit!r}"
+            )
+    return problems
+
+
+def prose_problems(text: str) -> list[str]:
+    """Default claims anywhere in the rule that are unscoped, wrong, or unreadable."""
+    return [p for unit, header in units(text) for p in unit_problems(unit, header)]
 
 
 def default_tables(text: str) -> list[list[tuple[str, str]]]:
     """Rows of every table whose header has a kind column and a default column."""
+    prose_lines, _ = split_fences(_FRONTMATTER.sub("", text))
     tables: list[list[tuple[str, str]]] = []
-    lines = prose(text).splitlines()
-    i = 0
-    while i < len(lines):
-        if not lines[i].lstrip().startswith("|"):
-            i += 1
+    header: list[str] | None = None
+    cols: tuple[int, int] | None = None
+    for cells, is_header in _table_rows(prose_lines):
+        if is_header:
+            header = [h.lower() for h in cells]
+            kind_col = next((n for n, h in enumerate(header) if "kind" in h), None)
+            default_col = next(
+                (
+                    n
+                    for n, h in enumerate(header)
+                    if n != kind_col and ("default" in h or "omitted" in h)
+                ),
+                None,
+            )
+            cols = (
+                None
+                if kind_col is None or default_col is None
+                else (kind_col, default_col)
+            )
+            if cols:
+                tables.append([])
             continue
-        block = []
-        while i < len(lines) and lines[i].lstrip().startswith("|"):
-            block.append([c.strip() for c in lines[i].strip().strip("|").split("|")])
-            i += 1
-        if len(block) < 3:
-            continue
-        header = [h.lower() for h in block[0]]
-        kind_col = next((n for n, h in enumerate(header) if "kind" in h), None)
-        default_col = next(
-            (
-                n
-                for n, h in enumerate(header)
-                if n != kind_col and ("default" in h or "omitted" in h)
-            ),
-            None,
-        )
-        if kind_col is None or default_col is None:
-            continue
-        tables.append(
-            [
-                (row[kind_col], row[default_col])
-                for row in block[2:]
-                if len(row) > max(kind_col, default_col)
-            ]
-        )
+        if cols and len(cells) > max(cols):
+            tables[-1].append((cells[cols[0]], cells[cols[1]]))
     return tables
 
 
@@ -149,94 +329,16 @@ def table_mapping(rows: list[tuple[str, str]]) -> tuple[dict[str, str], list[str
     mapping: dict[str, str] = {}
     unknown: list[str] = []
     for kind_cell, default_cell in rows:
-        value = re.search(rf"({_VALUE})", default_cell)
-        kinds = {
-            next(g for g in m.groups() if g) for m in _KIND_MENTION.finditer(kind_cell)
-        }
+        values = [v for pattern, v in _VALUES if pattern.search(default_cell)]
+        kinds = {m.group(1) for m in _KIND_MENTION.finditer(kind_cell)}
         if _OTHER_MENTION.search(kind_cell):
             kinds.add(OTHER)
-        if not kinds or value is None:
+        if not kinds or len(values) != 1:
             unknown.append(f"{kind_cell} | {default_cell}")
             continue
         for kind in kinds:
-            mapping[kind] = value.group(1)
+            mapping[kind] = values[0]
     return mapping, unknown
-
-
-def sentences(text: str) -> list[str]:
-    """Prose sentences and list items, with tables and headings left out."""
-    out: list[str] = []
-    for para in re.split(r"\n\s*\n", prose(text)):
-        lines = [
-            ln for ln in para.splitlines() if not ln.lstrip().startswith(("|", "#"))
-        ]
-        items = re.split(r"\n\s*(?:[-*]|\d+\.)\s+", "\n" + "\n".join(lines))
-        for item in items:
-            flat = " ".join(item.split())
-            out.extend(s for s in re.split(r"(?<=[.!?])\s+(?=[A-Z`*])", flat) if s)
-    return out
-
-
-def sentence_claims(sentence: str) -> list[tuple[str, str]]:
-    """The (scope, value) default claims a sentence makes.
-
-    Each kind mention is assigned to the claim nearest to it, so a sentence
-    stating both defaults pairs each value with its own kind, whichever order
-    it is written in. A claim no kind is assigned to has scope "" (unscoped).
-    """
-    claims: list[tuple[int, str]] = []
-    spans: list[tuple[int, int]] = []
-    for m in _DEFAULT_CLAIM.finditer(sentence):
-        claims.append((m.start(), (m.group(1) or m.group(2)).lower()))
-        spans.append(m.span())
-    for m in _OPT_IN_CLAIM.finditer(sentence):
-        claims.append((m.end(), RelationshipDeleteBehavior.NO_ACTION.value))
-    if not claims:
-        return []
-    # A sentence that states a default once states it for every value it
-    # coordinates with that claim ("resolves to `cascade` on Component and to
-    # `no-action` on every other kind"). `on_delete: <value>` is a setting,
-    # not a default, so it is left out.
-    for m in _CODED_VALUE.finditer(sentence):
-        if not any(start <= m.start() < end for start, end in spans):
-            claims.append((m.start(), m.group(1).lower()))
-    mentions = [
-        (m.start(), next(g for g in m.groups() if g))
-        for m in _KIND_MENTION.finditer(sentence)
-    ]
-    mentions += [(m.start(), OTHER) for m in _OTHER_MENTION.finditer(sentence)]
-    scopes: dict[int, set[str]] = {n: set() for n in range(len(claims))}
-    for pos, kind in mentions:
-        nearest = min(range(len(claims)), key=lambda n: abs(claims[n][0] - pos))
-        scopes[nearest].add(kind)
-    result: list[tuple[str, str]] = []
-    for n, (_, value) in enumerate(claims):
-        if scopes[n]:
-            result.extend((kind, value) for kind in sorted(scopes[n]))
-        else:
-            result.append(("", value))
-    return result
-
-
-def prose_problems(text: str) -> list[str]:
-    """Default claims in prose that are unscoped or contradict upstream."""
-    problems: list[str] = []
-    for sentence in sentences(text):
-        for scope, value in sentence_claims(sentence):
-            if scope == "":
-                problems.append(
-                    f"states a default of {value!r} without naming a kind: {sentence!r}"
-                )
-            elif scope == OTHER:
-                if value != UPSTREAM_OTHER:
-                    problems.append(
-                        f"says other kinds default to {value!r}: {sentence!r}"
-                    )
-            elif value != upstream_default(scope):
-                problems.append(
-                    f"says {scope} defaults to {value!r}, upstream applies {upstream_default(scope)!r}: {sentence!r}"
-                )
-    return problems
 
 
 def table_problems(text: str) -> list[str]:
@@ -292,32 +394,36 @@ def test_rule_prose_matches_upstream(rule_text: str) -> None:
 # ---------------------------------------------------------------------------
 # The parsers, verified both ways against hand-written rules.
 #
-# The near misses are the cases that matter: one carries a correct table and
-# keeps a wrong sentence; the other states `cascade` for Component in prose,
-# so it contains the right words, and has its table backwards.
+# Every reject case is _CORRECT with exactly one change, built by edit(), and
+# asserts the exact problem lists, so a fixture that fails for a reason other
+# than the one it names fails the test.
 # ---------------------------------------------------------------------------
 
-_CORRECT = """## Relationship Delete Behavior
+_SENTENCE = (
+    "A `kind: Component` relationship that omits `on_delete` resolves to\n"
+    "`cascade`, so deleting the owner deletes the peer."
+)
+_SENTENCE_FLAT = " ".join(_SENTENCE.split())
 
-When `on_delete` is omitted, Infrahub applies a default from the kind.
+_CORRECT = f"""## Relationship Delete Behavior
 
 | Relationship kind | Default when `on_delete` is omitted |
 | ----------------- | ----------------------------------- |
 | `Component` | `cascade` |
 | Every other kind | `no-action` |
 
-A `kind: Component` relationship that omits `on_delete` resolves to
-`cascade`, so deleting the owner deletes the peer.
+{_SENTENCE}
 
 ```yaml
 - name: servers
   kind: Component
-  on_delete: no-action   # defaults to no-action would be wrong here
+  on_delete: no-action   # keeps the servers when the service is deleted
 ```
 """
 
-# Same substance: a row per kind, the value written before the kind in
-# prose, both defaults in one sentence, and a list item.
+# Same substance: a row per kind, the value written before the kind, both
+# defaults in one sentence, a negated claim that is true, a list item with
+# a setting, the rule's advice sentence, and a comment that scopes itself.
 _CORRECT_VARIANT = """## Relationship Delete Behavior
 
 | Omitted `on_delete` default | Kind |
@@ -328,66 +434,212 @@ _CORRECT_VARIANT = """## Relationship Delete Behavior
 | `no-action` | `Parent`, `Group`, `Hierarchy`, `Profile`, `Template` |
 
 An omitted `on_delete` resolves to `cascade` on `kind: Component` and to
-`no-action` on every other kind.
+`no-action` on every other kind. A `kind: Component` relationship does not
+default to `no-action`.
 
-- Set `on_delete: no-action` explicitly on a Component relationship to a
-  shared peer.
-"""
+- Set `on_delete: no-action` explicitly on a `kind: Component` relationship
+  whose peers are shared or must outlive the owner. Omitting it on
+  `kind: Component` means `cascade`, which is right for truly owned peers.
 
-_WRONG = """## Relationship Delete Behavior
-
-| Value | Behavior |
-| --- | --- |
-| `cascade` | Deletes the peer |
-| `no-action` | Keeps the peer |
-
-A `kind: Component` relationship that omits `on_delete` defaults to
-`no-action`. If omitted, behavior defaults to `no-action`.
-"""
-
-_NEAR_MISS_PROSE = """## Relationship Delete Behavior
-
-| Relationship kind | Default when omitted |
-| --- | --- |
-| `Component` | `cascade` |
-| Every other kind | `no-action` |
-
-If omitted, behavior defaults to `no-action`.
-"""
-
-_NEAR_MISS_TABLE = """## Relationship Delete Behavior
-
-| Relationship kind | Default when omitted |
-| --- | --- |
-| `Component` | `no-action` |
-| Every other kind | `cascade` |
-
-A `kind: Component` relationship that omits `on_delete` resolves to `cascade`.
+  ~~~yaml
+  kind: Component   # with no on_delete, Component cascades
+  ~~~
 """
 
 
-@pytest.mark.parametrize(
-    ("label", "text", "expected"),
-    [
-        ("correct", _CORRECT, True),
-        ("correct-variant", _CORRECT_VARIANT, True),
-        ("wrong", _WRONG, False),
-        ("near-miss-prose", _NEAR_MISS_PROSE, False),
-        ("near-miss-table", _NEAR_MISS_TABLE, False),
-    ],
-    ids=["correct", "correct-variant", "wrong", "near-miss-prose", "near-miss-table"],
-)
-def test_parsers_grade_fixtures(label: str, text: str, expected: bool) -> None:
-    ok = not table_problems(text) and not prose_problems(text)
-    assert ok is expected, (
-        f"fixture {label!r} graded wrong: {table_problems(text) + prose_problems(text)}"
-    )
+def edit(old: str, new: str, base: str = _CORRECT) -> str:
+    """_CORRECT with one change; fails if the target is not there."""
+    assert base.count(old) == 1, f"edit target not found once: {old!r}"
+    return base.replace(old, new)
+
+
+def _says(scope: str, verb: str, value: str, unit: str) -> str:
+    upstream = upstream_default(scope) if scope != "other kinds" else UPSTREAM_OTHER
+    return f"says {scope} {verb} {value!r}, upstream applies {upstream!r}: {unit!r}"
+
+
+_FENCED_CLAIM = "description: Component defaults to no-action"
+
+ACCEPT = {
+    "correct": _CORRECT,
+    "correct-variant": _CORRECT_VARIANT,
+    # Fence boundaries, inside side: a non-comment line in a fence is code.
+    "fence-indented-tilde": edit(
+        _SENTENCE, f"{_SENTENCE}\n\n- item\n\n  ~~~\n  {_FENCED_CLAIM}\n  ~~~"
+    ),
+    "fence-length-matched": edit(
+        _SENTENCE, f"{_SENTENCE}\n\n````\n```\n{_FENCED_CLAIM}\n````"
+    ),
+}
+
+# label -> (text, table_problems, prose_problems)
+REJECT: dict[str, tuple[str, list[str], list[str]]] = {
+    "wrong": (
+        edit("resolves to\n`cascade`", "defaults to\n`no-action`"),
+        [],
+        [
+            _says(
+                "Component",
+                "defaults to",
+                "no-action",
+                _SENTENCE_FLAT.replace(
+                    "resolves to `cascade`", "defaults to `no-action`"
+                ),
+            )
+        ],
+    ),
+    "near-miss-prose": (
+        edit(_SENTENCE, "If omitted, behavior defaults to `no-action`."),
+        [],
+        [
+            "says it defaults to 'no-action' without naming a kind: "
+            "'If omitted, behavior defaults to `no-action`.'"
+        ],
+    ),
+    "near-miss-table": (
+        edit("| `Component` | `cascade` |", "| `Component` | `no-action` |"),
+        ["table says Component defaults to 'no-action', upstream applies 'cascade'"],
+        [_says("Component", "defaults to", "no-action", "`Component` | `no-action`")],
+    ),
+    # Paraphrases the earlier parser passed.
+    "negated-cascade": (
+        edit(
+            _SENTENCE,
+            "A `kind: Component` relationship that omits `on_delete` does not resolve to `cascade`.",
+        ),
+        [],
+        [
+            _says(
+                "Component",
+                "does not default to",
+                "cascade",
+                "A `kind: Component` relationship that omits `on_delete` does not resolve to `cascade`.",
+            )
+        ],
+    ),
+    "falls-back": (
+        edit(_SENTENCE, "If omitted, `on_delete` falls back to `no-action`."),
+        [],
+        [
+            "says it defaults to 'no-action' without naming a kind: "
+            "'If omitted, `on_delete` falls back to `no-action`.'"
+        ],
+    ),
+    "uses": (
+        edit(
+            _SENTENCE,
+            "When omitted on a Component relationship, Infrahub uses `no-action`.",
+        ),
+        [],
+        [
+            _says(
+                "Component",
+                "defaults to",
+                "no-action",
+                "When omitted on a Component relationship, Infrahub uses `no-action`.",
+            )
+        ],
+    ),
+    "unless-set": (
+        edit(_SENTENCE, "On `kind: Component`, `on_delete` is `no-action` unless set."),
+        [],
+        [
+            _says(
+                "Component",
+                "defaults to",
+                "no-action",
+                "On `kind: Component`, `on_delete` is `no-action` unless set.",
+            )
+        ],
+    ),
+    # Table-header boundary: a table the default-table detector does not
+    # recognise is still graded row by row, and so is a header row.
+    "second-table": (
+        edit(
+            _SENTENCE,
+            f"{_SENTENCE}\n\n| Relationship type | Applied value |\n| --- | --- |\n"
+            "| `Component` | `no-action` |",
+        ),
+        [],
+        [_says("Component", "defaults to", "no-action", "`Component` | `no-action`")],
+    ),
+    "claim-in-header-row": (
+        edit(
+            _SENTENCE,
+            f"{_SENTENCE}\n\n| `Component` | `no-action` |\n| --- | --- |\n"
+            "| `Generic` | `no-action` |",
+        ),
+        [],
+        [_says("Component", "defaults to", "no-action", "`Component` | `no-action`")],
+    ),
+    # A comment inside a fence is prose.
+    "fence-comment": (
+        edit(
+            "  kind: Component\n",
+            "  kind: Component  # omitted on_delete defaults to no-action\n",
+        ),
+        [],
+        [
+            _says(
+                "Component",
+                "defaults to",
+                "no-action",
+                "kind: Component  # omitted on_delete defaults to no-action",
+            )
+        ],
+    ),
+    # Fence boundaries, outside side: the same line once the fence closes.
+    "fence-indented-tilde-after": (
+        edit(_SENTENCE, f"{_SENTENCE}\n\n- item\n\n  ~~~\n  ~~~\n  {_FENCED_CLAIM}"),
+        [],
+        [_says("Component", "defaults to", "no-action", _FENCED_CLAIM)],
+    ),
+    "fence-length-matched-after": (
+        edit(_SENTENCE, f"{_SENTENCE}\n\n````\n```\n````\n{_FENCED_CLAIM}"),
+        [],
+        [_says("Component", "defaults to", "no-action", _FENCED_CLAIM)],
+    ),
+    # Fail closed: a sentence about the default that the parser cannot read.
+    "kind-without-value": (
+        edit(
+            _SENTENCE,
+            "A `kind: Component` relationship that omits `on_delete` keeps its peers.",
+        ),
+        [],
+        [
+            "names a kind but no value for its default: "
+            "'A `kind: Component` relationship that omits `on_delete` keeps its peers.'"
+        ],
+    ),
+    "nothing-named": (
+        edit(_SENTENCE, "If omitted, Infrahub keeps the peers."),
+        [],
+        [
+            "talks about the default but names no kind or value: "
+            "'If omitted, Infrahub keeps the peers.'"
+        ],
+    ),
+}
+
+
+@pytest.mark.parametrize("label", sorted(ACCEPT))
+def test_parsers_accept(label: str) -> None:
+    text = ACCEPT[label]
+    assert table_problems(text) == []
+    assert prose_problems(text) == []
+
+
+@pytest.mark.parametrize("label", sorted(REJECT))
+def test_parsers_reject(label: str) -> None:
+    text, expected_table, expected_prose = REJECT[label]
+    assert table_problems(text) == expected_table
+    assert prose_problems(text) == expected_prose
 
 
 def test_opt_in_claim_scoped_to_component_fails() -> None:
     """The rule's old lead, "cascade behavior is opt-in", reads as a no-action default."""
     sentence = "It is independent of `kind: Component` and cascade behavior is opt-in."
-    assert sentence_claims(sentence) == [("Component", "no-action")]
+    assert sentence_claims(sentence) == [("Component", "no-action", False)]
 
 
 def test_explicit_value_without_default_verb_is_not_a_claim() -> None:
@@ -398,3 +650,23 @@ def test_explicit_value_without_default_verb_is_not_a_claim() -> None:
         )
         == []
     )
+
+
+def test_exempt_units_are_in_the_rule(rule_text: str) -> None:
+    """An exemption for a sentence the rule no longer carries is dead."""
+    present = {unit for unit, _ in units(rule_text)}
+    assert set(EXEMPT) <= present
+
+
+def test_advice_sentence_is_a_setting_then_a_true_default() -> None:
+    """The rule's advice sets a value, then states the Component default."""
+    assert (
+        sentence_claims(
+            "Set `on_delete: no-action` explicitly on a `kind: Component` relationship "
+            "whose peers are shared or must outlive the owner."
+        )
+        == []
+    )
+    assert sentence_claims(
+        "Omitting it on `kind: Component` means `cascade`, which is right for truly owned peers."
+    ) == [("Component", "cascade", False)]

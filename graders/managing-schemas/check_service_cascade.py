@@ -18,6 +18,7 @@ from lib import run_checks  # noqa: E402
 CHECKS = [
     "schema-version",
     "on-delete-cascade-present",
+    "ip-reference-not-cascade",
     "parent-rel-optional-false",
     "matching-identifiers",
     "full-kind-references",

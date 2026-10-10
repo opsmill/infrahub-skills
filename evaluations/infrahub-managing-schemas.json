@@ -293,6 +293,10 @@
           "check": "At least one relationship sets on_delete: cascade for owned children"
         },
         {
+          "name": "ip-reference-not-cascade",
+          "check": "Every relationship to the IP address resolves to on_delete: no-action (explicit value, or omitted on a non-Component kind)"
+        },
+        {
           "name": "parent-rel-optional-false",
           "check": "Any kind: Parent relationship has optional: false and cardinality: one"
         },

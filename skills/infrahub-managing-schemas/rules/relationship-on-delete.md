@@ -11,14 +11,13 @@ Impact: MEDIUM
 `on_delete` controls what happens to peers when the
 source node is deleted. When a relationship omits it,
 Infrahub fills it in from the relationship kind at
-schema load:
+schema load, and the schema it serves carries that
+value:
 
 | Relationship kind | Default when `on_delete` is omitted |
 | ----------------- | ----------------------------------- |
 | `Component` | `cascade` |
 | Every other kind | `no-action` |
-
-The schema Infrahub serves carries the filled-in value.
 
 ### Why it matters
 
@@ -34,10 +33,11 @@ quieter. An owned child modelled as `Generic` or
 `no-action`, so deleting the owner leaves the child
 behind as an orphan.
 
-Set `on_delete` explicitly on every `kind: Component`
-relationship, including when you want `cascade`. The
-YAML then states the delete behavior, and a reader
-does not have to know the kind-based default.
+Set `on_delete: no-action` explicitly on a
+`kind: Component` relationship whose peers are shared
+or must outlive the owner. Omitting it on
+`kind: Component` means `cascade`, which is right for
+truly owned peers.
 
 ### Values
 
@@ -86,9 +86,6 @@ does not have to know the kind-based default.
 
 ### Common Pattern: Component Without Cascade
 
-`kind` sets the default, and an explicit `on_delete`
-overrides it:
-
 - `kind: Component` describes the **structural
   relationship** (identifier pairing, parent/child
   semantics in the data model). Left alone, it also
@@ -133,7 +130,7 @@ peer. Set `on_delete: no-action`.
 **Leaving an owned child without cascade:** a circuit
 endpoint or interface that has no purpose without its
 parent should cascade. As `kind: Component` with no
-`on_delete` it does. Modelled as `Generic` or
+`on_delete`, it resolves to `cascade`. Modelled as `Generic` or
 `Attribute`, it needs `on_delete: cascade`, or every
 parent delete leaves orphans.
 

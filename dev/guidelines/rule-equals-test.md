@@ -160,6 +160,13 @@ the model would not model an independent peer as
 kind and value sets from `infrahub-sdk` and pins the
 kind-to-default mapping to the server source.
 
+That pin is the limit of the remedy here. The mapping
+lives only in the server, so the test holds a copy with
+a citation instead of reading it. It does not fail on
+its own when the server changes which kind defaults to
+what; only a new kind or value in `infrahub-sdk`
+reaches it without an edit.
+
 ## When the grader and the rule disagree, decide which side moves
 
 A check that encodes a stricter contract than the rule
