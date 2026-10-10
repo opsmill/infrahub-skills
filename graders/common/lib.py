@@ -828,12 +828,10 @@ def check_protocols_regenerated_from_server(
     is a contrast, not a recommendation, so it is skipped. A fenced block
     is always a recommendation: it is the text a reader copies and runs.
 
-    No eval task runs this check. Every trial scored 1.0 with the prose
-    before #192's fix, so the task was dropped under the carve-out in
-    `dev/guidelines/rule-equals-test.md` § "When no task can score the
-    rule". This check and its fixtures in `tests/graders/test_common_lib.py`
-    guard the check's contract, not the skill's prose. They are what a
-    future task would wire.
+    The eval task `common-protocols-regenerate-from-server` runs this check
+    through `check_protocols_regenerated.py`, and that task is what guards
+    the skill's prose. The fixtures in `tests/graders/test_common_lib.py`
+    guard the check's own contract.
 
     The committed path is a check parameter
     (`protocols-regenerated-from-server:<path>`), so a task with a

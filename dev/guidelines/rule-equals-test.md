@@ -144,41 +144,6 @@ to reach hydration through `.add()`, so the sample looked
 like the cause. Name the mechanism from what the scenarios
 share, not from what the ones you happened to write share.
 
-Taken a second time, for the `--schemas` regeneration
-guidance in
-`skills/infrahub-common/rules/protocols-generated.md`
-(#192). Four scenarios, five single trials, all with the
-skill read and the current prose in place. The deterministic
-check `protocols-regenerated-from-server` scored 1.0 in all
-five. The scenarios went from naming a generator that imports
-`TemplateNetworkCircuit`, to no mention of templates or
-`extensions` at all, to schema files with an `extensions`
-block and `generate_template`, with no branch or server
-mentioned.
-
-The mechanism: skillgrade copies the working tree, `.venv`
-included, so the installed infrahub-sdk source is in the
-sandbox. The answers resolved the choice by reading the
-`protocols` command's source, or the rule's existing
-sentence that local generation emits no Profile or Template
-protocols, and picked the server form. A precondition that
-makes the offline form wrong (an `extensions` block or a
-template) is exactly what sends the model to check what the
-offline form leaves out.
-
-One flaw in the sample: the first four trials ran with the
-uncommitted stage-1 handoff file in the worktree, so the
-sandbox also held the diagnosis. Only the last trial ran
-without it, and it still scored 1.0. Move any gitignored
-analysis notes out of the worktree before a red run.
-
-The check was tightened after these trials, when the rule
-fix restricted `--schemas` to a scratch path: an offline
-command that writes the committed file now fails even
-beside the server form. The third trial named `--schemas`
-as an option, and its output was not kept, so whether it
-would pass the tightened check is not known.
-
 ## When the grader and the rule disagree, decide which side moves
 
 A check that encodes a stricter contract than the rule
