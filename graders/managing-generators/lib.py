@@ -2630,20 +2630,51 @@ def _resolve_create_kind(call: ast.Call, scope: ast.AST, kinds: dict[str, set[st
     return None, False
 
 
-def _dict_keys(node: ast.AST, scope: ast.AST, seen: frozenset[str] = frozenset()) -> tuple[set[str], list[str]]:
+def _can_run_before(node: ast.AST, call: ast.AST | None, scope: ast.AST) -> bool:
+    """True when ``node`` can run before ``call`` in ``scope``.
+
+    That is: it comes earlier in the source, it shares a loop with the call
+    (a later line runs before the next pass), or it sits in a nested function
+    the check cannot place. With no ``call`` everything counts.
+    """
+    if call is None:
+        return True
+    if (node.lineno, node.col_offset) < (call.lineno, call.col_offset):
+        return True
+    for outer in ast.walk(scope):
+        if outer is scope:
+            continue
+        holds_node = any(n is node for n in ast.walk(outer))
+        if not holds_node:
+            continue
+        if isinstance(outer, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            return True
+        if isinstance(outer, (ast.For, ast.AsyncFor, ast.While)) and any(n is call for n in ast.walk(outer)):
+            return True
+    return False
+
+
+def _dict_keys(
+    node: ast.AST,
+    scope: ast.AST,
+    seen: frozenset[str] = frozenset(),
+    call: ast.AST | None = None,
+) -> tuple[set[str], list[str]]:
     """Collect the string keys a ``data`` value carries.
 
     Reads a dict literal, ``dict(...)`` with keyword arguments, or a local name
     bound to either, plus ``name["key"] = ...`` and ``name.update(...)`` on
-    that name in the same function. Returns ``(keys, unresolved)``, where
-    ``unresolved`` describes every part the check could not read.
+    that name in the same function. When ``call`` is given, only bindings and
+    changes that can run before it count (see ``_can_run_before``). Returns
+    ``(keys, unresolved)``, where ``unresolved`` describes every part the
+    check could not read.
     """
     keys: set[str] = set()
     unresolved: list[str] = []
     if isinstance(node, ast.Dict):
         for k, v in zip(node.keys, node.values):
             if k is None:  # {**other}
-                sub_keys, sub_unres = _dict_keys(v, scope, seen)
+                sub_keys, sub_unres = _dict_keys(v, scope, seen, call)
                 keys |= sub_keys
                 unresolved += sub_unres
             elif isinstance(k, ast.Constant) and isinstance(k.value, str):
@@ -2653,12 +2684,12 @@ def _dict_keys(node: ast.AST, scope: ast.AST, seen: frozenset[str] = frozenset()
         return keys, unresolved
     if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "dict":
         for arg in node.args:
-            sub_keys, sub_unres = _dict_keys(arg, scope, seen)
+            sub_keys, sub_unres = _dict_keys(arg, scope, seen, call)
             keys |= sub_keys
             unresolved += sub_unres
         for kw in node.keywords:
             if kw.arg is None:
-                sub_keys, sub_unres = _dict_keys(kw.value, scope, seen)
+                sub_keys, sub_unres = _dict_keys(kw.value, scope, seen, call)
                 keys |= sub_keys
                 unresolved += sub_unres
             else:
@@ -2666,14 +2697,16 @@ def _dict_keys(node: ast.AST, scope: ast.AST, seen: frozenset[str] = frozenset()
         return keys, unresolved
     if isinstance(node, ast.Name) and node.id not in seen:
         name = node.id
-        bindings = _name_bindings(name, scope)
+        bindings = [b for b in _name_bindings(name, scope) if _can_run_before(b, call, scope)]
         if not bindings:
-            return keys, [f"{name} is not bound in the calling function"]
+            return keys, [f"{name} is not bound before the call in the calling function"]
         for value in bindings:
-            sub_keys, sub_unres = _dict_keys(value, scope, seen | {name})
+            sub_keys, sub_unres = _dict_keys(value, scope, seen | {name}, call)
             keys |= sub_keys
             unresolved += sub_unres
         for sub in ast.walk(scope):
+            if not hasattr(sub, "lineno") or not _can_run_before(sub, call, scope):
+                continue
             # name["key"] = ...
             targets: list[ast.AST] = []
             if isinstance(sub, ast.Assign):
@@ -2699,7 +2732,7 @@ def _dict_keys(node: ast.AST, scope: ast.AST, seen: frozenset[str] = frozenset()
             ):
                 if sub.func.attr == "update":
                     for arg in sub.args:
-                        sub_keys, sub_unres = _dict_keys(arg, scope, seen | {name})
+                        sub_keys, sub_unres = _dict_keys(arg, scope, seen | {name}, call)
                         keys |= sub_keys
                         unresolved += sub_unres
                     for kw in sub.keywords:
@@ -2725,7 +2758,7 @@ def _create_fields(call: ast.Call, scope: ast.AST) -> tuple[set[str], list[str]]
     unresolved: list[str] = []
     for kw in call.keywords:
         if kw.arg is None:
-            sub_keys, sub_unres = _dict_keys(kw.value, scope)
+            sub_keys, sub_unres = _dict_keys(kw.value, scope, call=call)
             fields |= sub_keys
             unresolved += sub_unres
         elif kw.arg not in _CREATE_PARAMS:
@@ -2734,7 +2767,7 @@ def _create_fields(call: ast.Call, scope: ast.AST) -> tuple[set[str], list[str]]
     if data is None and len(call.args) > 1:
         data = call.args[1]
     if data is not None and not (isinstance(data, ast.Constant) and data.value is None):
-        sub_keys, sub_unres = _dict_keys(data, scope)
+        sub_keys, sub_unres = _dict_keys(data, scope, call=call)
         fields |= sub_keys
         unresolved += sub_unres
     return fields, unresolved

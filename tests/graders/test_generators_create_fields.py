@@ -229,6 +229,53 @@ def test_payload_in_another_function_does_not_leak():
     assert ok, msg
 
 
+def test_payload_change_after_the_call_does_not_count():
+    """A key added to a reused payload after create() is not in that call."""
+    ok, msg = _run(
+        "async def generate(self, device, lag):\n"
+        "    payload = {'name': 'lo0', 'device': device}\n"
+        "    await self.client.create(kind='DcimVirtualInterface', data=payload)\n"
+        "    payload['lag'] = lag\n"
+        "    await self.client.create(kind='DcimPhysicalInterface', data=payload)\n"
+        "    payload = {'name': 'eth2', 'device': device, 'lag': lag}\n"
+        "    await self.client.create(kind='DcimPhysicalInterface', data=payload)\n"
+    )
+    assert ok, msg
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param(
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    for _ in range(2):\n"
+            "        await self.client.create(kind='DcimVirtualInterface', data=payload)\n"
+            "        payload['lag'] = lag\n",
+            id="loop-carried-key",
+        ),
+        pytest.param(
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    while True:\n"
+            "        await self.client.create(kind='DcimVirtualInterface', data=payload)\n"
+            "        payload = {'name': 'lo1', 'lag': lag}\n",
+            id="loop-carried-rebinding",
+        ),
+        pytest.param(
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    await self.client.create(kind='DcimVirtualInterface', data=payload)\n"
+            "    def add_lag():\n"
+            "        payload['lag'] = lag\n",
+            id="nested-function-key",
+        ),
+    ],
+)
+def test_payload_change_that_can_reach_the_call_counts(body):
+    """Later lines still count when a loop or a nested function can run them first."""
+    ok, msg = _run("async def generate(self, device, lag):\n" + _PHYSICAL + body)
+    assert not ok
+    assert "create(DcimVirtualInterface) passes lag" in msg, msg
+
+
 def test_create_params_are_not_fields():
     ok, msg = _run(
         "async def generate(self, device, lag):\n"
