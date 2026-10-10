@@ -71,7 +71,7 @@ def check_docs_fallback(text: str) -> tuple[bool, str]:
 # question of the repository's own prose.
 # ---------------------------------------------------------------------------
 
-from cli_tree import FENCE, SPAN, code_regions, invalid_invocations  # noqa: E402
+from cli_tree import FENCE, LEAVES, SPAN, code_regions, invalid_invocations  # noqa: E402
 
 
 def check_cli_commands_exist(text: str) -> tuple[bool, str]:
@@ -525,13 +525,57 @@ def check_graphql_schema_regenerated(text: str) -> tuple[bool, str]:
 # The committed protocol file is regenerated from the server
 # ---------------------------------------------------------------------------
 
+# The command this check reads, taken from the pinned CLI tree so a rename
+# there fails loudly here instead of leaving the check reading nothing.
+_PROTOCOLS = "protocols"
+assert _PROTOCOLS in LEAVES, "cli_tree.LEAVES no longer has `protocols`"
+
 # `infrahubctl protocols` writes here when no `--out` is given.
 _PROTOCOLS_DEFAULT_OUT = "schema_protocols.py"
+
+# Options of `infrahubctl protocols` that take a value (infrahub-sdk 1.23.2).
+# `--sync` / `--no-sync` take none. infrahubctl has no root options, so the
+# subcommand is always the word right after the binary.
+_PROTOCOLS_VALUE_OPTIONS = {"--schemas", "--branch", "--out", "--config-file"}
 
 # Tokens that end one shell command and start the next. shlex with
 # `punctuation_chars` emits these as tokens of their own, so a quoted `;`
 # stays inside its argument instead of fabricating a second command.
-_SHELL_OPERATORS = {";", "&&", "||", "|", "&", "(", ")"}
+_SHELL_OPERATORS = {";", "&&", "||", "|", "&", "(", ")", ";;", "|&"}
+
+# A redirection takes the next word as its target, never as an argument.
+_REDIRECTIONS = {"<", ">", ">>", "<<", "<<<", ">&", "<&", ">|", "&>", "&>>"}
+
+# Programs that run another program, and, for each, the options that take a
+# value. Any other option is read as a flag. A wrong guess leaves the binary
+# somewhere other than argv[0], and the command is then unreadable, which
+# fails the check rather than passing it.
+_WRAPPERS: dict[tuple[str, ...], set[str]] = {
+    ("sudo",): {"-u", "-g", "-C", "-D", "-h", "-p", "-r", "-t", "-U", "-T",
+                "--user", "--group", "--chdir", "--host", "--prompt"},
+    ("env",): {"-u", "--unset", "-C", "--chdir", "-S", "--split-string"},
+    ("uv", "run"): {"--with", "--with-editable", "--with-requirements", "--python",
+                    "-p", "--project", "--directory", "--group", "--no-group",
+                    "--extra", "--env-file", "--package", "--index",
+                    "--default-index", "--from"},
+    ("uvx",): {"--with", "--with-editable", "--with-requirements", "--python",
+               "-p", "--from", "--index", "--default-index"},
+    ("poetry", "run"): {"-C", "--directory", "-P", "--project"},
+    ("pipx", "run"): {"--spec", "--python", "--pip-args", "--index-url"},
+}
+
+_ENV_ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
+
+# Words that print their arguments: `infrahubctl` after one of these is data.
+_PRINT_WORDS = {"echo", "printf", "print"}
+
+# `<path>`, `<branch>`: a placeholder, not a value. Swapped for one opaque
+# word before lexing, because `<` and `>` would otherwise read as
+# redirections and swallow the words around them.
+_PLACEHOLDER = re.compile(r"<[A-Za-z][\w.-]*>")
+_PLACEHOLDER_WORD = "__placeholder__"
+
+_HEREDOC = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?")
 
 
 def _code_regions_with_offsets(text: str) -> list[tuple[int, str, bool]]:
@@ -554,50 +598,124 @@ def _code_regions_with_offsets(text: str) -> list[tuple[int, str, bool]]:
     return regions
 
 
-def _shell_tokens(line: str) -> list[str]:
-    """Split one shell line into words and operators, dropping comments."""
-    lexer = shlex.shlex(line, posix=True, punctuation_chars=True)
-    lexer.whitespace_split = True
-    try:
-        return list(lexer)
-    except ValueError:
-        # An unbalanced quote: fall back to whitespace, which is wrong only
-        # inside the quote, and cut the comment by hand.
-        return line.split("#", 1)[0].split()
+def _shell_lines(region: str) -> list[str]:
+    """The region's lines as the shell reads them.
+
+    A `\\` continuation joins with no separator, as the shell does, and a
+    heredoc body is data, so it is dropped.
+    """
+    joined = region.replace("\\\n", "")
+    lines: list[str] = []
+    delimiter = None
+    for line in joined.splitlines():
+        if delimiter is not None:
+            if line.strip() == delimiter:
+                delimiter = None
+            continue
+        lines.append(line)
+        match = _HEREDOC.search(line)
+        if match:
+            delimiter = match.group(1)
+    return lines
 
 
-def _protocols_invocations(region: str) -> list[dict]:
+def _split_commands(tokens: list[str]) -> list[list[str]]:
+    """Cut a token list into commands, dropping redirections and their targets."""
+    commands: list[list[str]] = [[]]
+    skip = False
+    for token in tokens:
+        if skip:
+            skip = False
+            continue
+        if token in _SHELL_OPERATORS:
+            commands.append([])
+        elif token in _REDIRECTIONS:
+            skip = True
+        else:
+            commands[-1].append(token)
+    return [c for c in commands if c]
+
+
+def _peel_wrappers(argv: list[str]) -> int:
+    """Index of the program that actually runs, after wrappers and `VAR=value`."""
+    i = 0
+    while i < len(argv):
+        if _ENV_ASSIGNMENT.match(argv[i]):
+            i += 1
+            continue
+        for wrapper, value_options in _WRAPPERS.items():
+            names = [Path(w).name for w in argv[i : i + len(wrapper)]]
+            if tuple(names) == wrapper:
+                i += len(wrapper)
+                while i < len(argv) and argv[i].startswith("-"):
+                    if argv[i] == "--":
+                        i += 1
+                        break
+                    flag, eq, _ = argv[i].partition("=")
+                    i += 2 if flag in value_options and not eq else 1
+                break
+        else:
+            return i
+    return i
+
+
+def _protocols_invocations(region: str) -> tuple[list[dict], list[str]]:
     """Every `infrahubctl protocols` command in one code region, parsed.
 
-    Each result records whether the command reads local files
-    (`--schemas`) and the file it writes (`--out`, or the CLI default).
-    A runner prefix (`uv run`, `poetry run`) and an `ENV=value` prefix sit
-    before `infrahubctl` and are skipped by looking for the program name
-    rather than parsing from the first word.
+    Returns the readable commands, each with whether it reads local files
+    (`--schemas`) and the file it writes (`--out`, or the CLI default), and
+    the lines naming the command that could not be read.
+
+    The program is argv[0] after wrappers (`sudo`, `env`, `VAR=value`,
+    `uv run`, `uvx`, `poetry run`, `pipx run`). `infrahubctl` anywhere
+    else is data when a print word runs it (`echo infrahubctl ...`), and
+    unreadable otherwise (`time infrahubctl ...`, an unknown wrapper). An
+    unreadable line fails the check: a parser gap must not read as a
+    compliant answer.
     """
     found: list[dict] = []
-    folded = _LINE_CONTINUATION.sub(" ", region)
-    for line in folded.splitlines():
-        tokens = _shell_tokens(line)
-        for i, token in enumerate(tokens[:-1]):
-            if Path(token).name != "infrahubctl" or tokens[i + 1] != "protocols":
+    unreadable: list[str] = []
+    for line in _shell_lines(region):
+        lexer = shlex.shlex(
+            _PLACEHOLDER.sub(_PLACEHOLDER_WORD, line), posix=True, punctuation_chars=True
+        )
+        lexer.whitespace_split = True
+        try:
+            tokens = list(lexer)
+        except ValueError:
+            if "infrahubctl" in line and _PROTOCOLS in line:
+                unreadable.append(line.strip())
+            continue
+        for argv in _split_commands(tokens):
+            names = [Path(t).name for t in argv]
+            if "infrahubctl" not in names:
+                continue
+            start = _peel_wrappers(argv)
+            if start >= len(argv) or names[start] != "infrahubctl":
+                if start < len(argv) and names[start] in _PRINT_WORDS:
+                    continue
+                at = names.index("infrahubctl")
+                if names[at + 1 : at + 2] == [_PROTOCOLS]:
+                    unreadable.append(" ".join(argv))
+                continue
+            if names[start + 1 : start + 2] != [_PROTOCOLS]:
                 continue
             schemas = False
             out = _PROTOCOLS_DEFAULT_OUT
-            args = tokens[i + 2 :]
+            args = argv[start + 2 :]
             j = 0
-            while j < len(args) and args[j] not in _SHELL_OPERATORS:
+            while j < len(args):
                 flag, eq, value = args[j].partition("=")
+                if flag in _PROTOCOLS_VALUE_OPTIONS and not eq:
+                    value = args[j + 1] if j + 1 < len(args) else ""
+                    j += 1
                 if flag == "--schemas":
                     schemas = True
                 elif flag == "--out":
-                    if not eq and j + 1 < len(args):
-                        j += 1
-                        value = args[j]
                     out = value
                 j += 1
-            found.append({"schemas": schemas, "out": out, "line": " ".join(tokens[i:i + 2 + j])})
-    return found
+            found.append({"schemas": schemas, "out": out, "line": " ".join(argv[start:])})
+    return found, unreadable
 
 
 def _same_path(a: str, b: str) -> bool:
@@ -611,29 +729,27 @@ def check_protocols_regenerated_from_server(
     """The committed protocol file is regenerated from a running server.
 
     `infrahubctl protocols --schemas <dir>` builds the module from the local
-    YAML alone. It reads only `nodes` and `generics`, so it emits no Profile
-    or Template classes and none of the relationships that another schema
-    file adds through `extensions`. Writing that output over a committed,
-    server-generated file deletes classes and fields the repository's code
-    imports. The answer has to regenerate the committed file with the
-    server form: `infrahubctl protocols` without `--schemas`.
+    YAML alone. It emits no Profile or Template classes and none of the
+    relationships that another schema file adds through `extensions`.
+    Writing that output over a committed, server-generated file deletes
+    classes and fields the repository's code imports.
+    `skills/infrahub-common/rules/protocols-generated.md` therefore keeps
+    `--schemas` for a scratch path only.
 
     The check parses the `infrahubctl protocols` commands in fenced blocks
-    and inline code. It passes when at least one recommended command
-    writes the committed file without `--schemas`. It fails when no command
-    writes that file, or when every command that does reads local files.
-    `--schemas` named in prose, as the offline option with its limits, is
-    not a command and does not count either way.
+    and inline code. It passes when a recommended command writes the
+    committed file without `--schemas`, and no recommended command writes
+    it with `--schemas`. It fails when no command writes that file, when
+    any command that does reads local files, or when a line naming the
+    command cannot be read. `--schemas` named in prose, as the offline
+    option with its limits, is not a command and does not count either way.
 
     An inline span introduced as something to avoid ("do not run `...`")
     is a contrast, not a recommendation, so it is skipped. A fenced block
     is always a recommendation: it is the text a reader copies and runs.
 
-    Known gap, accepted: an answer that gives the server form and then the
-    `--schemas` form as an equal alternative for the same file passes.
-
-    No eval task runs this check. Every trial scored 1.0 with the current
-    prose (#192), so the task was dropped under the carve-out in
+    No eval task runs this check. Every trial scored 1.0 with the prose
+    before #192's fix, so the task was dropped under the carve-out in
     `dev/guidelines/rule-equals-test.md` § "When no task can score the
     rule". This check and its fixtures in `tests/graders/test_common_lib.py`
     guard the check's contract, not the skill's prose. They are what a
@@ -647,26 +763,33 @@ def check_protocols_regenerated_from_server(
         return False, "no output to check"
 
     writes_committed: list[dict] = []
+    unreadable: list[str] = []
     for start, region, is_span in _code_regions_with_offsets(text):
         if is_span and _is_negated(text, start - 1):
             continue
-        for inv in _protocols_invocations(region):
-            if _same_path(inv["out"], committed):
-                writes_committed.append(inv)
+        found, bad = _protocols_invocations(region)
+        unreadable.extend(bad)
+        writes_committed.extend(inv for inv in found if _same_path(inv["out"], committed))
 
+    if unreadable:
+        return False, (
+            f"cannot read these `infrahubctl {_PROTOCOLS}` lines: {sorted(set(unreadable))}; "
+            "give the command with infrahubctl as the program"
+        )
     if not writes_committed:
         return False, (
-            f"no `infrahubctl protocols` command writes {committed}, so the "
+            f"no `infrahubctl {_PROTOCOLS}` command writes {committed}, so the "
             "committed protocol file is never regenerated"
         )
-    if any(not inv["schemas"] for inv in writes_committed):
-        return True, f"regenerates {committed} from the server, without --schemas"
-    return False, (
-        f"every command that writes {committed} uses --schemas: "
-        f"{sorted({inv['line'] for inv in writes_committed})}; offline output "
-        "has no Profile or Template classes and no `extensions` relationships, "
-        "so it must not overwrite the committed, server-generated file"
-    )
+    offline = sorted({inv["line"] for inv in writes_committed if inv["schemas"]})
+    if offline:
+        return False, (
+            f"command(s) that write {committed} with --schemas: {offline}; offline "
+            "output has no Profile or Template classes and no `extensions` "
+            "relationships, so it must not overwrite the committed, "
+            "server-generated file"
+        )
+    return True, f"regenerates {committed} from the server, without --schemas"
 
 
 # A name may carry colon-separated arguments, e.g.

@@ -598,44 +598,125 @@ PROTOCOLS_ACCEPTED = [
         "--out lib/protocols.py && git diff --stat lib/protocols.py\n```",
         id="offline-command-only-in-a-comment",
     ),
+    # Wrappers with their own options and values sit before the program.
+    pytest.param(
+        "```bash\nsudo -u infra env INFRAHUB_ADDRESS=http://localhost:8000 "
+        "uv run --with rich infrahubctl protocols --branch circuit-commit-rate "
+        "--out lib/protocols.py\n```",
+        id="wrapper-chain-with-option-values",
+    ),
+    # The pairing the rule teaches: offline output to a scratch path, the
+    # committed file from the server. The branch is a placeholder, which
+    # must not read as two redirections swallowing `--out`.
+    pytest.param(
+        "```bash\ninfrahubctl protocols --schemas schemas/ --out /tmp/protocols_check.py\n"
+        "infrahubctl protocols --branch <branch> --out lib/protocols.py\n```",
+        id="offline-to-scratch-server-to-committed-with-placeholder-branch",
+    ),
 ]
 
-# The first two are the violating pair of the four-fixture set. The second
-# names the server and passes `--branch`, yet the command reads local files.
+# Each case names the fragment its failure message must carry, so a fixture
+# that fails for another reason than the one it names does not pass. The
+# first two are the violating pair of the four-fixture set.
 PROTOCOLS_REJECTED = [
     pytest.param(
         "```bash\ninfrahubctl protocols --schemas schemas/ --out lib/protocols.py\n```",
+        "with --schemas",
         id="violating-offline-only",
+    ),
+    # The near miss carries every token the check reads, the server form
+    # included, but the server form writes a scratch file and the offline
+    # form writes the committed one.
+    pytest.param(
+        "Preview with `infrahubctl protocols --out /tmp/protocols_check.py`, "
+        "then write the real file:\n\n```bash\ninfrahubctl protocols "
+        "--schemas=schemas/ --out=lib/protocols.py\n```",
+        "with --schemas",
+        id="near-miss-server-form-bound-to-a-scratch-file",
     ),
     pytest.param(
         "Regenerate against the running server so the templates are "
         "included:\n\n```bash\ninfrahubctl protocols --schemas schemas/ "
         "--branch circuit-commit-rate --out lib/protocols.py\n```",
-        id="near-miss-names-the-server-but-reads-local-files",
+        "with --schemas",
+        id="names-the-server-but-reads-local-files",
     ),
-    # The server form aimed at a scratch file does not regenerate the
-    # committed one; the offline form still overwrites it.
+    # The rule keeps `--schemas` for a scratch path only, so an offline
+    # alternative aimed at the committed file fails even beside the server
+    # form.
     pytest.param(
-        "Preview with `infrahubctl protocols --out /tmp/protocols_check.py`, "
-        "then write the real file:\n\n```bash\ninfrahubctl protocols "
-        "--schemas=schemas/ --out=lib/protocols.py\n```",
-        id="server-form-to-a-scratch-file-offline-to-the-committed-one",
+        "```bash\ninfrahubctl protocols --branch circuit-commit-rate --out lib/protocols.py\n"
+        "# or, without a server:\n"
+        "infrahubctl protocols --schemas schemas/ --out lib/protocols.py\n```",
+        "with --schemas",
+        id="server-form-plus-offline-alternative-to-the-committed-file",
     ),
     # A server command in a comment is not a command.
     pytest.param(
         "```bash\n# infrahubctl protocols --out lib/protocols.py\n"
         "infrahubctl protocols --schemas schemas/ --out lib/protocols.py\n```",
+        "with --schemas",
         id="server-command-only-in-a-comment",
+    ),
+    # A negation in the previous sentence does not make this span a contrast.
+    pytest.param(
+        "This step is not optional. Run "
+        "`infrahubctl protocols --schemas schemas/ --out lib/protocols.py`, then "
+        "`infrahubctl protocols --branch circuit-commit-rate --out lib/protocols.py`.",
+        "with --schemas",
+        id="negation-belongs-to-the-previous-sentence",
     ),
     pytest.param(
         "Regenerate the protocols from the server and commit them.",
-        id="no-command-at-all",
+        "no `infrahubctl protocols` command writes",
+        id="omission-no-command-at-all",
     ),
     # No `--out` writes the CLI default, schema_protocols.py, not the
     # committed file.
     pytest.param(
         "Run `infrahubctl protocols --branch circuit-commit-rate`.",
-        id="server-form-without-out-writes-the-default-file",
+        "no `infrahubctl protocols` command writes",
+        id="omission-no-out-writes-the-default-file",
+    ),
+    # Path boundaries: a longer name and a sibling file are other files.
+    pytest.param(
+        "Run `infrahubctl protocols --branch b --out lib/protocols.py.new`.",
+        "no `infrahubctl protocols` command writes",
+        id="boundary-longer-file-name",
+    ),
+    pytest.param(
+        "Run `infrahubctl protocols --branch b --sync --out lib/protocols_sync.py`.",
+        "no `infrahubctl protocols` command writes",
+        id="boundary-sibling-sync-file",
+    ),
+    # A placeholder is not a value.
+    pytest.param(
+        "Run `infrahubctl protocols --branch b --out <path>`.",
+        "no `infrahubctl protocols` command writes",
+        id="placeholder-out-is-not-the-committed-file",
+    ),
+    # Data is not a command: printed words and heredoc bodies.
+    pytest.param(
+        "```bash\necho infrahubctl protocols --out lib/protocols.py\n```",
+        "no `infrahubctl protocols` command writes",
+        id="server-command-printed-by-echo",
+    ),
+    pytest.param(
+        "```bash\ncat <<EOF > NOTES.md\n"
+        "infrahubctl protocols --out lib/protocols.py\nEOF\n```",
+        "no `infrahubctl protocols` command writes",
+        id="server-command-in-a-heredoc-body",
+    ),
+    # Fail closed: a line the parser cannot read is not a pass.
+    pytest.param(
+        "Run `time infrahubctl protocols --out lib/protocols.py`.",
+        "cannot read",
+        id="unknown-wrapper-fails-closed",
+    ),
+    pytest.param(
+        "```bash\ninfrahubctl protocols --out 'lib/protocols.py\n```",
+        "cannot read",
+        id="unbalanced-quote-fails-closed",
     ),
 ]
 
@@ -646,10 +727,15 @@ def test_protocols_regenerated_from_server_accepts(text):
     assert ok, msg
 
 
-@pytest.mark.parametrize("text", PROTOCOLS_REJECTED)
-def test_protocols_regenerated_from_server_rejects(text):
-    ok, _ = check_protocols_regenerated_from_server(text)
+@pytest.mark.parametrize(("text", "reason"), PROTOCOLS_REJECTED)
+def test_protocols_regenerated_from_server_rejects(text, reason):
+    ok, msg = check_protocols_regenerated_from_server(text)
     assert not ok
+    assert reason in msg, msg
+
+
+def test_protocols_check_rejects_empty_output():
+    assert check_protocols_regenerated_from_server("")[0] is False
 
 
 def test_protocols_failure_names_the_offline_command():
@@ -659,6 +745,15 @@ def test_protocols_failure_names_the_offline_command():
     )
     assert not ok
     assert "--schemas" in msg and "lib/protocols.py" in msg
+
+
+def test_the_protocols_rule_passes_its_own_check():
+    """The rule's own commands are the answer it teaches. Hold it to the check."""
+    rule = (
+        _REPO_ROOT / "skills" / "infrahub-common" / "rules" / "protocols-generated.md"
+    ).read_text(encoding="utf-8")
+    ok, msg = check_protocols_regenerated_from_server(rule)
+    assert ok, msg
 
 
 def test_the_export_command_is_matched_in_full():

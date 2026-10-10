@@ -172,6 +172,13 @@ sandbox also held the diagnosis. Only the last trial ran
 without it, and it still scored 1.0. Move any gitignored
 analysis notes out of the worktree before a red run.
 
+The check was tightened after these trials, when the rule
+fix restricted `--schemas` to a scratch path: an offline
+command that writes the committed file now fails even
+beside the server form. The third trial named `--schemas`
+as an option, and its output was not kept, so whether it
+would pass the tightened check is not known.
+
 ## When the grader and the rule disagree, decide which side moves
 
 A check that encodes a stricter contract than the rule
