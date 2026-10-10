@@ -1465,6 +1465,63 @@ tasks:
           Every python_transforms and generator_definitions entry declares
           a `watch:` mapping
 
+  - name: check-proposed-change-commit
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-managing-checks/SKILL.md and
+      follow its workflow and rules.
+
+      Task: We fixed a false positive in our `check_rack_power_budget`
+      check. The fix is merged to `main` in our Git repository
+      (`git@git.example.com:netops/infra-repo.git`), and Infrahub's `main`
+      branch already shows the new repository commit. Fourteen proposed
+      changes are still open and still fail with the old message. All of
+      their branches were created by our intake bot with the Python SDK's
+      `client.branch.create`. Our runbook says "to refresh a branch, run
+      `infrahubctl branch rebase <branch>`, then retry the checks".
+
+      Write a bash script that gets every open proposed change re-validated
+      with the fixed check. Our Infrahub address is in `INFRAHUB_ADDRESS`
+      and the API token in `INFRAHUB_API_TOKEN`.
+
+      Save the script to: output.sh
+    graders:
+      - type: deterministic
+        run: python graders/managing-checks/check_proposed_change_commit.py
+        weight: 1.0
+    expected_output: >-
+      A script that moves the repository commit each proposed change runs:
+      for each open proposed change it merges or rebases main into the Git
+      branch that has the same name as the source branch, and pushes that
+      branch. Opening a new branch and then a new proposed change after the
+      fix is on main is also correct. A loop of `infrahubctl branch rebase`
+      and `CoreProposedChangeRunCheck` alone is wrong, because on branches
+      synced with Git it reruns the old commit.
+    expectations:
+      - >-
+        Explains that the proposed change pipeline runs the check code at
+        the repository commit recorded on the source branch
+      - >-
+        States that on branches synced with Git, as `client.branch.create`
+        creates them, a rebase plus a retry of the checks reruns the old
+        commit
+      - >-
+        Merges or rebases main into each source branch's Git branch and
+        pushes it, or opens a new branch and proposed change instead
+      - >-
+        Waits for the repository sync to record the new commit before
+        rerunning the checks
+      - >-
+        Recommends `infrahubctl check <name> --branch <branch>` as the fast
+        loop while editing a check, since it runs the local code with no
+        commit
+    assertions:
+      - name: moves-source-branch-commit
+        check: >-
+          A `git push` to each source branch follows a merge or rebase of
+          main, or the script opens a new branch and then a new proposed
+          change; a rebase-and-retry loop alone fails
+
   # --- Generators: relationship reference encoding --- #
   - name: generator-relationship-hfid-encoding
     trials: 3
