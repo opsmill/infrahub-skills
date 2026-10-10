@@ -71,7 +71,14 @@ def check_docs_fallback(text: str) -> tuple[bool, str]:
 # question of the repository's own prose.
 # ---------------------------------------------------------------------------
 
-from cli_tree import FENCE, LEAVES, SPAN, code_regions, invalid_invocations  # noqa: E402
+from cli_tree import (  # noqa: E402
+    FENCE,
+    GROUPS,
+    LEAVES,
+    SPAN,
+    code_regions,
+    invalid_invocations,
+)
 
 
 def check_cli_commands_exist(text: str) -> tuple[bool, str]:
@@ -530,6 +537,19 @@ def check_graphql_schema_regenerated(text: str) -> tuple[bool, str]:
 _PROTOCOLS = "protocols"
 assert _PROTOCOLS in LEAVES, "cli_tree.LEAVES no longer has `protocols`"
 
+# The server generates from the schema it holds, so the check also reads
+# the command that loads the change: `infrahubctl schema load`.
+_SCHEMA_LOAD = ("schema", "load")
+assert _SCHEMA_LOAD[1] in GROUPS[_SCHEMA_LOAD[0]], "cli_tree.GROUPS no longer has `schema load`"
+
+# Options of `infrahubctl schema load` that take a value (infrahub-sdk 1.23.2).
+# `--debug` takes none; the schema paths are positional.
+_SCHEMA_LOAD_VALUE_OPTIONS = {"--branch", "--wait", "--config-file"}
+
+# Without `--branch`, both commands use the SDK's default branch, which this
+# variable sets (`INFRAHUB_` prefix on `Config.default_branch`).
+_DEFAULT_BRANCH_VAR = "INFRAHUB_DEFAULT_BRANCH"
+
 # `infrahubctl protocols` writes here when no `--out` is given.
 _PROTOCOLS_DEFAULT_OUT = "schema_protocols.py"
 
@@ -734,11 +754,16 @@ def _peel_wrappers(argv: list[str]) -> int:
 
 
 def _protocols_invocations(region: str) -> tuple[list[dict], list[str]]:
-    """Every `infrahubctl protocols` command in one code region, parsed.
+    """Every `infrahubctl protocols` and `schema load` command in one region, parsed.
 
-    Returns the readable commands, each with whether it reads local files
-    (`--schemas`) and the file it writes (`--out`, or the CLI default), and
-    the lines naming the command that could not be read.
+    Returns the readable commands in line order, each with its `command`,
+    the branch it acts on (`--branch`, else an `INFRAHUB_DEFAULT_BRANCH=`
+    prefix, else None for the default branch), and, for `protocols`,
+    whether it reads local files (`--schemas`) and the file it writes
+    (`--out`, or the CLI default). Also returns the lines naming
+    `protocols` that could not be read. An unreadable `schema load` is not
+    returned at all, which leaves the protocols command unpaired and fails
+    the check.
 
     The program is argv[0] after wrappers (`sudo`, `env`, `VAR=value`,
     `uv run`, `uvx`, `poetry run`, `pipx run`). `infrahubctl` anywhere
@@ -778,24 +803,44 @@ def _protocols_invocations(region: str) -> tuple[list[dict], list[str]]:
                 if names[at + 1 : at + 2] == [_PROTOCOLS]:
                     unreadable.append(" ".join(argv))
                 continue
-            if names[start + 1 : start + 2] != [_PROTOCOLS]:
+            if names[start + 1 : start + 2] == [_PROTOCOLS]:
+                command, args, value_options = _PROTOCOLS, argv[start + 2 :], _PROTOCOLS_VALUE_OPTIONS
+            elif tuple(names[start + 1 : start + 3]) == _SCHEMA_LOAD:
+                command, args, value_options = " ".join(_SCHEMA_LOAD), argv[start + 3 :], _SCHEMA_LOAD_VALUE_OPTIONS
+            else:
                 continue
+            branch = None
+            for word in argv[:start]:
+                name, eq, value = word.partition("=")
+                if eq and name == _DEFAULT_BRANCH_VAR:
+                    branch = value
             schemas = False
             out = _PROTOCOLS_DEFAULT_OUT
-            args = argv[start + 2 :]
             j = 0
             while j < len(args):
                 flag, eq, value = args[j].partition("=")
-                if flag in _PROTOCOLS_VALUE_OPTIONS and not eq:
+                if flag in value_options and not eq:
                     value = args[j + 1] if j + 1 < len(args) else ""
                     j += 1
                 if flag == "--schemas":
                     schemas = True
                 elif flag == "--out":
                     out = value
+                elif flag == "--branch":
+                    branch = value
                 j += 1
-            found.append({"schemas": schemas, "out": out, "line": " ".join(argv[start:])})
+            found.append({
+                "command": command,
+                "branch": branch,
+                "schemas": schemas,
+                "out": out,
+                "line": " ".join(argv[start:]),
+            })
     return found, unreadable
+
+
+def _branch_name(branch: str | None) -> str:
+    return "the default branch" if branch is None else f"branch {branch}"
 
 
 def _same_path(a: str, b: str) -> bool:
@@ -824,6 +869,17 @@ def check_protocols_regenerated_from_server(
     command cannot be read. `--schemas` named in prose, as the offline
     option with its limits, is not a command and does not count either way.
 
+    The server generates from the schema it holds, so a server-form command
+    counts only when an `infrahubctl schema load` comes before it in the
+    answer, on the same branch. A command with no `--branch` acts on the
+    default branch, unless an `INFRAHUB_DEFAULT_BRANCH=` prefix names
+    another. The check fails when no server-form command has a matching
+    load before it, and names both branches when the only loads before it
+    are of another branch. A server-form command with no matching load is
+    otherwise ignored, so a conditional alternative ("if you loaded on the
+    default branch, drop `--branch`") does not cost an answer its paired
+    command.
+
     An inline span introduced as something to avoid ("do not run `...`")
     is a contrast, not a recommendation, so it is skipped. A fenced block
     is always a recommendation: it is the text a reader copies and runs.
@@ -840,14 +896,19 @@ def check_protocols_regenerated_from_server(
     if not text.strip():
         return False, "no output to check"
 
-    writes_committed: list[dict] = []
+    # Regions in answer order, so a load can be read as coming first.
+    commands: list[dict] = []
     unreadable: list[str] = []
-    for start, region, is_span in _code_regions_with_offsets(text):
+    for start, region, is_span in sorted(_code_regions_with_offsets(text)):
         if is_span and _is_negated(text, start - 1):
             continue
         found, bad = _protocols_invocations(region)
         unreadable.extend(bad)
-        writes_committed.extend(inv for inv in found if _same_path(inv["out"], committed))
+        commands.extend(found)
+    writes_committed = [
+        inv for inv in commands
+        if inv["command"] == _PROTOCOLS and _same_path(inv["out"], committed)
+    ]
 
     if unreadable:
         return False, (
@@ -867,7 +928,37 @@ def check_protocols_regenerated_from_server(
             "relationships, so it must not overwrite the committed, "
             "server-generated file"
         )
-    return True, f"regenerates {committed} from the server, without --schemas"
+    loaded: list[str | None] = []
+    paired = False
+    mismatch = ""
+    for inv in commands:
+        if inv["command"] != _PROTOCOLS:
+            loaded.append(inv["branch"])
+        elif inv in writes_committed:
+            if inv["branch"] in loaded:
+                paired = True
+                break
+            if loaded and not mismatch:
+                mismatch = (
+                    f"`infrahubctl schema load` puts the change on "
+                    f"{', '.join(sorted({_branch_name(b) for b in loaded}))}, but "
+                    f"`{inv['line']}` generates from {_branch_name(inv['branch'])}"
+                )
+    if not paired:
+        if mismatch:
+            return False, (
+                f"{mismatch}; the server generates from the schema on that "
+                "branch, so the protocols would not carry the change"
+            )
+        return False, (
+            f"no `infrahubctl schema load` comes before the command that writes "
+            f"{committed}; the server generates from the schema it holds, so "
+            "load the change first"
+        )
+    return True, (
+        f"loads the schema, then regenerates {committed} from the server on "
+        "the same branch, without --schemas"
+    )
 
 
 # A name may carry colon-separated arguments, e.g.

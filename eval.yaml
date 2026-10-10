@@ -2699,8 +2699,9 @@ tasks:
       - name: protocols-regenerated-from-server
         check: >-
           Writes `lib/protocols.py` with an `infrahubctl protocols` command
-          that has no `--schemas`, and no recommended command writes it
-          with `--schemas`
+          that has no `--schemas`, after an `infrahubctl schema load` of the
+          same branch, and no recommended command writes it with
+          `--schemas`
       - name: cli-commands-exist
         check: No invented infrahubctl subcommand appears in the answer
 
