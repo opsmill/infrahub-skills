@@ -138,13 +138,31 @@ def test_merge_source_must_be_the_default_branch(ref, expected):
 @pytest.mark.parametrize(
     ("script", "expected"),
     [
-        ('while read -r b; do git merge origin/main; git push origin "$b"; done < f', True),
-        ('push_one() { git merge origin/main; git push origin "HEAD:refs/heads/$1"; }', True),
-        ('b=$(jq -r .branch pc.json)\ngit merge origin/main\ngit push origin "$b"', True),
-        ('FIX=fix-power-budget\ngit merge origin/main\ngit push origin "$FIX"', False),
-        ('git merge origin/main\ngit push origin "$UNSET_BRANCH"', False),
-        ("git merge origin/main\ngit push origin '<branch>'", False),
-        ("git merge origin/main\ngit push origin fix-power-budget", False),
+        (
+            'while read -r b; do git checkout "$b"; git merge origin/main; git push origin "$b"; '
+            "done < f",
+            True,
+        ),
+        (
+            'push_one() { git checkout "$1"; git merge origin/main; '
+            'git push origin "HEAD:refs/heads/$1"; }',
+            True,
+        ),
+        (
+            'b=$(jq -r .branch pc.json)\ngit checkout "$b"\ngit merge origin/main\n'
+            'git push origin "$b"',
+            True,
+        ),
+        (
+            'FIX=fix-power-budget\ngit checkout "$FIX"\ngit merge origin/main\n'
+            'git push origin "$FIX"',
+            False,
+        ),
+        ('git checkout "$UNSET_BRANCH"\ngit merge origin/main\ngit push origin "$UNSET_BRANCH"',
+         False),
+        ("git checkout '<branch>'\ngit merge origin/main\ngit push origin '<branch>'", False),
+        ("git checkout fix-power-budget\ngit merge origin/main\ngit push origin fix-power-budget",
+         False),
     ],
     ids=["read-var", "function-arg", "assigned-from-command", "literal-var", "unbound-var",
          "placeholder", "literal"],
@@ -152,6 +170,39 @@ def test_merge_source_must_be_the_default_branch(ref, expected):
 def test_push_destination_must_be_a_bound_branch_variable(script, expected):
     assert _passes(script) is expected
 
+
+
+# The merge has to land on the branch that is pushed. Merging main into main,
+# or into nothing the script checked out, and then pushing a source branch
+# leaves that branch at its old commit.
+@pytest.mark.parametrize(
+    ("script", "expected"),
+    [
+        (
+            'git checkout "$b"\ngit merge origin/main\ngit push origin "$b"',
+            True,
+        ),
+        (
+            'git checkout -b tmp "origin/$b"\ngit merge origin/main\n'
+            'git push origin "tmp:refs/heads/${b}"',
+            True,
+        ),
+        ('git rebase origin/main "$b"\ngit push origin "$b"', True),
+        ('git clone --branch "$b" "$URL" w\ngit -C w pull origin main\ngit -C w push origin HEAD',
+         True),
+        ('git checkout main\ngit merge origin/main\ngit push origin "$b"', False),
+        ('git checkout "$b"\ngit checkout main\ngit merge origin/main\ngit push origin "$b"',
+         False),
+        ('git clone "$URL" w\ngit -C w merge origin/main\ngit -C w push origin "$b"', False),
+        ('git merge origin/main\ngit push origin "$b"', False),
+    ],
+    ids=["checkout-merge-push", "temp-branch-to-source", "rebase-names-branch",
+         "clone-branch-pull", "merged-on-main", "switched-back-to-main",
+         "clone-default-branch", "no-checkout"],
+)
+def test_merge_must_land_on_the_pushed_branch(script, expected):
+    looped = f"while read -r b; do\n{script}\ndone < branches.txt"
+    assert _passes(looped) is expected
 
 @pytest.mark.parametrize(
     ("script", "expected"),
@@ -183,6 +234,57 @@ EOF
 done
 """
     assert _passes(script)
+
+
+# The new-branch route counts a mutation only where the script sends it.
+_PC_MUTATION = 'mutation { CoreProposedChangeCreate(data: {}) { ok } }'
+_BRANCH_MUTATION = 'mutation { BranchCreate(data: {name: \\"x\\"}) { ok } }'
+
+
+@pytest.mark.parametrize(
+    ("script", "expected"),
+    [
+        (
+            'gql() {\n  curl -sS "$INFRAHUB_ADDRESS/graphql" -d "$1"\n}\n'
+            f'gql "{{\\"query\\": \\"{_BRANCH_MUTATION}\\"}}"\n'
+            f"gql '{_PC_MUTATION}'",
+            True,
+        ),
+        (
+            f"B='{_BRANCH_MUTATION}'\nP='{_PC_MUTATION}'\n"
+            'curl -d "$B" "$URL"\ncurl -d "$P" "$URL"',
+            True,
+        ),
+        (
+            "python3 - <<'EOF'\nclient.branch.create(branch_name=b)\n"
+            "client.create(kind='CoreProposedChange', data={})\nEOF",
+            True,
+        ),
+        (
+            f'echo "{_BRANCH_MUTATION}"\necho "{_PC_MUTATION}"',
+            False,
+        ),
+        (
+            'say() {\n  echo "$1"\n}\n'
+            f'say "{_BRANCH_MUTATION}"\nsay "{_PC_MUTATION}"',
+            False,
+        ),
+        (
+            f"B='{_BRANCH_MUTATION}'\nP='{_PC_MUTATION}'\n"
+            'echo "$B"\necho "$P"\ncurl -d "$OTHER" "$URL"',
+            False,
+        ),
+        (
+            "cat <<'EOF'\nclient.branch.create(branch_name=b)\n"
+            "client.create(kind='CoreProposedChange', data={})\nEOF",
+            False,
+        ),
+    ],
+    ids=["helper-function", "variable-sent", "python-heredoc", "echoed",
+         "echo-helper", "variable-only-echoed", "heredoc-to-cat"],
+)
+def test_new_branch_route_counts_only_sent_mutations(script, expected):
+    assert _passes(script) is expected
 
 
 # --- Shell reading (dev/guidelines/graders.md) ------------------------------

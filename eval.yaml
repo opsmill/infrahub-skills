@@ -1519,8 +1519,8 @@ tasks:
       - name: moves-source-branch-commit
         check: >-
           A `git push` to each source branch follows a merge or rebase of
-          main, or the script opens a new branch and then a new proposed
-          change; a rebase-and-retry loop alone fails
+          main into that branch, or the script opens a new branch and then
+          sends a new proposed change; a rebase-and-retry loop alone fails
 
   # --- Generators: relationship reference encoding --- #
   - name: generator-relationship-hfid-encoding

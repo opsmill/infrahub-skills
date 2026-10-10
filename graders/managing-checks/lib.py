@@ -763,7 +763,14 @@ _GIT_VALUE_OPTS: dict[str, set[str]] = {
     "checkout": {"-b", "-B", "--orphan", "--conflict"},
     "switch": {"-c", "-C", "--orphan", "--conflict"},
     "worktree": {"-b", "-B", "--reason"},
+    "clone": {
+        "-b", "--branch", "-o", "--origin", "--depth", "-c", "--config", "--reference",
+        "-u", "--upload-pack", "--separate-git-dir", "-j", "--jobs", "--filter",
+    },
 }
+# Programs that send a GraphQL document or SDK call to Infrahub. A mutation name
+# counts only where one of these, or a script function that calls one, sends it.
+_SENDERS = {"curl", "wget", "http", "https", "xh", "infrahubctl"}
 _BRANCH_CREATE_GQL_RE = re.compile(r"\bBranchCreate\s*\(|\.branch\.create\s*\(")
 _PC_CREATE_GQL_RE = re.compile(
     r"\bCoreProposedChangeCreate\s*\(|\bcreate\s*\(\s*(?:kind\s*=\s*)?[\"']CoreProposedChange[\"']"
@@ -776,26 +783,28 @@ def _shell_script_text(raw: str) -> str:
     return "\n".join(blocks) if blocks else raw
 
 
-def _split_heredocs(text: str) -> tuple[list[str], list[tuple[int, str]]]:
-    """Script lines with heredoc bodies blanked, plus each body line with its index.
+def _split_heredocs(text: str) -> tuple[list[str], list[tuple[int, str, int]]]:
+    """Script lines with heredoc bodies blanked, plus each body line.
 
-    A heredoc body is data (a GraphQL document, a Python snippet), not shell, so
-    tokenizing it as commands would fabricate calls and trip on its quotes.
+    Each body line comes with its own index and the index of the line that
+    opened the heredoc. A heredoc body is data (a GraphQL document, a Python
+    snippet), not shell, so tokenizing it as commands would fabricate calls and
+    trip on its quotes.
     """
     lines = text.split("\n")
     shell: list[str] = []
-    bodies: list[tuple[int, str]] = []
-    pending: list[str] = []
+    bodies: list[tuple[int, str, int]] = []
+    pending: list[tuple[str, int]] = []
     for idx, line in enumerate(lines):
         if pending:
-            bodies.append((idx, line))
+            bodies.append((idx, line, pending[0][1]))
             shell.append("")
-            if line.strip() == pending[0]:
+            if line.strip() == pending[0][0]:
                 pending.pop(0)
             continue
         shell.append(line)
         if not line.lstrip().startswith("#"):
-            pending.extend(m.group(2) for m in _HEREDOC_RE.finditer(line))
+            pending.extend((m.group(2), idx) for m in _HEREDOC_RE.finditer(line))
     return shell, bodies
 
 
@@ -953,9 +962,12 @@ def _positionals(args: list[str], value_opts: set[str]) -> list[str]:
 
 
 def _option_value(args: list[str], names: set[str]) -> str | None:
-    for j, a in enumerate(args[:-1]):
-        if a in names:
+    for j, a in enumerate(args):
+        if a in names and j + 1 < len(args):
             return args[j + 1]
+        for n in names:
+            if n.startswith("--") and a.startswith(n + "="):
+                return a[len(n) + 1 :]
     return None
 
 
@@ -1024,15 +1036,130 @@ def _names_a_source_branch(
     return False
 
 
+_BRACED_VAR_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*|[0-9@*])\}")
+
+
+def _branch_ref(ref: str) -> str:
+    """A ref as a branch name, with `${b}` and `$b` spelled the same way."""
+    return _BRACED_VAR_RE.sub(r"$\1", _short_ref(ref))
+
+
+def _function_name(tokens: list[str]) -> str | None:
+    """The name a `name() {` or `function name {` line defines, if it is one."""
+    if len(tokens) >= 2 and tokens[0] == "function":
+        return tokens[1].removesuffix("()") or None
+    if len(tokens) >= 2 and tokens[1] == "()" and re.fullmatch(r"[A-Za-z_][\w-]*", tokens[0]):
+        return tokens[0]
+    if len(tokens) >= 3 and tokens[1:3] == ["(", ")"] and re.fullmatch(r"[A-Za-z_][\w-]*", tokens[0]):
+        return tokens[0]
+    return None
+
+
+def _function_bodies(lines: list[tuple[int, list[str]]]) -> dict[str, list[int]]:
+    """Each function's name, with the positions in ``lines`` its body spans."""
+    bodies: dict[str, list[int]] = {}
+    current: str | None = None
+    depth, opened = 0, False
+    for pos, (_, tokens) in enumerate(lines):
+        if current is None:
+            current = _function_name(tokens)
+            if current is None:
+                continue
+            bodies[current] = []
+            depth, opened = 0, False
+        bodies[current].append(pos)
+        depth += tokens.count("{") - tokens.count("}")
+        opened = opened or "{" in tokens
+        if opened and depth <= 0:
+            current = None
+    return bodies
+
+
+def _sent_graphql_lines(
+    line_info: list[tuple[int, list[str], list[list[str]], set[str]]],
+    assigns: dict[str, list[str]],
+    bodies: list[tuple[int, str, int]],
+    pattern: re.Pattern[str],
+) -> list[int]:
+    """Line indexes where ``pattern`` appears in text the script sends.
+
+    Text counts on a line that runs a sender (curl, wget, httpie, infrahubctl,
+    python, or a script function that calls one), in a variable such a line
+    expands, and in a heredoc opened on such a line or assigned to such a
+    variable. Text that is only echoed or printed is not a request.
+    """
+    funcs = _function_bodies([(idx, tokens) for idx, tokens, _, _ in line_info])
+
+    def _program(argv: list[str]) -> str:
+        return argv[0].rsplit("/", 1)[-1]
+
+    sender_funcs: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for name, positions in funcs.items():
+            if name in sender_funcs:
+                continue
+            for pos in positions:
+                for argv in line_info[pos][2]:
+                    prog = _program(argv)
+                    if prog != name and (
+                        prog in _SENDERS or prog.startswith("python") or prog in sender_funcs
+                    ):
+                        sender_funcs.add(name)
+                        changed = True
+                        break
+                if name in sender_funcs:
+                    break
+
+    def _sends(argvs: list[list[str]]) -> bool:
+        return any(
+            (p := _program(a)) in _SENDERS or p.startswith("python") or p in sender_funcs
+            for a in argvs
+        )
+
+    sender_pos = [pos for pos, (_, _, argvs, _) in enumerate(line_info) if _sends(argvs)]
+    sent_vars = {
+        m.group(1)
+        for pos in sender_pos
+        for tok in line_info[pos][1]
+        for m in _SHELL_VAR_RE.finditer(tok)
+    }
+
+    found: list[int] = []
+    for pos in sender_pos:
+        idx, tokens, _, _ = line_info[pos]
+        if pattern.search(" ".join(tokens)):
+            found.append(idx)
+    for idx, _, _, assigned in line_info:
+        if any(pattern.search(v) for name in assigned & sent_vars for v in assigns[name]):
+            found.append(idx)
+
+    starts = [idx for idx, _, _, _ in line_info]
+    sender_idx = {line_info[pos][0] for pos in sender_pos}
+    for body_idx, body_line, opener in bodies:
+        if not pattern.search(body_line):
+            continue
+        k = max((i for i, start in enumerate(starts) if start <= opener), default=None)
+        if k is None:
+            continue
+        start, _, _, assigned = line_info[k]
+        if start in sender_idx or assigned & sent_vars:
+            found.append(body_idx)
+    return found
+
+
 def check_moves_source_branch_commit(
     config: dict, *, sh_raw: str = "", **_: Any
 ) -> tuple[bool, str]:
     """The script moves the repository commit each proposed change runs.
 
-    Passes when a `git push` to a source branch follows a merge, rebase or pull
-    of main in script order, or when the script opens a new branch and then a
-    new proposed change. Rebasing the Infrahub branch and retrying the checks
-    alone reruns the old commit on a branch synced with Git.
+    Passes when a source branch has main merged, rebased or pulled into it and
+    a later `git push` sends that branch to a source branch, or when the script
+    opens a new branch and then a new proposed change. Rebasing the Infrahub
+    branch and retrying the checks alone reruns the old commit on a branch
+    synced with Git, and so does merging main into a branch other than the one
+    pushed.
     """
     text = _shell_script_text(sh_raw or "")
     if not text.strip():
@@ -1044,21 +1171,33 @@ def check_moves_source_branch_commit(
     bound: set[str] = set()
     commands: list[tuple[int, list[str]]] = []
     all_tokens: list[str] = []
+    line_info: list[tuple[int, list[str], list[list[str]], set[str]]] = []
     for line_idx, tokens in logical:
         all_tokens.extend(tokens)
+        line_assigns: dict[str, list[str]] = {}
+        argvs: list[list[str]] = []
         for seg in _simple_commands(tokens):
-            argv = _peel(seg, assigns)
+            argv = _peel(seg, line_assigns)
             if argv:
                 _bound_vars(argv, bound)
                 commands.append((line_idx, argv))
+                argvs.append(argv)
+        for name, values in line_assigns.items():
+            assigns.setdefault(name, []).extend(values)
+        line_info.append((line_idx, tokens, argvs, set(line_assigns)))
     default_vars = _default_vars(assigns, all_tokens)
 
     current: str | None = None
-    merged_default = False
+    merged: set[str] = set()  # branches main was merged, rebased or pulled into
     qualifying_push: str | None = None
     pushes_seen: list[str] = []
     rebases = 0
     branch_create_lines: list[int] = []
+
+    def _merged_into(target: str | None) -> None:
+        if target and not _is_default_ref(target, default_vars):
+            merged.add(target)
+
     for line_idx, argv in commands:
         if argv[0].rsplit("/", 1)[-1] == "infrahubctl" and argv[1:2] == [_BRANCH_GROUP]:
             verb = argv[2] if len(argv) > 2 else ""
@@ -1074,25 +1213,33 @@ def check_moves_source_branch_commit(
         if sub in {"checkout", "switch"}:
             named = _option_value(args, {"-b", "-B", "-c", "-C"})
             if named:
-                current = named
+                current = _branch_ref(named)
             elif pos:
                 ref = pos[-1]
                 if ("-t" in args or "--track" in args) and "/" in ref:
                     ref = ref.split("/", 1)[1]
-                current = ref
+                current = _branch_ref(ref)
+        elif sub == "clone":
+            named = _option_value(args, {"-b", "--branch"})
+            current = _branch_ref(named) if named else None
         elif sub == "worktree" and pos[:1] == ["add"]:
             named = _option_value(args, {"-b", "-B"})
-            current = named or (pos[2] if len(pos) > 2 else current)
+            ref = named or (pos[2] if len(pos) > 2 else None)
+            current = _branch_ref(ref) if ref else current
         elif sub in {"merge", "rebase"}:
             refs = list(pos)
+            if sub == "rebase" and len(pos) >= 2:
+                # `git rebase <upstream> <branch>` checks out <branch> first.
+                current = _branch_ref(pos[1])
+                refs = [pos[0]]
             onto = _option_value(args, {"--onto"})
             if onto:
                 refs.append(onto)
             if any(_is_default_ref(r, default_vars) for r in refs):
-                merged_default = True
+                _merged_into(current)
         elif sub == "pull":
             if any(_is_default_ref(r, default_vars) for r in pos[1:]):
-                merged_default = True
+                _merged_into(current)
         elif sub == "push":
             if {"--delete", "-d", "--all", "--mirror", "--tags"} & set(args):
                 continue
@@ -1100,14 +1247,16 @@ def check_moves_source_branch_commit(
             for spec in refspecs:
                 if spec.startswith(":"):
                     continue
-                dst = spec.split(":", 1)[1] if ":" in spec else spec
-                dst = _short_ref(dst)
+                src, dst = spec.split(":", 1) if ":" in spec else (spec, spec)
+                src, dst = _branch_ref(src), _branch_ref(dst)
+                if src == "HEAD":
+                    src = current or ""
                 if dst == "HEAD":
-                    dst = _short_ref(current) if current else ""
+                    dst = current or ""
                 pushes_seen.append(dst or "HEAD (branch unknown)")
                 if (
-                    merged_default
-                    and qualifying_push is None
+                    qualifying_push is None
+                    and src in merged
                     and _names_a_source_branch(dst, assigns, bound, default_vars)
                 ):
                     qualifying_push = dst
@@ -1119,21 +1268,19 @@ def check_moves_source_branch_commit(
         )
 
     # Second accepted route: a new branch, then a new proposed change on it.
-    code_lines: list[tuple[int, str]] = [
-        (i, ln) for i, ln in enumerate(shell_lines) if ln.strip() and not ln.lstrip().startswith("#")
-    ] + bodies
-    gql_branch = [i for i, ln in code_lines if _BRANCH_CREATE_GQL_RE.search(ln)]
-    pc_create = [i for i, ln in code_lines if _PC_CREATE_GQL_RE.search(ln)]
+    gql_branch = _sent_graphql_lines(line_info, assigns, bodies, _BRANCH_CREATE_GQL_RE)
+    pc_create = _sent_graphql_lines(line_info, assigns, bodies, _PC_CREATE_GQL_RE)
     first_branch = min(branch_create_lines + gql_branch, default=None)
     if first_branch is not None and any(i >= first_branch for i in pc_create):
         return True, "Opens a new branch and a new proposed change, which run the current commit"
 
     seen = ", ".join(pushes_seen) if pushes_seen else "none"
+    into = ", ".join(sorted(merged)) if merged else "none"
     return False, (
         "No `git push` to a source branch after merging or rebasing main into it, and no new "
         "branch plus new proposed change: the open proposed changes keep running the old "
         f"repository commit (git push destinations: {seen}; infrahubctl branch rebase calls: "
-        f"{rebases}; merged main before a push: {merged_default})"
+        f"{rebases}; branches main was merged into: {into})"
     )
 
 

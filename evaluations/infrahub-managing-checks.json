@@ -195,7 +195,7 @@
       "assertions": [
         {
           "name": "moves-source-branch-commit",
-          "check": "A `git push` to each source branch follows a merge or rebase of main, or the script opens a new branch and then a new proposed change; a rebase-and-retry loop alone fails"
+          "check": "A `git push` to each source branch follows a merge or rebase of main into that branch, or the script opens a new branch and then sends a new proposed change; a rebase-and-retry loop alone fails"
         }
       ]
     }
