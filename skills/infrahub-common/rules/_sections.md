@@ -26,9 +26,10 @@ specific to any single workflow.
    `infrahubctl` generates rather than you: the protocol
    module (`infrahubctl protocols`) and `schema.graphql`
    (`infrahubctl graphql export-schema`). Never edit
-   either directly, regenerate after schema changes;
-   protocol generation supports a local schema directory,
-   the schema export needs a running server.
+   either directly, regenerate after schema changes. Both
+   are generated from a running server with the schema
+   loaded; offline `--schemas` protocol output is
+   incomplete and never replaces the committed file.
 
 4. **Connectivity (connectivity-)** -- HIGH. Python
    environment detection (`uv run` / `poetry run` /
