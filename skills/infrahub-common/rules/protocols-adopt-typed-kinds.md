@@ -9,9 +9,10 @@ tags: protocols, infrahubctl, type-safety, generators, transforms, checks
 When Python — a generator, transform, or check — reads or writes schema
 objects through the SDK, pass a generated protocol class as the `kind` instead
 of a string. You get dev-time type checking and IDE autocomplete on the
-object's attributes, and a later schema change makes every read of a renamed
-or retyped attribute a type error on the exact line rather than a runtime
-failure. Field names passed to `create()` are not checked.
+object's attributes. After a schema change, every read of a renamed attribute,
+and every use that no longer fits a retyped one, is a type error on the exact
+line rather than a runtime failure. Field names passed to `create()` are not
+checked.
 
 ### Generate the protocols
 

@@ -30,8 +30,9 @@ as a string, you can use the corresponding protocol instead. A bare-string
 and a renamed or retyped attribute compiles fine and fails only at runtime,
 deep in a proposed-change pipeline or a failed artifact generation. With the
 generated class, the type checker turns that same schema drift into a list of
-errors pointing at the exact lines that read the attribute. It does not check
-the field names passed to `create()`. The cost of *not* adopting
+errors pointing at the exact lines that read a renamed attribute or use a
+retyped one in a way its new type does not allow. It does not check the field
+names passed to `create()`. The cost of *not* adopting
 protocols is paid later, and in a worse place.
 
 ## Checks
