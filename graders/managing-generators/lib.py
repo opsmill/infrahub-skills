@@ -2076,6 +2076,131 @@ def check_group_membership_from_member_side(
 
 
 # ---------------------------------------------------------------------------
+# Generator target group (registration-config) — output.md family
+# ---------------------------------------------------------------------------
+#
+# Fixture-coupled: the generator-target-standard-group task hands the model an
+# existing CoreStandardGroup named topologies_dc, whose members are the design
+# objects, and asks it to register the generator so it runs once per design.
+# `targets:` accepts any CoreGroup kind, so the right answer reuses that group
+# as it is. CoreGeneratorGroup is the group a generator creates to track its
+# own output; the prompt supplies none, so any in the answer is new.
+
+_TARGET_GROUP = "topologies_dc"
+_TARGET_GROUP_KIND = "CoreStandardGroup"
+_OUTPUT_GROUP_KIND = "CoreGeneratorGroup"
+
+
+def yaml_documents(raw: str) -> list[Any]:
+    """Every YAML document in every ```yaml fence of ``raw``.
+
+    Each fence is parsed on its own, and may hold several ``---`` documents:
+    joining fences before parsing would merge two files' keys into one
+    mapping. A fence whose first line is a comment labelling it as the wrong
+    form is skipped, so a contrast block does not count as the answer. A fence
+    that does not parse contributes nothing.
+    """
+    docs: list[Any] = []
+    for match in _YAML_FENCE.finditer(raw):
+        block = match.group(1)
+        first = next((ln.strip() for ln in block.splitlines() if ln.strip()), "")
+        if first.startswith("#") and _NEGATIVE_LABEL.match(first):
+            continue
+        try:
+            docs.extend(doc for doc in yaml.safe_load_all(block) if doc is not None)
+        except yaml.YAMLError:
+            continue
+    return docs
+
+
+def manifest_generator_entries(docs: list[Any]) -> list[dict]:
+    """Every ``generator_definitions`` entry across the parsed documents."""
+    entries: list[dict] = []
+    for doc in docs:
+        if isinstance(doc, dict):
+            entries.extend(_generator_entries(doc))
+    return entries
+
+
+def _kind_mappings(node: Any) -> Iterator[dict]:
+    """Every mapping with a string ``kind`` key, at any depth.
+
+    Covers the ``spec: {kind, data}`` object-file wrapper and the bare
+    list-of-``{kind, data}`` form alike.
+    """
+    if isinstance(node, dict):
+        if isinstance(node.get("kind"), str):
+            yield node
+        for value in node.values():
+            yield from _kind_mappings(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _kind_mappings(value)
+
+
+def _object_name(item: Any) -> str | None:
+    if not isinstance(item, dict):
+        return None
+    name = item.get("name")
+    if isinstance(name, dict):
+        name = name.get("value")
+    return name if isinstance(name, str) else None
+
+
+def check_generator_targets_existing_group(
+    output: dict, **_: Any
+) -> tuple[bool, str]:
+    """The generator targets the existing CoreStandardGroup, unchanged.
+
+    Two halves, both read from the parsed YAML, never from prose:
+
+    * every ``generator_definitions`` entry names ``targets: topologies_dc``;
+    * no object data declares a ``CoreGeneratorGroup``, and none redeclares
+      ``topologies_dc`` as any kind other than ``CoreStandardGroup``.
+    """
+    docs = yaml_documents(output.get("raw", ""))
+    entries = manifest_generator_entries(docs)
+    if not entries:
+        return False, "no generator_definitions entry found in any ```yaml block"
+
+    problems: list[str] = []
+    wrong_targets = [
+        f"{e.get('name', '<unnamed>')} -> {e.get('targets')!r}"
+        for e in entries
+        if e.get("targets") != _TARGET_GROUP
+    ]
+    if wrong_targets:
+        problems.append(
+            f"targets does not name the existing group {_TARGET_GROUP}: "
+            + ", ".join(wrong_targets)
+        )
+
+    for mapping in _kind_mappings(docs):
+        kind = mapping["kind"]
+        data = mapping.get("data")
+        names = [n for n in (_object_name(i) for i in data or []) if n] if isinstance(data, list) else []
+        if kind == _OUTPUT_GROUP_KIND:
+            problems.append(
+                f"object data declares a {_OUTPUT_GROUP_KIND} "
+                f"({', '.join(names) or 'unnamed'}); targets accepts the existing "
+                f"{_TARGET_GROUP_KIND}, and {_OUTPUT_GROUP_KIND} is the group a "
+                "generator creates for its own output"
+            )
+        elif _TARGET_GROUP in names and kind != _TARGET_GROUP_KIND:
+            problems.append(
+                f"object data redeclares {_TARGET_GROUP} as {kind}, not "
+                f"{_TARGET_GROUP_KIND}"
+            )
+
+    if problems:
+        return False, "; ".join(problems)
+    return True, (
+        f"generator targets the existing {_TARGET_GROUP_KIND} {_TARGET_GROUP} "
+        "and no group is created or converted"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Delete ordering: detach peers before deleting them
 # ---------------------------------------------------------------------------
 
@@ -2531,6 +2656,7 @@ CHECKS: dict[str, Any] = {
     "traversal-enumerates-and-checks-truncation": check_traversal_enumerates_and_checks_truncation,
     "shared-save-opts-out-of-tracking": check_shared_save_opts_out_of_tracking,
     "group-membership-from-member-side": check_group_membership_from_member_side,
+    "generator-targets-existing-group": check_generator_targets_existing_group,
     "path-hop-shape": check_path_hop_shape,
     # AST / relationship family (output.py)
     "relationship-hfid-form-correct": check_relationship_hfid_form_correct,

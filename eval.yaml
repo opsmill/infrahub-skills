@@ -3592,6 +3592,84 @@ tasks:
           generate_rack, which has no first-party import, declares
           watch.files as []
 
+  - name: generator-target-standard-group
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: I wrote a Generator that builds a data center fabric from each
+      TopologyDataCenter design object. Register it in `.infrahub.yml` so it
+      runs once for every design we have. The query `topology_dc` is already
+      declared in the `queries:` section; it takes one variable, `$name`, the
+      design's name. The class is `DCTopologyGenerator` in
+      `generators/generate_dc.py`, and it imports nothing from the repository.
+
+      Our designs are already loaded from object files, and they are already
+      grouped:
+
+      objects/groups.yml:
+      ```yaml
+      ---
+      apiVersion: infrahub.app/v1
+      kind: Object
+      spec:
+        kind: CoreStandardGroup
+        data:
+          - name: topologies_dc
+            description: Data center designs
+      ```
+
+      objects/designs.yml:
+      ```yaml
+      ---
+      apiVersion: infrahub.app/v1
+      kind: Object
+      spec:
+        kind: TopologyDataCenter
+        data:
+          - name: dc-ams1
+            member_of_groups:
+              - topologies_dc
+          - name: dc-fra1
+            member_of_groups:
+              - topologies_dc
+      ```
+
+      Add the `generator_definitions` entry, and create or change any object
+      files the Generator needs before it will run.
+
+      Save your answer to: output.md. For every file you create or change,
+      write its path on its own line, followed by its full content in a
+      fenced yaml code block.
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_generator_target_standard_group.py
+        weight: 1.0
+    expected_output: >-
+      A generator_definitions entry for DCTopologyGenerator whose targets is
+      the existing topologies_dc group, with parameters mapping name to
+      name__value and a watch block. No new group object file and no change
+      to topologies_dc: targets accepts any CoreGroup kind, so the existing
+      CoreStandardGroup is the target as it is.
+    expectations:
+      - "The generator_definitions entry has targets: topologies_dc"
+      - "No object file declares a CoreGeneratorGroup"
+      - "topologies_dc stays a CoreStandardGroup"
+      - "The entry carries a watch block in the object form"
+    assertions:
+      - name: generator-targets-existing-group
+        check: >-
+          Every generator_definitions entry targets topologies_dc, no object
+          data declares a CoreGeneratorGroup, and none redeclares
+          topologies_dc as a kind other than CoreStandardGroup
+      - name: gen-watch-present
+        check: >-
+          Every generator_definitions entry has a watch key
+      - name: gen-watch-object-form
+        check: >-
+          Every watch block is the object form {files: [...]}, not a bare list
+
   - name: practices-watch-dependencies
     trials: 3
     instruction: |
