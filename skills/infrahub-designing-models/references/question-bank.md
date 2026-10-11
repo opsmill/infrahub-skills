@@ -87,7 +87,8 @@ a rule needs from the user.
   later? Rules:
   [extension-object-template](../../infrahub-managing-schemas/rules/extension-object-template.md),
   [extension-object-profile](../../infrahub-managing-schemas/rules/extension-object-profile.md),
-  [yagni-template-profile-confusion](../../infrahub-auditing-repo/rules/yagni-template-profile-confusion.md).
+  [yagni-template-profile-confusion](../../infrahub-auditing-repo/rules/yagni-template-profile-confusion.md),
+  [profiles-and-templates](../../infrahub-common/profiles-and-templates.md).
 - **Source of truth.** Which system is authoritative for
   this node kind? Does Infrahub write to it or read from
   it?

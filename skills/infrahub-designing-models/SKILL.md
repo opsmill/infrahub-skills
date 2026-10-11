@@ -56,14 +56,16 @@ skill for each artifact builds it from the brief.
 1. **Read before asking.** Read `.infrahub.yml`,
    `schemas/`, and any existing `design-brief.md`. Check
    the Marketplace (`infrahubctl marketplace search
-   <domain>`) for a published schema to build on, and
-   pick the closest worked example from
+   <domain>`) for a published schema to build on (when
+   it cannot run, say so and keep it as an open item),
+   and pick the closest worked example from
    [references/reference-designs.md](./references/reference-designs.md),
    including newer demos it tells you how to find. Read
    [rules/brief-reference-design.md](./rules/brief-reference-design.md)
    before choosing.
    Never ask what these already answer. Extending a
-   design means editing its brief, not starting another.
+   design means editing its brief, not starting another;
+   see "Extending a brief" below.
 2. **Ask for inputs once, first.** Before reading the
    inputs and on every later turn, read
    [rules/interview-inputs-digested.md](./rules/interview-inputs-digested.md):
@@ -79,8 +81,11 @@ skill for each artifact builds it from the brief.
    question block; read
    [rules/interview-one-question-recommended.md](./rules/interview-one-question-recommended.md)
    before writing the first one. Push back once on a
-   vague answer ("scalable", "everything", "like
-   NetBox"), then record what the user says. Keep the
+   vague answer ("scalable", "everything"), then record
+   what the user says. When the user compares their model
+   to NetBox, read `../infrahub-common/netbox-vs-infrahub.md`
+   and name the differences it states that matter for
+   this design, instead of copying the NetBox shape. Keep the
    business and service layers short, about five
    questions together: the draft in step 6 shows which
    of their gaps matter, and you can return to them.
@@ -90,40 +95,48 @@ skill for each artifact builds it from the brief.
    for the signals, the merge rule, and what a split
    leaves in the sketch.
 6. **Draft the sketch, then question the draft,** for
-   F1 only. Before the first data question, show a draft
-   of F1's sketch table, and the Features table after a
-   split, built from the inputs, the answers so far, and
-   the closest reference design. Fill every cell with
-   your best guess and mark each guess `(guess)`. A guess
-   comes from the user's files, their answers or the
-   reference design, never from nowhere: do not invent
-   attributes or peers nobody mentioned. Under the draft,
-   show two or three sample objects built from the user's
-   own rows (one VPN with two of its sites, say), so a
-   wrong identity or cardinality shows on real data.
-   Ground
-   each guess in the current best-practice rules, which
-   grow over time: list the file names in
-   `../infrahub-managing-schemas/rules/` and the
-   `yagni-*` files in `../infrahub-auditing-repo/rules/`,
-   then read only the rules that govern a decision in
-   front of you, and name the rule as the question's
-   basis. The links in the question bank are starting
-   points, not the full set. When the design needs a
-   generator, a check or a transform, do the same with
-   that skill's rules (`../infrahub-managing-generators/`,
-   `../infrahub-managing-checks/`,
-   `../infrahub-managing-transforms/`) and ask what it
-   needs: what drives it, what it produces, when it runs. People correct a draft faster than they
-   answer questions about a model they cannot see. Then
-   ask about the guesses that change the design most,
-   one question block per message with the draft as its
-   lead-in, and after each answer show only the rows
-   that changed. Stop when every node kind has an
-   identity, a source of truth and an owner, or an open
-   item, and you can predict the answers to your next
-   three questions. At about 25 questions, turn the
-   remaining guesses into open items.
+   F1 only. People correct a draft faster than they
+   answer questions about a model they cannot see.
+   - **Draft.** Before the first data question, show
+     F1's sketch table, and the Features table after a
+     split. Fill each cell with a guess marked `(guess)`
+     that comes from the user's files, their answers,
+     the reference design or an Infrahub default in the
+     question bank. A cell none of these supports stays
+     `?` and becomes a question. Do not invent
+     attributes or peers nobody mentioned.
+   - **Samples.** When the user gave rows of data, show
+     two or three sample objects built from them under
+     the draft (one VPN with two of its sites, say), so
+     a wrong identity or cardinality shows on real data.
+     Without rows, show none.
+   - **Left out.** Add one line naming what you left out
+     because nobody mentioned it (a vendor, a serial
+     number, a status), so the user can bring it in.
+   - **Ground each guess** in the current best-practice
+     rules, which grow over time: list the file names in
+     `../infrahub-managing-schemas/rules/` and the
+     `yagni-*` files in `../infrahub-auditing-repo/rules/`,
+     read only the rules that govern a decision in front
+     of you, and name the rule in the question's basis
+     by its plain name (uniqueness-constraints, not a
+     link). The question bank's links are starting
+     points, not the full set. When the design needs a
+     generator, a check or a transform, do the same with
+     that skill's rules (`../infrahub-managing-generators/`,
+     `../infrahub-managing-checks/`,
+     `../infrahub-managing-transforms/`) and ask what it
+     needs: what drives it, what it produces, when it
+     runs.
+   - **Question the draft.** Ask about the guesses that
+     change the design most, one question block per
+     message with the draft as its lead-in, and after
+     each answer show only the rows that changed.
+   - **Stop** when every node kind has an identity, a
+     source of truth and an owner, or an open item, and
+     you can predict the answers to your next three
+     questions. At about 25 questions, turn the
+     remaining guesses into open items.
 7. **Walk one scenario through the model, then restate
    and confirm.** Take one lifecycle event from the
    service layer (an order, a change, a decommission) and
@@ -163,11 +176,39 @@ Some requests come with every answer up front, or say
 the user is away. Do not ask: take the answers as
 given, record each decision with its provenance, and
 skip step 7. Build the draft of step 6 for yourself but
-do not present it; go straight to the brief. Turn whatever they did not answer, and
-every recommendation they did not confirm, into an
-`open` decision with an open item rather than a
-default, and write the brief. When there are no
+do not present it; go straight to the brief. Turn every
+design decision they did not answer, and every
+recommendation you would have asked them to confirm,
+into an `open` decision with an open item rather than a
+default, and write the brief. Node kind names and the
+outcome of the skill's own rules, such as not
+splitting, are recorded, not opened. When there are no
 answers at all, write only the next question block.
+
+### When the user asks for every question at once
+
+Send one numbered set: the inputs question, then at
+most five business and service questions, each in the
+block layout of
+[rules/interview-one-question-recommended.md](./rules/interview-one-question-recommended.md).
+Follow it with the step 6 draft, and under the draft at
+most three data questions, as blocks, on the guesses
+that change the design most. The user corrects the rest
+by marking up the draft. Whatever they leave unanswered or
+uncorrected becomes an open item, as above.
+
+### Extending a brief
+
+- Keep what was agreed: existing features, sketch rows,
+  decisions and open items stay as they are.
+- Continue the numbering: the next feature ID, decision
+  number and `O<n>` after the highest in the brief.
+- A gap found in an agreed feature, such as a peer F1's
+  intent needs, becomes an open item proposing the
+  change, settled before that feature in Next steps.
+  Do not edit agreed rows on your own.
+- Update Summary, Business and Service with what the
+  user said, and redraw the maps and Next steps.
 
 ## Rule Categories
 

@@ -148,11 +148,15 @@ graph LR
   another system).
 - `Source of truth` is the system that is authoritative
   for the node kind. `Evidence` is where you learned the
-  row's facts: `file:column`, `file:element`, or
-  `answer Q<n>`.
+  row's facts: `file:column`, `file:element`,
+  `answer Q<n>`, `request` (the user's opening message),
+  or the reference design's name.
 - `Peers` names each peer node kind spelled exactly as
   its `Node kind`, followed by the cardinality:
-  `Strand (many)`.
+  `Strand (many)`. A peer this design does not define,
+  because it exists elsewhere or nobody described it,
+  gets no sketch row: name it in `Peers` and track what
+  is unknown about it in Open items.
 - A value nobody knows is written `open: O<n>`, pointing
   at a real entry in Open items.
 
@@ -209,7 +213,9 @@ graph LR
 - `Driven by` names the node kind that triggers or feeds
   the behavior, from the sketch for F1. `Produces` says
   what it creates, enforces or renders. `Runs when`
-  says what starts it.
+  says what starts it: a change, or a schedule the user
+  stated ("every night"); what runs a schedule is a
+  question for the building skill or an open item.
 - Prefer a `schema constraint` to a `check` for a rule
   the schema can enforce, such as uniqueness.
 
@@ -230,11 +236,15 @@ graph LR
 
 - One numbered step per feature, after the features it
   depends on. Open items that F1's sketch waits on come
-  first.
+  first, one step per owner.
+- Name skills as the mapping above does
+  (`infrahub-managing-schemas`), optionally with their
+  short name (Schema Manager).
 - Word each feature's step for the workflow the
   repository already uses, without asking: with
   `.specify/`, give its Handoff to `/speckit.specify`;
-  with another specification or planning setup, take the
-  Handoff there; with none, name the skill for each
+  with another specification or planning setup the user
+  named, take the Handoff there; with none, name the
+  skill for each
   artifact, in the order of the `Artifacts` cell, using
   the mapping above.
