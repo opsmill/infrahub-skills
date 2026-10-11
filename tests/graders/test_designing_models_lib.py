@@ -595,6 +595,14 @@ WIFI_VARIANT_OPEN = """\
             "still carries a (guess) from the draft", id="near-miss-guess-left-from-draft",
         ),
         pytest.param(
+            brief(
+                sketch_rows=WIFI_ROWS.replace("| answer Q3 |", "| - |"),
+                open_items=WIFI_OPEN,
+                model_map=WIFI_MODEL_MAP,
+            ),
+            "Evidence is '-'", id="near-miss-row-without-evidence",
+        ),
+        pytest.param(
             brief(sketch_rows=WIFI_ROWS.replace("open: O1", "open: O3"), open_items=WIFI_OPEN, model_map=WIFI_MODEL_MAP),
             "references O3", id="near-miss-dangling-reference",
         ),

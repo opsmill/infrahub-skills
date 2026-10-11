@@ -16,7 +16,10 @@ in `## Open items` with who might own the answer.
 `TBD`, `?`, `unknown`, `-`, a bare `open`, a value
 still marked `(guess)` from the draft, and a value you
 made up all fail. A guess either gets confirmed or
-becomes an open item. When the user asks you to "fill in
+becomes an open item. Every row's `Evidence` names
+where its facts came from (a file and column, an answer,
+the reference design), so a row nobody asked for is
+visible. When the user asks you to "fill in
 sensible defaults", a default you chose is a
 recommendation they have not accepted: put it in the
 open item as a proposal, not in the sketch as a fact.
