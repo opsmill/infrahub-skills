@@ -54,7 +54,7 @@ the same, and the review checks neither.
 
 ## Open items
 
-- O1: Who approves new console servers? (owner: unknown)
+- O1: Who approves new console servers? (owner: unknown; affects F1)
 ```
 
 ## Incorrect
