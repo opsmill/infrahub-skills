@@ -216,6 +216,18 @@ It then tells you which features the answer changed.
 
 The brief does not assume a particular framework. Paste each feature's handoff into your existing specification, planning, ticketing or implementation workflow in dependency order, together with the brief it names. The handoff names the brief and the feature ID, and the workflow reads the details from the brief. For a spec-driven flow, use the handoff as the input to its Specify step. See [Spec-Driven Development](../spec-driven-development.mdx).
 
+## What it does not do
+
+The Model Designer stops at the brief. It does not:
+
+- **Write schema YAML, object files or code.** Each artifact goes to the skill named in [From artifact to skill](#from-artifact-to-skill), in the order of the brief's Next steps.
+- **Load anything into Infrahub or run the other skills.** It points to the next step and stops.
+- **Build integrations with other systems.** When another system, such as NetBox, is the source of truth for a node kind, the brief records that system and whether Infrahub reads from it or writes to it. It does not create [infrahub-sync](https://docs.infrahub.app/sync/) adapters or mappings, API integrations or webhooks, and no skill in this plugin does. infrahub-sync is a separate product.
+- **Query a running Infrahub instance.** It reads your repository and the files you give it, plus the Marketplace catalog and the list of OpsMill demos when it has network access.
+- **Download Marketplace schemas or copy a reference design's schema files.** It names the published schemas the design builds on; the [Schema Manager](./managing-schemas.mdx) fetches them with `infrahubctl marketplace get`.
+- **Model every feature in depth at once.** After a split, only F1 has rows in the data model sketch. Run it again on the same brief to add a later feature.
+- **Resume an interview in a new session.** Nothing is saved until the brief is written. If you stop earlier, continue the same Claude Code conversation (`claude --continue`), or start again and give your earlier answers up front.
+
 ## Not sure this is the right skill?
 
 See [Which skill do I use?](../choosing-a-skill.mdx) for how the Model Designer differs from the Schema Manager.
