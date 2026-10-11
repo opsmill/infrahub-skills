@@ -200,7 +200,18 @@ def find_brief(ws: Path) -> tuple[Path | None, str]:
     found = sorted(p for pattern in BRIEF_GLOBS for p in ws.glob(pattern))
     where = " or ".join(BRIEF_GLOBS)
     if not found:
-        return None, f"no brief at {where}"
+        # Name what was written instead, so a failed run shows where it went.
+        elsewhere = sorted(
+            str(p.relative_to(ws)) for p in ws.rglob("*brief*.md")
+            if not str(p.relative_to(ws)).startswith(
+                ("skills/", ".agents/", ".claude/", ".codex/", "docs/docs/", ".git/", "node_modules")
+            )
+        )[:5]
+        answer = ws / ANSWER_PATH
+        hint = f"; found instead: {elsewhere}" if elsewhere else ""
+        if answer.is_file():
+            hint += f"; {ANSWER_PATH} starts: {answer.read_text()[:120]!r}"
+        return None, f"no brief at {where}{hint}"
     if len(found) > 1:
         names = ", ".join(str(p.relative_to(ws)) for p in found)
         return None, f"expected one brief at {where}, found {len(found)}: {names}"
@@ -712,7 +723,11 @@ def check_decision_tags_for(ws: Path, subjects: dict[str, tuple[re.Pattern, str]
         swapped = (tags - {tag, "open"})
         if swapped or tag not in tags:
             found = sorted(swapped) or sorted(tags)
-            return False, f"the decision about {label} is tagged {found[0]!r}; the transcript makes it {tag!r}"
+            texts = "; ".join(_clean(r[dec_col])[:90] for r in matching)
+            return False, (
+                f"the decision about {label} is tagged {found[0]!r}; the transcript makes it {tag!r} "
+                f"(rows: {texts!r})"
+            )
     return True, "each decision carries the provenance the transcript gives it"
 
 
@@ -864,7 +879,9 @@ def check_plan_map_matches(ws: Path) -> tuple[bool, str]:
 def _peer_kinds(cell: str) -> set[str]:
     """Node kinds named in a Peers cell such as 'Rack (many), Site (one)'."""
     kinds = set()
-    for item in re.split(r"[,;]", _clean(cell)):
+    # Split on commas outside parentheses: "AccessPoint (many, where it
+    # broadcasts)" is one peer, not two.
+    for item in _citations(cell):
         match = _KIND.match(item.strip())
         if match and match.group(0).lower() not in PLACEHOLDERS:
             kinds.add(match.group(0))
@@ -1169,7 +1186,8 @@ def check_next_steps_in_order(ws: Path) -> tuple[bool, str]:
             names = ARTIFACT_SKILLS.get(artifact, ())
             if names and not any(n in text for n in names):
                 return False, (
-                    f"Next steps for {fid} neither hand it off nor name the skill for its {artifact} artifact"
+                    f"Next steps for {fid} neither hand it off nor name the skill for its {artifact} "
+                    f"artifact: {steps[first_step[fid]][:160]!r}"
                 )
     s_headers, s_rows, _ = _sketch(parts)
     for row in s_rows:

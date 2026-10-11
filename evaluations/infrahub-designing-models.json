@@ -111,7 +111,7 @@
     },
     {
       "id": 5,
-      "prompt": "We're modelling carrier circuits. Here is how our session went\nyesterday, before my laptop died:\n\n- What identifies a circuit? Me: the carrier's circuit ID.\n- Are providers their own thing? Me: yes, providers are a separate kind.\n- Who sets bandwidth? Me: the requester enters it.\n- You recommended a generic for circuit endpoints so both sites and PoPs\n  can terminate a circuit, because they share an address and a code.\n  Me: yes.\n- You recommended importing contract end dates from carriers.xlsx, which\n  has an end_date column, instead of typing them. Me: yes.\n\nThe transport team owns circuits and providers; the carrier portal is\nthe source of truth for circuit IDs. Write the design brief.",
+      "prompt": "We're modelling carrier circuits. Here is how our session went\nyesterday, before my laptop died:\n\n- What identifies a circuit? Me: the carrier's circuit ID.\n- Me, unprompted: providers are their own kind, we have dozens of them.\n- Who sets bandwidth? Me: the requester enters it.\n- You recommended a generic for circuit endpoints so both sites and PoPs\n  can terminate a circuit, because they share an address and a code.\n  Me: yes.\n- You recommended importing contract end dates from carriers.xlsx, which\n  has an end_date column, instead of typing them. Me: yes.\n\nThe transport team owns circuits and providers; the carrier portal is\nthe source of truth for circuit IDs. Write the design brief.",
       "expected_output": "A design brief whose decision log tags the three answers the user gave as stated and the two accepted recommendations as recommended, each recommended row with its basis.",
       "files": [],
       "expectations": [

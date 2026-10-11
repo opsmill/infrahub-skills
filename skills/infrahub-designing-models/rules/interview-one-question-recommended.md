@@ -23,7 +23,7 @@ and nothing else that asks anything:
    line is the last line of the message.
 
 A short lead-in before the block is fine if it asks
-nothing: the starting point, the current draft sketch
+nothing, so it contains no question mark: the starting point, the current draft sketch
 during the data questions (SKILL.md step 6), or the
 restated brief before the final confirmation question
 (SKILL.md step 7). When the user explicitly asks for
@@ -55,9 +55,12 @@ guess, and every answer after it only adjusts the guess.
 - When the user asks for something the skill does not
   do, such as schema YAML now or copying a demo's schema
   files, say so plainly in the lead-in, with the reason,
-  then send the block. "Just give me the schema" gets:
-  the schema comes after a few answers, because a
-  schema written now would guess them.
+  then send the block. "Just give me the schema" gets a
+  flat statement such as "The schema comes after a few
+  short answers; written now, it would guess how each
+  item is identified and who owns it." List what it
+  would guess as statements, never as questions: the
+  block holds the only question.
 
 ## Correct
 

@@ -47,18 +47,11 @@ skill for each artifact builds it from the brief.
 ## Workflow
 
 1. **Read before asking.** Read `.infrahub.yml`,
-   `schemas/`, and any existing `design-brief.md`. Check
-   the Marketplace (`infrahubctl marketplace search
-   <domain>`) for a published schema to build on, and
-   read the worked examples in
-   [references/reference-designs.md](./references/reference-designs.md),
-   including newer demos it tells you how to find. You
-   choose one in step 5.
-   Discovery that needs the network runs once: one
-   Marketplace search for the domain, one listing of
-   newer demos. A command that fails or does not return
-   promptly is not retried; record it as an open item and
-   go on. Never ask what these already answer. Extending a
+   `schemas/`, any existing `design-brief.md`, and the
+   worked examples in
+   [references/reference-designs.md](./references/reference-designs.md).
+   These are local reads; the network searches wait for
+   step 5. Never ask what these already answer. Extending a
    design means editing its brief, not starting another;
    see "Extending a brief" below.
 2. **Ask for inputs once, first.** Before reading the
@@ -93,6 +86,13 @@ skill for each artifact builds it from the brief.
    [rules/brief-reference-design.md](./rules/brief-reference-design.md)
    to choose the closest worked example from the
    business and service answers and the user's inputs.
+   Now run the network discovery, once each: one
+   Marketplace search for the domain
+   (`infrahubctl marketplace search <domain>`) for a
+   published schema to build on, and one listing of newer
+   demos (references/reference-designs.md). A command that
+   fails or does not return promptly is not retried;
+   record it as an open item and go on.
 6. **Draft the sketch, then question the draft,** for
    F1 only. People correct a draft faster than they
    answer questions about a model they cannot see.
