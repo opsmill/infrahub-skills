@@ -48,8 +48,11 @@ rest on someone's recollection.
   and connections as candidate peers.
 - From a document, take goals, pains, named services and
   the customer's vocabulary.
-- From another tool's schema, propose the node kind
-  mapping and check the Marketplace for a published one.
+- From another tool's schema or export, propose the
+  node kind mapping and check the Marketplace for a
+  published one. For NetBox, name the differences from
+  `../../infrahub-common/netbox-vs-infrahub.md` that
+  change the mapping.
 - Table format and Evidence values:
   [../references/brief-format.md](../references/brief-format.md).
 

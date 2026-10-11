@@ -19,7 +19,8 @@ made up all fail. A guess either gets confirmed or
 becomes an open item. Every row's `Evidence` names
 where its facts came from (a file and column, an answer,
 the reference design), so a row nobody asked for is
-visible. When the user asks you to "fill in
+visible. A user who asks for no open items still gets
+them: the Summary says why they are there. When the user asks you to "fill in
 sensible defaults", a default you chose is a
 recommendation they have not accepted: put it in the
 open item as a proposal, not in the sketch as a fact.

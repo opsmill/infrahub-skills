@@ -22,11 +22,13 @@ and nothing else that asks anything:
    `(strong)`, `(medium)` or `(weak basis)`. The Basis
    line is the last line of the message.
 
-A lead-in before the block is fine if it asks nothing:
-one line early in the interview, the current draft
-sketch during the data questions (SKILL.md step 6), or
-the restated brief before the final confirmation
-question (SKILL.md step 7). No schema YAML, ever, even when the user asks
+A short lead-in before the block is fine if it asks
+nothing: the starting point, the current draft sketch
+during the data questions (SKILL.md step 6), or the
+restated brief before the final confirmation question
+(SKILL.md step 7). When the user explicitly asks for
+every question at once, follow SKILL.md "When the user
+asks for every question at once" instead. No schema YAML, ever, even when the user asks
 for it: the schema is written from the finished brief.
 
 ## Why it matters
@@ -50,9 +52,12 @@ guess, and every answer after it only adjusts the guess.
   default from the question bank. With neither, say
   `(weak basis)` so the user does not accept it out of
   habit.
-- When the user says "just give me the schema", still
-  send the block. Say in the lead-in, without a
-  question, that the schema comes after a few answers.
+- When the user asks for something the skill does not
+  do, such as schema YAML now or copying a demo's schema
+  files, say so plainly in the lead-in, with the reason,
+  then send the block. "Just give me the schema" gets:
+  the schema comes after a few answers, because a
+  schema written now would guess them.
 
 ## Correct
 

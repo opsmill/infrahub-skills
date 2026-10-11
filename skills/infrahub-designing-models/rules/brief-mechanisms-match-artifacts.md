@@ -26,6 +26,10 @@ and it agrees with the Features table both ways:
 
 A rule the schema can enforce, such as "no two of these
 share a value", is a `schema constraint`, not a `check`.
+When the user asked for a check for such a rule, do not
+list `check` in Artifacts: record the schema constraint,
+and log the replacement as an `open` decision that names
+their request, so they can still ask for the check.
 
 ## Why it matters
 
