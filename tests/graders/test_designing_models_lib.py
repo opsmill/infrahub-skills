@@ -1101,11 +1101,6 @@ def test_uniqueness_rule_left_out_fails(tmp_path: Path) -> None:
                                "1. Give F1's Handoff to /speckit.specify."),
             F1_ROWS, "none\n", None, id="compliant-spec-kit-handoff",
         ),
-        pytest.param(
-            NEXT_STEPS.replace("1. Build F1 DC fabric: Schema Manager, then Object Manager.",
-                               "1. Build F1 DC fabric: Schema Manager, then load the rack sheet with infrahub-importing-data."),
-            F1_ROWS, "none\n", None, id="compliant-objects-via-importer",
-        ),
     ],
 )
 def test_next_steps(tmp_path: Path, steps: str | None, rows: str, open_items: str, expected: str | None) -> None:
@@ -1113,6 +1108,31 @@ def test_next_steps(tmp_path: Path, steps: str | None, rows: str, open_items: st
     if steps is None:
         text = text.replace("## Next steps\n\n", "")
     write(tmp_path, BRIEF, text)
+    assert_outcome(run_grader("check_scope_split.py", tmp_path), expected)
+
+
+IMPORTER_STEPS = NEXT_STEPS.replace(
+    "1. Build F1 DC fabric: Schema Manager, then Object Manager.",
+    "1. Build F1 DC fabric: Schema Manager, then load the rack sheet with infrahub-importing-data.",
+)
+
+
+@pytest.mark.parametrize(
+    ("inputs", "expected"),
+    [
+        pytest.param("| File | Taken from it |\n| --- | --- |\n| racks.csv | rack names and sites |\n", None,
+                     id="compliant-importer-for-csv"),
+        pytest.param("| File | Taken from it |\n| --- | --- |\n| `inputs/racks.TSV` | rack names |\n", None,
+                     id="compliant-variant-importer-for-tsv"),
+        pytest.param("none\n", "name the skill for its objects", id="violating-importer-without-files"),
+        pytest.param("| File | Taken from it |\n| --- | --- |\n| racks.xlsx | rack names, as in racks.csv |\n",
+                     "name the skill for its objects", id="near-miss-csv-named-outside-file-column"),
+    ],
+)
+def test_next_steps_importer_needs_tabular_input(tmp_path: Path, inputs: str, expected: str | None) -> None:
+    """The data importer builds objects only from CSV or TSV files listed in Inputs."""
+    write(tmp_path, BRIEF, brief(inputs=inputs, features=FEATURES, sketch_rows=F1_ROWS, plan_map=PLAN_MAP,
+                                 next_steps=IMPORTER_STEPS))
     assert_outcome(run_grader("check_scope_split.py", tmp_path), expected)
 
 
