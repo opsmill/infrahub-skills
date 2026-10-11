@@ -94,7 +94,14 @@ skill for each artifact builds it from the brief.
    of F1's sketch table, and the Features table after a
    split, built from the inputs, the answers so far, and
    the closest reference design. Fill every cell with
-   your best guess and mark each guess `(guess)`. Ground
+   your best guess and mark each guess `(guess)`. A guess
+   comes from the user's files, their answers or the
+   reference design, never from nowhere: do not invent
+   attributes or peers nobody mentioned. Under the draft,
+   show two or three sample objects built from the user's
+   own rows (one VPN with two of its sites, say), so a
+   wrong identity or cardinality shows on real data.
+   Ground
    each guess in the current best-practice rules, which
    grow over time: list the file names in
    `../infrahub-managing-schemas/rules/` and the
@@ -117,8 +124,15 @@ skill for each artifact builds it from the brief.
    item, and you can predict the answers to your next
    three questions. At about 25 questions, turn the
    remaining guesses into open items.
-7. **Restate and confirm,** only when the user can
-   reply (otherwise see "When the user cannot reply").
+7. **Walk one scenario through the model, then restate
+   and confirm.** Take one lifecycle event from the
+   service layer (an order, a change, a decommission) and
+   say which nodes it creates, changes or removes. A gap
+   it shows, such as a missing peer or an unclear delete,
+   becomes the next question, or an open item when the
+   user cannot reply. Restate and confirm only when the
+   user can reply (otherwise see "When the user cannot
+   reply").
    First ask again about each accepted recommendation
    whose basis was weak, one question block per
    message, in the layout from the one-question rule.

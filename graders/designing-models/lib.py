@@ -566,7 +566,10 @@ _REQUIRED_SKETCH_COLUMNS = ("identified by", "source of truth", "owner")
 
 
 def check_sketch_rows_complete(ws: Path) -> tuple[bool, str]:
-    """Identity, source of truth and owner are answered or reference an open item."""
+    """Identity, source of truth and owner are answered or reference an open item.
+
+    Every row also names its evidence, so a node kind nobody asked for shows.
+    """
     parts, err = _brief_sections(ws)
     if parts is None:
         return False, err
@@ -581,8 +584,14 @@ def check_sketch_rows_complete(ws: Path) -> tuple[bool, str]:
         columns[name] = col
     open_ids = _open_item_ids(parts)
     kind_col = _column(headers, "node kind") or ""
+    ev_col = _column(headers, "evidence")
+    if ev_col is None:
+        return False, "sketch table has no 'evidence' column"
     for row in rows:
         kind = _clean(row.get(kind_col, "")) or "?"
+        evidence = _clean(row.get(ev_col, ""))
+        if evidence.lower().rstrip(".") in PLACEHOLDERS:
+            return False, f"{kind}: Evidence is {evidence!r}; name the file, answer or reference design it came from"
         for header, cell in row.items():
             if _GUESS.search(_clean(cell)):
                 return False, f"{kind}: {header} still carries a (guess) from the draft; confirm it or make it an open item"
