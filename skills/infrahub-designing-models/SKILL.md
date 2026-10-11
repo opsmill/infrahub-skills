@@ -95,7 +95,12 @@ skill for each artifact builds it from the brief.
    then read only the rules that govern a decision in
    front of you, and name the rule as the question's
    basis. The links in the question bank are starting
-   points, not the full set. People correct a draft faster than they
+   points, not the full set. When the design needs a
+   generator, a check or a transform, do the same with
+   that skill's rules (`../infrahub-managing-generators/`,
+   `../infrahub-managing-checks/`,
+   `../infrahub-managing-transforms/`) and ask what it
+   needs: what drives it, what it produces, when it runs. People correct a draft faster than they
    answer questions about a model they cannot see. Then
    ask about the guesses that change the design most,
    one question block per message with the draft as its
@@ -120,18 +125,16 @@ skill for each artifact builds it from the brief.
    [rules/brief-sketch-rows-complete.md](./rules/brief-sketch-rows-complete.md);
    before writing the decision log, read
    [rules/brief-decision-provenance.md](./rules/brief-decision-provenance.md).
-   Last, draw the plan map and the model map from the
+   Before writing Mechanisms, read
+   [rules/brief-mechanisms-match-artifacts.md](./rules/brief-mechanisms-match-artifacts.md).
+   Then draw the plan map and the model map from the
    finished tables; read
    [rules/brief-maps-match-tables.md](./rules/brief-maps-match-tables.md)
-   first.
-9. **Name the next step and stop.** Hand F1 to the
-   user's existing specification, planning or
-   implementation workflow. If none is established,
-   recommend the skill for each of F1's artifacts, in
-   the order its `Artifacts` cell lists them (schema
-   first), using the mapping in
-   [references/brief-format.md](./references/brief-format.md).
-   Do not invoke them.
+   first. Last, write Next steps:
+   [rules/brief-next-steps.md](./rules/brief-next-steps.md).
+9. **Point to the Next steps and stop.** They hand F1
+   to the user's existing workflow, or name the skill for
+   each of its artifacts. Do not invoke them.
 
 ### When the user cannot reply
 
@@ -151,7 +154,7 @@ answers at all, write only the next question block.
 | -------- | -------- | ------ | ----------- |
 | CRITICAL | Interview | `interview-` | One question per message with a recommended answer; every input used as evidence |
 | HIGH | Scope | `scope-` | Split a too-big scope into ordered features before the data questions; sketch F1 only |
-| HIGH | Brief | `brief-` | Complete sketch rows or open items; every decision tagged with its provenance; plan and model maps that match their tables; the closest reference design named |
+| HIGH | Brief | `brief-` | Complete sketch rows or open items; every decision tagged with its provenance; plan and model maps that match their tables; the closest reference design named; mechanisms that match the artifacts; next steps in order |
 
 Full scope per prefix is in `rules/_sections.md`.
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import shlex
 import subprocess
 import sys
@@ -78,6 +79,8 @@ def brief(
     plan_map: str = "",
     model_map: str = "",
     reference: str | None = None,
+    mechanisms: str = "No generator: nothing creates objects.\n",
+    next_steps: str | None = None,
 ) -> str:
     parts = [
         "# Design brief: test\n",
@@ -90,10 +93,16 @@ def brief(
     if features is not None:
         parts.append(f"## Features\n\n{features}\n{plan_map}")
     parts.append(f"## Data model sketch\n\n{SKETCH_HEADER}{sketch_rows}\n{model_map}")
-    parts.append("## Mechanisms\n\nNo generator: nothing creates objects.\n")
+    parts.append(f"## Mechanisms\n\n{mechanisms}")
     if decisions is not None:
         parts.append(f"## Decision log\n\n{decisions}")
     parts.append(f"## Open items\n\n{open_items}")
+    if features is not None:
+        if next_steps is None:
+            # One step per feature, in table order, unless a test sets its own.
+            ids = re.findall(r"^\|[^|]*?`?(F\d+)`?\s*\|", features, flags=re.M) or re.findall(r"`(F\d+)`", features)
+            next_steps = "".join(f"{i}. Build {fid}.\n" for i, fid in enumerate(dict.fromkeys(ids), 1))
+        parts.append(f"## Next steps\n\n{next_steps}")
     return "\n".join(parts)
 
 
@@ -391,6 +400,13 @@ flowchart TD
 ```
 """
 
+NEXT_STEPS = """\
+1. Build F1 DC fabric: Schema Manager, then Object Manager.
+2. Build F2 IPAM with the Schema Manager.
+3. Build F3 Firewall policy: Schema Manager, Check Manager, Transform Manager.
+4. Build F4 Customer peering: Schema Manager, then Generator Manager.
+"""
+
 F1_ROWS = """\
 | F1 | LocationSite | site_code | name (stated) | Rack (many) | Infrahub | DC team | answer Q4 |
 | F1 | DcimDevice | hostname | role (stated) | Interface (many) | Infrahub | DC team | answer Q6 |
@@ -411,7 +427,7 @@ ALL_ROWS = F1_ROWS + """\
     ("text", "expected"),
     [
         pytest.param(brief(features=FEATURES, sketch_rows=F1_ROWS, plan_map=PLAN_MAP), None, id="compliant"),
-        pytest.param(brief(features=FEATURES_VARIANT, sketch_rows=F1_VARIANT_ROWS, plan_map=PLAN_MAP_VARIANT), None, id="compliant-variant"),
+        pytest.param(brief(features=FEATURES_VARIANT, sketch_rows=F1_VARIANT_ROWS, plan_map=PLAN_MAP_VARIANT, next_steps=NEXT_STEPS), None, id="compliant-variant"),
         pytest.param(
             brief(
                 features=FEATURES.replace("| schema | F1 |", "| schema, objects, menu | F1 |"),
@@ -903,3 +919,115 @@ def test_relative_markdown_links_resolve(doc: str) -> None:
         if not link.startswith("http") and not (path.parent / link).resolve().is_file()
     ]
     assert not broken, f"{doc}: broken links {broken}"
+
+
+# --------------------------------------------------------------------------
+# brief-mechanisms-match-artifacts and the uniqueness trap
+# --------------------------------------------------------------------------
+
+BRANCH_FEATURES = """\
+| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| F1 | Branch service | A new branch gets its router, WAN prefix and VLAN without typing | LocationBranch, AccessRouter, Vlan | schema, objects, generator, transform | - | planned | Build the branch service, as designed in F1 of docs/designs/branch-service/design-brief.md. |
+"""
+
+BRANCH_ROWS = """\
+| F1 | LocationBranch | branch code | name (stated) | AccessRouter (one) | Infrahub | Network team | answer Q2 |
+| F1 | AccessRouter | hostname | model (stated) | LocationBranch (one) | Infrahub | Network team | answer Q3 |
+| F1 | Vlan | vlan_id | vlan_id (pool) | LocationBranch (one) | Infrahub | Network team | answer Q4 |
+"""
+
+MECH_HEADER = "| Feature | Behavior | Mechanism | Driven by | Produces | Runs when | Why |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+
+BRANCH_MECH = MECH_HEADER + """\
+| F1 | A new branch gets its access router, /29 and VLAN | generator | LocationBranch | AccessRouter, WAN prefix, VLAN | a branch is added | creates other nodes from a design |
+| F1 | No two branches share a VLAN | schema constraint | Vlan | uniqueness on vlan_id | every change | the schema enforces it without code |
+| F1 | Each router's configuration for the pipeline | transform | AccessRouter | one rendered configuration per router | the router changes | the deployment pipeline consumes it |
+| F1 | WAN /29 per branch | resource pool | LocationBranch | a /29 prefix | a branch is added | no hand allocation |
+"""
+
+BRANCH_MECH_VARIANT = MECH_HEADER + """\
+| F1 | Rendered router configuration | Transform | `AccessRouter` objects | one configuration per router | on change | pipeline input |
+| `F1` | VLANs must never be shared between branches | Schema constraint | Vlan | uniqueness constraint | always | schema-level |
+| F1 | Branch build-out | Generator | each `LocationBranch` | AccessRouter and its addressing | branch added | creates nodes |
+"""
+
+
+def branch_brief(mechanisms: str = BRANCH_MECH) -> str:
+    return brief(features=BRANCH_FEATURES, sketch_rows=BRANCH_ROWS, mechanisms=mechanisms)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        pytest.param(branch_brief(), None, id="compliant"),
+        pytest.param(branch_brief(BRANCH_MECH_VARIANT), None, id="compliant-variant"),
+        pytest.param(branch_brief("No generator.\n"), "Mechanisms table lacks columns", id="violating-prose-only"),
+        pytest.param(
+            branch_brief("".join(row + "\n" for row in BRANCH_MECH.splitlines() if "| generator |" not in row)),
+            "lists generator in its Artifacts but has no generator row", id="near-miss-generator-row-missing",
+        ),
+        pytest.param(
+            branch_brief(BRANCH_MECH.replace("| schema constraint | Vlan |", "| check | Vlan |")),
+            "the schema enforces uniqueness", id="near-miss-uniqueness-as-check",
+        ),
+        pytest.param(
+            branch_brief(BRANCH_MECH.replace("| generator | LocationBranch |", "| generator | the network team |")),
+            "not driven by a node kind from the sketch", id="near-miss-generator-not-driven-by-sketch-kind",
+        ),
+        pytest.param(
+            branch_brief(BRANCH_MECH.replace("| transform | AccessRouter |", "| script | AccessRouter |")),
+            "not one of", id="near-miss-unknown-mechanism",
+        ),
+        pytest.param(
+            branch_brief(BRANCH_MECH.replace("| a branch is added | creates other nodes", "| TBD | creates other nodes")),
+            "has no 'runs when'", id="near-miss-generator-runs-when-tbd",
+        ),
+    ],
+)
+def test_mechanisms(tmp_path: Path, text: str, expected: str | None) -> None:
+    write(tmp_path, BRIEF, text)
+    assert_outcome(run_grader("check_mechanisms.py", tmp_path), expected)
+
+
+def test_uniqueness_rule_left_out_fails(tmp_path: Path) -> None:
+    """Leaving the asked-for rule out of Mechanisms does not pass."""
+    mech = "".join(row + "\n" for row in BRANCH_MECH.splitlines() if "share a VLAN" not in row)
+    write(tmp_path, BRIEF, branch_brief(mech))
+    assert_outcome(run_grader("check_mechanisms.py", tmp_path), "no Mechanisms row covers the uniqueness rule")
+
+
+# --------------------------------------------------------------------------
+# brief-next-steps
+# --------------------------------------------------------------------------
+
+
+
+@pytest.mark.parametrize(
+    ("steps", "rows", "open_items", "expected"),
+    [
+        pytest.param(NEXT_STEPS, F1_ROWS, "none\n", None, id="compliant"),
+        pytest.param(
+            "Do these in order.\n\n1) Settle **O1** with the DC team.\n2) `F1` DC fabric first.\n3) F2 IPAM.\n4) F4 peering and F3 firewall.\n",
+            F1_ROWS.replace("| DC team | answer Q4 |", "| open: O1 | answer Q4 |"),
+            "- O1: Who owns sites? (owner: DC team)\n", None, id="compliant-variant",
+        ),
+        pytest.param(None, F1_ROWS, "none\n", "no '## Next steps' section", id="violating-no-section"),
+        pytest.param(
+            "1. Build F1 DC fabric.\n2. Build F4 Customer peering.\n3. Build F2 IPAM.\n4. Build F3 Firewall policy.\n",
+            F1_ROWS, "none\n", "take up F4 before F2", id="near-miss-dependency-order",
+        ),
+        pytest.param(
+            NEXT_STEPS + "5. Settle O1 with the DC team.\n",
+            F1_ROWS.replace("| DC team | answer Q4 |", "| open: O1 | answer Q4 |"),
+            "- O1: Who owns sites? (owner: DC team)\n",
+            "do not settle it before F1", id="near-miss-open-item-after-f1",
+        ),
+    ],
+)
+def test_next_steps(tmp_path: Path, steps: str | None, rows: str, open_items: str, expected: str | None) -> None:
+    text = brief(features=FEATURES, sketch_rows=rows, plan_map=PLAN_MAP, open_items=open_items, next_steps=steps or "")
+    if steps is None:
+        text = text.replace("## Next steps\n\n", "")
+    write(tmp_path, BRIEF, text)
+    assert_outcome(run_grader("check_scope_split.py", tmp_path), expected)

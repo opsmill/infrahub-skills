@@ -992,6 +992,161 @@ def check_reference_design(ws: Path, names: set[str] | None = None) -> tuple[boo
 
 
 # --------------------------------------------------------------------------
+# Rules: brief-mechanisms-match-artifacts, brief-next-steps  (artifact: the brief)
+# --------------------------------------------------------------------------
+
+MECHANISMS_HEADING = "mechanisms"
+NEXT_STEPS_HEADING = "next steps"
+# The Mechanism column's values, from the skill's brief format.
+MECHANISM_TYPES = {"generator", "check", "transform", "computed attribute", "resource pool", "schema constraint"}
+# Artifacts that need a Mechanisms row saying what drives them and what they produce.
+MECHANISM_ARTIFACTS = {"generator", "check", "transform"}
+_STEP = re.compile(r"^\s*(\d+)[.)]\s+(.*\S)\s*$")
+
+
+def _features(parts: dict[str, str]) -> tuple[dict[str, set[str]], dict[str, set[str]], list[str], str]:
+    """Feature ID -> artifacts, feature ID -> dependency IDs, IDs in table order."""
+    headers, rows = first_table(parts.get(FEATURES_HEADING, ""))
+    id_col, art_col, dep_col = _column(headers, "id"), _column(headers, "artifacts"), _column(headers, "depends on")
+    if not rows or None in (id_col, art_col, dep_col):
+        return {}, {}, [], "Features table has no 'ID', 'Artifacts' and 'Depends on' columns"
+    arts, deps, order = {}, {}, []
+    for row in rows:
+        ids = _FEATURE_ID.findall(_clean(row[id_col]))
+        if not ids:
+            continue
+        fid = f"F{ids[0]}"
+        order.append(fid)
+        arts[fid] = {a.strip() for a in re.split(r"[,;]|\band\b|->|→", _clean(row[art_col]).lower()) if a.strip()}
+        deps[fid] = {f"F{d}" for d in _FEATURE_ID.findall(_clean(row[dep_col]))}
+    return arts, deps, order, ""
+
+
+def check_mechanisms_match_artifacts(ws: Path) -> tuple[bool, str]:
+    """Every generator, check or transform a feature lists has a Mechanisms row, and back.
+
+    F1's rows must say what drives them, what they produce and when they run,
+    and a generator in F1 must be driven by a node kind from the sketch.
+    """
+    parts, err = _brief_sections(ws)
+    if parts is None:
+        return False, err
+    arts, _, _, err = _features(parts)
+    if err:
+        return False, err
+    if MECHANISMS_HEADING not in parts:
+        return False, "brief has no '## Mechanisms' section"
+    headers, rows = first_table(parts[MECHANISMS_HEADING])
+    cols = {n: _column(headers, n) for n in ("feature", "behavior", "mechanism", "driven by", "produces", "runs when")}
+    missing = [n for n, c in cols.items() if c is None]
+    if missing:
+        return False, f"Mechanisms table lacks columns {missing}"
+    open_ids = _open_item_ids(parts)
+    s_headers, s_rows, _ = _sketch(parts)
+    kind_col = _column(s_headers, "node kind")
+    sketch_kinds = {_clean(r[kind_col]).lower() for r in s_rows} if kind_col else set()
+
+    seen: set[tuple[str, str]] = set()
+    for row in rows:
+        ids = _FEATURE_ID.findall(_clean(row[cols["feature"]]))
+        mech = _clean(row[cols["mechanism"]]).lower()
+        behavior = _clean(row[cols["behavior"]]) or "?"
+        if len(ids) != 1:
+            return False, f"Mechanisms row '{behavior}' names {len(ids)} features, expected one"
+        fid = f"F{ids[0]}"
+        if mech not in MECHANISM_TYPES:
+            return False, f"Mechanisms row '{behavior}' has mechanism {mech!r}, not one of {sorted(MECHANISM_TYPES)}"
+        if fid not in arts:
+            return False, f"Mechanisms row '{behavior}' belongs to {fid}, which is not in the Features table"
+        if mech in MECHANISM_ARTIFACTS and mech not in arts[fid]:
+            return False, f"Mechanisms row '{behavior}' is a {mech} in {fid}, but {fid}'s Artifacts do not list {mech}"
+        seen.add((fid, mech))
+        if fid == "F1":
+            for name in ("driven by", "produces", "runs when"):
+                value = _clean(row[cols[name]])
+                ref = _OPEN_REF.search(value)
+                if ref and ref.group(1).upper() in open_ids:
+                    continue
+                if value.lower().rstrip(".") in PLACEHOLDERS:
+                    return False, f"F1 mechanism '{behavior}' has no '{name}': {value!r}"
+            if mech == "generator":
+                words = set(re.findall(r"[a-z0-9_]+", _clean(row[cols["driven by"]]).lower()))
+                if not words & sketch_kinds:
+                    return False, f"F1 generator '{behavior}' is not driven by a node kind from the sketch"
+    for fid, listed in arts.items():
+        for mech in sorted(listed & MECHANISM_ARTIFACTS):
+            if (fid, mech) not in seen:
+                return False, f"{fid} lists {mech} in its Artifacts but has no {mech} row in Mechanisms"
+    return True, "every generator, check and transform matches a Mechanisms row"
+
+
+def check_uniqueness_is_schema_constraint(ws: Path, subject: re.Pattern) -> tuple[bool, str]:
+    """The uniqueness rule the task asks for is a schema constraint, not a check.
+
+    ``subject`` matches the Behavior of the row about that rule; at least one
+    row must match, so leaving the rule out does not pass.
+    """
+    parts, err = _brief_sections(ws)
+    if parts is None:
+        return False, err
+    headers, rows = first_table(parts.get(MECHANISMS_HEADING, ""))
+    beh_col, mech_col = _column(headers, "behavior"), _column(headers, "mechanism")
+    if not rows or beh_col is None or mech_col is None:
+        return False, "Mechanisms table has no 'Behavior' and 'Mechanism' columns"
+    matching = [r for r in rows if subject.search(_clean(r[beh_col]))]
+    if not matching:
+        return False, "no Mechanisms row covers the uniqueness rule the task asks for"
+    for row in matching:
+        mech = _clean(row[mech_col]).lower()
+        if mech != "schema constraint":
+            return False, f"'{_clean(row[beh_col])}' is a {mech}; the schema enforces uniqueness, so it is a schema constraint"
+    return True, "the uniqueness rule is a schema constraint"
+
+
+def check_next_steps_in_order(ws: Path) -> tuple[bool, str]:
+    """Next steps take each feature once, after the features it depends on.
+
+    Open items that F1's sketch refers to are settled in a step before F1.
+    """
+    parts, err = _brief_sections(ws)
+    if parts is None:
+        return False, err
+    if NEXT_STEPS_HEADING not in parts:
+        return False, "brief has no '## Next steps' section"
+    _, deps, order, err = _features(parts)
+    if err:
+        return False, err
+    steps = []
+    for line in _lines_outside_fences(parts[NEXT_STEPS_HEADING]):
+        match = _STEP.match(line)
+        if match:
+            steps.append(_clean(match.group(2)))
+    if not steps:
+        return False, "Next steps has no numbered steps"
+    first_step: dict[str, int] = {}
+    open_step: dict[str, int] = {}
+    for index, text in enumerate(steps):
+        for n in _FEATURE_ID.findall(text):
+            first_step.setdefault(f"F{n}", index)
+        for o in re.findall(r"\bO(\d+)\b", text):
+            open_step.setdefault(f"O{o}", index)
+    for fid in order:
+        if fid not in first_step:
+            return False, f"Next steps never take up {fid}"
+        for dep in deps.get(fid, set()):
+            if dep in first_step and first_step[dep] > first_step[fid]:
+                return False, f"Next steps take up {fid} before {dep}, which it depends on"
+    s_headers, s_rows, _ = _sketch(parts)
+    for row in s_rows:
+        for cell in row.values():
+            for ref in _OPEN_REF.findall(_clean(cell)):
+                ref = ref.upper()
+                if ref not in open_step or open_step[ref] > first_step.get("F1", 0):
+                    return False, f"F1's sketch waits on {ref}, but Next steps do not settle it before F1"
+    return True, "Next steps take the features in dependency order, open items first"
+
+
+# --------------------------------------------------------------------------
 # Registry
 # --------------------------------------------------------------------------
 
@@ -1000,6 +1155,8 @@ CHECKS: dict[str, Callable[[Path], tuple[bool, str]]] = {
     "scope-split-f1-only": check_scope_split_f1_only,
     "features-artifacts": check_features_artifacts,
     "reference-design": check_reference_design,
+    "mechanisms-match-artifacts": check_mechanisms_match_artifacts,
+    "next-steps-in-order": check_next_steps_in_order,
     "plan-map-matches": check_plan_map_matches,
     "model-map-matches": check_model_map_matches,
     "sketch-rows-complete": check_sketch_rows_complete,
