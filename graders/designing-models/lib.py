@@ -1018,7 +1018,7 @@ MECHANISM_ARTIFACTS = {"generator", "check", "transform"}
 # How a Next step may name the skill that builds each artifact.
 ARTIFACT_SKILLS = {
     "schema": ("schema manager", "infrahub-managing-schemas"),
-    "objects": ("object manager", "infrahub-managing-objects"),
+    "objects": ("object manager", "infrahub-managing-objects", "data importer", "infrahub-importing-data"),
     "generator": ("generator manager", "infrahub-managing-generators"),
     "check": ("check manager", "infrahub-managing-checks"),
     "transform": ("transform manager", "infrahub-managing-transforms"),
@@ -1182,6 +1182,65 @@ def check_next_steps_in_order(ws: Path) -> tuple[bool, str]:
 
 
 # --------------------------------------------------------------------------
+# Rule: brief-open-items-name-features  (artifact: the brief)
+# --------------------------------------------------------------------------
+
+_OPEN_ITEM_FULL = re.compile(r"^\s*(?:[-*]|\d+[.)])?\s*\**\s*(O\d+)\s*\**\s*:(.*)$", re.IGNORECASE)
+_AFFECTS = re.compile(r"affects\s*:?\s*((?:`?F\d+`?(?:\s*(?:,|and|&)\s*)?)+)", re.IGNORECASE)
+
+
+def _open_item_features(parts: dict[str, str]) -> dict[str, set[str]]:
+    """Open item ID -> the feature IDs its 'affects' list names."""
+    items: dict[str, set[str]] = {}
+    for line in _lines_outside_fences(parts.get(OPEN_ITEMS_HEADING, "")):
+        match = _OPEN_ITEM_FULL.match(line)
+        if not match:
+            continue
+        affects = _AFFECTS.search(_clean(match.group(2)))
+        ids = {f"F{n}" for n in _FEATURE_ID.findall(affects.group(1))} if affects else set()
+        items[match.group(1).upper()] = ids
+    return items
+
+
+def check_open_items_name_features(ws: Path) -> tuple[bool, str]:
+    """Each open item says which features its answer changes.
+
+    Every item names at least one feature from the Features table, and every
+    ``open: O<n>`` cell in the sketch or in Mechanisms belongs to a feature
+    that item names, so a later answer shows which features it touches.
+    """
+    parts, err = _brief_sections(ws)
+    if parts is None:
+        return False, err
+    arts, _, order, err = _features(parts)
+    if err:
+        return False, err
+    items = _open_item_features(parts)
+    for oid, ids in sorted(items.items()):
+        if not ids:
+            return False, f"{oid} names no feature it affects ('affects F<n>')"
+        unknown = sorted(ids - set(order))
+        if unknown:
+            return False, f"{oid} affects {unknown}, which are not in the Features table"
+
+    def refs(heading: str, feature_col_name: str) -> list[tuple[str, str]]:
+        headers, rows = first_table(parts.get(heading, ""))
+        col = _column(headers, feature_col_name)
+        found = []
+        for row in rows:
+            fids = _FEATURE_ID.findall(_clean(row.get(col, ""))) if col else []
+            for cell in row.values():
+                for ref in _OPEN_REF.findall(_clean(cell)):
+                    found.append((ref.upper(), f"F{fids[0]}" if fids else "F1"))
+        return found
+
+    for oid, fid in refs(SKETCH_HEADING, "feature") + refs(MECHANISMS_HEADING, "feature"):
+        if oid in items and fid not in items[oid]:
+            return False, f"{fid} waits on {oid}, but {oid} does not list {fid} among the features it affects"
+    return True, "every open item names the features its answer changes"
+
+
+# --------------------------------------------------------------------------
 # Registry
 # --------------------------------------------------------------------------
 
@@ -1192,6 +1251,7 @@ CHECKS: dict[str, Callable[[Path], tuple[bool, str]]] = {
     "reference-design": check_reference_design,
     "mechanisms-match-artifacts": check_mechanisms_match_artifacts,
     "next-steps-in-order": check_next_steps_in_order,
+    "open-items-name-features": check_open_items_name_features,
     "plan-map-matches": check_plan_map_matches,
     "model-map-matches": check_model_map_matches,
     "sketch-rows-complete": check_sketch_rows_complete,

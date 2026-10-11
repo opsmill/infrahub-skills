@@ -53,7 +53,7 @@ visible until someone answers it.
 ```markdown
 ## Open items
 
-- O1: Who owns the channel plan? (owner: unknown, optical or planning team). Proposed: optical team.
+- O1: Who owns the channel plan? (owner: unknown, optical or planning team; affects F1). Proposed: optical team.
 ```
 
 ## Incorrect

@@ -170,7 +170,9 @@ skill for each artifact builds it from the brief.
    Then draw the plan map and the model map from the
    finished tables; read
    [rules/brief-maps-match-tables.md](./rules/brief-maps-match-tables.md)
-   first. Last, write Next steps:
+   first. Name in each open item the features it
+   affects: [rules/brief-open-items-name-features.md](./rules/brief-open-items-name-features.md).
+   Last, write Next steps:
    [rules/brief-next-steps.md](./rules/brief-next-steps.md).
 9. **Point to the Next steps and stop.** They hand F1
    to the user's existing workflow, or name the skill for
@@ -222,13 +224,36 @@ uncorrected becomes an open item, as above.
 - Update Summary, Business and Service with what the
   user said, and redraw the maps and Next steps.
 
+### Coming back with an answer
+
+A user returns with an answer to an open item ("O2 is
+settled: the NOC owns cabling"). Read the brief, then:
+
+1. Record the answer as a `stated` decision, put it in
+   every cell that said `open: O2`, and remove O2 from
+   Open items and Next steps.
+2. Take the features O2 `affects`. For a `planned`
+   feature, update its rows and Handoff.
+3. For a `specified` or `built` feature, do not rewrite
+   it silently. Add a dated line to its Handoff saying
+   what changed, and a Next step that sends the change
+   on: re-specify it in the user's workflow, or, for a
+   loaded schema, change it with
+   `infrahub-managing-schemas`, which handles the
+   migration.
+4. If the answer adds node kinds or a new domain, run
+   the scope check of step 5 again; a new feature takes
+   the next ID, and no ID changes.
+5. Redraw the maps, and tell the user which features
+   the answer changed.
+
 ## Rule Categories
 
 | Priority | Category | Prefix | Description |
 | -------- | -------- | ------ | ----------- |
 | CRITICAL | Interview | `interview-` | One question per message with a recommended answer; every input used as evidence |
 | HIGH | Scope | `scope-` | Split a too-big scope into ordered features before the data questions; sketch F1 only |
-| HIGH | Brief | `brief-` | Complete sketch rows or open items; every decision tagged with its provenance; plan and model maps that match their tables; the closest reference design named; mechanisms that match the artifacts; next steps in order |
+| HIGH | Brief | `brief-` | Complete sketch rows or open items; every decision tagged with its provenance; plan and model maps that match their tables; the closest reference design named; mechanisms that match the artifacts; open items that name the features they affect; next steps in order |
 
 Full scope per prefix is in `rules/_sections.md`.
 

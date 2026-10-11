@@ -8824,6 +8824,9 @@ tasks:
 
   - name: design-inputs-digested
     trials: 3
+    # Writes a full design brief (maps, mechanisms, next steps); 300s is too
+    # close to the typical run under parallel load.
+    timeout: 480
     instruction: |
       Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
 
@@ -8932,6 +8935,9 @@ tasks:
 
   - name: design-sketch-rows-complete
     trials: 3
+    # Writes a full design brief (maps, mechanisms, next steps); 300s is too
+    # close to the typical run under parallel load.
+    timeout: 480
     instruction: |
       Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
 
@@ -8969,11 +8975,16 @@ tasks:
         check: The SSID row's owner references a real open item instead of an invented value
       - name: model-map-matches
         check: The sketch mermaid map has one node per node kind and one line per peer in the Peers column
+      - name: open-items-name-features
+        check: Every open item names the features it affects, including each feature whose cells wait on it
       - name: decision-provenance
         check: Every decision is tagged stated, recommended or open; open decisions name an open item
 
   - name: design-decision-provenance
     trials: 3
+    # Writes a full design brief (maps, mechanisms, next steps); 300s is too
+    # close to the typical run under parallel load.
+    timeout: 480
     instruction: |
       Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
 
@@ -9012,6 +9023,9 @@ tasks:
 
   - name: design-mechanisms
     trials: 3
+    # Writes a full design brief (maps, mechanisms, next steps); 300s is too
+    # close to the typical run under parallel load.
+    timeout: 480
     instruction: |
       Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
 

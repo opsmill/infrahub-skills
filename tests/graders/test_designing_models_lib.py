@@ -561,7 +561,13 @@ flowchart TB
 ```
 """
 
-WIFI_OPEN = "- O1: Who owns SSID definitions? (owner: unknown)\n"
+WIFI_OPEN = "- O1: Who owns SSID definitions? (owner: unknown; affects F1)\n"
+
+WIFI_FEATURES = """\
+| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| F1 | Campus wireless | Guests stay off staff VLANs | WirelessAccessPoint, WirelessController, WirelessSsid | schema | - | planned | Build campus wireless, as designed in F1 of docs/designs/test/design-brief.md. |
+"""
 
 WIFI_VARIANT_ROWS = """\
 | F1 | WirelessController | hostname | version (imported) | WirelessAccessPoint (many) | open: O1 | Campus network | answer Q2 |
@@ -569,22 +575,23 @@ WIFI_VARIANT_ROWS = """\
 """
 
 WIFI_VARIANT_OPEN = """\
-1. **O1**: Is the controller or Infrahub authoritative for firmware versions? (owner: campus team)
-2. **O2**: Who owns SSID definitions? (owner: unknown)
+1. **O1**: Is the controller or Infrahub authoritative for firmware versions? (owner: campus team; affects `F1`)
+2. **O2**: Who owns SSID definitions? (owner: unknown) Affects: F1.
 """
 
 
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        pytest.param(brief(sketch_rows=WIFI_ROWS, open_items=WIFI_OPEN, model_map=WIFI_MODEL_MAP), None, id="compliant"),
-        pytest.param(brief(sketch_rows=WIFI_VARIANT_ROWS, open_items=WIFI_VARIANT_OPEN, model_map=WIFI_VARIANT_MODEL_MAP), None, id="compliant-variant"),
+        pytest.param(brief(features=WIFI_FEATURES, sketch_rows=WIFI_ROWS, open_items=WIFI_OPEN, model_map=WIFI_MODEL_MAP), None, id="compliant"),
+        pytest.param(brief(features=WIFI_FEATURES, sketch_rows=WIFI_VARIANT_ROWS, open_items=WIFI_VARIANT_OPEN, model_map=WIFI_VARIANT_MODEL_MAP), None, id="compliant-variant"),
         pytest.param(
-            brief(sketch_rows=WIFI_ROWS.replace("open: O1", "NetOps"), open_items="none\n", model_map=WIFI_MODEL_MAP),
+            brief(features=WIFI_FEATURES, sketch_rows=WIFI_ROWS.replace("open: O1", "NetOps"), open_items="none\n", model_map=WIFI_MODEL_MAP),
             "must reference an open item", id="violating-invented-owner",
         ),
         pytest.param(
             brief(
+                features=WIFI_FEATURES,
                 sketch_rows=WIFI_ROWS.replace("open: O1", "Security").replace(
                     "| Controller export |", "| open: O1 |"
                 ),
@@ -594,11 +601,12 @@ WIFI_VARIANT_OPEN = """\
             "must reference an open item", id="near-miss-open-item-on-wrong-row",
         ),
         pytest.param(
-            brief(sketch_rows=WIFI_ROWS.replace("open: O1", "TBD"), open_items=WIFI_OPEN, model_map=WIFI_MODEL_MAP),
+            brief(features=WIFI_FEATURES, sketch_rows=WIFI_ROWS.replace("open: O1", "TBD"), open_items=WIFI_OPEN, model_map=WIFI_MODEL_MAP),
             "owner is 'TBD'", id="near-miss-tbd",
         ),
         pytest.param(
             brief(
+                features=WIFI_FEATURES,
                 sketch_rows=WIFI_ROWS.replace("| serial number |", "| serial number (guess) |"),
                 open_items=WIFI_OPEN,
                 model_map=WIFI_MODEL_MAP,
@@ -607,6 +615,7 @@ WIFI_VARIANT_OPEN = """\
         ),
         pytest.param(
             brief(
+                features=WIFI_FEATURES,
                 sketch_rows=WIFI_ROWS.replace("| answer Q3 |", "| - |"),
                 open_items=WIFI_OPEN,
                 model_map=WIFI_MODEL_MAP,
@@ -614,7 +623,7 @@ WIFI_VARIANT_OPEN = """\
             "Evidence is '-'", id="near-miss-row-without-evidence",
         ),
         pytest.param(
-            brief(sketch_rows=WIFI_ROWS.replace("open: O1", "open: O3"), open_items=WIFI_OPEN, model_map=WIFI_MODEL_MAP),
+            brief(features=WIFI_FEATURES, sketch_rows=WIFI_ROWS.replace("open: O1", "open: O3"), open_items=WIFI_OPEN, model_map=WIFI_MODEL_MAP),
             "references O3", id="near-miss-dangling-reference",
         ),
     ],
@@ -840,7 +849,7 @@ def test_plan_map(tmp_path: Path, plan_map: str, expected: str | None) -> None:
 )
 def test_model_map(tmp_path: Path, rows: str, model_map: str, expected: str | None) -> None:
     open_items = WIFI_VARIANT_OPEN if rows is WIFI_VARIANT_ROWS else WIFI_OPEN
-    write(tmp_path, BRIEF, brief(sketch_rows=rows, open_items=open_items, model_map=model_map))
+    write(tmp_path, BRIEF, brief(features=WIFI_FEATURES, sketch_rows=rows, open_items=open_items, model_map=model_map))
     assert_outcome(run_grader("check_sketch_rows_complete.py", tmp_path), expected)
 
 
@@ -1064,6 +1073,11 @@ def test_uniqueness_rule_left_out_fails(tmp_path: Path) -> None:
                                "1. Give F1's Handoff to /speckit.specify."),
             F1_ROWS, "none\n", None, id="compliant-spec-kit-handoff",
         ),
+        pytest.param(
+            NEXT_STEPS.replace("1. Build F1 DC fabric: Schema Manager, then Object Manager.",
+                               "1. Build F1 DC fabric: Schema Manager, then load the rack sheet with infrahub-importing-data."),
+            F1_ROWS, "none\n", None, id="compliant-objects-via-importer",
+        ),
     ],
 )
 def test_next_steps(tmp_path: Path, steps: str | None, rows: str, open_items: str, expected: str | None) -> None:
@@ -1072,3 +1086,34 @@ def test_next_steps(tmp_path: Path, steps: str | None, rows: str, open_items: st
         text = text.replace("## Next steps\n\n", "")
     write(tmp_path, BRIEF, text)
     assert_outcome(run_grader("check_scope_split.py", tmp_path), expected)
+
+
+# --------------------------------------------------------------------------
+# brief-open-items-name-features
+# --------------------------------------------------------------------------
+
+WIFI_TWO_FEATURES = WIFI_FEATURES + "| F2 | Guest portal | Guests self-register | GuestPortal | schema | F1 | planned | Build the guest portal, as designed in F2 of docs/designs/test/design-brief.md. |\n"
+
+
+@pytest.mark.parametrize(
+    ("features", "open_items", "expected"),
+    [
+        pytest.param(WIFI_FEATURES, WIFI_OPEN, None, id="compliant"),
+        pytest.param(
+            WIFI_TWO_FEATURES, "- **O1**: Who owns SSID definitions? (owner: unknown) affects F1 and F2\n",
+            None, id="compliant-variant-two-features",
+        ),
+        pytest.param(WIFI_FEATURES, "- O1: Who owns SSID definitions? (owner: unknown)\n", "names no feature", id="violating-no-affects"),
+        pytest.param(
+            WIFI_FEATURES, "- O1: Who owns SSID definitions? (owner: unknown; affects F9)\n",
+            "not in the Features table", id="near-miss-unknown-feature",
+        ),
+        pytest.param(
+            WIFI_TWO_FEATURES, "- O1: Who owns SSID definitions? (owner: unknown; affects F2)\n",
+            "does not list F1", id="near-miss-wrong-feature",
+        ),
+    ],
+)
+def test_open_items_name_features(tmp_path: Path, features: str, open_items: str, expected: str | None) -> None:
+    write(tmp_path, BRIEF, brief(features=features, sketch_rows=WIFI_ROWS, open_items=open_items, model_map=WIFI_MODEL_MAP))
+    assert_outcome(run_grader("check_sketch_rows_complete.py", tmp_path), expected)

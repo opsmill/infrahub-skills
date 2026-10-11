@@ -44,6 +44,7 @@ It writes no schema YAML.
 - **Start from a worked example**: the brief names the closest OpsMill reference design, or says why none fits
 - **Every generator, check and transform has its decisions**: each one the features list has a Mechanisms row saying what drives it, what it produces and when it runs, and a rule the schema can enforce, such as uniqueness, is a schema constraint rather than a check
 - **Next steps in order**: open items first, then each feature after the features it depends on
+- **Answers that land later**: each open item names the features it affects, so an answer given later updates the right features and flags those already specified or built
 - **Your files are evidence**: every file you provide is listed in the brief, and model rows built from it name it as their source
 - **Split before modelling**: a scope that covers several domains or many node kinds is split into ordered features, and only the first is modelled in depth
 - **No invented values**: a node kind's identity, source of truth or owner is either answered or recorded as an open item
@@ -155,7 +156,7 @@ graph LR
 
 ## Open items
 
-- O1: Who owns site records once a VPN is live? (owner: unknown, network or service desk)
+- O1: Who owns site records once a VPN is live? (owner: unknown, network or service desk; affects F1)
 
 ## Next steps
 
@@ -198,6 +199,17 @@ The next step is to take the F1 handoff into the team's existing specification, 
 | `menu` | [Menu Manager](./managing-menus.mdx) |
 
 A later feature that lists `schema, generator`, for example, goes to the Schema Manager and then the Generator Manager.
+
+## Coming back with an answer
+
+Open items often get answered days later. Run the Model Designer again on the same brief with the answer, for example "O1 is settled: the service desk owns site records, see docs/designs/l3vpn-service/design-brief.md". Each open item names the features it affects, so the skill:
+
+- records the answer as your decision and fills in the cells that waited on it
+- updates every affected feature that is still `planned`
+- does not silently rewrite a feature already `specified` or `built`: it notes the change and adds a next step to re-specify it, or to change the loaded schema with the [Schema Manager](./managing-schemas.mdx), which handles the migration
+- checks the scope again if the answer adds node kinds, giving any new feature the next ID
+
+It then tells you which features the answer changed.
 
 ## Using it with your workflow
 

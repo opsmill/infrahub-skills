@@ -88,7 +88,7 @@ files pasted into the conversation.
   | Artifact | Skill |
   | -------- | ----- |
   | `schema` | `infrahub-managing-schemas` |
-  | `objects` | `infrahub-managing-objects` |
+  | `objects` | `infrahub-managing-objects`, or `infrahub-importing-data` when the objects come from CSV or TSV files |
   | `generator` | `infrahub-managing-generators` |
   | `check` | `infrahub-managing-checks` |
   | `transform` | `infrahub-managing-transforms` |
@@ -99,7 +99,9 @@ files pasted into the conversation.
   and never names a later or unknown ID. A later
   feature can be independent; write `-` rather than a
   dependency it does not have.
-- `Status` starts as `planned`.
+- `Status` is `planned`, `specified` once a spec or
+  plan exists for the feature, or `built` once its
+  artifacts are loaded. It starts as `planned`.
 - `Handoff` states the outcome, scope, artifacts and
   dependencies, and names the brief's path and the
   feature ID, so the downstream workflow reads the
@@ -222,9 +224,13 @@ graph LR
 ## Open items
 
 ```markdown
-- O1: Who owns cable records? (owner: unknown, field operations or planning team)
-- O2: Who approves new OOB sites? (owner: network operations)
+- O1: Who owns cable records? (owner: unknown, field operations or planning team; affects F1)
+- O2: Who approves new OOB sites? (owner: network operations; affects F1, F2)
 ```
+
+Each item names the features its answer changes
+(`affects F1, F2`), including every feature with a cell
+that refers to it.
 
 ## Next steps
 

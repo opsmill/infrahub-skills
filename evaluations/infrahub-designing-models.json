@@ -100,6 +100,10 @@
           "check": "The sketch mermaid map has one node per node kind and one line per peer in the Peers column"
         },
         {
+          "name": "open-items-name-features",
+          "check": "Every open item names the features it affects, including each feature whose cells wait on it"
+        },
+        {
           "name": "decision-provenance",
           "check": "Every decision is tagged stated, recommended or open; open decisions name an open item"
         }
