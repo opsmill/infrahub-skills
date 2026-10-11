@@ -23,6 +23,8 @@ Checks are deterministic: no LLM, no network.
 
 from __future__ import annotations
 
+import fnmatch
+import os
 import re
 from pathlib import Path
 from typing import Callable
@@ -196,17 +198,33 @@ def _column(headers: list[str], name: str) -> str | None:
     return None
 
 
+# Folders a stray brief is never looked for in: the skills themselves, the
+# docs site, and tool folders that can hold thousands of files.
+_SKIP_TOP = {"skills", ".agents", ".claude", ".codex", ".git"}
+_SKIP_ANY = {"node_modules", ".git", ".venv", "__pycache__"}
+
+
+def _stray_briefs(ws: Path) -> list[str]:
+    """Brief-like Markdown files outside the expected paths, pruning skipped folders while walking."""
+    found = []
+    for root, dirs, files in os.walk(ws):
+        rel = Path(root).relative_to(ws)
+        dirs[:] = [
+            d for d in dirs
+            if d not in _SKIP_ANY
+            and not (rel == Path(".") and d in _SKIP_TOP)
+            and not (rel == Path("docs") and d == "docs")
+        ]
+        found += [str(rel / f) for f in files if fnmatch.fnmatch(f, "*brief*.md")]
+    return found
+
+
 def find_brief(ws: Path) -> tuple[Path | None, str]:
     found = sorted(p for pattern in BRIEF_GLOBS for p in ws.glob(pattern))
     where = " or ".join(BRIEF_GLOBS)
     if not found:
         # Name what was written instead, so a failed run shows where it went.
-        elsewhere = sorted(
-            str(p.relative_to(ws)) for p in ws.rglob("*brief*.md")
-            if not str(p.relative_to(ws)).startswith(
-                ("skills/", ".agents/", ".claude/", ".codex/", "docs/docs/", ".git/", "node_modules")
-            )
-        )[:5]
+        elsewhere = sorted(_stray_briefs(ws))[:5]
         answer = ws / ANSWER_PATH
         hint = f"; found instead: {elsewhere}" if elsewhere else ""
         if answer.is_file():
@@ -999,9 +1017,10 @@ def check_reference_design(ws: Path, names: set[str] | None = None) -> tuple[boo
         if match:
             current = match.group(1).lower()
             labels.setdefault(current, _clean(match.group(2)))
-        elif current and line.strip() and not labels.get(current):
-            # A label on its own line, its value in the bullets below it.
-            labels[current] = _clean(line.strip().lstrip("-*").strip())
+        elif current and line.strip() and (not labels.get(current) or re.match(r"\s*[-*]\s", line)):
+            # A label's value in the bullets below it, every bullet kept.
+            value = _clean(line.strip().lstrip("-*").strip())
+            labels[current] = f"{labels[current]}; {value}" if labels.get(current) else value
     closest = labels.get("closest")
     if not closest:
         return False, "Reference design has no 'Closest:' line"
@@ -1015,6 +1034,14 @@ def check_reference_design(ws: Path, names: set[str] | None = None) -> tuple[boo
             return False, f"'Marketplace: {marketplace}' gives no reason"
     elif not _MARKETPLACE_ID.search(marketplace):
         return False, f"'Marketplace: {marketplace}' names no namespace/name schema, and is not 'none' or 'not searched' with a reason"
+    else:
+        # Each schema is followed by the node kinds it covers, before the next schema.
+        ids = list(_MARKETPLACE_ID.finditer(marketplace))
+        for i, m in enumerate(ids):
+            end = ids[i + 1].start() if i + 1 < len(ids) else len(marketplace)
+            covers = re.sub(r"\band\b|[^A-Za-z]", "", marketplace[m.end():end])
+            if not covers:
+                return False, f"'Marketplace:' names {m.group(0)} without the node kinds it covers"
     # The first word, read whole so a URL keeps its scheme; "none:" loses its colon.
     first = re.split(r"[\s(,;]", closest.strip(), maxsplit=1)[0].lower().rstrip(".:")
     if first == "none":

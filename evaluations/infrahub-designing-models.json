@@ -69,7 +69,7 @@
         },
         {
           "name": "reference-design",
-          "check": "The brief names its closest reference design and Marketplace matches, or none with a reason"
+          "check": "Closest design with what it reuses, Marketplace schemas with their node kinds, or none with a reason"
         },
         {
           "name": "sketch-rows-complete",

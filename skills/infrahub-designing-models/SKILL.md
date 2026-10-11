@@ -94,11 +94,13 @@ skill for each artifact builds it from the brief.
    site, a VLAN, a circuit), not against the project's
    name, and run `infrahubctl marketplace show` on at most
    three candidates to see their generics. Record the
-   result in the brief's `Marketplace:` line. Also list
-   newer demos once (references/reference-designs.md).
-   A command that fails or does not return promptly is
-   not retried; write `Marketplace: not searched` with
-   the reason, keep it as an open item, and go on.
+   result in the brief's `Marketplace:` line. A
+   Marketplace command that fails or does not return
+   promptly is not retried; write `Marketplace: not
+   searched` with the reason, keep it as an open item,
+   and go on. Also list newer demos once
+   (references/reference-designs.md); when that listing
+   fails, use the table there and do not retry it.
 6. **Draft the sketch, then question the draft,** for
    F1 only. People correct a draft faster than they
    answer questions about a model they cannot see.
