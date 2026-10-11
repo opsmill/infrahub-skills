@@ -41,7 +41,7 @@ It writes no schema YAML.
 - **A draft before the details**: after a few business and service questions, you see a draft of the model with each guess marked and two or three sample objects built from your own data, and the data questions go to the guesses that matter most. Nothing in the draft is invented: every guess comes from your files, your answers or the reference design
 - **A scenario walkthrough**: before the brief is confirmed, one event such as an order or a decommission is walked through the model to find missing peers or unclear deletes
 - **Grounded in the managing skills**: each data question names the schema or best-practice rule its answer feeds, such as uniqueness scope, what happens on delete, or a resource pool instead of hand allocation, and no guess reaches the brief unconfirmed
-- **Start from a worked example**: the brief names the closest OpsMill reference design, or says why none fits
+- **Start from a worked example and published schemas**: the brief names the closest OpsMill reference design and the Marketplace schemas it builds on, matched against each node kind from the whole catalog, or says why none fits
 - **Every generator, check and transform has its decisions**: each one the features list has a Mechanisms row saying what drives it, what it produces and when it runs, and a rule the schema can enforce, such as uniqueness, is a schema constraint rather than a check
 - **Next steps in order**: open items first, then each feature after the features it depends on
 - **Answers that land later**: each open item names the features it affects, so an answer given later updates the right features and flags those already specified or built
@@ -110,6 +110,7 @@ The request covers the VPN service and the allocation of route distinguishers an
 Closest: infrahub-demo-sp
 Reused: the service-with-sites pattern (L3Vpn and L3VpnSite, called VpnSite in this brief)
 Different: route distinguishers and route targets come from pools, not from the order
+Marketplace: infrahub/base-schemas (locations and devices behind each VpnSite)
 
 ## Features
 

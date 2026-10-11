@@ -93,22 +93,30 @@ skill for each artifact builds it from the brief.
    [rules/brief-reference-design.md](./rules/brief-reference-design.md)
    to choose the closest worked example from the
    business and service answers and the user's inputs.
-   Now run the network discovery, once each: one
-   Marketplace search for the domain
-   (`infrahubctl marketplace search <domain>`) for a
-   published schema to build on, and one listing of newer
-   demos (references/reference-designs.md). A command that
-   fails or does not return promptly is not retried;
-   record it as an open item and go on.
+   Then read the Marketplace catalog whole, not by
+   keyword: `infrahubctl marketplace list --json` and
+   `infrahubctl marketplace list --collections --json`
+   (see `../infrahub-common/marketplace-reference.md`).
+   Match it against each node kind the design needs (a
+   site, a VLAN, a circuit), not against the project's
+   name, and run `infrahubctl marketplace show` on at most
+   three candidates to see their generics. Record the
+   result in the brief's `Marketplace:` line. Also list
+   newer demos once (references/reference-designs.md).
+   A command that fails or does not return promptly is
+   not retried; write `Marketplace: not searched` with
+   the reason, keep it as an open item, and go on.
 6. **Draft the sketch, then question the draft,** for
    F1 only. People correct a draft faster than they
    answer questions about a model they cannot see.
    - **Draft.** Before the first data question, show
      F1's sketch table, and the Features table after a
      split. Fill each cell with a guess marked `(guess)`
-     that comes from the user's files, their answers,
-     the reference design or an Infrahub default in the
-     question bank. A cell none of these supports stays
+     that comes from the user's files, their answers, a
+     Marketplace schema that covers the node kind, the
+     reference design or an Infrahub default in the
+     question bank. Prefer a published schema's kind to a
+     new one, judged per generic, not per file. A cell none of these supports stays
      `?` and becomes a question. Do not invent
      attributes or peers nobody mentioned.
    - **Samples.** When the user gave rows of data, show

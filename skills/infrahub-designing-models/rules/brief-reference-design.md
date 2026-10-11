@@ -30,6 +30,11 @@ Different: route distinguishers come from a pool, not from the order
   objects the design follows. It is required whenever a
   design is named.
 - `Different:` says where this design departs from it.
+- `Marketplace:` names the published schemas the design
+  builds on and the node kinds each covers, or
+  `none matched` or `not searched`, each with the
+  reason. Read the catalog whole and match it per node
+  kind (SKILL.md step 5).
 
 ## Why it matters
 
@@ -60,6 +65,7 @@ lets a reviewer compare the two and ask why they differ.
 ## Reference design
 
 Closest: none, no listed design models campus wireless
+Marketplace: not searched: the session had no network (O3)
 ```
 
 ## Incorrect

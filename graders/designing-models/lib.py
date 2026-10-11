@@ -968,8 +968,10 @@ REFERENCE_DESIGNS_FILE = Path("skills/infrahub-designing-models/references/refer
 # A design found at run time that the table does not list yet: accepted only
 # as a full URL into the opsmill organisation, never as a bare name.
 _DISCOVERED_REPO = re.compile(r"^https?://github\.com/opsmill/infrahub-(?:demo|solution)-[a-z0-9-]+/?$")
+# A published schema or collection, e.g. infrahub/base-schemas.
+_MARKETPLACE_ID = re.compile(r"\b[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*\b")
 _LABEL_LINE = re.compile(
-    r"^\s*(?:[-*]\s*)?\**\s*(closest|reused|different)\s*\**\s*:\s*\**\s*(.*?)\s*$", re.IGNORECASE
+    r"^\s*(?:[-*]\s*)?\**\s*(closest|reused|different|marketplace)\s*\**\s*:\s*\**\s*(.*?)\s*$", re.IGNORECASE
 )
 
 
@@ -1003,6 +1005,16 @@ def check_reference_design(ws: Path, names: set[str] | None = None) -> tuple[boo
     closest = labels.get("closest")
     if not closest:
         return False, "Reference design has no 'Closest:' line"
+    marketplace = (labels.get("marketplace") or "").strip()
+    if not marketplace:
+        return False, "Reference design has no 'Marketplace:' line saying what the catalog offered"
+    lowered = marketplace.lower()
+    if lowered.startswith(("none", "not searched")):
+        reason = re.sub(r"^(none( matched)?|not searched)\s*[:,(-]?\s*", "", lowered).strip(" .)")
+        if not reason:
+            return False, f"'Marketplace: {marketplace}' gives no reason"
+    elif not _MARKETPLACE_ID.search(marketplace):
+        return False, f"'Marketplace: {marketplace}' names no namespace/name schema, and is not 'none' or 'not searched' with a reason"
     # The first word, read whole so a URL keeps its scheme; "none:" loses its colon.
     first = re.split(r"[\s(,;]", closest.strip(), maxsplit=1)[0].lower().rstrip(".:")
     if first == "none":

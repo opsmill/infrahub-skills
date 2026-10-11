@@ -47,6 +47,7 @@ These `##` headings, spelled and ordered exactly like this:
 Closest: infrahub-demo-sp
 Reused: the service-with-sites pattern (L3Vpn and L3VpnSite)
 Different: route distinguishers come from a pool, not from the order
+Marketplace: infrahub/base-schemas (Site and Device for the VPN's sites)
 ```
 
 `Closest:` names a design from
@@ -54,6 +55,11 @@ Different: route distinguishers come from a pool, not from the order
 `https://github.com/opsmill/...` URL of a newer demo or
 solution you read, or `none` with the reason.
 `Reused:` is required whenever a design is named.
+`Marketplace:` names each published schema or
+collection the design builds on, with the node kinds it
+covers; or `none matched` with the reason; or
+`not searched` with the reason, also kept as an open
+item.
 
 ## Inputs table
 

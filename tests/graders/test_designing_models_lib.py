@@ -113,6 +113,7 @@ REFERENCE_DC = """\
 Closest: infrahub-demo-dc
 Reused: the fabric pattern of sites, racks and devices, and its segment services
 Different: firewall rules come from the existing firewall manager
+Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)
 """
 
 BRIEF = "docs/designs/test/design-brief.md"
@@ -867,6 +868,8 @@ The closest worked example is below.
 - **Closest:** https://github.com/opsmill/infrahub-demo-dc (fabric and segments)
 - **Reused:** sites, racks and devices, and NetworkSegment as the ordered service.
 - **Different:** no load balancers.
+- **Marketplace:**
+  - `infrahub/vlan` for the segment VLANs
 """
 
 
@@ -876,10 +879,31 @@ The closest worked example is below.
         pytest.param(REFERENCE_DC, None, id="compliant"),
         pytest.param(REFERENCE_VARIANT, None, id="compliant-variant"),
         pytest.param(
-            "Closest: infrahub-demo-dc\n\nReused:\n- the fabric pattern of sites, racks and devices\n- NetworkSegment as the ordered service\n",
+            "Closest: infrahub-demo-dc\n\nReused:\n- the fabric pattern of sites, racks and devices\n- NetworkSegment as the ordered service\n"
+            "Marketplace: infrahub/base-schemas\n",
             None, id="compliant-reused-as-bullets",
         ),
-        pytest.param("Closest: none, no listed design models optical spans per strand\n", None, id="compliant-none-with-reason"),
+        pytest.param(
+            "Closest: none, no listed design models optical spans per strand\nMarketplace: not searched: no network in this session (O4)\n",
+            None, id="compliant-none-with-reason",
+        ),
+        pytest.param(
+            REFERENCE_DC.replace("Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)",
+                                 "Marketplace: none matched, no published schema models firewall policy"),
+            None, id="compliant-marketplace-none-matched",
+        ),
+        pytest.param(
+            REFERENCE_DC.replace("Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)\n", ""),
+            "no 'Marketplace:' line", id="violating-no-marketplace-line",
+        ),
+        pytest.param(
+            REFERENCE_DC.replace("Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)", "Marketplace: searched"),
+            "names no namespace/name schema", id="near-miss-marketplace-searched-without-result",
+        ),
+        pytest.param(
+            REFERENCE_DC.replace("Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)", "Marketplace: not searched"),
+            "gives no reason", id="near-miss-not-searched-without-reason",
+        ),
         pytest.param("", "no 'Closest:' line", id="violating-empty-section"),
         pytest.param(
             REFERENCE_DC.replace("infrahub-demo-dc", "infrahub-demo-netbox"),
@@ -891,7 +915,7 @@ The closest worked example is below.
             ),
             "says nothing about what it follows", id="near-miss-nothing-reused",
         ),
-        pytest.param("Closest: none\n", "gives no reason", id="near-miss-none-without-reason"),
+        pytest.param("Closest: none\nMarketplace: none matched, nothing published for this\n", "gives no reason", id="near-miss-none-without-reason"),
         pytest.param(
             REFERENCE_DC.replace("infrahub-demo-dc", "https://github.com/opsmill/infrahub-demo-campus"),
             None, id="compliant-discovered-repo-as-url",
