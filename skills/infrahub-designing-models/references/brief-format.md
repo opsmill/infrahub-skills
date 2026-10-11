@@ -72,7 +72,7 @@ files pasted into the conversation.
 ```markdown
 | ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | Fiber plant | Know which strand runs where | Site, FiberCable, Strand | schema, objects | - | planned | Design and implement the fiber plant model, then populate its initial objects, as designed in F1 of docs/designs/metro-optical/design-brief.md. |
+| F1 | Fiber plant | Know which strand runs where | Site, FiberCable, Strand | schema, objects, generator | - | planned | Design and implement the fiber plant model, then populate its initial objects, as designed in F1 of docs/designs/metro-optical/design-brief.md. |
 | F2 | DWDM channels | Allocate channels without clashes | OpticalChannel, channel pool | schema | F1 | planned | After F1, design the channel model and allocation pool, as designed in F2 of docs/designs/metro-optical/design-brief.md. |
 ```
 
@@ -127,7 +127,7 @@ change the table first, then redraw the map.
 ```mermaid
 graph LR
   F1["F1 Fiber plant
-  schema, objects"]
+  schema, objects, generator"]
   F2["F2 DWDM channels
   schema"]
   F1 --> F2

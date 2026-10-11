@@ -101,7 +101,10 @@ def brief(
         if next_steps is None:
             # One step per feature, in table order, unless a test sets its own.
             ids = re.findall(r"^\|[^|]*?`?(F\d+)`?\s*\|", features, flags=re.M) or re.findall(r"`(F\d+)`", features)
-            next_steps = "".join(f"{i}. Build {fid}.\n" for i, fid in enumerate(dict.fromkeys(ids), 1))
+            next_steps = "".join(
+                f"{i}. Take {fid}'s Handoff to the team's planning workflow.\n"
+                for i, fid in enumerate(dict.fromkeys(ids), 1)
+            )
         parts.append(f"## Next steps\n\n{next_steps}")
     return "\n".join(parts)
 
@@ -427,7 +430,15 @@ ALL_ROWS = F1_ROWS + """\
     ("text", "expected"),
     [
         pytest.param(brief(features=FEATURES, sketch_rows=F1_ROWS, plan_map=PLAN_MAP), None, id="compliant"),
-        pytest.param(brief(features=FEATURES_VARIANT, sketch_rows=F1_VARIANT_ROWS, plan_map=PLAN_MAP_VARIANT, next_steps=NEXT_STEPS), None, id="compliant-variant"),
+        pytest.param(brief(
+                features=FEATURES_VARIANT, sketch_rows=F1_VARIANT_ROWS, plan_map=PLAN_MAP_VARIANT,
+                next_steps=(
+                    "1. F1 DC fabric: infrahub-managing-schemas.\n"
+                    "2. F2 IPAM: Schema Manager, then Object Manager.\n"
+                    "3. F3 Firewall policy: Check Manager and Transform Manager.\n"
+                    "4. F4 peering: give its Handoff to the planning tool.\n"
+                ),
+            ), None, id="compliant-variant"),
         pytest.param(
             brief(
                 features=FEATURES.replace("| schema | F1 |", "| schema, objects, menu | F1 |"),
@@ -851,6 +862,10 @@ The closest worked example is below.
     [
         pytest.param(REFERENCE_DC, None, id="compliant"),
         pytest.param(REFERENCE_VARIANT, None, id="compliant-variant"),
+        pytest.param(
+            "Closest: infrahub-demo-dc\n\nReused:\n- the fabric pattern of sites, racks and devices\n- NetworkSegment as the ordered service\n",
+            None, id="compliant-reused-as-bullets",
+        ),
         pytest.param("Closest: none, no listed design models optical spans per strand\n", None, id="compliant-none-with-reason"),
         pytest.param("", "no 'Closest:' line", id="violating-empty-section"),
         pytest.param(
@@ -1016,20 +1031,38 @@ def test_uniqueness_rule_left_out_fails(tmp_path: Path) -> None:
     [
         pytest.param(NEXT_STEPS, F1_ROWS, "none\n", None, id="compliant"),
         pytest.param(
-            "Do these in order.\n\n1) Settle **O1** with the DC team.\n2) `F1` DC fabric first.\n3) F2 IPAM.\n4) F4 peering and F3 firewall.\n",
+            "Do these in order.\n\n1) Settle **O1** with the DC team.\n2) `F1` DC fabric first: Schema Manager, Object Manager.\n"
+            "3) F2 IPAM: Schema Manager.\n4) F3 firewall: Schema Manager, Check Manager, Transform Manager.\n"
+            "5) F4 peering: hand off to the planning tool.\n",
             F1_ROWS.replace("| DC team | answer Q4 |", "| open: O1 | answer Q4 |"),
             "- O1: Who owns sites? (owner: DC team)\n", None, id="compliant-variant",
         ),
         pytest.param(None, F1_ROWS, "none\n", "no '## Next steps' section", id="violating-no-section"),
         pytest.param(
-            "1. Build F1 DC fabric.\n2. Build F4 Customer peering.\n3. Build F2 IPAM.\n4. Build F3 Firewall policy.\n",
-            F1_ROWS, "none\n", "take up F4 before F2", id="near-miss-dependency-order",
+            NEXT_STEPS.replace("2. Build F2 IPAM with the Schema Manager.", "2. Build F4 first, then F2 IPAM with the Schema Manager.")
+            .replace("4. Build F4 Customer peering: Schema Manager, then Generator Manager.", "4. Finish F4 Customer peering: Schema Manager, then Generator Manager."),
+            F1_ROWS, "none\n", "take up F4 before or with F2", id="near-miss-dependency-in-same-step",
         ),
         pytest.param(
             NEXT_STEPS + "5. Settle O1 with the DC team.\n",
             F1_ROWS.replace("| DC team | answer Q4 |", "| open: O1 | answer Q4 |"),
             "- O1: Who owns sites? (owner: DC team)\n",
             "do not settle it before F1", id="near-miss-open-item-after-f1",
+        ),
+        pytest.param(
+            NEXT_STEPS.replace("1. Build F1 DC fabric:", "1. Settle O1, then build F1 DC fabric:"),
+            F1_ROWS.replace("| DC team | answer Q4 |", "| open: O1 | answer Q4 |"),
+            "- O1: Who owns sites? (owner: DC team)\n",
+            "do not settle it before F1", id="near-miss-open-item-in-f1-step",
+        ),
+        pytest.param(
+            NEXT_STEPS.replace("1. Build F1 DC fabric: Schema Manager, then Object Manager.", "1. Build F1 DC fabric."),
+            F1_ROWS, "none\n", "neither hand it off nor name the skill", id="near-miss-generic-step",
+        ),
+        pytest.param(
+            NEXT_STEPS.replace("1. Build F1 DC fabric: Schema Manager, then Object Manager.",
+                               "1. Give F1's Handoff to /speckit.specify."),
+            F1_ROWS, "none\n", None, id="compliant-spec-kit-handoff",
         ),
     ],
 )

@@ -43,9 +43,11 @@ lets a reviewer compare the two and ask why they differ.
 
 ## How to apply
 
-- Choose the design in step 1, before drafting, so the
-  draft's guesses can follow it. Recommend it like any
-  other answer, with the design as the basis.
+- Read the candidates in step 1, then choose after the
+  business and service answers and the user's inputs
+  (SKILL.md step 5), before drafting, so the draft's
+  guesses can follow it. Recommend it like any other
+  answer, with the design as the basis.
 - Choose by use case, not by matching words.
 - Never copy schema YAML out of a reference design;
   reusable schemas come from the Marketplace.

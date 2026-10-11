@@ -48,6 +48,7 @@ the same, and the review checks neither.
 | # | Decision | Tag | Basis |
 | --- | --- | --- | --- |
 | 1 | Console ports are identified by server and port number | stated | |
+| 2 | Console servers are their own node kind (asked "Are console servers their own thing?", answered "yes") | stated | |
 | 4 | Console servers and PDUs share a generic | recommended | Both have numbered ports and a management address (medium) |
 | 5 | Who approves new console servers | open | O1 |
 

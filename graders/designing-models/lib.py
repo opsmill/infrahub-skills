@@ -974,10 +974,15 @@ def check_reference_design(ws: Path, names: set[str] | None = None) -> tuple[boo
         return False, "brief has no '## Reference design' section"
     known = names if names is not None else REFERENCE_DESIGNS
     labels: dict[str, str] = {}
+    current: str | None = None
     for line in _lines_outside_fences(parts[REFERENCE_HEADING]):
         match = _LABEL_LINE.match(line)
         if match:
-            labels.setdefault(match.group(1).lower(), _clean(match.group(2)))
+            current = match.group(1).lower()
+            labels.setdefault(current, _clean(match.group(2)))
+        elif current and line.strip() and not labels.get(current):
+            # A label on its own line, its value in the bullets below it.
+            labels[current] = _clean(line.strip().lstrip("-*").strip())
     closest = labels.get("closest")
     if not closest:
         return False, "Reference design has no 'Closest:' line"
@@ -1010,6 +1015,17 @@ NEXT_STEPS_HEADING = "next steps"
 MECHANISM_TYPES = {"generator", "check", "transform", "computed attribute", "resource pool", "schema constraint"}
 # Artifacts that need a Mechanisms row saying what drives them and what they produce.
 MECHANISM_ARTIFACTS = {"generator", "check", "transform"}
+# How a Next step may name the skill that builds each artifact.
+ARTIFACT_SKILLS = {
+    "schema": ("schema manager", "infrahub-managing-schemas"),
+    "objects": ("object manager", "infrahub-managing-objects"),
+    "generator": ("generator manager", "infrahub-managing-generators"),
+    "check": ("check manager", "infrahub-managing-checks"),
+    "transform": ("transform manager", "infrahub-managing-transforms"),
+    "menu": ("menu manager", "infrahub-managing-menus"),
+}
+# A step that passes the feature on: "Handoff", "hand off", "hand it off", or spec-kit.
+_HANDOFF = re.compile(r"hand\s*-?\s*(?:it\s+)?off|/speckit\.specify", re.IGNORECASE)
 _STEP = re.compile(r"^\s*(\d+)[.)]\s+(.*\S)\s*$")
 
 
@@ -1139,18 +1155,28 @@ def check_next_steps_in_order(ws: Path) -> tuple[bool, str]:
             first_step.setdefault(f"F{n}", index)
         for o in re.findall(r"\bO(\d+)\b", text):
             open_step.setdefault(f"O{o}", index)
+    arts, _, _, _ = _features(parts)
     for fid in order:
         if fid not in first_step:
             return False, f"Next steps never take up {fid}"
         for dep in deps.get(fid, set()):
-            if dep in first_step and first_step[dep] > first_step[fid]:
-                return False, f"Next steps take up {fid} before {dep}, which it depends on"
+            if dep in first_step and first_step[dep] >= first_step[fid]:
+                return False, f"Next steps take up {fid} before or with {dep}, which it depends on"
+        text = steps[first_step[fid]].lower()
+        if _HANDOFF.search(text):
+            continue
+        for artifact in sorted(arts.get(fid, set())):
+            names = ARTIFACT_SKILLS.get(artifact, ())
+            if names and not any(n in text for n in names):
+                return False, (
+                    f"Next steps for {fid} neither hand it off nor name the skill for its {artifact} artifact"
+                )
     s_headers, s_rows, _ = _sketch(parts)
     for row in s_rows:
         for cell in row.values():
             for ref in _OPEN_REF.findall(_clean(cell)):
                 ref = ref.upper()
-                if ref not in open_step or open_step[ref] > first_step.get("F1", 0):
+                if ref not in open_step or open_step[ref] >= first_step.get("F1", 0):
                     return False, f"F1's sketch waits on {ref}, but Next steps do not settle it before F1"
     return True, "Next steps take the features in dependency order, open items first"
 
