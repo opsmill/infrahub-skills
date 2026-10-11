@@ -9009,3 +9009,45 @@ tasks:
         check: The three answers are tagged stated and the two accepted recommendations recommended
       - name: sketch-rows-complete
         check: Every sketch row has identity, source of truth and owner, or an open item
+
+  - name: design-mechanisms
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: We run managed connectivity for branch offices and want it in
+      Infrahub. Each branch is a site with one access router. When we add a
+      new branch, we want Infrahub to create its access router, carve a /29
+      for the WAN link and assign it a VLAN, without anyone typing those in.
+      We also want something that stops anyone giving two branches the same
+      VLAN. And every access router needs its configuration rendered so our
+      deployment pipeline can push it.
+
+      I'm away for the day, so here are my answers: the network team owns
+      branches and routers and decides when a branch is added. The branch
+      list is ours; Infrahub becomes the source of truth for it. Routers are
+      identified by hostname, branches by a branch code. The deployment
+      pipeline reads one rendered configuration per router. VLAN IDs and the
+      /29s should never be chosen by hand.
+
+      Write the design brief.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_mechanisms.py
+        weight: 1.0
+    expected_output: >-
+      A design brief whose Mechanisms table has a generator row driven by the
+      branch, a transform row for each router's configuration, and the VLAN
+      uniqueness rule as a schema constraint rather than a check.
+    expectations:
+      - The generator is driven by the branch and names what it creates
+      - The /29 and the VLAN come from resource pools, not code in the generator
+      - VLAN uniqueness is a schema uniqueness constraint, not a Python check
+      - The transform names its consumer, the deployment pipeline
+    assertions:
+      - name: mechanisms-match-artifacts
+        check: Each generator, check or transform artifact has a Mechanisms row, and each row an artifact
+      - name: uniqueness-is-a-schema-constraint
+        check: The VLAN uniqueness rule is a schema constraint, not a check
+      - name: sketch-rows-complete
+        check: Every sketch row has identity, source of truth and owner, or an open item

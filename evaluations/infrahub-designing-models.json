@@ -128,6 +128,32 @@
           "check": "Every sketch row has identity, source of truth and owner, or an open item"
         }
       ]
+    },
+    {
+      "id": 6,
+      "prompt": "We run managed connectivity for branch offices and want it in\nInfrahub. Each branch is a site with one access router. When we add a\nnew branch, we want Infrahub to create its access router, carve a /29\nfor the WAN link and assign it a VLAN, without anyone typing those in.\nWe also want something that stops anyone giving two branches the same\nVLAN. And every access router needs its configuration rendered so our\ndeployment pipeline can push it.\n\nI'm away for the day, so here are my answers: the network team owns\nbranches and routers and decides when a branch is added. The branch\nlist is ours; Infrahub becomes the source of truth for it. Routers are\nidentified by hostname, branches by a branch code. The deployment\npipeline reads one rendered configuration per router. VLAN IDs and the\n/29s should never be chosen by hand.\n\nWrite the design brief.",
+      "expected_output": "A design brief whose Mechanisms table has a generator row driven by the branch, a transform row for each router's configuration, and the VLAN uniqueness rule as a schema constraint rather than a check.",
+      "files": [],
+      "expectations": [
+        "The generator is driven by the branch and names what it creates",
+        "The /29 and the VLAN come from resource pools, not code in the generator",
+        "VLAN uniqueness is a schema uniqueness constraint, not a Python check",
+        "The transform names its consumer, the deployment pipeline"
+      ],
+      "assertions": [
+        {
+          "name": "mechanisms-match-artifacts",
+          "check": "Each generator, check or transform artifact has a Mechanisms row, and each row an artifact"
+        },
+        {
+          "name": "uniqueness-is-a-schema-constraint",
+          "check": "The VLAN uniqueness rule is a schema constraint, not a check"
+        },
+        {
+          "name": "sketch-rows-complete",
+          "check": "Every sketch row has identity, source of truth and owner, or an open item"
+        }
+      ]
     }
   ]
 }

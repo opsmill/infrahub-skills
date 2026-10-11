@@ -96,7 +96,16 @@ a rule needs from the user.
   attributes or peers, or remove them? Then it is a
   generator. A value derived on the same node is a
   computed attribute, a pass or fail rule is a check,
-  and a rendered output is a transform.
+  and a rendered output is a transform. A rule the
+  schema can enforce, such as uniqueness, is a schema
+  constraint, not a check
+  ([yagni-python-validator-vs-schema-constraint](../../infrahub-auditing-repo/rules/yagni-python-validator-vs-schema-constraint.md)).
+  Then ask what the mechanism needs: which node kind
+  drives it, what it produces, and when it runs. For a
+  generator, what happens to what it created when the
+  driving object is deleted; for a transform, who
+  consumes the output. The building skill's own rules
+  hold the rest (SKILL.md step 6).
 - **Hierarchy.** Is there a parent and child tree
   (region, site, rack) that queries walk? Rule:
   [hierarchy-setup](../../infrahub-managing-schemas/rules/hierarchy-setup.md).

@@ -21,8 +21,9 @@ The Model Designer works out what to model before any schema exists. It reads th
 - **Reference design**: the closest OpsMill demo or solution to build from, such as `infrahub-demo-sp` for an L3VPN service, what the design follows from it, and where it differs
 - **Features**: one row per feature in build order, with the artifacts each one needs (schema, objects, generator, check, transform, menu), its dependencies, and a handoff that names the brief and the feature ID, for any downstream workflow
 - **Data model sketch**: for the first feature, each node kind with how it is identified, its key attributes, its peers, its source of truth, its owner, and where each fact came from
-- **Mechanisms**: whether each behavior is a computed attribute, a resource pool, a check, a transform or a generator, and why
+- **Mechanisms**: a table of each behavior and what delivers it (a generator, a check, a transform, a computed attribute, a resource pool or a schema constraint), with what drives it, what it produces and when it runs, so the skill that builds it has the decisions it needs
 - **Plan map and model map**: two Mermaid diagrams drawn from the Features table and the sketch, showing the build order and how the F1 node kinds relate
+- **Next steps**: a short numbered list for you to follow, worded for the workflow your repository already uses: spec-kit, another planning setup, or the managing skills
 - **Decision log and open items**: every decision tagged as stated by you, accepted from a recommendation, or open, and every unknown with who owes the answer
 
 It writes no schema YAML.
@@ -40,6 +41,8 @@ It writes no schema YAML.
 - **A draft before the details**: after a few business and service questions, you see a draft of the model with each guess marked, and the data questions go to the guesses that matter most
 - **Grounded in the managing skills**: each data question names the schema or best-practice rule its answer feeds, such as uniqueness scope, what happens on delete, or a resource pool instead of hand allocation, and no guess reaches the brief unconfirmed
 - **Start from a worked example**: the brief names the closest OpsMill reference design, or says why none fits
+- **Every generator, check and transform has its decisions**: each one the features list has a Mechanisms row saying what drives it, what it produces and when it runs, and a rule the schema can enforce, such as uniqueness, is a schema constraint rather than a check
+- **Next steps in order**: open items first, then each feature after the features it depends on
 - **Your files are evidence**: every file you provide is listed in the brief, and model rows built from it name it as their source
 - **Split before modelling**: a scope that covers several domains or many node kinds is split into ordered features, and only the first is modelled in depth
 - **No invented values**: a node kind's identity, source of truth or owner is either answered or recorded as an open item
@@ -134,6 +137,13 @@ graph LR
   L3Vpn ---|many| VpnSite
 ```
 
+## Mechanisms
+
+| Feature | Behavior | Mechanism | Driven by | Produces | Runs when | Why |
+| --- | --- | --- | --- | --- | --- | --- |
+| F1 | No two VPNs of one customer share a name | schema constraint | L3Vpn | uniqueness on customer and vpn_name | every change | the schema enforces it without code |
+| F2 | Each VPN gets a route distinguisher and route targets | resource pool | L3Vpn | an RD and RT values | a VPN is created | no hand allocation, no duplicates |
+
 ## Decision log
 
 | # | Decision | Tag | Basis |
@@ -145,6 +155,12 @@ graph LR
 ## Open items
 
 - O1: Who owns site records once a VPN is live? (owner: unknown, network or service desk)
+
+## Next steps
+
+1. Settle O1 with the network team and the service desk.
+2. Build F1 VPN service: run the Schema Manager, then the Object Manager to load the VPNs from the customer export.
+3. When F1 is loaded, build F2 RD and RT allocation with the Schema Manager and the Object Manager.
 ````
 
 ### The maps

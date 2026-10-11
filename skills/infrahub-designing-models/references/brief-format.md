@@ -34,11 +34,12 @@ These `##` headings, spelled and ordered exactly like this:
    then the plan map.
 7. `## Data model sketch`: the node kinds of F1, then
    the model map.
-8. `## Mechanisms`: for each behavior, a computed
-   attribute, a resource pool, a check, a transform or
-   a generator, and why.
+8. `## Mechanisms`: a table of each behavior, the
+   mechanism that delivers it, and why.
 9. `## Decision log`: every decision and its provenance.
 10. `## Open items`: what is not known, and who owes it.
+11. `## Next steps`: what the reader does next, in
+    order.
 
 ## Reference design
 
@@ -189,9 +190,51 @@ graph LR
   that tracks the question, `O<n>`, which must be a real
   entry in Open items.
 
+## Mechanisms table
+
+```markdown
+| Feature | Behavior | Mechanism | Driven by | Produces | Runs when | Why |
+| --- | --- | --- | --- | --- | --- | --- |
+| F1 | A new cable gets its strands | generator | FiberCable | Strand per fiber | a cable is added | creates other nodes from a design |
+| F1 | No two cables share a cable ID | schema constraint | FiberCable | uniqueness on cable ID | every change | the schema enforces it without code |
+| F2 | Channel numbers per span | resource pool | FiberCable | a channel number | a channel is requested | no hand allocation |
+```
+
+- `Mechanism` is one of `generator`, `check`,
+  `transform`, `computed attribute`, `resource pool`,
+  `schema constraint`.
+- Every `generator`, `check` or `transform` a feature
+  lists in `Artifacts` has a row here, and every such row
+  belongs to a feature that lists it.
+- `Driven by` names the node kind that triggers or feeds
+  the behavior, from the sketch for F1. `Produces` says
+  what it creates, enforces or renders. `Runs when`
+  says what starts it.
+- Prefer a `schema constraint` to a `check` for a rule
+  the schema can enforce, such as uniqueness.
+
 ## Open items
 
 ```markdown
 - O1: Who owns cable records? (owner: unknown, field operations or planning team)
 - O2: Who approves new OOB sites? (owner: network operations)
 ```
+
+## Next steps
+
+```markdown
+1. Settle O1 with field operations.
+2. Build F1 Fiber plant: run the Schema Manager, then the Object Manager and the Generator Manager.
+3. When F1 is loaded, build F2 DWDM channels with the Schema Manager.
+```
+
+- One numbered step per feature, after the features it
+  depends on. Open items that F1's sketch waits on come
+  first.
+- Word each feature's step for the workflow the
+  repository already uses, without asking: with
+  `.specify/`, give its Handoff to `/speckit.specify`;
+  with another specification or planning setup, take the
+  Handoff there; with none, name the skill for each
+  artifact, in the order of the `Artifacts` cell, using
+  the mapping above.
