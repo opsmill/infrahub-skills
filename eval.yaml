@@ -8992,7 +8992,7 @@ tasks:
       yesterday, before my laptop died:
 
       - What identifies a circuit? Me: the carrier's circuit ID.
-      - Are providers their own thing? Me: yes, providers are a separate kind.
+      - Me, unprompted: providers are their own kind, we have dozens of them.
       - Who sets bandwidth? Me: the requester enters it.
       - You recommended a generic for circuit endpoints so both sites and PoPs
         can terminate a circuit, because they share an address and a code.

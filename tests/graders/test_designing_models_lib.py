@@ -819,6 +819,10 @@ def test_plan_map(tmp_path: Path, plan_map: str, expected: str | None) -> None:
     [
         pytest.param(WIFI_ROWS, WIFI_MODEL_MAP, None, id="compliant"),
         pytest.param(WIFI_VARIANT_ROWS, WIFI_VARIANT_MODEL_MAP, None, id="compliant-variant"),
+        pytest.param(
+            WIFI_ROWS.replace("| WirelessAccessPoint (many) |", "| WirelessAccessPoint (many, where it broadcasts) |"),
+            WIFI_MODEL_MAP, None, id="compliant-peer-note-with-comma",
+        ),
         pytest.param(WIFI_ROWS, "", "needs exactly one mermaid map, found 0", id="violating-no-map"),
         pytest.param(
             WIFI_ROWS, WIFI_MODEL_MAP.replace("  WirelessSsid -->|many| WirelessAccessPoint\n", ""),
