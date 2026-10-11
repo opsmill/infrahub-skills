@@ -28,15 +28,31 @@ These `##` headings, spelled and ordered exactly like this:
    orders, what the requester decides compared with
    what the network team derives, and the lifecycle
    states with who moves each one.
-5. `## Features`: always present, one row per feature,
+5. `## Reference design`: the closest OpsMill reference
+   design and what this design follows from it.
+6. `## Features`: always present, one row per feature,
    then the plan map.
-6. `## Data model sketch`: the node kinds of F1, then
+7. `## Data model sketch`: the node kinds of F1, then
    the model map.
-7. `## Mechanisms`: for each behavior, a computed
+8. `## Mechanisms`: for each behavior, a computed
    attribute, a resource pool, a check, a transform or
    a generator, and why.
-8. `## Decision log`: every decision and its provenance.
-9. `## Open items`: what is not known, and who owes it.
+9. `## Decision log`: every decision and its provenance.
+10. `## Open items`: what is not known, and who owes it.
+
+## Reference design
+
+```markdown
+Closest: infrahub-demo-sp
+Reused: the service-with-sites pattern (L3Vpn and L3VpnSite)
+Different: route distinguishers come from a pool, not from the order
+```
+
+`Closest:` names a design from
+[reference-designs.md](reference-designs.md), the full
+`https://github.com/opsmill/...` URL of a newer demo or
+solution you read, or `none` with the reason.
+`Reused:` is required whenever a design is named.
 
 ## Inputs table
 

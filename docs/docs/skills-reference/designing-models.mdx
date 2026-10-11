@@ -18,6 +18,7 @@ The Model Designer works out what to model before any schema exists. It reads th
 `design-brief.md`, in your repository's existing design-document location or `docs/designs/<design-slug>/` by default. It holds:
 
 - **Business and service**: who uses the data, the incident it prevents, what is ordered, and the service lifecycle
+- **Reference design**: the closest OpsMill demo or solution to build from, such as `infrahub-demo-sp` for an L3VPN service, what the design follows from it, and where it differs
 - **Features**: one row per feature in build order, with the artifacts each one needs (schema, objects, generator, check, transform, menu), its dependencies, and a handoff that names the brief and the feature ID, for any downstream workflow
 - **Data model sketch**: for the first feature, each node kind with how it is identified, its key attributes, its peers, its source of truth, its owner, and where each fact came from
 - **Mechanisms**: whether each behavior is a computed attribute, a resource pool, a check, a transform or a generator, and why
@@ -36,6 +37,9 @@ It writes no schema YAML.
 ## Key rules enforced
 
 - **One question at a time, with a recommendation**: each message is a single question with two to four options, one marked as recommended, and the basis for it with its strength
+- **A draft before the details**: after a few business and service questions, you see a draft of the model with each guess marked, and the data questions go to the guesses that matter most
+- **Grounded in the managing skills**: each data question names the schema or best-practice rule its answer feeds, such as uniqueness scope, what happens on delete, or a resource pool instead of hand allocation, and no guess reaches the brief unconfirmed
+- **Start from a worked example**: the brief names the closest OpsMill reference design, or says why none fits
 - **Your files are evidence**: every file you provide is listed in the brief, and model rows built from it name it as their source
 - **Split before modelling**: a scope that covers several domains or many node kinds is split into ordered features, and only the first is modelled in depth
 - **No invented values**: a node kind's identity, source of truth or owner is either answered or recorded as an open item
@@ -82,11 +86,26 @@ You answer "A". Later, a service question separates what the customer orders fro
 
 You answer "A, but the route targets are ours to choose, not the customer's". The skill records the first half as an accepted recommendation and the second as your own decision.
 
+Before the data questions, the skill shows a draft of the model built from your file and the closest reference design, `infrahub-demo-sp`, which models L3VPN services with their sites. Each guess is marked `(guess)`, and the next questions go to the guesses that change the design most. Only the rows that changed come back after each answer:
+
+```markdown
+| Feature | Node kind | Identified by | Peers (cardinality) | Owner |
+| --- | --- | --- | --- | --- |
+| F1 | L3Vpn | customer + vpn_name (guess) | VpnSite (many) | Network team (guess) |
+| F1 | VpnSite | vpn + site_code (guess) | L3Vpn (one) | (guess) |
+```
+
 ### The brief
 
 The request covers the VPN service and the allocation of route distinguishers and route targets, so the skill splits it into two features and models only the first in depth. An excerpt of `docs/designs/l3vpn-service/design-brief.md`:
 
 ````markdown
+## Reference design
+
+Closest: infrahub-demo-sp
+Reused: the service-with-sites pattern (L3Vpn and L3VpnSite)
+Different: route distinguishers and route targets come from pools, not from the order
+
 ## Features
 
 | ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |

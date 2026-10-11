@@ -77,6 +77,7 @@ def brief(
     open_items: str = "none\n",
     plan_map: str = "",
     model_map: str = "",
+    reference: str | None = None,
 ) -> str:
     parts = [
         "# Design brief: test\n",
@@ -84,6 +85,7 @@ def brief(
         f"## Inputs\n\n{inputs}",
         "## Business\n\nWho uses the data and why.\n",
         "## Service\n\nWhat is ordered.\n",
+        f"## Reference design\n\n{REFERENCE_DC if reference is None else reference}",
     ]
     if features is not None:
         parts.append(f"## Features\n\n{features}\n{plan_map}")
@@ -94,6 +96,12 @@ def brief(
     parts.append(f"## Open items\n\n{open_items}")
     return "\n".join(parts)
 
+
+REFERENCE_DC = """\
+Closest: infrahub-demo-dc
+Reused: the fabric pattern of sites, racks and devices, and its segment services
+Different: firewall rules come from the existing firewall manager
+"""
 
 BRIEF = "docs/designs/test/design-brief.md"
 EXISTING_BRIEF = "specs/test-design/design-brief.md"
@@ -563,6 +571,14 @@ WIFI_VARIANT_OPEN = """\
             "owner is 'TBD'", id="near-miss-tbd",
         ),
         pytest.param(
+            brief(
+                sketch_rows=WIFI_ROWS.replace("| serial number |", "| serial number (guess) |"),
+                open_items=WIFI_OPEN,
+                model_map=WIFI_MODEL_MAP,
+            ),
+            "still carries a (guess) from the draft", id="near-miss-guess-left-from-draft",
+        ),
+        pytest.param(
             brief(sketch_rows=WIFI_ROWS.replace("open: O1", "open: O3"), open_items=WIFI_OPEN, model_map=WIFI_MODEL_MAP),
             "references O3", id="near-miss-dangling-reference",
         ),
@@ -791,3 +807,99 @@ def test_model_map(tmp_path: Path, rows: str, model_map: str, expected: str | No
     open_items = WIFI_VARIANT_OPEN if rows is WIFI_VARIANT_ROWS else WIFI_OPEN
     write(tmp_path, BRIEF, brief(sketch_rows=rows, open_items=open_items, model_map=model_map))
     assert_outcome(run_grader("check_sketch_rows_complete.py", tmp_path), expected)
+
+
+# --------------------------------------------------------------------------
+# brief-reference-design
+# --------------------------------------------------------------------------
+
+REFERENCE_VARIANT = """\
+The closest worked example is below.
+
+- **Closest:** https://github.com/opsmill/infrahub-demo-dc (fabric and segments)
+- **Reused:** sites, racks and devices, and NetworkSegment as the ordered service.
+- **Different:** no load balancers.
+"""
+
+
+@pytest.mark.parametrize(
+    ("reference", "expected"),
+    [
+        pytest.param(REFERENCE_DC, None, id="compliant"),
+        pytest.param(REFERENCE_VARIANT, None, id="compliant-variant"),
+        pytest.param("Closest: none, no listed design models optical spans per strand\n", None, id="compliant-none-with-reason"),
+        pytest.param("", "no 'Closest:' line", id="violating-empty-section"),
+        pytest.param(
+            REFERENCE_DC.replace("infrahub-demo-dc", "infrahub-demo-netbox"),
+            "is not a reference design listed", id="near-miss-unknown-design",
+        ),
+        pytest.param(
+            REFERENCE_DC.replace(
+                "Reused: the fabric pattern of sites, racks and devices, and its segment services", "Reused: -"
+            ),
+            "says nothing about what it follows", id="near-miss-nothing-reused",
+        ),
+        pytest.param("Closest: none\n", "gives no reason", id="near-miss-none-without-reason"),
+        pytest.param(
+            REFERENCE_DC.replace("infrahub-demo-dc", "https://github.com/opsmill/infrahub-demo-campus"),
+            None, id="compliant-discovered-repo-as-url",
+        ),
+        pytest.param(
+            REFERENCE_DC.replace("infrahub-demo-dc", "infrahub-demo-campus"),
+            "nor the full URL", id="near-miss-discovered-repo-bare-name",
+        ),
+        pytest.param(
+            REFERENCE_DC.replace("infrahub-demo-dc", "https://github.com/someone/infrahub-demo-campus"),
+            "nor the full URL", id="near-miss-repo-outside-opsmill",
+        ),
+    ],
+)
+def test_reference_design(tmp_path: Path, reference: str, expected: str | None) -> None:
+    write(tmp_path, BRIEF, brief(features=FEATURES, sketch_rows=F1_ROWS, plan_map=PLAN_MAP, reference=reference))
+    assert_outcome(run_grader("check_scope_split.py", tmp_path), expected)
+
+
+def test_reference_design_section_missing(tmp_path: Path) -> None:
+    text = brief(features=FEATURES, sketch_rows=F1_ROWS, plan_map=PLAN_MAP)
+    text = text.replace("## Reference design\n\n" + REFERENCE_DC, "")
+    write(tmp_path, BRIEF, text)
+    assert_outcome(run_grader("check_scope_split.py", tmp_path), "no '## Reference design' section")
+
+
+@pytest.mark.parametrize("name", sorted(LIB.REFERENCE_DESIGNS))
+def test_every_reference_design_is_accepted(tmp_path: Path, name: str) -> None:
+    """Each listed name is a valid Closest value."""
+    write(tmp_path, BRIEF, brief(sketch_rows=F1_ROWS, reference=REFERENCE_DC.replace("infrahub-demo-dc", name)))
+    passed, message = LIB.check_reference_design(tmp_path)
+    assert passed, message
+
+
+def test_grader_reference_designs_match_the_skill() -> None:
+    """The grader's copy and the skill's table hold the same names, both ways."""
+    text = (REPO_ROOT / LIB.REFERENCE_DESIGNS_FILE).read_text()
+    assert LIB.reference_design_names_in(text) == set(LIB.REFERENCE_DESIGNS)
+
+
+# --------------------------------------------------------------------------
+# Rule links in the skill stay valid as other skills' rules are renamed
+# --------------------------------------------------------------------------
+
+SKILL_DIR = REPO_ROOT / "skills" / "infrahub-designing-models"
+
+
+@pytest.mark.parametrize(
+    "doc", sorted(p.relative_to(SKILL_DIR).as_posix() for p in SKILL_DIR.rglob("*.md")),
+)
+def test_relative_markdown_links_resolve(doc: str) -> None:
+    """A renamed or removed rule in another skill fails here, not silently in a session."""
+    import re
+
+    path = SKILL_DIR / doc
+    text = path.read_text()
+    # Links inside fenced examples are illustrations, not references.
+    text = re.sub(r"```.*?```", "", text, flags=re.S)
+    broken = [
+        link for link in re.findall(r"\]\(([^)#\s]+\.md)(?:#[^)]*)?\)", text)
+        if not link.startswith("http") and not (path.parent / link).resolve().is_file()
+    ]
+    assert not broken, f"{doc}: broken links {broken}"

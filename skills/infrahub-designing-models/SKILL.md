@@ -56,7 +56,12 @@ skill for each artifact builds it from the brief.
 1. **Read before asking.** Read `.infrahub.yml`,
    `schemas/`, and any existing `design-brief.md`. Check
    the Marketplace (`infrahubctl marketplace search
-   <domain>`) for a published schema to build on.
+   <domain>`) for a published schema to build on, and
+   pick the closest worked example from
+   [references/reference-designs.md](./references/reference-designs.md),
+   including newer demos it tells you how to find. Read
+   [rules/brief-reference-design.md](./rules/brief-reference-design.md)
+   before choosing.
    Never ask what these already answer. Extending a
    design means editing its brief, not starting another.
 2. **Ask for inputs once, first.** Before reading the
@@ -75,18 +80,38 @@ skill for each artifact builds it from the brief.
    [rules/interview-one-question-recommended.md](./rules/interview-one-question-recommended.md)
    before writing the first one. Push back once on a
    vague answer ("scalable", "everything", "like
-   NetBox"), then record what the user says.
+   NetBox"), then record what the user says. Keep the
+   business and service layers short, about five
+   questions together: the draft in step 6 shows which
+   of their gaps matter, and you can return to them.
 5. **Check the scope after the service layer,** before
    the data questions. Read
    [rules/scope-split-before-data-layer.md](./rules/scope-split-before-data-layer.md)
    for the signals, the merge rule, and what a split
    leaves in the sketch.
-6. **Data layer, for F1 only.** Stop when every node
-   kind in the sketch has an identity, a source of truth
-   and an owner, or an open item, and you can predict
-   the answers to your next three questions. At about
-   25 questions, turn the remaining gaps into open
-   items.
+6. **Draft the sketch, then question the draft,** for
+   F1 only. Before the first data question, show a draft
+   of F1's sketch table, and the Features table after a
+   split, built from the inputs, the answers so far, and
+   the closest reference design. Fill every cell with
+   your best guess and mark each guess `(guess)`. Ground
+   each guess in the current best-practice rules, which
+   grow over time: list the file names in
+   `../infrahub-managing-schemas/rules/` and the
+   `yagni-*` files in `../infrahub-auditing-repo/rules/`,
+   then read only the rules that govern a decision in
+   front of you, and name the rule as the question's
+   basis. The links in the question bank are starting
+   points, not the full set. People correct a draft faster than they
+   answer questions about a model they cannot see. Then
+   ask about the guesses that change the design most,
+   one question block per message with the draft as its
+   lead-in, and after each answer show only the rows
+   that changed. Stop when every node kind has an
+   identity, a source of truth and an owner, or an open
+   item, and you can predict the answers to your next
+   three questions. At about 25 questions, turn the
+   remaining guesses into open items.
 7. **Restate and confirm,** only when the user can
    reply (otherwise see "When the user cannot reply").
    First ask again about each accepted recommendation
@@ -120,7 +145,8 @@ skill for each artifact builds it from the brief.
 Some requests come with every answer up front, or say
 the user is away. Do not ask: take the answers as
 given, record each decision with its provenance, and
-skip step 7. Turn whatever they did not answer, and
+skip step 7. Build the draft of step 6 for yourself but
+do not present it; go straight to the brief. Turn whatever they did not answer, and
 every recommendation they did not confirm, into an
 `open` decision with an open item rather than a
 default, and write the brief. When there are no
@@ -132,7 +158,7 @@ answers at all, write only the next question block.
 | -------- | -------- | ------ | ----------- |
 | CRITICAL | Interview | `interview-` | One question per message with a recommended answer; every input used as evidence |
 | HIGH | Scope | `scope-` | Split a too-big scope into ordered features before the data questions; sketch F1 only |
-| HIGH | Brief | `brief-` | Complete sketch rows or open items; every decision tagged with its provenance; plan and model maps that match their tables |
+| HIGH | Brief | `brief-` | Complete sketch rows or open items; every decision tagged with its provenance; plan and model maps that match their tables; the closest reference design named |
 
 Full scope per prefix is in `rules/_sections.md`.
 
@@ -140,8 +166,11 @@ Full scope per prefix is in `rules/_sections.md`.
 
 - `references/brief-format.md`: the brief's location,
   sections and tables. The single home for that format.
-- `references/question-bank.md`: questions by layer, and
-  the Infrahub defaults a recommendation can rest on.
+- `references/question-bank.md`: questions by layer, the
+  schema and YAGNI rules each one serves, and the
+  Infrahub defaults a recommendation can rest on.
+- `references/reference-designs.md`: OpsMill worked
+  examples to build from, and how to find newer ones.
 - `../infrahub-managing-*/`: build each feature's
   artifacts from the finished brief, schema first.
 - `../infrahub-common/marketplace-reference.md`: the
