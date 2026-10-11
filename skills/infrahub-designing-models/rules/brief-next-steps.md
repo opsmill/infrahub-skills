@@ -13,7 +13,9 @@ in the format in
 [../references/brief-format.md](../references/brief-format.md),
 that a person can follow.
 
-1. Open items that F1's sketch waits on come first.
+1. Every open item that a cell of F1's sketch refers to
+   (`open: O<n>`) is named in a step before F1's step,
+   also when you group open items by owner.
 2. Each feature has a step, after the steps of the
    features it depends on.
 3. Each feature's step is worded for the workflow the

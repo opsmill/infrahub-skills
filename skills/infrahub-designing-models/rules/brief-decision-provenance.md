@@ -11,10 +11,11 @@ tags: brief, decisions, provenance, recommendations
 Every decision in the brief is a row in `## Decision
 log`, tagged with where it came from:
 
-- `stated`: the user said it, unprompted or by choosing
-  a non-recommended option or free text.
-- `recommended`: you recommended it and the user
-  accepted. The `Basis` column keeps the reason it was
+- `stated`: the user said it, unprompted, by choosing
+  a non-recommended option or free text, or by saying
+  yes to a question that carried no recommendation.
+- `recommended`: you marked it as your recommendation
+  and the user accepted that option. The `Basis` column keeps the reason it was
   recommended.
 - `open`: not decided. The `Basis` column names the
   open item that tracks it (`O1`), and that item is
