@@ -23,9 +23,10 @@ and nothing else that asks anything:
    line is the last line of the message.
 
 A lead-in before the block is fine if it asks nothing:
-one line during the interview, or the restated brief
-before the final confirmation question (SKILL.md step
-7). No schema YAML, ever, even when the user asks
+one line early in the interview, the current draft
+sketch during the data questions (SKILL.md step 6), or
+the restated brief before the final confirmation
+question (SKILL.md step 7). No schema YAML, ever, even when the user asks
 for it: the schema is written from the finished brief.
 
 ## Why it matters

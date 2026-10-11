@@ -62,6 +62,9 @@ _RECOMMENDED = re.compile(r"\*\*\(Recommended\)\*\*")
 _SENTENCE_QUESTION = re.compile(r"\?(?=[\s*_)\"'”]|$)")
 _FEATURE_ID = re.compile(r"\bF(\d+)\b")
 _NO_PREREQUISITE = {"-", "none"}
+# The draft shown during the interview marks unconfirmed cells this way;
+# none may reach the brief.
+_GUESS = re.compile(r"\(\s*guess\s*\)", re.IGNORECASE)
 _OPEN_REF = re.compile(r"\bopen:\s*(O\d+)\b", re.IGNORECASE)
 _OPEN_ID = re.compile(r"\b(O\d+)\b", re.IGNORECASE)
 _OPEN_ITEM = re.compile(r"^\s*(?:[-*]|\d+[.)])?\s*\**\s*(O\d+)\s*\**\s*:", re.IGNORECASE)
@@ -580,6 +583,9 @@ def check_sketch_rows_complete(ws: Path) -> tuple[bool, str]:
     kind_col = _column(headers, "node kind") or ""
     for row in rows:
         kind = _clean(row.get(kind_col, "")) or "?"
+        for header, cell in row.items():
+            if _GUESS.search(_clean(cell)):
+                return False, f"{kind}: {header} still carries a (guess) from the draft; confirm it or make it an open item"
         for name, col in columns.items():
             value = _clean(row.get(col, ""))
             ref = _OPEN_REF.search(value)
@@ -913,6 +919,79 @@ def check_model_map_matches(ws: Path) -> tuple[bool, str]:
 
 
 # --------------------------------------------------------------------------
+# Rule: brief-reference-design  (artifact: the brief)
+# --------------------------------------------------------------------------
+
+REFERENCE_HEADING = "reference design"
+# The list of reference designs lives in the skill; read it from there so the
+# grader holds no second copy.
+# The names in the skill's references/reference-designs.md table. The grading
+# sandbox has no copy of the skill, so the grader keeps this list;
+# tests/graders/test_designing_models_lib.py fails when the two differ.
+REFERENCE_DESIGNS = frozenset({
+    "infrahub-demo-dc",
+    "infrahub-demo-service-catalog",
+    "infrahub-solution-ai-dc",
+    "infrahub-demo-sp",
+    "infrahub-demo-otn",
+    "infrahub-demo-reachability-check",
+})
+REFERENCE_DESIGNS_FILE = Path("skills/infrahub-designing-models/references/reference-designs.md")
+
+
+# A design found at run time that the table does not list yet: accepted only
+# as a full URL into the opsmill organisation, never as a bare name.
+_DISCOVERED_REPO = re.compile(r"^https?://github\.com/opsmill/infrahub-(?:demo|solution)-[a-z0-9-]+/?$")
+_LABEL_LINE = re.compile(
+    r"^\s*(?:[-*]\s*)?\**\s*(closest|reused|different)\s*\**\s*:\s*\**\s*(.*?)\s*$", re.IGNORECASE
+)
+
+
+def reference_design_names_in(text: str) -> set[str]:
+    """The names in the first column of a reference-design table."""
+    headers, rows = first_table(text)
+    name_col = _column(headers, "name")
+    if name_col is None:
+        return set()
+    return {_clean(r[name_col]).lower() for r in rows if _clean(r[name_col])}
+
+
+def check_reference_design(ws: Path, names: set[str] | None = None) -> tuple[bool, str]:
+    """The brief names the closest reference design and what it reuses, or none with a reason."""
+    parts, err = _brief_sections(ws)
+    if parts is None:
+        return False, err
+    if REFERENCE_HEADING not in parts:
+        return False, "brief has no '## Reference design' section"
+    known = names if names is not None else REFERENCE_DESIGNS
+    labels: dict[str, str] = {}
+    for line in _lines_outside_fences(parts[REFERENCE_HEADING]):
+        match = _LABEL_LINE.match(line)
+        if match:
+            labels.setdefault(match.group(1).lower(), _clean(match.group(2)))
+    closest = labels.get("closest")
+    if not closest:
+        return False, "Reference design has no 'Closest:' line"
+    # The first word, read whole so a URL keeps its scheme; "none:" loses its colon.
+    first = re.split(r"[\s(,;]", closest.strip(), maxsplit=1)[0].lower().rstrip(".:")
+    if first == "none":
+        reason = closest[len("none"):].strip(" :-,;.(")
+        if not reason:
+            return False, "'Closest: none' gives no reason"
+        return True, "no reference design fits, with a reason"
+    discovered = _DISCOVERED_REPO.match(first)
+    name = re.sub(r"^https?://github\.com/opsmill/", "", first).strip("/")
+    if name not in known and not discovered:
+        return False, (
+            f"'Closest: {closest}' is not a reference design listed in {REFERENCE_DESIGNS_FILE.name}, "
+            "nor the full URL of an opsmill infrahub-demo-* or infrahub-solution-* repository"
+        )
+    if not labels.get("reused") or labels["reused"].lower().rstrip(".") in PLACEHOLDERS:
+        return False, f"the brief names {name} but its 'Reused:' line says nothing about what it follows"
+    return True, f"closest reference design is {name}, with what it reuses"
+
+
+# --------------------------------------------------------------------------
 # Registry
 # --------------------------------------------------------------------------
 
@@ -920,6 +999,7 @@ CHECKS: dict[str, Callable[[Path], tuple[bool, str]]] = {
     "one-question-recommended": check_one_question_recommended,
     "scope-split-f1-only": check_scope_split_f1_only,
     "features-artifacts": check_features_artifacts,
+    "reference-design": check_reference_design,
     "plan-map-matches": check_plan_map_matches,
     "model-map-matches": check_model_map_matches,
     "sketch-rows-complete": check_sketch_rows_complete,

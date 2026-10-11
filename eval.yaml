@@ -9342,6 +9342,9 @@ tasks:
 
   - name: design-scope-split
     trials: 3
+    # The largest design task (four domains, a split, two maps and a
+    # reference design) runs past the 300s default in about half its trials.
+    timeout: 480
     instruction: |
       Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
 
@@ -9381,6 +9384,8 @@ tasks:
         check: Every feature lists supported artifact types, schema first
       - name: plan-map-matches
         check: The Features mermaid map has one node per feature with its artifacts and one arrow per dependency
+      - name: reference-design
+        check: The brief names its closest reference design and what it reuses, or none with a reason
       - name: sketch-rows-complete
         check: Every sketch row has identity, source of truth and owner, or an open item
 
