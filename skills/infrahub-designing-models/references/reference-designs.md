@@ -34,11 +34,13 @@ gh repo list opsmill --limit 300 --no-archived --json name,description \
   --jq '.[] | select(.name | test("^infrahub-(demo|solution)-")) | "\(.name): \(.description)"'
 ```
 
-A repository that is not in the table but fits the use
-case better can be the reference design. Read its
-README and schema files first, and name it in the brief
-by its full URL, `https://github.com/opsmill/<name>`.
-Without network access, use the table.
+Run it once. A repository that is not in the table but
+fits the use case better can be the reference design:
+read its README and schema files first, and name it in
+the brief by its full URL,
+`https://github.com/opsmill/<name>`. When the command
+fails or does not return promptly, use the table and do
+not retry.
 
 ## How to use it
 

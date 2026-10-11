@@ -49,14 +49,17 @@ skill for each artifact builds it from the brief.
 1. **Read before asking.** Read `.infrahub.yml`,
    `schemas/`, and any existing `design-brief.md`. Check
    the Marketplace (`infrahubctl marketplace search
-   <domain>`) for a published schema to build on (when
-   it cannot run, say so and keep it as an open item),
-   and pick the closest worked example from
+   <domain>`) for a published schema to build on, and
+   pick the closest worked example from
    [references/reference-designs.md](./references/reference-designs.md),
    including newer demos it tells you how to find. Read
    [rules/brief-reference-design.md](./rules/brief-reference-design.md)
    before choosing.
-   Never ask what these already answer. Extending a
+   Discovery that needs the network runs once: one
+   Marketplace search for the domain, one listing of
+   newer demos. A command that fails or does not return
+   promptly is not retried; record it as an open item and
+   go on. Never ask what these already answer. Extending a
    design means editing its brief, not starting another;
    see "Extending a brief" below.
 2. **Ask for inputs once, first.** Before reading the
