@@ -9388,7 +9388,7 @@ tasks:
       - name: plan-map-matches
         check: The Features mermaid map has one node per feature with its artifacts and one arrow per dependency
       - name: reference-design
-        check: The brief names its closest reference design and what it reuses, or none with a reason
+        check: The brief names its closest reference design and Marketplace matches, or none with a reason
       - name: sketch-rows-complete
         check: Every sketch row has identity, source of truth and owner, or an open item
 
