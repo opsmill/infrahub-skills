@@ -880,7 +880,7 @@ The closest worked example is below.
         pytest.param(REFERENCE_VARIANT, None, id="compliant-variant"),
         pytest.param(
             "Closest: infrahub-demo-dc\n\nReused:\n- the fabric pattern of sites, racks and devices\n- NetworkSegment as the ordered service\n"
-            "Marketplace: infrahub/base-schemas\n",
+            "Marketplace:\n- infrahub/base-schemas: LocationSite, DcimDevice\n- infrahub/vlan: the segment VLANs\n",
             None, id="compliant-reused-as-bullets",
         ),
         pytest.param(
@@ -891,6 +891,19 @@ The closest worked example is below.
             REFERENCE_DC.replace("Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)",
                                  "Marketplace: none matched, no published schema models firewall policy"),
             None, id="compliant-marketplace-none-matched",
+        ),
+        pytest.param(
+            REFERENCE_DC.replace("infrahub/base-schemas (LocationSite, DcimDevice)", "infrahub/base-schemas"),
+            "without the node kinds it covers", id="near-miss-schema-without-kinds",
+        ),
+        pytest.param(
+            REFERENCE_DC.replace("infrahub/base-schemas (LocationSite, DcimDevice)",
+                                 "infrahub/vlan and infrahub/base-schemas (LocationSite, DcimDevice)"),
+            "names infrahub/vlan without", id="near-miss-second-schema-without-kinds",
+        ),
+        pytest.param(
+            "Closest: infrahub-demo-dc\nReused: the fabric pattern\nMarketplace:\n- infrahub/base-schemas (LocationSite)\n- `infrahub/vlan`\n",
+            "names infrahub/vlan without", id="near-miss-bullet-schema-without-kinds",
         ),
         pytest.param(
             REFERENCE_DC.replace("Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)\n", ""),
@@ -1165,3 +1178,13 @@ WIFI_TWO_FEATURES = WIFI_FEATURES + "| F2 | Guest portal | Guests self-register 
 def test_open_items_name_features(tmp_path: Path, features: str, open_items: str, expected: str | None) -> None:
     write(tmp_path, BRIEF, brief(features=features, sketch_rows=WIFI_ROWS, open_items=open_items, model_map=WIFI_MODEL_MAP))
     assert_outcome(run_grader("check_sketch_rows_complete.py", tmp_path), expected)
+
+
+def test_missing_brief_names_stray_briefs_outside_skipped_folders(tmp_path: Path) -> None:
+    """A brief written elsewhere is named; skills, docs/docs and node_modules are not searched."""
+    write(tmp_path, "notes/design-brief.md", "# Design brief\n")
+    write(tmp_path, "skills/infrahub-designing-models/brief-format.md", "x\n")
+    write(tmp_path, "docs/docs/design-brief.md", "x\n")
+    write(tmp_path, "docs/node_modules/pkg/brief.md", "x\n")
+    _, err = LIB.find_brief(tmp_path)
+    assert "found instead: ['notes/design-brief.md']" in err, err
