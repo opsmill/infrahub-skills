@@ -167,10 +167,12 @@ skillgrade --eval=<task> --trials=1     # skill unread, expect below 1.0
 # then restore the line
 ```
 
-Below 1.0 and the proof lands. A 1.0 does not mean the task is broken: the
-line is a pointer and the sandbox still ships the skill, so read the three
-cases in `dev/guides/running-evals.md` and report which one this is rather
-than hardening a prompt that was never the problem. This proof only carries
+First check the output for a grader read, which voids the trial at any score
+(see `dev/guides/running-evals.md` § "Prove the task discriminates"). On a
+trial that counts, below 1.0 and the proof lands. A 1.0 does not mean the task
+is broken: the line is a pointer and the sandbox still ships the skill, so read
+the three readings in `dev/guides/running-evals.md` and report which one this
+is rather than hardening a prompt that was never the problem. This proof only carries
 signal now that the rule exists, which is why
 `test-driving-skill-changes` leaves it to this stage: with the rule absent the
 task scores below 1.0 either way.

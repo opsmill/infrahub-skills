@@ -41,16 +41,17 @@ rule as covered forever.
    the same `eval.yaml`, so the diff is empty and the
    job is green.
 
-   Below 1.0 and the step is met. A 1.0 is met only by
-   the disposition its reading carries, and every
-   reading carries one:
+   First check the trial's output for a grader read,
+   using the tell in `running-evals.md` § "Prove the
+   task discriminates". A trial that read the grader is
+   void at any score, and no score from it counts,
+   before/after included. Re-run, and count only trials
+   whose output shows no grader read.
 
-   - The model read the grader: the trial is void and
-     no score from it counts, before/after included.
-     Re-run, and count only trials whose output shows
-     no grader read. Rule this reading out first; its
-     tell is in `running-evals.md` § "Prove the task
-     discriminates".
+   On a trial that counts, below 1.0 and the step is
+   met. A 1.0 is met only by the disposition its
+   reading carries, and every reading carries one:
+
    - The model read the skill anyway: record the
      before/after score on the same prompt and grader.
    - The task measures the model: not a result. Harden

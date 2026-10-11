@@ -139,9 +139,10 @@ Read `Defect class` from the handoff file: `guidance` follows
    repository as it stands scoring below 1.0. Require a score below 1.0 here.
    A score of 1.0 means the model already produces the wanted behavior
    without the rule, so the rule may be redundant: escalate, do not record it
-   as a pass. First rule out the "model read the grader" reading in
-   `dev/guides/running-evals.md` § "Prove the task discriminates": a trial
-   that read the grader is void, so re-run it instead of escalating. The discrimination proof, the same task run with the skill
+   as a pass. Before reading the score, check the trial's output for a
+   grader read, using the tell in `dev/guides/running-evals.md` § "Prove the
+   task discriminates": a trial that read the grader is void at any score, so
+   re-run it instead of recording it or escalating. The discrimination proof, the same task run with the skill
    unread, belongs to `implementing-skill-changes`: while the rule is absent
    the task scores below 1.0 whether the skill is read or not, so running it
    here proves nothing.
