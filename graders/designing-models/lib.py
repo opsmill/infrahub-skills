@@ -1047,13 +1047,16 @@ MECHANISM_ARTIFACTS = {"generator", "check", "transform"}
 # How a Next step may name the skill that builds each artifact.
 ARTIFACT_SKILLS = {
     "schema": ("schema manager", "infrahub-managing-schemas"),
-    "objects": ("object manager", "infrahub-managing-objects", "data importer", "infrahub-importing-data"),
+    "objects": ("object manager", "infrahub-managing-objects"),
     "generator": ("generator manager", "infrahub-managing-generators"),
     "check": ("check manager", "infrahub-managing-checks"),
     "transform": ("transform manager", "infrahub-managing-transforms"),
     "menu": ("menu manager", "infrahub-managing-menus"),
 }
 # A step that passes the feature on: "Handoff", "hand off", "hand it off", or spec-kit.
+# The data importer builds objects only from CSV or TSV files the brief lists in Inputs.
+IMPORTER_NAMES = ("data importer", "infrahub-importing-data")
+_TABULAR = re.compile(r"\.(?:csv|tsv)$", re.IGNORECASE)
 _HANDOFF = re.compile(r"hand\s*-?\s*(?:it\s+)?off|/speckit\.specify", re.IGNORECASE)
 _STEP = re.compile(r"^\s*(\d+)[.)]\s+(.*\S)\s*$")
 
@@ -1185,6 +1188,11 @@ def check_next_steps_in_order(ws: Path) -> tuple[bool, str]:
         for o in re.findall(r"\bO(\d+)\b", text):
             open_step.setdefault(f"O{o}", index)
     arts, _, _, _ = _features(parts)
+    in_headers, in_rows = first_table(parts.get(INPUTS_HEADING, ""))
+    file_col = _column(in_headers, "file")
+    tabular = file_col is not None and any(
+        _TABULAR.search(name) for row in in_rows for name in _file_names(row[file_col])
+    )
     for fid in order:
         if fid not in first_step:
             return False, f"Next steps never take up {fid}"
@@ -1196,6 +1204,8 @@ def check_next_steps_in_order(ws: Path) -> tuple[bool, str]:
             continue
         for artifact in sorted(arts.get(fid, set())):
             names = ARTIFACT_SKILLS.get(artifact, ())
+            if artifact == "objects" and tabular:
+                names += IMPORTER_NAMES
             if names and not any(n in text for n in names):
                 return False, (
                     f"Next steps for {fid} neither hand it off nor name the skill for its {artifact} "
@@ -1242,7 +1252,7 @@ def check_open_items_name_features(ws: Path) -> tuple[bool, str]:
     parts, err = _brief_sections(ws)
     if parts is None:
         return False, err
-    arts, _, order, err = _features(parts)
+    _, _, order, err = _features(parts)
     if err:
         return False, err
     items = _open_item_features(parts)
