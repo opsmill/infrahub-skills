@@ -45,6 +45,12 @@ rule as covered forever.
    the disposition its reading carries, and every
    reading carries one:
 
+   - The model read the grader: the trial is void and
+     no score from it counts, before/after included.
+     Re-run, and count only trials whose output shows
+     no grader read. Rule this reading out first; its
+     tell is in `running-evals.md` § "Prove the task
+     discriminates".
    - The model read the skill anyway: record the
      before/after score on the same prompt and grader.
    - The task measures the model: not a result. Harden

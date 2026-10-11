@@ -259,7 +259,7 @@ Stop and report rather than guessing forward, when:
 - the fix the diagnosis calls for needs an artifact the recorded rung forbids
 - the targeted eval will not reach 1.0 after reasonable rewording
 - the discrimination run scores 1.0 with the skill unread and none of the
-  three readings in `dev/guides/running-evals.md` accounts for it
+  readings in `dev/guides/running-evals.md` accounts for it
 - a gate fails for a reason outside the handoff's scope
 
 ## Common mistakes
@@ -269,7 +269,7 @@ Stop and report rather than guessing forward, when:
 | Weakening the grader instead of fixing the cause | The test passes, but the defect the handoff diagnosed is still there |
 | Adding a rule file when the rung said edit an existing one | Splits one concern across two files and pays a second grader and eval forever |
 | Linking the rule only from `_sections.md` | The rule is read after the mistake, which is the same as not writing it down |
-| Skipping the discrimination proof | An unread run scoring 1.0 is unexplained until one of the three readings accounts for it |
+| Skipping the discrimination proof | An unread run scoring 1.0 is unexplained until one of the readings in `dev/guides/running-evals.md` accounts for it |
 | Skipping the sweep | An old claim the change makes wrong survives next to the new one |
 | Committing `eval.yaml` without the regenerated JSON | `evaluations/*.json` silently diverges from the source it was built from |
 | Editing `CHANGELOG.md` by hand | Bypasses the fragment system that assembles the release notes |

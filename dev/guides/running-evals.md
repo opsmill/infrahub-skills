@@ -223,16 +223,20 @@ reaching the grader.
 
 **Prove the task discriminates.** Every task's
 `instruction` opens with a `Read the skill at
-.agents/skills/<skill>/SKILL.md` line. Delete that
+skills/<skill>/SKILL.md` line. Delete that
 line for the run and restore it afterwards. Do not
 comment it out: `instruction:` is a literal block
 scalar, so a `#` is body text and the model still
 receives the pointer.
 
 Deleting it removes the pointer, not the skill.
-skillgrade copies the working tree into the sandbox,
-so the files stay findable and the model may read
-them anyway. Run the task without the line:
+skillgrade installs every skill it detects into the
+sandbox's `.claude/skills/` and `.agents/skills/`, so
+the model can still find and read it. skillgrade also
+copies the top-level directory of each grader's `run:`
+path, so all of `graders/` sits in the sandbox while
+the model works, and `tests/test.sh` holds the grader
+command. Run the task without the line:
 
 ```bash
 skillgrade --eval=<task-name> --trials=1
@@ -242,8 +246,18 @@ skillgrade --eval=<task-name> --trials=1
 Leave the rest of the instruction untouched, since
 the task body is what you are testing. A score below
 1.0 proves the task discriminates. A 1.0 does not
-prove the opposite. It has three readings:
+prove the opposite. It has four readings, and the
+first one rules out the other three:
 
+- **The model read the grader.** The tell is an output
+  that names `graders/`, a `check_*.py` file, `tests/`,
+  or a grader score. The trial is void. It is not the
+  next reading, and a before/after score does not
+  rescue it, because the model can read the grader in
+  both runs. Re-run, and count only trials whose output
+  shows no grader read. A model that reads the grader
+  and does not say so cannot be detected, because
+  skillgrade records only the model's final text.
 - **The model read the skill anyway.** The tell is an
   answer quoting the rule near-verbatim. The proof is
   inconclusive, not failed.
@@ -259,8 +273,9 @@ prove the opposite. It has three readings:
   `rule-equals-test.md` carve out the eval task and
   its task grader together.
 
-When it stays inconclusive, the usable evidence is the
-before/after score on the same prompt and grader.
+When the model read the skill and the proof stays
+inconclusive, the usable evidence is the before/after
+score on the same prompt and grader.
 
 ## Iteration Loop
 
