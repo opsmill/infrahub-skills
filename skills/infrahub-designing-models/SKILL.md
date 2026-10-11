@@ -50,11 +50,10 @@ skill for each artifact builds it from the brief.
    `schemas/`, and any existing `design-brief.md`. Check
    the Marketplace (`infrahubctl marketplace search
    <domain>`) for a published schema to build on, and
-   pick the closest worked example from
+   read the worked examples in
    [references/reference-designs.md](./references/reference-designs.md),
-   including newer demos it tells you how to find. Read
-   [rules/brief-reference-design.md](./rules/brief-reference-design.md)
-   before choosing.
+   including newer demos it tells you how to find. You
+   choose one in step 5.
    Discovery that needs the network runs once: one
    Marketplace search for the domain, one listing of
    newer demos. A command that fails or does not return
@@ -85,11 +84,15 @@ skill for each artifact builds it from the brief.
    business and service layers short, about five
    questions together: the draft in step 6 shows which
    of their gaps matter, and you can return to them.
-5. **Check the scope after the service layer,** before
-   the data questions. Read
+5. **Check the scope and choose the reference design
+   after the service layer,** before the data questions.
+   Read
    [rules/scope-split-before-data-layer.md](./rules/scope-split-before-data-layer.md)
    for the signals, the merge rule, and what a split
-   leaves in the sketch.
+   leaves in the sketch, and
+   [rules/brief-reference-design.md](./rules/brief-reference-design.md)
+   to choose the closest worked example from the
+   business and service answers and the user's inputs.
 6. **Draft the sketch, then question the draft,** for
    F1 only. People correct a draft faster than they
    answer questions about a model they cannot see.
@@ -169,17 +172,18 @@ skill for each artifact builds it from the brief.
 ### When the user cannot reply
 
 Some requests come with every answer up front, or say
-the user is away. Do not ask: take the answers as
-given, record each decision with its provenance, and
-skip step 7. Build the draft of step 6 for yourself but
-do not present it; go straight to the brief. Turn every
+the user is away. When there are no answers at all,
+write only the next question block. Otherwise do not
+ask: take the answers as given, record each decision
+with its provenance, and skip step 7. Build the draft
+of step 6 for yourself but do not present it; go
+straight to the brief. Turn every
 design decision they did not answer, and every
 recommendation you would have asked them to confirm,
 into an `open` decision with an open item rather than a
 default, and write the brief. Node kind names and the
 outcome of the skill's own rules, such as not
-splitting, are recorded, not opened. When there are no
-answers at all, write only the next question block.
+splitting, are recorded, not opened.
 
 ### When the user asks for every question at once
 
@@ -195,8 +199,13 @@ uncorrected becomes an open item, as above.
 
 ### Extending a brief
 
-- Keep what was agreed: existing features, sketch rows,
-  decisions and open items stay as they are.
+- Keep what was agreed: existing features, sketch rows
+  and decisions stay as they are unless the user changes
+  them.
+- Close what the user answers: an open item they settle
+  becomes a `stated` decision, its `open: O<n>` cells
+  take the answer, and the item leaves Open items and
+  Next steps. Items still unanswered stay.
 - Continue the numbering: the next feature ID, decision
   number and `O<n>` after the highest in the brief.
 - A gap found in an agreed feature, such as a peer F1's
