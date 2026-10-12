@@ -1364,6 +1364,13 @@ def value_brief(value: str | None = DEFAULT_VALUE, features: str = FEATURES, **k
             None, id="compliant-other-leads",
         ),
         pytest.param(
+            value_brief(
+                VALUE_THREE,
+                FEATURES_VALUE.replace("| Reduced engineering effort | Prefix", "| Reduced engineering effort for other teams | Prefix"),
+            ),
+            None, id="compliant-word-other-in-a-cell-is-not-the-other-entry",
+        ),
+        pytest.param(
             value_brief("Value: Other: audit evidence for every firewall change (recommended)"),
             "an 'Other' entry is always stated", id="near-miss-other-recommended",
         ),
