@@ -69,7 +69,7 @@ _NO_PREREQUISITE = {"-", "none"}
 _GUESS = re.compile(r"\(\s*guess\s*\)", re.IGNORECASE)
 _OPEN_REF = re.compile(r"\bopen:\s*(O\d+)\b", re.IGNORECASE)
 _OPEN_ID = re.compile(r"\b(O\d+)\b", re.IGNORECASE)
-_OPEN_ITEM = re.compile(r"^\s*(?:[-*]|\d+[.)])?\s*\**\s*(O\d+)\s*\**\s*:", re.IGNORECASE)
+_OPEN_ITEM = re.compile(r"^\s*(?:[-*]|\d+[.)])?\s*\**\s*(O\d+)\s*\**\s*:(.*)$", re.IGNORECASE)
 _TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
 _UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
 # A top-level schema key on its own line, whether or not the YAML parses.
@@ -157,6 +157,15 @@ def _clean(cell: str) -> str:
     return re.sub(r"\s+", " ", cell).strip()
 
 
+def _artifacts(cell: str) -> list[str]:
+    """The artifact types an Artifacts cell lists, lower-cased."""
+    return [a.strip() for a in re.split(r"[,;]|\band\b|->|→", _clean(cell).lower()) if a.strip()]
+
+
+def _is_placeholder(value: str) -> bool:
+    return value.lower().rstrip(".") in PLACEHOLDERS
+
+
 def _split_row(line: str) -> list[str]:
     body = line.strip()
     if body.startswith("|"):
@@ -200,7 +209,7 @@ def _column(headers: list[str], name: str) -> str | None:
 
 # Folders a stray brief is never looked for in: the skills themselves, the
 # docs site, and tool folders that can hold thousands of files.
-_SKIP_TOP = {"skills", ".agents", ".claude", ".codex", ".git"}
+_SKIP_TOP = {"skills", ".agents", ".claude", ".codex"}
 _SKIP_ANY = {"node_modules", ".git", ".venv", "__pycache__"}
 
 
@@ -315,10 +324,9 @@ def check_one_question_recommended(ws: Path) -> tuple[bool, str]:
     # the five value drivers, and one or two of them are recommended.
     # A sixth, last option "Other (say which)" takes the user's own words.
     texts = [_norm(_OPTION.match(lines[i]).group(2)) for i in options]
-    has_other = bool(texts) and texts[-1].startswith("other")
+    has_other = bool(texts) and texts[-1].startswith(OTHER)
     driver_options = options[:-1] if has_other else options
-    leads = [next((d for d in VALUE_DRIVERS if _norm(_OPTION.match(lines[i]).group(2)).startswith(d)), None)
-             for i in driver_options]
+    leads = [next((d for d in VALUE_DRIVERS if t.startswith(d)), None) for t in texts[:len(driver_options)]]
     value_block = len(driver_options) == len(VALUE_DRIVERS) and set(leads) == set(VALUE_DRIVERS)
     if value_block and has_other and _RECOMMENDED.search(lines[options[-1]]):
         return False, "the 'Other' option is never recommended: the skill cannot recommend a value it did not hear"
@@ -552,7 +560,7 @@ def check_scope_split_f1_only(ws: Path) -> tuple[bool, str]:
         handoff = _clean(row[handoff_col])
         if not handoff:
             return False, f"F{position} has an empty Handoff cell"
-        if handoff.lower().rstrip(".") in PLACEHOLDERS:
+        if _is_placeholder(handoff):
             return False, f"F{position} has a placeholder Handoff cell: {handoff!r}"
 
     s_headers, s_rows, err = _sketch(parts)
@@ -588,8 +596,7 @@ def check_features_artifacts(ws: Path) -> tuple[bool, str]:
         return False, "Features table has no 'ID' and 'Artifacts' columns"
     for row in rows:
         fid = _clean(row[id_col]) or "?"
-        items = [a for a in re.split(r"[,;]|\band\b|->|→", _clean(row[art_col]).lower()) if a.strip()]
-        items = [a.strip() for a in items]
+        items = _artifacts(row[art_col])
         if not items:
             return False, f"{fid} has an empty Artifacts cell"
         unknown = [a for a in items if a not in ARTIFACT_TYPES]
@@ -632,7 +639,7 @@ def check_sketch_rows_complete(ws: Path) -> tuple[bool, str]:
     for row in rows:
         kind = _clean(row.get(kind_col, "")) or "?"
         evidence = _clean(row.get(ev_col, ""))
-        if evidence.lower().rstrip(".") in PLACEHOLDERS:
+        if _is_placeholder(evidence):
             return False, f"{kind}: Evidence is {evidence!r}; name the file, answer or reference design it came from"
         for header, cell in row.items():
             if _GUESS.search(_clean(cell)):
@@ -644,7 +651,7 @@ def check_sketch_rows_complete(ws: Path) -> tuple[bool, str]:
                 if ref.group(1).upper() not in open_ids:
                     return False, f"{kind}: {name} references {ref.group(1)}, which is not in Open items"
                 continue
-            if value.lower().rstrip(".") in PLACEHOLDERS:
+            if _is_placeholder(value):
                 return False, f"{kind}: {name} is {value!r}, neither an answer nor an open item reference"
     return True, "every sketch row has identity, source of truth and owner, or an open item"
 
@@ -875,7 +882,8 @@ def check_plan_map_matches(ws: Path) -> tuple[bool, str]:
     table_ids = []
     want_edges: set[tuple[str, str]] = set()
     for row in rows:
-        fid = "F" + _FEATURE_ID.findall(_clean(row[id_col]))[0] if _FEATURE_ID.findall(_clean(row[id_col])) else "?"
+        ids = _FEATURE_ID.findall(_clean(row[id_col]))
+        fid = f"F{ids[0]}" if ids else "?"
         table_ids.append(fid)
         for dep in _FEATURE_ID.findall(_clean(row[dep_col])):
             want_edges.add((f"F{dep}", fid))
@@ -888,7 +896,7 @@ def check_plan_map_matches(ws: Path) -> tuple[bool, str]:
             # Read artifacts from what is left once the name is removed, so
             # a feature called 'Menus' or 'Policy check' cannot supply them.
             label_words = set(re.findall(r"[a-z]+", label[: named.start()] + " " + label[named.end():]))
-            want = {a.strip() for a in re.split(r"[,;]|\band\b|->|→", _clean(row[art_col]).lower()) if a.strip()}
+            want = set(_artifacts(row[art_col]))
             missing = sorted(want - label_words)
             if missing:
                 return False, f"plan map node for {fid} does not show its artifacts {missing}"
@@ -980,8 +988,6 @@ def check_model_map_matches(ws: Path) -> tuple[bool, str]:
 # --------------------------------------------------------------------------
 
 REFERENCE_HEADING = "reference design"
-# The list of reference designs lives in the skill; read it from there so the
-# grader holds no second copy.
 # The names in the skill's references/reference-designs.md table. The grading
 # sandbox has no copy of the skill, so the grader keeps this list;
 # tests/graders/test_designing_models_lib.py fails when the two differ.
@@ -1015,14 +1021,13 @@ def reference_design_names_in(text: str) -> set[str]:
     return {_clean(r[name_col]).lower() for r in rows if _clean(r[name_col])}
 
 
-def check_reference_design(ws: Path, names: set[str] | None = None) -> tuple[bool, str]:
+def check_reference_design(ws: Path) -> tuple[bool, str]:
     """The brief names the closest reference design and what it reuses, or none with a reason."""
     parts, err = _brief_sections(ws)
     if parts is None:
         return False, err
     if REFERENCE_HEADING not in parts:
         return False, "brief has no '## Reference design' section"
-    known = names if names is not None else REFERENCE_DESIGNS
     labels: dict[str, str] = {}
     current: str | None = None
     for line in _lines_outside_fences(parts[REFERENCE_HEADING]):
@@ -1064,12 +1069,12 @@ def check_reference_design(ws: Path, names: set[str] | None = None) -> tuple[boo
         return True, "no reference design fits, with a reason"
     discovered = _DISCOVERED_REPO.match(first)
     name = re.sub(r"^https?://github\.com/opsmill/", "", first).strip("/")
-    if name not in known and not discovered:
+    if name not in REFERENCE_DESIGNS and not discovered:
         return False, (
             f"'Closest: {closest}' is not a reference design listed in {REFERENCE_DESIGNS_FILE.name}, "
             "nor the full URL of an opsmill infrahub-demo-* or infrahub-solution-* repository"
         )
-    if not labels.get("reused") or labels["reused"].lower().rstrip(".") in PLACEHOLDERS:
+    if not labels.get("reused") or _is_placeholder(labels["reused"]):
         return False, f"the brief names {name} but its 'Reused:' line says nothing about what it follows"
     return True, f"closest reference design is {name}, with what it reuses"
 
@@ -1114,7 +1119,7 @@ def _features(parts: dict[str, str]) -> tuple[dict[str, set[str]], dict[str, set
             continue
         fid = f"F{ids[0]}"
         order.append(fid)
-        arts[fid] = {a.strip() for a in re.split(r"[,;]|\band\b|->|→", _clean(row[art_col]).lower()) if a.strip()}
+        arts[fid] = set(_artifacts(row[art_col]))
         deps[fid] = {f"F{d}" for d in _FEATURE_ID.findall(_clean(row[dep_col]))}
     return arts, deps, order, ""
 
@@ -1164,7 +1169,7 @@ def check_mechanisms_match_artifacts(ws: Path) -> tuple[bool, str]:
                 ref = _OPEN_REF.search(value)
                 if ref and ref.group(1).upper() in open_ids:
                     continue
-                if value.lower().rstrip(".") in PLACEHOLDERS:
+                if _is_placeholder(value):
                     return False, f"F1 mechanism '{behavior}' has no '{name}': {value!r}"
             if mech == "generator":
                 words = set(re.findall(r"[a-z0-9_]+", _clean(row[cols["driven by"]]).lower()))
@@ -1210,7 +1215,7 @@ def check_next_steps_in_order(ws: Path) -> tuple[bool, str]:
         return False, err
     if NEXT_STEPS_HEADING not in parts:
         return False, "brief has no '## Next steps' section"
-    _, deps, order, err = _features(parts)
+    arts, deps, order, err = _features(parts)
     if err:
         return False, err
     steps = []
@@ -1220,7 +1225,6 @@ def check_next_steps_in_order(ws: Path) -> tuple[bool, str]:
             steps.append(_clean(match.group(2)))
     if not steps:
         return False, "Next steps has no numbered steps"
-    arts, _, _, _ = _features(parts)
     builders = {n for names in ARTIFACT_SKILLS.values() for n in names} | set(IMPORTER_NAMES)
 
     def settles_only(text: str) -> bool:
@@ -1237,11 +1241,7 @@ def check_next_steps_in_order(ws: Path) -> tuple[bool, str]:
                 first_step.setdefault(f"F{n}", index)
         for o in re.findall(r"\bO(\d+)\b", text):
             open_step.setdefault(f"O{o}", index)
-    in_headers, in_rows = first_table(parts.get(INPUTS_HEADING, ""))
-    file_col = _column(in_headers, "file")
-    tabular = file_col is not None and any(
-        _TABULAR.search(name) for row in in_rows for name in _file_names(row[file_col])
-    )
+    tabular = any(_TABULAR.search(name) for name in _input_files(parts))
     for fid in order:
         if fid not in first_step:
             return False, f"Next steps never take up {fid}"
@@ -1260,7 +1260,7 @@ def check_next_steps_in_order(ws: Path) -> tuple[bool, str]:
                     f"Next steps for {fid} neither hand it off nor name the skill for its {artifact} "
                     f"artifact: {steps[first_step[fid]][:160]!r}"
                 )
-    s_headers, s_rows, _ = _sketch(parts)
+    _, s_rows, _ = _sketch(parts)
     for row in s_rows:
         for cell in row.values():
             for ref in _OPEN_REF.findall(_clean(cell)):
@@ -1274,7 +1274,6 @@ def check_next_steps_in_order(ws: Path) -> tuple[bool, str]:
 # Rule: brief-open-items-name-features  (artifact: the brief)
 # --------------------------------------------------------------------------
 
-_OPEN_ITEM_FULL = re.compile(r"^\s*(?:[-*]|\d+[.)])?\s*\**\s*(O\d+)\s*\**\s*:(.*)$", re.IGNORECASE)
 _AFFECTS = re.compile(r"affects\s*:?\s*((?:`?F\d+`?(?:\s*(?:,|and|&)\s*)?)+)", re.IGNORECASE)
 
 
@@ -1282,7 +1281,7 @@ def _open_item_features(parts: dict[str, str]) -> dict[str, set[str]]:
     """Open item ID -> the feature IDs its 'affects' list names."""
     items: dict[str, set[str]] = {}
     for line in _lines_outside_fences(parts.get(OPEN_ITEMS_HEADING, "")):
-        match = _OPEN_ITEM_FULL.match(line)
+        match = _OPEN_ITEM.match(line)
         if not match:
             continue
         affects = _AFFECTS.search(_clean(match.group(2)))
@@ -1380,6 +1379,27 @@ def _drivers_named(cell: str) -> list[str]:
     return [d for _, d in sorted(found)]
 
 
+def _input_files(parts: dict[str, str]) -> set[str]:
+    """Lower-cased names of the files the Inputs table lists."""
+    headers, rows = first_table(parts.get(INPUTS_HEADING, ""))
+    col = _column(headers, "file")
+    return {n.lower() for row in rows for n in _file_names(row[col])} if col else set()
+
+
+def _has_figure(text: str) -> bool:
+    # Citations carry digits of their own (answer Q2, sites-2024.csv); a
+    # number left after removing them is a figure.
+    bare = _FILE_NAME.sub("", _ANSWER_REF.sub("", text))
+    return bool(re.search(r"\d", bare) or _NUMBER_WORD.search(bare))
+
+
+def _has_source(text: str, inputs: set[str]) -> bool:
+    return bool(
+        _ANSWER_REF.search(text) or _REQUEST_REF.search(text)
+        or {Path(m.group(1)).name.lower() for m in _FILE_LOCATOR.finditer(text)} & inputs
+    )
+
+
 def _split_entries(line: str) -> list[str]:
     """Split a Value: line on ';' outside parentheses."""
     out, depth, current = [], 0, ""
@@ -1413,9 +1433,7 @@ def check_value_drivers(ws: Path) -> tuple[bool, str]:
     if len(lines) != 1:
         return False, f"expected one 'Value:' line in Business, found {len(lines)}"
 
-    in_headers, in_rows = first_table(parts.get(INPUTS_HEADING, ""))
-    file_col = _column(in_headers, "file")
-    inputs = {n.lower() for row in in_rows for n in _file_names(row[file_col])} if file_col else set()
+    inputs = _input_files(parts)
 
     ranked: list[str] = []
     for entry in _split_entries(_clean(lines[0])):
@@ -1426,11 +1444,7 @@ def check_value_drivers(ws: Path) -> tuple[bool, str]:
             if not other.group("text").strip():
                 return False, "an 'Other' entry needs the user's own words after 'Other:'"
             words = other.group("text") + other.group("rest")
-            bare = _FILE_NAME.sub("", _ANSWER_REF.sub("", words))
-            if (re.search(r"\d", bare) or _NUMBER_WORD.search(bare)) and not (
-                _ANSWER_REF.search(words) or _REQUEST_REF.search(words)
-                or {Path(m.group(1)).name.lower() for m in _FILE_LOCATOR.finditer(words)} & inputs
-            ):
+            if _has_figure(words) and not _has_source(words, inputs):
                 return False, "the 'Other' entry gives a figure without its source (answer Q<n>, request, or <input file>:<locator>)"
             ranked.append(OTHER)
             continue
@@ -1441,14 +1455,10 @@ def check_value_drivers(ws: Path) -> tuple[bool, str]:
         if driver not in VALUE_DRIVERS:
             return False, f"'Value:' entry {match.group('driver')!r} is not one of the five value drivers"
         rest = match.group("rest")
-        cited_files = {Path(m.group(1)).name.lower() for m in _FILE_LOCATOR.finditer(rest)}
-        # Citations carry digits of their own (answer Q2, sites-2024.csv); a
-        # number left after removing them is a figure.
-        bare = _FILE_NAME.sub("", _ANSWER_REF.sub("", rest))
-        if re.search(r"\d", bare) or _NUMBER_WORD.search(bare):
+        if _has_figure(rest):
             if match.group("tag").lower() != "stated":
                 return False, f"'Value:' entry '{driver}' gives a figure but is tagged recommended; only a figure the user stated may appear"
-            if not (_ANSWER_REF.search(rest) or _REQUEST_REF.search(rest) or cited_files & inputs):
+            if not _has_source(rest, inputs):
                 return False, f"'Value:' entry '{driver}' gives a figure without its source (answer Q<n>, request, or <input file>:<locator>)"
         ranked.append(driver)
 
