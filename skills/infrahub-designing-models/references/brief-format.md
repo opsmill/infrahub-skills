@@ -113,12 +113,16 @@ files pasted into the conversation.
   | Artifact | Skill |
   | -------- | ----- |
   | `schema` | `infrahub-managing-schemas` |
-  | `objects` | `infrahub-managing-objects`, or `infrahub-importing-data` when the objects come from CSV or TSV files |
+  | `objects` | `infrahub-managing-objects`, or `infrahub-importing-data` when the objects come from CSV or TSV files listed in Inputs |
   | `generator` | `infrahub-managing-generators` |
   | `check` | `infrahub-managing-checks` |
   | `transform` | `infrahub-managing-transforms` |
   | `menu` | `infrahub-managing-menus` |
 
+- Data the user only described, such as a spreadsheet,
+  a wiki page or another system nobody provided, goes to
+  `infrahub-managing-objects`. Name `infrahub-importing-data`
+  only for CSV or TSV files the brief lists in Inputs.
 - `Depends on` names the earlier features a feature
   needs, or `-` when it needs none. It is never empty,
   and never names a later or unknown ID. A later
