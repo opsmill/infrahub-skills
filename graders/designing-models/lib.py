@@ -1372,7 +1372,9 @@ def _drivers_named(cell: str) -> list[str]:
     """Value drivers a cell names, in the order they appear."""
     text = _norm(cell)
     found = [(text.find(d), d) for d in VALUE_DRIVERS if d in text]
-    other = re.search(r"\bother\b", text)
+    # "Other" counts only as a list item of its own, not as a word in a
+    # phrase such as "for other teams".
+    other = re.search(r"(?:^|[,;/]|\band\b)\s*\bother\s*(?=$|[,;/]|\band\b)", text)
     if other:
         found.append((other.start(), OTHER))
     return [d for _, d in sorted(found)]
