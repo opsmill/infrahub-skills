@@ -23,9 +23,10 @@ and nothing else that asks anything:
    line is the last line of the message.
 
 One exception: the value question. Its options are
-exactly the five value drivers, A to E, the user may
-pick any number of them, and one or two carry
-`**(Recommended)**`
+exactly the five value drivers, A to E, optionally
+followed by `F. Other (say which)`, never recommended.
+The user may pick any number of them, and one or two
+drivers carry `**(Recommended)**`
 ([brief-value-drivers.md](brief-value-drivers.md)). No
 other question allows more than one answer.
 

@@ -18,11 +18,21 @@ drivers, spelled exactly like this:
 5. Reduced risk of service disruption
 
 - **Ask once, pick any.** The first business question
-  offers the five drivers as options A to E, and the
-  user picks any number. Recommend one or two from what
-  the files and the request show. It is the only
-  question that allows more than one answer
+  offers the five drivers as options A to E, and
+  `F. Other (say which)` last, never recommended. The
+  user picks any number. Recommend one or two drivers
+  from what the files and the request show. It is the
+  only question that allows more than one answer
   ([interview-one-question-recommended.md](interview-one-question-recommended.md)).
+- **Map "Other" before recording it.** When the user's
+  words describe one of the five drivers ("we retype
+  the same data in three tools" is Less duplicated
+  operational work), record that driver and say so in
+  one line. Keep the words as
+  `Other: <the user's words> (stated)` only when no
+  driver fits. It is always `stated`, ranks like a
+  driver, and a feature names it as `Other` in its
+  `Value` cell.
 - **Skipping is an answer.** "Skip", "not sure" or no
   reply takes the recommended drivers. Never ask for
   hours, costs or lead times.
@@ -112,4 +122,6 @@ Value: Reduced engineering effort (recommended: saves 40 hours a month)
 | Asking for the hours or cost behind a driver | The engineer does not need to know it to get a design going |
 | Opening an item for a missing figure | Open items are for what blocks the design |
 | A paraphrased driver ("faster delivery") | Readers and tools match the five names |
+| Recording "Other" for words that describe a driver | The brief loses the shared name, and the coaching for that driver |
+| An `Other` entry tagged `recommended` | The skill cannot recommend a value it did not hear |
 | F1 chosen without the leading driver | The first thing built does not deliver what the design is for |
