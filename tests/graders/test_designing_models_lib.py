@@ -285,6 +285,16 @@ Q_VALUE_THREE_RECOMMENDED = Q_VALUE.replace(
     "- E. Reduced risk of service disruption: the impact of a change can be queried  **(Recommended)**",
 )
 
+Q_VALUE_OTHER = Q_VALUE.replace(
+    "- E. Reduced risk of service disruption: the impact of a change can be queried\n",
+    "- E. Reduced risk of service disruption: the impact of a change can be queried\n- F. Other (say which)\n",
+)
+Q_VALUE_OTHER_RECOMMENDED = Q_VALUE_OTHER.replace("- F. Other (say which)", "- F. Other (say which)  **(Recommended)**")
+# Other placed among the drivers instead of last.
+Q_VALUE_OTHER_NOT_LAST = Q_VALUE.replace(
+    "- A. Reduced engineering effort", "- A. Other (say which)\n- B. Reduced engineering effort"
+)
+
 # Pick-any wording on a data question: five options, two recommended, no drivers.
 Q_NEAR_PICK_ANY_DATA = """\
 **Q6 (data):** Which identifiers should a cabinet carry (pick any)?
@@ -312,6 +322,9 @@ Q_NEAR_FOUR_DRIVERS = Q_VALUE.replace(
     [
         pytest.param(Q_VALUE, None, id="compliant-value-question"),
         pytest.param(Q_VALUE_VARIANT, None, id="compliant-variant-value-question-two-recommended"),
+        pytest.param(Q_VALUE_OTHER, None, id="compliant-value-question-with-other"),
+        pytest.param(Q_VALUE_OTHER_RECOMMENDED, "the 'Other' option is never recommended", id="near-miss-other-recommended"),
+        pytest.param(Q_VALUE_OTHER_NOT_LAST, "expected 2-4 option lines", id="near-miss-other-not-last"),
         pytest.param(Q_VALUE_THREE_RECOMMENDED, "one or two '**(Recommended)**' tags, found 3", id="violating-value-three-recommended"),
         pytest.param(Q_NEAR_PICK_ANY_DATA, "expected 2-4 option lines", id="near-miss-pick-any-data-question"),
         pytest.param(Q_NEAR_FOUR_DRIVERS, "expected exactly one '**(Recommended)**' tag, found 2", id="near-miss-value-question-missing-driver"),
@@ -1340,6 +1353,27 @@ def value_brief(value: str | None = DEFAULT_VALUE, features: str = FEATURES, **k
         pytest.param(
             value_brief("Value: Less duplicated operational work (recommended: fabric data sits in a spreadsheet and phpIPAM)"),
             None, id="compliant-fifth-driver",
+        ),
+        pytest.param(
+            value_brief(
+                "Value: Other: audit evidence for every firewall change (stated); Lower change failure costs (recommended)",
+                FEATURES_VALUE.replace("Lower change failure costs, Reduced engineering effort", "Other, Lower change failure costs")
+                .replace("| Reduced engineering effort | Prefix", "| Lower change failure costs | Prefix")
+                .replace("reduced risk of service disruption", "Other").replace("| Reduced risk of service disruption |", "| Other |"),
+            ),
+            None, id="compliant-other-leads",
+        ),
+        pytest.param(
+            value_brief("Value: Other: audit evidence for every firewall change (recommended)"),
+            "an 'Other' entry is always stated", id="near-miss-other-recommended",
+        ),
+        pytest.param(
+            value_brief("Value: Other: (stated)"),
+            "an 'Other' entry needs the user's own words", id="near-miss-empty-other",
+        ),
+        pytest.param(
+            value_brief("Value: Other: audit evidence for every firewall change (stated); Reduced risk of service disruption (recommended)"),
+            "F1's Value cell does not name the first driver on the 'Value:' line, 'other'", id="near-miss-f1-ignores-leading-other",
         ),
         pytest.param(value_brief(None), "expected one 'Value:' line in Business, found 0", id="violating-no-value-line"),
         pytest.param(
