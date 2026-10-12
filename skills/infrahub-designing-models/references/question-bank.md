@@ -16,9 +16,13 @@ block layout from
 
 ## Business: why the data exists
 
-- Which decision, automation or report fails today
-  because this data is wrong or missing? Name one
-  incident.
+- Which of these outcomes should the design deliver
+  first (pick any)? The five value drivers, as options
+  A to E, with one or two recommended from the files
+  and the request
+  ([value drivers](../rules/brief-value-drivers.md)).
+  The answer ranks them; it is never followed by a
+  question about hours or costs.
 - Who uses this data: a person, a pipeline that renders
   configurations, monitoring, billing?
 - What is out of scope for the first version?

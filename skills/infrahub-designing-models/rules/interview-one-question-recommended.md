@@ -22,6 +22,13 @@ and nothing else that asks anything:
    `(strong)`, `(medium)` or `(weak basis)`. The Basis
    line is the last line of the message.
 
+One exception: the value question. Its options are
+exactly the five value drivers, A to E, the user may
+pick any number of them, and one or two carry
+`**(Recommended)**`
+([brief-value-drivers.md](brief-value-drivers.md)). No
+other question allows more than one answer.
+
 A short lead-in before the block is fine if it asks
 nothing, so it contains no question mark: the starting point, the current draft sketch
 during the data questions (SKILL.md step 6), or the
@@ -93,6 +100,7 @@ Does this look right? Also, which system owns console servers today?
 | Mistake | Why it is wrong |
 | ------- | --------------- |
 | Two questions in one message | The second answer is given without the first one's effect |
-| Two options marked Recommended | The user has nothing to accept or reject |
+| Two options marked Recommended outside the value question | The user has nothing to accept or reject |
+| "Pick any" on a question other than the value question | Each other answer is one decision; several answers hide which one the design follows |
 | `**Basis:**` left empty or without a strength | The user cannot tell a guess from a fact |
 | Schema YAML "to save time" | The model is guessed before anything is known |

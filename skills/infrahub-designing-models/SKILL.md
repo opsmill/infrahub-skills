@@ -68,7 +68,11 @@ skill for each artifact builds it from the brief.
    Every message you send during the interview is one
    question block; read
    [rules/interview-one-question-recommended.md](./rules/interview-one-question-recommended.md)
-   before writing the first one. Push back once on a
+   before writing the first one. The first business
+   question is the value question, the only one that
+   takes several answers; read
+   [rules/brief-value-drivers.md](./rules/brief-value-drivers.md)
+   before asking it. Push back once on a
    vague answer ("scalable", "everything"), then record
    what the user says. When the user compares their model
    to NetBox, read `../infrahub-common/netbox-vs-infrahub.md`
@@ -86,6 +90,8 @@ skill for each artifact builds it from the brief.
    [rules/brief-reference-design.md](./rules/brief-reference-design.md)
    to choose the closest worked example from the
    business and service answers and the user's inputs.
+   After a split, F1 is the feature that delivers the
+   leading value driver.
    Then read the Marketplace catalog whole, not by
    keyword: `infrahubctl marketplace list --json` and
    `infrahubctl marketplace list --collections --json`
@@ -119,6 +125,9 @@ skill for each artifact builds it from the brief.
      the draft (one VPN with two of its sites, say), so
      a wrong identity or cardinality shows on real data.
      Without rows, show none.
+   - **Value.** Add one or two lines on what the draft
+     gains for the leading value driver, from the files
+     and answers only, with no estimated figures.
    - **Left out.** Add one line naming what you left out
      because nobody mentioned it (a vendor, a serial
      number, a status), so the user can bring it in.
@@ -164,6 +173,8 @@ skill for each artifact builds it from the brief.
    `B. Change something`; "sounds good" is not a yes.
 8. **Write the brief** in the format in
    [references/brief-format.md](./references/brief-format.md).
+   Before writing Business and the Features table, read
+   [rules/brief-value-drivers.md](./rules/brief-value-drivers.md).
    Before writing the sketch, read
    [rules/brief-sketch-rows-complete.md](./rules/brief-sketch-rows-complete.md);
    before writing the decision log, read
@@ -195,7 +206,9 @@ recommendation you would have asked them to confirm,
 into an `open` decision with an open item rather than a
 default, and write the brief. Node kind names and the
 outcome of the skill's own rules, such as not
-splitting, are recorded, not opened.
+splitting, are recorded, not opened. So are the value
+drivers: record the ones you recommend as
+`recommended`.
 
 ### When the user asks for every question at once
 
@@ -256,7 +269,7 @@ settled: the NOC owns cabling"). Read the brief, then:
 | -------- | -------- | ------ | ----------- |
 | CRITICAL | Interview | `interview-` | One question per message with a recommended answer; every input used as evidence |
 | HIGH | Scope | `scope-` | Split a too-big scope into ordered features before the data questions; sketch F1 only |
-| HIGH | Brief | `brief-` | Complete sketch rows or open items; every decision tagged with its provenance; plan and model maps that match their tables; the closest reference design named; mechanisms that match the artifacts; open items that name the features they affect; next steps in order |
+| HIGH | Brief | `brief-` | The value drivers the design serves, ranked, with each feature naming its own; complete sketch rows or open items; every decision tagged with its provenance; plan and model maps that match their tables; the closest reference design named; mechanisms that match the artifacts; open items that name the features they affect; next steps in order |
 
 Full scope per prefix is in `rules/_sections.md`.
 

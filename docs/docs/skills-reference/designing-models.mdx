@@ -4,7 +4,7 @@ title: Model Designer
 
 Skill: `infrahub-designing-models`
 
-The Model Designer works out what to model before any schema exists. It reads the diagrams, spreadsheets or documents you have, then interviews you one question at a time: first why the data matters, then what is delivered or ordered, and only then the data itself. Each question comes with a recommended answer and the reason for it. The result is a design brief that the managing skills build from: the [Schema Manager](./managing-schemas.mdx) first, then the skill for each other artifact the brief lists.
+The Model Designer works out what to model before any schema exists. It reads the diagrams, spreadsheets or documents you have, then interviews you one question at a time: first which value the design is for and why the data matters, then what is delivered or ordered, and only then the data itself. Each question comes with a recommended answer and the reason for it. The result is a design brief that the managing skills build from: the [Schema Manager](./managing-schemas.mdx) first, then the skill for each other artifact the brief lists.
 
 ## When to use
 
@@ -12,6 +12,7 @@ The Model Designer works out what to model before any schema exists. It reads th
 - You have diagrams, inventory exports or a requirements document to turn into a design
 - A request spans several domains, such as a fiber plant, DWDM channels and a wavelength service, and needs to be split
 - A design brief exists and needs another feature or a changed decision
+- You want to agree a design with your management, or with OpsMill, before anyone builds it
 
 ## What it produces
 
@@ -19,9 +20,9 @@ The Model Designer works out what to model before any schema exists. It reads th
 
 - **Summary**: the problem, the intended outcome and what is not decided yet, in three to five sentences
 - **Inputs**: each file you provided and what was taken from it
-- **Business and service**: who uses the data, the incident it prevents, what is ordered, and the service lifecycle
+- **Business and service**: the value drivers the design serves, ranked, then who uses the data, what is ordered, and the service lifecycle
 - **Reference design**: the closest OpsMill demo or solution to build from, such as `infrahub-demo-sp` for an L3VPN service, what the design follows from it, and where it differs
-- **Features**: one row per feature in build order, with the artifacts each one needs (schema, objects, generator, check, transform, menu), its dependencies, and a handoff that names the brief and the feature ID, for any downstream workflow
+- **Features**: one row per feature in build order, with the value drivers it serves, the artifacts it needs (schema, objects, generator, check, transform, menu), its dependencies, and a handoff that names the brief and the feature ID, for any downstream workflow
 - **Data model sketch**: for the first feature, each node kind with how it is identified, its key attributes, its peers, its source of truth, its owner, and where each fact came from
 - **Mechanisms**: a table of each behavior and what delivers it (a generator, a check, a transform, a computed attribute, a resource pool or a schema constraint), with what drives it, what it produces and when it runs, so the skill that builds it has the decisions it needs
 - **Plan map and model map**: two Mermaid diagrams drawn from the Features table and the sketch, showing the build order and how the F1 node kinds relate
@@ -39,7 +40,8 @@ It writes no schema YAML.
 
 ## Key rules enforced
 
-- **One question at a time, with a recommendation**: each message is a single question with two to four options, one marked as recommended, and the basis for it with its strength
+- **One question at a time, with a recommendation**: each message is a single question with two to four options, one marked as recommended, and the basis for it with its strength. The value question is the one exception: you can pick several drivers, and one or two are recommended
+- **Designed for a value, without a business case**: you pick which outcomes the design should deliver first, from five value drivers: reduced engineering effort, faster service delivery, lower change failure costs, less duplicated operational work, and reduced risk of service disruption. You can skip the question, and the skill takes its recommendation. It never asks for hours or costs, and never writes a figure you did not give it. The first driver decides which feature is built first, and each recommendation says which driver it serves
 - **A draft before the details**: after a few business and service questions, you see a draft of the model with each guess marked and two or three sample objects built from your own data, and the data questions go to the guesses that matter most. Nothing in the draft is invented: every guess comes from your files, your answers, a Marketplace schema that covers the node kind, the reference design or an Infrahub default, and any other cell stays unknown and becomes a question
 - **A scenario walkthrough**: before the brief is confirmed, one event such as an order or a decommission is walked through the model to find missing peers or unclear deletes
 - **Grounded in the managing skills**: each data question names the schema or best-practice rule its answer feeds, such as uniqueness scope, what happens on delete, or a resource pool instead of hand allocation, and no guess reaches the brief unconfirmed
@@ -55,11 +57,22 @@ It writes no schema YAML.
 
 ## Common mistakes it catches
 
+- A design that follows whatever data is at hand, with nothing saying what it is for
 - Writing a schema before anyone has asked what service it models
 - A model built around devices with no service object
 - Two systems both treated as the source of truth for the same data
 - "Sensible defaults" that look decided but were never confirmed
 - A generator chosen for a value that a computed attribute on the same node would give
+
+## Discussing the design before you build it
+
+The brief is meant to be read before anything is built. Take it to your management, or to OpsMill, and agree on the design first:
+
+- **What the design is for.** The `Value:` line and the Features table show which value drivers each feature serves, and which one leads. A reader can see why F1 comes first and decide whether the order matches what the organization needs.
+- **What is still open.** Open items name who owes each answer and the features it affects, so the discussion can settle them before work starts.
+- **What it builds on.** The reference design and the Marketplace line show which parts follow OpsMill's worked examples and published schemas, and which parts are new.
+
+Agreeing on the model first matters because everything else depends on it. Objects, generators, checks, transforms and the systems that read from Infrahub are all built on the schema's node kinds, identities and relationships. A wrong choice found at this point costs an edit to the brief. Found after data is loaded and automation runs, it costs a schema migration and changes to everything that uses it.
 
 ## Example: an L3VPN service
 
@@ -67,19 +80,21 @@ You ask: "We want our L3VPN service in Infrahub. Where do we start?" You attach 
 
 ### The interview
 
-Each message is one question. The skill reads your file first, so the first business question already uses what is in it:
+Each message is one question. The skill reads your file first, so the first business question already uses what is in it. It asks which value the design is for, and you can pick several answers or skip it:
 
 ```markdown
-**Q1 (business):** Which task fails today because VPN data is wrong or missing?
+**Q1 (business):** Which of these outcomes should the design deliver first (pick any)?
 
-- A. Provisioning: a new site gets a route distinguisher that is already in use  **(Recommended)**
-- B. Troubleshooting: nobody can tell which PE serves which customer site
-- C. Billing: VPNs stay billed after they are decommissioned
+- A. Reduced engineering effort: values are allocated or generated instead of typed by hand
+- B. Faster service delivery: an order needs only what the customer decides
+- C. Lower change failure costs: constraints and pools stop a change that would clash  **(Recommended)**
+- D. Less duplicated operational work: each value has one source of truth
+- E. Reduced risk of service disruption: the impact of a change can be found before it is made
 
-**Basis:** vpn-customers.xlsx has duplicate values in its rd column (strong)
+**Basis:** vpn-customers.xlsx has duplicate values in its rd column, and a duplicate route distinguisher fails the change that uses it (strong)
 ```
 
-You answer "A". Later, a service question separates what the customer orders from what the network team derives:
+You answer "C, and B too". The skill ranks lower change failure costs first, because your file is the evidence for it. It does not ask what the failures cost. Later, a service question separates what the customer orders from what the network team derives:
 
 ```markdown
 **Q3 (service):** What does the customer order?
@@ -109,7 +124,7 @@ The request covers the VPN service and the allocation of route distinguishers an
 ````markdown
 ## Summary
 
-New VPN sites sometimes get a route distinguisher that is already in use, because route distinguishers are kept by hand in the customer export. The outcome is one object per ordered VPN with its sites, loaded from that export, and route distinguishers and route targets allocated from pools so they cannot clash. Not decided yet: who owns site records once a VPN is live (O1).
+New VPN sites sometimes get a route distinguisher that is already in use, because route distinguishers are kept by hand in the customer export. The outcome is one object per ordered VPN with its sites, loaded from that export, and route distinguishers and route targets allocated from pools so they cannot clash. The design is led by lower change failure costs. Not decided yet: who owns site records once a VPN is live (O1).
 
 ## Inputs
 
@@ -119,7 +134,9 @@ New VPN sites sometimes get a route distinguisher that is already in use, becaus
 
 ## Business
 
-The provisioning team uses the data when they add a site to a VPN. It prevents a new site getting a route distinguisher that another VPN already uses. Out of scope: billing and troubleshooting.
+Value: Lower change failure costs (recommended: duplicate rd values in vpn-customers.xlsx); Faster service delivery (stated)
+
+The provisioning team uses the data when they add a site to a VPN. Today a new site can get a route distinguisher that another VPN already uses. Out of scope: billing and troubleshooting.
 
 ## Service
 
@@ -134,10 +151,10 @@ Marketplace: infrahub/base-schemas (locations and devices behind each VpnSite)
 
 ## Features
 
-| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | VPN service | One object per ordered VPN, with its sites | L3Vpn, VpnSite | schema, objects | - | planned | Design and implement the L3Vpn and VpnSite model, then populate it from the customer export, as designed in F1 of docs/designs/l3vpn-service/design-brief.md. |
-| F2 | RD and RT allocation | No duplicate distinguishers or targets | RD pool, RT pool | schema, objects | F1 | planned | After F1, design the RD and RT pools and populate the initial allocations, as designed in F2 of docs/designs/l3vpn-service/design-brief.md. |
+| ID | Feature | Intent | Value | Scope boundary | Artifacts | Depends on | Status | Handoff |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| F1 | VPN service | One object per ordered VPN, with its sites | Lower change failure costs, Faster service delivery | L3Vpn, VpnSite | schema, objects | - | planned | Design and implement the L3Vpn and VpnSite model, then populate it from the customer export, as designed in F1 of docs/designs/l3vpn-service/design-brief.md. |
+| F2 | RD and RT allocation | No duplicate distinguishers or targets | Lower change failure costs | RD pool, RT pool | schema, objects | F1 | planned | After F1, design the RD and RT pools and populate the initial allocations, as designed in F2 of docs/designs/l3vpn-service/design-brief.md. |
 
 ```mermaid
 graph LR
@@ -171,9 +188,10 @@ graph LR
 
 | # | Decision | Tag | Basis |
 | --- | --- | --- | --- |
-| 1 | The customer orders one VPN, and sites are added to it | recommended | Every row in vpn-customers.xlsx is one VPN with a site list (strong) |
-| 2 | The network team chooses route targets, not the customer | stated | |
-| 3 | Who owns site records once a VPN is live | open | O1 |
+| 1 | Lower change failure costs leads, then faster service delivery | recommended | Duplicate rd values in vpn-customers.xlsx (strong) |
+| 2 | The customer orders one VPN, and sites are added to it | recommended | Every row in vpn-customers.xlsx is one VPN with a site list (strong) |
+| 3 | The network team chooses route targets, not the customer | stated | |
+| 4 | Who owns site records once a VPN is live | open | O1 |
 
 ## Open items
 
