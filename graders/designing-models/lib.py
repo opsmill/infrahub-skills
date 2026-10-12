@@ -1214,14 +1214,23 @@ def check_next_steps_in_order(ws: Path) -> tuple[bool, str]:
             steps.append(_clean(match.group(2)))
     if not steps:
         return False, "Next steps has no numbered steps"
+    arts, _, _, _ = _features(parts)
+    builders = {n for names in ARTIFACT_SKILLS.values() for n in names} | set(IMPORTER_NAMES)
+
+    def settles_only(text: str) -> bool:
+        # "Settle O1 before building F1" names F1 but is not F1's step:
+        # it names an open item and neither hands off nor names a skill.
+        low = text.lower()
+        return bool(re.search(r"\bO\d+\b", text)) and not _HANDOFF.search(low) and not any(n in low for n in builders)
+
     first_step: dict[str, int] = {}
     open_step: dict[str, int] = {}
     for index, text in enumerate(steps):
-        for n in _FEATURE_ID.findall(text):
-            first_step.setdefault(f"F{n}", index)
+        if not settles_only(text):
+            for n in _FEATURE_ID.findall(text):
+                first_step.setdefault(f"F{n}", index)
         for o in re.findall(r"\bO(\d+)\b", text):
             open_step.setdefault(f"O{o}", index)
-    arts, _, _, _ = _features(parts)
     in_headers, in_rows = first_table(parts.get(INPUTS_HEADING, ""))
     file_col = _column(in_headers, "file")
     tabular = file_col is not None and any(
