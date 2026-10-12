@@ -39,7 +39,8 @@ drivers, spelled exactly like this:
   naming, for each feature, the drivers it serves from
   that line; F1's names the first. The format is in
   [../references/brief-format.md](../references/brief-format.md).
-- **No invented figures.** A number appears only on a
+- **No invented figures.** A number, in digits or words,
+  appears only on a
   `stated` entry, with its source: `answer Q<n>`,
   `request`, or `<input file>:<locator>`. A `Value`
   cell names drivers only. A missing number is not an
