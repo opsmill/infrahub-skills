@@ -1351,6 +1351,18 @@ def value_brief(value: str | None = DEFAULT_VALUE, features: str = FEATURES, **k
             "gives a figure but is tagged recommended", id="near-miss-invented-figure",
         ),
         pytest.param(
+            value_brief("Value: Reduced engineering effort (recommended: saves forty hours a month)"),
+            "gives a figure but is tagged recommended", id="near-miss-invented-figure-in-words",
+        ),
+        pytest.param(
+            value_brief("Value: Reduced engineering effort (recommended: cuts 30% of the work)"),
+            "gives a figure but is tagged recommended", id="near-miss-invented-percentage",
+        ),
+        pytest.param(
+            value_brief("Value: Less duplicated operational work (recommended: one source of truth instead of a spreadsheet and phpIPAM)"),
+            None, id="compliant-word-one-is-not-a-figure",
+        ),
+        pytest.param(
             value_brief("Value: Reduced engineering effort (stated: saves 40 hours a month)"),
             "gives a figure without its source", id="near-miss-stated-figure-without-source",
         ),

@@ -1344,6 +1344,14 @@ _ANSWER_REF = re.compile(r"\banswer\s+Q\d+\b", re.IGNORECASE)
 _REQUEST_REF = re.compile(r"\brequest\b", re.IGNORECASE)
 # A file name's extension starts with a letter, so "1.5 days" is a figure.
 _FILE_NAME = re.compile(r"[\w.\-/]*\w\.[A-Za-z][A-Za-z0-9]*")
+# A figure written out in words counts the same as one in digits. "one" is
+# left out: it is ordinary wording ("one row per VPN", "one source of truth").
+_NUMBER_WORD = re.compile(
+    r"\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|"
+    r"sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|"
+    r"hundreds?|thousands?|millions?|dozens?|percent)\b|%",
+    re.IGNORECASE,
+)
 _FILE_LOCATOR = re.compile(r"([\w.\-/]*\w\.[A-Za-z][A-Za-z0-9]*):\s*[^\s:;,)]+")
 
 
@@ -1408,7 +1416,7 @@ def check_value_drivers(ws: Path) -> tuple[bool, str]:
         # Citations carry digits of their own (answer Q2, sites-2024.csv); a
         # number left after removing them is a figure.
         bare = _FILE_NAME.sub("", _ANSWER_REF.sub("", rest))
-        if re.search(r"\d", bare):
+        if re.search(r"\d", bare) or _NUMBER_WORD.search(bare):
             if match.group("tag").lower() != "stated":
                 return False, f"'Value:' entry '{driver}' gives a figure but is tagged recommended; only a figure the user stated may appear"
             if not (_ANSWER_REF.search(rest) or _REQUEST_REF.search(rest) or cited_files & inputs):
@@ -1426,7 +1434,7 @@ def check_value_drivers(ws: Path) -> tuple[bool, str]:
         if not ids:
             continue
         fid, cell = f"F{ids[0]}", _clean(row[value_col])
-        if re.search(r"\d", cell):
+        if re.search(r"\d", cell) or _NUMBER_WORD.search(cell):
             return False, f"{fid}'s Value cell gives a figure: {cell!r}; figures belong on the 'Value:' line with their source"
         named = _drivers_named(cell)
         if not named:
