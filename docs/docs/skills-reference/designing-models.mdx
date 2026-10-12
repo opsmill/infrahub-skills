@@ -17,6 +17,8 @@ The Model Designer works out what to model before any schema exists. It reads th
 
 `design-brief.md`, in your repository's existing design-document location or `docs/designs/<design-slug>/` by default. It holds:
 
+- **Summary**: the problem, the intended outcome and what is not decided yet, in three to five sentences
+- **Inputs**: each file you provided and what was taken from it
 - **Business and service**: who uses the data, the incident it prevents, what is ordered, and the service lifecycle
 - **Reference design**: the closest OpsMill demo or solution to build from, such as `infrahub-demo-sp` for an L3VPN service, what the design follows from it, and where it differs
 - **Features**: one row per feature in build order, with the artifacts each one needs (schema, objects, generator, check, transform, menu), its dependencies, and a handoff that names the brief and the feature ID, for any downstream workflow
@@ -102,9 +104,27 @@ Before the data questions, the skill shows a draft of the model built from your 
 
 ### The brief
 
-The request covers the VPN service and the allocation of route distinguishers and route targets, so the skill splits it into two features and models only the first in depth. An excerpt of `docs/designs/l3vpn-service/design-brief.md`:
+The request covers the VPN service and the allocation of route distinguishers and route targets, so the skill splits it into two features and models only the first in depth. The brief, `docs/designs/l3vpn-service/design-brief.md`:
 
 ````markdown
+## Summary
+
+New VPN sites sometimes get a route distinguisher that is already in use, because route distinguishers are kept by hand in the customer export. The outcome is one object per ordered VPN with its sites, loaded from that export, and route distinguishers and route targets allocated from pools so they cannot clash. Not decided yet: who owns site records once a VPN is live (O1).
+
+## Inputs
+
+| File | Taken from it |
+| --- | --- |
+| vpn-customers.xlsx | One row per VPN: customer and vpn_name identify it, site_code identifies each site, and the rd column has duplicate values |
+
+## Business
+
+The provisioning team uses the data when they add a site to a VPN. It prevents a new site getting a route distinguisher that another VPN already uses. Out of scope: billing and troubleshooting.
+
+## Service
+
+The customer orders one VPN and adds sites to it over time. The customer decides the VPN name and bandwidth, its sites, and each site's access type. The network team derives the route distinguishers and chooses the route targets. Lifecycle: ordered, active, decommissioned; the network team moves a VPN between them.
+
 ## Reference design
 
 Closest: infrahub-demo-sp
@@ -186,7 +206,21 @@ graph LR
   L3Vpn ---|many| VpnSite
 ```
 
-The next step is to take the F1 handoff into the team's existing specification, planning or implementation workflow. If the team has no established workflow, each artifact in F1's `Artifacts` cell goes to its managing skill, in the listed order. Here F1 lists `schema, objects`: the [Schema Manager](./managing-schemas.mdx) writes the L3Vpn and VpnSite schema, then the [Object Manager](./managing-objects.mdx) loads the VPNs from the customer export.
+### Next steps in a spec-kit repository
+
+The Next steps above are for a repository with no specification or planning workflow: each artifact in a feature's `Artifacts` cell goes to its managing skill, in the listed order. Here F1 lists `schema, objects`, so the [Schema Manager](./managing-schemas.mdx) writes the L3Vpn and VpnSite schema, then the [Object Manager](./managing-objects.mdx) loads the VPNs from the customer export.
+
+When the repository has a `.specify/` folder, the skill words each feature's step as a `/speckit.specify` prompt that carries the feature's `Handoff` cell:
+
+```markdown
+## Next steps
+
+1. Settle O1 with the network team and the service desk.
+2. Specify F1 VPN service: `/speckit.specify Design and implement the L3Vpn and VpnSite model, then populate it from the customer export, as designed in F1 of docs/designs/l3vpn-service/design-brief.md.`
+3. When F1 is built, specify F2 RD and RT allocation: `/speckit.specify After F1, design the RD and RT pools and populate the initial allocations, as designed in F2 of docs/designs/l3vpn-service/design-brief.md.`
+```
+
+The handoff names the brief and the feature ID, so `/speckit.specify` reads the sketch, decisions and open items from the brief rather than from one sentence. [Spec-driven development](../spec-driven-development.mdx) shows the rest of that flow. With another specification or planning setup, each step gives the same `Handoff` cell to that setup instead.
 
 ### From artifact to skill
 
