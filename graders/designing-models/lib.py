@@ -311,16 +311,23 @@ def check_one_question_recommended(ws: Path) -> tuple[bool, str]:
         return False, "the question line does not end with '?'"
 
     options = [i for i, ln in enumerate(lines) if _OPTION.match(ln)]
-    if not 2 <= len(options) <= 4:
+    # The value question is the one pick-any block: its options are exactly
+    # the five value drivers, and one or two of them are recommended.
+    leads = [next((d for d in VALUE_DRIVERS if _norm(_OPTION.match(lines[i]).group(2)).startswith(d)), None)
+             for i in options]
+    value_block = len(options) == len(VALUE_DRIVERS) and set(leads) == set(VALUE_DRIVERS)
+    if not value_block and not 2 <= len(options) <= 4:
         return False, f"expected 2-4 option lines '- A. ...', found {len(options)}"
     if any(i < q_idx[0] for i in options):
         return False, "an option line appears before the question line"
 
     recommended_lines = [i for i, ln in enumerate(lines) if _RECOMMENDED.search(ln)]
     recommended_count = sum(len(_RECOMMENDED.findall(lines[i])) for i in recommended_lines)
-    if recommended_count != 1:
+    if value_block and not 1 <= recommended_count <= 2:
+        return False, f"the value-driver question takes one or two '**(Recommended)**' tags, found {recommended_count}"
+    if not value_block and recommended_count != 1:
         return False, f"expected exactly one '**(Recommended)**' tag, found {recommended_count}"
-    if recommended_lines[0] not in options:
+    if any(i not in options for i in recommended_lines):
         return False, "the '**(Recommended)**' tag is not on an option line"
 
     basis_idx = [i for i, ln in enumerate(lines) if _BASIS.match(ln)]
@@ -1308,6 +1315,122 @@ def check_open_items_name_features(ws: Path) -> tuple[bool, str]:
 
 
 # --------------------------------------------------------------------------
+# Rule: brief-value-drivers  (artifact: the brief)
+# --------------------------------------------------------------------------
+
+# The fixed list the value question offers and the brief names. It is the
+# contract between the question block, the Value: line and the Value column,
+# so it lives here as ARTIFACT_TYPES does, not as a copy of the rule's prose.
+VALUE_DRIVERS = (
+    "reduced engineering effort",
+    "faster service delivery",
+    "lower change failure costs",
+    "less duplicated operational work",
+    "reduced risk of service disruption",
+)
+BUSINESS_HEADING = "business"
+_VALUE_LINE = re.compile(r"^\s*(?:[-*]\s+)?Value:\s*(.*?)\s*$", re.IGNORECASE)
+_VALUE_ENTRY = re.compile(r"^(?P<driver>[^()]+?)\s*\(\s*(?P<tag>stated|recommended)\b(?P<rest>.*)\)\s*$", re.IGNORECASE)
+_ANSWER_REF = re.compile(r"\banswer\s+Q\d+\b", re.IGNORECASE)
+_REQUEST_REF = re.compile(r"\brequest\b", re.IGNORECASE)
+# A file name's extension starts with a letter, so "1.5 days" is a figure.
+_FILE_NAME = re.compile(r"[\w.\-/]*\w\.[A-Za-z][A-Za-z0-9]*")
+_FILE_LOCATOR = re.compile(r"([\w.\-/]*\w\.[A-Za-z][A-Za-z0-9]*):\s*[^\s:;,)]+")
+
+
+def _norm(text: str) -> str:
+    return re.sub(r"\s+", " ", _clean(text)).strip().lower()
+
+
+def _drivers_named(cell: str) -> list[str]:
+    """Value drivers a cell names, in the order they appear."""
+    text = _norm(cell)
+    found = [(text.find(d), d) for d in VALUE_DRIVERS if d in text]
+    return [d for _, d in sorted(found)]
+
+
+def _split_entries(line: str) -> list[str]:
+    """Split a Value: line on ';' outside parentheses."""
+    out, depth, current = [], 0, ""
+    for ch in line:
+        depth += ch == "("
+        depth -= ch == ")" and depth > 0
+        if ch == ";" and depth == 0:
+            out.append(current.strip())
+            current = ""
+            continue
+        current += ch
+    out.append(current.strip())
+    return [e for e in out if e]
+
+
+def check_value_drivers(ws: Path) -> tuple[bool, str]:
+    """The brief ranks the value drivers it serves, and each feature names one.
+
+    Business has one `Value:` line: drivers from the fixed list in rank
+    order, each tagged stated or recommended. A number is allowed only on a
+    stated entry that cites where it came from. The Features table has a
+    Value column naming drivers from that line, and F1 names the first.
+    """
+    parts, err = _brief_sections(ws)
+    if parts is None:
+        return False, err
+    if BUSINESS_HEADING not in parts:
+        return False, "brief has no '## Business' section"
+    lines = [m.group(1) for ln in _lines_outside_fences(parts[BUSINESS_HEADING])
+             if (m := _VALUE_LINE.match(_clean(ln)))]
+    if len(lines) != 1:
+        return False, f"expected one 'Value:' line in Business, found {len(lines)}"
+
+    in_headers, in_rows = first_table(parts.get(INPUTS_HEADING, ""))
+    file_col = _column(in_headers, "file")
+    inputs = {n.lower() for row in in_rows for n in _file_names(row[file_col])} if file_col else set()
+
+    ranked: list[str] = []
+    for entry in _split_entries(_clean(lines[0])):
+        match = _VALUE_ENTRY.match(entry)
+        if not match:
+            return False, f"'Value:' entry {entry[:60]!r} is not '<driver> (stated|recommended ...)'"
+        driver = _norm(match.group("driver"))
+        if driver not in VALUE_DRIVERS:
+            return False, f"'Value:' entry {match.group('driver')!r} is not one of the five value drivers"
+        rest = match.group("rest")
+        cited_files = {Path(m.group(1)).name.lower() for m in _FILE_LOCATOR.finditer(rest)}
+        # Citations carry digits of their own (answer Q2, sites-2024.csv); a
+        # number left after removing them is a figure.
+        bare = _FILE_NAME.sub("", _ANSWER_REF.sub("", rest))
+        if re.search(r"\d", bare):
+            if match.group("tag").lower() != "stated":
+                return False, f"'Value:' entry '{driver}' gives a figure but is tagged recommended; only a figure the user stated may appear"
+            if not (_ANSWER_REF.search(rest) or _REQUEST_REF.search(rest) or cited_files & inputs):
+                return False, f"'Value:' entry '{driver}' gives a figure without its source (answer Q<n>, request, or <input file>:<locator>)"
+        ranked.append(driver)
+
+    headers, rows = first_table(parts.get(FEATURES_HEADING, ""))
+    id_col, value_col = _column(headers, "id"), _column(headers, "value")
+    if not rows or id_col is None:
+        return False, "Features table has no 'ID' column"
+    if value_col is None:
+        return False, "Features table has no 'Value' column"
+    for row in rows:
+        ids = _FEATURE_ID.findall(_clean(row[id_col]))
+        if not ids:
+            continue
+        fid, cell = f"F{ids[0]}", _clean(row[value_col])
+        if re.search(r"\d", cell):
+            return False, f"{fid}'s Value cell gives a figure: {cell!r}; figures belong on the 'Value:' line with their source"
+        named = _drivers_named(cell)
+        if not named:
+            return False, f"{fid}'s Value cell names no value driver: {cell!r}"
+        extra = [d for d in named if d not in ranked]
+        if extra:
+            return False, f"{fid}'s Value cell names '{extra[0]}', which the 'Value:' line does not list"
+        if fid == "F1" and ranked[0] not in named:
+            return False, f"F1's Value cell does not name the first driver on the 'Value:' line, '{ranked[0]}'"
+    return True, f"value drivers ranked ({', '.join(ranked)}), and every feature names one"
+
+
+# --------------------------------------------------------------------------
 # Registry
 # --------------------------------------------------------------------------
 
@@ -1323,6 +1446,7 @@ CHECKS: dict[str, Callable[[Path], tuple[bool, str]]] = {
     "model-map-matches": check_model_map_matches,
     "sketch-rows-complete": check_sketch_rows_complete,
     "decision-provenance": check_decision_provenance,
+    "value-drivers": check_value_drivers,
 }
 
 

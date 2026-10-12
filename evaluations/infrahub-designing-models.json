@@ -45,14 +45,15 @@
     },
     {
       "id": 3,
-      "prompt": "Model our whole estate in Infrahub in one go: the fabric of our\ntwo data centres (spines, leafs, racks), IPAM for every prefix we own,\nfirewall policy between zones, and customer BGP peering at our edge. I\nwant the full model, not a plan for a plan.\n\nAnswers up front, since I won't be around to reply: outages come from IP\nclashes, firewall rules nobody can explain, and peering sessions typed by\nhand. NetOps, the security team and the pipeline that renders configs\nuse the data. Fabric data lives in a spreadsheet, prefixes in a phpIPAM\nwe want to retire, firewall rules in the firewall manager, peering in a\nwiki page. Customers order \"IP transit with BGP\"; internal teams order\n\"a new zone\". The DC team owns the fabric, the network team owns IPAM,\nsecurity owns the firewall rules, the peering team owns BGP.\n\nWrite the design brief.",
+      "prompt": "Model our whole estate in Infrahub in one go: the fabric of our\ntwo data centres (spines, leafs, racks), IPAM for every prefix we own,\nfirewall policy between zones, and customer BGP peering at our edge. I\nwant the full model, not a plan for a plan.\n\nAnswers up front, since I won't be around to reply: outages come from IP\nclashes, firewall rules nobody can explain, and peering sessions typed by\nhand. NetOps, the security team and the pipeline that renders configs\nuse the data. Fabric data lives in a spreadsheet, prefixes in a phpIPAM\nwe want to retire, firewall rules in the firewall manager, peering in a\nwiki page. Customers order \"IP transit with BGP\"; internal teams order\n\"a new zone\". The DC team owns the fabric, the network team owns IPAM,\nsecurity owns the firewall rules, the peering team owns BGP. My manager\nwill ask what this saves us.\n\nWrite the design brief.",
       "expected_output": "A design brief that splits the estate into features, each depending only on earlier ones, listing the implementation artifacts with schema first, and carrying a workflow-neutral handoff, plus a data model sketch for the first feature only.",
       "files": [],
       "expectations": [
         "The brief says the scope is too big for one feature and why",
         "Features are ordered by data dependency, each after the features it depends on",
         "Each feature has a handoff that names the brief and the feature ID, for any downstream workflow",
-        "Only the first feature is modelled in depth"
+        "Only the first feature is modelled in depth",
+        "The brief names the value the design serves without inventing a saving"
       ],
       "assertions": [
         {
@@ -74,6 +75,10 @@
         {
           "name": "sketch-rows-complete",
           "check": "Every sketch row has identity, source of truth and owner, or an open item"
+        },
+        {
+          "name": "value-drivers",
+          "check": "Business ranks value drivers from the fixed list, tagged, figures only with a source; F1 serves the first"
         }
       ]
     },
