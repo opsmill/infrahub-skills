@@ -69,6 +69,23 @@ DECISIONS = """\
 """
 
 
+DEFAULT_VALUE = "Value: Reduced risk of service disruption (recommended: outages come from IP clashes)"
+
+
+def with_value_column(features: str, driver: str) -> str:
+    """Append a Value column to the first table in `features`, unless it has one."""
+    lines = features.splitlines()
+    start = next((i for i, ln in enumerate(lines) if ln.lstrip().startswith("|")), None)
+    if start is None or re.search(r"\|\s*Value\s*\|", lines[start]):
+        return features
+    i = start
+    while i < len(lines) and lines[i].lstrip().startswith("|"):
+        cell = "Value" if i == start else "---" if i == start + 1 else driver
+        lines[i] = f"{lines[i].rstrip()} {cell} |"
+        i += 1
+    return "\n".join(lines) + ("\n" if features.endswith("\n") else "")
+
+
 def brief(
     *,
     inputs: str = "none\n",
@@ -81,12 +98,20 @@ def brief(
     reference: str | None = None,
     mechanisms: str = "No generator: nothing creates objects.\n",
     next_steps: str | None = None,
+    value: str | None = DEFAULT_VALUE,
 ) -> str:
+    """A brief; with `value`, Business gets that Value: line and a Features
+    table without a Value column gets one naming the line's first driver."""
+    business = "Who uses the data and why.\n"
+    if value is not None:
+        business = f"{value}\n\n{business}"
+        if features is not None:
+            features = with_value_column(features, value.split(":", 1)[1].split("(")[0].strip())
     parts = [
         "# Design brief: test\n",
         "## Summary\n\nWhat the team needs and what is not decided.\n",
         f"## Inputs\n\n{inputs}",
-        "## Business\n\nWho uses the data and why.\n",
+        f"## Business\n\n{business}",
         "## Service\n\nWhat is ordered.\n",
         f"## Reference design\n\n{REFERENCE_DC if reference is None else reference}",
     ]
@@ -223,6 +248,76 @@ nodes:
     ],
 )
 def test_one_question_recommended(tmp_path: Path, answer: str, expected: str | None) -> None:
+    write(tmp_path, "output_dir/answer.md", answer)
+    assert_outcome(run_grader("check_one_question_recommended.py", tmp_path), expected)
+
+
+Q_VALUE = """\
+**Q2 (business):** Which of these outcomes should the design deliver first (pick any)?
+
+- A. Reduced engineering effort: generators and pools replace work done by hand
+- B. Faster service delivery: an order needs only what the customer decides
+- C. Lower change failure costs: checks and constraints stop a bad change  **(Recommended)**
+- D. Less duplicated operational work: one source of truth per node kind
+- E. Reduced risk of service disruption: the impact of a change can be queried
+
+**Basis:** the rd column in vpn-customers.xlsx has duplicate values, which fail changes today (strong).
+"""
+
+# Options in another order, lower case, two recommended, no explanations.
+Q_VALUE_VARIANT = """\
+**Q1 (business):** Which outcomes matter most for this design (pick any)?
+
+* A. faster service delivery  **(Recommended)**
+* B. Reduced risk of service disruption
+* C. Less duplicated operational work
+* D. Lower change failure costs
+* E. Reduced engineering effort **(Recommended)**
+
+**Basis:** you said orders wait on hand-typed peering sessions (medium).
+"""
+
+Q_VALUE_THREE_RECOMMENDED = Q_VALUE.replace(
+    "- A. Reduced engineering effort: generators and pools replace work done by hand",
+    "- A. Reduced engineering effort: generators and pools replace work done by hand  **(Recommended)**",
+).replace(
+    "- E. Reduced risk of service disruption: the impact of a change can be queried",
+    "- E. Reduced risk of service disruption: the impact of a change can be queried  **(Recommended)**",
+)
+
+# Pick-any wording on a data question: five options, two recommended, no drivers.
+Q_NEAR_PICK_ANY_DATA = """\
+**Q6 (data):** Which identifiers should a cabinet carry (pick any)?
+
+- A. Cabinet name  **(Recommended)**
+- B. Row and position  **(Recommended)**
+- C. Asset tag
+- D. Serial number
+- E. Customer reference
+
+**Basis:** your sheet has name and row columns (strong).
+"""
+
+# The value block with one driver missing reads as an ordinary block.
+Q_NEAR_FOUR_DRIVERS = Q_VALUE.replace(
+    "- D. Less duplicated operational work: one source of truth per node kind\n", ""
+).replace(
+    "- A. Reduced engineering effort: generators and pools replace work done by hand",
+    "- A. Reduced engineering effort: generators and pools replace work done by hand  **(Recommended)**",
+)
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        pytest.param(Q_VALUE, None, id="compliant-value-question"),
+        pytest.param(Q_VALUE_VARIANT, None, id="compliant-variant-value-question-two-recommended"),
+        pytest.param(Q_VALUE_THREE_RECOMMENDED, "one or two '**(Recommended)**' tags, found 3", id="violating-value-three-recommended"),
+        pytest.param(Q_NEAR_PICK_ANY_DATA, "expected 2-4 option lines", id="near-miss-pick-any-data-question"),
+        pytest.param(Q_NEAR_FOUR_DRIVERS, "expected exactly one '**(Recommended)**' tag, found 2", id="near-miss-value-question-missing-driver"),
+    ],
+)
+def test_value_question_block(tmp_path: Path, answer: str, expected: str | None) -> None:
     write(tmp_path, "output_dir/answer.md", answer)
     assert_outcome(run_grader("check_one_question_recommended.py", tmp_path), expected)
 
@@ -1188,3 +1283,92 @@ def test_missing_brief_names_stray_briefs_outside_skipped_folders(tmp_path: Path
     write(tmp_path, "docs/node_modules/pkg/brief.md", "x\n")
     _, err = LIB.find_brief(tmp_path)
     assert "found instead: ['notes/design-brief.md']" in err, err
+
+
+# --------------------------------------------------------------------------
+# brief-value-drivers
+# --------------------------------------------------------------------------
+
+# Value after Intent; F1 serves both drivers, F2 only the second, F3 and F4
+# the third, written in lower case.
+FEATURES_VALUE = """\
+| ID | Feature | Intent | Value | Scope boundary | Artifacts | Depends on | Status | Handoff |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| F1 | DC fabric | Know what is racked where | Lower change failure costs, Reduced engineering effort | Site, Rack, Device, Interface | schema, objects | - | planned | Design the fabric model and populate it from the rack inventory. |
+| F2 | IPAM | Allocate prefixes without clashes | Reduced engineering effort | Prefix, IP pool | schema | F1 | planned | After F1, design the prefix and pool model. |
+| F3 | Firewall policy | Rules follow zones | reduced risk of service disruption | Zone, Rule | schema, check, transform | F1, F2 | planned | After F2, model zones, validate policy, and render the rules. |
+| F4 | Customer peering | Sessions per customer | Reduced risk of service disruption | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |
+"""
+VALUE_THREE = (
+    "Value: Lower change failure costs (stated, answer Q2: about 3 failed changes a month); "
+    "Reduced engineering effort (recommended: peering sessions typed by hand); "
+    "Reduced risk of service disruption (recommended)"
+)
+ORDERS_INPUT = "| File | Taken from it |\n| --- | --- |\n| orders-2024.csv | order dates and go-live dates |\n"
+
+
+def value_brief(value: str | None = DEFAULT_VALUE, features: str = FEATURES, **kw) -> str:
+    return brief(features=features, sketch_rows=F1_ROWS, plan_map=PLAN_MAP, value=value, **kw)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        pytest.param(value_brief(), None, id="compliant-one-driver"),
+        pytest.param(value_brief(VALUE_THREE, FEATURES_VALUE), None, id="compliant-variant-three-ranked-drivers"),
+        pytest.param(
+            value_brief(
+                "Value: faster service delivery (stated: orders take 12 days, orders-2024.csv:go_live)",
+                inputs=ORDERS_INPUT,
+            ),
+            None, id="compliant-figure-from-input-file",
+        ),
+        pytest.param(
+            value_brief("Value: Lower change failure costs (recommended: duplicate values in orders-2024.csv)", inputs=ORDERS_INPUT),
+            None, id="compliant-file-name-with-digits",
+        ),
+        pytest.param(
+            value_brief("Value: Less duplicated operational work (recommended: fabric data sits in a spreadsheet and phpIPAM)"),
+            None, id="compliant-fifth-driver",
+        ),
+        pytest.param(value_brief(None), "expected one 'Value:' line in Business, found 0", id="violating-no-value-line"),
+        pytest.param(
+            value_brief(None).replace("Who uses the data and why.", f"{DEFAULT_VALUE}\n\nWho uses the data and why."),
+            "Features table has no 'Value' column", id="violating-no-value-column",
+        ),
+        pytest.param(
+            value_brief("Value: Reduced engineering effort (recommended: saves 40 hours a month)"),
+            "gives a figure but is tagged recommended", id="near-miss-invented-figure",
+        ),
+        pytest.param(
+            value_brief("Value: Reduced engineering effort (stated: saves 40 hours a month)"),
+            "gives a figure without its source", id="near-miss-stated-figure-without-source",
+        ),
+        pytest.param(
+            value_brief("Value: Better automation (recommended)"),
+            "is not one of the five value drivers", id="near-miss-unknown-driver",
+        ),
+        pytest.param(
+            value_brief(
+                "Value: Reduced engineering effort (recommended); Lower change failure costs (stated)",
+                FEATURES_VALUE.replace("Lower change failure costs, Reduced engineering effort", "Lower change failure costs"),
+            ),
+            "F1's Value cell does not name the first driver", id="near-miss-f1-serves-second-driver",
+        ),
+        pytest.param(
+            value_brief(VALUE_THREE, FEATURES_VALUE.replace("| Reduced engineering effort | Prefix", "| Faster delivery | Prefix")),
+            "F2's Value cell names no value driver", id="near-miss-paraphrased-driver",
+        ),
+        pytest.param(
+            value_brief(VALUE_THREE, FEATURES_VALUE.replace("| Reduced engineering effort | Prefix", "| Faster service delivery | Prefix")),
+            "which the 'Value:' line does not list", id="near-miss-driver-not-ranked",
+        ),
+        pytest.param(
+            value_brief(VALUE_THREE, FEATURES_VALUE.replace("| Reduced engineering effort | Prefix", "| Reduced engineering effort, 40 hours saved | Prefix")),
+            "F2's Value cell gives a figure", id="near-miss-figure-in-value-cell",
+        ),
+    ],
+)
+def test_value_drivers(tmp_path: Path, text: str, expected: str | None) -> None:
+    write(tmp_path, BRIEF, text)
+    assert_outcome(run_grader("check_scope_split.py", tmp_path), expected)
