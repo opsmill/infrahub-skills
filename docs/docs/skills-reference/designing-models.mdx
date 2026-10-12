@@ -138,7 +138,7 @@ Before the data questions, the skill shows a draft of the model built from your 
 
 ### The brief
 
-The request covers the VPN service and the allocation of route distinguishers and route targets, so the skill splits it into two features and models only the first in depth. The brief, `docs/designs/l3vpn-service/design-brief.md`:
+The request covers the VPN service and the allocation of route distinguishers and route targets, so the skill splits it into two features. F1 includes the route distinguisher pool, because duplicate route distinguishers are the change failures that lead the design. The skill models only F1 in depth. The brief, `docs/designs/l3vpn-service/design-brief.md`:
 
 ````markdown
 ## Summary
@@ -153,7 +153,7 @@ New VPN sites sometimes get a route distinguisher that is already in use, becaus
 
 ## Business
 
-Value: Lower change failure costs (recommended: duplicate rd values in vpn-customers.xlsx); Faster service delivery (stated)
+Value: Lower change failure costs (recommended: duplicate rd values in vpn-customers.xlsx); Faster service delivery (stated: answer Q1)
 
 The provisioning team uses the data when they add a site to a VPN. Today a new site can get a route distinguisher that another VPN already uses. Out of scope: billing and troubleshooting.
 
@@ -172,14 +172,14 @@ Marketplace: infrahub/base-schemas (locations and devices behind each VpnSite)
 
 | ID | Feature | Intent | Value | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | VPN service | One object per ordered VPN, with its sites | Lower change failure costs, Faster service delivery | L3Vpn, VpnSite | schema, objects | - | planned | Design and implement the L3Vpn and VpnSite model, then populate it from the customer export, as designed in F1 of docs/designs/l3vpn-service/design-brief.md. |
-| F2 | RD and RT allocation | No duplicate distinguishers or targets | Lower change failure costs | RD pool, RT pool | schema, objects | F1 | planned | After F1, design the RD and RT pools and populate the initial allocations, as designed in F2 of docs/designs/l3vpn-service/design-brief.md. |
+| F1 | VPN service | One object per ordered VPN, with its sites and a route distinguisher no other VPN uses | Lower change failure costs, Faster service delivery | L3Vpn, VpnSite, RD pool | schema, objects | - | planned | Design and implement the L3Vpn and VpnSite model with an RD pool, then populate it from the customer export, as designed in F1 of docs/designs/l3vpn-service/design-brief.md. |
+| F2 | Route target allocation | No duplicate route targets | Lower change failure costs | RT pool | schema, objects | F1 | planned | After F1, design the RT pool and populate the initial allocations, as designed in F2 of docs/designs/l3vpn-service/design-brief.md. |
 
 ```mermaid
 graph LR
   F1["F1 VPN service
   schema, objects"]
-  F2["F2 RD and RT allocation
+  F2["F2 Route target allocation
   schema, objects"]
   F1 --> F2
 ```
@@ -188,7 +188,7 @@ graph LR
 
 | Feature | Node kind | Identified by | Key attributes (value class) | Peers (cardinality) | Source of truth | Owner | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | L3Vpn | customer + vpn_name | bandwidth (stated) | VpnSite (many) | Infrahub | Network team | vpn-customers.xlsx:vpn_name |
+| F1 | L3Vpn | customer + vpn_name | bandwidth (stated), route distinguisher (pool) | VpnSite (many) | Infrahub | Network team | vpn-customers.xlsx:vpn_name |
 | F1 | VpnSite | vpn + site_code | access type (stated) | L3Vpn (one) | Infrahub | open: O1 | vpn-customers.xlsx:site_code |
 
 ```mermaid
@@ -201,7 +201,8 @@ graph LR
 | Feature | Behavior | Mechanism | Driven by | Produces | Runs when | Why |
 | --- | --- | --- | --- | --- | --- | --- |
 | F1 | No two VPNs of one customer share a name | schema constraint | L3Vpn | uniqueness on customer and vpn_name | every change | the schema enforces it without code |
-| F2 | Each VPN gets a route distinguisher and route targets | resource pool | L3Vpn | an RD and RT values | a VPN is created | no hand allocation, no duplicates |
+| F1 | Each VPN gets a route distinguisher | resource pool | L3Vpn | an RD value | a VPN is created | no hand allocation, no duplicates |
+| F2 | Each VPN gets its route targets | resource pool | L3Vpn | RT values | a VPN is created | no hand allocation, no duplicates |
 
 ## Decision log
 
@@ -219,8 +220,8 @@ graph LR
 ## Next steps
 
 1. Settle O1 with the network team and the service desk.
-2. Build F1 VPN service: run the Schema Manager, then the Object Manager to load the VPNs from the customer export.
-3. When F1 is loaded, build F2 RD and RT allocation with the Schema Manager and the Object Manager.
+2. Build F1 VPN service: run the Schema Manager, then the Object Manager to load the VPNs from the customer export and allocate their route distinguishers.
+3. When F1 is loaded, build F2 Route target allocation with the Schema Manager and the Object Manager.
 ````
 
 ### The maps
@@ -231,7 +232,7 @@ The brief draws each table as a map, so the plan and the model can be read at a 
 graph LR
   F1["F1 VPN service
   schema, objects"]
-  F2["F2 RD and RT allocation
+  F2["F2 Route target allocation
   schema, objects"]
   F1 --> F2
 ```
@@ -245,7 +246,7 @@ graph LR
 
 ### Next steps in a spec-kit repository
 
-The Next steps above are for a repository with no specification or planning workflow: each artifact in a feature's `Artifacts` cell goes to its managing skill, in the listed order. Here F1 lists `schema, objects`, so the [Schema Manager](./managing-schemas.mdx) writes the L3Vpn and VpnSite schema, then the [Object Manager](./managing-objects.mdx) loads the VPNs from the customer export.
+The Next steps above are for a repository with no specification or planning workflow: each artifact in a feature's `Artifacts` cell goes to its managing skill, in the listed order. Here F1 lists `schema, objects`, so the [Schema Manager](./managing-schemas.mdx) writes the L3Vpn and VpnSite schema with the RD pool, then the [Object Manager](./managing-objects.mdx) loads the VPNs from the customer export.
 
 When the repository has a `.specify/` folder, the skill words each feature's step as a `/speckit.specify` prompt that carries the feature's `Handoff` cell:
 
@@ -253,8 +254,8 @@ When the repository has a `.specify/` folder, the skill words each feature's ste
 ## Next steps
 
 1. Settle O1 with the network team and the service desk.
-2. Specify F1 VPN service: `/speckit.specify Design and implement the L3Vpn and VpnSite model, then populate it from the customer export, as designed in F1 of docs/designs/l3vpn-service/design-brief.md.`
-3. When F1 is built, specify F2 RD and RT allocation: `/speckit.specify After F1, design the RD and RT pools and populate the initial allocations, as designed in F2 of docs/designs/l3vpn-service/design-brief.md.`
+2. Specify F1 VPN service: `/speckit.specify Design and implement the L3Vpn and VpnSite model with an RD pool, then populate it from the customer export, as designed in F1 of docs/designs/l3vpn-service/design-brief.md.`
+3. When F1 is built, specify F2 Route target allocation: `/speckit.specify After F1, design the RT pool and populate the initial allocations, as designed in F2 of docs/designs/l3vpn-service/design-brief.md.`
 ```
 
 The handoff names the brief and the feature ID, so `/speckit.specify` reads the sketch, decisions and open items from the brief rather than from one sentence. [Spec-driven development](../spec-driven-development.mdx) shows the rest of that flow. With another specification or planning setup, each step gives the same `Handoff` cell to that setup instead.
