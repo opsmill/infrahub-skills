@@ -95,7 +95,7 @@ the rest of the brief.
 ```markdown
 ## Business
 
-Value: Lower change failure costs (recommended: duplicate rd values in vpn-customers.xlsx); Reduced engineering effort (stated)
+Value: Lower change failure costs (recommended: duplicate rd values in vpn-customers.xlsx); Reduced engineering effort (stated: answer Q1)
 
 | ID | Feature | Intent | Value | ... |
 | F1 | VPN service | One object per ordered VPN | Lower change failure costs | ... |

@@ -66,7 +66,7 @@ item.
 The first line of `## Business`:
 
 ```markdown
-Value: Lower change failure costs (recommended: duplicate rd values in vpn-customers.xlsx); Reduced engineering effort (stated)
+Value: Lower change failure costs (recommended: duplicate rd values in vpn-customers.xlsx); Reduced engineering effort (stated: answer Q1)
 ```
 
 The drivers from
@@ -75,7 +75,7 @@ spelled as listed there, in rank order, separated by
 `;`. Each is tagged `stated` or `recommended` in
 parentheses, followed by what it rests on. A value no
 driver fits is written in the user's words as
-`Other: audit evidence for every change (stated)`; it is
+`Other: audit evidence for every change (stated: answer Q1)`; it is
 always `stated`, and a feature names it as `Other`. A figure
 appears only on a `stated` entry, with its source:
 `answer Q<n>`, `request`, or `<input file>:<locator>`.
