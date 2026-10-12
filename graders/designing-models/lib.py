@@ -313,9 +313,15 @@ def check_one_question_recommended(ws: Path) -> tuple[bool, str]:
     options = [i for i, ln in enumerate(lines) if _OPTION.match(ln)]
     # The value question is the one pick-any block: its options are exactly
     # the five value drivers, and one or two of them are recommended.
+    # A sixth, last option "Other (say which)" takes the user's own words.
+    texts = [_norm(_OPTION.match(lines[i]).group(2)) for i in options]
+    has_other = bool(texts) and texts[-1].startswith("other")
+    driver_options = options[:-1] if has_other else options
     leads = [next((d for d in VALUE_DRIVERS if _norm(_OPTION.match(lines[i]).group(2)).startswith(d)), None)
-             for i in options]
-    value_block = len(options) == len(VALUE_DRIVERS) and set(leads) == set(VALUE_DRIVERS)
+             for i in driver_options]
+    value_block = len(driver_options) == len(VALUE_DRIVERS) and set(leads) == set(VALUE_DRIVERS)
+    if value_block and has_other and _RECOMMENDED.search(lines[options[-1]]):
+        return False, "the 'Other' option is never recommended: the skill cannot recommend a value it did not hear"
     if not value_block and not 2 <= len(options) <= 4:
         return False, f"expected 2-4 option lines '- A. ...', found {len(options)}"
     if any(i < q_idx[0] for i in options):
@@ -1339,6 +1345,9 @@ VALUE_DRIVERS = (
 )
 BUSINESS_HEADING = "business"
 _VALUE_LINE = re.compile(r"^\s*(?:[-*]\s+)?Value:\s*(.*?)\s*$", re.IGNORECASE)
+# A value no driver fits, in the user's words: "Other: audit evidence (stated)".
+_OTHER_ENTRY = re.compile(r"^Other:\s*(?P<text>[^()]*?)\s*\(\s*(?P<tag>stated|recommended)\b(?P<rest>.*)\)\s*$", re.IGNORECASE)
+OTHER = "other"
 _VALUE_ENTRY = re.compile(r"^(?P<driver>[^()]+?)\s*\(\s*(?P<tag>stated|recommended)\b(?P<rest>.*)\)\s*$", re.IGNORECASE)
 _ANSWER_REF = re.compile(r"\banswer\s+Q\d+\b", re.IGNORECASE)
 _REQUEST_REF = re.compile(r"\brequest\b", re.IGNORECASE)
@@ -1363,6 +1372,9 @@ def _drivers_named(cell: str) -> list[str]:
     """Value drivers a cell names, in the order they appear."""
     text = _norm(cell)
     found = [(text.find(d), d) for d in VALUE_DRIVERS if d in text]
+    other = re.search(r"\bother\b", text)
+    if other:
+        found.append((other.start(), OTHER))
     return [d for _, d in sorted(found)]
 
 
@@ -1405,6 +1417,21 @@ def check_value_drivers(ws: Path) -> tuple[bool, str]:
 
     ranked: list[str] = []
     for entry in _split_entries(_clean(lines[0])):
+        other = _OTHER_ENTRY.match(entry)
+        if other:
+            if other.group("tag").lower() != "stated":
+                return False, "an 'Other' entry is always stated: it records a value the user named and no driver fits"
+            if not other.group("text").strip():
+                return False, "an 'Other' entry needs the user's own words after 'Other:'"
+            words = other.group("text") + other.group("rest")
+            bare = _FILE_NAME.sub("", _ANSWER_REF.sub("", words))
+            if (re.search(r"\d", bare) or _NUMBER_WORD.search(bare)) and not (
+                _ANSWER_REF.search(words) or _REQUEST_REF.search(words)
+                or {Path(m.group(1)).name.lower() for m in _FILE_LOCATOR.finditer(words)} & inputs
+            ):
+                return False, "the 'Other' entry gives a figure without its source (answer Q<n>, request, or <input file>:<locator>)"
+            ranked.append(OTHER)
+            continue
         match = _VALUE_ENTRY.match(entry)
         if not match:
             return False, f"'Value:' entry {entry[:60]!r} is not '<driver> (stated|recommended ...)'"

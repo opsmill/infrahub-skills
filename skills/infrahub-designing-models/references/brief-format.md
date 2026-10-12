@@ -73,7 +73,10 @@ The drivers from
 [../rules/brief-value-drivers.md](../rules/brief-value-drivers.md),
 spelled as listed there, in rank order, separated by
 `;`. Each is tagged `stated` or `recommended` in
-parentheses, followed by what it rests on. A figure
+parentheses, followed by what it rests on. A value no
+driver fits is written in the user's words as
+`Other: audit evidence for every change (stated)`; it is
+always `stated`, and a feature names it as `Other`. A figure
 appears only on a `stated` entry, with its source:
 `answer Q<n>`, `request`, or `<input file>:<locator>`.
 

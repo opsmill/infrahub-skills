@@ -18,8 +18,8 @@ block layout from
 
 - Which of these outcomes should the design deliver
   first (pick any)? The five value drivers, as options
-  A to E, with one or two recommended from the files
-  and the request
+  A to E, then `F. Other (say which)`, with one or two
+  drivers recommended from the files and the request
   ([value drivers](../rules/brief-value-drivers.md)).
   The answer ranks them; it is never followed by a
   question about hours or costs.

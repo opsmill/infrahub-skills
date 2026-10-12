@@ -1372,7 +1372,10 @@ def value_brief(value: str | None = DEFAULT_VALUE, features: str = FEATURES, **k
             "an 'Other' entry needs the user's own words", id="near-miss-empty-other",
         ),
         pytest.param(
-            value_brief("Value: Other: audit evidence for every firewall change (stated); Reduced risk of service disruption (recommended)"),
+            value_brief(
+                "Value: Other: audit evidence for every firewall change (stated); Reduced risk of service disruption (recommended)",
+                with_value_column(FEATURES, "Reduced risk of service disruption"),
+            ),
             "F1's Value cell does not name the first driver on the 'Value:' line, 'other'", id="near-miss-f1-ignores-leading-other",
         ),
         pytest.param(value_brief(None), "expected one 'Value:' line in Business, found 0", id="violating-no-value-line"),

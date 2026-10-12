@@ -41,7 +41,7 @@ It writes no schema YAML.
 ## Key rules enforced
 
 - **One question at a time, with a recommendation**: each message is a single question with two to four options, one marked as recommended, and the basis for it with its strength. The value question is the one exception: you can pick several drivers, and one or two are recommended
-- **Designed for a value, without a business case**: you pick which outcomes the design should deliver first, from five value drivers: reduced engineering effort, faster service delivery, lower change failure costs, less duplicated operational work, and reduced risk of service disruption. You can skip the question, and the skill takes its recommendation. It never asks for hours or costs, and never writes a figure you did not give it. The first driver decides which feature is built first, and each recommendation says which driver it serves
+- **Designed for a value, without a business case**: you pick which outcomes the design should deliver first, from five value drivers: reduced engineering effort, faster service delivery, lower change failure costs, less duplicated operational work, and reduced risk of service disruption. You can also add a value of your own in free text: the skill maps it to one of the five when it fits, and otherwise records it in your words. You can skip the question, and the skill takes its recommendation. It never asks for hours or costs, and never writes a figure you did not give it. The first driver decides which feature is built first, and each recommendation says which driver it serves
 - **A draft before the details**: after a few business and service questions, you see a draft of the model with each guess marked and two or three sample objects built from your own data, and the data questions go to the guesses that matter most. Nothing in the draft is invented: every guess comes from your files, your answers, a Marketplace schema that covers the node kind, the reference design or an Infrahub default, and any other cell stays unknown and becomes a question
 - **A scenario walkthrough**: before the brief is confirmed, one event such as an order or a decommission is walked through the model to find missing peers or unclear deletes
 - **Grounded in the managing skills**: each data question names the schema or best-practice rule its answer feeds, such as uniqueness scope, what happens on delete, or a resource pool instead of hand allocation, and no guess reaches the brief unconfirmed
@@ -94,11 +94,26 @@ Each message is one question. The skill reads your file first, so the first busi
 - C. Lower change failure costs: constraints and pools stop a change that would clash  **(Recommended)**
 - D. Less duplicated operational work: each value has one source of truth
 - E. Reduced risk of service disruption: the impact of a change can be found before it is made
+- F. Other (say which)
 
 **Basis:** vpn-customers.xlsx has duplicate values in its rd column, and a duplicate route distinguisher fails the change that uses it (strong)
 ```
 
-You answer "C, and B too". The skill ranks lower change failure costs first, because your file is the evidence for it. It does not ask what the failures cost. Later, a service question separates what the customer orders from what the network team derives:
+You answer "C, and B too". The skill ranks lower change failure costs first, because your file is the evidence for it. It does not ask what the failures cost. Had you picked F and written "audit evidence for every change", the skill would first check whether one of the five drivers covers it, and otherwise record your words as an `Other:` entry.
+
+The next business question asks who uses the data, so the design serves the people who feel the problem:
+
+```markdown
+**Q2 (business):** Who uses VPN data first?
+
+- A. The provisioning team, when they add a site to a VPN  **(Recommended)**
+- B. The pipeline that renders PE configurations
+- C. The service desk, when a customer reports a problem
+
+**Basis:** you picked lower change failure costs, and a duplicate route distinguisher fails when a site is provisioned (medium)
+```
+
+You answer "A". Then a service question separates what the customer orders from what the network team derives:
 
 ```markdown
 **Q3 (service):** What does the customer order?
