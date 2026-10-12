@@ -22,8 +22,8 @@ These `##` headings, spelled and ordered exactly like this:
    what is not decided yet. Three to five sentences.
 2. `## Inputs`: the files the user provided, as a table,
    or the word `none`.
-3. `## Business`: who uses the data, the incident it
-   prevents, and what is out of scope.
+3. `## Business`: the `Value:` line, then who uses the
+   data and what is out of scope.
 4. `## Service`: what a customer or internal team
    orders, what the requester decides compared with
    what the network team derives, and the lifecycle
@@ -61,6 +61,22 @@ covers; or `none matched` with the reason; or
 `not searched` with the reason, also kept as an open
 item.
 
+## Value line
+
+The first line of `## Business`:
+
+```markdown
+Value: Lower change failure costs (recommended: duplicate rd values in vpn-customers.xlsx); Reduced engineering effort (stated)
+```
+
+The drivers from
+[../rules/brief-value-drivers.md](../rules/brief-value-drivers.md),
+spelled as listed there, in rank order, separated by
+`;`. Each is tagged `stated` or `recommended` in
+parentheses, followed by what it rests on. A figure
+appears only on a `stated` entry, with its source:
+`answer Q<n>`, `request`, or `<input file>:<locator>`.
+
 ## Inputs table
 
 ```markdown
@@ -76,14 +92,17 @@ files pasted into the conversation.
 ## Features table
 
 ```markdown
-| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | Fiber plant | Know which strand runs where | Site, FiberCable, Strand | schema, objects, generator | - | planned | Design and implement the fiber plant model, then populate its initial objects, as designed in F1 of docs/designs/metro-optical/design-brief.md. |
-| F2 | DWDM channels | Allocate channels without clashes | OpticalChannel, channel pool | schema | F1 | planned | After F1, design the channel model and allocation pool, as designed in F2 of docs/designs/metro-optical/design-brief.md. |
+| ID | Feature | Intent | Value | Scope boundary | Artifacts | Depends on | Status | Handoff |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| F1 | Fiber plant | Know which strand runs where | Reduced engineering effort | Site, FiberCable, Strand | schema, objects, generator | - | planned | Design and implement the fiber plant model, then populate its initial objects, as designed in F1 of docs/designs/metro-optical/design-brief.md. |
+| F2 | DWDM channels | Allocate channels without clashes | Lower change failure costs | OpticalChannel, channel pool | schema | F1 | planned | After F1, design the channel model and allocation pool, as designed in F2 of docs/designs/metro-optical/design-brief.md. |
 ```
 
 - `ID` is `F1`, `F2`, ... in build order. An ID never
   changes once a spec refers to it.
+- `Value` names the drivers the feature serves, from the
+  `Value:` line, and no figures. F1's names the first
+  driver on that line.
 - `Artifacts` is an ordered, comma-separated list from
   exactly these values: `schema`, `objects`, `generator`,
   `check`, `transform`, `menu`. `schema` comes first
