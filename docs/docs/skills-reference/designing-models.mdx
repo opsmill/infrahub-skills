@@ -12,7 +12,7 @@ The Model Designer works out what to model before any schema exists. It reads th
 - You have diagrams, inventory exports or a requirements document to turn into a design
 - A request spans several domains, such as a fiber plant, DWDM channels and a wavelength service, and needs to be split
 - A design brief exists and needs another feature or a changed decision
-- You want to agree a design with your management, or with OpsMill, before anyone builds it
+- You want to discuss the business and service implications of a design inside your organization, with management, the service owner or OpsMill, before anyone builds it
 
 ## What it produces
 
@@ -64,15 +64,19 @@ It writes no schema YAML.
 - "Sensible defaults" that look decided but were never confirmed
 - A generator chosen for a value that a computed attribute on the same node would give
 
-## Discussing the design before you build it
+## Discussing the brief inside your organization before you build
 
-The brief is meant to be read before anything is built. Take it to your management, or to OpsMill, and agree on the design first:
+The brief is written to be read by people, not only by the skills that build from it. Before anything is built, review it with the people the design affects: your management, the service owner, the teams the brief names as owners, and OpsMill if you work with OpsMill. It is a Markdown file in your repository, so it can be reviewed like any other change. The sections answer the questions those people ask:
 
-- **What the design is for.** The `Value:` line and the Features table show which value drivers each feature serves, and which one leads. A reader can see why F1 comes first and decide whether the order matches what the organization needs.
-- **What is still open.** Open items name who owes each answer and the features it affects, so the discussion can settle them before work starts.
-- **What it builds on.** The reference design and the Marketplace line show which parts follow OpsMill's worked examples and published schemas, and which parts are new.
+- **Business: what the design is for.** The `Value:` line ranks the value drivers the design serves, and the Features table shows which feature serves which driver. Business also names who uses the data and what is out of scope. Management can check that the order of the work matches what the organization needs, and that nothing they expected was left out.
+- **Service: what changes in how the service is delivered.** Service says what a customer or internal team orders, what the requester decides and what the network team derives, and which lifecycle states the service goes through with who moves each one. These are process decisions, not data decisions: they change order forms, hand-overs between teams and who is responsible for each step. The service owner and the teams involved should agree with them.
+- **Ownership: who owns which data from now on.** The sketch's `Source of truth` and `Owner` columns name, for each node kind, which system is authoritative and which team keeps it correct. When the design retires a system, such as a spreadsheet or an IPAM tool, the brief shows which data moves to Infrahub and which team takes it over.
+- **Open decisions: what still needs an answer.** Open items name who owes each answer and the features it affects, so the review can settle them before work starts rather than during it.
+- **Reuse: what it builds on.** The reference design and the Marketplace line show which parts follow OpsMill's worked examples and published schemas, and which parts are new.
 
-Agreeing on the model first matters because everything else depends on it. Objects, generators, checks, transforms and the systems that read from Infrahub are all built on the schema's node kinds, identities and relationships. A wrong choice found at this point costs an edit to the brief. Found after data is loaded and automation runs, it costs a schema migration and changes to everything that uses it.
+When the review changes something, run the Model Designer again with the answer or the change. It updates the brief and shows which features the change affects (see [Coming back with an answer](#coming-back-with-an-answer)).
+
+Agreeing on the model first matters because everything else depends on it. Objects, generators, checks, transforms and the systems that read from Infrahub are all built on the schema's node kinds, identities and relationships. A wrong choice found in the review costs an edit to the brief. Found after data is loaded and automation runs, it costs a schema migration and changes to everything that uses it.
 
 ## Example: an L3VPN service
 
