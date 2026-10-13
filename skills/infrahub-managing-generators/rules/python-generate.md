@@ -109,7 +109,9 @@ ip = await self.client.allocate_next_ip_address(
   usual cause. Check each field name against the
   kind's schema before you write the call. A generated
   protocol class as `kind` does not catch this,
-  because the field arguments are untyped. Current as
+  because the field arguments are untyped. When `data`
+  is not empty, every keyword field is ignored, valid
+  or not, so pass all fields in one place. Current as
   of infrahub-sdk 1.23.2
   ([infrahub-sdk-python#1413](https://github.com/opsmill/infrahub-sdk-python/issues/1413)).
 - Treat optional GraphQL fields defensively —

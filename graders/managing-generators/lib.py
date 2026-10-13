@@ -2888,25 +2888,48 @@ def _dict_keys(
     return keys, [ast.unparse(node)[:60]]
 
 
-def _create_fields(call: ast.Call, scope: ast.AST) -> tuple[set[str], list[str]]:
-    """Every field name a create() call passes, from keywords and from ``data``."""
+def _create_fields(call: ast.Call, scope: ast.AST) -> tuple[set[str], list[str], list[str], str | None]:
+    """Every field name a create() call passes, from keywords and from ``data``.
+
+    Returns ``(fields, unresolved, keyword_fields, data_state)``.
+    ``keyword_fields`` names the fields passed as keywords, with an
+    unreadable ``**`` argument listed as itself. ``data_state`` is
+    ``"non-empty"`` when ``data`` carries a key, ``"unreadable"`` when the
+    check cannot tell, and None when ``data`` is absent, None, or provably
+    empty.
+    """
     fields: set[str] = set()
     unresolved: list[str] = []
+    keyword_fields: set[str] = set()
     for kw in call.keywords:
         if kw.arg is None:
             sub_keys, sub_unres = _dict_keys(kw.value, scope, call=call)
-            fields |= sub_keys
+            splat = f"**{ast.unparse(kw.value)}"
+            passed = sorted(sub_keys & {"kind", "data"})
+            if passed:
+                unresolved.append(f"{splat}, which passes {', '.join(passed)}")
+            sub_fields = sub_keys - _CREATE_PARAMS
+            fields |= sub_fields
+            keyword_fields |= sub_fields
+            if sub_unres:
+                keyword_fields.add(splat)
             unresolved += sub_unres
         elif kw.arg not in _CREATE_PARAMS:
             fields.add(kw.arg)
+            keyword_fields.add(kw.arg)
     data = get_kwarg(call, "data")
     if data is None and len(call.args) > 1:
         data = call.args[1]
+    data_state = None
     if data is not None and not (isinstance(data, ast.Constant) and data.value is None):
         sub_keys, sub_unres = _dict_keys(data, scope, call=call)
         fields |= sub_keys
         unresolved += sub_unres
-    return fields, unresolved
+        if sub_keys:
+            data_state = "non-empty"
+        elif sub_unres:
+            data_state = "unreadable"
+    return fields, unresolved, sorted(keyword_fields), data_state
 
 
 def _is_client_receiver(node: ast.AST) -> bool:
@@ -2932,9 +2955,14 @@ def check_create_fields_exist_on_kind(
     receiver when the kind resolves to a schema kind, and compares its keyword
     and ``data`` keys with the schema fixture.
 
+    It also fails a field passed as a keyword next to a ``data`` that is not
+    empty: create() builds the node from ``data or kwargs``, so every keyword
+    field is dropped then, valid or not.
+
     It fails closed: an unparseable answer, a create() call whose kind or
-    fields cannot be read, and an answer that creates none of a schema kind
-    all fail.
+    fields cannot be read, a keyword field next to a ``data`` the check
+    cannot prove empty, and an answer that creates none of a schema kind all
+    fail.
     """
     if tree is None:
         return False, "create-fields-exist-on-kind: no parseable Python to inspect"
@@ -2957,9 +2985,16 @@ def check_create_fields_exist_on_kind(
                 )
             continue
         created.add(kind)
-        fields, unresolved = _create_fields(call, scope)
+        fields, unresolved, keyword_fields, data_state = _create_fields(call, scope)
         for part in unresolved:
             problems.append(f"line {call.lineno}: cannot read the {kind} fields from {part}")
+        if keyword_fields and data_state is not None:
+            which = "a non-empty data" if data_state == "non-empty" else "a data the check cannot read"
+            problems.append(
+                f"line {call.lineno}: create({kind}) passes {', '.join(keyword_fields)} "
+                f"as a keyword next to {which}; create() ignores every keyword field "
+                "when data is not empty"
+            )
         unknown = sorted(fields - kinds[kind])
         if unknown:
             problems.append(

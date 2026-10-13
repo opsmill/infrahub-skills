@@ -225,6 +225,13 @@ def test_skipping_one_kind_fails():
             "cannot read the kind",
             id="kind-from-attribute-of-a-non-protocols-module",
         ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    extra = {'data': {'name': 'lo0', 'lag': lag}}\n"
+            "    await self.client.create(kind='DcimVirtualInterface', name='lo0', **extra)\n",
+            "cannot read the DcimVirtualInterface fields from **extra, which passes data",
+            id="data-passed-through-kwargs-splat",
+        ),
     ],
 )
 def test_unreadable_create_call_fails(src, expected):
@@ -300,7 +307,6 @@ def test_unknown_field_reached_another_way_fails(body):
     assert "create(DcimVirtualInterface) passes" in msg, msg
 
 
-
 @pytest.mark.parametrize(
     "header, kind",
     [
@@ -335,6 +341,82 @@ def test_kind_bound_at_module_level_passes_when_fields_match():
         "    await self.client.create(kind=p.DcimLagInterface, name='po2', members=[])\n"
     )
     assert ok, msg
+
+
+# ---------------------------------------------------------------------------
+# Keyword fields next to a non-empty data: create() uses ``data or kwargs``
+# ---------------------------------------------------------------------------
+
+_VIRTUAL = "    await self.client.create(kind='DcimVirtualInterface', name='lo0', device=device)\n"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param(
+            "    await self.client.create(kind='DcimPhysicalInterface', data={'name': 'eth1', 'device': device}, lag=lag)\n",
+            id="data-literal-and-keyword",
+        ),
+        pytest.param(
+            "    await self.client.create('DcimPhysicalInterface', {'name': 'eth1', 'device': device}, lag=lag)\n",
+            id="positional-data-and-keyword",
+        ),
+        pytest.param(
+            "    payload = {'name': 'eth1'}\n"
+            "    payload['device'] = device\n"
+            "    await self.client.create(kind='DcimPhysicalInterface', data=payload, lag=lag)\n",
+            id="data-name-and-keyword",
+        ),
+        pytest.param(
+            "    extra = {'lag': lag}\n"
+            "    await self.client.create(kind='DcimPhysicalInterface', data={'name': 'eth1', 'device': device}, **extra)\n",
+            id="data-and-kwargs-splat",
+        ),
+    ],
+)
+def test_keyword_field_next_to_non_empty_data_fails(body):
+    """Every field is valid on the kind, but create() ignores the keywords."""
+    ok, msg = _run("async def generate(self, device, lag):\n" + _VIRTUAL + body)
+    assert not ok
+    assert "create(DcimPhysicalInterface) passes lag as a keyword next to a non-empty data" in msg, msg
+
+
+def test_keyword_field_next_to_data_that_cannot_be_read_fails():
+    ok, msg = _run(
+        "async def generate(self, device, lag):\n"
+        + _VIRTUAL
+        + "    await self.client.create(kind='DcimPhysicalInterface', data=build(device), lag=lag)\n"
+    )
+    assert not ok
+    assert "create(DcimPhysicalInterface) passes lag as a keyword next to a data the check cannot read" in msg, msg
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param(
+            "    await self.client.create(kind='DcimPhysicalInterface', data={}, name='eth1', device=device, lag=lag)\n",
+            id="empty-data-literal",
+        ),
+        pytest.param(
+            "    await self.client.create(kind='DcimPhysicalInterface', data=dict(), name='eth1', device=device, lag=lag)\n",
+            id="empty-dict-call",
+        ),
+        pytest.param(
+            "    await self.client.create(kind='DcimPhysicalInterface', data={'name': 'eth1', 'device': device, 'lag': lag}, branch='main', timeout=10)\n",
+            id="data-with-create-params",
+        ),
+        pytest.param(
+            "    opts = {'branch': 'main'}\n"
+            "    await self.client.create(kind='DcimPhysicalInterface', data={'name': 'eth1', 'device': device, 'lag': lag}, **opts)\n",
+            id="data-with-create-params-splat",
+        ),
+    ],
+)
+def test_keywords_used_only_with_empty_data_or_as_create_params_pass(body):
+    ok, msg = _run("async def generate(self, device, lag):\n" + _VIRTUAL + body)
+    assert ok, msg
+
 
 # ---------------------------------------------------------------------------
 # Boundaries
