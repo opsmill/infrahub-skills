@@ -838,6 +838,35 @@ def _skip_options(argv: list[str], value_options: frozenset[str]) -> list[str]:
     return argv
 
 
+def _env_command(args: list[str]) -> list[str]:
+    """The command ``env`` runs, its options and ``VAR=value`` words left on.
+
+    ``-S STRING`` (``--split-string``) splits ``STRING`` into words that
+    become the command, ahead of any arguments after it: ``env -S "git
+    push"`` and ``env -S git push`` both run ``git push``.
+    """
+    args = list(args)
+    while args and args[0].startswith("-"):
+        option = args.pop(0)
+        if option == "--":
+            break
+        split = None
+        if option in ("-S", "--split-string"):
+            split = args.pop(0) if args else ""
+        elif option.startswith("--split-string="):
+            split = option.split("=", 1)[1]
+        elif option.startswith("-S"):
+            split = option[2:]
+        elif option in _ENV_VALUE_OPTIONS and args:
+            args.pop(0)
+        if split is not None:
+            try:
+                return shlex.split(split) + args
+            except ValueError:
+                return args
+    return args
+
+
 def _program_argv(argv: list[str]) -> list[str]:
     """The argv of the program that actually runs, wrappers peeled off.
 
@@ -855,7 +884,7 @@ def _program_argv(argv: list[str]) -> list[str]:
         elif head == "sudo":
             argv = _skip_options(argv[1:], _SUDO_VALUE_OPTIONS)
         elif head == "env":
-            argv = _skip_options(argv[1:], _ENV_VALUE_OPTIONS)
+            argv = _env_command(argv[1:])
         elif head in _RUN_LAUNCHERS:
             rest = _skip_options(argv[1:], _LAUNCHER_VALUE_OPTIONS)
             if rest[:1] != ["run"]:

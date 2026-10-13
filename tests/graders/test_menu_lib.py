@@ -2416,6 +2416,16 @@ infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
         ok, msg = self._deleted(notes)
         assert ok, msg
 
+    def test_env_split_string_runs_its_command(self):
+        """``env -S STRING`` runs the words of STRING, quoted or not."""
+        for push in ('env -S "git commit -am retire" && env -S "git push"', "env -S git commit -am retire && env -S git push", "env -i -S'git commit -am retire' && env --split-string='git push' origin main"):
+            notes = (
+                f"```bash\n{push}\n"
+                "env -S \"infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\"\n```\n"
+            )
+            ok, msg = self._deleted(notes)
+            assert ok, f"{push}: {msg}"
+
     def test_multi_line_commit_message_keeps_the_commit(self):
         notes = """\
 ```bash
