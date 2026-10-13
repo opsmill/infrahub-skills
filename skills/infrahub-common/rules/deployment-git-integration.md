@@ -59,8 +59,8 @@ Three steps, and the third is the one people miss:
 | | `CoreReadOnlyRepository` | `CoreRepository` |
 | --- | --- | --- |
 | Tracks | one ref, set by `ref` (branch, tag, or commit) | every branch on the remote; `default_branch` names the one mapped to Infrahub's default |
-| Import | **never automatic.** Only when you change `ref`, or run the **Import latest commit** action (`InfrahubReadOnlyRepositoryImportLastCommit`) | **automatic.** Background tasks poll the remote several times a minute and re-import on change |
-| Infrahub branches | creates none | creates a matching Infrahub branch for every Git branch (branch parity) |
+| Import | **On creation, then only when told.** Registering it imports once. After that, run **Import latest commit** (`InfrahubReadOnlyRepositoryImportLastCommit`, Infrahub 1.8+) or set `commit` to the new SHA. An update re-imports only when the value actually changes, so re-saving the same `ref` does nothing | **automatic.** A background workflow polls the remote once a minute (`* * * * *`) and re-imports on change |
+| Infrahub branches | creates none | creates a matching Infrahub branch for every Git branch (branch parity), unless `git.import_sync_branch_names` narrows which ones are imported |
 | Writes back to Git | never | pushes the linked branch when a proposed change merges |
 
 The automatic import is why `CoreRepository` is the
@@ -109,12 +109,26 @@ a matching branch in every read-write repository and
 merges that branch in Git when a proposed change
 merges.
 
-It does not gate importing. Import always runs from
-Git into Infrahub regardless of this property. The
+It does not gate importing in the normal case. The
 name reads the other way round, which is the usual
 source of confusion. Data-only changes generally need
 no Git branch at all, since that data lives only in
 the graph.
+
+The one setting that makes it affect an import is
+`git.import_sync_branch_names`, which is empty by
+default. While it is empty, Infrahub imports every
+branch on the remote and `sync_with_git` changes
+nothing. Once patterns are configured, a Git branch
+whose Infrahub branch already exists is imported if it
+is the default branch, if its Infrahub branch has
+`sync_with_git` on, or if its name matches a pattern,
+and is skipped otherwise. A Git branch with no
+Infrahub branch yet is imported only if its name
+matches a pattern. This filtering applies to
+`CoreRepository` only: a read-only repository imports
+whatever its `ref` resolves to and ignores the
+setting.
 
 ### Local Development Setup
 
@@ -149,11 +163,14 @@ services:
   produces validation errors or circular dependencies
   when the repo tries to register itself. Use a
   separate `bootstrap/` directory
-- **Waiting for a read-only repo to re-sync**: it
-  never will on its own. Run **Import latest commit**
-  or change the `ref`. Do **not** delete and re-create
-  the registration, which is destructive and
-  unnecessary
+- **Read-only repos don't follow pushes**:
+  `CoreReadOnlyRepository` does not pick up new
+  commits on its own. Run
+  `InfrahubReadOnlyRepositoryImportLastCommit`
+  (Infrahub 1.8+), or set its `commit` to the new SHA.
+  An update only re-imports when the value changes, so
+  re-saving the same `ref` does nothing. There is no
+  need to delete and re-create the registration
 - **Treating `ok: true` as "imported"**: the mutation
   returns when the import is *dispatched*, not when it
   finishes. Confirm by checking the repository's
