@@ -485,25 +485,6 @@ def check_computed_jinja2_kind(schema: dict, **_: Any) -> tuple[bool, str]:
     return True, "All computed_attribute entries use kind: Jinja2 with a template"
 
 
-def check_on_delete_cascade_present(schema: dict, **_: Any) -> tuple[bool, str]:
-    """At least one relationship sets on_delete: cascade.
-
-    Used in evals where the prompt describes owned children whose existence
-    has no meaning without the parent. An omitted on_delete resolves to
-    cascade on kind: Component and to no-action on every other kind; this
-    check accepts only an explicit on_delete: cascade.
-    """
-    all_items = _all_nodes(schema) + _all_generics(schema)
-    cascading: list[str] = []
-    for node in all_items:
-        for rel in _all_rels(node):
-            if rel.get("on_delete") == "cascade":
-                cascading.append(f"{_full_kind(node)}.{rel.get('name', '')}")
-    if cascading:
-        return True, f"Found cascade on: {', '.join(cascading)}"
-    return False, "No relationship sets on_delete: cascade"
-
-
 def _resolved_on_delete(rel: dict) -> str:
     """The on_delete Infrahub applies to a relationship.
 
@@ -517,6 +498,50 @@ def _resolved_on_delete(rel: dict) -> str:
     return "cascade" if rel.get("kind", "Generic") == "Component" else "no-action"
 
 
+def _on_delete_source(rel: dict) -> str:
+    """Say where the resolved on_delete came from, for check messages."""
+    if rel.get("on_delete") is not None:
+        return "explicit"
+    return f"omitted on kind {rel.get('kind', 'Generic')}"
+
+
+def _relationship_containers(schema: dict) -> list[dict]:
+    """Nodes, generics and node extensions: everything that declares relationships."""
+    extensions = schema.get("extensions") or {}
+    return _all_nodes(schema) + _all_generics(schema) + (extensions.get("nodes", []) or [])
+
+
+def check_on_delete_cascade_present(schema: dict, **_: Any) -> tuple[bool, str]:
+    """A relationship to the HealthCheck node resolves to on_delete: cascade.
+
+    Used in the service-cascade eval, where the prompt says health checks
+    have no meaning without their VIPService and must be deleted with it.
+    The resolved value is what Infrahub acts on, so an explicit cascade and
+    a kind: Component relationship that omits on_delete both pass. Only
+    relationships whose peer is a HealthCheck node count, so a cascade
+    elsewhere, such as on the HealthCheck's Parent relationship back to the
+    VIPService, does not.
+    """
+    refs: list[str] = []
+    cascading: list[str] = []
+    for node in _relationship_containers(schema):
+        owner = node.get("kind") or _full_kind(node)
+        for rel in _all_rels(node):
+            if not str(rel.get("peer", "")).endswith("HealthCheck"):
+                continue
+            ref = f"{owner}.{rel.get('name', '')}"
+            resolved = _resolved_on_delete(rel)
+            source = _on_delete_source(rel)
+            refs.append(f"{ref} resolves to on_delete {resolved!r} ({source})")
+            if resolved == "cascade":
+                cascading.append(f"{ref} ({source})")
+    if not refs:
+        return False, "No relationship references a HealthCheck node"
+    if not cascading:
+        return False, "No HealthCheck relationship resolves to cascade: " + "; ".join(refs)
+    return True, f"HealthCheck relationships resolving to cascade: {', '.join(cascading)}"
+
+
 def check_ip_reference_not_cascade(schema: dict, **_: Any) -> tuple[bool, str]:
     """Every relationship to an IP address node resolves to on_delete: no-action.
 
@@ -525,12 +550,9 @@ def check_ip_reference_not_cascade(schema: dict, **_: Any) -> tuple[bool, str]:
     kind: Component relationship that omits on_delete fails: it cascades.
     Any value other than no-action fails, so an unknown value is not a pass.
     """
-    containers = _all_nodes(schema) + _all_generics(schema)
-    extensions = schema.get("extensions") or {}
-    containers += extensions.get("nodes", []) or []
     refs: list[str] = []
     bad: list[str] = []
-    for node in containers:
+    for node in _relationship_containers(schema):
         owner = node.get("kind") or _full_kind(node)
         for rel in _all_rels(node):
             if not str(rel.get("peer", "")).endswith("IPAddress"):
@@ -539,10 +561,7 @@ def check_ip_reference_not_cascade(schema: dict, **_: Any) -> tuple[bool, str]:
             refs.append(ref)
             resolved = _resolved_on_delete(rel)
             if resolved != "no-action":
-                source = "explicit" if rel.get("on_delete") is not None else (
-                    f"omitted on kind {rel.get('kind', 'Generic')}"
-                )
-                bad.append(f"{ref} resolves to on_delete {resolved!r} ({source})")
+                bad.append(f"{ref} resolves to on_delete {resolved!r} ({_on_delete_source(rel)})")
     if not refs:
         return False, "No relationship references an IP address node"
     if bad:

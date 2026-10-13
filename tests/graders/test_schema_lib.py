@@ -1111,3 +1111,143 @@ class TestCheckIpReferenceNotCascade:
             and any(isinstance(t, ast.Name) and t.id == "CHECKS" for t in node.targets)
         ]
         assert lists == [_SERVICE_CASCADE_CHECKS]
+
+
+# ---------------------------------------------------------------------------
+# on-delete-cascade-present (service-cascade task)
+#
+# The task says health checks have no meaning without their VIPService and
+# must be deleted with it. The check reads the resolved on_delete of the
+# relationships whose peer is a HealthCheck node, wherever they are declared.
+# ---------------------------------------------------------------------------
+
+# The relationship as _VIP_COMPLIANT writes it, for edits below.
+_HC_REL = (
+    "peer: ServiceLBHealthCheck\n"
+    "        kind: Component\n"
+    "        cardinality: many\n"
+    "        identifier: vipservice__healthchecks\n"
+    "        on_delete: cascade"
+)
+
+
+class TestCheckOnDeleteCascadePresent:
+    check = staticmethod(CHECKS["on-delete-cascade-present"])
+
+    def test_compliant_explicit_cascade(self):
+        assert self.check(yaml.safe_load(_VIP_COMPLIANT)) == (
+            True,
+            "HealthCheck relationships resolving to cascade: "
+            "ServiceLBVIPService.health_checks (explicit)",
+        )
+
+    def test_compliant_component_omits_on_delete(self):
+        """The #196 review case: no on_delete on a Component still cascades."""
+        schema = _vip(_VIP_COMPLIANT, _HC_REL, _HC_REL.removesuffix("\n        on_delete: cascade"))
+        assert self.check(schema) == (
+            True,
+            "HealthCheck relationships resolving to cascade: "
+            "ServiceLBVIPService.health_checks (omitted on kind Component)",
+        )
+
+    def test_compliant_component_on_extension(self):
+        schema = yaml.safe_load(_VIP_COMPLIANT)
+        schema["nodes"][0]["relationships"].pop()
+        schema["extensions"] = {
+            "nodes": [
+                {
+                    "kind": "ServiceLBVIPService",
+                    "relationships": [
+                        {
+                            "name": "health_checks",
+                            "peer": "ServiceLBHealthCheck",
+                            "kind": "Component",
+                            "cardinality": "many",
+                            "identifier": "vipservice__healthchecks",
+                        }
+                    ],
+                }
+            ]
+        }
+        assert self.check(schema) == (
+            True,
+            "HealthCheck relationships resolving to cascade: "
+            "ServiceLBVIPService.health_checks (omitted on kind Component)",
+        )
+
+    def test_compliant_component_on_generic(self):
+        schema = yaml.safe_load(_VIP_COMPLIANT)
+        rel = schema["nodes"][0]["relationships"].pop()
+        del rel["on_delete"]
+        schema["generics"] = [
+            {"name": "Monitored", "namespace": "ServiceLB", "relationships": [rel]}
+        ]
+        assert self.check(schema) == (
+            True,
+            "HealthCheck relationships resolving to cascade: "
+            "ServiceLBMonitored.health_checks (omitted on kind Component)",
+        )
+
+    def test_violating_component_explicit_no_action(self):
+        schema = _vip(
+            _VIP_COMPLIANT, _HC_REL, _HC_REL.replace("on_delete: cascade", "on_delete: no-action")
+        )
+        assert self.check(schema) == (
+            False,
+            "No HealthCheck relationship resolves to cascade: "
+            "ServiceLBVIPService.health_checks resolves to on_delete 'no-action' (explicit)",
+        )
+
+    def test_near_miss_cascade_only_in_description(self):
+        schema = _vip(
+            _VIP_COMPLIANT,
+            _HC_REL,
+            _HC_REL.replace(
+                "on_delete: cascade",
+                'on_delete: no-action\n        description: "on_delete: cascade"',
+            ),
+        )
+        assert self.check(schema) == (
+            False,
+            "No HealthCheck relationship resolves to cascade: "
+            "ServiceLBVIPService.health_checks resolves to on_delete 'no-action' (explicit)",
+        )
+
+    def test_near_miss_generic_kind_without_on_delete(self):
+        schema = _vip(
+            _VIP_COMPLIANT,
+            _HC_REL,
+            "peer: ServiceLBHealthCheck\n        cardinality: many\n"
+            '        description: "deleted in cascade with the VIP"',
+        )
+        assert self.check(schema) == (
+            False,
+            "No HealthCheck relationship resolves to cascade: "
+            "ServiceLBVIPService.health_checks resolves to on_delete 'no-action' "
+            "(omitted on kind Generic)",
+        )
+
+    def test_near_miss_cascade_on_parent_side(self):
+        """Cascade bound to the wrong relationship deletes the VIP, not the checks."""
+        schema = _vip(
+            _VIP_COMPLIANT, _HC_REL, _HC_REL.replace("on_delete: cascade", "on_delete: no-action")
+        )
+        parent = schema["nodes"][1]["relationships"][0]
+        parent["on_delete"] = "cascade"
+        assert self.check(schema) == (
+            False,
+            "No HealthCheck relationship resolves to cascade: "
+            "ServiceLBVIPService.health_checks resolves to on_delete 'no-action' (explicit)",
+        )
+
+    def test_missing_health_check_reference_fails(self):
+        schema = _vip(_VIP_COMPLIANT, "peer: ServiceLBHealthCheck", "peer: ServiceLBProbe")
+        assert self.check(schema) == (False, "No relationship references a HealthCheck node")
+
+    def test_task_grader_scores_omitted_on_delete_one(self, tmp_path):
+        path = tmp_path / "output.yml"
+        path.write_text(
+            _VIP_COMPLIANT.replace(_HC_REL, _HC_REL.removesuffix("\n        on_delete: cascade"))
+        )
+        result = run_checks(_SERVICE_CASCADE_CHECKS, path)
+        assert result["score"] == 1.0, result

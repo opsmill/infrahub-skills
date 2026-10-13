@@ -127,6 +127,17 @@ _NEGATION = re.compile(
 )
 # A negation reaches back only to the start of its clause.
 _CLAUSE_BREAK = re.compile(r"[;:,()|]")
+# The verb that states a default. When one stands before a value in its
+# clause, only a negation on that verb ("does not default to", "is never")
+# negates the claim; a "not" earlier in the clause belongs to a relative
+# clause on the subject ("that does not set `on_delete`").
+_DEFAULT_VERB = re.compile(
+    r"\b(?:default(?:s|ed|ing)?|resolv(?:e|es|ed|ing)|f(?:a|e)ll(?:s|ing)?\s+back"
+    r"|us(?:e|es|ed|ing)|means?|meant|is|are|becomes?|appl(?:y|ies|ied))\b",
+    re.I,
+)
+# A negation standing directly before the verb.
+_NEGATION_BEFORE_VERB = re.compile(r"(?:\bnot|n't|\bnever|\bno\s+longer)\s+$", re.I)
 
 OTHER = "*other*"
 
@@ -225,7 +236,11 @@ def sentence_claims(sentence: str) -> list[tuple[str, str, bool]]:
     Each kind mention is assigned to the claim nearest to it, so a sentence
     stating both defaults pairs each value with its own kind. A claim no kind
     is assigned to has scope "" (unscoped). A claim is negated when "not" (or
-    similar) stands between it and the start of its clause.
+    similar) negates the default verb before it ("does not default to", "is
+    never"). A "not" earlier in the clause, as in "a relationship that does
+    not set `on_delete` defaults to ...", does not count. With no default verb
+    in the clause ("`cascade`, not `no-action`"), a negation anywhere between
+    the claim and the start of its clause counts.
     """
     masked = _SETTING.sub(lambda m: " " * len(m.group()), sentence)
     hits: list[tuple[int, int, str]] = []
@@ -246,7 +261,16 @@ def sentence_claims(sentence: str) -> list[tuple[str, str, bool]]:
         breaks = list(_CLAUSE_BREAK.finditer(window))
         if breaks:
             window = window[breaks[-1].end() :]
-        claims.append((start, value, bool(_NEGATION.search(window))))
+        verbs = list(_DEFAULT_VERB.finditer(window))
+        if verbs:
+            verb = verbs[-1].start()
+            negated = bool(
+                _NEGATION.search(window[verb:])
+                or _NEGATION_BEFORE_VERB.search(window[:verb])
+            )
+        else:
+            negated = bool(_NEGATION.search(window))
+        claims.append((start, value, negated))
         prev_end = end
     scopes: dict[int, set[str]] = {n: set() for n in range(len(claims))}
     for pos, kind in mentions:
@@ -599,6 +623,38 @@ REJECT: dict[str, tuple[str, list[str], list[str]]] = {
         [],
         [_says("Component", "defaults to", "no-action", _FENCED_CLAIM)],
     ),
+    # Negation boundary: a "not" in a relative clause on the subject does not
+    # negate the default verb. "does not default to" in _CORRECT_VARIANT is
+    # the other side.
+    **{
+        label: (
+            edit(_SENTENCE, unit),
+            [],
+            [_says("Component", "defaults to", "no-action", unit)],
+        )
+        for label, unit in {
+            "relative-that-does-not-set": (
+                "A `kind: Component` relationship that does not set `on_delete` "
+                "defaults to `no-action`."
+            ),
+            "relative-which-does-not-set": (
+                "A `kind: Component` relationship which does not set `on_delete` "
+                "defaults to `no-action`."
+            ),
+            "relative-doesnt-set": (
+                "A `kind: Component` relationship that doesn't set `on_delete` "
+                "resolves to `no-action`."
+            ),
+            "relative-never-sets": (
+                "A `kind: Component` relationship that never sets `on_delete` "
+                "uses `no-action`."
+            ),
+            "relative-is-not-given": (
+                "A `kind: Component` relationship that is not given an `on_delete` "
+                "is `no-action`."
+            ),
+        }.items()
+    },
     # Fail closed: a sentence about the default that the parser cannot read.
     "kind-without-value": (
         edit(
