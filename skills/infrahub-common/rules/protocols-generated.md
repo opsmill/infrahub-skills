@@ -56,11 +56,11 @@ classes, and the relationships that one schema file
 adds to another through `extensions`.
 
 ```bash
-# Schema loaded on the default branch (async client, default)
-infrahubctl protocols --out lib/protocols.py
-
-# Schema loaded on a branch: generate from that branch
+# Schema loaded on a branch: generate from that branch (async client, default)
 infrahubctl protocols --branch <branch> --out lib/protocols.py
+
+# Schema already on the default branch: merged, or a throwaway local instance
+infrahubctl protocols --out lib/protocols.py
 ```
 
 The instance address is not hardcoded — it comes from
@@ -144,9 +144,14 @@ hand-edited protocol does, one layer down.
 When the schema changes, the correct sequence is:
 
 1. **Update the schema** files (YAML in `schemas/`)
-2. **Load the schema** into Infrahub, on a branch if
-   you work on one:
-   `infrahubctl schema load schemas/ --branch <branch>`
+2. **Create a branch and load the schema** onto it.
+   `schema load` does not create the branch, so create
+   it first:
+   `infrahubctl branch create <branch>`, then
+   `infrahubctl schema load schemas/ --branch <branch>`.
+   Load on the default branch only on a throwaway local
+   instance; see
+   [workflow-branch-first](../../infrahub-managing-schemas/rules/workflow-branch-first.md).
 3. **Regenerate protocols** from that branch:
    `infrahubctl protocols --branch <branch> --out lib/protocols.py`
 4. **Check the diff**: `git diff lib/protocols.py`. Your

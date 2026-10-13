@@ -2679,8 +2679,9 @@ tasks:
              leaves out the `provider` relationship that
              `schemas/provider.yml` adds through `extensions`.
     expected_output: >-
-      An answer that loads the schema change into Infrahub (on a branch or
-      the default branch) and then regenerates the committed file from the
+      An answer that loads the schema change into Infrahub (on a branch,
+      or on the default branch of a throwaway local instance) and then
+      regenerates the committed file from the
       server, for example `infrahubctl protocols --branch <branch> --out
       lib/protocols.py`, then diffs it against the committed file before
       committing. It does not write `lib/protocols.py` with
