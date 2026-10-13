@@ -2614,8 +2614,14 @@ def _walk_scope(scope: ast.AST, nested: bool) -> Iterator[ast.AST]:
         todo.extend(ast.iter_child_nodes(node))
 
 
-def _name_bindings(name: str, scope: ast.AST, nested: bool = True) -> list[Any]:
+def _name_bindings(
+    name: str, scope: ast.AST, nested: bool = True, use: ast.AST | None = None
+) -> list[Any]:
     """Every value bound to the bare name ``name`` within ``scope``.
+
+    A comprehension's target is local to it, so it counts only when ``use``
+    (the call reading the name) sits inside that comprehension, or when no
+    ``use`` is given.
 
     A binding the check can read yields its value expression. Any other
     binding yields an ``_Unreadable`` or ``_Imported`` marker, so a name is
@@ -2643,7 +2649,8 @@ def _name_bindings(name: str, scope: ast.AST, nested: bool = True) -> list[Any]:
                 values.append(_Unreadable(name, "a with statement", node))
         elif isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
             # Placed at the whole expression: its targets bind before its element runs.
-            if any(_binds(gen.target, name) for gen in node.generators):
+            inside = use is None or any(n is use for n in ast.walk(node))
+            if inside and any(_binds(gen.target, name) for gen in node.generators):
                 values.append(_Unreadable(name, "a comprehension", node))
         elif isinstance(node, (ast.MatchAs, ast.MatchStar)):
             if node.name == name:
@@ -2674,9 +2681,9 @@ def _name_bindings(name: str, scope: ast.AST, nested: bool = True) -> list[Any]:
     return values
 
 
-def _module_bindings(name: str, tree: ast.Module) -> list[Any]:
+def _module_bindings(name: str, tree: ast.Module, use: ast.AST | None = None) -> list[Any]:
     """Bindings of ``name`` at module level, plus any function that rebinds it through ``global``."""
-    values = _name_bindings(name, tree, nested=False)
+    values = _name_bindings(name, tree, nested=False, use=use)
     for node in ast.walk(tree):
         if isinstance(node, ast.Global) and name in node.names:
             values.append(_Unreadable(name, "a global statement", node))
@@ -2688,11 +2695,11 @@ def _is_protocols_module(module: str | None) -> bool:
     return module is not None and module.split(".")[-1] == "protocols"
 
 
-def _bindings_in_reach(name: str, scope: ast.AST, tree: ast.Module) -> list[Any]:
+def _bindings_in_reach(name: str, scope: ast.AST, tree: ast.Module, use: ast.AST) -> list[Any]:
     """Bindings of ``name`` in the calling function, else at module level."""
-    bindings = _name_bindings(name, scope)
+    bindings = _name_bindings(name, scope, use=use)
     if not bindings and scope is not tree:
-        bindings = _module_bindings(name, tree)
+        bindings = _module_bindings(name, tree, use=use)
     return bindings
 
 
@@ -2741,14 +2748,14 @@ def _resolve_create_kind(
         if node.attr in kinds:
             return node.attr, True
         if isinstance(node.value, ast.Name):
-            module = _bindings_in_reach(node.value.id, scope, tree)
+            module = _bindings_in_reach(node.value.id, scope, tree, call)
             if module and all(_is_protocols_import(b) for b in module):
                 return node.attr, True
         return None, False
     if isinstance(node, ast.Name):
         if node.id in kinds:
             return node.id, True
-        bindings = _bindings_in_reach(node.id, scope, tree)
+        bindings = _bindings_in_reach(node.id, scope, tree, call)
         values = {_kind_from_binding(b, kinds) for b in bindings}
         if len(values) == 1 and None not in values:
             return values.pop(), True
@@ -2833,7 +2840,7 @@ def _dict_keys(
         return keys, unresolved
     if isinstance(node, ast.Name) and node.id not in seen:
         name = node.id
-        bindings = [b for b in _name_bindings(name, scope) if _can_run_before(b, call, scope)]
+        bindings = [b for b in _name_bindings(name, scope, use=call) if _can_run_before(b, call, scope)]
         if not bindings:
             return keys, [f"{name} is not bound before the call in the calling function"]
         for value in bindings:

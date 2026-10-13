@@ -485,6 +485,20 @@ def test_payload_change_that_can_reach_the_call_counts(body):
     assert "create(DcimVirtualInterface) passes lag" in msg, msg
 
 
+def test_comprehension_target_does_not_rebind_the_function():
+    """A comprehension's loop name is local to it, so the outer payload and kind stand."""
+    ok, msg = _run(
+        "async def generate(self, device, lag, rows):\n"
+        + _PHYSICAL
+        + "    payload = {'name': 'lo0', 'device': device}\n"
+        "    kind = 'DcimVirtualInterface'\n"
+        "    names = [payload['name'] for payload in rows]\n"
+        "    kinds = {kind for kind in rows}\n"
+        "    await self.client.create(kind=kind, data=payload)\n"
+    )
+    assert ok, msg
+
+
 def test_create_params_are_not_fields():
     ok, msg = _run(
         "async def generate(self, device, lag):\n"
