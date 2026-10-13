@@ -14,7 +14,7 @@ nobody knows is written `open: O<n>`, and `O<n>` exists
 in `## Open items` with who might own the answer.
 
 `TBD`, `?`, `unknown`, `-`, a bare `open`, a value
-still marked `(guess)` from the draft, and a value you
+still marked `(guess)` or `(open)` from the draft, and a value you
 made up all fail. A guess either gets confirmed or
 becomes an open item. Every row's `Evidence` names
 where its facts came from (a file and column, an answer,
