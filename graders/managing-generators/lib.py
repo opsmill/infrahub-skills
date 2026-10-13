@@ -2568,43 +2568,167 @@ def _enclosing_scopes(tree: ast.Module) -> dict[int, ast.AST]:
     return scopes
 
 
-def _name_bindings(name: str, scope: ast.AST) -> list[ast.AST]:
-    """Every value assigned to the bare name ``name`` within ``scope``."""
-    values: list[ast.AST] = []
-    for node in ast.walk(scope):
+class _Unreadable:
+    """A binding of ``name`` the check cannot read, placed at ``at``.
+
+    ``_dict_keys`` and ``_resolve_create_kind`` report it as unresolved, so
+    the check fails closed on it.
+    """
+
+    def __init__(self, name: str, how: str, at: ast.AST) -> None:
+        self.name = name
+        self.how = how
+        self.at = at
+        self.lineno = at.lineno
+        self.col_offset = at.col_offset
+
+
+class _Imported:
+    """A name bound by an import: ``original`` from ``module`` (None for ``import x``)."""
+
+    def __init__(self, original: str, module: str | None, at: ast.AST) -> None:
+        self.original = original
+        self.module = module
+        self.at = at
+        self.lineno = at.lineno
+        self.col_offset = at.col_offset
+
+
+def _binds(target: ast.AST, name: str) -> bool:
+    return any(isinstance(n, ast.Name) and n.id == name for n in ast.walk(target))
+
+
+def _walk_scope(scope: ast.AST, nested: bool) -> Iterator[ast.AST]:
+    """Walk ``scope``; with ``nested`` False, skip the bodies of inner functions and classes."""
+    if nested:
+        yield from ast.walk(scope)
+        return
+    todo = [scope]
+    while todo:
+        node = todo.pop()
+        yield node
+        if node is not scope and isinstance(
+            node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+        ):
+            continue
+        todo.extend(ast.iter_child_nodes(node))
+
+
+def _name_bindings(name: str, scope: ast.AST, nested: bool = True) -> list[Any]:
+    """Every value bound to the bare name ``name`` within ``scope``.
+
+    A binding the check can read yields its value expression. Any other
+    binding yields an ``_Unreadable`` or ``_Imported`` marker, so a name is
+    never treated as unbound while something rebinds it.
+    """
+    values: list[Any] = []
+    for node in _walk_scope(scope, nested):
         if isinstance(node, ast.Assign):
-            if any(isinstance(t, ast.Name) and t.id == name for t in node.targets):
-                values.append(node.value)
+            for t in node.targets:
+                if isinstance(t, ast.Name) and t.id == name:
+                    values.append(node.value)
+                elif isinstance(t, (ast.Tuple, ast.List, ast.Starred)) and _binds(t, name):
+                    values.append(_Unreadable(name, "unpacking", node))
         elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
             if isinstance(node.target, ast.Name) and node.target.id == name and node.value:
                 values.append(node.value)
-        elif isinstance(node, (ast.For, ast.AsyncFor, ast.With, ast.AsyncWith, ast.NamedExpr)):
-            targets = []
-            if isinstance(node, (ast.For, ast.AsyncFor)):
-                targets = [node.target]
-            elif isinstance(node, ast.NamedExpr):
-                targets = [node.target]
-            else:
-                targets = [i.optional_vars for i in node.items if i.optional_vars]
-            for target in targets:
-                if any(isinstance(n, ast.Name) and n.id == name for n in ast.walk(target)):
-                    values.append(target)  # bound by something the check cannot read
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node is scope:
+        elif isinstance(node, ast.NamedExpr):
+            if node.target.id == name:
+                values.append(node.value)
+        elif isinstance(node, (ast.For, ast.AsyncFor)):
+            if _binds(node.target, name):
+                values.append(_Unreadable(name, "a for loop", node))
+        elif isinstance(node, (ast.With, ast.AsyncWith)):
+            if any(i.optional_vars is not None and _binds(i.optional_vars, name) for i in node.items):
+                values.append(_Unreadable(name, "a with statement", node))
+        elif isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+            # Placed at the whole expression: its targets bind before its element runs.
+            if any(_binds(gen.target, name) for gen in node.generators):
+                values.append(_Unreadable(name, "a comprehension", node))
+        elif isinstance(node, (ast.MatchAs, ast.MatchStar)):
+            if node.name == name:
+                values.append(_Unreadable(name, "a match pattern", node))
+        elif isinstance(node, ast.MatchMapping):
+            if node.rest == name:
+                values.append(_Unreadable(name, "a match pattern", node))
+        elif isinstance(node, ast.ExceptHandler):
+            if node.name == name:
+                values.append(_Unreadable(name, "an except clause", node))
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                bound = alias.asname or alias.name.split(".")[0]
+                if bound == name:
+                    module = node.module if isinstance(node, ast.ImportFrom) else None
+                    values.append(_Imported(alias.name, module, node))
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node is not scope:
+            if node.name == name:
+                values.append(node)
+        elif isinstance(node, (ast.Global, ast.Nonlocal)):
+            if name in node.names:
+                values.append(_Unreadable(name, "a global or nonlocal statement", node))
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node is scope:
             args = node.args
             for arg in [*args.posonlyargs, *args.args, *args.kwonlyargs, args.vararg, args.kwarg]:
                 if arg is not None and arg.arg == name:
-                    values.append(arg)
+                    values.append(_Unreadable(name, "a function parameter", arg))
     return values
 
 
-def _resolve_create_kind(call: ast.Call, scope: ast.AST, kinds: dict[str, set[str]]) -> tuple[str | None, bool]:
+def _module_bindings(name: str, tree: ast.Module) -> list[Any]:
+    """Bindings of ``name`` at module level, plus any function that rebinds it through ``global``."""
+    values = _name_bindings(name, tree, nested=False)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Global) and name in node.names:
+            values.append(_Unreadable(name, "a global statement", node))
+    return values
+
+
+def _is_protocols_module(module: str | None) -> bool:
+    """True for the module ``infrahubctl protocols`` writes, by its usual name."""
+    return module is not None and module.split(".")[-1] == "protocols"
+
+
+def _bindings_in_reach(name: str, scope: ast.AST, tree: ast.Module) -> list[Any]:
+    """Bindings of ``name`` in the calling function, else at module level."""
+    bindings = _name_bindings(name, scope)
+    if not bindings and scope is not tree:
+        bindings = _module_bindings(name, tree)
+    return bindings
+
+
+def _kind_from_binding(binding: Any, kinds: dict[str, set[str]]) -> str | None:
+    """The kind one binding of a ``kind`` name gives, or None when it cannot be read."""
+    if isinstance(binding, ast.Constant) and isinstance(binding.value, str):
+        return binding.value
+    if isinstance(binding, ast.ClassDef):
+        return binding.name
+    if isinstance(binding, _Imported) and binding.module is not None:
+        if binding.original in kinds or _is_protocols_module(binding.module):
+            return binding.original
+    return None
+
+
+def _is_protocols_import(binding: Any) -> bool:
+    """True for ``import x.protocols as p`` or ``from x import protocols``."""
+    if not isinstance(binding, _Imported):
+        return False
+    path = binding.original if binding.module is None else f"{binding.module}.{binding.original}"
+    return _is_protocols_module(path)
+
+
+def _resolve_create_kind(
+    call: ast.Call, scope: ast.AST, kinds: dict[str, set[str]], tree: ast.Module
+) -> tuple[str | None, bool]:
     """Return ``(kind, resolved)`` for a create() call.
 
     The kind comes from ``kind=`` or the first positional argument: a string
-    literal, a protocol class (``DcimVirtualInterface`` or
-    ``protocols.DcimVirtualInterface``), or a local name bound only to string
-    literals. ``resolved`` is False when the kind cannot be read, which the
-    caller treats as a failure rather than a pass.
+    literal, a protocol class (``DcimVirtualInterface``, an alias imported
+    from a ``protocols`` module, or ``protocols.DcimVirtualInterface``), or a
+    name bound only to one string literal, in the function or else at module
+    level. ``resolved`` is False when the kind cannot be read, which the
+    caller treats as a failure rather than a pass: an unbound name, a name
+    imported from any other module, or one bound by a loop, parameter or
+    ``global``.
     """
     node = get_kwarg(call, "kind")
     if node is None and call.args:
@@ -2614,18 +2738,20 @@ def _resolve_create_kind(call: ast.Call, scope: ast.AST, kinds: dict[str, set[st
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return node.value, True
     if isinstance(node, ast.Attribute):
-        return node.attr, True
+        if node.attr in kinds:
+            return node.attr, True
+        if isinstance(node.value, ast.Name):
+            module = _bindings_in_reach(node.value.id, scope, tree)
+            if module and all(_is_protocols_import(b) for b in module):
+                return node.attr, True
+        return None, False
     if isinstance(node, ast.Name):
         if node.id in kinds:
             return node.id, True
-        bindings = _name_bindings(node.id, scope)
-        if not bindings:
-            # An imported or module-level protocol class for another kind.
-            return node.id, True
-        if all(isinstance(b, ast.Constant) and isinstance(b.value, str) for b in bindings):
-            values = {b.value for b in bindings}
-            if len(values) == 1:
-                return values.pop(), True
+        bindings = _bindings_in_reach(node.id, scope, tree)
+        values = {_kind_from_binding(b, kinds) for b in bindings}
+        if len(values) == 1 and None not in values:
+            return values.pop(), True
         return None, False
     return None, False
 
@@ -2639,6 +2765,8 @@ def _can_run_before(node: ast.AST, call: ast.AST | None, scope: ast.AST) -> bool
     """
     if call is None:
         return True
+    if isinstance(node, (_Unreadable, _Imported)):
+        node = node.at
     if (node.lineno, node.col_offset) < (call.lineno, call.col_offset):
         return True
     for outer in ast.walk(scope):
@@ -2671,6 +2799,14 @@ def _dict_keys(
     """
     keys: set[str] = set()
     unresolved: list[str] = []
+    if isinstance(node, _Unreadable):
+        return keys, [f"{node.name}, bound by {node.how}"]
+    if isinstance(node, _Imported):
+        return keys, [f"{node.original}, bound by an import"]
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return keys, [f"{node.name}, bound by a def or class statement"]
+    if isinstance(node, ast.NamedExpr):
+        return _dict_keys(node.value, scope, seen, call)
     if isinstance(node, ast.Dict):
         for k, v in zip(node.keys, node.values):
             if k is None:  # {**other}
@@ -2813,7 +2949,7 @@ def check_create_fields_exist_on_kind(
         if not isinstance(func, ast.Attribute) or func.attr != "create":
             continue
         scope = scopes.get(id(call), tree)
-        kind, resolved = _resolve_create_kind(call, scope, kinds)
+        kind, resolved = _resolve_create_kind(call, scope, kinds, tree)
         if kind not in kinds:
             if _is_client_receiver(func.value) and not resolved:
                 problems.append(
