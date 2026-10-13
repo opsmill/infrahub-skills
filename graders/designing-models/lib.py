@@ -34,7 +34,8 @@ import yaml
 ANSWER_PATH = Path("output_dir") / "answer.md"
 # These cover the default and the established location used by existing
 # fixtures; a session writes exactly one brief.
-BRIEF_GLOBS = ("specs/*/design-brief.md", "docs/designs/*/design-brief.md")
+# The one location references/brief-format.md gives the brief.
+BRIEF_GLOBS = ("docs/designs/*/design-brief.md",)
 
 SKETCH_HEADING = "data model sketch"
 FEATURES_HEADING = "features"
@@ -64,9 +65,9 @@ _RECOMMENDED = re.compile(r"\*\*\(Recommended\)\*\*")
 _SENTENCE_QUESTION = re.compile(r"\?(?=[\s*_)\"'”]|$)")
 _FEATURE_ID = re.compile(r"\bF(\d+)\b")
 _NO_PREREQUISITE = {"-", "none"}
-# The draft shown during the interview marks unconfirmed cells this way;
-# none may reach the brief.
-_GUESS = re.compile(r"\(\s*guess\s*\)", re.IGNORECASE)
+# The draft shown during the interview marks unconfirmed cells "(guess)" and
+# unsupported ones "(open)"; neither may reach the brief.
+_DRAFT_MARK = re.compile(r"\(\s*(?:guess|open)\s*\)", re.IGNORECASE)
 _OPEN_REF = re.compile(r"\bopen:\s*(O\d+)\b", re.IGNORECASE)
 _OPEN_ID = re.compile(r"\b(O\d+)\b", re.IGNORECASE)
 _OPEN_ITEM = re.compile(r"^\s*(?:[-*]|\d+[.)])?\s*\**\s*(O\d+)\s*\**\s*:(.*)$", re.IGNORECASE)
@@ -446,8 +447,8 @@ def check_inputs_digested(
 ) -> tuple[bool, str]:
     """Every input file is listed and used as evidence for the sketch.
 
-    ``inputs`` maps each file the task provided to its CSV column headers
-    (empty for files that are not tables). A sketch row identified by one of
+    ``inputs`` maps each file the task provided to the CSV columns that
+    identify something in it (empty for files that are not tables). A sketch row identified by one of
     a file's columns must cite that file in its Evidence cell, every citation
     of an input file carries a locator, and every file must be the evidence
     for at least one row.
@@ -642,8 +643,9 @@ def check_sketch_rows_complete(ws: Path) -> tuple[bool, str]:
         if _is_placeholder(evidence):
             return False, f"{kind}: Evidence is {evidence!r}; name the file, answer or reference design it came from"
         for header, cell in row.items():
-            if _GUESS.search(_clean(cell)):
-                return False, f"{kind}: {header} still carries a (guess) from the draft; confirm it or make it an open item"
+            mark = _DRAFT_MARK.search(_clean(cell))
+            if mark:
+                return False, f"{kind}: {header} still carries {mark.group(0).lower()} from the draft; confirm it or make it an open item"
         for name, col in columns.items():
             value = _clean(row.get(col, ""))
             ref = _OPEN_REF.search(value)
@@ -1198,10 +1200,12 @@ def check_uniqueness_is_schema_constraint(ws: Path, subject: re.Pattern) -> tupl
     matching = [r for r in rows if subject.search(_clean(r[beh_col]))]
     if not matching:
         return False, "no Mechanisms row covers the uniqueness rule the task asks for"
-    for row in matching:
-        mech = _clean(row[mech_col]).lower()
-        if mech != "schema constraint":
-            return False, f"'{_clean(row[beh_col])}' is a {mech}; the schema enforces uniqueness, so it is a schema constraint"
+    # A pool row that hands out the values can sit beside the constraint;
+    # a check enforcing the rule cannot.
+    mechs = [(_clean(r[beh_col]), _clean(r[mech_col]).lower()) for r in matching]
+    for behavior, mech in mechs:
+        if mech == "check" or "schema constraint" not in {m for _, m in mechs}:
+            return False, f"'{behavior}' is a {mech}; the schema enforces uniqueness, so it is a schema constraint"
     return True, "the uniqueness rule is a schema constraint"
 
 
@@ -1354,6 +1358,9 @@ _REQUEST_REF = re.compile(r"\brequest\b", re.IGNORECASE)
 _FILE_NAME = re.compile(r"[\w.\-/]*\w\.[A-Za-z][A-Za-z0-9]*")
 # A figure written out in words counts the same as one in digits. "one" is
 # left out: it is ordinary wording ("one row per VPN", "one source of truth").
+# A number standing on its own ("40", "3.5", "30%", "3x"), not a digit inside
+# a name such as L3VPN, IPv4 or Q2.
+_NUMBER = re.compile(r"(?<![A-Za-z])\d+(?:[.,]\d+)?(?:x\b|(?![A-Za-z]))")
 _NUMBER_WORD = re.compile(
     r"\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|"
     r"sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|"
@@ -1390,7 +1397,7 @@ def _has_figure(text: str) -> bool:
     # Citations carry digits of their own (answer Q2, sites-2024.csv); a
     # number left after removing them is a figure.
     bare = _FILE_NAME.sub("", _ANSWER_REF.sub("", text))
-    return bool(re.search(r"\d", bare) or _NUMBER_WORD.search(bare))
+    return bool(_NUMBER.search(bare) or _NUMBER_WORD.search(bare))
 
 
 def _has_source(text: str, inputs: set[str]) -> bool:
@@ -1473,7 +1480,7 @@ def check_value_drivers(ws: Path) -> tuple[bool, str]:
         if not ids:
             continue
         fid, cell = f"F{ids[0]}", _clean(row[value_col])
-        if re.search(r"\d", cell) or _NUMBER_WORD.search(cell):
+        if _NUMBER.search(cell) or _NUMBER_WORD.search(cell):
             return False, f"{fid}'s Value cell gives a figure: {cell!r}; figures belong on the 'Value:' line with their source"
         named = _drivers_named(cell)
         if not named:
@@ -1510,11 +1517,14 @@ def run_checks(
     names: list[str],
     workspace: Path,
     extra: dict[str, Callable[[Path], tuple[bool, str]]] | None = None,
+    gate: tuple[str, ...] = (),
 ) -> dict:
     """Run named checks and return skillgrade JSON.
 
     ``extra`` supplies checks bound to a task's own inputs (for example the
     files a task provided), which have no place in the shared registry.
+    ``gate`` names the checks the task exists for: one of them failing zeroes
+    the score, so the other checks cannot carry the task past the threshold.
     """
     registry = {**CHECKS, **(extra or {})}
     results = []
@@ -1529,6 +1539,8 @@ def run_checks(
             passed, message = False, f"check crashed: {exc}"
         results.append({"name": name, "passed": passed, "message": message})
     score = sum(r["passed"] for r in results) / len(results) if results else 0.0
+    if any(r["name"] in gate and not r["passed"] for r in results):
+        score = 0.0
     failures = "; ".join(f"{r['name']}: {r['message']}" for r in results if not r["passed"])
     return {
         "score": round(score, 2),

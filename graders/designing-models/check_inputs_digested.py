@@ -18,9 +18,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import check_inputs_digested, run_checks  # noqa: E402
 
-# File name -> CSV column headers (empty for files that are not tables).
+# File name -> the CSV columns that identify something in that file (empty
+# for files that are not tables). pops.csv also has name and city, but those
+# words name things in backbone.txt too ("name (AMS1-cr1)"), so they cannot
+# tie a row to pops.csv.
 INPUTS = {
-    "pops.csv": ["pop_code", "name", "city", "region"],
+    "pops.csv": ["pop_code", "region"],
     "backbone.txt": [],
 }
 
