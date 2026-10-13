@@ -210,7 +210,7 @@ def test_push_destination_must_be_a_bound_branch_variable(script, expected):
             'git push origin "tmp:refs/heads/${b}"',
             True,
         ),
-        ('git clone --branch "$b" "$URL" w\ngit -C w pull origin main\ngit -C w push origin HEAD',
+        ('git clone --branch "$b" "$URL" w\ngit -C w pull --no-rebase origin main\ngit -C w push origin HEAD',
          True),
         ('git checkout main\ngit merge origin/main\ngit push origin "$b"', False),
         ('git checkout "$b"\ngit checkout main\ngit merge origin/main\ngit push origin "$b"',
@@ -244,6 +244,34 @@ def test_merge_must_land_on_the_pushed_branch(script, expected):
          "pull-rebase", "pull-r", "merge-then-rebase", "rebase-then-merge"],
 )
 def test_rebase_onto_main_does_not_count(body, expected):
+    assert _passes(_LOOP.format(body=body)) is expected
+
+
+# A `git pull` of main merges only with an explicit merge mode. A plain one
+# rebases under `pull.rebase=true`, and since Git 2.33 refuses a branch with
+# its own commits when no mode is configured.
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ('  git pull origin main\n  git push origin "$b"', False),
+        ('  git -c pull.rebase=true pull origin main\n  git push origin "$b"', False),
+        ('  git pull --no-rebase --rebase origin main\n  git push origin "$b"', False),
+        ('  git pull --rebase=merges origin main\n  git push origin "$b"', False),
+        ('  git config pull.rebase true\n  git pull origin main\n  git push origin "$b"', False),
+        ('  git config pull.rebase false\n  git config --unset pull.rebase\n'
+         '  git pull origin main\n  git push origin "$b"', False),
+        ('  git -c pull.rebase=false pull origin main\n  git push origin "$b"', True),
+        ('  git config pull.rebase false\n  git pull origin main\n  git push origin "$b"', True),
+        ('  git config --local pull.rebase false\n  git pull origin main\n  git push origin "$b"',
+         True),
+        ('  git -c pull.rebase=true pull --no-rebase origin main\n  git push origin "$b"', True),
+        ('  git pull --rebase --no-rebase origin main\n  git push origin "$b"', True),
+    ],
+    ids=["plain-pull", "c-rebase-true", "last-flag-rebase", "rebase-merges", "config-rebase-true",
+         "config-unset", "c-rebase-false", "config-rebase-false", "config-local-false",
+         "flag-beats-c", "last-flag-no-rebase"],
+)
+def test_pull_counts_only_with_explicit_merge_mode(body, expected):
     assert _passes(_LOOP.format(body=body)) is expected
 
 

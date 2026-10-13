@@ -769,10 +769,13 @@ _GIT_VALUE_OPTS: dict[str, set[str]] = {
         "-u", "--upload-pack", "--separate-git-dir", "-j", "--jobs", "--filter",
     },
 }
-# `git pull` options that make it rebase instead of merge. `--rebase=false`
-# and `--no-rebase` merge.
+# A `git pull` merges only when the script says so. Without an explicit mode
+# it rebases under `pull.rebase=true`, and since Git 2.33 it refuses a branch
+# with its own commits when no mode is configured. The mode comes from, last
+# one winning: `--no-rebase` or `--rebase=false` on the pull, else
+# `git -c pull.rebase=...` on it, else an earlier `git config pull.rebase ...`.
 _PULL_REBASE_OPTS = {"-r", "--rebase"}
-_PULL_REBASE_VALUES = {"true", "merges", "interactive", "i", "m"}
+_FALSE_VALUES = {"false", "no", "off", "0"}
 
 
 def _shell_script_text(raw: str) -> str:
@@ -964,6 +967,27 @@ def _option_value(args: list[str], names: set[str]) -> str | None:
     return None
 
 
+def _pull_rebase_setting(value: str) -> bool:
+    """Whether a `pull.rebase` value rebases. Anything not plainly false does."""
+    return value.lower() not in _FALSE_VALUES
+
+
+def _pull_rebases(argv: list[str], args: list[str], configured: bool | None) -> bool:
+    """Whether a `git pull` rebases. Only an explicit merge mode counts as a merge."""
+    mode = configured
+    for j, a in enumerate(argv[1:-len(args) or None], start=1):
+        if a == "-c" and j + 1 < len(argv) and argv[j + 1].lower().startswith("pull.rebase="):
+            mode = _pull_rebase_setting(argv[j + 1].split("=", 1)[1])
+    for a in args:
+        if a == "--no-rebase":
+            mode = False
+        elif a.startswith("--rebase="):
+            mode = _pull_rebase_setting(a.split("=", 1)[1])
+        elif a in _PULL_REBASE_OPTS:
+            mode = True
+    return mode is not False
+
+
 def _git_subcommand(argv: list[str]) -> tuple[str | None, list[str]]:
     if not argv or argv[0].rsplit("/", 1)[-1] != "git":
         return None, []
@@ -1049,7 +1073,9 @@ def check_moves_source_branch_commit(
     pushed. A Git rebase onto main (`git rebase`, `git pull --rebase`) does not
     count, and disqualifies that branch before or after a merge: it rewrites it,
     so a plain push is rejected and a force-push leaves the repository sync
-    unable to pull it.
+    unable to pull it. A `git pull` of main counts only with an explicit merge
+    mode, since a plain one rebases under `pull.rebase=true` and fails on a
+    diverged branch when no mode is set.
     """
     text = _shell_script_text(sh_raw or "")
     if not text.strip():
@@ -1075,6 +1101,7 @@ def check_moves_source_branch_commit(
     qualifying_push: str | None = None
     pushes_seen: list[str] = []
     rebases = 0
+    configured_rebase: bool | None = None  # from `git config pull.rebase ...`
 
     def _main_into(target: str | None, *, rebase: bool) -> None:
         if not target or _is_default_ref(target, default_vars):
@@ -1120,13 +1147,15 @@ def check_moves_source_branch_commit(
                 refs.append(onto)
             if any(_is_default_ref(r, default_vars) for r in refs):
                 _main_into(current, rebase=sub == "rebase")
+        elif sub == "config":
+            setting = [p for p in pos if p not in {"set", "unset"}]
+            if setting[:1] == ["pull.rebase"] and {"--unset", "unset"} & set(args):
+                configured_rebase = None
+            elif len(setting) == 2 and setting[0].lower() == "pull.rebase":
+                configured_rebase = _pull_rebase_setting(setting[1])
         elif sub == "pull":
             if any(_is_default_ref(r, default_vars) for r in pos[1:]):
-                rebase_value = _option_value(args, {"--rebase"})
-                pull_rebases = bool(_PULL_REBASE_OPTS & set(args)) or (
-                    rebase_value is not None and rebase_value in _PULL_REBASE_VALUES
-                )
-                _main_into(current, rebase=pull_rebases)
+                _main_into(current, rebase=_pull_rebases(argv, args, configured_rebase))
         elif sub == "push":
             if {"--delete", "-d", "--all", "--mirror", "--tags"} & set(args):
                 continue
