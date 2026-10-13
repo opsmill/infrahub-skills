@@ -144,9 +144,9 @@ hand-edited protocol does, one layer down.
 When the schema changes, the correct sequence is:
 
 1. **Update the schema** files (YAML in `schemas/`)
-2. **Create a branch and load the schema** onto it.
-   `schema load` does not create the branch, so create
-   it first:
+2. **Load the schema onto a branch.** `schema load`
+   does not create the branch, so create it first if
+   it does not exist yet:
    `infrahubctl branch create <branch>`, then
    `infrahubctl schema load schemas/ --branch <branch>`.
    Load on the default branch only on a throwaway local
