@@ -584,15 +584,16 @@ PROTOCOLS_ACCEPTED = [
         "`schemas/provider.yml` adds through `extensions`.",
         id="compliant-variant-prefixes-continuation-and-prose-mention",
     ),
-    # A contrast span introduced as something to avoid is not a
-    # recommendation, so it must not cost a correct answer anything.
+    # A negated span is still skipped when its command cannot hide the
+    # violation: `--schemas` with no `--out` writes schema_protocols.py, not
+    # the committed file.
     pytest.param(
-        "Do not run `infrahubctl protocols --schemas schemas/ --out lib/protocols.py` "
-        "here. Use the server form:\n\n"
+        "Do not run `infrahubctl protocols --schemas schemas/` for this. "
+        "Use the server form:\n\n"
         "```bash\nuv run infrahubctl schema load schemas/ --branch circuit-commit-rate\n"
         "uv run infrahubctl protocols --branch circuit-commit-rate "
         "--out lib/protocols.py\n```",
-        id="negated-offline-span-then-server-fence",
+        id="negated-offline-span-without-the-committed-target",
     ),
     # A shell comment holding an offline command is prose, not a command.
     pytest.param(
@@ -681,6 +682,17 @@ PROTOCOLS_REJECTED = [
         "infrahubctl protocols --schemas schemas/ --out lib/protocols.py\n```",
         "with --schemas",
         id="server-command-only-in-a-comment",
+    ),
+    # A negation word before a span does not hide a span that writes the
+    # committed file with `--schemas`: a conditional fallback reads as a
+    # contrast to the negation list, but it is a recommendation.
+    pytest.param(
+        "If the server is not running, use "
+        "`infrahubctl protocols --schemas schemas/ --out lib/protocols.py`.\n\n"
+        "```bash\ninfrahubctl schema load schemas/ --branch circuit-commit-rate\n"
+        "infrahubctl protocols --branch circuit-commit-rate --out lib/protocols.py\n```",
+        "with --schemas",
+        id="inline-conditional-offline-fallback-after-a-negation-word",
     ),
     # A negation in the previous sentence does not make this span a contrast.
     pytest.param(
@@ -778,6 +790,105 @@ def test_protocols_regenerated_from_server_accepts(text):
 
 @pytest.mark.parametrize(("text", "reason"), PROTOCOLS_REJECTED)
 def test_protocols_regenerated_from_server_rejects(text, reason):
+    ok, msg = check_protocols_regenerated_from_server(text)
+    assert not ok
+    assert reason in msg, msg
+
+
+def test_protocols_negated_span_with_the_full_offline_command_fails():
+    """Pins a decision, in the strict direction: an anti-example that quotes
+    the full offline command aimed at the committed file fails.
+
+    The check cannot tell "do not run `...`" from "if the server is not
+    running, use `...`" without reading intent, and a skipped span is a
+    violation the task exists to catch. Quote the option, or the command
+    with a scratch `--out`, to name it as something to avoid.
+    """
+    ok, msg = check_protocols_regenerated_from_server(
+        "Do not run `infrahubctl protocols --schemas schemas/ --out lib/protocols.py` "
+        "here. Use the server form:\n\n"
+        "```bash\nuv run infrahubctl schema load schemas/ --branch circuit-commit-rate\n"
+        "uv run infrahubctl protocols --branch circuit-commit-rate "
+        "--out lib/protocols.py\n```"
+    )
+    assert not ok
+    assert "with --schemas" in msg, msg
+
+
+def test_protocols_negated_span_still_skips_a_scratch_offline_command():
+    """The negation skip is kept where it cannot hide the violation."""
+    ok, msg = check_protocols_regenerated_from_server(
+        "Never write `infrahubctl protocols --schemas schemas/ --out /tmp/p.py` "
+        "over the committed file.\n\n"
+        "```bash\ninfrahubctl schema load schemas/ --branch circuit-commit-rate\n"
+        "infrahubctl protocols --branch circuit-commit-rate --out lib/protocols.py\n```"
+    )
+    assert ok, msg
+
+
+# A shell prompt at the start of a line in a console or shell block is not
+# part of the command. Without `--branch`, both commands use the SDK's
+# default branch, `main` unless `INFRAHUB_DEFAULT_BRANCH` names another.
+PROTOCOLS_PROMPT_AND_DEFAULT_ACCEPTED = [
+    pytest.param(
+        "```console\n$ infrahubctl schema load schemas/ --branch c1\n"
+        "1 schema processed in 0.512 seconds.\n"
+        "$ infrahubctl protocols --branch c1 --out lib/protocols.py\n```",
+        id="console-block-with-dollar-prompts",
+    ),
+    pytest.param(
+        "```zsh\n% uv run infrahubctl schema load schemas/ --branch c1\n"
+        "% uv run infrahubctl protocols --branch c1 --out lib/protocols.py\n```",
+        id="shell-block-with-percent-prompts",
+    ),
+    pytest.param(
+        "```bash\ninfrahubctl schema load schemas/\n"
+        "infrahubctl protocols --branch main --out lib/protocols.py\n```",
+        id="load-on-default-branch-then-protocols-from-main",
+    ),
+    pytest.param(
+        "```bash\nINFRAHUB_DEFAULT_BRANCH=c1 infrahubctl schema load schemas/\n"
+        "infrahubctl protocols --branch c1 --out lib/protocols.py\n```",
+        id="load-on-env-default-branch-then-protocols-from-that-branch",
+    ),
+]
+
+PROTOCOLS_PROMPT_AND_DEFAULT_REJECTED = [
+    # Near miss: the prompt is stripped, so the offline overwrite is read.
+    pytest.param(
+        "```console\n$ infrahubctl schema load schemas/ --branch c1\n"
+        "$ infrahubctl protocols --branch c1 --out lib/protocols.py\n"
+        "$ infrahubctl protocols --schemas schemas/ --out lib/protocols.py\n```",
+        "with --schemas",
+        id="near-miss-prompted-offline-overwrite",
+    ),
+    # Outside a shell or console block a prompt is not stripped, and the
+    # line is unreadable rather than skipped.
+    pytest.param(
+        "```text\n$ infrahubctl schema load schemas/ --branch c1\n"
+        "$ infrahubctl protocols --branch c1 --out lib/protocols.py\n```",
+        "cannot read",
+        id="near-miss-prompt-outside-a-shell-block",
+    ),
+    # Near miss: the default branch is the one the environment names, not
+    # `main`.
+    pytest.param(
+        "```bash\nINFRAHUB_DEFAULT_BRANCH=staging infrahubctl schema load schemas/\n"
+        "infrahubctl protocols --branch main --out lib/protocols.py\n```",
+        "staging",
+        id="near-miss-env-default-branch-is-not-main",
+    ),
+]
+
+
+@pytest.mark.parametrize("text", PROTOCOLS_PROMPT_AND_DEFAULT_ACCEPTED)
+def test_protocols_prompt_and_default_branch_accepts(text):
+    ok, msg = check_protocols_regenerated_from_server(text)
+    assert ok, msg
+
+
+@pytest.mark.parametrize(("text", "reason"), PROTOCOLS_PROMPT_AND_DEFAULT_REJECTED)
+def test_protocols_prompt_and_default_branch_rejects(text, reason):
     ok, msg = check_protocols_regenerated_from_server(text)
     assert not ok
     assert reason in msg, msg

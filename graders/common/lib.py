@@ -550,6 +550,18 @@ _SCHEMA_LOAD_VALUE_OPTIONS = {"--branch", "--wait", "--config-file"}
 # variable sets (`INFRAHUB_` prefix on `Config.default_branch`).
 _DEFAULT_BRANCH_VAR = "INFRAHUB_DEFAULT_BRANCH"
 
+# The SDK's default branch when the variable is not set: `Config.default_branch`
+# defaults to `main` (infrahub-sdk 1.23.2), and both commands send that name
+# when no `--branch` is given. The server's own default branch is also `main`
+# unless `INFRAHUB_INITIAL_DEFAULT_BRANCH` renamed it at initialization.
+_DEFAULT_BRANCH = "main"
+
+# A shell prompt at the start of a line: `$ ` or `% `, then the command.
+# Stripped only in a fence a reader runs in a shell, so a prompt elsewhere
+# leaves the line unreadable rather than skipped.
+_PROMPT = re.compile(r"^[ \t]*[$%][ \t]+")
+_SHELL_FENCES = {"", "bash", "sh", "shell", "zsh", "console", "shell-session", "shellsession"}
+
 # `infrahubctl protocols` writes here when no `--out` is given.
 _PROTOCOLS_DEFAULT_OUT = "schema_protocols.py"
 
@@ -599,23 +611,25 @@ _PLACEHOLDER_WORD = "__placeholder__"
 _WORD_END = set(" \t;&|<>()")
 
 
-def _code_regions_with_offsets(text: str) -> list[tuple[int, str, bool]]:
+def _code_regions_with_offsets(text: str) -> list[tuple[int, str, str | None]]:
     """Fenced blocks and inline spans, each with its offset into ``text``.
 
     The same regions `code_regions` returns, but with offsets, so a span
-    can be read against the prose just before it. The flag says whether
-    the region is an inline span: only a span sits inside a sentence that
-    can introduce it as something to avoid.
+    can be read against the prose just before it. The third item is None
+    for an inline span, which is the only region that sits inside a
+    sentence that can introduce it as something to avoid. For a fence it
+    is the fence's language, lowercased, or "" when it names none.
     """
-    regions: list[tuple[int, str, bool]] = []
+    regions: list[tuple[int, str, str | None]] = []
     blanked = list(text)
     for match in FENCE.finditer(text):
-        regions.append((match.start(1), match.group(1), False))
+        info = text[match.start() + 3 : match.start(1)].split()
+        regions.append((match.start(1), match.group(1), info[0].lower() if info else ""))
         for i in range(match.start(), match.end()):
             if blanked[i] != "\n":
                 blanked[i] = " "
     for match in SPAN.finditer("".join(blanked)):
-        regions.append((match.start(1), match.group(1), True))
+        regions.append((match.start(1), match.group(1), None))
     return regions
 
 
@@ -753,12 +767,13 @@ def _peel_wrappers(argv: list[str]) -> int:
     return i
 
 
-def _protocols_invocations(region: str) -> tuple[list[dict], list[str]]:
+def _protocols_invocations(region: str, prompts: bool = False) -> tuple[list[dict], list[str]]:
     """Every `infrahubctl protocols` and `schema load` command in one region, parsed.
 
     Returns the readable commands in line order, each with its `command`,
     the branch it acts on (`--branch`, else an `INFRAHUB_DEFAULT_BRANCH=`
-    prefix, else None for the default branch), and, for `protocols`,
+    prefix, else `main`, the SDK default), a label naming that branch for
+    messages, and, for `protocols`,
     whether it reads local files (`--schemas`) and the file it writes
     (`--out`, or the CLI default). Also returns the lines naming
     `protocols` that could not be read. An unreadable `schema load` is not
@@ -771,6 +786,10 @@ def _protocols_invocations(region: str) -> tuple[list[dict], list[str]]:
     unreadable otherwise (`time infrahubctl ...`, an unknown wrapper). An
     unreadable line fails the check: a parser gap must not read as a
     compliant answer.
+
+    With ``prompts``, a `$ ` or `% ` prompt at the start of a line is
+    removed before the line is read, as a reader does when copying from a
+    console block.
     """
     found: list[dict] = []
     unreadable: list[str] = []
@@ -781,6 +800,8 @@ def _protocols_invocations(region: str) -> tuple[list[dict], list[str]]:
         if "infrahubctl" in swallowed and _PROTOCOLS in swallowed:
             unreadable.append(f"{swallowed.splitlines()[0]} (heredoc never ends)")
     for line in lines:
+        if prompts:
+            line = _PROMPT.sub("", line, count=1)
         lexer = shlex.shlex(
             _PLACEHOLDER.sub(_PLACEHOLDER_WORD, line), posix=True, punctuation_chars=True
         )
@@ -810,10 +831,11 @@ def _protocols_invocations(region: str) -> tuple[list[dict], list[str]]:
             else:
                 continue
             branch = None
+            default = _DEFAULT_BRANCH
             for word in argv[:start]:
                 name, eq, value = word.partition("=")
                 if eq and name == _DEFAULT_BRANCH_VAR:
-                    branch = value
+                    default = value
             schemas = False
             out = _PROTOCOLS_DEFAULT_OUT
             j = 0
@@ -831,16 +853,13 @@ def _protocols_invocations(region: str) -> tuple[list[dict], list[str]]:
                 j += 1
             found.append({
                 "command": command,
-                "branch": branch,
+                "branch": branch or default,
+                "label": f"branch {branch}" if branch else f"the default branch ({default})",
                 "schemas": schemas,
                 "out": out,
                 "line": " ".join(argv[start:]),
             })
     return found, unreadable
-
-
-def _branch_name(branch: str | None) -> str:
-    return "the default branch" if branch is None else f"branch {branch}"
 
 
 def _same_path(a: str, b: str) -> bool:
@@ -872,17 +891,26 @@ def check_protocols_regenerated_from_server(
     The server generates from the schema it holds, so a server-form command
     counts only when an `infrahubctl schema load` comes before it in the
     answer, on the same branch. A command with no `--branch` acts on the
-    default branch, unless an `INFRAHUB_DEFAULT_BRANCH=` prefix names
-    another. The check fails when no server-form command has a matching
-    load before it, and names both branches when the only loads before it
-    are of another branch. A server-form command with no matching load is
+    SDK's default branch, `main`, unless an `INFRAHUB_DEFAULT_BRANCH=`
+    prefix names another, so `schema load schemas/` pairs with
+    `protocols --branch main`. The check fails when no server-form command
+    has a matching load before it, and names both branches when the only
+    loads before it are of another branch. A server-form command with no matching load is
     otherwise ignored, so a conditional alternative ("if you loaded on the
     default branch, drop `--branch`") does not cost an answer its paired
     command.
 
     An inline span introduced as something to avoid ("do not run `...`")
-    is a contrast, not a recommendation, so it is skipped. A fenced block
-    is always a recommendation: it is the text a reader copies and runs.
+    is a contrast, not a recommendation, so its commands are skipped, with
+    one exception: a `protocols` command that writes the committed file
+    with `--schemas` is always read. A negation word before a span cannot
+    tell "do not run `...`" from "if the server is not running, use
+    `...`", and skipping the second lets the violation through. An answer
+    that quotes the whole offline command as an anti-example therefore
+    fails too. A line in a contrast that cannot be read still fails the
+    check. A fenced block is always a recommendation: it is the text a
+    reader copies and runs. In a shell or console fence, a `$ ` or `% `
+    prompt at the start of a line is not part of the command.
 
     The eval task `common-protocols-regenerate-from-server` runs this check
     through `check_protocols_regenerated.py`, and that task is what guards
@@ -899,11 +927,16 @@ def check_protocols_regenerated_from_server(
     # Regions in answer order, so a load can be read as coming first.
     commands: list[dict] = []
     unreadable: list[str] = []
-    for start, region, is_span in sorted(_code_regions_with_offsets(text)):
-        if is_span and _is_negated(text, start - 1):
-            continue
-        found, bad = _protocols_invocations(region)
+    for start, region, fence in sorted(_code_regions_with_offsets(text), key=lambda r: r[0]):
+        found, bad = _protocols_invocations(region, prompts=fence in _SHELL_FENCES)
         unreadable.extend(bad)
+        if fence is None and _is_negated(text, start - 1):
+            # Fail closed: a contrast keeps only what could hide the violation.
+            found = [
+                inv for inv in found
+                if inv["command"] == _PROTOCOLS and inv["schemas"]
+                and _same_path(inv["out"], committed)
+            ]
         commands.extend(found)
     writes_committed = [
         inv for inv in commands
@@ -928,12 +961,12 @@ def check_protocols_regenerated_from_server(
             "relationships, so it must not overwrite the committed, "
             "server-generated file"
         )
-    loaded: list[str | None] = []
+    loaded: dict[str, str] = {}
     paired = False
     mismatch = ""
     for inv in commands:
         if inv["command"] != _PROTOCOLS:
-            loaded.append(inv["branch"])
+            loaded[inv["branch"]] = inv["label"]
         elif inv in writes_committed:
             if inv["branch"] in loaded:
                 paired = True
@@ -941,8 +974,8 @@ def check_protocols_regenerated_from_server(
             if loaded and not mismatch:
                 mismatch = (
                     f"`infrahubctl schema load` puts the change on "
-                    f"{', '.join(sorted({_branch_name(b) for b in loaded}))}, but "
-                    f"`{inv['line']}` generates from {_branch_name(inv['branch'])}"
+                    f"{', '.join(sorted(set(loaded.values())))}, but "
+                    f"`{inv['line']}` generates from {inv['label']}"
                 )
     if not paired:
         if mismatch:
