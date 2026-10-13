@@ -2090,6 +2090,21 @@ _TARGET_GROUP = "topologies_dc"
 _TARGET_GROUP_KIND = "CoreStandardGroup"
 _OUTPUT_GROUP_KIND = "CoreGeneratorGroup"
 
+# A first-line comment that labels a whole fence as the wrong form. Narrower
+# than _NEGATIVE_LABEL on purpose: a fence opening with an instruction such
+# as `# Do not create a new group` or `# Never edit by hand` is still the
+# answer. A negation counts only when it stands alone as a label (`# AVOID:`)
+# or points at the block (`# Don't do this`).
+_WRONG_FENCE_LABEL = re.compile(
+    r"#\s*\**\s*(?:"
+    r"(?:WRONG|INCORRECT|BAD|BROKEN|ANTI-?PATTERN|DOES NOT RESOLVE)\b"
+    r"|(?:AVOID|DO NOT|DON'T|NEVER)"
+    r"(?:\s*\**\s*(?:$|[:.\-–—(])"
+    r"|\s+(?:(?:DO|USE|WRITE|COPY)\s+)?(?:THIS|THESE|THAT)\b)"
+    r")",
+    re.IGNORECASE,
+)
+
 
 def yaml_documents(raw: str) -> list[Any]:
     """Every YAML document in every ```yaml fence of ``raw``.
@@ -2097,14 +2112,14 @@ def yaml_documents(raw: str) -> list[Any]:
     Each fence is parsed on its own, and may hold several ``---`` documents:
     joining fences before parsing would merge two files' keys into one
     mapping. A fence whose first line is a comment labelling it as the wrong
-    form is skipped, so a contrast block does not count as the answer. A fence
-    that does not parse contributes nothing.
+    form (see ``_WRONG_FENCE_LABEL``) is skipped, so a contrast block does
+    not count as the answer. A fence that does not parse contributes nothing.
     """
     docs: list[Any] = []
     for match in _YAML_FENCE.finditer(raw):
         block = match.group(1)
         first = next((ln.strip() for ln in block.splitlines() if ln.strip()), "")
-        if first.startswith("#") and _NEGATIVE_LABEL.match(first):
+        if _WRONG_FENCE_LABEL.match(first):
             continue
         try:
             docs.extend(doc for doc in yaml.safe_load_all(block) if doc is not None)

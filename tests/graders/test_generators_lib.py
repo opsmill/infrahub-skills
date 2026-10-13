@@ -1239,3 +1239,48 @@ def test_generator_targets_existing_group_fails_without_a_manifest(tmp_path):
     )
     assert ok is False
     assert "no generator_definitions" in msg
+
+
+_GENERATOR_GROUP_FENCE = (
+    "\n```yaml\n{label}\n---\napiVersion: infrahub.app/v1\nkind: Object\n"
+    "spec:\n  kind: CoreGeneratorGroup\n  data:\n    - name: dc_generator_targets\n```\n"
+)
+
+
+def test_generator_targets_existing_group_reads_a_manifest_opening_with_an_instruction(tmp_path):
+    """A negated instruction as the first comment is not a WRONG label."""
+    body = _TARGET_MANIFEST.replace(
+        "```yaml\n",
+        "```yaml\n# Do not create a new group: target the existing one\n",
+        1,
+    )
+    ok, msg = _mod.CHECKS["generator-targets-existing-group"](_target_answer(tmp_path, body))
+    assert ok is True, msg
+
+
+def test_generator_targets_existing_group_grades_a_violation_opening_with_an_instruction(tmp_path):
+    """`# Never edit by hand` does not hide a CoreGeneratorGroup fence."""
+    body = _TARGET_MANIFEST + _GENERATOR_GROUP_FENCE.format(label="# Never edit by hand")
+    ok, msg = _mod.CHECKS["generator-targets-existing-group"](_target_answer(tmp_path, body))
+    assert ok is False
+    assert "CoreGeneratorGroup" in msg
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "# WRONG: do not create a generator group",
+        "# Incorrect",
+        "# BAD - a second group",
+        "# AVOID: a second group",
+        "# AVOID — a second group",
+        "# Don't do this",
+        "# Avoid this:",
+        "# Never use this",
+    ],
+)
+def test_generator_targets_existing_group_skips_a_fence_labelled_wrong(label, tmp_path):
+    """A label that describes the block as the wrong form still skips it."""
+    body = _TARGET_MANIFEST + _GENERATOR_GROUP_FENCE.format(label=label)
+    ok, msg = _mod.CHECKS["generator-targets-existing-group"](_target_answer(tmp_path, body))
+    assert ok is True, msg
