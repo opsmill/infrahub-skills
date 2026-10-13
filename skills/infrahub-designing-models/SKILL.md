@@ -124,8 +124,10 @@ skill for each artifact builds it from the brief.
      Marketplace schema that covers the node kind, the
      reference design or an Infrahub default in the
      question bank. Prefer a published schema's kind to a
-     new one, judged per generic, not per file. A cell none of these supports stays
-     `?` and becomes a question. Do not invent
+     new one, judged per generic, not per file. A cell none of these supports is
+     marked `(open)` and becomes a question. Never write
+     `?` in a cell: the message may hold only one
+     question. Do not invent
      attributes or peers nobody mentioned.
    - **Samples.** When the user gave rows of data, show
      two or three sample objects built from them under

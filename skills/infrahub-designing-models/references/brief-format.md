@@ -5,10 +5,10 @@ tables. The rules link here; none of them restate it.
 
 ## Location
 
-One brief per design, named `design-brief.md`. Follow an
-existing design-document location when the repository has
-one. Otherwise write
-`docs/designs/<design-slug>/design-brief.md`.
+One brief per design, at
+`docs/designs/<design-slug>/design-brief.md`, even when
+the repository keeps other design documents elsewhere.
+The handoffs and the Next steps name this path.
 
 `<design-slug>` is two to four lowercase words joined by
 hyphens, such as `oob-network`. Extending a design
