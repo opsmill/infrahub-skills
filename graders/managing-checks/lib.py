@@ -712,9 +712,11 @@ def check_targeted_has_targets_and_parameters(
 # A proposed change runs its checks with the code at the repository commit
 # recorded on its source branch. On a branch synced with Git, neither
 # `infrahubctl branch rebase` nor `CoreProposedChangeRunCheck` moves that
-# commit; pushing main into the branch's own Git branch does, and so does
-# opening a new branch and proposed change. The script is tokenized with
-# shlex, so comments, prose and echoed strings do not count as commands.
+# commit; merging main into the branch's own Git branch and pushing it does.
+# A Git rebase does not count: it rewrites the branch, so a plain push is
+# rejected and a force-push leaves the sync unable to pull the branch. The
+# script is tokenized with shlex, so comments, prose and echoed strings do not
+# count as commands.
 
 # A fence may be indented under a list item, and closes on a run of the same
 # character at least as long as the one that opened it.
@@ -745,10 +747,9 @@ _TREE_SPEC = importlib.util.spec_from_file_location(
 _cli_tree = importlib.util.module_from_spec(_TREE_SPEC)
 _TREE_SPEC.loader.exec_module(_cli_tree)
 _BRANCH_GROUP = "branch"
-_BRANCH_CREATE = "create"
 _BRANCH_REBASE = "rebase"
-assert {_BRANCH_CREATE, _BRANCH_REBASE} <= _cli_tree.GROUPS[_BRANCH_GROUP], (
-    "graders/common/cli_tree.py no longer lists `infrahubctl branch create|rebase`"
+assert _BRANCH_REBASE in _cli_tree.GROUPS[_BRANCH_GROUP], (
+    "graders/common/cli_tree.py no longer lists `infrahubctl branch rebase`"
 )
 _SHELL_ASSIGN_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.S)
 _SHELL_VAR_RE = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*|[0-9@*])")
@@ -768,13 +769,10 @@ _GIT_VALUE_OPTS: dict[str, set[str]] = {
         "-u", "--upload-pack", "--separate-git-dir", "-j", "--jobs", "--filter",
     },
 }
-# Programs that send a GraphQL document or SDK call to Infrahub. A mutation name
-# counts only where one of these, or a script function that calls one, sends it.
-_SENDERS = {"curl", "wget", "http", "https", "xh", "infrahubctl"}
-_BRANCH_CREATE_GQL_RE = re.compile(r"\bBranchCreate\s*\(|\.branch\.create\s*\(")
-_PC_CREATE_GQL_RE = re.compile(
-    r"\bCoreProposedChangeCreate\s*\(|\bcreate\s*\(\s*(?:kind\s*=\s*)?[\"']CoreProposedChange[\"']"
-)
+# `git pull` options that make it rebase instead of merge. `--rebase=false`
+# and `--no-rebase` merge.
+_PULL_REBASE_OPTS = {"-r", "--rebase"}
+_PULL_REBASE_VALUES = {"true", "merges", "interactive", "i", "m"}
 
 
 def _shell_script_text(raw: str) -> str:
@@ -783,29 +781,24 @@ def _shell_script_text(raw: str) -> str:
     return "\n".join(blocks) if blocks else raw
 
 
-def _split_heredocs(text: str) -> tuple[list[str], list[tuple[int, str, int]]]:
-    """Script lines with heredoc bodies blanked, plus each body line.
+def _blank_heredocs(text: str) -> list[str]:
+    """Script lines with heredoc bodies blanked.
 
-    Each body line comes with its own index and the index of the line that
-    opened the heredoc. A heredoc body is data (a GraphQL document, a Python
-    snippet), not shell, so tokenizing it as commands would fabricate calls and
-    trip on its quotes.
+    A heredoc body is data (a GraphQL document, a Python snippet), not shell,
+    so tokenizing it as commands would fabricate calls and trip on its quotes.
     """
-    lines = text.split("\n")
     shell: list[str] = []
-    bodies: list[tuple[int, str, int]] = []
-    pending: list[tuple[str, int]] = []
-    for idx, line in enumerate(lines):
+    pending: list[str] = []
+    for line in text.split("\n"):
         if pending:
-            bodies.append((idx, line, pending[0][1]))
             shell.append("")
-            if line.strip() == pending[0][0]:
+            if line.strip() == pending[0]:
                 pending.pop(0)
             continue
         shell.append(line)
         if not line.lstrip().startswith("#"):
-            pending.extend((m.group(2), idx) for m in _HEREDOC_RE.finditer(line))
-    return shell, bodies
+            pending.extend(m.group(2) for m in _HEREDOC_RE.finditer(line))
+    return shell
 
 
 def _shell_tokens(line: str) -> list[str]:
@@ -1044,167 +1037,57 @@ def _branch_ref(ref: str) -> str:
     return _BRACED_VAR_RE.sub(r"$\1", _short_ref(ref))
 
 
-def _function_name(tokens: list[str]) -> str | None:
-    """The name a `name() {` or `function name {` line defines, if it is one."""
-    if len(tokens) >= 2 and tokens[0] == "function":
-        return tokens[1].removesuffix("()") or None
-    if len(tokens) >= 2 and tokens[1] == "()" and re.fullmatch(r"[A-Za-z_][\w-]*", tokens[0]):
-        return tokens[0]
-    if len(tokens) >= 3 and tokens[1:3] == ["(", ")"] and re.fullmatch(r"[A-Za-z_][\w-]*", tokens[0]):
-        return tokens[0]
-    return None
-
-
-def _function_bodies(lines: list[tuple[int, list[str]]]) -> dict[str, list[int]]:
-    """Each function's name, with the positions in ``lines`` its body spans."""
-    bodies: dict[str, list[int]] = {}
-    current: str | None = None
-    depth, opened = 0, False
-    for pos, (_, tokens) in enumerate(lines):
-        if current is None:
-            current = _function_name(tokens)
-            if current is None:
-                continue
-            bodies[current] = []
-            depth, opened = 0, False
-        bodies[current].append(pos)
-        depth += tokens.count("{") - tokens.count("}")
-        opened = opened or "{" in tokens
-        if opened and depth <= 0:
-            current = None
-    return bodies
-
-
-def _sent_graphql_lines(
-    line_info: list[tuple[int, list[str], list[list[str]], set[str]]],
-    assigns: dict[str, list[str]],
-    bodies: list[tuple[int, str, int]],
-    pattern: re.Pattern[str],
-) -> list[int]:
-    """Line indexes where ``pattern`` appears in text the script sends.
-
-    Text counts on a line that runs a sender (curl, wget, httpie, infrahubctl,
-    python, or a script function that calls one), in a variable such a line
-    expands, and in a heredoc opened on such a line or assigned to such a
-    variable. Text that is only echoed or printed is not a request.
-    """
-    funcs = _function_bodies([(idx, tokens) for idx, tokens, _, _ in line_info])
-
-    def _program(argv: list[str]) -> str:
-        return argv[0].rsplit("/", 1)[-1]
-
-    sender_funcs: set[str] = set()
-    changed = True
-    while changed:
-        changed = False
-        for name, positions in funcs.items():
-            if name in sender_funcs:
-                continue
-            for pos in positions:
-                for argv in line_info[pos][2]:
-                    prog = _program(argv)
-                    if prog != name and (
-                        prog in _SENDERS or prog.startswith("python") or prog in sender_funcs
-                    ):
-                        sender_funcs.add(name)
-                        changed = True
-                        break
-                if name in sender_funcs:
-                    break
-
-    def _sends(argvs: list[list[str]]) -> bool:
-        return any(
-            (p := _program(a)) in _SENDERS or p.startswith("python") or p in sender_funcs
-            for a in argvs
-        )
-
-    sender_pos = [pos for pos, (_, _, argvs, _) in enumerate(line_info) if _sends(argvs)]
-    sent_vars = {
-        m.group(1)
-        for pos in sender_pos
-        for tok in line_info[pos][1]
-        for m in _SHELL_VAR_RE.finditer(tok)
-    }
-
-    found: list[int] = []
-    for pos in sender_pos:
-        idx, tokens, _, _ = line_info[pos]
-        if pattern.search(" ".join(tokens)):
-            found.append(idx)
-    for idx, _, _, assigned in line_info:
-        if any(pattern.search(v) for name in assigned & sent_vars for v in assigns[name]):
-            found.append(idx)
-
-    starts = [idx for idx, _, _, _ in line_info]
-    sender_idx = {line_info[pos][0] for pos in sender_pos}
-    for body_idx, body_line, opener in bodies:
-        if not pattern.search(body_line):
-            continue
-        k = max((i for i, start in enumerate(starts) if start <= opener), default=None)
-        if k is None:
-            continue
-        start, _, _, assigned = line_info[k]
-        if start in sender_idx or assigned & sent_vars:
-            found.append(body_idx)
-    return found
-
-
 def check_moves_source_branch_commit(
     config: dict, *, sh_raw: str = "", **_: Any
 ) -> tuple[bool, str]:
     """The script moves the repository commit each proposed change runs.
 
-    Passes when a source branch has main merged, rebased or pulled into it and
-    a later `git push` sends that branch to a source branch, or when the script
-    opens a new branch and then a new proposed change. Rebasing the Infrahub
+    Passes when a source branch has main merged or pulled into it and a later
+    `git push` sends that branch to a source branch. Rebasing the Infrahub
     branch and retrying the checks alone reruns the old commit on a branch
     synced with Git, and so does merging main into a branch other than the one
-    pushed.
+    pushed. A Git rebase onto main (`git rebase`, `git pull --rebase`) does not
+    count, and disqualifies that branch before or after a merge: it rewrites it,
+    so a plain push is rejected and a force-push leaves the repository sync
+    unable to pull it.
     """
     text = _shell_script_text(sh_raw or "")
     if not text.strip():
         return False, "output.sh is missing or empty"
-    shell_lines, bodies = _split_heredocs(text)
-    logical = _logical_lines(shell_lines)
+    logical = _logical_lines(_blank_heredocs(text))
 
     assigns: dict[str, list[str]] = {}
     bound: set[str] = set()
-    commands: list[tuple[int, list[str]]] = []
+    commands: list[list[str]] = []
     all_tokens: list[str] = []
-    line_info: list[tuple[int, list[str], list[list[str]], set[str]]] = []
-    for line_idx, tokens in logical:
+    for _line_idx, tokens in logical:
         all_tokens.extend(tokens)
-        line_assigns: dict[str, list[str]] = {}
-        argvs: list[list[str]] = []
         for seg in _simple_commands(tokens):
-            argv = _peel(seg, line_assigns)
+            argv = _peel(seg, assigns)
             if argv:
                 _bound_vars(argv, bound)
-                commands.append((line_idx, argv))
-                argvs.append(argv)
-        for name, values in line_assigns.items():
-            assigns.setdefault(name, []).extend(values)
-        line_info.append((line_idx, tokens, argvs, set(line_assigns)))
+                commands.append(argv)
     default_vars = _default_vars(assigns, all_tokens)
 
     current: str | None = None
-    merged: set[str] = set()  # branches main was merged, rebased or pulled into
+    merged: set[str] = set()  # branches main was merged or pulled into
+    rebased: set[str] = set()  # branches rebased onto main
     qualifying_push: str | None = None
     pushes_seen: list[str] = []
     rebases = 0
-    branch_create_lines: list[int] = []
 
-    def _merged_into(target: str | None) -> None:
-        if target and not _is_default_ref(target, default_vars):
+    def _main_into(target: str | None, *, rebase: bool) -> None:
+        if not target or _is_default_ref(target, default_vars):
+            return
+        if rebase:
+            merged.discard(target)
+            rebased.add(target)
+        elif target not in rebased:  # a merge after a rebase does not undo the rewrite
             merged.add(target)
 
-    for line_idx, argv in commands:
-        if argv[0].rsplit("/", 1)[-1] == "infrahubctl" and argv[1:2] == [_BRANCH_GROUP]:
-            verb = argv[2] if len(argv) > 2 else ""
-            if verb == _BRANCH_CREATE:
-                branch_create_lines.append(line_idx)
-            elif verb == _BRANCH_REBASE:
-                rebases += 1
+    for argv in commands:
+        if argv[0].rsplit("/", 1)[-1] == "infrahubctl" and argv[1:3] == [_BRANCH_GROUP, _BRANCH_REBASE]:
+            rebases += 1
         sub, args = _git_subcommand(argv)
         if sub is None:
             continue
@@ -1236,10 +1119,14 @@ def check_moves_source_branch_commit(
             if onto:
                 refs.append(onto)
             if any(_is_default_ref(r, default_vars) for r in refs):
-                _merged_into(current)
+                _main_into(current, rebase=sub == "rebase")
         elif sub == "pull":
             if any(_is_default_ref(r, default_vars) for r in pos[1:]):
-                _merged_into(current)
+                rebase_value = _option_value(args, {"--rebase"})
+                pull_rebases = bool(_PULL_REBASE_OPTS & set(args)) or (
+                    rebase_value is not None and rebase_value in _PULL_REBASE_VALUES
+                )
+                _main_into(current, rebase=pull_rebases)
         elif sub == "push":
             if {"--delete", "-d", "--all", "--mirror", "--tags"} & set(args):
                 continue
@@ -1263,24 +1150,18 @@ def check_moves_source_branch_commit(
 
     if qualifying_push:
         return True, (
-            f"Pushes main into each source branch's Git branch (`git push` to {qualifying_push}), "
-            "so the repository sync records a new commit on the branch"
+            f"Merges main into each source branch's Git branch and pushes it (`git push` to "
+            f"{qualifying_push}), so the repository sync records a new commit on the branch"
         )
-
-    # Second accepted route: a new branch, then a new proposed change on it.
-    gql_branch = _sent_graphql_lines(line_info, assigns, bodies, _BRANCH_CREATE_GQL_RE)
-    pc_create = _sent_graphql_lines(line_info, assigns, bodies, _PC_CREATE_GQL_RE)
-    first_branch = min(branch_create_lines + gql_branch, default=None)
-    if first_branch is not None and any(i >= first_branch for i in pc_create):
-        return True, "Opens a new branch and a new proposed change, which run the current commit"
 
     seen = ", ".join(pushes_seen) if pushes_seen else "none"
     into = ", ".join(sorted(merged)) if merged else "none"
+    onto = ", ".join(sorted(rebased)) if rebased else "none"
     return False, (
-        "No `git push` to a source branch after merging or rebasing main into it, and no new "
-        "branch plus new proposed change: the open proposed changes keep running the old "
-        f"repository commit (git push destinations: {seen}; infrahubctl branch rebase calls: "
-        f"{rebases}; branches main was merged into: {into})"
+        "No `git push` to a source branch after merging main into it: the open proposed "
+        "changes keep running the old repository commit (git push destinations: "
+        f"{seen}; infrahubctl branch rebase calls: {rebases}; branches main was merged "
+        f"into: {into}; branches rebased onto main, which the sync cannot pull: {onto})"
     )
 
 

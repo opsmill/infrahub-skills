@@ -3,16 +3,21 @@
 A proposed change runs its checks with the repository commit recorded on its
 source branch. On a branch synced with Git, `infrahubctl branch rebase` and
 `CoreProposedChangeRunCheck` leave that commit where it is, so the check
-passes only a script that pushes main into each source branch's Git branch,
-or one that opens a new branch and proposed change.
+passes only a script that merges main into each source branch's Git branch
+and pushes it. A Git rebase onto main does not count: it rewrites the branch,
+so a plain push is rejected, and after a force-push the repository sync
+cannot pull the branch. A new branch and proposed change do not count
+either: a branch cut from main carries none of the old branch's data.
 
 The four fixtures under fixtures/managing-checks/proposed-change-commit/ are
-compliant, compliant variant, violating, and violating near miss. Each
-violating fixture is the compliant one with one shape changed: the violating
-one swaps the Git step for the runbook's rebase, and the near miss keeps every
-token the check reads (checkout, merge, push, the loop variable, the default
-branch) but binds them to the wrong subject, merging the source branch into
-main and pushing main.
+compliant, compliant variant, violating, and violating near miss, plus two
+more violating ones for the routes the rule does not accept. Each violating
+fixture is the compliant one with one shape changed: the violating one swaps
+the Git step for the runbook's rebase, the near miss keeps every token the
+check reads (checkout, merge, push, the loop variable, the default branch)
+but binds them to the wrong subject, merging the source branch into main and
+pushing main, fail-rebase swaps the merge for a Git rebase and a force-push,
+and fail-new-branch swaps the Git step for a new branch and proposed change.
 """
 
 import ast
@@ -34,7 +39,7 @@ _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
 
 check = _mod.check_moves_source_branch_commit
-_FAIL_PREFIX = "No `git push` to a source branch after merging or rebasing main into it"
+_FAIL_PREFIX = "No `git push` to a source branch after merging main into it"
 
 
 def _task_checks() -> list[str]:
@@ -90,6 +95,24 @@ def test_near_miss_fails_because_it_pushes_main():
     (entry,) = result["checks"]
     assert entry["message"].startswith(_FAIL_PREFIX)
     assert "git push destinations: $DEFAULT_BRANCH" in entry["message"]
+
+
+def test_rebase_fixture_fails_because_it_rebases():
+    result = _run_fixture("fail-rebase")
+    assert result["score"] < 1.0
+    (entry,) = result["checks"]
+    assert entry["message"].startswith(_FAIL_PREFIX)
+    assert "git push destinations: $b" in entry["message"]
+    assert "branches rebased onto main, which the sync cannot pull: $b" in entry["message"]
+
+
+def test_new_branch_fixture_fails_because_it_moves_no_branch():
+    result = _run_fixture("fail-new-branch")
+    assert result["score"] < 1.0
+    (entry,) = result["checks"]
+    assert entry["message"].startswith(_FAIL_PREFIX)
+    assert "git push destinations: none" in entry["message"]
+    assert "branches main was merged into: none" in entry["message"]
 
 
 def test_missing_script_fails_closed():
@@ -187,7 +210,6 @@ def test_push_destination_must_be_a_bound_branch_variable(script, expected):
             'git push origin "tmp:refs/heads/${b}"',
             True,
         ),
-        ('git rebase origin/main "$b"\ngit push origin "$b"', True),
         ('git clone --branch "$b" "$URL" w\ngit -C w pull origin main\ngit -C w push origin HEAD',
          True),
         ('git checkout main\ngit merge origin/main\ngit push origin "$b"', False),
@@ -196,35 +218,43 @@ def test_push_destination_must_be_a_bound_branch_variable(script, expected):
         ('git clone "$URL" w\ngit -C w merge origin/main\ngit -C w push origin "$b"', False),
         ('git merge origin/main\ngit push origin "$b"', False),
     ],
-    ids=["checkout-merge-push", "temp-branch-to-source", "rebase-names-branch",
-         "clone-branch-pull", "merged-on-main", "switched-back-to-main",
+    ids=["checkout-merge-push", "temp-branch-to-source", "clone-branch-pull", "merged-on-main", "switched-back-to-main",
          "clone-default-branch", "no-checkout"],
 )
 def test_merge_must_land_on_the_pushed_branch(script, expected):
     looped = f"while read -r b; do\n{script}\ndone < branches.txt"
     assert _passes(looped) is expected
 
+# A Git rebase onto main rewrites the source branch: a plain push is rejected,
+# and after a force-push the repository sync cannot pull the branch. It counts
+# as no merge, whatever comes before or after it on that branch.
 @pytest.mark.parametrize(
-    ("script", "expected"),
+    ("body", "expected"),
     [
-        (
-            'infrahubctl branch create "$b-v2"\n'
-            "curl -d '{\"query\": \"mutation { CoreProposedChangeCreate(data: {}) { ok } }\"}' x",
-            True,
-        ),
-        (
-            "curl -d '{\"query\": \"mutation { CoreProposedChangeCreate(data: {}) { ok } }\"}' x\n"
-            'infrahubctl branch create "$b-v2"',
-            False,
-        ),
+        ('  git pull --no-rebase origin main\n  git push origin "$b"', True),
+        ('  git pull --rebase=false origin main\n  git push origin "$b"', True),
+        ('  git rebase origin/main\n  git push origin "$b"', False),
+        ('  git rebase origin/main\n  git push --force origin "$b"', False),
+        ('  git pull --rebase origin main\n  git push origin "$b"', False),
+        ('  git pull -r origin main\n  git push origin "$b"', False),
+        ('  git merge origin/main\n  git rebase origin/main\n  git push origin "$b"', False),
+        ('  git rebase origin/main\n  git merge origin/main\n  git push origin "$b"', False),
     ],
-    ids=["branch-then-proposed-change", "proposed-change-then-branch"],
+    ids=["pull-no-rebase", "pull-rebase-false", "rebase-push", "rebase-force-push",
+         "pull-rebase", "pull-r", "merge-then-rebase", "rebase-then-merge"],
 )
-def test_new_branch_route_needs_the_branch_first(script, expected):
-    assert _passes(script) is expected
+def test_rebase_onto_main_does_not_count(body, expected):
+    assert _passes(_LOOP.format(body=body)) is expected
 
 
-def test_new_branch_route_reads_heredoc_graphql():
+def test_rebase_with_branch_argument_does_not_count():
+    script = 'while read -r b; do\ngit rebase origin/main "$b"\ngit push origin "$b"\ndone < f'
+    assert not _passes(script)
+
+
+# A new branch cut from main has none of the old branch's data or commits, so
+# opening one with a new proposed change re-validates main, not the change.
+def test_new_branch_and_proposed_change_do_not_count():
     script = """
 for b in $(list_branches); do
   uv run infrahubctl branch create "${b}-v2"
@@ -233,58 +263,7 @@ for b in $(list_branches); do
 EOF
 done
 """
-    assert _passes(script)
-
-
-# The new-branch route counts a mutation only where the script sends it.
-_PC_MUTATION = 'mutation { CoreProposedChangeCreate(data: {}) { ok } }'
-_BRANCH_MUTATION = 'mutation { BranchCreate(data: {name: \\"x\\"}) { ok } }'
-
-
-@pytest.mark.parametrize(
-    ("script", "expected"),
-    [
-        (
-            'gql() {\n  curl -sS "$INFRAHUB_ADDRESS/graphql" -d "$1"\n}\n'
-            f'gql "{{\\"query\\": \\"{_BRANCH_MUTATION}\\"}}"\n'
-            f"gql '{_PC_MUTATION}'",
-            True,
-        ),
-        (
-            f"B='{_BRANCH_MUTATION}'\nP='{_PC_MUTATION}'\n"
-            'curl -d "$B" "$URL"\ncurl -d "$P" "$URL"',
-            True,
-        ),
-        (
-            "python3 - <<'EOF'\nclient.branch.create(branch_name=b)\n"
-            "client.create(kind='CoreProposedChange', data={})\nEOF",
-            True,
-        ),
-        (
-            f'echo "{_BRANCH_MUTATION}"\necho "{_PC_MUTATION}"',
-            False,
-        ),
-        (
-            'say() {\n  echo "$1"\n}\n'
-            f'say "{_BRANCH_MUTATION}"\nsay "{_PC_MUTATION}"',
-            False,
-        ),
-        (
-            f"B='{_BRANCH_MUTATION}'\nP='{_PC_MUTATION}'\n"
-            'echo "$B"\necho "$P"\ncurl -d "$OTHER" "$URL"',
-            False,
-        ),
-        (
-            "cat <<'EOF'\nclient.branch.create(branch_name=b)\n"
-            "client.create(kind='CoreProposedChange', data={})\nEOF",
-            False,
-        ),
-    ],
-    ids=["helper-function", "variable-sent", "python-heredoc", "echoed",
-         "echo-helper", "variable-only-echoed", "heredoc-to-cat"],
-)
-def test_new_branch_route_counts_only_sent_mutations(script, expected):
-    assert _passes(script) is expected
+    assert not _passes(script)
 
 
 # --- Shell reading (dev/guidelines/graders.md) ------------------------------
@@ -353,5 +332,4 @@ def test_every_fence_is_graded_including_indented_and_long_fences():
 
 def test_cli_tree_is_the_source_of_infrahubctl_commands():
     tree = _mod._cli_tree
-    assert _mod._BRANCH_CREATE in tree.GROUPS[_mod._BRANCH_GROUP]
     assert _mod._BRANCH_REBASE in tree.GROUPS[_mod._BRANCH_GROUP]

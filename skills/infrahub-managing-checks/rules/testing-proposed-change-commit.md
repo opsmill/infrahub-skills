@@ -34,22 +34,30 @@ created sets it:
 - `infrahubctl branch create`: synced only with
   `--sync-with-git`.
 
-This rule covers branches synced with Git. Each one has
-a Git branch of the same name in the repository, and its
-recorded commit moves only when that Git branch moves.
+This rule covers branches synced with Git and checks in
+a read-write repository (`CoreRepository`). Each such
+branch has a Git branch of the same name in the
+repository, and its recorded commit moves only when that
+Git branch moves.
 
 ### Get new check code into an open proposed change
 
-1. Merge or rebase `main` into the Git branch with the
-   same name as the source branch, and push it.
+1. Merge `main` into the Git branch with the same name
+   as the source branch, and push it. Do not rebase: a
+   rebase rewrites the branch, so a plain push is
+   rejected, and after a force-push the repository sync
+   cannot pull the branch and the commit stays put.
 2. Wait for the repository sync to record the new commit
    on the branch. The sync runs about once a minute.
 3. Rerun the checks with `CoreProposedChangeRunCheck` or
    the "Retry" button.
 
-Or open a new branch and a new proposed change after the
-fix is on `main`. The new branch starts from the current
-commit.
+A read-only repository (`CoreReadOnlyRepository`) has no
+Git branch to push. Its commit is set per Infrahub
+branch: on the source branch, run the
+`InfrahubReadOnlyRepositoryImportLastCommit` mutation to
+record the latest commit of its `ref`, then rerun the
+checks.
 
 While writing or fixing the check, run it locally first.
 `infrahubctl check <name> --branch <branch>` runs your

@@ -4,9 +4,11 @@
 The task asks for a bash script that gets open proposed changes re-validated
 after a fixed check was merged to main. It reads `output.sh` and passes only
 when the script moves the repository commit each proposed change runs: a
-`git push` to each source branch after merging main into it, or a new branch
-and proposed change. A loop of `infrahubctl branch rebase` plus
-`CoreProposedChangeRunCheck` reruns the old commit on branches synced with Git.
+`git push` to each source branch after merging main into it. A loop of
+`infrahubctl branch rebase` plus `CoreProposedChangeRunCheck` reruns the old
+commit on branches synced with Git, a Git rebase onto main leaves the
+repository sync unable to pull the branch, and a new branch and proposed
+change re-validate main instead of the change under review.
 
 No other managing-checks check grades a shell script, so this task runs the
 one assertion on its own.

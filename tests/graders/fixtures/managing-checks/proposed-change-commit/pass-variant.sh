@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Same behaviour as the plain script, refactored: the Git steps live in a
-# function, use `git -C`, rebase instead of merge, push with an explicit
-# refspec to HEAD, span lines with continuations, and also rebase the
-# Infrahub branch (harmless next to the Git step).
+# function, use `git -C`, pull main with an explicit merge instead of running
+# `git merge`, push with an explicit refspec to HEAD, span lines with
+# continuations, and also rebase the Infrahub branch (harmless next to the
+# Git step).
 set -euo pipefail
 
 WORKDIR=/tmp/infra-repo
@@ -11,10 +12,9 @@ WORKDIR=/tmp/infra-repo
 refresh_branch() {
   git -C "$WORKDIR" fetch --prune origin
   git -C "$WORKDIR" checkout -B "$1" "origin/$1"
-  git -C "$WORKDIR" rebase \
-    "origin/$BASE"
+  git -C "$WORKDIR" pull \
+    --no-rebase --no-edit origin "$BASE"
   git -C "$WORKDIR" push \
-    --force-with-lease \
     origin "HEAD:refs/heads/$1" 2>&1
   infrahubctl branch rebase "$1"
 }

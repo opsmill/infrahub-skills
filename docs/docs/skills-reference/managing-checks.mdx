@@ -36,7 +36,7 @@ Three files that must be used together:
 - **GraphQL query naming**: the query name in the `.gql` file must match the `query` class attribute exactly
 - **Parameter mapping**: if the check accepts parameters (e.g., to parameterize a naming pattern), the parameters are declared in both the Python class and the `.infrahub.yml` registration
 - **Error collection before logging**: errors are collected across all objects first, then logged together, rather than short-circuiting on the first error
-- **Which code a proposed change runs**: a proposed change runs the check code at its source branch's repository commit. On a branch synced with Git, a branch rebase or a retry of the checks reruns that same commit, so the skill updates and pushes the branch's Git branch instead
+- **Which code a proposed change runs**: a proposed change runs the check code at its source branch's repository commit. On a branch synced with Git, a branch rebase or a retry of the checks reruns that same commit, so the skill merges `main` into the branch's Git branch and pushes it instead. It does not rebase that Git branch, because the repository sync cannot pull a rewritten branch
 
 ## Common mistakes it catches
 
