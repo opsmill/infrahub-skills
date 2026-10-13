@@ -5,7 +5,7 @@ type objects and, where the profile configures it,
 module templates. What it cannot do is resolve
 `{module}`.
 
-93.9% of published module-type component names carry
+94.8% of published module-type component names carry
 that token, which NetBox substitutes with the bay
 position when the module is installed. A template is
 not bound to a bay, so at conversion time the position
@@ -51,8 +51,10 @@ module is installed.
 
 Schema prerequisites, in load order: `base/dcim.yml` →
 `extensions/device_module/device_module.yml` →
-`extensions/device_module/device_module.yml` →
-`extensions/module_port/module_port.yml`.
+`extensions/module_port/module_port.yml` →
+`generate_template: true` on `DcimModule`, which
+schema-library does not set (see
+[Carrying the ports too](./extending-your-schema.md#carrying-the-ports-too)).
 
 ## What it creates, and what it refuses to
 
@@ -166,27 +168,34 @@ and the next run's cleanup would then delete it.
 ## Query
 
 `scripts/materialize_module_ports.gql`, rooted at
-`DcimDevice` — `modules` and `module_bays` are extended
-onto the `DcimPhysicalDevice` generic while `name` and
+`DcimDevice`. `module_bays` is extended onto the
+`DcimPhysicalDevice` generic, while `name` and
 `interfaces` live on `DcimGenericDevice`, and
 `DcimDevice` inherits both.
 
+A device reaches its modules **through its bays**:
+`module_bays` → `installed_module`. schema-library v2
+has no device-side `modules` relationship, and
+selecting one fails the whole query with
+`Cannot query field 'modules' on type 'DcimDevice'`.
+Walking the bays also makes the position reliable,
+because the bay owns `position`.
+
 It fetches, per device: the device name and id, its
 existing interface names and descriptions (for the
-collision check), its installed modules, each module's
-`module_bay.position`, and each module's ports with
+collision check), each bay's name and `position`, the
+module installed in it, and that module's ports with
 `name`, `category`, `mgmt_only`, `port_type`, and
 `maximum_draw`.
 
 ### Unions and inline fragments
 
-`device.modules` peers the **generic**
+`installed_module` peers the **generic**
 `DcimGenericModule`, so the node type is a GraphQL
 interface. Everything the generator needs is declared
-on that generic — `serial_number` and `description` on
-the generic itself, `ports` and `module_bay` extended
-onto it by `module_port.yml` and `module_bay.yml` —
-which is why they select directly.
+on that generic: `serial_number` on the generic itself,
+and `ports` extended onto it by `module_port.yml`. That
+is why they select directly.
 
 Fields living only on a **concrete** module kind need
 an inline fragment. Selecting one on the interface
@@ -228,12 +237,13 @@ they select directly too.
 
 ## Registration
 
-Copy the two files into the repo Infrahub syncs, then:
+Copy the two files into the repo Infrahub syncs, keeping
+their names, then:
 
 ```yaml
 queries:
   - name: module_ports_for_device
-    file_path: queries/module_ports_for_device.gql
+    file_path: queries/materialize_module_ports.gql
 
 generator_definitions:
   - name: materialize_module_ports
@@ -345,57 +355,42 @@ before concluding the generator is broken.
 
 **Ports come from the module template, and
 `object_template` applies only at creation.** Port
-declarations hang off `TemplateDeviceLinecard`, not off
-the module *type*. A `DeviceLinecard` created without
-`object_template` comes up with `ports=0`, so the
+declarations hang off `TemplateDcimModule` (see
+[Carrying the ports too](./extending-your-schema.md#carrying-the-ports-too)),
+not off the module *type*. A `DcimModule` created
+without `object_template` comes up with no ports, so the
 generator finds nothing, resolves nothing, and reports a
 clean no-op — which reads as "it does not work" rather
 than "this module has no ports".
 
+**Install a module by setting its `module_bay`.** The bay
+is what carries the position the generator substitutes,
+and `DcimModule.module_bay` is the link; there is no
+`modules` relationship on the device. A bay is keyed on
+its computed name, `<device> > <bay>`, not on a
+`[device, bay]` pair:
+
 ```yaml
 spec:
-  kind: DeviceLinecard
+  kind: DcimModule
   data:
     - serial_number: JPE-SUP2-0001
-      object_template: mod-DCS-7500-SUP2   # REQUIRED, or ports=0
-      linecard_type: DCS-7500-SUP2
+      object_template: mod-DCS-7500-SUP2   # REQUIRED, or no ports
       module_type: DCS-7500-SUP2
-      module_bay: ["lon-dc1-chassis-01", "Slot 1"]
+      module_bay: "lon-dc1-chassis-01 > Slot 1"
 ```
 
 Adding `object_template` to a module that already exists
 and re-loading does **not** backfill the ports. The
 modules have to be deleted and recreated.
 
-**The module→device link has to be set from the device
-side.** `DcimGenericModule.device` peers
-`DcimPhysicalDevice`, a generic with no `name` and so no
-`human_friendly_id` — there is nothing for a name in an
-object file to resolve against. Set it from
-`DcimDevice.modules` instead, whose peer
-`DcimGenericModule` *is* keyed on `serial_number__value`.
-That document has to restate the device's mandatory
-`status` and `location`:
-
-```yaml
-spec:
-  kind: DcimDevice
-  data:
-    - name: lon-dc1-chassis-01
-      status: active
-      location: lon-dc1
-      modules:
-        - JPE-SUP2-0001
-        - JPE-SUP2-0002
-```
-
 Load order: device types and module types → templates →
-devices → module bays → modules → the group. Then run the
-generator.
+devices (created from their template, so their bays
+exist) → modules → the group. Then run the generator.
 
 ## Testing
 
-`tests/scripts/test_materialize_module_ports.py` — 49
+`tests/scripts/test_materialize_module_ports.py` — 55
 tests over real published fixtures:
 
 | Fixture | Covers |

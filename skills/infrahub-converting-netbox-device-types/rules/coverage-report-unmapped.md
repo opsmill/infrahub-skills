@@ -35,7 +35,7 @@ accept the omission knowingly.
 | Skipped component lists | `console-ports (2 entries)` |
 | Dropped top-level fields | `airflow`, `front_image` |
 | Dropped component fields | `interfaces`: `type`, `poe_mode` |
-| Value coercions | `16.1 lb converted to 7.303 kg` |
+| Value coercions | `16.1 lb converted to 7 kg` |
 
 Fields that were *consumed* rather than lost do not
 belong in the report — `slug` drives the template name
