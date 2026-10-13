@@ -11,6 +11,26 @@ This project uses [*towncrier*](https://towncrier.readthedocs.io/) and the chang
 
 <!-- towncrier release notes start -->
 
+## [Infrahub Skills - v1.4.0](https://github.com/opsmill/infrahub-skills/tree/v1.4.0) - 2026-10-13
+
+### Added
+
+- Added `netbox_export_device_types.py` to the `infrahub-converting-netbox-device-types` skill: it pulls device types, module types, and their component templates straight out of a live NetBox over pynetbox and writes them in the devicetype-library layout the bundled converter already reads, so an existing NetBox instance no longer has to be exported by hand before it can be converted. ([#129](https://github.com/opsmill/infrahub-skills/issues/129))
+- Added the infrahub-planning-upgrades skill, which plans an Infrahub upgrade one minor version at a time and checks every release's breaking changes against the repository and instance without running the upgrade.
+
+### Fixed
+
+- The duplicate-issue search in infrahub-reporting-issues and infrahub-reporting-skill-gaps no longer passes `--state all`, which `gh search issues` rejects, so the search returns results again. The CLI invocation gate now flags invalid `gh search --state` values. ([#136](https://github.com/opsmill/infrahub-skills/issues/136))
+
+### Housekeeping
+
+- A new skill's registration surfaces are now listed in one place and checked: `scripts/check-skill-registration.py` fails a user-invocable skill missing from AGENTS.md, the README, the front-page catalog, the router, or the release manifest, or whose reference page lacks the standard sections. ([#160](https://github.com/opsmill/infrahub-skills/issues/160))
+- Fixed the defects an end-to-end run of the NetBox device-type converter found: device types sharing a model are refused instead of silently overwriting each other on load, the exporter no longer reports NetBox defaults as lost or leaves an earlier run's module types behind, an unknown --manufacturer exits 2, and a new schema-library-module-ports.yml profile carries module ports for the generator.
+- Grouped the react and react-dom Dependabot updates into one pull request, because a bump of one without the other fails the docs build.
+- Restructured the documentation site around the Infrahub lifecycle, added a first-schema tutorial, a skill router page, and a contributor section covering the skill-change pipeline. Each skills-reference page now names the skill it documents, Spec-Driven Development has its own section, and the pages carry diagrams where the shape of a thing is the point. The prose follows the OpsMill documentation voice and describes AI agents in general rather than naming one. The skill router groups its table by the same lifecycle stages as the sidebar instead of listing fifteen skills flat, the front page leads with the situations that send a reader to a skill, and the `graphql_fragments` version floor moved to the prerequisites where versions are already being checked. The Data Analyzer page no longer names three MCP tools that the server dropped.
+- Standardized release bump labels and now reject pull requests with missing or conflicting release intent.
+- Watch grader checks now match whole path segments and whole identity tokens instead of substrings, and severity grading covers every finding rather than only the first.
+
 ## [Infrahub Skills - v1.3.0](https://github.com/opsmill/infrahub-skills/tree/v1.3.0) - 2026-09-23
 
 ### Fixed

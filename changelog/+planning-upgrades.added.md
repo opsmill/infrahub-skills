@@ -1,1 +1,0 @@
-Added the infrahub-planning-upgrades skill, which plans an Infrahub upgrade one minor version at a time and checks every release's breaking changes against the repository and instance without running the upgrade.
