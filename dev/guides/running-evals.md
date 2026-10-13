@@ -247,9 +247,14 @@ Leave the rest of the instruction untouched, since
 the task body is what you are testing.
 
 **Check the output for a grader read before you read
-the score.** The tell is an output that names
-`graders/`, a `check_*.py` file, `tests/`, or a grader
-score. That trial is void at any score, below 1.0
+the score.** The tell is an output that names the
+grader's own files or results: a path under
+`graders/`, the `tests/test*.sh` scripts skillgrade
+writes for the grader, or a grader score. A path the
+task prompt itself hands the model is not a tell:
+several audit tasks give it a `checks/check_*.py`
+file and grade it on naming that file. A trial that
+shows the tell is void at any score, below 1.0
 included, and a before/after score does not rescue it,
 because the model can read the grader in both runs.
 Re-run, and count only trials whose output shows no
