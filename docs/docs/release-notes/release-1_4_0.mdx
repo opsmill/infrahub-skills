@@ -87,13 +87,20 @@ Then: leave all but one device type for each shared model out of the input. The 
 ```text
 error: 4 model name(s) are used by more than one device type. A template names its device type by model, so these cannot be told apart, and loading them overwrites one with another. Leave all but one of each out of the input:
   '24 Port Keystone Patch Panel': CMYKZONE (devicetype-library/device-types/CMYKZONE/24-port-keystone-patch-panel.yml), Cable Matters (devicetype-library/device-types/Cable Matters/180013.yaml), Leviton (devicetype-library/device-types/Leviton/49255-H24.yaml)
+  'D6220': Netgear (devicetype-library/device-types/Netgear/D6220.yaml), Zavio (devicetype-library/device-types/Zavio/d6220.yaml)
+  'GL-AX1800': DreamQuest (devicetype-library/device-types/DreamQuest/GL-AX1800.yml), GL-iNet (devicetype-library/device-types/GL-iNet/GL-AX1800.yml)
+  'MPUIQ-VMCHS': Avocent (devicetype-library/device-types/Avocent/MPUIQ-VMCHS.yaml), Vertiv (devicetype-library/device-types/Vertiv/MPUIQ-VMCHS.yaml)
 ```
 
-The converter has no exclude option, so convert a copy of the input with the extra files removed:
+The converter has no exclude option, so convert a copy of the input with all but one file per listed model removed. Which one you keep is your choice. This example keeps the first of each and converts the published library at commit `36690ec`:
 
 ```bash
 cp -R devicetype-library/device-types ./device-types
-rm "./device-types/Cable Matters/180013.yaml" "./device-types/Leviton/49255-H24.yaml"
+rm "./device-types/Cable Matters/180013.yaml" \
+   "./device-types/Leviton/49255-H24.yaml" \
+   "./device-types/Zavio/d6220.yaml" \
+   "./device-types/DreamQuest/GL-AX1800.yml" \
+   "./device-types/Vertiv/MPUIQ-VMCHS.yaml"
 ```
 
 Notes: the published library at commit `36690ec` has four such model names. Before this release the conversion succeeded and the load overwrote one device type with another.
@@ -108,11 +115,11 @@ Notes: the published library at commit `36690ec` has four such model names. Befo
 ### Fixed
 
 * Duplicate-issue search no longer passes `--state all` to `gh search issues` ([#136](https://github.com/opsmill/infrahub-skills/issues/136)).
+* NetBox device-type converter refuses device types that share a model, and the exporter stops reporting NetBox defaults as lost and removes an earlier run's module types; adds the `schema-library-module-ports.yml` profile.
 
 ### Housekeeping
 
 * Registration surfaces for a new skill are checked by `scripts/check-skill-registration.py` ([#160](https://github.com/opsmill/infrahub-skills/issues/160)).
-* End-to-end fixes to the NetBox device-type converter and exporter, and the `schema-library-module-ports.yml` profile.
 * Documentation site restructured around the Infrahub lifecycle.
 * react and react-dom Dependabot updates grouped into one pull request.
 * Release bump labels standardised, and pull requests with missing or conflicting labels rejected.
