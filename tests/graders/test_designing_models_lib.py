@@ -142,7 +142,7 @@ Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)
 """
 
 BRIEF = "docs/designs/test/design-brief.md"
-EXISTING_BRIEF = "specs/test-design/design-brief.md"
+SECOND_BRIEF = "docs/designs/other/design-brief.md"
 
 
 # --------------------------------------------------------------------------
@@ -375,7 +375,7 @@ INPUT_VARIANT_ROWS = """\
     [
         pytest.param(BRIEF, brief(inputs=INPUTS_TABLE, sketch_rows=INPUT_ROWS), None, id="compliant"),
         pytest.param(
-            EXISTING_BRIEF,
+            BRIEF,
             brief(inputs=INPUTS_VARIANT_TABLE, sketch_rows=INPUT_VARIANT_ROWS),
             None, id="compliant-variant",
         ),
@@ -443,6 +443,25 @@ INPUT_VARIANT_ROWS = """\
             BRIEF,
             brief(inputs=INPUTS_TABLE, sketch_rows=INPUT_ROWS.replace("NetworkBackboneLink", "SiteLink")),
             None, id="compliant-overlapping-words-bind-first-match",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(
+                inputs=INPUTS_TABLE,
+                sketch_rows=INPUT_ROWS.replace(
+                    "| NetworkRouter | pop_code + role | model (stated) | LocationPop (one) | Infrahub | Backbone team | pops.csv:pop_code; backbone.txt:cr1/cr2 |",
+                    "| NetworkRouter | name (AMS1-cr1) | model (stated) | LocationPop (one) | Infrahub | Backbone team | backbone.txt:router lines |",
+                ),
+            ),
+            None, id="compliant-generic-column-name-from-another-file",
+        ),
+        pytest.param(
+            BRIEF,
+            brief(
+                inputs=INPUTS_TABLE,
+                sketch_rows=INPUT_ROWS.replace("pops.csv:pop_code; backbone.txt:cr1/cr2", "backbone.txt:cr1/cr2"),
+            ),
+            "NetworkRouter is identified by a pops.csv column", id="near-miss-router-keyed-by-pop-code",
         ),
     ],
 )
@@ -720,7 +739,16 @@ WIFI_VARIANT_OPEN = """\
                 open_items=WIFI_OPEN,
                 model_map=WIFI_MODEL_MAP,
             ),
-            "still carries a (guess) from the draft", id="near-miss-guess-left-from-draft",
+            "still carries (guess) from the draft", id="near-miss-guess-left-from-draft",
+        ),
+        pytest.param(
+            brief(
+                features=WIFI_FEATURES,
+                sketch_rows=WIFI_ROWS.replace("| serial number |", "| (open) |"),
+                open_items=WIFI_OPEN,
+                model_map=WIFI_MODEL_MAP,
+            ),
+            "still carries (open) from the draft", id="near-miss-open-mark-left-from-draft",
         ),
         pytest.param(
             brief(
@@ -845,13 +873,53 @@ def test_decision_provenance(tmp_path: Path, text: str, expected: str | None) ->
 # --------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize(
+    ("script", "text", "gate"),
+    [
+        pytest.param(
+            "check_scope_split.py",
+            brief(
+                features=FEATURES,
+                plan_map=PLAN_MAP,
+                sketch_rows=F1_ROWS + "| F2 | IpamPrefix | prefix | status (stated) | VRF (one) | Infrahub | Network team | answer Q8 |\n",
+            ),
+            "scope-split-f1-only", id="scope-split",
+        ),
+        pytest.param(
+            "check_sketch_rows_complete.py",
+            brief(
+                features=WIFI_FEATURES,
+                sketch_rows=WIFI_ROWS.replace("open: O1", "Security").replace("| Controller export |", "| open: O1 |"),
+                open_items=WIFI_OPEN,
+                model_map=WIFI_MODEL_MAP,
+            ),
+            "unknown-owner-open", id="sketch-rows-complete",
+        ),
+    ],
+)
+def test_core_check_failure_zeroes_the_score(tmp_path: Path, script: str, text: str, gate: str) -> None:
+    """The check a task exists for cannot fail while the other checks carry the task past 0.8."""
+    write(tmp_path, BRIEF, text)
+    result = run_grader(script, tmp_path)
+    assert [c["name"] for c in result["checks"] if not c["passed"]] == [gate], result["details"]
+    assert result["score"] == 0.0, result["details"]
+
+
 def test_two_briefs_fail(tmp_path: Path) -> None:
     """A session writes one brief; two leave the grader unable to choose."""
     text = brief(sketch_rows=WIFI_ROWS, open_items=WIFI_OPEN)
     write(tmp_path, BRIEF, text)
-    write(tmp_path, EXISTING_BRIEF, text)
+    write(tmp_path, SECOND_BRIEF, text)
     result = run_grader("check_sketch_rows_complete.py", tmp_path)
     assert result["score"] == 0.0, result["details"]
+
+
+def test_brief_outside_docs_designs_fails(tmp_path: Path) -> None:
+    """The brief has one location, so a brief in the repository's own spec folder is not found."""
+    write(tmp_path, "dev/specs/oob-network/design-brief.md", brief(sketch_rows=WIFI_ROWS, open_items=WIFI_OPEN))
+    result = run_grader("check_sketch_rows_complete.py", tmp_path)
+    assert result["score"] == 0.0, result["details"]
+    assert "found instead: ['dev/specs/oob-network/design-brief.md']" in result["details"], result["details"]
 
 
 @pytest.mark.parametrize("script", sorted(p.name for p in GRADER_DIR.glob("check_*.py")))
@@ -1153,6 +1221,16 @@ def branch_brief(mechanisms: str = BRANCH_MECH) -> str:
             "the schema enforces uniqueness", id="near-miss-uniqueness-as-check",
         ),
         pytest.param(
+            branch_brief(BRANCH_MECH + "| F1 | VLAN per branch from a pool, so no two branches share one | resource pool | LocationBranch | a VLAN ID | a branch is added | no hand allocation |\n"),
+            None, id="compliant-vlan-pool-row-beside-the-constraint",
+        ),
+        pytest.param(
+            branch_brief(
+                BRANCH_MECH.replace("| schema constraint | Vlan |", "| resource pool | Vlan |")
+            ),
+            "the schema enforces uniqueness", id="near-miss-uniqueness-only-as-pool",
+        ),
+        pytest.param(
             branch_brief(BRANCH_MECH.replace("| generator | LocationBranch |", "| generator | the network team |")),
             "not driven by a node kind from the sketch", id="near-miss-generator-not-driven-by-sketch-kind",
         ),
@@ -1405,6 +1483,22 @@ def value_brief(value: str | None = DEFAULT_VALUE, features: str = FEATURES, **k
         pytest.param(
             value_brief("Value: Less duplicated operational work (recommended: one source of truth instead of a spreadsheet and phpIPAM)"),
             None, id="compliant-word-one-is-not-a-figure",
+        ),
+        pytest.param(
+            value_brief("Value: Lower change failure costs (recommended: duplicate L3VPN route distinguishers and IPv4 clashes)"),
+            None, id="compliant-network-names-are-not-figures",
+        ),
+        pytest.param(
+            value_brief("Value: Faster service delivery (recommended: answer Q2 and Q3)"),
+            None, id="compliant-several-answer-refs",
+        ),
+        pytest.param(
+            value_brief(VALUE_THREE, FEATURES_VALUE.replace("| Reduced engineering effort | Prefix", "| Reduced engineering effort for IPv4 | Prefix")),
+            None, id="compliant-network-name-in-value-cell",
+        ),
+        pytest.param(
+            value_brief("Value: Faster service delivery (recommended: orders 3x faster)"),
+            "gives a figure but is tagged recommended", id="near-miss-multiplier-figure",
         ),
         pytest.param(
             value_brief("Value: Reduced engineering effort (stated: saves 40 hours a month)"),

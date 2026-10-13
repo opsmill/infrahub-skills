@@ -20,12 +20,15 @@ from lib import check_open_item_for, run_checks  # noqa: E402
 SSID = re.compile(r"ssid", re.IGNORECASE)
 
 CHECK_NAMES = ["sketch-rows-complete", "unknown-owner-open", "model-map-matches", "open-items-name-features", "decision-provenance"]
+# The checks of the rules this task exists for. Each of them failing zeroes
+# the score; the others are neighbouring rules that only cost their share.
+GATE = ("sketch-rows-complete", "unknown-owner-open", "model-map-matches", "open-items-name-features")
 
 
 def main() -> None:
     workspace = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
     extra = {"unknown-owner-open": lambda ws: check_open_item_for(ws, SSID, "owner")}
-    print(json.dumps(run_checks(CHECK_NAMES, workspace, extra)))
+    print(json.dumps(run_checks(CHECK_NAMES, workspace, extra, gate=GATE)))
 
 
 if __name__ == "__main__":
