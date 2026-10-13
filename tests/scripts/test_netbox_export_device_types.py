@@ -1548,3 +1548,59 @@ def test_a_run_that_matches_nothing_leaves_the_previous_export_alone(tmp_path, t
     assert written == []
     assert (tmp_path / "device-types/APC/ap7901.yaml").exists()
     assert (tmp_path / "module-types/Juniper/EX9200-32XS.yaml").exists()
+
+
+# ---------------------------------------------------------------------------
+# Module-type profiles (NetBox 4.3+)
+# ---------------------------------------------------------------------------
+
+
+def _module_record(profile_name: str, attributes: dict):
+    """A module type as pynetbox really returns it, nested values as Records.
+
+    A plain mapping hides the trap: pynetbox turns `attributes` into a Record,
+    and `unwrap` collapses a Record to its `name`, so an attribute called
+    `name` would have replaced the whole object.
+    """
+    import pynetbox
+
+    api = pynetbox.api("http://127.0.0.1", token="t")
+    endpoint = api.dcim.module_types
+    return endpoint.return_obj(
+        {
+            **MODULE_TYPE,
+            "url": "http://127.0.0.1/api/dcim/module-types/1/",
+            "profile": {
+                "id": 3,
+                "url": "http://127.0.0.1/api/dcim/module-type-profiles/3/",
+                "display": profile_name,
+                "name": profile_name,
+            },
+            "attributes": attributes,
+        },
+        api,
+        endpoint,
+    )
+
+
+def test_a_library_profile_and_its_attribute_data_are_carried():
+    """The library format has both fields; dropping them lost real data."""
+    attributes = {"name": "psu-a", "input_current": "AC", "wattage": 320}
+
+    document, notes = build_document(
+        _module_record("Power supply", attributes), {}, is_module=True
+    )
+
+    assert document["profile"] == "Power supply"
+    assert document["attribute_data"] == attributes
+    assert not [n for n in notes if "profile" in n or "attributes" in n]
+
+
+def test_a_profile_the_library_does_not_define_is_reported_not_written():
+    """The library's `profile` is an enum; a custom profile would be invalid YAML."""
+    document, notes = build_document(
+        _module_record("Line card", {"slots": 4}), {}, is_module=True
+    )
+
+    assert "profile" not in document and "attribute_data" not in document
+    assert any("Line card" in n for n in notes)

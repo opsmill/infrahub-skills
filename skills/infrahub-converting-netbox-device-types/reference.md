@@ -85,8 +85,9 @@ a bare `requests.Session` and mounts nothing, so the
 default is `Retry(0)`. Both are wired in by the script,
 because a full `--in-use` run is on the order of a
 thousand requests and one blip would otherwise abort it.
-GET is retried three times with exponential backoff on
-429, 502, 503 and 504. A 500 and the other 4xx statuses
+GET is retried up to three times with exponential
+backoff on 429, 502, 503, 504 and a connection dropped
+before NetBox answered. A 500 and the other 4xx statuses
 are not: those answer the same way next time, and the
 export explains them instead.
 
@@ -103,6 +104,9 @@ Two bounds keep a retry from becoming its own outage:
   already struggling, and costs `--timeout` again for
   each attempt. The export reports it instead, and
   `--timeout` is the dial.
+
+Together these bound one request at about four times
+`--timeout` plus 90 seconds of waiting.
 
 NetBox 4.5 reshaped front ports: the singular
 `rear_port` / `rear_port_position` fields became a
@@ -140,6 +144,7 @@ version, and the export names which one it found.
 | `airflow: null`, `description: ""` | field omitted |
 | `rear_ports: [{position, rear_port: <pk>}]` | `port-mappings` naming both ports |
 | `rear_port: <pk>` + `rear_port_position` (pre-4.5) | the same `port-mappings`, read from the older shape |
+| module type `profile: {id, name, ...}` + `attributes: {...}` | `profile: <name>` + `attribute_data: {...}`, for a built-in profile |
 
 `is_full_depth: false` and `u_height: 0` are kept:
 absent and false are different things.
@@ -150,8 +155,9 @@ Six classes of note, on the same principle as the
 converter's coverage report:
 
 - **NetBox holds it, the library format has no field**
-  — module-type `attributes` and `profile`, a device
-  type's `default_platform`, `cooling_method`,
+  — a custom module-type profile (the library accepts
+  only NetBox's built-in profile names) with its
+  attribute data, a device type's `default_platform`, `cooling_method`,
   `end_of_life` or `tags`, a module bay's `enabled`,
   and the `front_image` / `rear_image` URLs, which the
   library format types as booleans asserting an image

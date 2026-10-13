@@ -168,27 +168,34 @@ and the next run's cleanup would then delete it.
 ## Query
 
 `scripts/materialize_module_ports.gql`, rooted at
-`DcimDevice` — `modules` and `module_bays` are extended
-onto the `DcimPhysicalDevice` generic while `name` and
+`DcimDevice`. `module_bays` is extended onto the
+`DcimPhysicalDevice` generic, while `name` and
 `interfaces` live on `DcimGenericDevice`, and
 `DcimDevice` inherits both.
 
+A device reaches its modules **through its bays**:
+`module_bays` → `installed_module`. schema-library v2
+has no device-side `modules` relationship, and
+selecting one fails the whole query with
+`Cannot query field 'modules' on type 'DcimDevice'`.
+Walking the bays also makes the position reliable,
+because the bay owns `position`.
+
 It fetches, per device: the device name and id, its
 existing interface names and descriptions (for the
-collision check), its installed modules, each module's
-`module_bay.position`, and each module's ports with
+collision check), each bay's name and `position`, the
+module installed in it, and that module's ports with
 `name`, `category`, `mgmt_only`, `port_type`, and
 `maximum_draw`.
 
 ### Unions and inline fragments
 
-`device.modules` peers the **generic**
+`installed_module` peers the **generic**
 `DcimGenericModule`, so the node type is a GraphQL
 interface. Everything the generator needs is declared
-on that generic — `serial_number` and `description` on
-the generic itself, `ports` and `module_bay` extended
-onto it by `module_port.yml` and `module_bay.yml` —
-which is why they select directly.
+on that generic: `serial_number` on the generic itself,
+and `ports` extended onto it by `module_port.yml`. That
+is why they select directly.
 
 Fields living only on a **concrete** module kind need
 an inline fragment. Selecting one on the interface

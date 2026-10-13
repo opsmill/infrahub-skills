@@ -242,6 +242,13 @@ REQUIRED_DEVICE_TYPE_FIELDS: tuple[str, ...] = (
 #: Fields the library schema requires of a module type.
 REQUIRED_MODULE_TYPE_FIELDS: tuple[str, ...] = ("manufacturer", "model")
 
+#: The module-type profiles the library format accepts: its `profile` field is
+#: an enum of NetBox's built-in profile names. A custom profile cannot be
+#: written without making the file invalid, so it is reported instead.
+LIBRARY_MODULE_PROFILES = frozenset(
+    {"CPU", "Fan", "GPU", "Hard disk", "Memory", "Power supply", "Expansion card"}
+)
+
 #: Fields that are numeric in the library format. NetBox may serialize a
 #: DecimalField as a string, which YAML would then quote.
 NUMERIC_FIELDS = frozenset(
@@ -356,8 +363,11 @@ def _build_retry() -> Any:
     Returns:
         A ``Retry`` whose sleeps total at most
         ``RETRY_ATTEMPTS * RETRY_AFTER_CAP`` seconds, rather than running for
-        as long as a server asks. An unreachable host is bounded separately,
-        by ``--timeout`` per attempt.
+        as long as a server asks. That bounds the waiting, not the request:
+        each of the ``RETRY_ATTEMPTS + 1`` attempts can also take up to
+        ``--timeout``, so one request's worst case is about
+        ``(RETRY_ATTEMPTS + 1) * timeout + RETRY_ATTEMPTS * RETRY_AFTER_CAP``,
+        4 x ``--timeout`` + 90 seconds with the defaults.
     """
     return _bounded_retry_class()(
         total=RETRY_ATTEMPTS,
@@ -916,7 +926,12 @@ def build_document(
     """
     fields = MODULE_TYPE_FIELDS if is_module else DEVICE_TYPE_FIELDS
     document = carry_fields(source, fields)
-    notes = carry_components(document, components, is_module=is_module)
+    notes: list[str] = []
+    carried_elsewhere: frozenset[str] = frozenset()
+    if is_module:
+        carried_elsewhere, profile_notes = carry_module_profile(source, document)
+        notes.extend(profile_notes)
+    notes.extend(carry_components(document, components, is_module=is_module))
 
     mappings = port_mappings(
         components.get("front-ports") or [], components.get("rear-ports") or []
@@ -924,7 +939,7 @@ def build_document(
     if mappings:
         document["port-mappings"] = mappings
 
-    lost = unmapped_fields(source, document)
+    lost = unmapped_fields(source, document, carried_elsewhere)
     if lost:
         notes.append(
             f"NetBox holds {', '.join(lost)}, which the library format has no "
@@ -939,6 +954,41 @@ def build_document(
             f"unset in NetBox but required by the library schema: {', '.join(absent)}"
         )
     return document, notes
+
+
+def carry_module_profile(
+    source: Any, document: dict[str, Any]
+) -> tuple[frozenset[str], list[str]]:
+    """Carry a module type's profile and its attribute data (NetBox 4.3+).
+
+    NetBox sends the profile as a nested object and the data as
+    ``attributes``; the library format names them ``profile`` and
+    ``attribute_data``. The data is copied whole rather than through
+    ``unwrap``: pynetbox turns ``attributes`` into a ``Record``, and ``unwrap``
+    collapses a record to its ``name``, which for a profile with a ``name``
+    attribute would have replaced the whole object with one string.
+
+    Args:
+        source: The module-type object from the API.
+        document: The document being assembled, modified in place.
+
+    Returns:
+        ``(carried, notes)``: the API field names now carried, so they are not
+        reported as lost, and a note for a profile the library cannot hold.
+    """
+    profile = unwrap(field(source, "profile"))
+    if not is_present(profile):
+        return frozenset(), []
+    if profile not in LIBRARY_MODULE_PROFILES:
+        return frozenset(), [
+            f"profile {profile!r} is not one of the library's module-type profiles, "
+            "so it and its attribute data were not written"
+        ]
+    document["profile"] = profile
+    attributes = field(source, "attributes")
+    if attributes:
+        document["attribute_data"] = dict(attributes)
+    return frozenset({"profile", "attributes"}), []
 
 
 def back_fill_legacy_front_ports(
