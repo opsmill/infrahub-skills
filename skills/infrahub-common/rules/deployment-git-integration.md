@@ -167,10 +167,12 @@ services:
   `CoreReadOnlyRepository` does not pick up new
   commits on its own. Run
   `InfrahubReadOnlyRepositoryImportLastCommit`
-  (Infrahub 1.8+), or set its `commit` to the new SHA.
-  An update only re-imports when the value changes, so
-  re-saving the same `ref` does nothing. There is no
-  need to delete and re-create the registration
+  (Infrahub 1.8+, see
+  [testing-commands.md](../../infrahub-managing-transforms/rules/testing-commands.md#read-only-repos-dont-auto-pull-on-push)),
+  or set its `commit` to the new SHA. An update only
+  re-imports when the value changes, so re-saving the
+  same `ref` does nothing. There is no need to delete
+  and re-create the registration
 - **Treating `ok: true` as "imported"**: the mutation
   returns when the import is *dispatched*, not when it
   finishes. Confirm by checking the repository's
