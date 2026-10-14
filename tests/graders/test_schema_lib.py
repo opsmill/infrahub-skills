@@ -1330,6 +1330,14 @@ class TestCheckOnDeleteCascadePresent:
             "MonitorHealthCheck, ServiceLBHealthCheck",
         )
 
+    def test_task_grader_scores_omitted_on_delete_one(self, tmp_path):
+        path = tmp_path / "output.yml"
+        path.write_text(
+            _VIP_COMPLIANT.replace(_HC_REL, _HC_REL.removesuffix("\n        on_delete: cascade"))
+        )
+        result = run_checks(_SERVICE_CASCADE_CHECKS, path)
+        assert result["score"] == 1.0, result
+
 
 def _with_monitor_decoy(schema: dict) -> dict:
     """Add ServiceLBMonitorHealthCheck and a Component cascade to it on the VIP."""
@@ -1351,11 +1359,3 @@ def _with_monitor_decoy(schema: dict) -> dict:
         }
     )
     return schema
-
-    def test_task_grader_scores_omitted_on_delete_one(self, tmp_path):
-        path = tmp_path / "output.yml"
-        path.write_text(
-            _VIP_COMPLIANT.replace(_HC_REL, _HC_REL.removesuffix("\n        on_delete: cascade"))
-        )
-        result = run_checks(_SERVICE_CASCADE_CHECKS, path)
-        assert result["score"] == 1.0, result
