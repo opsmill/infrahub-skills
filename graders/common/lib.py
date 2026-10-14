@@ -287,15 +287,46 @@ def _blank_spans(piece: str, quotes: str) -> str:
     return piece
 
 
-def _unquote_single(piece: str) -> str:
-    """Blank out single-quoted text, which the shell never expands.
+def _in_command_position(piece: str) -> bool:
+    """Whether a substitution is the command itself: `$(command -v echo) ...`.
 
-    Unless the piece runs that text in an inner shell (`sh -c '...'`,
-    `eval`, `ssh host '...'`), which does expand it.
+    Its output is unknown, so the piece counts as printing and as a shell.
     """
-    if _runs_inner_shell(piece):
-        return piece
-    return _blank_spans(piece, "'")
+    return piece.lstrip().startswith("$(")
+
+
+def _runs_as_code(piece: str, outer: str) -> bool:
+    """Whether the piece runs its quoted text, or its substitutions' output, as code.
+
+    `bash <(echo '...')`, `source <(...)` and `eval "$(...)"` run what the
+    substitution prints, so single quotes inside it protect nothing.
+    """
+    if _in_command_position(piece) or _runs_inner_shell(outer):
+        return True
+    try:
+        tokens = shlex.split(outer)
+    except ValueError:
+        return True
+    return bool(tokens) and tokens[0].rsplit("/", 1)[-1] in _SHELLS | {"source", "."}
+
+
+def _expanded_values(piece: str, raw: bool) -> set[str]:
+    """Token values the piece expands, its nested substitutions included.
+
+    Single-quoted text is blanked unless ``raw`` is set or the piece runs it
+    as code. A piece whose parentheses do not balance is read whole.
+    """
+    split = _split_substitutions(piece)
+    if split is None:
+        return {m.group(0) for m in _TOKEN_VALUE.finditer(piece)}
+    outer, inner = split
+    runs = raw or _runs_as_code(piece, outer)
+    text = outer if runs else _blank_spans(outer, "'")
+    values = {m.group(0) for m in _TOKEN_VALUE.finditer(text)}
+    for body in inner:
+        for _, sub in _command_pieces(body):
+            values |= _expanded_values(sub, runs)
+    return values
 
 
 def _command_pieces(text: str) -> list[tuple[int, str]]:
@@ -350,31 +381,27 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
         for m in _TOKEN_FALLBACK.finditer(text)
         if not _is_negated(text, m.start())
     }
-    pending = list(_command_pieces(text))
+    # Each pending piece carries whether an enclosing command runs its
+    # output as code, which makes its single-quoted text live.
+    pending = [(start, piece, False) for start, piece in _command_pieces(text)]
     while pending:
-        start, piece = pending.pop()
+        start, piece, raw = pending.pop()
         if _is_negated(text, start):
             continue
         split = _split_substitutions(piece)
-        if split is None:
-            outer, inner_pieces = piece, []
-        else:
-            outer, inner = split
-            inner_pieces = [p for body in inner for _, p in _command_pieces(body)]
-            pending.extend((start, p) for p in inner_pieces)
+        outer = piece if split is None else split[0]
+        if split is not None:
+            runs = raw or _runs_as_code(piece, outer)
+            pending.extend(
+                (start, sub, runs) for body in split[1] for _, sub in _command_pieces(body)
+            )
         # Only the piece's own text decides whether it prints: a `printf`
         # inside a substitution prints into the argument, not to stdout.
-        if not _PRINTS_TO_STDOUT.search(outer):
+        if not (_PRINTS_TO_STDOUT.search(outer) or _in_command_position(piece)):
             continue
-        if split is not None:
-            outer = _unquote_single(outer)
-        offenders.update(m.group(0) for m in _TOKEN_VALUE.finditer(outer))
         # A substitution's output becomes an argument of this print, so a
         # value it expands is printed even when its own command does not print.
-        for inner_piece in inner_pieces:
-            offenders.update(
-                m.group(0) for m in _TOKEN_VALUE.finditer(_unquote_single(inner_piece))
-            )
+        offenders.update(_expanded_values(piece, raw))
     if offenders:
         return False, (
             f"expansion(s) that print the token's value: {sorted(offenders)}; "

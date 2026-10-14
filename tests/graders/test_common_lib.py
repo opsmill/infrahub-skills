@@ -102,6 +102,30 @@ TOKEN_LEAKS = [
         'Run `echo $(cat <<< "$INFRAHUB_API_TOKEN")`.',
         id="value-in-unquoted-substitution-printed-by-outer-echo",
     ),
+    # A command that runs a substitution's output as code expands what the
+    # single quotes inside it protected.
+    pytest.param(
+        "Run `bash <(echo 'echo $INFRAHUB_API_TOKEN')`.",
+        id="shell-runs-process-substitution-output",
+    ),
+    pytest.param(
+        "Run `source <(printf 'echo $INFRAHUB_API_TOKEN')`.",
+        id="source-runs-process-substitution-output",
+    ),
+    pytest.param(
+        """Run `eval "$(printf 'echo %s' '$INFRAHUB_API_TOKEN')"`.""",
+        id="eval-runs-command-substitution-output",
+    ),
+    # An inner shell one substitution further down still runs.
+    pytest.param(
+        "Run `echo $(cat <(sh -c 'cat <<< $INFRAHUB_API_TOKEN'))`.",
+        id="inner-shell-in-nested-substitution",
+    ),
+    # A substitution in command position can be any command, including echo.
+    pytest.param(
+        'Run `$(command -v echo) "$INFRAHUB_API_TOKEN"`.',
+        id="substitution-in-command-position",
+    ),
 ]
 
 
@@ -159,6 +183,16 @@ TOKEN_SAFE = [
     pytest.param(
         'Run `curl -H "Authorization: Bearer $INFRAHUB_API_TOKEN" "$(printf %s https://x)"`.',
         id="printf-only-inside-a-substitution",
+    ),
+    # The near-misses for the leaks above: a substitution whose output is only
+    # printed, not run, keeps its single-quoted text literal.
+    pytest.param(
+        """Run `echo "$(printf '%s' 'literal $INFRAHUB_API_TOKEN')"`.""",
+        id="single-quoted-literal-inside-a-printed-substitution",
+    ),
+    pytest.param(
+        "Run `$(command -v infrahubctl) info`.",
+        id="substitution-in-command-position-without-the-token",
     ),
 ]
 
