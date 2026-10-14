@@ -163,7 +163,8 @@ skill for each artifact builds it from the brief.
      source of truth and an owner, or an open item, and
      you can predict the answers to your next three
      questions. At about 25 questions, turn the
-     remaining guesses into open items.
+     remaining `(guess)` and `(open)` cells into open
+     items (`open: O<n>`).
 7. **Walk one scenario through the model, then restate
    and confirm.** Take one lifecycle event from the
    service layer (an order, a change, a decommission) and

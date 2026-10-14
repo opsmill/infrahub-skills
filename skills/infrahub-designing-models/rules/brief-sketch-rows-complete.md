@@ -15,8 +15,8 @@ in `## Open items` with who might own the answer.
 
 `TBD`, `?`, `unknown`, `-`, a bare `open`, a value
 still marked `(guess)` or `(open)` from the draft, and a value you
-made up all fail. A guess either gets confirmed or
-becomes an open item. Every row's `Evidence` names
+made up all fail. A `(guess)` or `(open)` cell either
+gets confirmed or becomes an open item (`open: O<n>`). Every row's `Evidence` names
 where its facts came from (a file and column, an answer,
 the reference design), so a row nobody asked for is
 visible. A user who asks for no open items still gets
