@@ -158,6 +158,26 @@ trial the model read the schema and left the field out. Its
 reasoning still showed the false belief the rule corrects,
 that the SDK rejects the field rather than dropping it, but
 the grader reads code, not reasoning.
+
+The bullet's second claim, that a non-empty `data` makes
+`create()` ignore every keyword field, was measured on its
+own, because that reason does not apply to it: every field
+is valid, so a task can show the schema without giving the
+answer away. Two scenarios, three trials, all 1.00, with the
+skill read, the claim removed from it, and the task graded by
+`check_create_fields_exist_on_kind`. Both scenarios gave an
+existing generator that builds a base `data` dict per
+interface. In the first the user asks for an mtu on every
+interface (2 trials); in the second the user asks for an
+`mtu=` argument on each `create()` call (1 trial).
+
+When the existing code passes its fields through `data`,
+adding the new one to that dict is the edit the model makes,
+and it did so in every trial. In one trial it also said,
+unasked, that keywords next to `data` are dropped. Asked for
+the keyword, it read `create()` in the installed SDK, found
+`data or kwargs`, and put the field in `data` instead.
+
 `check_create_fields_exist_on_kind` and its fixtures stay in
 `tests/graders/test_generators_create_fields.py`, guarding
 the check.

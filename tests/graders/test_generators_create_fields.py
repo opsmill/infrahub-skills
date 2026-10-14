@@ -6,10 +6,10 @@ every create() call, resolves its kind and its fields, and compares them with
 graders/managing-generators/fixtures/create_fields_interfaces_schema.yml.
 
 These tests guard the check, not the skill's prose. No eval task runs the
-check: every task that gives the model the schema also hands it the answer,
-so the rule took the carve-out in dev/guidelines/rule-equals-test.md
-§ "When no task can score the rule". The check and these fixtures are what a
-future task would wire.
+check: no task tried made a model break either claim of the rule, so it took
+the carve-out in dev/guidelines/rule-equals-test.md § "When no task can score
+the rule", where the #193 entry records the measurements. The check and these
+fixtures are what a future task would wire.
 
 The four fixtures under fixtures/managing-generators/create-fields-match-kind/
 are the compliant, compliant variant, violating, and violating near-miss
