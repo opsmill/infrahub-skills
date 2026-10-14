@@ -17,7 +17,9 @@ ancestor of `HEAD`, and it does at least one of:
   closes issue N of another repository does not count);
 * names `#N` as a whole token in its title or body (`#25`, not `#250`,
   `#25abc` or `#25_old`);
-* changes a file under one of the `--target` path prefixes.
+* changes a file under one of the `--target` path prefixes. A target may be
+  relative to the current directory or absolute; it is matched as a path
+  relative to the repository root, the form GitHub lists files in.
 
 Closed, unmerged PRs are never printed. Each match is one line,
 `#<number>\\t<state>\\t<branch>\\t<title>\\tmatched: <reason>`, where the
@@ -43,7 +45,8 @@ Exit codes
   0  The search ran. Matches, if any, are on stdout; no output means none.
   1  The search did not complete (`gh` or `git` failed, returned data this
      script could not read, the checkout is shallow, or an argument was
-     wrong, such as `--issue "#42"` instead of `--issue 42`).
+     wrong: `--issue "#42"` instead of `--issue 42`, an empty `--target`,
+     a target outside the repository, or neither option given).
      `SEARCH FAILED: <reason>` is on stderr.
      Never record this as "none found".
 """
@@ -52,6 +55,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess  # noqa: S404
 import sys
@@ -191,6 +195,35 @@ def search(issue: int | None, targets: list[str]) -> list[str]:
     return lines
 
 
+def repo_relative(targets: list[str]) -> list[str]:
+    """Each target as a path relative to the repository root, as GitHub lists files.
+
+    `./skills/x/` and an absolute path name the same files as `skills/x/`, but
+    would never match a PR file. An empty target, as an unset shell variable
+    leaves, and a path outside the repository are errors, not dropped.
+    """
+    top = _run_git("rev-parse", "--show-toplevel")
+    if top.returncode != 0:
+        raise SearchFailed("not inside a git checkout")
+    root = os.path.realpath(top.stdout.strip())
+    cwd = os.path.realpath(os.getcwd())
+    relative = []
+    for target in targets:
+        if not target.strip():
+            raise SearchFailed("an empty --target was given, such as an unset variable")
+        path = os.path.normpath(os.path.join(cwd, target))
+        if os.path.commonpath([root, path]) != root:
+            path = os.path.realpath(path)
+        if os.path.commonpath([root, path]) != root:
+            raise SearchFailed(f"--target {target} is outside the repository {root}")
+        rel = os.path.relpath(path, root).replace(os.sep, "/")
+        rel = "" if rel == "." else rel
+        if target.endswith(("/", os.sep)) and rel:
+            rel += "/"
+        relative.append(rel)
+    return relative
+
+
 class _Parser(argparse.ArgumentParser):
     """Report a wrong argument as SEARCH FAILED and exit 1, not argparse's 2."""
 
@@ -211,9 +244,10 @@ def main(argv: list[str] | None = None) -> int:
         help="path prefix the change touches; repeat for several",
     )
     args = parser.parse_args(argv)
-    targets = [t for t in args.target if t]
+    if args.issue is None and not args.target:
+        parser.error("give --issue, --target, or both")
     try:
-        lines = search(args.issue, targets)
+        lines = search(args.issue, repo_relative(args.target))
     except (SearchFailed, OSError, ValueError, KeyError, TypeError) as exc:
         print(f"SEARCH FAILED: {exc}. Nothing was searched.", file=sys.stderr)
         return 1

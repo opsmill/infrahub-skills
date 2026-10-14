@@ -454,3 +454,39 @@ def test_search_fails_loudly_in_a_shallow_clone(tmp_path: Path) -> None:
     """
     result = _execute(tmp_path, "25", "", shallow=True)
     _assert_fails_loudly(result, "the checkout is shallow")
+
+
+@pytest.mark.parametrize(
+    "raw_args",
+    [
+        pytest.param(("--target", ""), id="empty-target-alone"),
+        pytest.param(("--issue", "25", "--target", ""), id="empty-target-with-issue"),
+        pytest.param((), id="no-issue-no-target"),
+        pytest.param(("--target", "/elsewhere/skills/"), id="target-outside-repo"),
+    ],
+)
+def test_search_fails_loudly_on_a_target_that_searches_nothing(
+    tmp_path: Path, raw_args: tuple[str, ...]
+) -> None:
+    """A target that cannot match is SEARCH FAILED, not `none found`.
+
+    An unset shell variable passes `--target ""`; dropping it silently, with
+    no `--issue`, searches nothing and still exits 0.
+    """
+    result = _execute(tmp_path, "", "", raw_args=raw_args)
+    _assert_fails_loudly(result, "the arguments searched nothing")
+
+
+@pytest.mark.parametrize(
+    "target",
+    ["./skills/infrahub-managing-menus/", "{repo}/skills/infrahub-managing-menus/"],
+    ids=["dot-slash", "absolute"],
+)
+def test_search_matches_targets_written_relative_or_absolute(
+    tmp_path: Path, target: str
+) -> None:
+    """GitHub lists repo-relative paths, so `./x/` and `/abs/repo/x/` mean `x/`."""
+    target = target.format(repo=tmp_path / "repo")
+    result = _execute(tmp_path, "", "", raw_args=("--target", target))
+    assert result.returncode == 0, result.stderr
+    assert {int(m) for m in re.findall(r"^#(\d+)\b", result.stdout, re.M)} == {203}

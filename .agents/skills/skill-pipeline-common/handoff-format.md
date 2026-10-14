@@ -120,13 +120,17 @@ uv run python .agents/skills/skill-pipeline-common/scripts/find_existing_prs.py 
 ```
 
 `--issue` takes the bare number, `42`, not `#42`. Leave out `--issue` when
-there is no issue number, and `--target` when no files are named yet. It
-prints one line per open PR, and per merged PR whose merge commit is not in
-`HEAD` yet, that closes the issue, names `#<issue>` in its title or body, or
-changes a file under a target. The last column says what matched: `issue`,
-`files`, or both. Closed, unmerged PRs are left out. The search reads every
-PR, not the newest page, and the full file list of large PRs; the script's
-docstring states exactly what it checks.
+there is no issue number, and `--target` when no files are named yet, but
+give at least one of them. Write each target in full rather than from a
+shell variable set in an earlier Bash call: an empty `--target` fails the
+search.
+
+It prints one line per open PR, and per merged PR whose merge commit is not
+in `HEAD` yet, that closes the issue, names `#<issue>` in its title or body,
+or changes a file under a target. The last column says what matched:
+`issue`, `files`, or both. Closed, unmerged PRs are left out. The search
+reads every PR, not the newest page, and the full file list of large PRs;
+the script's docstring states exactly what it checks.
 
 No output and exit status 0: record `Duplicate check: none found` and
 continue.
