@@ -226,6 +226,52 @@ def test_skipping_one_kind_fails():
             id="kind-from-attribute-of-a-non-protocols-module",
         ),
         pytest.param(
+            "import consts.sub\n"
+            "async def generate(self, device, lag):\n"
+            "    await self.client.create(kind=consts.sub.VIRTUAL, name='lo0', device=device, lag=lag)\n",
+            "cannot read the kind",
+            id="kind-from-dotted-path-of-a-non-protocols-module",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    await self.client.create(kind=lib.protocols.DcimDevice, name='lo0')\n",
+            "cannot read the kind",
+            id="kind-from-dotted-path-with-unbound-root",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    await self.client.create(kind=self.protocols.DcimDevice, name='lo0')\n",
+            "cannot read the kind",
+            id="kind-from-dotted-path-rooted-at-a-parameter",
+        ),
+        pytest.param(
+            "import protocols.consts as c\n"
+            "async def generate(self, device, lag):\n"
+            "    await self.client.create(kind=c.DcimDevice, name='lo0')\n",
+            "cannot read the kind",
+            id="kind-from-a-module-inside-a-protocols-package",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    try:\n"
+            "        pass\n"
+            "    except Exception as payload:\n"
+            "        await self.client.create(kind='DcimVirtualInterface', data=payload)\n",
+            "cannot read the DcimVirtualInterface fields from payload, bound by an except clause",
+            id="data-from-except-name-inside-the-handler",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    def helper():\n"
+            "        nonlocal payload\n"
+            "        payload = {'name': 'lo0', 'lag': lag}\n"
+            "    await self.client.create(kind='DcimVirtualInterface', data=payload)\n",
+            "cannot read the DcimVirtualInterface fields from payload, bound by a global or nonlocal statement",
+            id="data-rebound-through-nonlocal",
+        ),
+        pytest.param(
             "async def generate(self, device, lag):\n"
             "    extra = {'data': {'name': 'lo0', 'lag': lag}}\n"
             "    await self.client.create(kind='DcimVirtualInterface', name='lo0', **extra)\n",
@@ -315,6 +361,16 @@ def test_unknown_field_reached_another_way_fails(body):
         pytest.param(
             "from .protocols import DcimVirtualInterface as Virtual\n", "Virtual", id="aliased-protocol-import"
         ),
+        pytest.param(
+            "from .schema_protocols import DcimVirtualInterface as Virtual\n",
+            "Virtual",
+            id="aliased-schema-protocols-import",
+        ),
+        pytest.param(
+            "from infrahub_sdk.protocols import DcimVirtualInterface as Virtual\n",
+            "Virtual",
+            id="aliased-sdk-protocols-import",
+        ),
     ],
 )
 def test_kind_bound_at_module_level_is_resolved(header, kind):
@@ -339,6 +395,35 @@ def test_kind_bound_at_module_level_passes_when_fields_match():
         + "    await self.client.create(kind=VIRTUAL, name='lo0', device=device)\n"
         "    await self.client.create(kind=DcimLagInterface, name='po1', members=[])\n"
         "    await self.client.create(kind=p.DcimLagInterface, name='po2', members=[])\n"
+    )
+    assert ok, msg
+
+
+@pytest.mark.parametrize(
+    "header, kind",
+    [
+        pytest.param("from .schema_protocols import DcimDevice\n", "DcimDevice", id="schema-protocols-import"),
+        pytest.param("import schema_protocols as sp\n", "sp.DcimDevice", id="schema-protocols-module-alias"),
+        pytest.param("from . import schema_protocols as sp\n", "sp.DcimDevice", id="schema-protocols-relative-module"),
+        pytest.param("from app import schema_protocols\n", "schema_protocols.DcimDevice", id="schema-protocols-module"),
+        pytest.param(
+            "import infrahub_sdk.protocols\n",
+            "infrahub_sdk.protocols.CoreStandardGroup",
+            id="sdk-protocols-dotted-path",
+        ),
+        pytest.param(
+            "import app.schema_protocols as sp\n", "sp.DcimDevice", id="dotted-schema-protocols-module-alias"
+        ),
+    ],
+)
+def test_protocol_kind_outside_the_schema_passes(header, kind):
+    """The file ``infrahubctl protocols`` writes by default is ``schema_protocols.py``."""
+    ok, msg = _run(
+        header
+        + "async def generate(self, device, lag):\n"
+        + _PHYSICAL
+        + "    await self.client.create(kind='DcimVirtualInterface', name='lo0', device=device)\n"
+        + f"    await self.client.create(kind={kind}, name='leaf1')\n"
     )
     assert ok, msg
 
@@ -494,6 +579,42 @@ def test_comprehension_target_does_not_rebind_the_function():
         "    kind = 'DcimVirtualInterface'\n"
         "    names = [payload['name'] for payload in rows]\n"
         "    kinds = {kind for kind in rows}\n"
+        "    await self.client.create(kind=kind, data=payload)\n"
+    )
+    assert ok, msg
+
+
+def test_except_name_does_not_outlive_its_handler():
+    """Python deletes an ``except ... as`` name when the handler ends."""
+    ok, msg = _run(
+        "async def generate(self, device, lag):\n"
+        + _PHYSICAL
+        + "    try:\n"
+        "        pass\n"
+        "    except Exception as payload:\n"
+        "        log(payload)\n"
+        "    except ValueError as kind:\n"
+        "        log(kind)\n"
+        "    payload = {'name': 'lo0', 'device': device}\n"
+        "    kind = 'DcimVirtualInterface'\n"
+        "    await self.client.create(kind=kind, data=payload)\n"
+    )
+    assert ok, msg
+
+
+def test_nested_function_local_does_not_rebind_the_function():
+    """An assignment inside a nested def or class is local to it."""
+    ok, msg = _run(
+        "async def generate(self, device, lag):\n"
+        + _PHYSICAL
+        + "    payload = {'name': 'lo0', 'device': device}\n"
+        "    kind = 'DcimVirtualInterface'\n"
+        "    def helper():\n"
+        "        payload = {'name': 'lo0', 'lag': lag}\n"
+        "        kind = 'DcimPhysicalInterface'\n"
+        "        return payload, kind\n"
+        "    class Defaults:\n"
+        "        payload = {'lag': lag}\n"
         "    await self.client.create(kind=kind, data=payload)\n"
     )
     assert ok, msg

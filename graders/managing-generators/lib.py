@@ -2584,11 +2584,17 @@ class _Unreadable:
 
 
 class _Imported:
-    """A name bound by an import: ``original`` from ``module`` (None for ``import x``)."""
+    """A name bound by an import: ``original`` from ``module`` (None for ``import x``).
 
-    def __init__(self, original: str, module: str | None, at: ast.AST) -> None:
+    ``path`` is the dotted path the bound name stands for: ``a`` for
+    ``import a.b``, ``a.b`` for ``import a.b as p``, ``x.y`` for
+    ``from x import y``.
+    """
+
+    def __init__(self, original: str, module: str | None, path: str, at: ast.AST) -> None:
         self.original = original
         self.module = module
+        self.path = path
         self.at = at
         self.lineno = at.lineno
         self.col_offset = at.col_offset
@@ -2598,11 +2604,8 @@ def _binds(target: ast.AST, name: str) -> bool:
     return any(isinstance(n, ast.Name) and n.id == name for n in ast.walk(target))
 
 
-def _walk_scope(scope: ast.AST, nested: bool) -> Iterator[ast.AST]:
-    """Walk ``scope``; with ``nested`` False, skip the bodies of inner functions and classes."""
-    if nested:
-        yield from ast.walk(scope)
-        return
+def _walk_scope(scope: ast.AST) -> Iterator[ast.AST]:
+    """Walk ``scope``, skipping the bodies of inner functions, classes and lambdas."""
     todo = [scope]
     while todo:
         node = todo.pop()
@@ -2619,16 +2622,24 @@ def _name_bindings(
 ) -> list[Any]:
     """Every value bound to the bare name ``name`` within ``scope``.
 
-    A comprehension's target is local to it, so it counts only when ``use``
-    (the call reading the name) sits inside that comprehension, or when no
-    ``use`` is given.
+    A comprehension's target is local to it, and Python deletes an
+    ``except ... as`` name when its handler ends, so each counts only when
+    ``use`` (the call reading the name) sits inside that comprehension or
+    handler, or when no ``use`` is given. A name assigned inside a nested
+    def or class is local to it; with ``nested`` True, a ``nonlocal`` or
+    ``global`` statement for the name in one still counts.
 
     A binding the check can read yields its value expression. Any other
     binding yields an ``_Unreadable`` or ``_Imported`` marker, so a name is
     never treated as unbound while something rebinds it.
     """
     values: list[Any] = []
-    for node in _walk_scope(scope, nested):
+    if nested:
+        direct = {id(n) for n in _walk_scope(scope)}
+        for node in ast.walk(scope):
+            if isinstance(node, (ast.Global, ast.Nonlocal)) and id(node) not in direct and name in node.names:
+                values.append(_Unreadable(name, "a global or nonlocal statement", node))
+    for node in _walk_scope(scope):
         if isinstance(node, ast.Assign):
             for t in node.targets:
                 if isinstance(t, ast.Name) and t.id == name:
@@ -2659,14 +2670,20 @@ def _name_bindings(
             if node.rest == name:
                 values.append(_Unreadable(name, "a match pattern", node))
         elif isinstance(node, ast.ExceptHandler):
-            if node.name == name:
+            inside = use is None or any(n is use for n in ast.walk(node))
+            if inside and node.name == name:
                 values.append(_Unreadable(name, "an except clause", node))
         elif isinstance(node, (ast.Import, ast.ImportFrom)):
             for alias in node.names:
                 bound = alias.asname or alias.name.split(".")[0]
                 if bound == name:
-                    module = node.module if isinstance(node, ast.ImportFrom) else None
-                    values.append(_Imported(alias.name, module, node))
+                    if isinstance(node, ast.ImportFrom):
+                        module = node.module
+                        path = f"{module}.{alias.name}" if module else alias.name
+                    else:
+                        module = None
+                        path = alias.name if alias.asname else bound
+                    values.append(_Imported(alias.name, module, path, node))
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node is not scope:
             if node.name == name:
                 values.append(node)
@@ -2691,8 +2708,12 @@ def _module_bindings(name: str, tree: ast.Module, use: ast.AST | None = None) ->
 
 
 def _is_protocols_module(module: str | None) -> bool:
-    """True for the module ``infrahubctl protocols`` writes, by its usual name."""
-    return module is not None and module.split(".")[-1] == "protocols"
+    """True for a module whose last segment ends in ``protocols``.
+
+    That covers ``infrahub_sdk.protocols`` and the file ``infrahubctl
+    protocols`` writes, ``schema_protocols.py`` by default.
+    """
+    return module is not None and module.split(".")[-1].endswith("protocols")
 
 
 def _bindings_in_reach(name: str, scope: ast.AST, tree: ast.Module, use: ast.AST) -> list[Any]:
@@ -2715,12 +2736,17 @@ def _kind_from_binding(binding: Any, kinds: dict[str, set[str]]) -> str | None:
     return None
 
 
-def _is_protocols_import(binding: Any) -> bool:
-    """True for ``import x.protocols as p`` or ``from x import protocols``."""
-    if not isinstance(binding, _Imported):
-        return False
-    path = binding.original if binding.module is None else f"{binding.module}.{binding.original}"
-    return _is_protocols_module(path)
+def _attribute_chain(node: ast.Attribute) -> list[str] | None:
+    """``["a", "b", "C"]`` for ``a.b.C``, or None when the chain does not start at a name."""
+    parts: list[str] = []
+    current: ast.AST = node
+    while isinstance(current, ast.Attribute):
+        parts.append(current.attr)
+        current = current.value
+    if not isinstance(current, ast.Name):
+        return None
+    parts.append(current.id)
+    return parts[::-1]
 
 
 def _resolve_create_kind(
@@ -2730,7 +2756,8 @@ def _resolve_create_kind(
 
     The kind comes from ``kind=`` or the first positional argument: a string
     literal, a protocol class (``DcimVirtualInterface``, an alias imported
-    from a ``protocols`` module, or ``protocols.DcimVirtualInterface``), or a
+    from a module ending in ``protocols``, or an attribute of such a module:
+    ``sp.DcimDevice``, ``infrahub_sdk.protocols.CoreStandardGroup``), or a
     name bound only to one string literal, in the function or else at module
     level. ``resolved`` is False when the kind cannot be read, which the
     caller treats as a failure rather than a pass: an unbound name, a name
@@ -2747,9 +2774,13 @@ def _resolve_create_kind(
     if isinstance(node, ast.Attribute):
         if node.attr in kinds:
             return node.attr, True
-        if isinstance(node.value, ast.Name):
-            module = _bindings_in_reach(node.value.id, scope, tree, call)
-            if module and all(_is_protocols_import(b) for b in module):
+        chain = _attribute_chain(node)
+        if chain is not None:
+            module = _bindings_in_reach(chain[0], scope, tree, call)
+            if module and all(
+                isinstance(b, _Imported) and _is_protocols_module(".".join([b.path, *chain[1:-1]]))
+                for b in module
+            ):
                 return node.attr, True
         return None, False
     if isinstance(node, ast.Name):
