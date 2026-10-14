@@ -220,8 +220,8 @@ def _runs_inner_shell(piece: str) -> bool:
     Read from shell tokens, after quote removal, so `bash '-c' '...'` counts
     and `echo 'su x -c ...'` does not. A shell word printed by `echo` or
     `printf` is an argument, not a command. Fails closed: a piece that does
-    not tokenize keeps its quoted text. Substitutions are cut out before
-    this runs, by ``_split_substitutions``, and checked on their own.
+    not tokenize keeps its quoted text. A piece with a substitution never
+    gets here: the caller fails it closed.
     """
     try:
         tokens = shlex.split(piece)
@@ -240,43 +240,14 @@ def _runs_inner_shell(piece: str) -> bool:
     return False
 
 
-_SUBSTITUTION_OPEN = re.compile(r"[$<>]\(")
+# A substitution's output is unknown when the check runs: it can be the
+# command itself, a value the command prints, or code a shell runs.
+_SUBSTITUTION = re.compile(r"[$<>]\(")
 
-
-def _split_substitutions(piece: str) -> tuple[str, list[str]] | None:
-    """Cut out `$(...)`, `<(...)` and `>(...)` outside single quotes.
-
-    Returns the piece with each substitution blanked, and the text each one
-    runs. A substitution runs its own text only, so quoted literals elsewhere
-    in the piece stay protected. None when the parentheses do not balance;
-    the caller then reads the piece whole, quoted text included.
-    """
-    single = [(a, b) for a, b, q in _quoted_spans(piece) or [] if q == "'"]
-    outer, inner = piece, []
-    pos = 0
-    while match := _SUBSTITUTION_OPEN.search(piece, pos):
-        if any(a < match.start() < b for a, b in single):
-            pos = match.end()
-            continue
-        depth, quote, i = 1, None, match.end()
-        while i < len(piece) and depth:
-            ch = piece[i]
-            if quote:
-                if ch == quote:
-                    quote = None
-            elif ch in "'\"":
-                quote = ch
-            elif ch == "(":
-                depth += 1
-            elif ch == ")":
-                depth -= 1
-            i += 1
-        if depth:
-            return None
-        inner.append(piece[match.end() : i - 1])
-        outer = outer[: match.start()] + " " * (i - match.start()) + outer[i:]
-        pos = i
-    return outer, inner
+# A pipe into a program that runs its input as code: `... | bash`,
+# `... | sudo sh`, `... | source /dev/stdin`. `||` is not a pipe.
+_PIPE_INTO = re.compile(r"(?<!\|)\|(?!\|)\s*(?:sudo\s+)?(\S+)")
+_RUNS_INPUT = _SHELLS | {"eval", "source", "."}
 
 
 def _blank_spans(piece: str, quotes: str) -> str:
@@ -287,46 +258,35 @@ def _blank_spans(piece: str, quotes: str) -> str:
     return piece
 
 
-def _in_command_position(piece: str) -> bool:
-    """Whether a substitution is the command itself: `$(command -v echo) ...`.
+def _unquote_single(piece: str) -> str:
+    """Blank out single-quoted text, which the shell never expands.
 
-    Its output is unknown, so the piece counts as printing and as a shell.
+    Unless the piece runs that text in an inner shell (`sh -c '...'`,
+    `eval`, `ssh host '...'`), which does expand it.
     """
-    return piece.lstrip().startswith("$(")
+    if _runs_inner_shell(piece):
+        return piece
+    return _blank_spans(piece, "'")
 
 
-def _runs_as_code(piece: str, outer: str) -> bool:
-    """Whether the piece runs its quoted text, or its substitutions' output, as code.
+def _segments(text: str) -> list[tuple[int, int]]:
+    """The line and backtick segments of the text, as (start, end) offsets."""
+    bounds = [m.start() for m in _LINE_BREAK.finditer(text)] + [len(text)]
+    return [(0 if i == 0 else bounds[i - 1] + 1, end) for i, end in enumerate(bounds)]
 
-    `bash <(echo '...')`, `source <(...)` and `eval "$(...)"` run what the
-    substitution prints, so single quotes inside it protect nothing.
+
+def _pipes_into_code(segment: str) -> bool:
+    """Whether the segment pipes into a shell, `eval`, `source` or `.`.
+
+    A pipe inside quotes is data. Quotes that do not balance count every
+    pipe, so the check fails closed.
     """
-    if _in_command_position(piece) or _runs_inner_shell(outer):
-        return True
-    try:
-        tokens = shlex.split(outer)
-    except ValueError:
-        return True
-    return bool(tokens) and tokens[0].rsplit("/", 1)[-1] in _SHELLS | {"source", "."}
-
-
-def _expanded_values(piece: str, raw: bool) -> set[str]:
-    """Token values the piece expands, its nested substitutions included.
-
-    Single-quoted text is blanked unless ``raw`` is set or the piece runs it
-    as code. A piece whose parentheses do not balance is read whole.
-    """
-    split = _split_substitutions(piece)
-    if split is None:
-        return {m.group(0) for m in _TOKEN_VALUE.finditer(piece)}
-    outer, inner = split
-    runs = raw or _runs_as_code(piece, outer)
-    text = outer if runs else _blank_spans(outer, "'")
-    values = {m.group(0) for m in _TOKEN_VALUE.finditer(text)}
-    for body in inner:
-        for _, sub in _command_pieces(body):
-            values |= _expanded_values(sub, runs)
-    return values
+    spans = _quoted_spans(segment) or []
+    return any(
+        m.group(1).rsplit("/", 1)[-1] in _RUNS_INPUT
+        for m in _PIPE_INTO.finditer(segment)
+        if not any(a < m.start() < b for a, b, _ in spans)
+    )
 
 
 def _command_pieces(text: str) -> list[tuple[int, str]]:
@@ -336,8 +296,7 @@ def _command_pieces(text: str) -> list[tuple[int, str]]:
     command, and splitting on its `;` cut the value away from the printf.
     """
     pieces: list[tuple[int, str]] = []
-    seg_start = 0
-    for seg_end in [m.start() for m in _LINE_BREAK.finditer(text)] + [len(text)]:
+    for seg_start, seg_end in _segments(text):
         segment = text[seg_start:seg_end]
         spans = _quoted_spans(segment) or []
         pos = 0
@@ -347,7 +306,6 @@ def _command_pieces(text: str) -> list[tuple[int, str]]:
             pieces.append((seg_start + pos, segment[pos : match.start()]))
             pos = match.end()
         pieces.append((seg_start + pos, segment[pos:]))
-        seg_start = seg_end + 1
     return pieces
 
 
@@ -381,27 +339,27 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
         for m in _TOKEN_FALLBACK.finditer(text)
         if not _is_negated(text, m.start())
     }
-    # Each pending piece carries whether an enclosing command runs its
-    # output as code, which makes its single-quoted text live.
-    pending = [(start, piece, False) for start, piece in _command_pieces(text)]
-    while pending:
-        start, piece, raw = pending.pop()
+    # Fails closed where reading the shell exactly has kept missing shapes:
+    # a command holding the token beside a substitution, and a line piped
+    # into something that runs its input as code. Either counts as a leak,
+    # quoted text included.
+    piped = [
+        (start, end)
+        for start, end in _segments(text)
+        if _pipes_into_code(text[start:end])
+    ]
+    for start, piece in _command_pieces(text):
         if _is_negated(text, start):
             continue
-        split = _split_substitutions(piece)
-        outer = piece if split is None else split[0]
-        if split is not None:
-            runs = raw or _runs_as_code(piece, outer)
-            pending.extend(
-                (start, sub, runs) for body in split[1] for _, sub in _command_pieces(body)
-            )
-        # Only the piece's own text decides whether it prints: a `printf`
-        # inside a substitution prints into the argument, not to stdout.
-        if not (_PRINTS_TO_STDOUT.search(outer) or _in_command_position(piece)):
+        values = {m.group(0) for m in _TOKEN_VALUE.finditer(piece)}
+        if not values:
             continue
-        # A substitution's output becomes an argument of this print, so a
-        # value it expands is printed even when its own command does not print.
-        offenders.update(_expanded_values(piece, raw))
+        if _SUBSTITUTION.search(piece) or any(a <= start < b for a, b in piped):
+            offenders |= values
+        elif _PRINTS_TO_STDOUT.search(piece):
+            offenders.update(
+                m.group(0) for m in _TOKEN_VALUE.finditer(_unquote_single(piece))
+            )
     if offenders:
         return False, (
             f"expansion(s) that print the token's value: {sorted(offenders)}; "

@@ -126,6 +126,18 @@ TOKEN_LEAKS = [
         'Run `$(command -v echo) "$INFRAHUB_API_TOKEN"`.',
         id="substitution-in-command-position",
     ),
+    pytest.param(
+        'Run `"$(command -v echo)" "$INFRAHUB_API_TOKEN"`.',
+        id="quoted-substitution-in-command-position",
+    ),
+    pytest.param(
+        'Run `sudo $(command -v echo) "$INFRAHUB_API_TOKEN"`.',
+        id="substitution-in-command-position-behind-sudo",
+    ),
+    # A pipe into a shell runs what the single quotes protected upstream.
+    pytest.param(
+        "Run `echo 'echo $INFRAHUB_API_TOKEN' | bash`.", id="single-quoted-piped-into-a-shell"
+    ),
 ]
 
 
@@ -173,26 +185,14 @@ TOKEN_SAFE = [
     pytest.param(
         "Run `echo sh -c 'x $INFRAHUB_API_TOKEN'`.", id="shell-words-as-echo-arguments"
     ),
-    # A substitution elsewhere in the command runs only its own text.
-    pytest.param(
-        "Run `echo 'literal $INFRAHUB_API_TOKEN' \"$(printf fixed)\"`.",
-        id="single-quoted-literal-beside-a-substitution",
-    ),
-    # A print command inside a substitution prints into the argument, not to
-    # stdout, so the command around it does not print the token.
-    pytest.param(
-        'Run `curl -H "Authorization: Bearer $INFRAHUB_API_TOKEN" "$(printf %s https://x)"`.',
-        id="printf-only-inside-a-substitution",
-    ),
-    # The near-misses for the leaks above: a substitution whose output is only
-    # printed, not run, keeps its single-quoted text literal.
-    pytest.param(
-        """Run `echo "$(printf '%s' 'literal $INFRAHUB_API_TOKEN')"`.""",
-        id="single-quoted-literal-inside-a-printed-substitution",
-    ),
     pytest.param(
         "Run `$(command -v infrahubctl) info`.",
         id="substitution-in-command-position-without-the-token",
+    ),
+    # Near-miss for the pipe leak: the pipe runs into grep, not a shell.
+    pytest.param(
+        "Run `echo 'literal $INFRAHUB_API_TOKEN' | grep x`.",
+        id="single-quoted-piped-into-a-non-shell",
     ),
 ]
 
@@ -201,6 +201,31 @@ TOKEN_SAFE = [
 def test_presence_tests_that_cannot_leak_pass(text):
     ok, msg = check_token_not_printed(text)
     assert ok, msg
+
+
+# These print nothing secret, and fail on purpose. A command holding the
+# token beside a substitution fails closed, because reading what the
+# substitution runs kept missing leaks. This list protects that choice:
+# do not move these back to TOKEN_SAFE without a reader that is exact.
+TOKEN_FAILS_CLOSED = [
+    pytest.param(
+        "Run `echo 'literal $INFRAHUB_API_TOKEN' \"$(printf fixed)\"`.",
+        id="single-quoted-literal-beside-a-substitution",
+    ),
+    pytest.param(
+        'Run `curl -H "Authorization: Bearer $INFRAHUB_API_TOKEN" "$(printf %s https://x)"`.',
+        id="token-header-beside-a-substitution",
+    ),
+    pytest.param(
+        """Run `echo "$(printf '%s' 'literal $INFRAHUB_API_TOKEN')"`.""",
+        id="single-quoted-literal-inside-a-printed-substitution",
+    ),
+]
+
+
+@pytest.mark.parametrize("text", TOKEN_FAILS_CLOSED)
+def test_token_beside_a_substitution_fails_closed(text):
+    assert not check_token_not_printed(text)[0]
 
 
 def test_empty_answer_is_not_a_free_pass_on_the_token_check():
