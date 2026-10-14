@@ -46,7 +46,8 @@ rule as covered forever.
    task discriminates". A trial that read the grader is
    void at any score, and no score from it counts,
    before/after included. Re-run, and count only trials
-   whose output shows no grader read.
+   whose output shows no grader read. Stop at the
+   re-run limit that section sets.
 
    On a trial that counts, below 1.0 and the step is
    met. A 1.0 is met only by the disposition its

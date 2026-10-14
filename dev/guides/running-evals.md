@@ -262,6 +262,14 @@ grader read. A model that reads the grader and does not
 say so cannot be detected, because skillgrade records
 only the model's final text.
 
+Stop re-running when three trials in a row show a grader
+read, whatever their scores. Record no score and report
+it to the person who owns the change: the model reads
+the grader reliably on this task, and skillgrade has no
+option that keeps the grader out of the sandbox, so
+further runs cost money without producing a trial that
+counts.
+
 On a trial that counts, a score below 1.0 proves the
 task discriminates. A 1.0 does not prove the opposite.
 It has three readings:

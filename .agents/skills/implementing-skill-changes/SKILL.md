@@ -262,6 +262,8 @@ Stop and report rather than guessing forward, when:
 - the targeted eval will not reach 1.0 after reasonable rewording
 - the discrimination run scores 1.0 with the skill unread and none of the
   readings in `dev/guides/running-evals.md` accounts for it
+- three discrimination runs in a row show a grader read, the re-run limit in
+  `dev/guides/running-evals.md` § "Prove the task discriminates"
 - a gate fails for a reason outside the handoff's scope
 
 ## Common mistakes
