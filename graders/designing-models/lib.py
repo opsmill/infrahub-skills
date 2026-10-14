@@ -1201,10 +1201,11 @@ def check_uniqueness_is_schema_constraint(ws: Path, subject: re.Pattern) -> tupl
     if not matching:
         return False, "no Mechanisms row covers the uniqueness rule the task asks for"
     # A pool row that hands out the values can sit beside the constraint;
-    # a check enforcing the rule cannot.
+    # any other mechanism enforcing the rule cannot.
     mechs = [(_clean(r[beh_col]), _clean(r[mech_col]).lower()) for r in matching]
+    has_constraint = any(m == "schema constraint" for _, m in mechs)
     for behavior, mech in mechs:
-        if mech == "check" or "schema constraint" not in {m for _, m in mechs}:
+        if mech not in {"schema constraint", "resource pool"} or not has_constraint:
             return False, f"'{behavior}' is a {mech}; the schema enforces uniqueness, so it is a schema constraint"
     return True, "the uniqueness rule is a schema constraint"
 
@@ -1358,9 +1359,9 @@ _REQUEST_REF = re.compile(r"\brequest\b", re.IGNORECASE)
 _FILE_NAME = re.compile(r"[\w.\-/]*\w\.[A-Za-z][A-Za-z0-9]*")
 # A figure written out in words counts the same as one in digits. "one" is
 # left out: it is ordinary wording ("one row per VPN", "one source of truth").
-# A number standing on its own ("40", "3.5", "30%", "3x"), not a digit inside
-# a name such as L3VPN, IPv4 or Q2.
-_NUMBER = re.compile(r"(?<![A-Za-z])\d+(?:[.,]\d+)?(?:x\b|(?![A-Za-z]))")
+# A number that starts a word ("40", "3.5", "30%", "3x", "$2M", "3h"), not
+# digits inside a name such as L3VPN, IPv4, Q13 or AS65000.
+_NUMBER = re.compile(r"(?<![A-Za-z0-9])\d+(?:[.,]\d+)?")
 _NUMBER_WORD = re.compile(
     r"\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|"
     r"sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|"
