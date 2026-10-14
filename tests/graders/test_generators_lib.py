@@ -1281,6 +1281,10 @@ def test_generator_targets_existing_group_grades_a_violation_opening_with_an_ins
         "# FAIL",
         "# Don't do it this way",
         "# Avoid the following",
+        "# WRONG — a second group",
+        "# DOES NOT RESOLVE",
+        "# **Wrong**: a second group",
+        "# Anti-pattern (creates a second group)",
     ],
 )
 def test_generator_targets_existing_group_skips_a_fence_labelled_wrong(label, tmp_path):
@@ -1314,3 +1318,48 @@ def test_generator_target_grader_passes_an_answer_showing_the_anti_pattern_after
     assert result.returncode == 0, result.stderr
     graded = json.loads(result.stdout)
     assert graded["score"] == 1.0, graded["details"]
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "# Bad things happen if the dispatcher finds no generator group",
+        "# Wrong group kinds are rejected by the dispatcher",
+        "# Broken targets get a dedicated generator group",
+        "# Fail fast: the dispatcher needs a generator group",
+        "# Fails silently as a CoreStandardGroup: the dispatcher needs a CoreGeneratorGroup",
+        "# Anti-pattern checks run against a generator group",
+        "# Does not resolve without a generator group",
+    ],
+)
+def test_generator_targets_existing_group_grades_a_violation_opening_with_a_verdict_word_sentence(
+    label, tmp_path
+):
+    """A verdict word that starts a sentence is not a WRONG label."""
+    body = _TARGET_MANIFEST + _GENERATOR_GROUP_FENCE.format(label=label)
+    ok, msg = _mod.CHECKS["generator-targets-existing-group"](_target_answer(tmp_path, body))
+    assert ok is False, msg
+    assert "CoreGeneratorGroup" in msg
+
+
+def test_generator_target_grader_fails_a_converted_target_under_a_fails_sentence(tmp_path):
+    """A model holding the old belief explains its conversion; it must not hide it."""
+    body = (
+        _TARGET_MANIFEST
+        + "\n```yaml\n"
+        "# Fails silently as a CoreStandardGroup: the dispatcher needs a CoreGeneratorGroup\n"
+        "---\napiVersion: infrahub.app/v1\nkind: Object\n"
+        "spec:\n  kind: CoreGeneratorGroup\n  data:\n    - name: topologies_dc\n```\n"
+    )
+    (tmp_path / "output.md").write_text(body, encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(_TARGET_GRADER_PATH)],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+    assert result.returncode == 0, result.stderr
+    graded = json.loads(result.stdout)
+    check = next(c for c in graded["checks"] if c["name"] == "generator-targets-existing-group")
+    assert check["passed"] is False, check["message"]
+    assert graded["score"] < 1.0, graded["details"]
