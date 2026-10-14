@@ -1277,6 +1277,10 @@ def test_generator_targets_existing_group_grades_a_violation_opening_with_an_ins
         "# Don't do this",
         "# Avoid this:",
         "# Never use this",
+        "# FAILS: creates a second group",
+        "# FAIL",
+        "# Don't do it this way",
+        "# Avoid the following",
     ],
 )
 def test_generator_targets_existing_group_skips_a_fence_labelled_wrong(label, tmp_path):
@@ -1284,3 +1288,29 @@ def test_generator_targets_existing_group_skips_a_fence_labelled_wrong(label, tm
     body = _TARGET_MANIFEST + _GENERATOR_GROUP_FENCE.format(label=label)
     ok, msg = _mod.CHECKS["generator-targets-existing-group"](_target_answer(tmp_path, body))
     assert ok is True, msg
+
+
+@pytest.mark.parametrize(
+    "label",
+    ["# FAILS: creates a second group", "# Don't do it this way", "# Avoid the following"],
+)
+def test_generator_target_grader_passes_an_answer_showing_the_anti_pattern_after_the_manifest(
+    label, tmp_path
+):
+    """The task grader scores 1.0 when a labelled wrong example follows the right manifest."""
+    body = (
+        "Register the generator against the existing group.\n\n"
+        + _TARGET_MANIFEST
+        + "\nDo not create a CoreGeneratorGroup for the targets:\n"
+        + _GENERATOR_GROUP_FENCE.format(label=label)
+    )
+    (tmp_path / "output.md").write_text(body, encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(_TARGET_GRADER_PATH)],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+    assert result.returncode == 0, result.stderr
+    graded = json.loads(result.stdout)
+    assert graded["score"] == 1.0, graded["details"]

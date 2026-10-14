@@ -2093,14 +2093,18 @@ _OUTPUT_GROUP_KIND = "CoreGeneratorGroup"
 # A first-line comment that labels a whole fence as the wrong form. Narrower
 # than _NEGATIVE_LABEL on purpose: a fence opening with an instruction such
 # as `# Do not create a new group` or `# Never edit by hand` is still the
-# answer. A negation counts only when it stands alone as a label (`# AVOID:`)
-# or points at the block (`# Don't do this`).
+# answer. A verdict word (`WRONG`, `FAILS`, ...) always counts. A negation
+# counts only when it stands alone (`# AVOID:`), or when the words after it
+# point at the block itself: an optional short verb (do/use/write/copy), an
+# optional `it` and `like`, then this/these/that/the following, as in
+# `# Don't do it this way`, `# Avoid the following` or `# Never write like this`.
 _WRONG_FENCE_LABEL = re.compile(
     r"#\s*\**\s*(?:"
-    r"(?:WRONG|INCORRECT|BAD|BROKEN|ANTI-?PATTERN|DOES NOT RESOLVE)\b"
+    r"(?:WRONG|INCORRECT|BAD|BROKEN|FAILS?|ANTI-?PATTERN|DOES NOT RESOLVE)\b"
     r"|(?:AVOID|DO NOT|DON'T|NEVER)"
     r"(?:\s*\**\s*(?:$|[:.\-–—(])"
-    r"|\s+(?:(?:DO|USE|WRITE|COPY)\s+)?(?:THIS|THESE|THAT)\b)"
+    r"|\s+(?:(?:DO|USE|WRITE|COPY)\s+)?(?:IT\s+)?(?:LIKE\s+)?"
+    r"(?:THIS|THESE|THAT|THE\s+FOLLOWING)\b)"
     r")",
     re.IGNORECASE,
 )
