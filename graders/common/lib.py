@@ -560,6 +560,9 @@ _DEFAULT_BRANCH = "main"
 # Stripped only in a fence a reader runs in a shell, so a prompt elsewhere
 # leaves the line unreadable rather than skipped.
 _PROMPT = re.compile(r"^[ \t]*[$%][ \t]+")
+# A `> ` continuation prompt after a `\` line end. Left in, it would read as
+# a redirection once the lines are joined and swallow the next word.
+_CONTINUATION_PROMPT = re.compile(r"\\\n[ \t]*>[ \t]")
 _SHELL_FENCES = {"", "bash", "sh", "shell", "zsh", "console", "shell-session", "shellsession"}
 
 # `infrahubctl protocols` writes here when no `--out` is given.
@@ -695,15 +698,18 @@ def _heredoc_delimiters(line: str) -> list[str]:
     return delimiters
 
 
-def _shell_lines(region: str) -> tuple[list[str], list[str]]:
+def _shell_lines(region: str, prompts: bool = False) -> tuple[list[str], list[str]]:
     """The region's lines as the shell reads them, and the heredocs that never end.
 
     A `\\` continuation joins with no separator, as the shell does, and a
     heredoc body is data, so it is dropped. A heredoc whose terminator never
     comes takes the rest of the region with it; it is returned by its
     opening line, with the body it swallowed, so the caller can fail closed
-    instead of reading the hidden lines as data.
+    instead of reading the hidden lines as data. With ``prompts``, a `> `
+    continuation prompt is removed before the lines are joined.
     """
+    if prompts:
+        region = _CONTINUATION_PROMPT.sub("\\\n", region)
     joined = region.replace("\\\n", "")
     lines: list[str] = []
     unterminated: list[str] = []
@@ -789,11 +795,11 @@ def _protocols_invocations(region: str, prompts: bool = False) -> tuple[list[dic
 
     With ``prompts``, a `$ ` or `% ` prompt at the start of a line is
     removed before the line is read, as a reader does when copying from a
-    console block.
+    console block, and so is a `> ` continuation prompt.
     """
     found: list[dict] = []
     unreadable: list[str] = []
-    lines, unterminated = _shell_lines(region)
+    lines, unterminated = _shell_lines(region, prompts)
     # A heredoc that never ends swallows the lines after it. If those lines
     # name the command, the parser cannot tell data from a hidden command.
     for swallowed in unterminated:

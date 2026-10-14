@@ -851,6 +851,11 @@ PROTOCOLS_PROMPT_AND_DEFAULT_ACCEPTED = [
         "infrahubctl protocols --branch c1 --out lib/protocols.py\n```",
         id="load-on-env-default-branch-then-protocols-from-that-branch",
     ),
+    pytest.param(
+        "```console\n$ infrahubctl schema load schemas/ --branch c1\n"
+        "$ infrahubctl protocols \\\n> --branch c1 --out lib/protocols.py\n```",
+        id="console-command-wrapped-with-a-continuation-prompt",
+    ),
 ]
 
 PROTOCOLS_PROMPT_AND_DEFAULT_REJECTED = [
@@ -861,6 +866,14 @@ PROTOCOLS_PROMPT_AND_DEFAULT_REJECTED = [
         "$ infrahubctl protocols --schemas schemas/ --out lib/protocols.py\n```",
         "with --schemas",
         id="near-miss-prompted-offline-overwrite",
+    ),
+    # The `> ` continuation prompt is stripped before the lines are joined,
+    # so it cannot read as a redirection that swallows `--schemas`.
+    pytest.param(
+        "```console\n$ infrahubctl schema load schemas/\n"
+        "$ infrahubctl protocols \\\n> --schemas schemas/ --out lib/protocols.py\n```",
+        "with --schemas",
+        id="near-miss-continuation-prompt-hides-schemas",
     ),
     # Outside a shell or console block a prompt is not stripped, and the
     # line is unreadable rather than skipped.
