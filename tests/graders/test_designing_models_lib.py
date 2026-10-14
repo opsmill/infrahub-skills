@@ -463,6 +463,14 @@ INPUT_VARIANT_ROWS = """\
             ),
             "NetworkRouter is identified by a pops.csv column", id="near-miss-router-keyed-by-pop-code",
         ),
+        pytest.param(
+            BRIEF,
+            brief(
+                inputs=INPUTS_TABLE,
+                sketch_rows=INPUT_ROWS + "| F1 | LocationCity | city | name (imported) | LocationPop (many) | Facilities sheet | Facilities | answer Q1 |\n",
+            ),
+            "LocationCity is identified by a pops.csv column", id="near-miss-city-keyed-without-pops-csv",
+        ),
     ],
 )
 def test_inputs_digested(tmp_path: Path, rel: str, text: str, expected: str | None) -> None:
@@ -1231,6 +1239,10 @@ def branch_brief(mechanisms: str = BRANCH_MECH) -> str:
             "the schema enforces uniqueness", id="near-miss-uniqueness-only-as-pool",
         ),
         pytest.param(
+            branch_brief(BRANCH_MECH + "| F1 | No two branches share a VLAN on the switch | generator | LocationBranch | a VLAN check | a branch is added | creates other nodes from a design |\n"),
+            "the schema enforces uniqueness", id="near-miss-generator-beside-the-constraint",
+        ),
+        pytest.param(
             branch_brief(BRANCH_MECH.replace("| generator | LocationBranch |", "| generator | the network team |")),
             "not driven by a node kind from the sketch", id="near-miss-generator-not-driven-by-sketch-kind",
         ),
@@ -1493,12 +1505,28 @@ def value_brief(value: str | None = DEFAULT_VALUE, features: str = FEATURES, **k
             None, id="compliant-several-answer-refs",
         ),
         pytest.param(
+            value_brief("Value: Faster service delivery (recommended: answer Q2 and Q13)"),
+            None, id="compliant-two-digit-answer-ref",
+        ),
+        pytest.param(
+            value_brief("Value: Lower change failure costs (recommended: route leaks from AS65000)"),
+            None, id="compliant-as-number-is-not-a-figure",
+        ),
+        pytest.param(
             value_brief(VALUE_THREE, FEATURES_VALUE.replace("| Reduced engineering effort | Prefix", "| Reduced engineering effort for IPv4 | Prefix")),
             None, id="compliant-network-name-in-value-cell",
         ),
         pytest.param(
             value_brief("Value: Faster service delivery (recommended: orders 3x faster)"),
             "gives a figure but is tagged recommended", id="near-miss-multiplier-figure",
+        ),
+        pytest.param(
+            value_brief("Value: Lower change failure costs (recommended: saves $2M a year)"),
+            "gives a figure but is tagged recommended", id="near-miss-figure-with-unit-suffix",
+        ),
+        pytest.param(
+            value_brief("Value: Faster service delivery (recommended: orders ready in 3h)"),
+            "gives a figure but is tagged recommended", id="near-miss-figure-with-time-unit",
         ),
         pytest.param(
             value_brief("Value: Reduced engineering effort (stated: saves 40 hours a month)"),

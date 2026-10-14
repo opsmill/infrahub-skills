@@ -19,11 +19,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import check_inputs_digested, run_checks  # noqa: E402
 
 # File name -> the CSV columns that identify something in that file (empty
-# for files that are not tables). pops.csv also has name and city, but those
-# words name things in backbone.txt too ("name (AMS1-cr1)"), so they cannot
-# tie a row to pops.csv.
+# for files that are not tables). pops.csv also has a name column, but
+# backbone.txt names its routers too ("name (AMS1-cr1)"), so name cannot tie
+# a row to pops.csv.
 INPUTS = {
-    "pops.csv": ["pop_code", "region"],
+    "pops.csv": ["pop_code", "city", "region"],
     "backbone.txt": [],
 }
 
