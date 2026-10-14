@@ -43,10 +43,14 @@ Git branch moves.
 ### Get new check code into an open proposed change
 
 1. Merge `main` into the Git branch with the same name
-   as the source branch, and push it. Do not rebase: a
-   rebase rewrites the branch, so a plain push is
-   rejected, and after a force-push the repository sync
-   cannot pull the branch and the commit stays put.
+   as the source branch, and push it. Use `git merge`,
+   or `git pull --no-rebase`; a plain `git pull` rebases
+   when `pull.rebase` is set and stops on a diverged
+   branch when it is not. Do not rebase: a rebase
+   rewrites the branch, so a plain push is rejected. On
+   Infrahub 1.11 and earlier, the repository sync also
+   cannot pull a force-pushed branch, so the commit
+   stays put.
 2. Wait for the repository sync to record the new commit
    on the branch. The sync runs about once a minute.
 3. Rerun the checks with `CoreProposedChangeRunCheck` or

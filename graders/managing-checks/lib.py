@@ -714,9 +714,9 @@ def check_targeted_has_targets_and_parameters(
 # `infrahubctl branch rebase` nor `CoreProposedChangeRunCheck` moves that
 # commit; merging main into the branch's own Git branch and pushing it does.
 # A Git rebase does not count: it rewrites the branch, so a plain push is
-# rejected and a force-push leaves the sync unable to pull the branch. The
-# script is tokenized with shlex, so comments, prose and echoed strings do not
-# count as commands.
+# rejected (on Infrahub 1.11 and earlier the sync cannot pull a force-pushed
+# branch either). The script is tokenized with shlex, so comments, prose and
+# echoed strings do not count as commands.
 
 # A fence may be indented under a list item, and closes on a run of the same
 # character at least as long as the one that opened it.
@@ -1072,8 +1072,8 @@ def check_moves_source_branch_commit(
     synced with Git, and so does merging main into a branch other than the one
     pushed. A Git rebase onto main (`git rebase`, `git pull --rebase`) does not
     count, and disqualifies that branch before or after a merge: it rewrites it,
-    so a plain push is rejected and a force-push leaves the repository sync
-    unable to pull it. A `git pull` of main counts only with an explicit merge
+    so a plain push is rejected, and on Infrahub 1.11 and earlier the
+    repository sync cannot pull a force-pushed branch. A `git pull` of main counts only with an explicit merge
     mode, since a plain one rebases under `pull.rebase=true` and fails on a
     diverged branch when no mode is set.
     """
@@ -1190,7 +1190,7 @@ def check_moves_source_branch_commit(
         "No `git push` to a source branch after merging main into it: the open proposed "
         "changes keep running the old repository commit (git push destinations: "
         f"{seen}; infrahubctl branch rebase calls: {rebases}; branches main was merged "
-        f"into: {into}; branches rebased onto main, which the sync cannot pull: {onto})"
+        f"into: {into}; branches rebased onto main, which a plain push rejects: {onto})"
     )
 
 

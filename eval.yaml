@@ -1497,8 +1497,11 @@ tasks:
       of `infrahubctl branch rebase` and `CoreProposedChangeRunCheck` alone
       is wrong, because on branches synced with Git it reruns the old
       commit. A Git rebase of the branch onto main is wrong too: it rewrites
-      the branch, so a plain push is rejected, and after a force-push the
-      repository sync cannot pull the branch. Opening a new branch and
+      the branch, so a plain push is rejected; on Infrahub 1.11 and
+      earlier the repository sync also cannot pull a force-pushed branch.
+      A plain `git pull` of main counts as a merge only with `--no-rebase`
+      or `pull.rebase=false`, since it otherwise rebases or stops on a
+      diverged branch. Opening a new branch and
       proposed change is wrong, because a branch cut from main has none of
       the old branch's data or commits.
     expectations:

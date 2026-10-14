@@ -103,7 +103,7 @@ def test_rebase_fixture_fails_because_it_rebases():
     (entry,) = result["checks"]
     assert entry["message"].startswith(_FAIL_PREFIX)
     assert "git push destinations: $b" in entry["message"]
-    assert "branches rebased onto main, which the sync cannot pull: $b" in entry["message"]
+    assert "branches rebased onto main, which a plain push rejects: $b" in entry["message"]
 
 
 def test_new_branch_fixture_fails_because_it_moves_no_branch():
@@ -226,8 +226,8 @@ def test_merge_must_land_on_the_pushed_branch(script, expected):
     assert _passes(looped) is expected
 
 # A Git rebase onto main rewrites the source branch: a plain push is rejected,
-# and after a force-push the repository sync cannot pull the branch. It counts
-# as no merge, whatever comes before or after it on that branch.
+# and on Infrahub 1.11 and earlier the sync cannot pull a force-pushed branch.
+# It counts as no merge, whatever comes before or after it on that branch.
 @pytest.mark.parametrize(
     ("body", "expected"),
     [
