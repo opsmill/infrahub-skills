@@ -1084,6 +1084,42 @@ class TestCheckIpReferenceNotCascade:
             "ServiceLBVIPService.frontend_ip resolves to on_delete 'keep' (explicit)",
         )
 
+    # Peer boundary: the name part of the kind is exactly IPAddress. Kinds that
+    # contain it, before or after, are the other side and may cascade.
+
+    def test_compliant_with_decoy_ip_kinds(self):
+        schema = yaml.safe_load(_VIP_COMPLIANT)
+        schema["nodes"].append({"name": "VirtualIPAddress", "namespace": "ServiceLB"})
+        schema["nodes"][0]["relationships"] += [
+            {"name": "vips", "peer": "ServiceLBVirtualIPAddress", "kind": "Component"},
+            {"name": "pool", "peer": "IpamIPAddressPool", "kind": "Component"},
+        ]
+        assert self.check(schema) == (
+            True,
+            "IP references resolve to no-action: ServiceLBVIPService.frontend_ip",
+        )
+
+    def test_near_miss_shared_ip_cascades_beside_decoy(self):
+        schema = _vip(_VIP_COMPLIANT, "on_delete: no-action", "on_delete: cascade")
+        schema["nodes"][0]["relationships"].append(
+            {"name": "pool", "peer": "IpamIPAddressPool", "on_delete": "no-action"}
+        )
+        assert self.check(schema) == (
+            False,
+            "IP reference deletes the shared IP: "
+            "ServiceLBVIPService.frontend_ip resolves to on_delete 'cascade' (explicit)",
+        )
+
+    def test_short_ip_kind_still_counts(self):
+        """A kind that does not split into namespace and name is read whole."""
+        schema = _vip(_VIP_COMPLIANT, "peer: IpamIPAddress", "peer: IPAddress")
+        schema = _vip(yaml.dump(schema), "on_delete: no-action", "on_delete: cascade")
+        assert self.check(schema) == (
+            False,
+            "IP reference deletes the shared IP: "
+            "ServiceLBVIPService.frontend_ip resolves to on_delete 'cascade' (explicit)",
+        )
+
     def test_missing_ip_reference_fails(self):
         schema = _vip(_VIP_COMPLIANT, "peer: IpamIPAddress", "peer: IpamPrefix")
         assert self.check(schema) == (
@@ -1242,7 +1278,79 @@ class TestCheckOnDeleteCascadePresent:
 
     def test_missing_health_check_reference_fails(self):
         schema = _vip(_VIP_COMPLIANT, "peer: ServiceLBHealthCheck", "peer: ServiceLBProbe")
-        assert self.check(schema) == (False, "No relationship references a HealthCheck node")
+        assert self.check(schema) == (False, "No relationship references ServiceLBHealthCheck")
+
+    # Peer boundary: only the kind defined with name HealthCheck counts. A kind
+    # that ends in HealthCheck, ServiceLBMonitorHealthCheck, is the other side.
+
+    def test_compliant_with_decoy_health_check_kind(self):
+        """A cascade on the decoy kind is not listed as the HealthCheck cascade."""
+        schema = _with_monitor_decoy(yaml.safe_load(_VIP_COMPLIANT))
+        assert self.check(schema) == (
+            True,
+            "HealthCheck relationships resolving to cascade: "
+            "ServiceLBVIPService.health_checks (explicit)",
+        )
+
+    def test_near_miss_cascade_on_decoy_health_check_kind(self):
+        """The #196 review case: the cascade sits on MonitorHealthCheck only."""
+        schema = _with_monitor_decoy(
+            _vip(_VIP_COMPLIANT, _HC_REL, _HC_REL.replace("on_delete: cascade", "on_delete: no-action"))
+        )
+        assert self.check(schema) == (
+            False,
+            "No HealthCheck relationship resolves to cascade: "
+            "ServiceLBVIPService.health_checks resolves to on_delete 'no-action' (explicit)",
+        )
+
+    def test_decoy_kind_alone_is_not_a_health_check(self):
+        schema = _with_monitor_decoy(yaml.safe_load(_VIP_COMPLIANT))
+        schema["nodes"] = [n for n in schema["nodes"] if n["name"] != "HealthCheck"]
+        schema["nodes"][0]["relationships"] = [
+            r for r in schema["nodes"][0]["relationships"] if r["name"] != "health_checks"
+        ]
+        assert self.check(schema) == (False, "No node or generic named HealthCheck is defined")
+
+    def test_health_check_defined_as_generic(self):
+        schema = yaml.safe_load(_VIP_COMPLIANT)
+        node = schema["nodes"].pop()
+        schema["generics"] = [node]
+        assert self.check(schema) == (
+            True,
+            "HealthCheck relationships resolving to cascade: "
+            "ServiceLBVIPService.health_checks (explicit)",
+        )
+
+    def test_several_health_check_definitions_fail_closed(self):
+        schema = yaml.safe_load(_VIP_COMPLIANT)
+        schema["nodes"].append({"name": "HealthCheck", "namespace": "Monitor"})
+        assert self.check(schema) == (
+            False,
+            "Several nodes or generics are named HealthCheck: "
+            "MonitorHealthCheck, ServiceLBHealthCheck",
+        )
+
+
+def _with_monitor_decoy(schema: dict) -> dict:
+    """Add ServiceLBMonitorHealthCheck and a Component cascade to it on the VIP."""
+    schema["nodes"].append(
+        {
+            "name": "MonitorHealthCheck",
+            "namespace": "ServiceLB",
+            "human_friendly_id": ["name__value"],
+            "attributes": [{"name": "name", "kind": "Text"}],
+        }
+    )
+    schema["nodes"][0]["relationships"].append(
+        {
+            "name": "monitor_checks",
+            "peer": "ServiceLBMonitorHealthCheck",
+            "kind": "Component",
+            "cardinality": "many",
+            "on_delete": "cascade",
+        }
+    )
+    return schema
 
     def test_task_grader_scores_omitted_on_delete_one(self, tmp_path):
         path = tmp_path / "output.yml"

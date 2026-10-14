@@ -511,23 +511,51 @@ def _relationship_containers(schema: dict) -> list[dict]:
     return _all_nodes(schema) + _all_generics(schema) + (extensions.get("nodes", []) or [])
 
 
+# A valid namespace is one capital then lowercase letters or digits, so the
+# name of a kind the answer does not define starts at the next capital.
+_KIND_SPLIT = re.compile(r"^[A-Z][a-z0-9]+(?P<name>[A-Z]\w*)$")
+
+
+def _peer_name(peer: str, defined: dict[str, str]) -> str:
+    """The name part of a peer kind: from its definition when the answer has
+    one, otherwise split off the namespace. A kind that does not split is
+    returned whole, so a short kind such as ``IPAddress`` still counts."""
+    if peer in defined:
+        return defined[peer]
+    m = _KIND_SPLIT.match(peer)
+    return m["name"] if m else peer
+
+
 def check_on_delete_cascade_present(schema: dict, **_: Any) -> tuple[bool, str]:
     """A relationship to the HealthCheck node resolves to on_delete: cascade.
 
     Used in the service-cascade eval, where the prompt says health checks
     have no meaning without their VIPService and must be deleted with it.
     The resolved value is what Infrahub acts on, so an explicit cascade and
-    a kind: Component relationship that omits on_delete both pass. Only
-    relationships whose peer is a HealthCheck node count, so a cascade
-    elsewhere, such as on the HealthCheck's Parent relationship back to the
-    VIPService, does not.
+    a kind: Component relationship that omits on_delete both pass.
+
+    The task asks the answer to create the HealthCheck node, so its kind is
+    read from the node or generic whose name is exactly HealthCheck, and only
+    relationships whose peer is that kind count. A cascade elsewhere does
+    not: on a differently named kind such as ServiceLBMonitorHealthCheck, or
+    on the HealthCheck's Parent relationship back to the VIPService. With no
+    such definition, or more than one, the check cannot tell which kind the
+    task means and fails.
     """
+    targets = sorted(
+        {_full_kind(d) for d in _all_nodes(schema) + _all_generics(schema) if d.get("name") == "HealthCheck"}
+    )
+    if not targets:
+        return False, "No node or generic named HealthCheck is defined"
+    if len(targets) > 1:
+        return False, "Several nodes or generics are named HealthCheck: " + ", ".join(targets)
+    target = targets[0]
     refs: list[str] = []
     cascading: list[str] = []
     for node in _relationship_containers(schema):
         owner = node.get("kind") or _full_kind(node)
         for rel in _all_rels(node):
-            if not str(rel.get("peer", "")).endswith("HealthCheck"):
+            if str(rel.get("peer", "")) != target:
                 continue
             ref = f"{owner}.{rel.get('name', '')}"
             resolved = _resolved_on_delete(rel)
@@ -536,7 +564,7 @@ def check_on_delete_cascade_present(schema: dict, **_: Any) -> tuple[bool, str]:
             if resolved == "cascade":
                 cascading.append(f"{ref} ({source})")
     if not refs:
-        return False, "No relationship references a HealthCheck node"
+        return False, f"No relationship references {target}"
     if not cascading:
         return False, "No HealthCheck relationship resolves to cascade: " + "; ".join(refs)
     return True, f"HealthCheck relationships resolving to cascade: {', '.join(cascading)}"
@@ -549,13 +577,21 @@ def check_ip_reference_not_cascade(schema: dict, **_: Any) -> tuple[bool, str]:
     owner's deletion. The resolved value is what Infrahub acts on, so a
     kind: Component relationship that omits on_delete fails: it cascades.
     Any value other than no-action fails, so an unknown value is not a pass.
+
+    The IP kind usually comes from another schema (IpamIPAddress), so it
+    cannot be read from a definition in the answer. A peer counts when the
+    name part of its kind is exactly IPAddress: taken from the answer's own
+    definition when it has one, otherwise from the kind with its namespace
+    split off. A kind that only contains the word, such as IpamIPAddressPool
+    or ServiceLBVirtualIPAddress, does not count.
     """
+    defined = {_full_kind(d): str(d.get("name", "")) for d in _all_nodes(schema) + _all_generics(schema)}
     refs: list[str] = []
     bad: list[str] = []
     for node in _relationship_containers(schema):
         owner = node.get("kind") or _full_kind(node)
         for rel in _all_rels(node):
-            if not str(rel.get("peer", "")).endswith("IPAddress"):
+            if _peer_name(str(rel.get("peer", "")), defined) != "IPAddress":
                 continue
             ref = f"{owner}.{rel.get('name', '')}"
             refs.append(ref)

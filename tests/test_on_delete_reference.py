@@ -138,6 +138,10 @@ _DEFAULT_VERB = re.compile(
 )
 # A negation standing directly before the verb.
 _NEGATION_BEFORE_VERB = re.compile(r"(?:\bnot|n't|\bnever|\bno\s+longer)\s+$", re.I)
+# The word that opens a relative clause on the subject. A negation before the
+# first one is on the main clause ("Do not assume that ...", "It is not true
+# that ..."), so it negates the claim; one after it belongs to the subject.
+_RELATIVE = re.compile(r"\b(?:that|which|who)\b", re.I)
 
 OTHER = "*other*"
 
@@ -237,10 +241,14 @@ def sentence_claims(sentence: str) -> list[tuple[str, str, bool]]:
     stating both defaults pairs each value with its own kind. A claim no kind
     is assigned to has scope "" (unscoped). A claim is negated when "not" (or
     similar) negates the default verb before it ("does not default to", "is
-    never"). A "not" earlier in the clause, as in "a relationship that does
-    not set `on_delete` defaults to ...", does not count. With no default verb
+    never"), or negates the main clause before the first "that", "which" or
+    "who" ("Do not assume that a relationship that omits ... defaults to").
+    A "not" inside the relative clause, as in "a relationship that does not
+    set `on_delete` defaults to ...", does not count. With no default verb
     in the clause ("`cascade`, not `no-action`"), a negation anywhere between
-    the claim and the start of its clause counts.
+    the claim and the start of its clause counts, and a claim no kind is
+    assigned to continues the claim before it, so it takes that claim's
+    scope.
     """
     masked = _SETTING.sub(lambda m: " " * len(m.group()), sentence)
     hits: list[tuple[int, int, str]] = []
@@ -255,6 +263,7 @@ def sentence_claims(sentence: str) -> list[tuple[str, str, bool]]:
     if not hits or not (mentions or _TOPIC.search(sentence)):
         return []
     claims: list[tuple[int, str, bool]] = []
+    continues: list[bool] = []
     prev_end = 0
     for start, end, value in hits:
         window = masked[prev_end:start]
@@ -264,18 +273,24 @@ def sentence_claims(sentence: str) -> list[tuple[str, str, bool]]:
         verbs = list(_DEFAULT_VERB.finditer(window))
         if verbs:
             verb = verbs[-1].start()
+            relative = _RELATIVE.search(window, 0, verb)
             negated = bool(
                 _NEGATION.search(window[verb:])
                 or _NEGATION_BEFORE_VERB.search(window[:verb])
+                or (relative and _NEGATION.search(window[: relative.start()]))
             )
         else:
             negated = bool(_NEGATION.search(window))
         claims.append((start, value, negated))
+        continues.append(not verbs and bool(claims[:-1]))
         prev_end = end
     scopes: dict[int, set[str]] = {n: set() for n in range(len(claims))}
     for pos, kind in mentions:
         nearest = min(range(len(claims)), key=lambda n: abs(claims[n][0] - pos))
         scopes[nearest].add(kind)
+    for n in range(1, len(claims)):
+        if continues[n] and not scopes[n]:
+            scopes[n] = set(scopes[n - 1])
     result: list[tuple[str, str, bool]] = []
     for n, (_, value, negated) in enumerate(claims):
         for kind in sorted(scopes[n]) or [""]:
@@ -483,6 +498,10 @@ def _says(scope: str, verb: str, value: str, unit: str) -> str:
 
 
 _FENCED_CLAIM = "description: Component defaults to no-action"
+_MIRROR = (
+    "A `kind: Component` relationship that omits `on_delete` defaults to "
+    "`no-action`, not `cascade`."
+)
 
 ACCEPT = {
     "correct": _CORRECT,
@@ -493,6 +512,29 @@ ACCEPT = {
     ),
     "fence-length-matched": edit(
         _SENTENCE, f"{_SENTENCE}\n\n````\n```\n{_FENCED_CLAIM}\n````"
+    ),
+    # Negation boundary, main-clause side: a negation before the first
+    # "that" negates the claim. The relative-clause rejects are the other side.
+    "main-clause-do-not-assume": edit(
+        _SENTENCE,
+        "Do not assume that a Component relationship that omits `on_delete` "
+        "defaults to `no-action`.",
+    ),
+    "main-clause-not-true": edit(
+        _SENTENCE,
+        "It is not true that a Component relationship that omits `on_delete` "
+        "defaults to `no-action`.",
+    ),
+    # A contrast after the value continues its claim and takes its scope.
+    "contrast-component": edit(
+        _SENTENCE,
+        "A `kind: Component` relationship that omits `on_delete` defaults to "
+        "`cascade`, not `no-action`.",
+    ),
+    "contrast-other-kinds": edit(
+        _SENTENCE,
+        f"{_SENTENCE} On every other kind, an omitted `on_delete` means "
+        "`no-action`, not `cascade`.",
     ),
 }
 
@@ -655,6 +697,31 @@ REJECT: dict[str, tuple[str, list[str], list[str]]] = {
             ),
         }.items()
     },
+    # The mirror of "contrast-component": both halves are wrong for Component.
+    "contrast-mirror": (
+        edit(_SENTENCE, _MIRROR),
+        [],
+        [
+            _says("Component", verb, value, _MIRROR)
+            for verb, value in (
+                ("defaults to", "no-action"),
+                ("does not default to", "cascade"),
+            )
+        ],
+    ),
+    # A contrast takes only the scope its claim has: none, here.
+    "contrast-unscoped": (
+        edit(_SENTENCE, "If omitted, `on_delete` is `cascade`, not `no-action`."),
+        [],
+        [
+            f"says it {verb} {value!r} without naming a kind: "
+            "'If omitted, `on_delete` is `cascade`, not `no-action`.'"
+            for verb, value in (
+                ("defaults to", "cascade"),
+                ("does not default to", "no-action"),
+            )
+        ],
+    ),
     # Fail closed: a sentence about the default that the parser cannot read.
     "kind-without-value": (
         edit(
