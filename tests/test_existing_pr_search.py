@@ -186,6 +186,8 @@ def _execute(
     filler: int = 0,
     extra: tuple = (),
     gh_fails: bool = False,
+    shallow: bool = False,
+    raw_args: tuple[str, ...] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -216,6 +218,9 @@ def _execute(
         [*git, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"],
         check=True,
     )
+    if shallow:
+        # What `git clone --depth 1` leaves behind: HEAD's parents are cut off.
+        (repo / ".git" / "shallow").write_text(head + "\n")
 
     fixtures = tmp_path / "prs.json"
     fixtures.write_text(json.dumps(_fixtures(head, ahead, filler, extra)))
@@ -237,6 +242,8 @@ def _execute(
         args += ["--issue", issue]
     for target in targets.split():
         args += ["--target", target]
+    if raw_args is not None:
+        args = [sys.executable, str(SCRIPT), *raw_args]
     return subprocess.run(
         args,
         cwd=repo,
@@ -406,3 +413,44 @@ def test_search_ignores_an_issue_closed_in_another_repository(tmp_path: Path) ->
     assert _run(
         tmp_path, "25", "skills/infrahub-managing-checks/", extra=(elsewhere,)
     ) == {201, 204, 301, 305}
+
+
+def test_search_says_what_matched(tmp_path: Path) -> None:
+    """Each line ends with what matched, so the agent need not guess.
+
+    The user's choice depends on it: a file match is often a PR doing
+    different work in the same files. #201 closes the issue only, #203 only
+    touches a target file.
+    """
+    result = _execute(tmp_path, "25", "skills/infrahub-managing-menus/")
+    assert result.returncode == 0, result.stderr
+    reasons = {
+        int(line.split("\t")[0][1:]): line.rsplit("\t", 1)[1]
+        for line in result.stdout.splitlines()
+    }
+    assert reasons[201] == "matched: issue"
+    assert reasons[203] == "matched: files"
+
+
+@pytest.mark.parametrize("issue", ["#25", ""], ids=["hash-prefix", "empty"])
+def test_search_fails_loudly_on_a_wrong_issue_argument(
+    tmp_path: Path, issue: str
+) -> None:
+    """A wrong `--issue` is SEARCH FAILED with exit 1, not argparse's exit 2.
+
+    An exit 2 with only a usage message and an empty stdout matches none of
+    the documented outcomes, and the closest one is `none found`.
+    """
+    result = _execute(tmp_path, "", "", raw_args=("--issue", issue))
+    assert result.returncode == 1, result.stderr
+    assert "SEARCH FAILED" in result.stderr
+
+
+def test_search_fails_loudly_in_a_shallow_clone(tmp_path: Path) -> None:
+    """A shallow clone is an error, not a list of every old merged PR.
+
+    Old merge commits are missing from a shallow clone even when they are in
+    HEAD, so every merged PR that ever matched would print as not in HEAD.
+    """
+    result = _execute(tmp_path, "25", "", shallow=True)
+    _assert_fails_loudly(result, "the checkout is shallow")

@@ -20,7 +20,8 @@ ancestor of `HEAD`, and it does at least one of:
 * changes a file under one of the `--target` path prefixes.
 
 Closed, unmerged PRs are never printed. Each match is one line,
-`#<number>\\t<state>\\t<branch>\\t<title>`.
+`#<number>\\t<state>\\t<branch>\\t<title>\\tmatched: <reason>`, where the
+reason is `issue`, `files`, or `issue, files`.
 
 The search is complete, not a sample:
 
@@ -33,13 +34,17 @@ The search is complete, not a sample:
   pull-files endpoint before the target paths are matched.
 
 It runs in the repository the stage works in and needs no fetch: a merge
-commit missing from the local repository is not in `HEAD` either.
+commit missing from the local repository is not in `HEAD` either. That does
+not hold in a shallow clone, where old commits of `HEAD` are missing too, so
+the search refuses to run in one.
 
 Exit codes
 ----------
   0  The search ran. Matches, if any, are on stdout; no output means none.
-  1  The search did not complete (`gh` or `git` failed, or returned data
-     this script could not read). `SEARCH FAILED: <reason>` is on stderr.
+  1  The search did not complete (`gh` or `git` failed, returned data this
+     script could not read, the checkout is shallow, or an argument was
+     wrong, such as `--issue "#42"` instead of `--issue 42`).
+     `SEARCH FAILED: <reason>` is on stderr.
      Never record this as "none found".
 """
 
@@ -50,6 +55,7 @@ import json
 import re
 import subprocess  # noqa: S404
 import sys
+from typing import NoReturn
 
 FIELDS = "number,title,body,headRefName,closingIssuesReferences,files,changedFiles,mergeCommit"
 FIRST_PAGE = 100
@@ -128,18 +134,27 @@ def touches(pr: dict, targets: list[str]) -> bool:
     return any(path.startswith(t) for path in all_files(pr) for t in targets)
 
 
-def matches(pr: dict, issue: int | None, targets: list[str]) -> bool:
+def match_reason(pr: dict, issue: int | None, targets: list[str]) -> str:
+    """What matched, `issue`, `files` or both, or an empty string for no match."""
+    reasons = []
     if issue is not None and names_issue(pr, issue):
-        return True
-    return bool(targets) and touches(pr, targets)
+        reasons.append("issue")
+    if targets and touches(pr, targets):
+        reasons.append("files")
+    return ", ".join(reasons)
 
 
-def _git(*args: str) -> int:
+def _run_git(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603
         ["git", *args],  # noqa: S607
         capture_output=True,
+        text=True,
         check=False,
-    ).returncode
+    )
+
+
+def _git(*args: str) -> int:
+    return _run_git(*args).returncode
 
 
 def in_head(sha: str) -> bool:
@@ -155,21 +170,40 @@ def in_head(sha: str) -> bool:
 def search(issue: int | None, targets: list[str]) -> list[str]:
     if _git("rev-parse", "--verify", "--quiet", "HEAD") != 0:
         raise SearchFailed("not inside a git checkout with a HEAD commit")
+    shallow = _run_git("rev-parse", "--is-shallow-repository")
+    if shallow.returncode != 0 or shallow.stdout.strip() != "false":
+        # A missing merge commit would read as "not in HEAD" for every old PR.
+        raise SearchFailed("the checkout is shallow; run git fetch --unshallow first")
     lines = []
     for pr in all_prs("open"):
-        if matches(pr, issue, targets):
-            lines.append(f"#{pr['number']}\topen\t{pr['headRefName']}\t{pr['title']}")
-    for pr in all_prs("merged"):
-        if matches(pr, issue, targets) and not in_head(pr["mergeCommit"]["oid"]):
+        if reason := match_reason(pr, issue, targets):
             lines.append(
-                f"#{pr['number']}\tmerged, not in HEAD\t{pr['headRefName']}\t{pr['title']}"
+                f"#{pr['number']}\topen\t{pr['headRefName']}\t{pr['title']}"
+                f"\tmatched: {reason}"
+            )
+    for pr in all_prs("merged"):
+        reason = match_reason(pr, issue, targets)
+        if reason and not in_head(pr["mergeCommit"]["oid"]):
+            lines.append(
+                f"#{pr['number']}\tmerged, not in HEAD\t{pr['headRefName']}"
+                f"\t{pr['title']}\tmatched: {reason}"
             )
     return lines
 
 
+class _Parser(argparse.ArgumentParser):
+    """Report a wrong argument as SEARCH FAILED and exit 1, not argparse's 2."""
+
+    def error(self, message: str) -> NoReturn:
+        print(f"SEARCH FAILED: {message}. Nothing was searched.", file=sys.stderr)
+        sys.exit(1)
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--issue", type=int, help="issue number the change is for")
+    parser = _Parser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--issue", type=int, help="issue number the change is for, bare (42, not #42)"
+    )
     parser.add_argument(
         "--target",
         action="append",

@@ -119,22 +119,27 @@ uv run python .agents/skills/skill-pipeline-common/scripts/find_existing_prs.py 
   --issue "<issue number>" --target "<path prefix>" --target "<another path prefix>"
 ```
 
-Leave out `--issue` when there is no issue number, and `--target` when no
-files are named yet. It prints one line per open PR, and per merged PR whose
-merge commit is not in `HEAD` yet, that closes the issue, names `#<issue>` in
-its title or body, or changes a file under a target. Closed, unmerged PRs are
-left out. The search reads every PR, not the newest page, and the full file
-list of large PRs; the script's docstring states exactly what it checks.
+`--issue` takes the bare number, `42`, not `#42`. Leave out `--issue` when
+there is no issue number, and `--target` when no files are named yet. It
+prints one line per open PR, and per merged PR whose merge commit is not in
+`HEAD` yet, that closes the issue, names `#<issue>` in its title or body, or
+changes a file under a target. The last column says what matched: `issue`,
+`files`, or both. Closed, unmerged PRs are left out. The search reads every
+PR, not the newest page, and the full file list of large PRs; the script's
+docstring states exactly what it checks.
 
 No output and exit status 0: record `Duplicate check: none found` and
 continue.
 
-`SEARCH FAILED` and exit status 1: nothing was searched. Report the
-error and stop. Never record `none found` for a search that did not run,
-because the next stage cannot tell the two apart.
+`SEARCH FAILED`, or any other non-zero exit status (from `uv`, for
+example): nothing was searched. Report the error and stop. A shallow
+checkout also fails here; run `git fetch --unshallow` and search again.
+Never record `none found` for a search that did not run, because the next
+stage cannot tell the two apart.
 
-Any output: list each PR with its number, title, branch, state, and whether
-the issue or a file matched, then stop and ask the user to choose one of:
+Exit status 0 with output on stdout: list each PR with its number, title,
+branch, state, and what matched, from the last column, then stop and ask
+the user to choose one of:
 
 - stop the pipeline here;
 - continue on that PR's branch instead of `ai-skill-pipeline-<key>`;
