@@ -2392,6 +2392,46 @@ EOF
         ok, msg = self._deleted(notes)
         assert ok, msg
 
+    def test_outer_terminator_closes_an_unclosed_nested_heredoc(self):
+        """Bash ends ``ssh host <<'EOF'`` at ``EOF`` even if its body never closed ``<<NOTE``."""
+        notes = """\
+```bash
+git commit -am retire
+ssh infrahub-host <<'EOF'
+cat <<NOTE
+EOF
+git push origin main
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_open_quote_in_a_running_body_ends_with_it(self):
+        notes = """\
+```bash
+git commit -am retire
+ssh infrahub-host <<'EOF'
+echo 'unfinished
+EOF
+git push origin main
+infrahubctl object delete CoreMenuItem Campus/LabMenu --yes
+```
+"""
+        ok, msg = self._deleted(notes)
+        assert ok, msg
+
+    def test_malformed_env_split_string_runs_nothing(self):
+        """``env -S "'bad" git push`` fails in env; the trailing ``git push`` never runs."""
+        notes = (
+            "```bash\ngit commit -am retire\n"
+            "env -S \"'bad\" git push\n"
+            "infrahubctl object delete CoreMenuItem Campus/LabMenu --yes\n```\n"
+        )
+        ok, msg = self._deleted(notes)
+        assert not ok
+        assert "No git push" in msg
+
     def test_heredoc_fed_to_python_stays_data(self):
         notes = """\
 ```bash

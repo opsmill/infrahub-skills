@@ -863,7 +863,7 @@ def _env_command(args: list[str]) -> list[str]:
             try:
                 return shlex.split(split) + args
             except ValueError:
-                return args
+                return []  # env rejects the string and runs nothing
     return args
 
 
@@ -1217,8 +1217,13 @@ def _shell_commands(body: str, console: bool = False) -> list[list[str]]:
         if console:
             raw = _CONTINUATION_PROMPT_RE.sub("", raw, count=1)
         if heredocs:
-            if raw.strip() == heredocs[-1][0]:
-                heredocs.pop()
+            # A terminator closes its heredoc and everything nested in it:
+            # bash ends ``ssh host <<EOF`` at ``EOF`` even when the body it
+            # runs opened ``cat <<NOTE`` and never closed it.
+            closes = [depth for depth, (end, _) in enumerate(heredocs) if raw.strip() == end]
+            if closes:
+                del heredocs[closes[-1] :]
+                pending = []  # a quote left open in the body ends with it
                 continue
             if not heredocs[-1][1]:
                 continue
