@@ -250,7 +250,8 @@ Stop and report rather than guessing forward, when:
 - the test cannot be made to fail against the current code
 - the red run scores 1.0, meaning the model already produces the wanted
   behavior without the rule and the rule may be redundant
-- three red runs in a row show a grader read, the re-run limit in
+- three red-run trials in a row, counted across runs, show a grader read, the
+  re-run limit in
   `dev/guides/running-evals.md` § "Prove the task discriminates"
 
 ## Common mistakes
