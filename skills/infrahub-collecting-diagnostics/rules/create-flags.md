@@ -92,4 +92,4 @@ infrahub-collect create --benchmark --include-queries --include-backup
   `environment detect` reports ambiguity, causing
   `create` to target the wrong deployment.
 
-Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)

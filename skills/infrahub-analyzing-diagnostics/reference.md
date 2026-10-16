@@ -293,6 +293,6 @@ risk), HIGH (feature broken, crash loop), MEDIUM
 
 ## Docs
 
-- [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+- [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)
 - [Infrahub architecture](https://docs.infrahub.app/overview/architecture)
 - [opsmill/infrahub issues](https://github.com/opsmill/infrahub/issues)

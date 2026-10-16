@@ -90,4 +90,4 @@ index) that nothing in the bundle establishes.
   listing it as an open question with the collection
   flags that would answer it.
 
-Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)

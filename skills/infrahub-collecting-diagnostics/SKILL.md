@@ -33,7 +33,7 @@ When an Infrahub user reports a problem, an expert
 (OpsMill support, or a senior engineer) needs a
 consistent set of artifacts to triage it: logs,
 config, version info, and environment state. This
-skill runs [`infrahub-collect`](https://docs.infrahub.app/backup/guides/install-collect),
+skill runs [`infrahub-collect`](https://docs.infrahub.app/backup/collect/install),
 OpsMill's dedicated diagnostic-bundle tool, to
 produce that artifact set.
 
