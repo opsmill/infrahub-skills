@@ -79,6 +79,11 @@ would drift from the original.
 Empty input, or an issue number `gh` cannot fetch: say so and stop. Analyzing
 a guess produces a diagnosis nobody asked for.
 
+With an issue number, run Part A of
+[`../skill-pipeline-common/handoff-format.md`](../skill-pipeline-common/handoff-format.md)
+§ "Searching for existing pull requests" now, before any analysis. A PR that
+already fixes the issue makes the rest of this stage wasted work.
+
 ## Clarity check
 
 | Requirement | What it means |
@@ -107,6 +112,11 @@ behavior, command, or claim the report names. Name the file and the line for
 every hit that matters: the prose sentence, the check function, the script
 line, or the eval task. A root cause with no `file:line` is not a root cause,
 it is a hunch with a citation missing.
+
+With those files named, run Part B of the existing-PR search in
+[`../skill-pipeline-common/handoff-format.md`](../skill-pipeline-common/handoff-format.md)
+§ "Searching for existing pull requests" on their paths. This is the only
+check that runs on free-text input, which has no issue number for Part A.
 
 ## Ground truth
 
