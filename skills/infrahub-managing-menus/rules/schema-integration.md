@@ -26,7 +26,11 @@ is additive — neither side dedupes against the
 other — so every node referenced by a custom item
 that hasn't set `include_in_menu: false` shows up
 twice: once in the custom hierarchy, once at the
-namespace root. Users typically report this as "my
+namespace root. (This is about the sidebar merge, not
+reloading a file: for what a reload does to items the
+file dropped, see
+[format-structure.md](./format-structure.md#removing-or-renaming-items).)
+Users typically report this as "my
 menu is weird" without realizing both entries are
 working as designed; the fix is on the schema side,
 which is why this rule lives in `managing-menus`
