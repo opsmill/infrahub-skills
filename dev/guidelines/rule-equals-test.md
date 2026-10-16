@@ -152,6 +152,44 @@ to reach hydration through `.add()`, so the sample looked
 like the cause. Name the mechanism from what the scenarios
 share, not from what the ones you happened to write share.
 
+Taken again, for the `client.create()` bullet in
+`skills/infrahub-managing-generators/rules/python-generate.md`
+(#193). Three scenarios, five trials, all 1.00: the schema
+inline in the prompt, a modification task with the schema
+inline, and the schema as `schemas/interfaces.yml` in the
+workspace.
+
+The bug needs a field the kind does not have. A grader can
+only score that against the kind's schema, and any task that
+gives the model the schema hands it the answer: in every
+trial the model read the schema and left the field out. Its
+reasoning still showed the false belief the rule corrects,
+that the SDK rejects the field rather than dropping it, but
+the grader reads code, not reasoning.
+
+The bullet's second claim, that a non-empty `data` makes
+`create()` ignore every keyword field, was measured on its
+own, because that reason does not apply to it: every field
+is valid, so a task can show the schema without giving the
+answer away. Two scenarios, three trials, all 1.00, with the
+skill read, the claim removed from it, and the task graded by
+`check_create_fields_exist_on_kind`. Both scenarios gave an
+existing generator that builds a base `data` dict per
+interface. In the first the user asks for an mtu on every
+interface (2 trials); in the second the user asks for an
+`mtu=` argument on each `create()` call (1 trial).
+
+When the existing code passes its fields through `data`,
+adding the new one to that dict is the edit the model makes,
+and it did so in every trial. In one trial it also said,
+unasked, that keywords next to `data` are dropped. Asked for
+the keyword, it read `create()` in the installed SDK, found
+`data or kwargs`, and put the field in `data` instead.
+
+`check_create_fields_exist_on_kind` and its fixtures stay in
+`tests/graders/test_generators_create_fields.py`, guarding
+the check.
+
 ## When the grader and the rule disagree, decide which side moves
 
 A check that encodes a stricter contract than the rule
