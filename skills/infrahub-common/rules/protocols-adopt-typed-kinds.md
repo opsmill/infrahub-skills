@@ -15,18 +15,13 @@ exact line rather than a runtime failure.
 ### Generate the protocols
 
 `infrahubctl protocols` writes a Python module of typed classes for your
-schema. The async client is the default; add `--sync` for the sync client.
+schema, read from a running instance that has the schema loaded. The async
+client is the default; add `--sync` for the sync client.
 
 ```bash
-# From a running instance (async client, default) — reads the configured
-# INFRAHUB_ADDRESS (defaults to http://localhost:8000)
+# Async client (default): reads the configured INFRAHUB_ADDRESS
+# (defaults to http://localhost:8000)
 infrahubctl protocols --out lib/protocols.py
-
-# From local schema files, no instance needed
-infrahubctl protocols --schemas schemas/ --out lib/protocols.py
-
-# Sync client
-infrahubctl protocols --schemas schemas/ --sync --out lib/protocols_sync.py
 ```
 
 Prefix `infrahubctl` with your project's Python runner and confirm the
@@ -38,9 +33,9 @@ info` as the connectivity test) and
 for the `uv run` / `poetry run` prefix. The instance address is not
 hardcoded here — it comes from your environment or `infrahubctl.toml`.
 
-> The full regeneration workflow and the "never hand-edit" rule live in
-> [protocols-generated](./protocols-generated.md) — keep the two in step if
-> the CLI changes.
+> The regeneration commands (branch, sync variant), the limits of offline
+> `--schemas` generation, and the "never hand-edit" rule live in
+> [protocols-generated](./protocols-generated.md).
 
 ### Use them
 
@@ -62,8 +57,6 @@ the SDK: `from infrahub_sdk.protocols import CoreIPPrefixPool`.
   update itself, and a stale file gives wrong types silently.
 - **Match sync vs async to your client** — a sync check imports the `--sync`
   variant; async uses the default.
-- Local-directory generation does not emit Profile or Object-Template
-  protocols.
 
 See [protocols-generated](./protocols-generated.md) for why the file is a
 build artifact you never hand-edit. The auditor flags untyped string kinds via
