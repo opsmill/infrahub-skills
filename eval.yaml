@@ -635,20 +635,22 @@ tasks:
         run: python graders/managing-schemas/check_service_cascade.py
         weight: 1.0
     expected_output: >-
-      A schema where the VIPService → HealthCheck Component relationship
-      sets on_delete: cascade explicitly (so health checks are removed
-      when the parent VIP is deleted), and the VIPService → IP
-      relationship either omits on_delete or sets on_delete: no-action
-      (so the shared IP is preserved). Any kind: Parent relationship has
+      A schema where the relationship to HealthCheck resolves to
+      on_delete: cascade, either set explicitly or omitted on a
+      Component kind (so health checks are removed when the parent VIP
+      is deleted), and the VIPService → IP
+      relationship either sets on_delete: no-action or omits on_delete
+      on a non-Component kind (so the shared IP is preserved). Any kind: Parent relationship has
       optional: false.
     expectations:
       - >-
-        At least one relationship sets on_delete: cascade — the owned
-        HealthCheck children whose existence has no meaning without the
-        VIPService
+        A relationship to HealthCheck resolves to on_delete: cascade
+        (explicit, or omitted on a Component kind), since health checks
+        have no meaning without the VIPService
       - >-
         The IP-address reference does NOT set on_delete: cascade
-        (no-action or omitted, since the IP is shared infrastructure)
+        (no-action, or omitted on a non-Component kind, since the IP is
+        shared infrastructure)
       - >-
         Any kind: Parent relationship has optional: false and
         cardinality: one
@@ -664,8 +666,12 @@ tasks:
         check: "Schema starts with version: '1.0'"
       - name: on-delete-cascade-present
         check: >-
-          At least one relationship sets on_delete: cascade for owned
-          children
+          A relationship to the HealthCheck node resolves to on_delete:
+          cascade (explicit value, or omitted on a Component kind)
+      - name: ip-reference-not-cascade
+        check: >-
+          Every relationship to the IP address resolves to on_delete:
+          no-action (explicit value, or omitted on a non-Component kind)
       - name: parent-rel-optional-false
         check: >-
           Any kind: Parent relationship has optional: false and

@@ -190,6 +190,29 @@ the keyword, it read `create()` in the installed SDK, found
 `tests/graders/test_generators_create_fields.py`, guarding
 the check.
 
+The reference-drift remedy was taken once, for
+`skills/infrahub-managing-schemas/rules/relationship-on-delete.md`
+(#190). The rule said an omitted `on_delete` defaults to
+`no-action`; Infrahub resolves it to `cascade` on
+`kind: Component`. Two scenarios, four trials. An audit
+task asking for the applied `on_delete` scored 1.0 twice
+with the wrong rule in place: the model read the Infrahub
+source on the host the first time and docs.infrahub.app
+the second, and overrode the skill both times. A design
+task scored 0.8 twice, on an unrelated check, because
+the model would not model an independent peer as
+`kind: Component`. The replacement is
+`tests/test_on_delete_reference.py`, which reads the
+kind and value sets from `infrahub-sdk` and pins the
+kind-to-default mapping to the server source.
+
+That pin is the limit of the remedy here. The mapping
+lives only in the server, so the test holds a copy with
+a citation instead of reading it. It does not fail on
+its own when the server changes which kind defaults to
+what; only a new kind or value in `infrahub-sdk`
+reaches it without an edit.
+
 ## When the grader and the rule disagree, decide which side moves
 
 A check that encodes a stricter contract than the rule
