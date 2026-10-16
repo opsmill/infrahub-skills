@@ -4,6 +4,7 @@ description: >-
   Audits an Infrahub repository against best practices and rules, producing a structured compliance report.
   TRIGGER when: reviewing repo for compliance, onboarding to existing project, pre-deployment validation, catching issues.
   DO NOT TRIGGER when: creating schemas, writing checks/generators, querying live data, populating objects, planning an Infrahub version upgrade (use infrahub-planning-upgrades).
+  ALWAYS pass the user's request verbatim as args, with any scope, path, or focus they named. This skill runs in a forked context and cannot see the parent conversation.
 context: fork
 allowed-tools:
   - Read

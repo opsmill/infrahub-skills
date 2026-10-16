@@ -60,20 +60,16 @@ rule as covered forever.
    `graders/<skill>/check_<task>.py`, run against four
    fixtures: compliant, compliant refactored the way
    the check's traversal is vulnerable to,
-   violating, and a violating near-miss that satisfies
-   the check's keyword. Steps 4 and 5 fall away
+   violating, and a violating near-miss that carries
+   the check's tokens bound to the wrong subject,
+   committed as tests under `tests/graders/`. Steps 4 and 5 fall away
    together under the step-4 carve-out: a task
    grader's only call site is its task's `run:` line,
    so one written without a task is dead coverage.
 6. Old claims the rule contradicts swept from every
-   surface that states one, the contributor skills
-   included:
-
-   ```bash
-   grep -rn "<old claim, command, or field>" \
-     skills/ graders/ eval.yaml dev/ .agents/skills/
-   ```
-
+   surface that states one, with the command and the
+   term choice in
+   [adding-a-rule.md](../guides/adding-a-rule.md#6-sweep-the-layers-the-rule-contradicts).
    Inside `eval.yaml`, sweep `expected_output` as well
    as `expectations`: it states the answer as prose,
    so a sweep aimed at the assertion list walks past
@@ -161,6 +157,13 @@ Before adding a check, write out the answer the rule's
 example shows, plus the answer its carve-outs allow, and
 run the check on both. When they disagree, decide which
 side moves and move it. Usually it is the check.
+
+The task's own prose is a third side. A step that
+`expected_output` describes and no check asserts is a
+wrong answer the grader passes: assert it, or drop the
+claim. The other way round, a check reading a field
+that only the prompt asked for breaks once the prompt
+stops dictating it. Teach the field in the skill first.
 
 **Never let an assertion pin a defect in place.** An
 invalid flag taught in eight places was also asserted by
