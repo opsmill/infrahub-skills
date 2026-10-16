@@ -45,8 +45,8 @@ Git branch moves.
 1. Merge `main` into the Git branch with the same name
    as the source branch, and push it. Use `git merge`,
    or `git pull --no-rebase`; a plain `git pull` rebases
-   when `pull.rebase` is set and stops on a diverged
-   branch when it is not. Do not rebase: a rebase
+   when `pull.rebase` is true and stops on a diverged
+   branch when it is unset. Do not rebase: a rebase
    rewrites the branch, so a plain push is rejected. On
    Infrahub 1.11 and earlier, the repository sync also
    cannot pull a force-pushed branch, so the commit
