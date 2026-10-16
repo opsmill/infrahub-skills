@@ -2093,22 +2093,28 @@ _OUTPUT_GROUP_KIND = "CoreGeneratorGroup"
 # A first-line comment that labels a whole fence as the wrong form. Narrower
 # than _NEGATIVE_LABEL on purpose: a fence opening with an instruction such
 # as `# Do not create a new group` or `# Never edit by hand` is still the
-# answer. A word counts only when it stands alone: followed by optional `*`
-# and whitespace, then the end of the line or one of `:`, `.`, `(`, `-`, an en
-# dash or an em dash. So `# WRONG`, `# FAILS: creates a second group` and
-# `# AVOID — ...` label the block, while `# Fails silently as a
-# CoreStandardGroup: ...` or `# Wrong group kinds are rejected` is a sentence
-# that opens the answer. The words are a verdict (`WRONG`, `INCORRECT`, `BAD`,
-# `BROKEN`, `FAIL`/`FAILS`, `ANTI-PATTERN`, `DOES NOT RESOLVE`) or a negation
-# (`AVOID`, `DO NOT`, `DON'T`, `NEVER`). A negation also counts when the words
-# after it point at the block itself: an optional short verb
+# answer. The words are a verdict (`WRONG`, `INCORRECT`, `BAD`, `BROKEN`,
+# `FAIL`/`FAILS`, `ANTI-PATTERN`, `DOES NOT RESOLVE`) or a negation (`AVOID`,
+# `DO NOT`, `DON'T`, `NEVER`). A word counts only when it stands alone:
+# followed by optional `*` and whitespace, then the end of the line or one of
+# `:`, `.`, `(`, `-`, an en dash, an em dash, `!`, `,`, `;` or `/`. A verdict
+# may also take one noun from a short list (example, examples, approach, way,
+# usage, pattern) before that terminator. So `# WRONG`, `# WRONG!`,
+# `# Bad example`, `# WRONG approach: ...`, `# FAILS: creates a second group`
+# and `# AVOID — ...` label the block, while `# Fails silently as a
+# CoreStandardGroup: ...`, `# Fail fast: ...` or `# Wrong group kinds are
+# rejected` is a sentence that opens the answer. A negation also counts when
+# the words after it point at the block itself: an optional short verb
 # (do/use/write/copy), an optional `it` and `like`, then this/these/that/the
 # following, as in `# Don't do it this way`, `# Avoid the following` or
 # `# Never write like this`.
-_STANDS_ALONE = r"\s*\**\s*(?:$|[:.\-–—(])"
+_STANDS_ALONE = r"\s*\**\s*(?:$|[:.\-–—(!,;/])"
+_LABEL_NOUN = r"(?:\s+(?:EXAMPLES?|APPROACH|WAY|USAGE|PATTERN))?"
 _WRONG_FENCE_LABEL = re.compile(
     r"#\s*\**\s*(?:"
-    r"(?:WRONG|INCORRECT|BAD|BROKEN|FAILS?|ANTI-?PATTERN|DOES NOT RESOLVE)" + _STANDS_ALONE
+    r"(?:WRONG|INCORRECT|BAD|BROKEN|FAILS?|ANTI-?PATTERN|DOES NOT RESOLVE)"
+    + _LABEL_NOUN
+    + _STANDS_ALONE
     + r"|(?:AVOID|DO NOT|DON'T|NEVER)"
     r"(?:" + _STANDS_ALONE
     + r"|\s+(?:(?:DO|USE|WRITE|COPY)\s+)?(?:IT\s+)?(?:LIKE\s+)?"

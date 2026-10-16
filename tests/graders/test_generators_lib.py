@@ -1285,6 +1285,14 @@ def test_generator_targets_existing_group_grades_a_violation_opening_with_an_ins
         "# DOES NOT RESOLVE",
         "# **Wrong**: a second group",
         "# Anti-pattern (creates a second group)",
+        "# Bad example",
+        "# WRONG approach: a second group",
+        "# WRONG!",
+        "# Incorrect usage",
+        "# Wrong way",
+        "# BAD, do not copy",
+        "# WRONG; a second group",
+        "# WRONG/INCORRECT",
     ],
 )
 def test_generator_targets_existing_group_skips_a_fence_labelled_wrong(label, tmp_path):
@@ -1363,3 +1371,43 @@ def test_generator_target_grader_fails_a_converted_target_under_a_fails_sentence
     check = next(c for c in graded["checks"] if c["name"] == "generator-targets-existing-group")
     assert check["passed"] is False, check["message"]
     assert graded["score"] < 1.0, graded["details"]
+
+
+def _grade_target_answer(body: str, tmp_path: Path) -> dict:
+    (tmp_path / "output.md").write_text(body, encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(_TARGET_GRADER_PATH)],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+_FAILS_SILENTLY = (
+    "# Fails silently as a CoreStandardGroup: the dispatcher needs a CoreGeneratorGroup"
+)
+
+
+@pytest.mark.parametrize(
+    ("label", "passes"),
+    [
+        # The skill's own rules/_template.md labels its contrast block this way.
+        ("# Bad example", True),
+        (_FAILS_SILENTLY, False),
+    ],
+)
+def test_generator_target_grader_skips_a_bad_example_but_grades_a_fails_sentence(
+    label, passes, tmp_path
+):
+    """`# Bad example` labels a contrast block; `# Fails silently ...` opens the answer."""
+    body = (
+        "Register the generator against the existing group.\n\n"
+        + _TARGET_MANIFEST
+        + _GENERATOR_GROUP_FENCE.format(label=label)
+    )
+    graded = _grade_target_answer(body, tmp_path)
+    check = next(c for c in graded["checks"] if c["name"] == "generator-targets-existing-group")
+    assert check["passed"] is passes, check["message"]
+    assert (graded["score"] == 1.0) is passes, graded["details"]
