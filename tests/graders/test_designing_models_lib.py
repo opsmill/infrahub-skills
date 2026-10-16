@@ -1233,6 +1233,21 @@ def branch_brief(mechanisms: str = BRANCH_MECH) -> str:
             None, id="compliant-vlan-pool-row-beside-the-constraint",
         ),
         pytest.param(
+            branch_brief(BRANCH_MECH.replace(
+                "| A new branch gets its access router, /29 and VLAN | generator |",
+                "| A new branch gets a unique VLAN and a /29 from shared pools | generator |",
+            )),
+            None, id="compliant-build-out-generator-names-unique-vlan-and-shared-pools",
+        ),
+        pytest.param(
+            branch_brief(BRANCH_MECH.replace("| No two branches share a VLAN |", "| VLAN uniqueness across branch offices |")),
+            None, id="compliant-rule-worded-as-vlan-uniqueness",
+        ),
+        pytest.param(
+            branch_brief(BRANCH_MECH.replace("| No two branches share a VLAN |", "| Reject a VLAN ID that another branch already uses |")),
+            None, id="compliant-rule-worded-as-reject-already-used",
+        ),
+        pytest.param(
             branch_brief(
                 BRANCH_MECH.replace("| schema constraint | Vlan |", "| resource pool | Vlan |")
             ),
