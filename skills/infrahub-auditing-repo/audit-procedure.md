@@ -323,9 +323,8 @@ convention).
 ### 5.2 Target group consistency
 
 - All `targets` referenced in `.infrahub.yml` should
-  be documented or exist as `CoreStandardGroup` /
-  `CoreGeneratorGroup`
-- Generator targets must be `CoreGeneratorGroup`
+  be documented or exist as a group of any `CoreGroup`
+  kind
 
 ### 5.3 Artifact → Transform linkage
 
@@ -545,7 +544,7 @@ The default verdict is `clear (unverified)`.
   (step 2, MEDIUM) — also applies when a generator's
   output shape duplicates an existing generic.
 - `yagni-generator-query-shape-too-broad` (step 4, LOW) —
-  `CoreGeneratorGroup` in the data query, focal-exclude
+  the trigger group in the data query, focal-exclude
   loops, or `>2` top-level kind sections. Frequently
   co-occurs with `yagni-missing-inverse-forces-python-filter`;
   re-check both together.
@@ -562,12 +561,14 @@ The default verdict is `clear (unverified)`.
 
 - `yagni-untyped-python-vs-generated-protocols` (step 7, LOW)
   — a bare string `kind` (`kind="Foo"` or positional `"Foo"`)
-  passed to `client.create/get/all/filters/count`, or a
-  hand-built dict payload, when a generated protocol class for
-  that kind is available (a repo `protocols.py` /
-  `schema_protocols.py` / `*_sync.py` / `*_async.py`, or
-  `infrahub_sdk.protocols`). Pass the class instead for
-  author-time type checking. Attributes only — do not flag
+  passed to `client.create/get/all/filters/count`, including
+  one sent with a hand-built dict payload, when a generated
+  protocol class for that kind is available (a repo
+  `protocols.py` / `schema_protocols.py` / `*_sync.py` /
+  `*_async.py`, or `infrahub_sdk.protocols`). Pass the class
+  instead for author-time type checking of attribute reads; the
+  payload's field names stay unchecked either way. Attributes
+  only — do not flag
   relationship-only access, trivial one-offs, or code already
   using protocol classes.
 

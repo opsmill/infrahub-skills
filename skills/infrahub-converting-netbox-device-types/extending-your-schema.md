@@ -126,9 +126,10 @@ Two details that are easy to get wrong:
   `PSU-1`–`PSU-8` beside `1`–`10`, and `A9K-AC-PEM-V3`
   starts at `'0'`. v2 types it as `Number` with
   `min_value: 1`, which rejects 15 of that chassis's 24
-  bays. [schema-library #76](https://github.com/opsmill/schema-library/pull/76)
-  retypes it and adds `bay_label`; until it merges, drop
-  `position` and `label` from the mapping.
+  bays. [schema-library #76](https://github.com/opsmill/schema-library/pull/76),
+  merged on 2026-09-09, retypes it and adds `bay_label`;
+  on a checkout from before then, drop `position` and
+  `label` from the mapping.
 - **NetBox's `label` maps to `bay_label`, never `label`.**
   Infrahub auto-populates an attribute named `label` from
   `name` and title-cases it, so "NetBox supplied no
@@ -142,10 +143,10 @@ Two details that are easy to get wrong:
 | `DcimModuleBay` | The **slot** — name, position, label | Yes, concrete |
 | `DcimGenericModule` / `DcimModule` | An **installed** module | Yes, generic + concrete |
 | `DcimGenericModuleType` / `DcimModuleType` | The module **model** | Yes, generic + concrete |
-| `DcimModulePort` | A port the module provides | [#76](https://github.com/opsmill/schema-library/pull/76) |
+| `DcimModulePort` | A port the module provides | Yes, since [#76](https://github.com/opsmill/schema-library/pull/76) (`extensions/module_port/`) |
 
-`DcimGenericModuleType.weight_grams` also arrives with
-[#76](https://github.com/opsmill/schema-library/pull/76). It is grams, not
+`DcimGenericModuleType.weight_grams` came with
+[#76](https://github.com/opsmill/schema-library/pull/76) too. It is grams, not
 kilograms, precisely because modules are the light hardware that integer
 kilograms round to zero — map it with the `weight_g` transform.
 
@@ -163,20 +164,20 @@ asserting it would be inventing data.
 
 ### Ports on a module
 
-`DcimModulePort` ([#76](https://github.com/opsmill/schema-library/pull/76))
-gives a module's ports a home, and #76 extends
-`DcimGenericModule` with a `ports` Component
-relationship. Those ports carry NetBox's `{module}`
-token, which no conversion can resolve — the bay
-position is only known once the module is installed.
+`DcimModulePort` ([#76](https://github.com/opsmill/schema-library/pull/76),
+`extensions/module_port/`) gives a module's ports a
+home, through a `ports` Component relationship on
+`DcimGenericModule`. Those ports carry NetBox's
+`{module}` token, which no conversion can resolve: the
+bay position is only known once the module is installed.
 The bundled generator closes that gap at runtime; see
 [generators-module-ports.md](./generators-module-ports.md).
 
-Note that v2's `DcimModule` does **not** set
-`generate_template: true`, so `TemplateDcimModule` is not
-generated and the converter reports a module's own
-component lists as skipped. Add the flag to your concrete
-module node if you want module templates.
+`DcimModule` does **not** set `generate_template: true`,
+so `TemplateDcimModule` is not generated and the
+converter reports a module's own component lists as
+skipped until you add it. See
+[Carrying the ports too](#carrying-the-ports-too).
 
 ## Converting module types
 
@@ -186,10 +187,10 @@ no published module type carries one — so a mixed tree
 converts in a single pass:
 
 ```bash
-python scripts/netbox_to_infrahub_templates.py \
+python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
   devicetype-library/device-types/Arista/ \
   devicetype-library/module-types/Arista/ \
-  --mapping scripts/mappings/schema-library-modules.yml \
+  --mapping "$SKILL/scripts/mappings/schema-library-modules.yml" \
   --output-dir ./generated
 ```
 
@@ -205,7 +206,7 @@ not written:
 
 ```yaml
 module_type:
-  kind: DeviceLinecardType        # YOUR concrete node, not the generic
+  kind: DcimModuleType            # the concrete node, not the generic
   manufacturer_relationship: manufacturer
   key: "{model}"                  # module types have no slug
   fields:
@@ -216,67 +217,68 @@ module_type:
       fallback: comments
 ```
 
-That is all the stock schema supports, and it is worth
-being blunt about why: a NetBox module type is mostly
-its component list — the ports the module provides —
-and neither `DcimGenericModuleType` nor
-`DcimGenericModule` has **any component
-relationship**. Every `interfaces`, `power-ports`, and
-`front-ports` entry is reported as skipped. You get a
-catalogue of module models, not their ports.
+That is what `schema-library-modules.yml` does, and it
+converts module *models* only. A NetBox module type is
+mostly its component list — the ports the module
+provides — and without a module template those have
+nowhere to go, so every `interfaces`, `console-ports`,
+and `power-ports` entry is reported as skipped.
 
 Note what is *not* the obstacle: the unique
 `serial_number`. Module templates work fine — Infrahub
 omits unique attributes from templates and keys them on
-`template_name`. The missing piece is somewhere to put
-the ports.
+`template_name`. The missing piece is the template
+itself.
 
-### Carrying the components too
+### Carrying the ports too
 
-Two changes to your concrete module node:
+Two changes, both additive.
 
-1. `generate_template: true`, so `Template<YourModule>`
-   is generated at all.
-2. A `Component` relationship that can hold ports
-   ([Gap 1](#gap-1-a-whole-component-list-is-skipped)).
+1. **Let Infrahub generate the module template.** Load
+   this after `extensions/device_module/` and
+   `extensions/module_port/`; it adds the flag to the
+   existing node rather than redefining it:
 
-```yaml
-nodes:
-  - name: Linecard
-    namespace: Device
-    generate_template: true          # generates TemplateDeviceLinecard
-    inherit_from:
-      - DcimGenericModule
-    relationships:
-      - name: interfaces
-        peer: DcimInterface
-        identifier: linecard__interface
-        cardinality: many
-        kind: Component              # generates the port sub-templates
+   ```yaml
+   ---
+   version: "1.0"
+   nodes:
+     - name: Module
+       namespace: Dcim
+       generate_template: true      # generates TemplateDcimModule
+       inherit_from:                # and TemplateDcimModulePort
+         - DcimGenericModule
+   ```
+
+2. **Use `scripts/mappings/schema-library-module-ports.yml`.**
+   It is `schema-library-modules.yml` plus the module
+   template, with `interfaces`, `console-ports`, and
+   `power-ports` mapped onto the one `ports` relationship
+   as `TemplateDcimModulePort`, told apart by `category`.
+   Names keep `{module}` for the generator to resolve.
+
+Verified against Infrahub 1.11.4 and schema-library
+`5dd97b2`: the templates load, a module created from one
+with `object_template` carries its port declarations,
+and the generator turns the interface ports into device
+interfaces. Console ports need a console interface kind
+in the schema, and power ports stay declarations; see
+[What it creates, and what it refuses to](./generators-module-ports.md#what-it-creates-and-what-it-refuses-to).
+
+**Map module ports to `DcimModulePort`, never to an
+interface kind.** Putting an `interfaces` Component on
+the module node, peering `DcimInterface`, loads as a
+schema but fails on the first module template:
+
+```text
+1.interfaces.0.device: device is mandatory
 ```
 
-Then add the template half of the profile:
-
-```yaml
-module_type:
-  kind: DeviceLinecardType
-  manufacturer_relationship: manufacturer
-  key: "{model}"
-  position_placeholder: "1"
-  fields:
-    model: name
-  template:
-    kind: TemplateDeviceLinecard
-    template_name: "module__{model}"
-    module_type_relationship: linecard_type
-  components:
-    interfaces:
-      kind: TemplateInterfacePhysical
-      relationship: interfaces
-      template_name: "{template_name}__{name}"
-      fields:
-        name: name
-```
+Every interface kind has a mandatory `device` parent,
+and a module template has no device to give it. That is
+why the port is a declaration on the module, and why a
+generator creates the interface once the module is
+installed in a device.
 
 Declaring `components` without `template` is rejected —
 components hang off a template, and without one they
@@ -284,7 +286,7 @@ would silently go nowhere.
 
 ### The `{module}` position token
 
-93.9% of published module-type component names contain
+94.8% of published module-type component names contain
 `{module}`, which NetBox substitutes with the bay
 position when the module is installed:
 
@@ -524,7 +526,7 @@ before you commit to a list.
 
 Infrahub has no float attribute kind, so a weight is a
 whole number or nothing. Against schema-library's
-`Weight (kg)` that rounds **302 published device
+`Weight (kg)` that rounds **1,597 published device
 types** — sub-500g transceivers and access points — to
 `0`, which is worse than dropping them: a zero looks
 like data.
@@ -555,7 +557,7 @@ device_type:
 Grams keep every published weight distinct and sort
 correctly. Kilograms are fine if you only care about
 racked equipment — the report names every value that
-rounds to zero either way.
+rounds to zero, and counts them in its summary.
 
 Other frequently dropped top-level fields:
 

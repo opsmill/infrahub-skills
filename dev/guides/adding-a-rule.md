@@ -197,11 +197,12 @@ exercise the rule*, and it must not carry the answer:
   then restore the line before you run
   `sync-evals.py`. It reads the task's skill off
   that path and silently drops the task without it.
-  Below 1.0 and the task discriminates. A 1.0 is not
-  a verdict: each of the three readings in the linked
-  procedure carries its own disposition, and reading 2
-  is not a result until the prompt is hardened and
-  re-run.
+  On a trial whose output shows no grader read, below
+  1.0 and the task discriminates. A 1.0 is not
+  a verdict: each of the readings in the linked
+  procedure carries its own disposition, and "the task
+  measures the model" is not a result until the
+  prompt is hardened and re-run.
 - **Reproduce the antipattern conditions.** Where the
   rule has a tempting wrong shape, put the temptation
   in the prompt instead of hoping the AI stumbles

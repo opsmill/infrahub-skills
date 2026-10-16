@@ -1,9 +1,9 @@
 # Query feeding materialize_module_ports.py.
 #
-# Root kind: DcimDevice. `modules` and `module_bays` are extended onto the
-# DcimPhysicalDevice generic, while `name` and `interfaces` live on the
-# DcimGenericDevice generic; DcimDevice inherits both, so rooting here selects
-# all three without fragments. A schema whose physical device kind is named
+# Root kind: DcimDevice. `module_bays` is extended onto the DcimPhysicalDevice
+# generic, while `name` and `interfaces` live on the DcimGenericDevice generic;
+# DcimDevice inherits both, so rooting here selects all three without
+# fragments. A schema whose physical device kind is named
 # something else needs that kind substituted here.
 #
 # Inline fragments and unions

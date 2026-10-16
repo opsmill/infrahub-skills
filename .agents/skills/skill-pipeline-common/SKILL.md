@@ -29,6 +29,9 @@ rung 2 is about.
 - **[`handoff-format.md`](./handoff-format.md)** — the `.skill-change-<key>.md`
   file: how the key is derived, the template, the required fields, and the
   default-branch snippet every stage re-derives.
+- **[`scripts/find_existing_prs.py`](./scripts/find_existing_prs.py)** — the
+  existing-PR search both entrances run before analysing or designing, as
+  `handoff-format.md` § "Searching for existing pull requests" describes.
 - **[`ground-truth.md`](./ground-truth.md)** — verifying a claim about Infrahub
   behavior against real source at a version, and deciding whether the behavior
   was already fixed upstream.

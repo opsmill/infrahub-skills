@@ -2604,6 +2604,114 @@ tasks:
       - name: cli-commands-exist
         check: No invented infrahubctl subcommand appears in the answer
 
+  - name: common-protocols-regenerate-from-server
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-common/SKILL.md and follow
+      its rules.
+
+      Task: I added two attributes to `NetworkCircuit` in
+      `schemas/circuit.yml`: `commit_rate` and `circuit_ref`. My
+      repository keeps its generated protocol module in
+      `lib/protocols.py`, checked into git. These are the two schema
+      files:
+
+      ```yaml
+      # schemas/circuit.yml
+      ---
+      version: "1.0"
+      nodes:
+        - name: Circuit
+          namespace: Network
+          generate_template: true
+          attributes:
+            - name: name
+              kind: Text
+              unique: true
+            - name: commit_rate
+              kind: Number
+            - name: circuit_ref
+              kind: Text
+              optional: true
+      ```
+
+      ```yaml
+      # schemas/provider.yml
+      ---
+      version: "1.0"
+      nodes:
+        - name: Provider
+          namespace: Organization
+          attributes:
+            - name: name
+              kind: Text
+              unique: true
+      extensions:
+        nodes:
+          - kind: NetworkCircuit
+            relationships:
+              - name: provider
+                peer: OrganizationProvider
+                cardinality: one
+                optional: true
+      ```
+
+      Regenerate `lib/protocols.py` for this change. Give me the
+      commands, so I can commit the regenerated file together with the
+      schema change.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/common/check_protocols_regenerated.py
+        weight: 0.7
+      # As with the other common tasks, the deterministic half cannot see a
+      # command written as bare prose.
+      - type: llm_rubric
+        provider: anthropic
+        weight: 0.3
+        rubric: |
+          Read output.md. Score each criterion 0.0 or 1.0; return the
+          average.
+
+          1. The command that writes `lib/protocols.py` reads the schema
+             from a running Infrahub server that has the change loaded,
+             not from the local files with `--schemas`. An answer that
+             writes `lib/protocols.py` with `--schemas`, as the main
+             command or as an alternative, scores 0.0.
+          2. The answer says why the local `--schemas` form is wrong for
+             the committed file: it emits no Template (or Profile)
+             classes, so `TemplateNetworkCircuit` would disappear, and it
+             leaves out the `provider` relationship that
+             `schemas/provider.yml` adds through `extensions`.
+    expected_output: >-
+      An answer that loads the schema change into Infrahub (on a branch,
+      or on the default branch of a throwaway local instance) and then
+      regenerates the committed file from the
+      server, for example `infrahubctl protocols --branch <branch> --out
+      lib/protocols.py`, then diffs it against the committed file before
+      committing. It does not write `lib/protocols.py` with
+      `infrahubctl protocols --schemas schemas/`, because that output has
+      no `TemplateNetworkCircuit` class and no `provider` relationship from
+      the `extensions` block.
+    expectations:
+      - >-
+        The command that writes `lib/protocols.py` reads the schema from a
+        running server, not from the local files with `--schemas`
+      - >-
+        Says the `--schemas` output drops `TemplateNetworkCircuit` and the
+        `provider` relationship added through `extensions`
+      - Every infrahubctl command named in the answer actually exists
+    assertions:
+      - name: protocols-regenerated-from-server
+        check: >-
+          Writes `lib/protocols.py` with an `infrahubctl protocols` command
+          that has no `--schemas`, after an `infrahubctl schema load` of the
+          same branch, and no recommended command writes it with
+          `--schemas`
+      - name: cli-commands-exist
+        check: No invented infrahubctl subcommand appears in the answer
+
   # --- Issue Reporter --- #
   - name: bug-sanitization
     instruction: |
@@ -3597,6 +3705,86 @@ tasks:
         check: >-
           generate_rack, which has no first-party import, declares
           watch.files as []
+
+  - name: generator-target-standard-group
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: I wrote a Generator that builds a data center fabric from each
+      TopologyDataCenter design object. Register it in `.infrahub.yml` so it
+      runs once for every design we have. The query `topology_dc` is already
+      declared in the `queries:` section; it takes one variable, `$name`, the
+      design's name. The class is `DCTopologyGenerator` in
+      `generators/generate_dc.py`, and it imports nothing from the repository.
+
+      Our designs are already loaded from object files, and they are already
+      grouped:
+
+      objects/groups.yml:
+      ```yaml
+      ---
+      apiVersion: infrahub.app/v1
+      kind: Object
+      spec:
+        kind: CoreStandardGroup
+        data:
+          - name: topologies_dc
+            description: Data center designs
+      ```
+
+      objects/designs.yml:
+      ```yaml
+      ---
+      apiVersion: infrahub.app/v1
+      kind: Object
+      spec:
+        kind: TopologyDataCenter
+        data:
+          - name: dc-ams1
+            member_of_groups:
+              - topologies_dc
+          - name: dc-fra1
+            member_of_groups:
+              - topologies_dc
+      ```
+
+      Add the `generator_definitions` entry, and create or change any object
+      files the Generator needs before it will run.
+
+      Save your answer to: output.md. For every file you create or change,
+      write its path on its own line, followed by its full content in a
+      fenced yaml code block.
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_generator_target_standard_group.py
+        weight: 1.0
+    expected_output: >-
+      A generator_definitions entry for DCTopologyGenerator whose targets is
+      the existing topologies_dc group, with parameters mapping name to
+      name__value and a watch block. No second group and no change to the
+      kind of topologies_dc: targets accepts any CoreGroup kind, so the
+      existing CoreStandardGroup is the target as it is. The answer may
+      restate topologies_dc as a CoreStandardGroup, and no object file
+      declares a CoreGeneratorGroup.
+    expectations:
+      - "The generator_definitions entry has targets: topologies_dc"
+      - "No object file declares a CoreGeneratorGroup"
+      - "topologies_dc stays a CoreStandardGroup"
+      - "The entry carries a watch block in the object form"
+    assertions:
+      - name: generator-targets-existing-group
+        check: >-
+          Every generator_definitions entry targets topologies_dc, no object
+          data declares a CoreGeneratorGroup, and none redeclares
+          topologies_dc as a kind other than CoreStandardGroup
+      - name: gen-watch-present
+        check: >-
+          Every generator_definitions entry has a watch key
+      - name: gen-watch-object-form
+        check: >-
+          Every watch block is the object form {files: [...]}, not a bare list
 
   - name: practices-watch-dependencies
     trials: 3
@@ -7463,6 +7651,87 @@ tasks:
       - name: module-type-object
         check: >-
           Module type objects are uniquely named and each names a manufacturer
+      - name: coverage-report
+        check: >-
+          A Markdown report names the NetBox component lists that did not
+          convert
+
+  - name: netbox-convert-bundled-scripts
+    trials: 3
+    instruction: |
+      Read the skill at
+      skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Convert this NetBox device type into Infrahub object templates
+      for the OpsMill schema-library DCIM schema, which has
+      `generate_template: true` on `DcimDevice`.
+
+          ---
+          manufacturer: Cisco
+          model: Catalyst 9300-24P
+          slug: cisco-c9300-24p
+          part_number: C9300-24P
+          u_height: 1
+          is_full_depth: true
+          weight: 7.59
+          weight_unit: kg
+          airflow: front-to-rear
+          console-ports:
+            - name: con 0
+              type: rj-45
+          interfaces:
+            - name: GigabitEthernet1/0/1
+              type: 1000base-t
+              poe_mode: pse
+            - name: GigabitEthernet1/0/2
+              type: 1000base-t
+              poe_mode: pse
+
+      Write the emitted files under `./output_dir/` (create the directory),
+      and tell me what did not convert.
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_bundled_scripts.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/ produced by the bundled converter: the 7.59 kg weight
+      is carried through as the whole number 8, rather than written as a
+      float that Infrahub's integer-backed Number attributes cannot hold or
+      dropped to avoid the problem, component children nest under a kind +
+      data wrapper, and a coverage report names the console-ports and the
+      dropped interface fields.
+    expectations:
+      - The device type weight is the whole number 8, neither 7.59 nor absent
+      - Component children nest under a kind + data wrapper
+      - A coverage report is written naming what did not convert
+      - The console-ports list and the interface type/poe_mode fields are accounted for
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind,
+          and spec.data list
+      - name: template-kind
+        check: >-
+          Templates are authored under a Template<Kind> and every row has a
+          template_name
+      - name: bundled-script-output
+        check: >-
+          Numerics are integers and a coverage report exists — guarantees a
+          hand-rolled conversion loses. Its choice-object predicate cannot
+          fire here: the input is devicetype-library YAML, which carries no
+          {value, label} wrappers. Feeding this task API-shaped input to
+          exercise it would fail the correct answer instead, since unwrapping
+          is the exporter's job and the converter does not do it.
+      - name: weight-rounds-to-a-whole-number
+        check: >-
+          The device type's weight is present and equals 8, bare or in the
+          {value, source} form — the registry check can only reject a float,
+          so dropping the field scored full marks
+      - name: component-kind-wrapper
+        check: >-
+          Component children nest under a kind + data wrapper naming a
+          Template* kind
       - name: coverage-report
         check: >-
           A Markdown report names the NetBox component lists that did not

@@ -2076,6 +2076,164 @@ def check_group_membership_from_member_side(
 
 
 # ---------------------------------------------------------------------------
+# Generator target group (registration-config) — output.md family
+# ---------------------------------------------------------------------------
+#
+# Fixture-coupled: the generator-target-standard-group task hands the model an
+# existing CoreStandardGroup named topologies_dc, whose members are the design
+# objects, and asks it to register the generator so it runs once per design.
+# `targets:` accepts any CoreGroup kind, so the right answer reuses that group
+# as it is. CoreGeneratorGroup is the group a generator creates to track its
+# own output; the prompt supplies none, so any in the answer is new.
+
+_TARGET_GROUP = "topologies_dc"
+_TARGET_GROUP_KIND = "CoreStandardGroup"
+_OUTPUT_GROUP_KIND = "CoreGeneratorGroup"
+
+# A first-line comment that labels a whole fence as the wrong form. Narrower
+# than _NEGATIVE_LABEL on purpose: a fence opening with an instruction such
+# as `# Do not create a new group` or `# Never edit by hand` is still the
+# answer. The words are a verdict (`WRONG`, `INCORRECT`, `BAD`, `BROKEN`,
+# `FAIL`/`FAILS`, `ANTI-PATTERN`, `DOES NOT RESOLVE`) or a negation (`AVOID`,
+# `DO NOT`, `DON'T`, `NEVER`). A word counts only when it stands alone:
+# followed by optional `*` and whitespace, then the end of the line or one of
+# `:`, `.`, `(`, `-`, an en dash, an em dash, `!`, `,`, `;` or `/`. A verdict
+# may also take one noun from a short list (example, examples, approach, way,
+# usage, pattern) before that terminator. So `# WRONG`, `# WRONG!`,
+# `# Bad example`, `# WRONG approach: ...`, `# FAILS: creates a second group`
+# and `# AVOID — ...` label the block, while `# Fails silently as a
+# CoreStandardGroup: ...`, `# Fail fast: ...` or `# Wrong group kinds are
+# rejected` is a sentence that opens the answer. A negation also counts when
+# the words after it point at the block itself: an optional short verb
+# (do/use/write/copy), an optional `it` and `like`, then this/these/that/the
+# following, as in `# Don't do it this way`, `# Avoid the following` or
+# `# Never write like this`.
+_STANDS_ALONE = r"\s*\**\s*(?:$|[:.\-–—(!,;/])"
+_LABEL_NOUN = r"(?:\s+(?:EXAMPLES?|APPROACH|WAY|USAGE|PATTERN))?"
+_WRONG_FENCE_LABEL = re.compile(
+    r"#\s*\**\s*(?:"
+    r"(?:WRONG|INCORRECT|BAD|BROKEN|FAILS?|ANTI-?PATTERN|DOES NOT RESOLVE)"
+    + _LABEL_NOUN
+    + _STANDS_ALONE
+    + r"|(?:AVOID|DO NOT|DON'T|NEVER)"
+    r"(?:" + _STANDS_ALONE
+    + r"|\s+(?:(?:DO|USE|WRITE|COPY)\s+)?(?:IT\s+)?(?:LIKE\s+)?"
+    r"(?:THIS|THESE|THAT|THE\s+FOLLOWING)\b)"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def yaml_documents(raw: str) -> list[Any]:
+    """Every YAML document in every ```yaml fence of ``raw``.
+
+    Each fence is parsed on its own, and may hold several ``---`` documents:
+    joining fences before parsing would merge two files' keys into one
+    mapping. A fence whose first line is a comment labelling it as the wrong
+    form (see ``_WRONG_FENCE_LABEL``) is skipped, so a contrast block does
+    not count as the answer. A fence that does not parse contributes nothing.
+    """
+    docs: list[Any] = []
+    for match in _YAML_FENCE.finditer(raw):
+        block = match.group(1)
+        first = next((ln.strip() for ln in block.splitlines() if ln.strip()), "")
+        if _WRONG_FENCE_LABEL.match(first):
+            continue
+        try:
+            docs.extend(doc for doc in yaml.safe_load_all(block) if doc is not None)
+        except yaml.YAMLError:
+            continue
+    return docs
+
+
+def manifest_generator_entries(docs: list[Any]) -> list[dict]:
+    """Every ``generator_definitions`` entry across the parsed documents."""
+    entries: list[dict] = []
+    for doc in docs:
+        if isinstance(doc, dict):
+            entries.extend(_generator_entries(doc))
+    return entries
+
+
+def _kind_mappings(node: Any) -> Iterator[dict]:
+    """Every mapping with a string ``kind`` key, at any depth.
+
+    Covers the ``spec: {kind, data}`` object-file wrapper and the bare
+    list-of-``{kind, data}`` form alike.
+    """
+    if isinstance(node, dict):
+        if isinstance(node.get("kind"), str):
+            yield node
+        for value in node.values():
+            yield from _kind_mappings(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _kind_mappings(value)
+
+
+def _object_name(item: Any) -> str | None:
+    if not isinstance(item, dict):
+        return None
+    name = item.get("name")
+    if isinstance(name, dict):
+        name = name.get("value")
+    return name if isinstance(name, str) else None
+
+
+def check_generator_targets_existing_group(
+    output: dict, **_: Any
+) -> tuple[bool, str]:
+    """The generator targets the existing CoreStandardGroup, unchanged.
+
+    Two halves, both read from the parsed YAML, never from prose:
+
+    * every ``generator_definitions`` entry names ``targets: topologies_dc``;
+    * no object data declares a ``CoreGeneratorGroup``, and none redeclares
+      ``topologies_dc`` as any kind other than ``CoreStandardGroup``.
+    """
+    docs = yaml_documents(output.get("raw", ""))
+    entries = manifest_generator_entries(docs)
+    if not entries:
+        return False, "no generator_definitions entry found in any ```yaml block"
+
+    problems: list[str] = []
+    wrong_targets = [
+        f"{e.get('name', '<unnamed>')} -> {e.get('targets')!r}"
+        for e in entries
+        if e.get("targets") != _TARGET_GROUP
+    ]
+    if wrong_targets:
+        problems.append(
+            f"targets does not name the existing group {_TARGET_GROUP}: "
+            + ", ".join(wrong_targets)
+        )
+
+    for mapping in _kind_mappings(docs):
+        kind = mapping["kind"]
+        data = mapping.get("data")
+        names = [n for n in (_object_name(i) for i in data or []) if n] if isinstance(data, list) else []
+        if kind == _OUTPUT_GROUP_KIND:
+            problems.append(
+                f"object data declares a {_OUTPUT_GROUP_KIND} "
+                f"({', '.join(names) or 'unnamed'}); targets accepts the existing "
+                f"{_TARGET_GROUP_KIND}, and {_OUTPUT_GROUP_KIND} is the group a "
+                "generator creates for its own output"
+            )
+        elif _TARGET_GROUP in names and kind != _TARGET_GROUP_KIND:
+            problems.append(
+                f"object data redeclares {_TARGET_GROUP} as {kind}, not "
+                f"{_TARGET_GROUP_KIND}"
+            )
+
+    if problems:
+        return False, "; ".join(problems)
+    return True, (
+        f"generator targets the existing {_TARGET_GROUP_KIND} {_TARGET_GROUP} "
+        "and no group is created or converted"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Delete ordering: detach peers before deleting them
 # ---------------------------------------------------------------------------
 
@@ -2526,11 +2684,535 @@ def check_detach_iterates_id_list(
 
     return True, "the detach loop does not iterate the live peer list"
 
+
+# ---------------------------------------------------------------------------
+# create() field names against the kind's schema
+# ---------------------------------------------------------------------------
+
+# The schema the check compares create() fields against, kept next to the
+# grader so the check never reads it from the answer. No eval task wires the
+# check (see the #193 entry in dev/guidelines/rule-equals-test.md);
+# tests/graders/test_generators_create_fields.py holds its fixtures.
+CREATE_FIELDS_SCHEMA = Path(__file__).resolve().parent / "fixtures" / "create_fields_interfaces_schema.yml"
+
+# create(kind, data=None, branch=None, timeout=None, **kwargs): these keyword
+# names are the method's own parameters, not node fields.
+_CREATE_PARAMS = {"kind", "data", "branch", "timeout"}
+
+
+def load_kind_fields(path: Path) -> dict[str, set[str]]:
+    """Map each node kind in a schema YAML to its attribute and relationship names."""
+    doc = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    kinds: dict[str, set[str]] = {}
+    for node in doc.get("nodes") or []:
+        kind = f"{node['namespace']}{node['name']}"
+        kinds[kind] = {a["name"] for a in node.get("attributes") or []} | {
+            r["name"] for r in node.get("relationships") or []
+        }
+    return kinds
+
+
+def _enclosing_scopes(tree: ast.Module) -> dict[int, ast.AST]:
+    """Map each node id to its innermost enclosing function, or the module."""
+    scopes: dict[int, ast.AST] = {}
+
+    def visit(node: ast.AST, scope: ast.AST) -> None:
+        for child in ast.iter_child_nodes(node):
+            scopes[id(child)] = scope
+            inner = child if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) else scope
+            visit(child, inner)
+
+    visit(tree, tree)
+    return scopes
+
+
+class _Unreadable:
+    """A binding of ``name`` the check cannot read, placed at ``at``.
+
+    ``_dict_keys`` and ``_resolve_create_kind`` report it as unresolved, so
+    the check fails closed on it.
+    """
+
+    def __init__(self, name: str, how: str, at: ast.AST) -> None:
+        self.name = name
+        self.how = how
+        self.at = at
+        self.lineno = at.lineno
+        self.col_offset = at.col_offset
+
+
+class _Imported:
+    """A name bound by an import: ``original`` from ``module`` (None for ``import x``).
+
+    ``path`` is the dotted path the bound name stands for: ``a`` for
+    ``import a.b``, ``a.b`` for ``import a.b as p``, ``x.y`` for
+    ``from x import y``.
+    """
+
+    def __init__(self, original: str, module: str | None, path: str, at: ast.AST) -> None:
+        self.original = original
+        self.module = module
+        self.path = path
+        self.at = at
+        self.lineno = at.lineno
+        self.col_offset = at.col_offset
+
+
+def _binds(target: ast.AST, name: str) -> bool:
+    return any(isinstance(n, ast.Name) and n.id == name for n in ast.walk(target))
+
+
+def _walk_scope(scope: ast.AST) -> Iterator[ast.AST]:
+    """Walk ``scope``, skipping the bodies of inner functions, classes and lambdas."""
+    todo = [scope]
+    while todo:
+        node = todo.pop()
+        yield node
+        if node is not scope and isinstance(
+            node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+        ):
+            continue
+        todo.extend(ast.iter_child_nodes(node))
+
+
+def _name_bindings(
+    name: str, scope: ast.AST, nested: bool = True, use: ast.AST | None = None
+) -> list[Any]:
+    """Every value bound to the bare name ``name`` within ``scope``.
+
+    A comprehension's target is local to it, and Python deletes an
+    ``except ... as`` name when its handler ends, so each counts only when
+    ``use`` (the call reading the name) sits inside that comprehension or
+    handler, or when no ``use`` is given. A name assigned inside a nested
+    def or class is local to it; with ``nested`` True, a ``nonlocal`` or
+    ``global`` statement for the name in one still counts.
+
+    A binding the check can read yields its value expression. Any other
+    binding yields an ``_Unreadable`` or ``_Imported`` marker, so a name is
+    never treated as unbound while something rebinds it.
+    """
+    values: list[Any] = []
+    if nested:
+        direct = {id(n) for n in _walk_scope(scope)}
+        for node in ast.walk(scope):
+            if isinstance(node, (ast.Global, ast.Nonlocal)) and id(node) not in direct and name in node.names:
+                values.append(_Unreadable(name, "a global or nonlocal statement", node))
+    for node in _walk_scope(scope):
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Name) and t.id == name:
+                    values.append(node.value)
+                elif isinstance(t, (ast.Tuple, ast.List, ast.Starred)) and _binds(t, name):
+                    values.append(_Unreadable(name, "unpacking", node))
+        elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
+            if isinstance(node.target, ast.Name) and node.target.id == name and node.value:
+                values.append(node.value)
+        elif isinstance(node, ast.NamedExpr):
+            if node.target.id == name:
+                values.append(node.value)
+        elif isinstance(node, (ast.For, ast.AsyncFor)):
+            if _binds(node.target, name):
+                values.append(_Unreadable(name, "a for loop", node))
+        elif isinstance(node, (ast.With, ast.AsyncWith)):
+            if any(i.optional_vars is not None and _binds(i.optional_vars, name) for i in node.items):
+                values.append(_Unreadable(name, "a with statement", node))
+        elif isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+            # Placed at the whole expression: its targets bind before its element runs.
+            inside = use is None or any(n is use for n in ast.walk(node))
+            if inside and any(_binds(gen.target, name) for gen in node.generators):
+                values.append(_Unreadable(name, "a comprehension", node))
+        elif isinstance(node, (ast.MatchAs, ast.MatchStar)):
+            if node.name == name:
+                values.append(_Unreadable(name, "a match pattern", node))
+        elif isinstance(node, ast.MatchMapping):
+            if node.rest == name:
+                values.append(_Unreadable(name, "a match pattern", node))
+        elif isinstance(node, ast.ExceptHandler):
+            inside = use is None or any(n is use for n in ast.walk(node))
+            if inside and node.name == name:
+                values.append(_Unreadable(name, "an except clause", node))
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                bound = alias.asname or alias.name.split(".")[0]
+                if bound == name:
+                    if isinstance(node, ast.ImportFrom):
+                        module = node.module
+                        path = f"{module}.{alias.name}" if module else alias.name
+                    else:
+                        module = None
+                        path = alias.name if alias.asname else bound
+                    values.append(_Imported(alias.name, module, path, node))
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node is not scope:
+            if node.name == name:
+                values.append(node)
+        elif isinstance(node, (ast.Global, ast.Nonlocal)):
+            if name in node.names:
+                values.append(_Unreadable(name, "a global or nonlocal statement", node))
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node is scope:
+            args = node.args
+            for arg in [*args.posonlyargs, *args.args, *args.kwonlyargs, args.vararg, args.kwarg]:
+                if arg is not None and arg.arg == name:
+                    values.append(_Unreadable(name, "a function parameter", arg))
+    return values
+
+
+def _module_bindings(name: str, tree: ast.Module, use: ast.AST | None = None) -> list[Any]:
+    """Bindings of ``name`` at module level, plus any function that rebinds it through ``global``."""
+    values = _name_bindings(name, tree, nested=False, use=use)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Global) and name in node.names:
+            values.append(_Unreadable(name, "a global statement", node))
+    return values
+
+
+def _is_protocols_module(module: str | None) -> bool:
+    """True for a module whose last segment ends in ``protocols``.
+
+    That covers ``infrahub_sdk.protocols`` and the file ``infrahubctl
+    protocols`` writes, ``schema_protocols.py`` by default.
+    """
+    return module is not None and module.split(".")[-1].endswith("protocols")
+
+
+def _bindings_in_reach(name: str, scope: ast.AST, tree: ast.Module, use: ast.AST) -> list[Any]:
+    """Bindings of ``name`` in the calling function, else at module level."""
+    bindings = _name_bindings(name, scope, use=use)
+    if not bindings and scope is not tree:
+        bindings = _module_bindings(name, tree, use=use)
+    return bindings
+
+
+def _kind_from_binding(binding: Any, kinds: dict[str, set[str]]) -> str | None:
+    """The kind one binding of a ``kind`` name gives, or None when it cannot be read."""
+    if isinstance(binding, ast.Constant) and isinstance(binding.value, str):
+        return binding.value
+    if isinstance(binding, ast.ClassDef):
+        return binding.name
+    if isinstance(binding, _Imported) and binding.module is not None:
+        if binding.original in kinds or _is_protocols_module(binding.module):
+            return binding.original
+    return None
+
+
+def _attribute_chain(node: ast.Attribute) -> list[str] | None:
+    """``["a", "b", "C"]`` for ``a.b.C``, or None when the chain does not start at a name."""
+    parts: list[str] = []
+    current: ast.AST = node
+    while isinstance(current, ast.Attribute):
+        parts.append(current.attr)
+        current = current.value
+    if not isinstance(current, ast.Name):
+        return None
+    parts.append(current.id)
+    return parts[::-1]
+
+
+def _resolve_create_kind(
+    call: ast.Call, scope: ast.AST, kinds: dict[str, set[str]], tree: ast.Module
+) -> tuple[str | None, bool]:
+    """Return ``(kind, resolved)`` for a create() call.
+
+    The kind comes from ``kind=`` or the first positional argument: a string
+    literal, a protocol class (``DcimVirtualInterface``, an alias imported
+    from a module ending in ``protocols``, or an attribute of such a module:
+    ``sp.DcimDevice``, ``infrahub_sdk.protocols.CoreStandardGroup``), or a
+    name bound only to one string literal, in the function or else at module
+    level. ``resolved`` is False when the kind cannot be read, which the
+    caller treats as a failure rather than a pass: an unbound name, a name
+    imported from any other module, or one bound by a loop, parameter or
+    ``global``.
+    """
+    node = get_kwarg(call, "kind")
+    if node is None and call.args:
+        node = call.args[0]
+    if node is None:
+        return None, False
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value, True
+    if isinstance(node, ast.Attribute):
+        if node.attr in kinds:
+            return node.attr, True
+        chain = _attribute_chain(node)
+        if chain is not None:
+            module = _bindings_in_reach(chain[0], scope, tree, call)
+            if module and all(
+                isinstance(b, _Imported) and _is_protocols_module(".".join([b.path, *chain[1:-1]]))
+                for b in module
+            ):
+                return node.attr, True
+        return None, False
+    if isinstance(node, ast.Name):
+        if node.id in kinds:
+            return node.id, True
+        bindings = _bindings_in_reach(node.id, scope, tree, call)
+        values = {_kind_from_binding(b, kinds) for b in bindings}
+        if len(values) == 1 and None not in values:
+            return values.pop(), True
+        return None, False
+    return None, False
+
+
+def _can_run_before(node: ast.AST, call: ast.AST | None, scope: ast.AST) -> bool:
+    """True when ``node`` can run before ``call`` in ``scope``.
+
+    That is: it comes earlier in the source, it shares a loop with the call
+    (a later line runs before the next pass), or it sits in a nested function
+    the check cannot place. With no ``call`` everything counts.
+    """
+    if call is None:
+        return True
+    if isinstance(node, (_Unreadable, _Imported)):
+        node = node.at
+    if (node.lineno, node.col_offset) < (call.lineno, call.col_offset):
+        return True
+    for outer in ast.walk(scope):
+        if outer is scope:
+            continue
+        holds_node = any(n is node for n in ast.walk(outer))
+        if not holds_node:
+            continue
+        if isinstance(outer, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            return True
+        if isinstance(outer, (ast.For, ast.AsyncFor, ast.While)) and any(n is call for n in ast.walk(outer)):
+            return True
+    return False
+
+
+def _dict_keys(
+    node: ast.AST,
+    scope: ast.AST,
+    seen: frozenset[str] = frozenset(),
+    call: ast.AST | None = None,
+) -> tuple[set[str], list[str]]:
+    """Collect the string keys a ``data`` value carries.
+
+    Reads a dict literal, ``dict(...)`` with keyword arguments, or a local name
+    bound to either, plus ``name["key"] = ...`` and ``name.update(...)`` on
+    that name in the same function. When ``call`` is given, only bindings and
+    changes that can run before it count (see ``_can_run_before``). Returns
+    ``(keys, unresolved)``, where ``unresolved`` describes every part the
+    check could not read.
+    """
+    keys: set[str] = set()
+    unresolved: list[str] = []
+    if isinstance(node, _Unreadable):
+        return keys, [f"{node.name}, bound by {node.how}"]
+    if isinstance(node, _Imported):
+        return keys, [f"{node.original}, bound by an import"]
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return keys, [f"{node.name}, bound by a def or class statement"]
+    if isinstance(node, ast.NamedExpr):
+        return _dict_keys(node.value, scope, seen, call)
+    if isinstance(node, ast.Dict):
+        for k, v in zip(node.keys, node.values):
+            if k is None:  # {**other}
+                sub_keys, sub_unres = _dict_keys(v, scope, seen, call)
+                keys |= sub_keys
+                unresolved += sub_unres
+            elif isinstance(k, ast.Constant) and isinstance(k.value, str):
+                keys.add(k.value)
+            else:
+                unresolved.append(f"non-literal key {ast.unparse(k)}")
+        return keys, unresolved
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "dict":
+        for arg in node.args:
+            sub_keys, sub_unres = _dict_keys(arg, scope, seen, call)
+            keys |= sub_keys
+            unresolved += sub_unres
+        for kw in node.keywords:
+            if kw.arg is None:
+                sub_keys, sub_unres = _dict_keys(kw.value, scope, seen, call)
+                keys |= sub_keys
+                unresolved += sub_unres
+            else:
+                keys.add(kw.arg)
+        return keys, unresolved
+    if isinstance(node, ast.Name) and node.id not in seen:
+        name = node.id
+        bindings = [b for b in _name_bindings(name, scope, use=call) if _can_run_before(b, call, scope)]
+        if not bindings:
+            return keys, [f"{name} is not bound before the call in the calling function"]
+        for value in bindings:
+            sub_keys, sub_unres = _dict_keys(value, scope, seen | {name}, call)
+            keys |= sub_keys
+            unresolved += sub_unres
+        for sub in ast.walk(scope):
+            if not hasattr(sub, "lineno") or not _can_run_before(sub, call, scope):
+                continue
+            # name["key"] = ...
+            targets: list[ast.AST] = []
+            if isinstance(sub, ast.Assign):
+                targets = list(sub.targets)
+            elif isinstance(sub, (ast.AnnAssign, ast.AugAssign)):
+                targets = [sub.target]
+            for target in targets:
+                if (
+                    isinstance(target, ast.Subscript)
+                    and isinstance(target.value, ast.Name)
+                    and target.value.id == name
+                ):
+                    if isinstance(target.slice, ast.Constant) and isinstance(target.slice.value, str):
+                        keys.add(target.slice.value)
+                    else:
+                        unresolved.append(f"{name}[{ast.unparse(target.slice)}]")
+            # name.update(...) / name.setdefault("key", ...)
+            if (
+                isinstance(sub, ast.Call)
+                and isinstance(sub.func, ast.Attribute)
+                and isinstance(sub.func.value, ast.Name)
+                and sub.func.value.id == name
+            ):
+                if sub.func.attr == "update":
+                    for arg in sub.args:
+                        sub_keys, sub_unres = _dict_keys(arg, scope, seen | {name}, call)
+                        keys |= sub_keys
+                        unresolved += sub_unres
+                    for kw in sub.keywords:
+                        if kw.arg is None:
+                            unresolved.append(f"{name}.update(**...)")
+                        else:
+                            keys.add(kw.arg)
+                elif sub.func.attr == "setdefault" and sub.args:
+                    first = sub.args[0]
+                    if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                        keys.add(first.value)
+                    else:
+                        unresolved.append(f"{name}.setdefault({ast.unparse(first)}, ...)")
+        return keys, unresolved
+    if isinstance(node, ast.Name):
+        return keys, unresolved  # already being resolved higher up
+    return keys, [ast.unparse(node)[:60]]
+
+
+def _create_fields(call: ast.Call, scope: ast.AST) -> tuple[set[str], list[str], list[str], str | None]:
+    """Every field name a create() call passes, from keywords and from ``data``.
+
+    Returns ``(fields, unresolved, keyword_fields, data_state)``.
+    ``keyword_fields`` names the fields passed as keywords, with an
+    unreadable ``**`` argument listed as itself. ``data_state`` is
+    ``"non-empty"`` when ``data`` carries a key, ``"unreadable"`` when the
+    check cannot tell, and None when ``data`` is absent, None, or provably
+    empty.
+    """
+    fields: set[str] = set()
+    unresolved: list[str] = []
+    keyword_fields: set[str] = set()
+    for kw in call.keywords:
+        if kw.arg is None:
+            sub_keys, sub_unres = _dict_keys(kw.value, scope, call=call)
+            splat = f"**{ast.unparse(kw.value)}"
+            passed = sorted(sub_keys & {"kind", "data"})
+            if passed:
+                unresolved.append(f"{splat}, which passes {', '.join(passed)}")
+            sub_fields = sub_keys - _CREATE_PARAMS
+            fields |= sub_fields
+            keyword_fields |= sub_fields
+            if sub_unres:
+                keyword_fields.add(splat)
+            unresolved += sub_unres
+        elif kw.arg not in _CREATE_PARAMS:
+            fields.add(kw.arg)
+            keyword_fields.add(kw.arg)
+    data = get_kwarg(call, "data")
+    if data is None and len(call.args) > 1:
+        data = call.args[1]
+    data_state = None
+    if data is not None and not (isinstance(data, ast.Constant) and data.value is None):
+        sub_keys, sub_unres = _dict_keys(data, scope, call=call)
+        fields |= sub_keys
+        unresolved += sub_unres
+        if sub_keys:
+            data_state = "non-empty"
+        elif sub_unres:
+            data_state = "unreadable"
+    return fields, unresolved, sorted(keyword_fields), data_state
+
+
+def _is_client_receiver(node: ast.AST) -> bool:
+    """True for ``client``, ``self.client``, ``self._client`` and the like."""
+    if isinstance(node, ast.Name):
+        return "client" in node.id.lower()
+    if isinstance(node, ast.Attribute):
+        return "client" in node.attr.lower()
+    return False
+
+
+def check_create_fields_exist_on_kind(
+    tree: ast.Module | None,
+    schema_path: Path | None = None,
+    **_: Any,
+) -> tuple[bool, str]:
+    """Every field passed to create() is an attribute or relationship of its kind.
+
+    ``client.create()`` keeps only the keys that name an attribute or a
+    relationship of the kind and drops the rest without an error (infrahub-sdk
+    1.23.2, ``InfrahubNode._init_attributes`` / ``_init_relationships``). The
+    check reads every ``.create(...)`` call on a client receiver, or on any
+    receiver when the kind resolves to a schema kind, and compares its keyword
+    and ``data`` keys with the schema fixture.
+
+    It also fails a field passed as a keyword next to a ``data`` that is not
+    empty: create() builds the node from ``data or kwargs``, so every keyword
+    field is dropped then, valid or not.
+
+    It fails closed: an unparseable answer, a create() call whose kind or
+    fields cannot be read, a keyword field next to a ``data`` the check
+    cannot prove empty, and an answer that creates none of a schema kind all
+    fail.
+    """
+    if tree is None:
+        return False, "create-fields-exist-on-kind: no parseable Python to inspect"
+
+    kinds = load_kind_fields(schema_path or CREATE_FIELDS_SCHEMA)
+    scopes = _enclosing_scopes(tree)
+
+    created: set[str] = set()
+    problems: list[str] = []
+    for call in _iter_calls(tree):
+        func = call.func
+        if not isinstance(func, ast.Attribute) or func.attr != "create":
+            continue
+        scope = scopes.get(id(call), tree)
+        kind, resolved = _resolve_create_kind(call, scope, kinds, tree)
+        if kind not in kinds:
+            if _is_client_receiver(func.value) and not resolved:
+                problems.append(
+                    f"line {call.lineno}: cannot read the kind of {ast.unparse(func)}(...)"
+                )
+            continue
+        created.add(kind)
+        fields, unresolved, keyword_fields, data_state = _create_fields(call, scope)
+        for part in unresolved:
+            problems.append(f"line {call.lineno}: cannot read the {kind} fields from {part}")
+        if keyword_fields and data_state is not None:
+            which = "a non-empty data" if data_state == "non-empty" else "a data the check cannot read"
+            problems.append(
+                f"line {call.lineno}: create({kind}) passes {', '.join(keyword_fields)} "
+                f"as a keyword next to {which}; create() ignores every keyword field "
+                "when data is not empty"
+            )
+        unknown = sorted(fields - kinds[kind])
+        if unknown:
+            problems.append(
+                f"line {call.lineno}: create({kind}) passes {', '.join(unknown)}, "
+                f"which {kind} does not have; create() drops it without an error"
+            )
+
+    missing = sorted(set(kinds) - created)
+    if missing:
+        problems.append(f"no create() call targets {', '.join(missing)}")
+
+    if problems:
+        return False, "create-fields-exist-on-kind: " + "; ".join(problems)
+    return True, f"every create() field exists on its kind ({', '.join(sorted(created))})"
+
+
 CHECKS: dict[str, Any] = {
     "traversal-uses-relationship-filter": check_traversal_uses_relationship_filter,
     "traversal-enumerates-and-checks-truncation": check_traversal_enumerates_and_checks_truncation,
     "shared-save-opts-out-of-tracking": check_shared_save_opts_out_of_tracking,
     "group-membership-from-member-side": check_group_membership_from_member_side,
+    "generator-targets-existing-group": check_generator_targets_existing_group,
     "path-hop-shape": check_path_hop_shape,
     # AST / relationship family (output.py)
     "relationship-hfid-form-correct": check_relationship_hfid_form_correct,
@@ -2548,6 +3230,7 @@ CHECKS: dict[str, Any] = {
     "peer-delete-present": check_peer_delete_present,
     "detach-precedes-peer-delete": check_detach_precedes_peer_delete,
     "detach-iterates-id-list": check_detach_iterates_id_list,
+    "create-fields-exist-on-kind": check_create_fields_exist_on_kind,
     # from_graphql hydration family (output.md)
     "imports-infrahub-node": check_imports_infrahub_node,
     "uses-from-graphql": check_uses_from_graphql,

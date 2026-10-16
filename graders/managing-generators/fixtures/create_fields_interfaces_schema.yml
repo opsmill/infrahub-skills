@@ -1,0 +1,35 @@
+---
+version: "1.0"
+nodes:
+  - name: PhysicalInterface
+    namespace: Dcim
+    attributes:
+      - name: name
+        kind: Text
+      - name: mtu
+        kind: Number
+    relationships:
+      - name: device
+        peer: DcimDevice
+        cardinality: one
+        optional: false
+      - name: lag
+        peer: DcimLagInterface
+        cardinality: one
+        optional: true
+  - name: VirtualInterface
+    namespace: Dcim
+    attributes:
+      - name: name
+        kind: Text
+      - name: mtu
+        kind: Number
+    relationships:
+      - name: device
+        peer: DcimDevice
+        cardinality: one
+        optional: false
+      - name: parent_interface
+        peer: DcimPhysicalInterface
+        cardinality: one
+        optional: true
