@@ -1,0 +1,145 @@
+---
+title: Release 1.4.0
+sidebar_position: 1
+description: Export device types from a running NetBox and convert them in one pass, plan an Infrahub upgrade one minor version at a time, and a working duplicate-issue search.
+---
+
+<table>
+  <tbody>
+    <tr>
+      <th>Release Number</th>
+      <td>1.4.0</td>
+    </tr>
+    <tr>
+      <th>Release Type</th>
+      <td>Feature</td>
+    </tr>
+    <tr>
+      <th>Release Date</th>
+      <td>October 13th, 2026</td>
+    </tr>
+    <tr>
+      <th>Tag</th>
+      <td>[v1.4.0](https://github.com/opsmill/infrahub-skills/releases/tag/v1.4.0)</td>
+    </tr>
+  </tbody>
+</table>
+
+## Release summary
+
+After upgrading, you can export the device types and module types from your own running NetBox and convert them into Infrahub Object Templates, instead of converting only the published library. You can also plan an Infrahub upgrade, with each breaking change checked against your repository and instance, before you run it. The duplicate-issue search in the issue-reporting skills returns results again.
+
+:::note What to expect after upgrading
+
+Nothing about how you invoke the skills has changed. One item is worth a review on your side.
+
+- Review conversions that read the whole devicetype-library: the converter now stops when two device types share a model name.
+
+See [Upgrade notes](#upgrade-notes) for full details.
+
+:::
+
+### Export device types from a running NetBox and convert them
+
+Export the device types and module types your own NetBox uses with the [converting-netbox-device-types](../skills-reference/converting-netbox-device-types.mdx) skill, and pass the export to the converter. Before, the converter read only the devicetype-library file format, so a catalogue held in NetBox had to be rebuilt as files manually ([#129](https://github.com/opsmill/infrahub-skills/pull/129)).
+
+What changed:
+
+* Export only what your devices and modules use, with `--in-use`. The bundled `netbox_export_device_types.py` reads NetBox through pynetbox and writes the library format, including port mappings, and a module type's built-in profile with its attribute data.
+* Read what did not come across before you convert. The export names the fields the library format cannot hold, other than NetBox's own defaults and bookkeeping, the required fields NetBox left unset, and the endpoints your NetBox version lacks. It writes into a staging directory, so a failed run leaves the previous export untouched, and it removes files an earlier, wider export left behind.
+* Fix shared model names before you load. The converter now refuses two device types with the same model and lists every pair, because a template names its device type by model and the second load overwrote the first without an error.
+* Carry module ports onto module templates with the new `schema-library-module-ports.yml` profile, after adding `generate_template: true` to `DcimModule`. The bundled generator then creates device interfaces from the interface ports once a module is installed.
+
+### Plan an Infrahub upgrade before you run it
+
+Plan a move from the Infrahub version you run to a later one with the new [planning-upgrades](../skills-reference/planning-upgrades.mdx) skill. It writes `UPGRADE_PLAN.md` and does not run the upgrade.
+
+What changed:
+
+* Plan one hop per minor version, as the Infrahub upgrade guide requires. Patch releases within a minor version can be skipped.
+* Review every breaking change in the range, including those that ship in patch releases. Each one is marked as affecting you, not affecting you, or unknown, with the file, schema kind, or query result behind the verdict, or the check that would decide it.
+* Keep the deployment unchanged while planning. The skill reads your repository and, when one is reachable, your instance through read-only tools, and runs only read-only probes such as `infrahub upgrade --check`.
+
+## Bug fixes
+
+* The duplicate-issue search in the reporting-issues and reporting-skill-gaps skills no longer passes `--state all`, which `gh search issues` rejects, so the search returns results again. The CLI invocation check now flags an invalid `gh search --state` value ([#136](https://github.com/opsmill/infrahub-skills/issues/136)).
+
+## Minor changes
+
+**Documentation**
+
+* The documentation site is organised around the Infrahub lifecycle, with a first-schema tutorial, a skill router grouped by lifecycle stage, and a contributor section for the skill-change pipeline.
+
+**Developer experience**
+
+* `scripts/check-skill-registration.py` fails a new skill missing from any of its registration surfaces, or whose reference page lacks the standard sections ([#160](https://github.com/opsmill/infrahub-skills/issues/160)).
+* Pull requests with missing or conflicting release bump labels are rejected.
+* Watch grader checks match whole path segments and identity tokens rather than substrings, and severity grading covers every finding.
+
+## Upgrade notes
+
+### Conversions where two device types share a model
+
+If: you convert the whole devicetype-library, or any input where two manufacturers publish the same model name.
+
+Then: leave all but one device type for each shared model out of the input. The converter stops with exit code 1 and lists every collision, for example:
+
+```text
+error: 4 model name(s) are used by more than one device type. A template names its device type by model, so these cannot be told apart, and loading them overwrites one with another. Leave all but one of each out of the input:
+  '24 Port Keystone Patch Panel': CMYKZONE (devicetype-library/device-types/CMYKZONE/24-port-keystone-patch-panel.yml), Cable Matters (devicetype-library/device-types/Cable Matters/180013.yaml), Leviton (devicetype-library/device-types/Leviton/49255-H24.yaml)
+  'D6220': Netgear (devicetype-library/device-types/Netgear/D6220.yaml), Zavio (devicetype-library/device-types/Zavio/d6220.yaml)
+  'GL-AX1800': DreamQuest (devicetype-library/device-types/DreamQuest/GL-AX1800.yml), GL-iNet (devicetype-library/device-types/GL-iNet/GL-AX1800.yml)
+  'MPUIQ-VMCHS': Avocent (devicetype-library/device-types/Avocent/MPUIQ-VMCHS.yaml), Vertiv (devicetype-library/device-types/Vertiv/MPUIQ-VMCHS.yaml)
+```
+
+The converter has no exclude option, so convert a copy of the input with all but one file per listed model removed. Which one you keep is your choice. This example keeps the first of each and converts the published library at commit `36690ec`:
+
+```bash
+cp -R devicetype-library/device-types ./device-types
+rm "./device-types/Cable Matters/180013.yaml" \
+   "./device-types/Leviton/49255-H24.yaml" \
+   "./device-types/Zavio/d6220.yaml" \
+   "./device-types/GL-iNet/GL-AX1800.yml" \
+   "./device-types/Vertiv/MPUIQ-VMCHS.yaml"
+```
+
+Notes: the published library at commit `36690ec` has four such model names. Before this release the conversion succeeded and the load overwrote one device type with another.
+
+## Full changelog
+
+### Added
+
+* Export device types and module types from a live NetBox with `netbox_export_device_types.py` in converting-netbox-device-types ([#129](https://github.com/opsmill/infrahub-skills/pull/129)).
+* infrahub-planning-upgrades skill, which plans an upgrade one minor version at a time without running it.
+
+### Fixed
+
+* Duplicate-issue search no longer passes `--state all` to `gh search issues` ([#136](https://github.com/opsmill/infrahub-skills/issues/136)).
+* NetBox device-type converter refuses device types that share a model, and the exporter stops reporting NetBox defaults as lost and removes an earlier run's module types; adds the `schema-library-module-ports.yml` profile.
+
+### Housekeeping
+
+* Registration surfaces for a new skill are checked by `scripts/check-skill-registration.py` ([#160](https://github.com/opsmill/infrahub-skills/issues/160)).
+* Documentation site restructured around the Infrahub lifecycle.
+* react and react-dom Dependabot updates grouped into one pull request.
+* Release bump labels standardised, and pull requests with missing or conflicting labels rejected.
+* Watch grader checks match whole path segments and identity tokens.
+
+## Skills included
+
+* infrahub-managing-schemas
+* infrahub-managing-objects
+* infrahub-managing-checks
+* infrahub-managing-generators
+* infrahub-managing-transforms
+* infrahub-managing-menus
+* infrahub-auditing-repo
+* infrahub-analyzing-data
+* infrahub-reporting-issues
+* infrahub-reporting-skill-gaps
+* infrahub-collecting-diagnostics
+* infrahub-analyzing-diagnostics
+* infrahub-importing-data
+* infrahub-teaching-concepts
+* infrahub-converting-netbox-device-types
+* infrahub-planning-upgrades
