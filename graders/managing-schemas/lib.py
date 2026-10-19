@@ -2561,21 +2561,29 @@ CHECKS: dict[str, Any] = {
 
 
 def run_checks(
-    check_names: list[str],
+    check_names: list[str | tuple[str, Any]],
     output_path: Path,
     raw_text: str | None = None,
+    sources: dict[str, str] | None = None,
 ) -> dict:
     """Run named checks against a schema file and return skillgrade JSON.
 
     Parameters
     ----------
     check_names:
-        List of assertion names from the ``CHECKS`` registry.
+        List of assertion names from the ``CHECKS`` registry, or
+        ``(name, function)`` pairs for checks that are specific to one eval
+        task. Task-local checks stay in the task's grader script instead of
+        the shared registry, so a check that encodes one fixture's intent
+        cannot be picked up by another task where it would be wrong.
     output_path:
         Path to the schema YAML file produced by the model.
     raw_text:
         Optional pre-loaded raw text (used by checks that inspect comments).
         If ``None``, the file is read from ``output_path``.
+    sources:
+        Optional companion files keyed by extension (for example ``{"py": ...}``)
+        for tasks that produce more than the schema YAML.
 
     Returns
     -------
@@ -2587,7 +2595,7 @@ def run_checks(
     Raises
     ------
     KeyError
-        If any name in ``check_names`` is not in ``CHECKS``.
+        If any bare name in ``check_names`` is not in ``CHECKS``.
     """
     schema, file_raw = load_output(output_path)
     if raw_text is None:
@@ -2596,10 +2604,14 @@ def run_checks(
     entries: list[dict] = []
     passed_count = 0
 
-    for name in check_names:
-        fn = CHECKS[name]  # raises KeyError for unknown names
+    for entry in check_names:
+        if isinstance(entry, tuple):
+            name, fn = entry
+        else:
+            name = entry
+            fn = CHECKS[name]  # raises KeyError for unknown names
         try:
-            ok, msg = fn(schema, raw_text=raw_text)
+            ok, msg = fn(schema, raw_text=raw_text, sources=sources or {})
         except Exception as exc:  # pragma: no cover — defensive
             ok, msg = False, f"Error running check: {exc}"
 
