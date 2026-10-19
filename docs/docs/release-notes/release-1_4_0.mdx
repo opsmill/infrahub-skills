@@ -45,7 +45,7 @@ Export the device types and module types your own NetBox uses with the [converti
 
 What changed:
 
-* Export only what your devices and modules use, with `--in-use`. The bundled `netbox_export_device_types.py` reads NetBox through pynetbox and writes the library format, including port mappings, and a module type's built-in profile with its attribute data.
+* Export only the device types your devices use, with `--in-use`. Add `--module-types` to export module types too; with `--in-use`, that is only the module types your modules use. The bundled `netbox_export_device_types.py` reads NetBox through pynetbox and writes the library format, including port mappings, and a module type's built-in profile with its attribute data.
 * Read what did not come across before you convert. The export names the fields the library format cannot hold, other than NetBox's own defaults and bookkeeping, the required fields NetBox left unset, and the endpoints your NetBox version lacks. It writes into a staging directory, so a failed run leaves the previous export untouched, and it removes files an earlier, wider export left behind.
 * Fix shared model names before you load. The converter now refuses two device types with the same model and lists every pair, because a template names its device type by model and the second load overwrote the first without an error.
 * Carry module ports onto module templates with the new `schema-library-module-ports.yml` profile, after adding `generate_template: true` to `DcimModule`. The bundled generator then creates device interfaces from the interface ports once a module is installed.
