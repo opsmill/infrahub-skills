@@ -51,7 +51,7 @@ def sandbox(tmp_path_factory: pytest.TempPathFactory) -> Path:
     ("task", "run"), _grader_commands(), ids=[t for t, _ in _grader_commands()]
 )
 def test_grader_runs_in_sandbox(sandbox: Path, task: str, run: str) -> None:
-    """With no agent output present, the grader still prints a JSON score.
+    """With no agent output, the grader exits cleanly and scores without errors.
 
     An empty trial is the one input every grader must handle, so it is the
     cheapest way to reach each script's `__main__` without a fixture per task.
@@ -65,6 +65,10 @@ def test_grader_runs_in_sandbox(sandbox: Path, task: str, run: str) -> None:
         text=True,
         timeout=60,
     )
+    assert result.returncode == 0, (
+        f"{task}: `{run}` exited {result.returncode}\n"
+        f"stderr:\n{result.stderr[-2000:]}"
+    )
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError:
@@ -74,6 +78,11 @@ def test_grader_runs_in_sandbox(sandbox: Path, task: str, run: str) -> None:
         f"stderr:\n{result.stderr[-2000:]}"
     )
     assert "score" in payload, f"{task}: grader JSON has no score: {payload}"
+    check_errors = [
+        check for check in payload.get("checks", [])
+        if "Error running check:" in check.get("message", "")
+    ]
+    assert not check_errors, f"{task}: grader swallowed check errors: {check_errors}"
 
 
 def test_redaction_seeds_match_eval_prompt() -> None:
