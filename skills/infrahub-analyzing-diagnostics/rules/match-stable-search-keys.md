@@ -58,6 +58,10 @@ Run a second pass with synonyms if the first returns
 nothing. If `gh` is unavailable, read the issue from
 its URL with `WebFetch`, or hand the user the search
 URL (`https://github.com/opsmill/infrahub/issues?q=...`).
+Either way, write the exact `gh search issues` line
+for each query in the report, including any you did
+not run: the URL is an addition, not a replacement,
+and the line is what the user or the expert re-runs.
 
 Present the top 3-5 matches with title, state, and
 URL, and say clearly when nothing matched. That

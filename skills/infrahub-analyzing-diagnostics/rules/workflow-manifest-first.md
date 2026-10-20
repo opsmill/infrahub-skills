@@ -36,6 +36,11 @@ partial bundle must say so.
   collected — the container may be down"), to be
   correlated with signals from the services that
   were collected.
+- State the manifest in every report, on the
+  deployment line: `bundle/bundle_information.json`
+  and how many collectors succeeded or failed. Do it
+  when every collector succeeded too — "8/8 ok" is
+  what tells the reader the analysis is not partial.
 - State in the report when analysis ran on a partial
   bundle, and which services are missing.
 
