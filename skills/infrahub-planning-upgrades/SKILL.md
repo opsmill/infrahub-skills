@@ -22,7 +22,7 @@ allowed-tools:
   - Write
 argument-hint: "[the user's upgrade request, verbatim]"
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 
