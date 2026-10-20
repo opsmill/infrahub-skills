@@ -1,0 +1,155 @@
+---
+title: Release 1.4.0
+sidebar_position: 1
+description: Upgrade planning one minor version at a time, device-type export from a live NetBox instance, and corrected generator, schema, menu, and protocol-generation guidance.
+---
+
+<table>
+  <tbody>
+    <tr>
+      <th>Release Number</th>
+      <td>1.4.0</td>
+    </tr>
+    <tr>
+      <th>Release Type</th>
+      <td>Feature</td>
+    </tr>
+    <tr>
+      <th>Release Date</th>
+      <td>October 20th, 2026</td>
+    </tr>
+    <tr>
+      <th>Tag</th>
+      <td>[v1.4.0](https://github.com/opsmill/infrahub-skills/releases/tag/v1.4.0)</td>
+    </tr>
+  </tbody>
+</table>
+
+## Release summary
+
+After upgrading, you can plan an Infrahub upgrade before you run it, with every release on the way checked for breaking changes that affect your repository and instance. You can also convert device types straight from a running NetBox instance, where before you had to export them manually first. Guidance for generators, schemas, menus, and generated protocol files that described Infrahub behavior inaccurately has been corrected.
+
+:::note What to expect after upgrading
+
+Nothing about how you invoke the skills has changed. One item is worth a review on your side.
+
+- Review committed protocol files that were generated offline with `--schemas`.
+
+See [Upgrade notes](#upgrade-notes) for full details.
+
+:::
+
+### Plan an Infrahub upgrade before you run it
+
+Plan a move from the Infrahub version you run to a target version with the [planning-upgrades](../skills-reference/planning-upgrades.mdx) skill. You get a written plan; the skill does not run the upgrade ([#159](https://github.com/opsmill/infrahub-skills/pull/159)).
+
+What changed:
+
+* Get a route of one hop per minor version, as the [Infrahub upgrade guide](https://docs.infrahub.app/deploy-manage/maintain-upgrade/upgrade/overview) requires, written to `UPGRADE_PLAN.md` with one section per hop.
+* Check each release's breaking changes against your repository and instance. Every finding records whether your deployment is affected (yes, no, or unknown) and the file, schema kind, query result, or probe output behind that verdict.
+* Plan upgrades within one edition. The skill does not plan a move from Community to Enterprise, or back.
+
+### Convert device types from a live NetBox instance
+
+Export device types from a running NetBox and convert them with the [converting-netbox-device-types](../skills-reference/converting-netbox-device-types.mdx) skill, without exporting the instance manually before conversion ([#129](https://github.com/opsmill/infrahub-skills/issues/129)).
+
+What changed:
+
+* Run `netbox_export_device_types.py` with `--url`, `--output-dir`, and a `NETBOX_TOKEN` to pull device types, module types, and their component templates over pynetbox. It writes them in the devicetype-library layout that the bundled converter already reads.
+* Narrow the export with `--in-use`, which keeps only types that NetBox counts at least one device or module for, and with `--manufacturer` or `--slug`.
+* Load device types without silent overwrites: device types that share a model are now refused, where before they overwrote each other on load. An unknown `--manufacturer` exits with code 2.
+* Carry module ports for the generator with the new `schema-library-module-ports.yml` mapping profile.
+
+## Bug fixes
+
+* `client.create()` in a generator drops any field the kind does not have, with no error, and ignores every keyword field when `data` is not empty. The managing-generators skill now warns about both, and the generators, transforms, common, and auditing-repo skills no longer claim that generated protocol classes type-check the field names passed to `create()` ([#193](https://github.com/opsmill/infrahub-skills/issues/193)).
+* The `on_delete` rule in the managing-schemas skill now states the default Infrahub applies when `on_delete` is omitted: `cascade` on `kind: Component` relationships and `no-action` on every other kind. Before, the rule said every kind defaulted to `no-action`, so Component peers were expected to survive when their owner was deleted ([#190](https://github.com/opsmill/infrahub-skills/issues/190)).
+* Generator `targets:` accept any group kind, not only `CoreGeneratorGroup`. The skill recommends reusing the group that holds the design objects and creating a `CoreStandardGroup` only when none exists, and the audit no longer flags a `CoreStandardGroup` target ([#191](https://github.com/opsmill/infrahub-skills/issues/191)).
+* The common skill now says to regenerate the committed protocol file from a running Infrahub server with the schema loaded, with `--branch` when the schema is on a branch, and to check the diff for classes or fields that disappear ([#192](https://github.com/opsmill/infrahub-skills/issues/192)).
+* Remove items from a loaded menu with the menus skill: a git sync deletes items dropped from a synced file, while items loaded with `infrahubctl menu load` stay until you delete them with `infrahubctl object delete` ([#25](https://github.com/opsmill/infrahub-skills/issues/25)).
+* The duplicate-issue search in the reporting-issues and reporting-skill-gaps skills returns results again. It no longer passes `--state all`, which `gh search issues` rejects ([#136](https://github.com/opsmill/infrahub-skills/issues/136)).
+* Audit findings from the auditing-repo skill list only live reference sites in `sites`: a file that nothing registers or includes is reported as dead code instead. A kind whose Dropdown has a different choice list, or whose relationship has a different peer, now counts toward a duplicate shape, and the difference is recorded as a feasibility blocker.
+* Analyze a pasted log excerpt with the analyzing-diagnostics skill without first being asked where the bundle is; what the excerpt lacks is listed under Open questions. Every report now states the bundle manifest, including when every collector succeeded, and writes the exact `gh search issues` line for each query, including queries that could not be run.
+* Lessons from the teaching-concepts skill name each node by its full kind, such as `CampusSwitch`, as the schema and the API do.
+
+## Minor changes
+
+**Documentation**
+
+* The documentation site is organized around the Infrahub lifecycle, with a first-schema tutorial, a skill router page grouped by lifecycle stage, and a contributor section for the skill-change pipeline ([#149](https://github.com/opsmill/infrahub-skills/pull/149)).
+
+**Developer experience**
+
+* `scripts/check-skill-registration.py` fails a user-invocable skill that is missing from any registration surface, or whose reference page lacks the standard sections ([#160](https://github.com/opsmill/infrahub-skills/issues/160)).
+* The skill-change pipeline searches other branches for a pull request that already covers a change before analysis or design starts ([#181](https://github.com/opsmill/infrahub-skills/pull/181)).
+* An evaluation trial whose output shows the agent read the grader is void and is run again ([#184](https://github.com/opsmill/infrahub-skills/issues/184)).
+
+**Reliability**
+
+* Three evaluation graders that crashed before scoring now run, and the weekly scheduled evaluation run starts again ([#209](https://github.com/opsmill/infrahub-skills/pull/209)).
+* Pull requests with a missing or conflicting release bump label are rejected ([#165](https://github.com/opsmill/infrahub-skills/pull/165)).
+* Evaluation graders that scored correct answers 0.0 now grade them correctly: they find skill files where an evaluation trial places them, and grade what their rules require. Evaluation trials run one at a time per skill.
+
+## Upgrade notes
+
+### Protocol files generated offline
+
+If: your repository commits a protocol file that you generated offline with `infrahubctl protocols --schemas`.
+
+Then: regenerate it from a running Infrahub server that has the schema loaded, adding `--branch` when the schema is on a branch, and check the diff for classes or fields that disappear.
+
+Notes: offline output has no Profile or Template classes and no relationships added through `extensions`. Offline generation is still fine for a scratch file.
+
+## Full changelog
+
+### Added
+
+* `netbox_export_device_types.py` in converting-netbox-device-types exports device types, module types, and component templates from a live NetBox instance ([#129](https://github.com/opsmill/infrahub-skills/issues/129)).
+* infrahub-planning-upgrades skill plans an upgrade one minor version at a time and checks every release's breaking changes against the repository and instance ([#159](https://github.com/opsmill/infrahub-skills/pull/159)).
+
+### Changed
+
+* managing-generators warns that `client.create()` silently drops unknown fields and ignores keyword fields when `data` is not empty ([#193](https://github.com/opsmill/infrahub-skills/issues/193)).
+
+### Fixed
+
+* Menus skill covers removing items from a loaded menu ([#25](https://github.com/opsmill/infrahub-skills/issues/25)).
+* Duplicate-issue search no longer passes `--state all` to `gh search issues` ([#136](https://github.com/opsmill/infrahub-skills/issues/136)).
+* managing-schemas states the `on_delete` default for Component relationships ([#190](https://github.com/opsmill/infrahub-skills/issues/190)).
+* managing-generators accepts any group kind as a generator target ([#191](https://github.com/opsmill/infrahub-skills/issues/191)).
+* infrahub-common regenerates committed protocol files from a running server ([#192](https://github.com/opsmill/infrahub-skills/issues/192)).
+* auditing-repo lists only live reference sites and counts differing kinds toward a duplicate shape.
+* analyzing-diagnostics analyzes a pasted excerpt, always states the manifest, and always writes the `gh search issues` line.
+* teaching-concepts names nodes by their full kind.
+
+### Housekeeping
+
+* Skill registration surfaces listed in one place and checked by `scripts/check-skill-registration.py` ([#160](https://github.com/opsmill/infrahub-skills/issues/160)).
+* Void reading added to the evaluation discrimination proof ([#184](https://github.com/opsmill/infrahub-skills/issues/184)).
+* NetBox device-type converter defects from an end-to-end run fixed ([#129](https://github.com/opsmill/infrahub-skills/issues/129)).
+* Three crashing evaluation graders fixed, and the weekly evaluation run starts ([#209](https://github.com/opsmill/infrahub-skills/pull/209)).
+* react and react-dom Dependabot updates grouped into one pull request ([#189](https://github.com/opsmill/infrahub-skills/pull/189)).
+* Documentation site restructured around the Infrahub lifecycle ([#149](https://github.com/opsmill/infrahub-skills/pull/149)).
+* Release bump labels standardized and enforced ([#165](https://github.com/opsmill/infrahub-skills/pull/165)).
+* Skill-change pipeline checks other branches for existing pull requests ([#181](https://github.com/opsmill/infrahub-skills/pull/181)).
+* Watch grader checks match whole path segments and identity tokens ([#164](https://github.com/opsmill/infrahub-skills/pull/164)).
+* Evaluation graders and tasks that scored correct answers 0.0 on the release evaluation gate fixed, and evaluation trials run one at a time.
+
+## Skills included
+
+* infrahub-managing-schemas
+* infrahub-managing-objects
+* infrahub-managing-checks
+* infrahub-managing-generators
+* infrahub-managing-transforms
+* infrahub-managing-menus
+* infrahub-auditing-repo
+* infrahub-analyzing-data
+* infrahub-reporting-issues
+* infrahub-reporting-skill-gaps
+* infrahub-collecting-diagnostics
+* infrahub-analyzing-diagnostics
+* infrahub-importing-data
+* infrahub-teaching-concepts
+* infrahub-converting-netbox-device-types
+* infrahub-planning-upgrades

@@ -11,6 +11,40 @@ This project uses [*towncrier*](https://towncrier.readthedocs.io/) and the chang
 
 <!-- towncrier release notes start -->
 
+## [Infrahub Skills - v1.4.0](https://github.com/opsmill/infrahub-skills/tree/v1.4.0) - 2026-10-20
+
+### Added
+
+- Added `netbox_export_device_types.py` to the `infrahub-converting-netbox-device-types` skill: it pulls device types, module types, and their component templates straight out of a live NetBox over pynetbox and writes them in the devicetype-library layout the bundled converter already reads, so an existing NetBox instance no longer has to be exported by hand before it can be converted. ([#129](https://github.com/opsmill/infrahub-skills/issues/129))
+- Added the infrahub-planning-upgrades skill, which plans an Infrahub upgrade one minor version at a time and checks every release's breaking changes against the repository and instance without running the upgrade.
+
+### Changed
+
+- infrahub-managing-generators now warns that `client.create()` drops any field the kind does not have, with no error, and that it ignores every keyword field when `data` is not empty. The generators, transforms, common, and auditing-repo skills no longer claim that generated protocol classes type-check the field names passed to `create()`. ([#193](https://github.com/opsmill/infrahub-skills/issues/193))
+
+### Fixed
+
+- The menus skill now covers removing items from a loaded menu: a git sync deletes items dropped from a synced file, while items loaded with infrahubctl menu load stay until deleted with infrahubctl object delete. ([#25](https://github.com/opsmill/infrahub-skills/issues/25))
+- The duplicate-issue search in infrahub-reporting-issues and infrahub-reporting-skill-gaps no longer passes `--state all`, which `gh search issues` rejects, so the search returns results again. The CLI invocation gate now flags invalid `gh search --state` values. ([#136](https://github.com/opsmill/infrahub-skills/issues/136))
+- The `infrahub-managing-schemas` on_delete rule now states the default Infrahub applies when `on_delete` is omitted: `cascade` on `kind: Component` relationships and `no-action` on every other kind. The rule used to say every kind defaulted to `no-action`, so an agent following it expected Component peers to survive when their owner was deleted. ([#190](https://github.com/opsmill/infrahub-skills/issues/190))
+- Generator skill no longer claims that `targets:` only runs for a `CoreGeneratorGroup`. Any group kind works; the skill now recommends reusing the group that holds the design objects, and creating a `CoreStandardGroup` only when none exists. The audit no longer flags a `CoreStandardGroup` target. ([#191](https://github.com/opsmill/infrahub-skills/issues/191))
+- infrahub-common now says to regenerate the committed protocol file from a running Infrahub server that has the schema loaded, with `--branch` when the schema is on a branch, and to check the diff for classes or fields that disappear. It keeps offline `--schemas` generation for a scratch file only, because that output has no Profile or Template classes and no relationships added through `extensions`. ([#192](https://github.com/opsmill/infrahub-skills/issues/192))
+- The auditing-repo skill now lists only live reference sites in a finding's `sites`, and counts a kind with a different choice list or peer toward a duplicate shape, recording the difference as a feasibility blocker. The teaching-concepts skill names each node by its full kind, such as `CampusSwitch`.
+- The analyzing-diagnostics skill now analyzes a pasted log excerpt instead of first asking where the bundle is, writes the exact `gh search issues` line for every query in the report even when it could not run it, and states the bundle manifest in every report, including when every collector succeeded.
+
+### Housekeeping
+
+- A new skill's registration surfaces are now listed in one place and checked: `scripts/check-skill-registration.py` fails a user-invocable skill missing from AGENTS.md, the README, the front-page catalog, the router, or the release manifest, or whose reference page lacks the standard sections. ([#160](https://github.com/opsmill/infrahub-skills/issues/160))
+- Added a fourth reading to the discrimination proof in `dev/guides/running-evals.md`: a trial whose output shows the agent read the grader is void and is re-run. Corrected how skillgrade fills the eval sandbox. ([#184](https://github.com/opsmill/infrahub-skills/issues/184))
+- Fixed the defects an end-to-end run of the NetBox device-type converter found: device types sharing a model are refused instead of silently overwriting each other on load, the exporter no longer reports NetBox defaults as lost or leaves an earlier run's module types behind, an unknown --manufacturer exits 2, and a new schema-library-module-ports.yml profile carries module ports for the generator.
+- Fixed three eval graders that crashed before scoring: two managing-schemas task graders called a `run_checks` signature a merge had dropped, and the reporting-skill-gaps redaction grader read `eval.yaml`, which the trial sandbox does not contain. A new test runs every grader in the sandbox layout and rejects non-zero exits and swallowed check exceptions. The weekly scheduled eval run now starts: it granted fewer permissions than the workflow it calls, so every run since it was added failed at startup.
+- Grouped the react and react-dom Dependabot updates into one pull request, because a bump of one without the other fails the docs build.
+- Restructured the documentation site around the Infrahub lifecycle, added a first-schema tutorial, a skill router page, and a contributor section covering the skill-change pipeline. Each skills-reference page now names the skill it documents, Spec-Driven Development has its own section, and the pages carry diagrams where the shape of a thing is the point. The prose follows the OpsMill documentation voice and describes AI agents in general rather than naming one. The skill router groups its table by the same lifecycle stages as the sidebar instead of listing fifteen skills flat, the front page leads with the situations that send a reader to a skill, and the `graphql_fragments` version floor moved to the prerequisites where versions are already being checked. The Data Analyzer page no longer names three MCP tools that the server dropped.
+- Standardized release bump labels and now reject pull requests with missing or conflicting release intent.
+- The skill-change pipeline's entrance stages now search other branches for an open pull request, or a merged one missing from the local tree, that already covers the change, and record the result in a required `Duplicate check` handoff field.
+- Watch grader checks now match whole path segments and whole identity tokens instead of substrings, and severity grading covers every finding rather than only the first.
+- Fixed eval graders and tasks that scored correct answers 0.0 on the release eval gate. Three graders read a skill file from `skills/`, which a skillgrade trial does not have; they now also look under `.claude/skills/` and `.agents/skills/`, and the sandbox test builds the real trial layout. The no-schema-mutation task now grades the fail-closed answer the skill requires instead of failing an empty output directory. The self-check grader no longer counts the importing-data skill's own rule files as invented managing-objects rules. The up-front interview prompt no longer forbids writing the `answer.md` it asks for. The teaching-concepts grounding check no longer counts kinds from grader fixtures as the learner's. Eval trials now run one at a time per skill job, because skillgrade writes every trial's prompt to the same file.
+
 ## [Infrahub Skills - v1.3.0](https://github.com/opsmill/infrahub-skills/tree/v1.3.0) - 2026-09-23
 
 ### Fixed

@@ -21,7 +21,7 @@ allowed-tools:
   - Write
   - WebFetch
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 
@@ -82,8 +82,9 @@ confident report about the wrong incident.
 Mentioning the default as a hint is fine
 (`./infrahub_bundles/` when `--output-dir` wasn't
 set), but the user names the path. Skip the question
-only when the user already gave a path or pasted the
-bundle contents. Once given, confirm it looks like
+only when the user already gave a path or pasted
+bundle contents, even a single log excerpt. Once
+given, confirm it looks like
 an `infrahub-collect` bundle — a `bundle/` directory
 containing `bundle_information.json`. If there is no
 bundle at all, stop and hand off to
