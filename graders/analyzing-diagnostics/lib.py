@@ -53,30 +53,62 @@ def _gh_search_commands(text: str) -> list[str]:
     The command line is the query surface; prose around it (e.g. "stripped
     the hostname X from the key") legitimately names volatile tokens.
     """
-    return [m.group(0) for m in re.finditer(r"gh\s+search\s+issues[^\n]*", text)]
+    commands: list[str] = []
+    for m in re.finditer(r"gh\s+search\s+issues", text):
+        line_start = text.rfind("\n", 0, m.start()) + 1
+        opened = text[line_start : m.start()].count("`") % 2 == 1
+        if opened and not _in_fenced_block(text, m.start()):
+            # An inline span can wrap across lines (the skill's own example
+            # does); the command runs to the closing backtick.
+            close = text.find("`", m.end())
+            end = close if close != -1 else len(text)
+        else:
+            end = text.find("\n", m.end())
+            # A trailing backslash continues the command on the next line.
+            while end != -1 and text[:end].rstrip().endswith("\\"):
+                end = text.find("\n", end + 1)
+            end = end if end != -1 else len(text)
+        commands.append(" ".join(text[m.start() : end].replace("\\\n", " ").split()))
+    return commands
+
+
+_HEADING = re.compile(r"(?m)^#{1,6}\s")
 
 
 def _root_windows(text: str) -> list[str]:
-    """The text of each root-mention line plus its continuation line.
+    """The evidence window after each root mention.
 
     The report template anchors the root to its evidence on the `- Root:` line
-    (path) and the line below (quoted excerpt); a wider window would credit
-    unrelated paths mentioned further down the section.
+    (path) and the next non-blank line (quoted excerpt); a wider window would
+    credit unrelated paths mentioned further down the section. A root named
+    by a heading (`### Root Cause`) owns that heading's section instead, up to
+    the next heading.
     """
     windows: list[str] = []
     for m in re.finditer(r"(?i)\broot(?:[ -]cause)?\b|caused by", text):
+        line_start = text.rfind("\n", 0, m.start()) + 1
+        if _HEADING.match(text, line_start):
+            nxt = _HEADING.search(text, m.end())
+            windows.append(text[m.end() : nxt.start() if nxt else len(text)])
+            continue
         line_end = text.find("\n", m.end())
         if line_end == -1:
             windows.append(text[m.end() :])
             continue
-        next_end = text.find("\n", line_end + 1)
-        windows.append(text[m.end() : len(text) if next_end == -1 else next_end])
+        following = re.search(r"\n[ \t]*\S[^\n]*", text[line_end:])
+        end = line_end + following.end() if following else len(text)
+        windows.append(text[m.end() : end])
     return windows
 
 
 def _incident_sections(text: str) -> list[tuple[str, str]]:
-    """(heading line, body) for each `## Incident ...` section in the report."""
-    matches = list(re.finditer(r"(?im)^#{1,6}\s*incident\b[^\n]*", text))
+    """(heading line, body) for each `## Incident <n>` section in the report.
+
+    Only a numbered or colon-led heading opens an incident, as the template
+    writes it (`## Incident 1: ...`). `### Incident Correlation` or
+    `## Incident Summary` are report sections about incidents, not incidents.
+    """
+    matches = list(re.finditer(r"(?im)^#{1,6}\s*incident\s*(?:#?\d+|:)[^\n]*", text))
     sections: list[tuple[str, str]] = []
     for i, m in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)

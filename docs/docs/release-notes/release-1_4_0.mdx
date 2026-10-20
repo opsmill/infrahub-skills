@@ -68,6 +68,9 @@ What changed:
 * The common skill now says to regenerate the committed protocol file from a running Infrahub server with the schema loaded, with `--branch` when the schema is on a branch, and to check the diff for classes or fields that disappear ([#192](https://github.com/opsmill/infrahub-skills/issues/192)).
 * Remove items from a loaded menu with the menus skill: a git sync deletes items dropped from a synced file, while items loaded with `infrahubctl menu load` stay until you delete them with `infrahubctl object delete` ([#25](https://github.com/opsmill/infrahub-skills/issues/25)).
 * The duplicate-issue search in the reporting-issues and reporting-skill-gaps skills returns results again. It no longer passes `--state all`, which `gh search issues` rejects ([#136](https://github.com/opsmill/infrahub-skills/issues/136)).
+* Audit findings from the auditing-repo skill list only live reference sites in `sites`: a file that nothing registers or includes is reported as dead code instead. A kind whose Dropdown has a different choice list, or whose relationship has a different peer, now counts toward a duplicate shape, and the difference is recorded as a feasibility blocker.
+* Analyze a pasted log excerpt with the analyzing-diagnostics skill without first being asked where the bundle is; what the excerpt lacks is listed under Open questions. Every report now states the bundle manifest, including when every collector succeeded, and writes the exact `gh search issues` line for each query, including queries that could not be run.
+* Lessons from the teaching-concepts skill name each node by its full kind, such as `CampusSwitch`, as the schema and the API do.
 
 ## Minor changes
 
@@ -85,6 +88,7 @@ What changed:
 
 * Three evaluation graders that crashed before scoring now run, and the weekly scheduled evaluation run starts again ([#209](https://github.com/opsmill/infrahub-skills/pull/209)).
 * Pull requests with a missing or conflicting release bump label are rejected ([#165](https://github.com/opsmill/infrahub-skills/pull/165)).
+* Evaluation graders that scored correct answers 0.0 now grade them correctly: they find skill files where an evaluation trial places them, and grade what their rules require. Evaluation trials run one at a time per skill.
 
 ## Upgrade notes
 
@@ -114,6 +118,9 @@ Notes: offline output has no Profile or Template classes and no relationships ad
 * managing-schemas states the `on_delete` default for Component relationships ([#190](https://github.com/opsmill/infrahub-skills/issues/190)).
 * managing-generators accepts any group kind as a generator target ([#191](https://github.com/opsmill/infrahub-skills/issues/191)).
 * infrahub-common regenerates committed protocol files from a running server ([#192](https://github.com/opsmill/infrahub-skills/issues/192)).
+* auditing-repo lists only live reference sites and counts differing kinds toward a duplicate shape.
+* analyzing-diagnostics analyzes a pasted excerpt, always states the manifest, and always writes the `gh search issues` line.
+* teaching-concepts names nodes by their full kind.
 
 ### Housekeeping
 
@@ -126,6 +133,7 @@ Notes: offline output has no Profile or Template classes and no relationships ad
 * Release bump labels standardized and enforced ([#165](https://github.com/opsmill/infrahub-skills/pull/165)).
 * Skill-change pipeline checks other branches for existing pull requests ([#181](https://github.com/opsmill/infrahub-skills/pull/181)).
 * Watch grader checks match whole path segments and identity tokens ([#164](https://github.com/opsmill/infrahub-skills/pull/164)).
+* Evaluation graders and tasks that scored correct answers 0.0 on the release evaluation gate fixed, and evaluation trials run one at a time.
 
 ## Skills included
 

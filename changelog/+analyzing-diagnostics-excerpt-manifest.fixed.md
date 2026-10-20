@@ -1,0 +1,1 @@
+The analyzing-diagnostics skill now analyzes a pasted log excerpt instead of first asking where the bundle is, writes the exact `gh search issues` line for every query in the report even when it could not run it, and states the bundle manifest in every report, including when every collector succeeded.
