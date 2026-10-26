@@ -24,7 +24,16 @@ fi
 
 # If Infrahub project detected, output context for Claude
 if [[ "$INFRAHUB_DETECTED" == "true" ]]; then
-    cat << 'EOF'
+    # The heredoc is quoted so the backticks in the text stay literal, which
+    # also leaves ${CLAUDE_PLUGIN_ROOT} unexpanded. Substitute it afterwards,
+    # escaped for a JSON string. Claude Code sets the variable for hooks; the
+    # fallback is the plugin root this script sits in.
+    plugin_root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+    plugin_root="${plugin_root//\\/\\\\}"
+    plugin_root="${plugin_root//\"/\\\"}"
+    # shellcheck disable=SC2016 # the literal placeholder text, not an expansion
+    placeholder='${CLAUDE_PLUGIN_ROOT}'
+    context=$(cat << 'EOF'
 {
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
@@ -32,6 +41,15 @@ if [[ "$INFRAHUB_DETECTED" == "true" ]]; then
   }
 }
 EOF
+)
+    # A loop rather than ${context//...}: bash 3.2, the macOS default, keeps
+    # the quotes a quoted replacement needs as literal characters.
+    output=""
+    while [[ "$context" == *"$placeholder"* ]]; do
+        output+="${context%%"$placeholder"*}$plugin_root"
+        context="${context#*"$placeholder"}"
+    done
+    printf '%s\n' "$output$context"
 fi
 
 exit 0
