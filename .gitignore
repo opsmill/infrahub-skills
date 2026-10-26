@@ -90,6 +90,7 @@ secrets.yaml
 .claude/*
 !.claude/rules
 !.claude/skills
+!.claude/CLAUDE.md
 
 # Superpowers workspaces (never commit)
 .superpowers/
