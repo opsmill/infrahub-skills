@@ -5,12 +5,6 @@ description: >-
   TRIGGER when: reviewing repo for compliance, onboarding to existing project, pre-deployment validation, catching issues.
   DO NOT TRIGGER when: creating schemas, writing checks/generators, querying live data, populating objects, planning an Infrahub version upgrade (use infrahub-planning-upgrades).
 context: fork
-allowed-tools:
-  - Read
-  - Bash
-  - Grep
-  - Glob
-  - Write
 argument-hint: "[focus-area]"
 metadata:
   version: 1.3.0

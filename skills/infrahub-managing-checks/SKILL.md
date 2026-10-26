@@ -4,12 +4,6 @@ description: >-
   Creates, modifies and debugs Infrahub check definitions — Python validation logic, GraphQL queries, and YAML-driven tests for proposed change pipelines.
   TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes, writing or running tests for a check, modifying or extending an existing check, debugging why a check fails, passes when it should not, or flags the wrong nodes.
   DO NOT TRIGGER when: designing schemas, querying live data, building transforms or generators.
-allowed-tools:
-  - Read
-  - Write
-  - Edit
-  - Bash
-  - Grep
 argument-hint: "[check-name] [description...]"
 metadata:
   version: 1.3.0

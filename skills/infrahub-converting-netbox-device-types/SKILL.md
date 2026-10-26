@@ -15,13 +15,6 @@ description: >-
   object data files (use infrahub-managing-objects), or setting up continuous
   two-way replication with a live NetBox (that is infrahub-sync, a separate
   product; a one-off export of device types is in scope here).
-allowed-tools:
-  - Read
-  - Write
-  - Edit
-  - Bash
-  - Glob
-  - Grep
 argument-hint: "[netbox-device-type-path...]"
 metadata:
   version: 1.3.0

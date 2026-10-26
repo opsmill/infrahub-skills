@@ -14,12 +14,6 @@ description: >-
   issue (use infrahub-reporting-issues), running operational queries
   (use infrahub-analyzing-data), or planning an upgrade that has not run yet
   (use infrahub-planning-upgrades).
-allowed-tools:
-  - Read
-  - Bash
-  - Grep
-  - Glob
-  - Write
 metadata:
   version: 1.3.0
   author: OpsMill
