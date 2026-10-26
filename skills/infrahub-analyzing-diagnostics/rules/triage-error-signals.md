@@ -80,4 +80,4 @@ was never read.
 - Recording matches without timestamps or paths,
   which makes the correlation step guesswork.
 
-Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)

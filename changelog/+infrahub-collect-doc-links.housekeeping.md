@@ -1,0 +1,1 @@
+Links to the `infrahub-collect` install and troubleshooting-bundle guides in the infrahub-collecting-diagnostics and infrahub-analyzing-diagnostics skills, and on their documentation pages, now point to the pages under `docs.infrahub.app/backup/collect/`. The old `docs.infrahub.app/backup/guides/` URLs return 404.

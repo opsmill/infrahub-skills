@@ -88,4 +88,4 @@ and destroys the crash state support may need.
   to supplement a stale bundle instead of handing
   back to `infrahub-collecting-diagnostics`.
 
-Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)

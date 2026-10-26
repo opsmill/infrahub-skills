@@ -88,4 +88,4 @@ today's, the report may describe the wrong outage.
   it (or pasted the contents) — the question is a
   gate, not a ritual.
 
-Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)
