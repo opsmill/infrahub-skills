@@ -72,4 +72,4 @@ skipped — the manifest says which. It never means
   if more data is needed, that is a hand-off to
   `infrahub-collecting-diagnostics`.
 
-Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)
