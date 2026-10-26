@@ -1,1 +1,1 @@
-Added the Otto icon at `.claude-plugin/icon.png`, so the plugin has a listing icon when it is submitted to the Claude plugin directory.
+Added the Infrahub logo at `.claude-plugin/icon.png` and set the plugin's `author.name` to "OpsMill", so the Claude plugin directory listing shows the product logo and the company as its publisher.
