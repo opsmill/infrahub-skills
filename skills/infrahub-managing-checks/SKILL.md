@@ -138,7 +138,7 @@ class MyCheck(InfrahubCheck):
 > repository config model uses `extra="forbid"`, so
 > putting `query:` under `check_definitions:` makes
 > the whole repo config fail validation. This is the
-> #1 confusion vs. `generator_definitions:`, which
+> most common confusion vs. `generator_definitions:`, which
 > *does* take a top-level `query:`. See
 > [rules/registration-config.md](./rules/registration-config.md).
 
