@@ -8,12 +8,6 @@ description: >-
   TRIGGER when: user wants to report a bug, file an issue, request a feature, open a ticket, or escalate a problem
   in any opsmill/infrahub-* project (SDK, Ansible, VS Code, MCP, Helm, schema-library, sync, backup, nornir, skills).
   DO NOT TRIGGER when: the user wants to fix the bug themselves locally, write a test, or debug code without filing.
-allowed-tools:
-  - Read
-  - Bash
-  - Grep
-  - Glob
-  - WebFetch
 metadata:
   version: 1.3.0
   author: OpsMill
