@@ -1,0 +1,446 @@
+---
+name: infrahub-converting-netbox-device-types
+description: >-
+  Converts NetBox device-type and module-type definitions (the netbox-community
+  devicetype-library format, also published via the NetBox Data Exchange / NDX)
+  into Infrahub object templates as Infrahub object YAML, using a bundled Python
+  converter driven by a schema mapping profile.
+  TRIGGER when: importing NetBox device types or module types, exporting device
+  types from a running NetBox instance, building object templates from vendor
+  device models, converting line cards / PSUs / transceivers from NetBox module
+  types into Template* objects, re-running a conversion after changing the
+  mapping profile, debugging a wrong or failed conversion.
+  DO NOT TRIGGER when: importing CSV/TSV data (use infrahub-importing-data),
+  authoring schemas from scratch (use infrahub-managing-schemas), writing ordinary
+  object data files (use infrahub-managing-objects), or setting up continuous
+  two-way replication with a live NetBox (that is infrahub-sync, a separate
+  product; a one-off export of device types is in scope here).
+argument-hint: "[netbox-device-type-path...]"
+metadata:
+  version: 1.3.0
+  author: OpsMill
+---
+
+# NetBox Device Type Converter
+
+## Overview
+
+Turns NetBox device-type YAML — the format used by
+[netbox-community/devicetype-library](https://github.com/netbox-community/devicetype-library)
+and browsable at the [NetBox Data Exchange](https://netboxlabs.com/ndx/)
+— into Infrahub **object templates**: reusable
+blueprints that create a device with all its ports
+already in place.
+
+The conversion is done by a bundled Python script,
+not by hand. Hand-converting a 48-port switch means
+transcribing 48 near-identical blocks, and the
+library has thousands of device types. The script is
+exact and repeatable; this skill is about pointing it
+at the right schema and reading what it tells you.
+
+## Project Context
+
+Target schema files:
+!`find . -name "*.yml" -path "*schema*" 2>/dev/null | head -10`
+
+Existing mapping profiles:
+!`find . -name "*.yml" -path "*mappings*" 2>/dev/null | head -10`
+
+## When to Use
+
+- Seeding a new Infrahub instance with vendor device
+  models from the NetBox library
+- Converting a handful of device types for a specific
+  project or lab topology
+- Re-running a conversion after the upstream library
+  or the local schema changed
+- Building the mapping profile that binds NetBox
+  fields to a custom Infrahub schema
+
+Not for keeping a **live** NetBox and Infrahub in
+sync — that is
+[infrahub-sync](https://docs.infrahub.app/sync/),
+a separate product. This skill converts device-type
+definitions, from the published library or from a
+one-off export of a running NetBox.
+
+## The Shape of the Conversion
+
+One NetBox file becomes **three** Infrahub artifacts,
+because Infrahub splits what NetBox keeps together:
+
+| NetBox | Infrahub | Why |
+| ------ | -------- | --- |
+| `manufacturer: Cisco` | `OrganizationManufacturer` object | Manufacturers are first-class objects |
+| `model`, `part_number`, `u_height`, `weight` | `DcimDeviceType` object | Templates hold no model data |
+| `interfaces:` and other component lists | `TemplateDcimDevice` + component templates | The reusable blueprint |
+
+The template links to the device type, so creating a
+device from the template also wires up its model.
+
+**Module types** are a second input family — line
+cards, PSUs, and transceivers, in a sibling
+`module-types/` directory. They carry no `slug`, which
+is how the converter tells the two apart, so a mixed
+tree converts in one pass. They follow the same split
+(a module type object, optionally a module template)
+and land in `04_module_types.yml` /
+`05_module_templates.yml`. Read
+[extending-your-schema.md](./extending-your-schema.md#converting-module-types)
+before promising much here: a module's ports convert
+only onto a **module template**, and stock
+schema-library's `DcimModule` does not generate one.
+With `schema-library-modules.yml` they are reported as
+skipped; `schema-library-module-ports.yml` carries them
+once `DcimModule` sets `generate_template: true`.
+
+Module port names carry NetBox's `{module}` token, which
+no conversion can resolve — the bay position is only
+known once the module is installed. Once the ports
+import as `DcimModulePort` declarations on a module
+template, the bundled generator resolves the token per
+installed module and creates the real device
+interfaces from the interface ports. Console ports need
+a console interface kind in the schema, and power ports
+stay declarations. See
+[generators-module-ports.md](./generators-module-ports.md).
+
+Three facts drive almost every surprise in this
+workflow — explain them rather than assuming them:
+
+1. **`Template*` kinds are generated, not written.**
+   `generate_template: true` on a node creates them;
+   without it they do not exist.
+2. **Component templates come only from `Component`
+   relationships.** An `Attribute` relationship keeps
+   pointing at real objects.
+3. **Model data lives on the device type, not the
+   template.** That is why three files, in that order.
+
+New to Infrahub's data model, or explaining it to
+someone who is? [concepts.md](./concepts.md) covers
+these with links to the Infrahub docs.
+
+## Rule Categories
+
+| Priority | Category | Prefix | Description |
+| -------- | -------- | ------ | ----------- |
+| CRITICAL | Workflow | `workflow-` | `generate_template` must be enabled first; the bundled scripts do the work |
+| CRITICAL | Mapping | `mapping-` | Names come from the schema, never guessed; competing fields declare precedence |
+| CRITICAL | Format | `format-` | Envelope, `Template<Kind>`, nested components |
+| HIGH | Naming | `naming-` | Slug-based, parent-namespaced, unique |
+| HIGH | Coverage | `coverage-` | Report what did not convert |
+| MEDIUM | Output | `output-` | Three files, load order, branch-first |
+
+Full index: [rules/_sections.md](./rules/_sections.md).
+
+## Workflow
+
+### 1. Confirm the schema generates templates
+
+`Template*` kinds exist only where a node declares
+`generate_template: true`. Check the target schema
+rather than assuming either way — this is the most
+common reason a conversion loads nothing.
+
+In the OpsMill schema-library the answer depends on
+the version: **v2 and later enable it** on `DcimDevice`
+in `base/dcim.yml`, while pre-v2 shipped the line
+commented out. Custom schemas usually have to add it.
+
+Read
+[rules/workflow-schema-prerequisites.md](./rules/workflow-schema-prerequisites.md).
+
+If it is not enabled, **explain the change rather than
+making it silently**: the flag generates
+`TemplateDcimDevice` plus a component template for
+every `Component` relationship, it is additive, and the
+schema has to be reloaded for the kinds to appear.
+Enabling it touches the user's source of truth, so it
+is their call — show the one-line diff and let them
+decide.
+
+> Docs:
+> [Object Templates overview](https://docs.infrahub.app/object-templates/overview)
+> · [Create and load a schema](https://docs.infrahub.app/schema/create-and-load)
+
+### 2. Choose or write a mapping profile
+
+The converter binds NetBox fields to Infrahub
+attributes through a profile, so it never guesses a
+name.
+
+- Using the OpsMill schema-library? Start with
+  `scripts/mappings/schema-library.yml`, or
+  `scripts/mappings/schema-library-modules.yml` if you
+  also want module types, or
+  `scripts/mappings/schema-library-module-ports.yml` if
+  you want their ports too (see
+  [generators-module-ports.md](./generators-module-ports.md)).
+- Custom schema? Copy `scripts/mappings/_template.yml`
+  into the working directory (say
+  `./mappings/my-schema.yml`, never inside `$SKILL`,
+  which a plugin reinstall wipes) and fill it in **by
+  reading the schema YAML**, kind by kind and attribute
+  by attribute.
+
+Read
+[rules/mapping-profile-driven.md](./rules/mapping-profile-driven.md)
+and [reference.md](./reference.md) for the full field
+inventory on both sides. Where two NetBox fields
+compete for one Infrahub attribute — `description` vs
+`comments`, interface `label` vs `description` —
+declare precedence with `fallback` rather than
+picking one and losing the other; see
+[rules/mapping-fallback-sources.md](./rules/mapping-fallback-sources.md).
+
+**Check for a node that already covers a gap before
+concluding one is missing.** A console port is often
+modelled as a node inheriting the interface generic, in
+which case it rides the device's existing `interfaces`
+relationship and needs no schema change at all — only
+a profile entry. When two lists share one relationship,
+read
+[rules/mapping-shared-relationships.md](./rules/mapping-shared-relationships.md):
+getting that wrong discards the larger list silently.
+[extending-your-schema.md](./extending-your-schema.md)
+lists what schema-library and infrahub-demo-dc already
+provide.
+
+### 3. Get the input
+
+Two sources, depending on where the device types live.
+
+**From a running NetBox.** The catalogue in someone's
+own instance is usually what they actually want to
+import, and it is not the same set as the published
+library. `scripts/netbox_export_device_types.py` reads
+a live instance over its REST API and writes the
+library file format:
+
+```bash
+pip install 'pynetbox>=7.0' pyyaml   # NetBox's client, and the file writer
+# SKILL is this skill's own directory, wherever it is installed
+SKILL=/path/to/infrahub-converting-netbox-device-types
+export NETBOX_TOKEN=...
+python "$SKILL/scripts/netbox_export_device_types.py" \
+  --url https://netbox.example.com \
+  --in-use \
+  --module-types \
+  --output-dir ./netbox-export
+```
+
+**Stay in the user's working directory and name the
+scripts by their full path.** `$SKILL` is wherever this
+skill is installed, which for a plugin install is under
+`~/.claude/plugins/cache/` — a directory reinstalling
+the plugin wipes. Running from there puts the export,
+the cloned library and the generated YAML inside it, so
+the next update deletes the user's data. Everything the
+commands below read or write (`./netbox-export`,
+`devicetype-library/`, `./generated`) stays relative to
+where the user actually is.
+
+`--in-use` keeps only device types with at least one
+device, and module types with at least one module,
+which on a real instance is a much smaller and more
+relevant set than the whole catalogue.
+
+It reports anything that did not come across cleanly:
+fields NetBox holds that the library format cannot
+carry, fields NetBox left unset that the library format
+requires, endpoints absent from that NetBox version,
+file names that collided after sanitising, and a NetBox
+older than the 4.5 front-port shape. Read that list
+before converting, the same way you read the conversion
+coverage report before loading.
+
+This is a one-way snapshot into files, not a sync.
+Continuous replication is
+[infrahub-sync](https://docs.infrahub.app/sync/), a
+separate product.
+
+**From the published library.** For seeding vendor
+models nobody has yet, clone the upstream repo — but
+sparsely. A plain `--depth 1` clone pulls 1.6 GB,
+almost all of it rack elevation images the converter
+never reads. Restricting to the definitions gets all
+11,500+ device types and 2,000+ module types in about
+60 MB:
+
+```bash
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/netbox-community/devicetype-library.git
+git -C devicetype-library sparse-checkout set device-types module-types
+```
+
+Drop `module-types` from that list if you only want
+devices.
+
+The converter accepts files, directories (walked
+recursively), and globs.
+
+### 4. Run the converter
+
+Run it — do not reimplement it. Both scripts carry
+correctness that a hand-rolled equivalent silently
+loses, and the failure looks like success: valid YAML,
+no error, no coverage report, wrong data. Read
+[rules/workflow-use-the-bundled-scripts.md](./rules/workflow-use-the-bundled-scripts.md).
+When a schema does not fit, the answer is a mapping
+profile, not a different script.
+
+```bash
+python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
+  devicetype-library/device-types/Cisco/ \
+  --mapping "$SKILL/scripts/mappings/schema-library.yml" \
+  --output-dir ./generated \
+  --report ./generated/coverage-report.md
+```
+
+For a live export, point it at the export directory.
+It walks `device-types/` and `module-types/` together,
+which needs the profile that maps both:
+
+```bash
+python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
+  ./netbox-export/ \
+  --mapping "$SKILL/scripts/mappings/schema-library-modules.yml" \
+  --output-dir ./generated \
+  --report ./generated/coverage-report.md
+```
+
+Exit codes: `0` converted, `1` bad profile or
+malformed input, `2` no files matched.
+
+It refuses two device types with the same `model` and
+lists every pair. A template names its device type by
+model, so loading both would overwrite one with the
+other without an error; the published library has a
+handful, shared between vendors. Leave one of each out
+of the input.
+
+Before writing or hand-editing any emitted file, read
+[rules/format-template-objects.md](./rules/format-template-objects.md)
+— the envelope, the `Template<Kind>` split, and the
+`{kind, data}` component wrapper are what makes the
+output loadable — and
+[rules/naming-template-names.md](./rules/naming-template-names.md),
+because component names collide across device types
+unless they are namespaced by their parent.
+
+### 5. Read the coverage report, explain the loss, offer the fix
+
+Against a typical schema, a large part of each NetBox
+file has nowhere to go. Open the report and, in the
+response:
+
+1. **Name the biggest losses** — which component lists
+   and which fields, with counts. Do not just say a
+   report exists.
+2. **Explain why the schema could not hold them.**
+   "Skipped `console-ports`" is unactionable to someone
+   who does not know component templates come only from
+   `Component` relationships. Give the reason.
+3. **Offer the concrete fix.** A dropped field is one
+   attribute; a skipped list is a node plus a
+   Component/Parent pair. Both are additive.
+   [extending-your-schema.md](./extending-your-schema.md)
+   has worked YAML per case, including which
+   schema-library extensions already cover some of them.
+
+Offer — do not unilaterally rewrite their schema. It is
+a migration against their source of truth.
+
+Read
+[rules/coverage-report-unmapped.md](./rules/coverage-report-unmapped.md).
+
+Two cases worth flagging by name when they apply:
+
+- **Modular chassis** — their ports live in module
+  bays, so 414 published device types (3.6%) declare
+  bays and no interfaces, and convert to a template with
+  no interfaces. On schema-library **v2**
+  the bays themselves convert (`TemplateDcimModuleBay`),
+  which turns an empty template into a useful one; the
+  `schema-library-modules.yml` profile maps them. On
+  pre-v2, or a schema with no bay node, they are still
+  reported as skipped. See
+  [extending-your-schema.md](./extending-your-schema.md#module-bays).
+- **Console ports are usually a profile change, not a
+  schema change** — if the schema models them as a node
+  inheriting the interface generic, they already ride
+  the `interfaces` relationship.
+
+### 6. Load onto a branch
+
+```bash
+infrahubctl branch create netbox-import
+for file in generated/0*.yml; do
+  infrahubctl object load "$file" --branch netbox-import
+done
+```
+
+Load order is dependency order — manufacturers, then
+device types, then templates. Read
+[rules/output-load-order.md](./rules/output-load-order.md).
+Never load a bulk import straight to the default
+branch.
+
+## Extending the Converter
+
+Reach for the mapping profile first — it covers new
+kinds, renamed attributes, extra component lists, and
+conditional values without touching Python. Change the
+script only for a genuinely new *mechanism* (a
+transform kind that does not exist yet). Adding a
+schema-specific special case to the script is how it
+stops working for everyone else.
+
+Its tests live at
+`tests/scripts/test_netbox_to_infrahub_templates.py`,
+and the module-port generator's at
+`tests/scripts/test_materialize_module_ports.py`. Run
+them after any change:
+
+```bash
+uv run invoke test
+```
+
+## Supporting References
+
+| File | Read it when |
+| ---- | ------------ |
+| [concepts.md](./concepts.md) | The Infrahub model is unfamiliar, or you need to explain it |
+| [reference.md](./reference.md) § Exporting from a live NetBox | The device types are in a running NetBox: the flags, the auth, and what the export reports |
+| [extending-your-schema.md](./extending-your-schema.md) | Turning a reported gap into a schema change |
+| [generators-module-ports.md](./generators-module-ports.md) | Module ports imported as declarations and the `{module}` token needs resolving into real device interfaces |
+| [reference.md](./reference.md) | Looking up a NetBox field or its Infrahub counterpart |
+| [examples.md](./examples.md) | Needing a worked conversion, profile, or schema patch |
+| [rules/](./rules/) | Applying or checking a specific rule |
+| [../infrahub-managing-objects/rules/value-profiles-templates.md](../infrahub-managing-objects/rules/value-profiles-templates.md) | Authoring templates by hand, or choosing profiles vs templates |
+| [../infrahub-managing-schemas/rules/relationship-component-parent.md](../infrahub-managing-schemas/rules/relationship-component-parent.md) | Adding the component relationships templates are generated from |
+
+## Infrahub Documentation
+
+Link these when explaining a concept — a user who
+follows one link learns the feature, not just this
+conversion.
+
+| Topic | Page |
+| ----- | ---- |
+| What object templates are | <https://docs.infrahub.app/object-templates/overview> |
+| Enabling and using them | <https://docs.infrahub.app/object-templates/use> |
+| Templates plus Profiles | <https://docs.infrahub.app/object-templates/with-profiles> |
+| Per-object unique values | <https://docs.infrahub.app/object-templates/allocate-resources-from-pools> |
+| Nodes and attributes | <https://docs.infrahub.app/schema/nodes-and-attributes> |
+| Relationships (Component vs Attribute) | <https://docs.infrahub.app/schema/relationships> |
+| Generics and inheritance | <https://docs.infrahub.app/schema/generics-and-inheritance> |
+| Extending a schema without forking it | <https://docs.infrahub.app/schema/extensions> |
+| Loading a schema | <https://docs.infrahub.app/schema/create-and-load> |
+| Schema migrations and their risks | <https://docs.infrahub.app/schema/migration> |
+| Schema property reference | <https://docs.infrahub.app/reference/schema/node> |
+| Profiles vs templates | <https://docs.infrahub.app/profiles/overview> |
+| Schema from scratch (tutorial) | <https://docs.infrahub.app/academy/tutorials/build-your-first-schema> |
+| Generators (resolving `{module}` after install) | <https://docs.infrahub.app/generators/overview> |

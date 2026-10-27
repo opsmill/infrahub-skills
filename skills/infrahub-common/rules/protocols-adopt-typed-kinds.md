@@ -1,0 +1,69 @@
+---
+title: Adopt Generated Protocols for Typed Schema Access
+impact: LOW
+tags: protocols, infrahubctl, type-safety, generators, transforms, checks
+---
+
+## Adopt Generated Protocols for Typed Schema Access
+
+When Python — a generator, transform, or check — reads or writes schema
+objects through the SDK, pass a generated protocol class as the `kind` instead
+of a string. You get dev-time type checking and IDE autocomplete on the
+object's attributes. After a schema change, every read of a renamed attribute,
+and every use that no longer fits a retyped one, is a type error on the exact
+line rather than a runtime failure. Field names passed to `create()` are not
+checked.
+
+### Generate the protocols
+
+`infrahubctl protocols` writes a Python module of typed classes for your
+schema, read from a running instance that has the schema loaded. The async
+client is the default; add `--sync` for the sync client.
+
+```bash
+# Async client (default): reads the configured INFRAHUB_ADDRESS
+# (defaults to http://localhost:8000)
+infrahubctl protocols --out lib/protocols.py
+```
+
+Prefix `infrahubctl` with your project's Python runner and confirm the
+server first — see
+[connectivity-server-check](./connectivity-server-check.md) for how
+`INFRAHUB_ADDRESS` / `INFRAHUB_API_TOKEN` are resolved (and `infrahubctl
+info` as the connectivity test) and
+[connectivity-python-environment](./connectivity-python-environment.md)
+for the `uv run` / `poetry run` prefix. The instance address is not
+hardcoded here — it comes from your environment or `infrahubctl.toml`.
+
+> The regeneration commands (branch, sync variant), the limits of offline
+> `--schemas` generation, and the "never hand-edit" rule live in
+> [protocols-generated](./protocols-generated.md).
+
+### Use them
+
+```python
+from lib.protocols import NetworkDevice   # or a protocols.py beside the script
+
+device = await client.create(NetworkDevice, hostname="spine-1", role="spine")
+device.hostname.value            # type-checked and autocompleted
+# the create() keywords above are not type-checked
+```
+
+For core and internal kinds you generate nothing — import them straight from
+the SDK: `from infrahub_sdk.protocols import CoreIPPrefixPool`.
+
+### Caveats
+
+- **Reads, not `create()` fields.** `create()` accepts any keyword or `data`
+  key, so a misspelled field, or one from another kind, passes the type
+  checker, and the SDK drops it without an error.
+- **Attributes only.** Relationships are `RelatedNode` / `RelationshipManager`
+  with no peer type; re-`get(Peer, ...)` when you need typed peer access.
+- **Regenerate after any schema change** and commit the file — it does not
+  update itself, and a stale file gives wrong types silently.
+- **Match sync vs async to your client** — a sync check imports the `--sync`
+  variant; async uses the default.
+
+See [protocols-generated](./protocols-generated.md) for why the file is a
+build artifact you never hand-edit. The auditor flags untyped string kinds via
+[yagni-untyped-python-vs-generated-protocols](../../infrahub-auditing-repo/rules/yagni-untyped-python-vs-generated-protocols.md).

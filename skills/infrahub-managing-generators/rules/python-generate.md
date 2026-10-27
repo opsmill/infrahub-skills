@@ -1,0 +1,123 @@
+---
+title: Python Generator Class and Object Creation
+impact: CRITICAL
+tags: python, generate, create, save, allow_upsert, async
+---
+
+## Python Generator Class and Object Creation
+
+Impact: CRITICAL
+
+`generate()` is the only method the dispatcher calls
+on a generator; it is async, takes the GraphQL
+result as `data`, and creates objects through
+`self.client`.
+
+### Why it matters
+
+The whole tracking context is wired up around the
+async `generate()` call. Defining it as a sync
+method silently shadows the base class's coroutine
+and the dispatcher awaits nothing — no objects get
+created and no error is raised. Calling sync SDK
+methods (or `time.sleep`, `requests.get`, etc.)
+inside `generate()` blocks the worker's event loop
+long enough to trigger a watchdog timeout, leaving
+the proposed change in an inconsistent state.
+`self.client` is the variant that emits tracking
+metadata on every write; reaching for the raw
+client bypasses the tracking group, so cleanup on
+the next run won't find those objects.
+
+### Basic Structure
+
+```python
+from infrahub_sdk.generator import InfrahubGenerator
+
+
+class MyGenerator(InfrahubGenerator):
+    async def generate(self, data: dict) -> None:
+        topology = (
+            data["TopologyDataCenter"]["edges"]
+            [0]["node"]
+        )
+        name = topology["name"]["value"]
+
+        device = await self.client.create(
+            kind="DcimDevice",
+            data={
+                "name": f"{name}-spine-01",
+                "status": "active",
+            }
+        )
+        await device.save(allow_upsert=True)
+```
+
+### Object Creation API
+
+```python
+# Create a new object — see [python-relationship-references.md]
+# for the three accepted forms for relationship fields.
+obj = await self.client.create(
+    kind="DcimDevice",
+    data={
+        "name": "my-device",
+        "status": "active",
+        # HFID dict for single-component HFID targets
+        "device_type": {"hfid": ["cEdge-1000"]},
+    }
+)
+await obj.save(allow_upsert=True)
+
+# Get an existing object
+existing = await self.client.get(
+    kind="LocationBuilding",
+    name__value="PAR-1",
+)
+
+# Allocate from a pool
+ip = await self.client.allocate_next_ip_address(
+    resource_pool=pool,
+    identifier=f"{device_name}-loopback",
+)
+```
+
+### Critical Rules
+
+- `generate()` is async; every client call needs
+  `await` or the coroutine returns unresolved and
+  the object is never saved.
+- `save(allow_upsert=True)` makes the write
+  idempotent — without it, the second run errors out
+  on the first object that already exists and the
+  rest of `generate()` never executes.
+- Use `self.client` inside `generate()`; the raw
+  client (`self._init_client`) skips tracking, so
+  `delete_unused_nodes` can't reclaim those objects
+  on the next run.
+- Reference related objects in `data` by HFID dict
+  (`{"hfid": ["name"]}`), ID dict (`{"id": "<uuid>"}`),
+  or SDK object directly. A bare string is treated as
+  `id`, not HFID — the server returns "Unable to find
+  the node" when the string is not a valid UUID. See
+  [python-relationship-references.md](./python-relationship-references.md).
+- `client.create()` keeps only the keys that are
+  attributes or relationships of the kind. Any other
+  key, passed as a keyword or in `data`, is dropped
+  with no error, so the saved node lacks that field.
+  A typo or a field copied from a sibling kind is the
+  usual cause. Check each field name against the
+  kind's schema before you write the call. A generated
+  protocol class as `kind` does not catch this,
+  because the field arguments are untyped. When `data`
+  is not empty, every keyword field is ignored, valid
+  or not, so pass all fields in one place. Current as
+  of infrahub-sdk 1.23.2
+  ([infrahub-sdk-python#1413](https://github.com/opsmill/infrahub-sdk-python/issues/1413)).
+- Treat optional GraphQL fields defensively —
+  `None` for a missing relationship is normal, and
+  unguarded `["value"]` access raises `TypeError`
+  partway through the run.
+
+Reference:
+[Infrahub Generator Docs](https://docs.infrahub.app)

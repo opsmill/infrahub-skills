@@ -1,0 +1,42 @@
+# Infrahub Transform Creator - Rule Sections
+
+1. **Transform Types (types-)** -- CRITICAL. Python vs
+   Jinja2 transforms, when to use which, output formats.
+   Choosing wrong type leads to unnecessary complexity.
+
+2. **Python Transform (python-)** -- CRITICAL.
+   InfrahubTransform base class, transform() method,
+   return types (dict=JSON, str=text), sync or async.
+
+3. **Jinja2 Transform (jinja2-)** -- CRITICAL. Template
+   syntax, data variable containing GraphQL response,
+   netutils filters, template imports.
+
+4. **Hybrid (hybrid-)** -- HIGH. Combining Python data
+   preparation with Jinja2 rendering. Platform-specific
+   template selection, FileSystemLoader setup.
+
+5. **Artifacts (artifacts-)** -- HIGH. Connecting
+   transforms to output files via artifact_definitions,
+   content types, targets (CoreArtifactTarget),
+   parameter mapping, async regeneration polling
+   (the /api/artifact/generate endpoint is fire-and-forget),
+   and declaring the transform's dependency closure with
+   `watch.files` so regeneration triggers on the right
+   file changes and only those.
+
+6. **API Reference (api-)** -- HIGH. Class attributes
+   (query, timeout), instance properties (client,
+   root_directory, server_url), methods, return types.
+
+7. **Patterns (patterns-)** -- MEDIUM. Data extraction
+   utilities (common.py), CSV output pattern, shared
+   functions (get_data, get_interfaces).
+
+8. **Testing (testing-)** -- HIGH. Resources Testing Framework (YAML-driven pytest tests: smoke, unit, integration), infrahubctl transform/render commands. Always create tests alongside new transforms.
+
+9. **Queries (queries-)** -- CRITICAL. Writing the .gql
+   query that feeds the transform. Covers union-typed
+   relationships (DcimDevice.location, Organization*) that
+   require inline fragments (... on Type { fields }) to
+   avoid "Cannot query field 'X' on type 'Y'" errors.
