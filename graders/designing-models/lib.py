@@ -438,6 +438,7 @@ def check_design_directions(ws: Path) -> tuple[bool, str]:
     directions: dict[str, dict[str, str]] = {}
     for (start, letter), end in zip(options, bounds):
         decisions: dict[str, str] = {}
+        first_topic = ""
         for line in lines[start + 1:end]:
             item = _SUB_ITEM.match(line)
             found = _DIRECTION_DECISION.match(_clean(item.group(1))) if item else None
@@ -445,11 +446,14 @@ def check_design_directions(ws: Path) -> tuple[bool, str]:
                 continue
             if found.group(1) != letter:
                 return False, f"decision ID {found.group(1)}{found.group(2)} under direction {letter}; IDs start with their direction's letter"
+            first_topic = first_topic or _choice(found.group(3))
             decisions[_choice(found.group(3))] = _choice(found.group(4))
         if not decisions:
             return False, f"direction {letter} lists no decisions as '{letter}1. <topic>: <choice>'"
         if REUSE_TOPIC not in decisions:
             return False, f"direction {letter} has no 'Reuse' decision"
+        if first_topic != REUSE_TOPIC:
+            return False, f"direction {letter} does not start with its 'Reuse' decision ({letter}1. Reuse: ...)"
         if not _reuses_something(decisions[REUSE_TOPIC]):
             return False, f"{letter}1 reuses neither a reference design, a Marketplace schema nor none: {decisions[REUSE_TOPIC]!r}"
         directions[letter] = decisions
@@ -565,7 +569,7 @@ def check_inputs_digested(
     for name in inputs:
         if name.lower() not in listed:
             return False, f"Inputs table does not list {name}"
-        if listed[name.lower()].lower() in PLACEHOLDERS:
+        if _is_placeholder(listed[name.lower()]):
             return False, f"Inputs row for {name} says nothing about what was taken"
 
     headers, rows, err = _sketch(parts)
@@ -804,7 +808,7 @@ def check_decision_provenance(parts: dict[str, str]) -> tuple[bool, str]:
         if tag not in DECISION_TAGS:
             return False, f"decision {number} has tag {tag!r}; expected stated, recommended or open"
         basis = _clean(row[basis_col])
-        if tag == "recommended" and basis.lower() in PLACEHOLDERS:
+        if tag == "recommended" and _is_placeholder(basis):
             return False, f"decision {number} is recommended but has no basis"
         if tag == "open":
             ref = _OPEN_ID.search(basis)
@@ -876,8 +880,11 @@ def check_direction_recorded(
     letter = _DIRECTION_ROW.match(cell).group(1)
     if letter != chosen:
         return False, f"the brief records direction {letter}; the transcript chose {chosen}"
-    halves = _NOT_TAKEN.split(cell, maxsplit=1)
-    ids = set(_DIRECTION_ID.findall(halves[0]))
+    # Parenthesised notes ("(follow infrahub-demo-otn)", "(answer Q4)") are
+    # reasons, not IDs or directions; F, O and Q IDs are features, open items
+    # and questions, not borrowed decisions.
+    halves = _NOT_TAKEN.split(re.sub(r"\([^)]*\)", "", cell), maxsplit=1)
+    ids = {i for i in _DIRECTION_ID.findall(halves[0]) if i[0] not in "FOQ"}
     if ids != borrowed:
         return False, f"the direction row borrows {sorted(ids)} where the transcript borrows {sorted(borrowed)}"
     if len(halves) < 2:
@@ -1261,7 +1268,7 @@ def check_mechanisms_match_artifacts(parts: dict[str, str]) -> tuple[bool, str]:
     open_ids = _open_item_ids(parts)
     s_headers, s_rows, _ = _sketch(parts)
     kind_col = _column(s_headers, "node kind")
-    sketch_kinds = {_clean(r[kind_col]).lower() for r in s_rows} if kind_col else set()
+    sketch_kinds = {m.group(0).lower() for r in s_rows if kind_col and (m := _KIND.match(_clean(r[kind_col])))}
 
     seen: set[tuple[str, str]] = set()
     for row in rows:
@@ -1347,14 +1354,22 @@ def check_next_steps_in_order(parts: dict[str, str]) -> tuple[bool, str]:
         low = text.lower()
         return bool(re.search(r"\bO\d+\b", text)) and not _HANDOFF.search(low) and not any(n in low for n in builders)
 
+    # A feature's step is the first one that leads with it; a feature named
+    # only in passing ("hand off F1; F2 builds on it") falls back to its
+    # first mention.
     first_step: dict[str, int] = {}
+    mentioned: dict[str, int] = {}
     open_step: dict[str, int] = {}
     for index, text in enumerate(steps):
         if not settles_only(text):
-            for n in _FEATURE_ID.findall(text):
-                first_step.setdefault(f"F{n}", index)
+            named = _FEATURE_ID.findall(text)
+            if named:
+                first_step.setdefault(f"F{named[0]}", index)
+            for n in named:
+                mentioned.setdefault(f"F{n}", index)
         for o in re.findall(r"\bO(\d+)\b", text):
             open_step.setdefault(f"O{o}", index)
+    first_step = {**mentioned, **first_step}
     tabular = any(_TABULAR.search(name) for name in _input_files(parts))
     for fid in order:
         if fid not in first_step:

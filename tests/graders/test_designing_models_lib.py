@@ -398,6 +398,11 @@ INPUT_VARIANT_ROWS = """\
         ),
         pytest.param(
             BRIEF,
+            brief(inputs=INPUTS_TABLE.replace("PoP routers and the links between PoPs", "n/a."), sketch_rows=INPUT_ROWS),
+            "says nothing about what was taken", id="near-miss-placeholder-taken-from-it",
+        ),
+        pytest.param(
+            BRIEF,
             brief(inputs=INPUTS_TABLE, sketch_rows=INPUT_ROWS.replace("pops.csv:pop_code", "user")),
             "Evidence does not name pops.csv", id="near-miss-evidence-user",
         ),
@@ -865,6 +870,13 @@ DIRECTIONS_NAMES_ONLY = """\
             "direction A has no 'Reuse' decision", id="near-miss-no-reuse-decision",
         ),
         pytest.param(
+            DIRECTIONS.replace(
+                "  - A1. Reuse: infrahub-demo-sp\n  - A2. Route distinguishers: allocated from a pool\n",
+                "  - A1. Route distinguishers: allocated from a pool\n  - A2. Reuse: infrahub-demo-sp\n",
+            ),
+            "direction A does not start with its 'Reuse' decision", id="near-miss-reuse-not-first",
+        ),
+        pytest.param(
             DIRECTIONS.replace("A1. Reuse: infrahub-demo-sp", "A1. Reuse: our NetBox model"),
             "A1 reuses neither a reference design, a Marketplace schema nor none", id="near-miss-reuse-names-nothing-reusable",
         ),
@@ -981,6 +993,10 @@ CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
             "recommended but has no basis", id="near-miss-empty-basis",
         ),
         pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace("Your carrier export has the dates (strong)", "TBD.")),
+            "recommended but has no basis", id="near-miss-placeholder-basis-with-period",
+        ),
+        pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace("| 3 | Bandwidth is entered by the requester | stated |", "| 3 | Bandwidth is entered by the requester | agreed |")),
             "has tag 'agreed'", id="near-miss-invented-tag",
         ),
@@ -989,6 +1005,14 @@ CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
                 line + "\n" for line in CIRCUIT_DECISIONS.splitlines() if "Direction" not in line
             )),
             "no decision names the direction", id="violating-no-direction-row",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "Direction A (follow infrahub-demo-service-catalog), with B2 (contract fields on the circuit); not taken: B (a custom model)",
+                "Direction A (follow infrahub-demo-service-catalog, per answer Q4), with B2 (contract fields on the circuit); "
+                "not taken: B (a custom model, A reuses more)",
+            )),
+            None, id="compliant-direction-reasons-name-questions-and-letters",
         ),
         pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
@@ -1364,6 +1388,11 @@ def branch_brief(mechanisms: str = BRANCH_MECH) -> str:
     [
         pytest.param(branch_brief(), None, id="compliant"),
         pytest.param(branch_brief(BRANCH_MECH_VARIANT), None, id="compliant-variant"),
+        pytest.param(
+            brief(features=BRANCH_FEATURES, mechanisms=BRANCH_MECH,
+                  sketch_rows=BRANCH_ROWS.replace("| F1 | LocationBranch | branch code |", "| F1 | LocationBranch (a site) | branch code |")),
+            None, id="compliant-node-kind-with-a-note",
+        ),
         pytest.param(branch_brief("No generator.\n"), "Mechanisms table lacks columns", id="violating-prose-only"),
         pytest.param(
             branch_brief("".join(row + "\n" for row in BRANCH_MECH.splitlines() if "| generator |" not in row)),
@@ -1438,6 +1467,11 @@ def test_uniqueness_rule_left_out_fails(tmp_path: Path) -> None:
     ("steps", "rows", "open_items", "expected"),
     [
         pytest.param(NEXT_STEPS, F1_ROWS, "none\n", None, id="compliant"),
+        pytest.param(
+            NEXT_STEPS.replace("1. Build F1 DC fabric: Schema Manager, then Object Manager.",
+                               "1. Build F1 DC fabric: Schema Manager, then Object Manager; F2 builds on it."),
+            F1_ROWS, "none\n", None, id="compliant-later-feature-named-in-passing",
+        ),
         pytest.param(
             "Do these in order.\n\n1) Settle **O1** with the DC team.\n2) `F1` DC fabric first: Schema Manager, Object Manager.\n"
             "3) F2 IPAM: Schema Manager.\n4) F3 firewall: Schema Manager, Check Manager, Transform Manager.\n"
