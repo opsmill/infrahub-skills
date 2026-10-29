@@ -55,6 +55,7 @@ Marketplace: infrahub/base-schemas (Site and Device for the VPN's sites)
 `https://github.com/opsmill/...` URL of a newer demo or
 solution you read, or `none` with the reason.
 `Reused:` is required whenever a design is named.
+`Different:` says where this design departs from it.
 `Marketplace:` names each published schema or
 collection the design builds on, with the node kinds it
 covers; or `none matched` with the reason; or

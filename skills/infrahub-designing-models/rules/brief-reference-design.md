@@ -10,31 +10,16 @@ tags: brief, reference-design, reuse, grounding
 
 The brief has a `## Reference design` section, right
 after `## Service`, that names the closest OpsMill
-reference design and what the design follows from it:
-
-```markdown
-## Reference design
-
-Closest: infrahub-demo-sp
-Reused: the service-with-sites pattern (L3Vpn and L3VpnSite)
-Different: route distinguishers come from a pool, not from the order
-```
-
-- `Closest:` names a design from
-  [../references/reference-designs.md](../references/reference-designs.md),
-  or the full `https://github.com/opsmill/...` URL of a
-  newer `infrahub-demo-*` or `infrahub-solution-*`
-  repository you found and read, or `none` followed by
-  the reason no design fits.
-- `Reused:` says which pattern, node kinds or service
-  objects the design follows. It is required whenever a
-  design is named.
-- `Different:` says where this design departs from it.
-- `Marketplace:` names the published schemas the design
-  builds on and the node kinds each covers, or
-  `none matched` or `not searched`, each with the
-  reason. Read the catalog whole and match it per node
-  kind (SKILL.md step 5).
+reference design, what the design reuses from it and
+where it differs, and the Marketplace schemas it builds
+on. The `Closest:`, `Reused:`, `Different:` and
+`Marketplace:` lines, and what each may hold, are
+defined in
+[../references/brief-format.md](../references/brief-format.md).
+Choose the design from
+[../references/reference-designs.md](../references/reference-designs.md),
+and read the Marketplace catalog whole, matching it per
+node kind (SKILL.md step 5).
 
 ## Why it matters
 

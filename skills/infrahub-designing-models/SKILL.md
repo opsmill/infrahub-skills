@@ -239,10 +239,9 @@ uncorrected becomes an open item, as above.
 - Keep what was agreed: existing features, sketch rows
   and decisions stay as they are unless the user changes
   them.
-- Close what the user answers: an open item they settle
-  becomes a `stated` decision, its `open: O<n>` cells
-  take the answer, and the item leaves Open items and
-  Next steps. Items still unanswered stay.
+- Close each open item the user answers as in "Coming
+  back with an answer" below. Items still unanswered
+  stay.
 - Continue the numbering: the next feature ID, decision
   number and `O<n>` after the highest in the brief.
 - A gap found in an agreed feature, such as a peer F1's

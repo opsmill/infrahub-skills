@@ -1728,3 +1728,35 @@ def test_grader_value_drivers_match_the_rule() -> None:
     rule_section = text.split("## The rule", 1)[1].split("\n- ", 1)[0]
     listed = [m.lower() for m in re.findall(r"^\d+\.\s+(.+?)\s*$", rule_section, flags=re.M)]
     assert listed == list(LIB.VALUE_DRIVERS)
+
+
+SKILL_DIR = REPO_ROOT / "skills/infrahub-designing-models"
+
+
+def _code_spans_after(path: Path, lead: str) -> list[str]:
+    """The `code` spans in the sentence of ``path`` that starts with ``lead``."""
+    text = re.sub(r"\s+", " ", path.read_text())
+    sentence = text.split(lead, 1)[1].split(".", 1)[0]
+    return re.findall(r"`([^`]+)`", sentence)
+
+
+@pytest.mark.parametrize(
+    ("path", "lead", "grader_copy"),
+    [
+        pytest.param(
+            SKILL_DIR / "rules/interview-one-question-recommended.md", "where the layer is",
+            set(LIB.QUESTION_LAYERS), id="question-layers",
+        ),
+        pytest.param(
+            SKILL_DIR / "references/brief-format.md", "`Mechanism` is one of",
+            LIB.MECHANISM_TYPES, id="mechanism-types",
+        ),
+        pytest.param(
+            SKILL_DIR / "references/brief-format.md", "exactly these values:",
+            LIB.ARTIFACT_TYPES, id="artifact-types",
+        ),
+    ],
+)
+def test_grader_lists_match_the_skill(path: Path, lead: str, grader_copy: set[str]) -> None:
+    """The grader's copy of a list the skill defines holds the same values as the skill's text."""
+    assert set(_code_spans_after(path, lead)) == set(grader_copy)

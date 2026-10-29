@@ -24,6 +24,7 @@ Checks are deterministic: no LLM, no network.
 from __future__ import annotations
 
 import fnmatch
+import functools
 import os
 import re
 from pathlib import Path
@@ -50,7 +51,7 @@ DECISION_TAGS = {"stated", "recommended", "open"}
 ARTIFACT_TYPES = {"schema", "objects", "generator", "check", "transform", "menu"}
 BASIS_STRENGTHS = ("(strong)", "(medium)", "(weak basis)")
 # Mirrors the layers named in rules/interview-one-question-recommended.md.
-QUESTION_LAYERS = {"inputs", "business", "service", "scope", "direction", "data"}
+QUESTION_LAYERS = ("inputs", "business", "service", "scope", "direction", "data")
 # Cell values that stand in for an answer without being one. An unknown
 # value has to become an `open: O<n>` reference to a real open item.
 PLACEHOLDERS = {"", "-", "--", "?", "tbd", "tba", "todo", "unknown", "n/a",
@@ -253,6 +254,17 @@ def _brief_sections(ws: Path) -> tuple[dict[str, str] | None, str]:
     return sections(brief.read_text()), ""
 
 
+def _on_brief(check: Callable[..., tuple[bool, str]]) -> Callable[..., tuple[bool, str]]:
+    """Run ``check`` on the brief's sections; a missing brief fails it with the reason."""
+    @functools.wraps(check)
+    def run(ws: Path, *args, **kwargs) -> tuple[bool, str]:
+        parts, err = _brief_sections(ws)
+        if parts is None:
+            return False, err
+        return check(parts, *args, **kwargs)
+    return run
+
+
 def _sketch(parts: dict[str, str]) -> tuple[list[str], list[dict[str, str]], str]:
     if SKETCH_HEADING not in parts:
         return [], [], "brief has no '## Data model sketch' section"
@@ -263,13 +275,7 @@ def _sketch(parts: dict[str, str]) -> tuple[list[str], list[dict[str, str]], str
 
 
 def _open_item_ids(parts: dict[str, str]) -> set[str]:
-    body = parts.get(OPEN_ITEMS_HEADING, "")
-    ids = set()
-    for line in _lines_outside_fences(body):
-        match = _OPEN_ITEM.match(line)
-        if match:
-            ids.add(match.group(1).upper())
-    return ids
+    return set(_open_item_features(parts))
 
 
 # --------------------------------------------------------------------------
@@ -316,7 +322,7 @@ def check_one_question_recommended(ws: Path) -> tuple[bool, str]:
     q_line = _QUESTION.match(lines[q_idx[0]])
     layer = q_line.group(2).strip().lower()
     if layer not in QUESTION_LAYERS:
-        return False, f"question layer {layer!r} is not one of inputs, business, service, scope, direction, data"
+        return False, f"question layer {layer!r} is not one of {', '.join(QUESTION_LAYERS)}"
     if not q_line.group(3).rstrip().endswith("?"):
         return False, "the question line does not end with '?'"
 
@@ -389,12 +395,11 @@ def check_one_question_recommended(ws: Path) -> tuple[bool, str]:
 
 _SUB_ITEM = re.compile(r"^\s+[-*]\s+(.+?)\s*$")
 _DIRECTION_DECISION = re.compile(r"^([A-Z])(\d+)\.\s+([^:]+?)\s*:\s*(.+?)$")
-_DESIGN_URL = re.compile(r"github\.com/opsmill/infrahub-(?:demo|solution)-[a-z0-9-]+")
 REUSE_TOPIC = "reuse"
 
 
 def _choice(text: str) -> str:
-    return re.sub(r"\s+", " ", text).strip().rstrip(".;,").lower()
+    return _norm(text).rstrip(".;,")
 
 
 def _reuses_something(choice: str) -> bool:
@@ -402,7 +407,7 @@ def _reuses_something(choice: str) -> bool:
     return (
         choice.startswith("none")
         or any(name in choice for name in REFERENCE_DESIGNS)
-        or bool(_DESIGN_URL.search(choice) or _MARKETPLACE_ID.search(choice))
+        or bool(re.search(_DESIGN_REPO, choice) or _MARKETPLACE_ID.search(choice))
     )
 
 
@@ -418,13 +423,13 @@ def check_design_directions(ws: Path) -> tuple[bool, str]:
     if not path.is_file():
         return False, f"no {ANSWER_PATH}"
     lines = _lines_outside_fences(path.read_text())
-    question = next((_QUESTION.match(ln) for ln in lines if _QUESTION.match(ln)), None)
+    question = next(filter(None, map(_QUESTION.match, lines)), None)
     if question is None:
         return False, "no '**Q<n> (direction):**' question line"
     layer = question.group(2).strip().lower()
     if layer != "direction":
         return False, f"the question layer is {layer!r}, not 'direction'"
-    options = [(i, _OPTION.match(ln).group(1)) for i, ln in enumerate(lines) if _OPTION.match(ln)]
+    options = [(i, m.group(1)) for i, ln in enumerate(lines) if (m := _OPTION.match(ln))]
     if not 2 <= len(options) <= 3:
         return False, f"expected two or three directions, found {len(options)}"
     basis = next((i for i, ln in enumerate(lines) if _BASIS.match(ln)), len(lines))
@@ -480,25 +485,30 @@ def _file_names(cell: str) -> set[str]:
 _LOCATOR = re.compile(r"^(?::\s*[^\s:]|\s*\(\s*[^)\s][^)]*\))")
 
 
-def _citations(cell: str) -> list[str]:
-    """Split an Evidence cell into its citations on ';' and ',' outside parentheses.
-
-    ``pops.csv (pop_code, region columns); backbone.txt:links`` gives two
-    citations, not three.
-    """
+def _split_outside_parens(text: str, seps: str) -> list[str]:
+    """Split ``text`` on any of ``seps`` outside parentheses, dropping empty parts."""
     out, depth, current = [], 0, ""
-    for ch in _clean(cell):
+    for ch in text:
         if ch == "(":
             depth += 1
         elif ch == ")":
             depth = max(depth - 1, 0)
-        if ch in ";," and depth == 0:
+        if ch in seps and depth == 0:
             out.append(current.strip())
             current = ""
             continue
         current += ch
     out.append(current.strip())
     return [c for c in out if c]
+
+
+def _citations(cell: str) -> list[str]:
+    """Split a cell into its items on ';' and ',' outside parentheses.
+
+    ``pops.csv (pop_code, region columns); backbone.txt:links`` gives two
+    citations, not three.
+    """
+    return _split_outside_parens(_clean(cell), ";,")
 
 
 def _cited_files(cell: str, inputs: dict[str, list[str]]) -> tuple[set[str], set[str]]:
@@ -521,8 +531,9 @@ def _cited_files(cell: str, inputs: dict[str, list[str]]) -> tuple[set[str], set
     return cited, bare
 
 
+@_on_brief
 def check_inputs_digested(
-    ws: Path,
+    parts: dict[str, str],
     inputs: dict[str, list[str]],
     sources: dict[str, re.Pattern] | None = None,
 ) -> tuple[bool, str]:
@@ -540,9 +551,6 @@ def check_inputs_digested(
     by leaving those rows out. Patterns are tried in order and the first
     match binds the row, so overlapping words cannot demand two files.
     """
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
     if INPUTS_HEADING not in parts:
         return False, "brief has no '## Inputs' section"
     in_headers, in_rows = first_table(parts[INPUTS_HEADING])
@@ -583,8 +591,8 @@ def check_inputs_digested(
                     f"sketch row {kind} is identified by a {name} column "
                     f"but its Evidence does not name {name}"
                 )
-        for name in sorted(bare):
-            return False, f"Evidence for {kind} cites {name} without a locator (file:column or file:element)"
+        if bare:
+            return False, f"Evidence for {kind} cites {min(bare)} without a locator (file:column or file:element)"
         for name, pattern in sources.items():
             if pattern.search(kind):
                 matched.add(name)
@@ -609,11 +617,9 @@ def check_inputs_digested(
 # --------------------------------------------------------------------------
 
 
-def check_scope_split_f1_only(ws: Path) -> tuple[bool, str]:
+@_on_brief
+def check_scope_split_f1_only(parts: dict[str, str]) -> tuple[bool, str]:
     """A split brief orders features, hands each off, and sketches F1 only."""
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
     if FEATURES_HEADING not in parts:
         return False, "brief has no '## Features' section although the scope needs a split"
     headers, rows = first_table(parts[FEATURES_HEADING])
@@ -658,7 +664,8 @@ def check_scope_split_f1_only(ws: Path) -> tuple[bool, str]:
     return True, f"{len(rows)} features have handoffs in dependency order, sketch covers F1 only"
 
 
-def check_features_artifacts(ws: Path) -> tuple[bool, str]:
+@_on_brief
+def check_features_artifacts(parts: dict[str, str]) -> tuple[bool, str]:
     """Every feature lists supported implementation artifacts in build order.
 
     The Features table is present even for a single feature, so downstream
@@ -666,9 +673,6 @@ def check_features_artifacts(ws: Path) -> tuple[bool, str]:
     artifact types, with schema first whenever it appears, because every
     other artifact reads the schema.
     """
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
     if FEATURES_HEADING not in parts:
         return False, "brief has no '## Features' section (required even for one feature)"
     headers, rows = first_table(parts[FEATURES_HEADING])
@@ -696,14 +700,12 @@ def check_features_artifacts(ws: Path) -> tuple[bool, str]:
 _REQUIRED_SKETCH_COLUMNS = ("identified by", "source of truth", "owner")
 
 
-def check_sketch_rows_complete(ws: Path) -> tuple[bool, str]:
+@_on_brief
+def check_sketch_rows_complete(parts: dict[str, str]) -> tuple[bool, str]:
     """Identity, source of truth and owner are answered or reference an open item.
 
     Every row also names its evidence, so a node kind nobody asked for shows.
     """
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
     headers, rows, err = _sketch(parts)
     if err:
         return False, err
@@ -739,16 +741,14 @@ def check_sketch_rows_complete(ws: Path) -> tuple[bool, str]:
     return True, "every sketch row has identity, source of truth and owner, or an open item"
 
 
-def check_open_item_for(ws: Path, kind: re.Pattern, column: str) -> tuple[bool, str]:
+@_on_brief
+def check_open_item_for(parts: dict[str, str], kind: re.Pattern, column: str) -> tuple[bool, str]:
     """The value the user left unknown is an open item on its own row.
 
     Bound to the subject: a brief that invents the unknown value and parks an
     open item on some other row still fails. ``kind`` matches the node kind
     the task left unknown; ``column`` names the sketch column.
     """
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
     headers, rows, err = _sketch(parts)
     if err:
         return False, err
@@ -776,27 +776,26 @@ def check_open_item_for(ws: Path, kind: re.Pattern, column: str) -> tuple[bool, 
 # --------------------------------------------------------------------------
 
 
-def _decision_rows(parts: dict[str, str]) -> tuple[list[dict[str, str]], str, str, str]:
+def _decision_rows(parts: dict[str, str]) -> tuple[list[dict[str, str]], str | None, str, str, str]:
+    """Decision log rows, and its Decision (if any), Tag and Basis columns."""
     if DECISIONS_HEADING not in parts:
-        return [], "", "", "brief has no '## Decision log' section"
+        return [], None, "", "", "brief has no '## Decision log' section"
     headers, rows = first_table(parts[DECISIONS_HEADING])
     tag_col = _column(headers, "tag")
     basis_col = _column(headers, "basis")
     if not rows or tag_col is None or basis_col is None:
-        return [], "", "", "Decision log has no table with 'Tag' and 'Basis' columns"
-    return rows, tag_col, basis_col, ""
+        return [], None, "", "", "Decision log has no table with 'Tag' and 'Basis' columns"
+    return rows, _column(headers, "decision"), tag_col, basis_col, ""
 
 
-def check_decision_provenance(ws: Path) -> tuple[bool, str]:
+@_on_brief
+def check_decision_provenance(parts: dict[str, str]) -> tuple[bool, str]:
     """Every decision is tagged stated, recommended or open.
 
     A recommended row carries a basis; an open row names its open item
     (``O<n>``) in Basis, and that item is listed under Open items.
     """
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
-    rows, tag_col, basis_col, err = _decision_rows(parts)
+    rows, _, tag_col, basis_col, err = _decision_rows(parts)
     if err:
         return False, err
     open_ids = _open_item_ids(parts)
@@ -816,7 +815,8 @@ def check_decision_provenance(ws: Path) -> tuple[bool, str]:
     return True, f"{len(rows)} decisions, each tagged with its provenance"
 
 
-def check_decision_tags_for(ws: Path, subjects: dict[str, tuple[re.Pattern, str]]) -> tuple[bool, str]:
+@_on_brief
+def check_decision_tags_for(parts: dict[str, str], subjects: dict[str, tuple[re.Pattern, str]]) -> tuple[bool, str]:
     """Each named decision carries the tag the transcript gives it.
 
     Bound to the subject: swapping tags between a stated decision and an
@@ -826,14 +826,9 @@ def check_decision_tags_for(ws: Path, subjects: dict[str, tuple[re.Pattern, str]
     tag and none the swapped one. ``subjects`` maps a label to (pattern on
     the Decision cell, expected tag).
     """
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
-    rows, tag_col, _, err = _decision_rows(parts)
+    rows, dec_col, tag_col, _, err = _decision_rows(parts)
     if err:
         return False, err
-    headers, _ = first_table(parts[DECISIONS_HEADING])
-    dec_col = _column(headers, "decision")
     if dec_col is None:
         return False, "Decision log has no 'Decision' column"
     for label, (pattern, tag) in subjects.items():
@@ -858,22 +853,18 @@ _NOT_TAKEN = re.compile(r"\bnot taken\b", re.IGNORECASE)
 _LISTED_LETTER = re.compile(r"(?:^|[,;:]|\band\b)\s*([A-Z])\b(?!\d)")
 
 
+@_on_brief
 def check_direction_recorded(
-    ws: Path, chosen: str, borrowed: set[str], not_taken: set[str], tag: str
+    parts: dict[str, str], chosen: str, borrowed: set[str], not_taken: set[str], tag: str
 ) -> tuple[bool, str]:
     """One decision names the chosen direction, the IDs borrowed, and the directions not taken.
 
     ``chosen``, ``borrowed``, ``not_taken`` and ``tag`` come from the task's
     transcript: a user who combines directions has stated the result.
     """
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
-    rows, tag_col, _, err = _decision_rows(parts)
+    rows, dec_col, tag_col, _, err = _decision_rows(parts)
     if err:
         return False, err
-    headers, _ = first_table(parts[DECISIONS_HEADING])
-    dec_col = _column(headers, "decision")
     if dec_col is None:
         return False, "Decision log has no 'Decision' column"
     matching = [r for r in rows if _DIRECTION_ROW.match(_clean(r[dec_col]))]
@@ -979,16 +970,14 @@ def _one_map(parts: dict[str, str], heading: str, what: str) -> tuple[dict[str, 
     return parse_flowchart(blocks[0])
 
 
-def check_plan_map_matches(ws: Path) -> tuple[bool, str]:
+@_on_brief
+def check_plan_map_matches(parts: dict[str, str]) -> tuple[bool, str]:
     """The Features map shows each feature with its artifacts and each dependency.
 
     The table is the source; the map must agree with it exactly: one node per
     feature, labelled with its ID, its Feature name and exactly its artifacts,
     and one arrow from each feature it depends on.
     """
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
     headers, rows = first_table(parts.get(FEATURES_HEADING, ""))
     id_col = _column(headers, "id")
     name_col = _column(headers, "feature")
@@ -1058,7 +1047,8 @@ def _peer_kinds(cell: str) -> set[str]:
     return kinds
 
 
-def check_model_map_matches(ws: Path) -> tuple[bool, str]:
+@_on_brief
+def check_model_map_matches(parts: dict[str, str]) -> tuple[bool, str]:
     """The sketch map shows each node kind and one line per peer in the table.
 
     The table is the source. Each sketch row is a node; each kind in its
@@ -1066,9 +1056,6 @@ def check_model_map_matches(ws: Path) -> tuple[bool, str]:
     table does not have, or a peer with no line, fails. So does a node whose
     kind is neither a sketch row nor a peer, and a kind drawn twice.
     """
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
     headers, rows, err = _sketch(parts)
     if err:
         return False, err
@@ -1135,7 +1122,8 @@ REFERENCE_DESIGNS_FILE = Path("skills/infrahub-designing-models/references/refer
 
 # A design found at run time that the table does not list yet: accepted only
 # as a full URL into the opsmill organisation, never as a bare name.
-_DISCOVERED_REPO = re.compile(r"^https?://github\.com/opsmill/infrahub-(?:demo|solution)-[a-z0-9-]+/?$")
+_DESIGN_REPO = r"github\.com/opsmill/infrahub-(?:demo|solution)-[a-z0-9-]+"
+_DISCOVERED_REPO = re.compile(rf"^https?://{_DESIGN_REPO}/?$")
 # A published schema or collection, e.g. infrahub/base-schemas.
 _MARKETPLACE_ID = re.compile(r"\b[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*\b")
 _LABEL_LINE = re.compile(
@@ -1152,11 +1140,9 @@ def reference_design_names_in(text: str) -> set[str]:
     return {_clean(r[name_col]).lower() for r in rows if _clean(r[name_col])}
 
 
-def check_reference_design(ws: Path) -> tuple[bool, str]:
+@_on_brief
+def check_reference_design(parts: dict[str, str]) -> tuple[bool, str]:
     """The brief names the closest reference design and what it reuses, or none with a reason."""
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
     if REFERENCE_HEADING not in parts:
         return False, "brief has no '## Reference design' section"
     labels: dict[str, str] = {}
@@ -1255,15 +1241,13 @@ def _features(parts: dict[str, str]) -> tuple[dict[str, set[str]], dict[str, set
     return arts, deps, order, ""
 
 
-def check_mechanisms_match_artifacts(ws: Path) -> tuple[bool, str]:
+@_on_brief
+def check_mechanisms_match_artifacts(parts: dict[str, str]) -> tuple[bool, str]:
     """Every generator, check or transform a feature lists has a Mechanisms row, and back.
 
     F1's rows must say what drives them, what they produce and when they run,
     and a generator in F1 must be driven by a node kind from the sketch.
     """
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
     arts, _, _, err = _features(parts)
     if err:
         return False, err
@@ -1313,15 +1297,13 @@ def check_mechanisms_match_artifacts(ws: Path) -> tuple[bool, str]:
     return True, "every generator, check and transform matches a Mechanisms row"
 
 
-def check_uniqueness_is_schema_constraint(ws: Path, subject: re.Pattern) -> tuple[bool, str]:
+@_on_brief
+def check_uniqueness_is_schema_constraint(parts: dict[str, str], subject: re.Pattern) -> tuple[bool, str]:
     """The uniqueness rule the task asks for is a schema constraint, not a check.
 
     ``subject`` matches the Behavior of the row about that rule; at least one
     row must match, so leaving the rule out does not pass.
     """
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
     headers, rows = first_table(parts.get(MECHANISMS_HEADING, ""))
     beh_col, mech_col = _column(headers, "behavior"), _column(headers, "mechanism")
     if not rows or beh_col is None or mech_col is None:
@@ -1339,14 +1321,12 @@ def check_uniqueness_is_schema_constraint(ws: Path, subject: re.Pattern) -> tupl
     return True, "the uniqueness rule is a schema constraint"
 
 
-def check_next_steps_in_order(ws: Path) -> tuple[bool, str]:
+@_on_brief
+def check_next_steps_in_order(parts: dict[str, str]) -> tuple[bool, str]:
     """Next steps take each feature once, after the features it depends on.
 
     Open items that F1's sketch refers to are settled in a step before F1.
     """
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
     if NEXT_STEPS_HEADING not in parts:
         return False, "brief has no '## Next steps' section"
     arts, deps, order, err = _features(parts)
@@ -1424,16 +1404,14 @@ def _open_item_features(parts: dict[str, str]) -> dict[str, set[str]]:
     return items
 
 
-def check_open_items_name_features(ws: Path) -> tuple[bool, str]:
+@_on_brief
+def check_open_items_name_features(parts: dict[str, str]) -> tuple[bool, str]:
     """Each open item says which features its answer changes.
 
     Every item names at least one feature from the Features table, and every
     ``open: O<n>`` cell in the sketch or in Mechanisms belongs to a feature
     that item names, so a later answer shows which features it touches.
     """
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
     _, _, order, err = _features(parts)
     if err:
         return False, err
@@ -1497,11 +1475,11 @@ _NUMBER_WORD = re.compile(
     r"hundreds?|thousands?|millions?|dozens?|percent)\b|%",
     re.IGNORECASE,
 )
-_FILE_LOCATOR = re.compile(r"([\w.\-/]*\w\.[A-Za-z][A-Za-z0-9]*):\s*[^\s:;,)]+")
+_FILE_LOCATOR = re.compile(rf"({_FILE_NAME.pattern}):\s*[^\s:;,)]+")
 
 
 def _norm(text: str) -> str:
-    return re.sub(r"\s+", " ", _clean(text)).strip().lower()
+    return _clean(text).lower()
 
 
 def _drivers_named(cell: str) -> list[str]:
@@ -1537,22 +1515,8 @@ def _has_source(text: str, inputs: set[str]) -> bool:
     )
 
 
-def _split_entries(line: str) -> list[str]:
-    """Split a Value: line on ';' outside parentheses."""
-    out, depth, current = [], 0, ""
-    for ch in line:
-        depth += ch == "("
-        depth -= ch == ")" and depth > 0
-        if ch == ";" and depth == 0:
-            out.append(current.strip())
-            current = ""
-            continue
-        current += ch
-    out.append(current.strip())
-    return [e for e in out if e]
-
-
-def check_value_drivers(ws: Path) -> tuple[bool, str]:
+@_on_brief
+def check_value_drivers(parts: dict[str, str]) -> tuple[bool, str]:
     """The brief ranks the value drivers it serves, and each feature names one.
 
     Business has one `Value:` line: drivers from the fixed list in rank
@@ -1560,9 +1524,6 @@ def check_value_drivers(ws: Path) -> tuple[bool, str]:
     stated entry that cites where it came from. The Features table has a
     Value column naming drivers from that line, and F1 names the first.
     """
-    parts, err = _brief_sections(ws)
-    if parts is None:
-        return False, err
     if BUSINESS_HEADING not in parts:
         return False, "brief has no '## Business' section"
     lines = [m.group(1) for ln in _lines_outside_fences(parts[BUSINESS_HEADING])
@@ -1573,7 +1534,7 @@ def check_value_drivers(ws: Path) -> tuple[bool, str]:
     inputs = _input_files(parts)
 
     ranked: list[str] = []
-    for entry in _split_entries(_clean(lines[0])):
+    for entry in _split_outside_parens(_clean(lines[0]), ";"):
         other = _OTHER_ENTRY.match(entry)
         if other:
             if other.group("tag").lower() != "stated":
@@ -1594,9 +1555,9 @@ def check_value_drivers(ws: Path) -> tuple[bool, str]:
         rest = match.group("rest")
         if _has_figure(rest):
             if match.group("tag").lower() != "stated":
-                return False, f"'Value:' entry '{driver}' gives a figure but is tagged recommended; only a figure the user stated may appear"
+                return False, f"'Value:' entry '{driver}' gives a figure but is tagged recommended; only a figure the user stated may appear: {rest.strip()!r}"
             if not _has_source(rest, inputs):
-                return False, f"'Value:' entry '{driver}' gives a figure without its source (answer Q<n>, request, or <input file>:<locator>)"
+                return False, f"'Value:' entry '{driver}' gives a figure without its source (answer Q<n>, request, or <input file>:<locator>): {rest.strip()!r}"
         ranked.append(driver)
 
     headers, rows = first_table(parts.get(FEATURES_HEADING, ""))
