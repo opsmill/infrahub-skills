@@ -234,7 +234,7 @@ nodes:
         pytest.param(Q_NESTED_FENCE, None, id="compliant-nested-fence"),
         *(
             pytest.param(Q_COMPLIANT.replace("(business)", f"({layer})"), None, id=f"compliant-layer-{layer}")
-            for layer in ("inputs", "business", "service", "scope", "data")
+            for layer in ("inputs", "business", "service", "scope", "direction", "data")
         ),
         pytest.param(Q_VIOLATING, "schema YAML", id="violating-yaml"),
         pytest.param(Q_NEAR_BROKEN_YAML, "schema YAML", id="near-miss-unparseable-yaml"),
@@ -779,6 +779,119 @@ def test_sketch_rows_complete(tmp_path: Path, text: str, expected: str | None) -
 
 
 # --------------------------------------------------------------------------
+# interview-design-directions
+# --------------------------------------------------------------------------
+
+DIRECTIONS = """\
+Two directions fit what you described. Pick one, or combine them by ID, such as A with B2.
+
+**Q6 (direction):** Which direction should the model follow?
+
+- A. Follow infrahub-demo-sp  **(Recommended)**
+  - A1. Reuse: infrahub-demo-sp
+  - A2. Route distinguishers: allocated from a pool
+  - A3. VPN sites: one L3VpnSite per customer site
+- B. A custom model
+  - B1. Reuse: none
+  - B2. Route distinguishers: entered by the requester
+  - B3. VPN sites: a list of sites on the VPN
+
+**Basis:** you sell L3VPN over an MPLS backbone, which is what infrahub-demo-sp models (strong)
+"""
+
+# Three directions, `*` bullets, deeper indentation, bold IDs, a Marketplace
+# schema and a custom model as the reuse choices, and two directions that
+# agree on one topic while a third differs.
+DIRECTIONS_VARIANT = """\
+Three ways to build this. Take one as it is, or mix them: "A, but with C3".
+
+**Q5 (direction):** Which of these directions do you want the first feature to follow?
+
+* A. Build on the Marketplace base schemas  **(Recommended)**
+    * **A1.** Reuse: `infrahub/base-schemas` (LocationSite, DcimDevice)
+    * **A2.** Service node: `ServiceL3Vpn` with a site per attachment
+    * **A3.** Route distinguishers: allocated from a number pool
+* B. Follow the service provider demo
+    * **B1.** Reuse: infrahub-demo-sp
+    * **B2.** Service node: `ServiceL3Vpn` with a site per attachment
+    * **B3.** Route distinguishers: entered by the requester
+* C. Model it from scratch
+    * **C1.** Reuse: none, a custom model
+    * **C2.** Service node: a VRF with no service object
+    * **C3.** Route distinguishers: allocated from a number pool
+
+**Basis:** the base schemas already cover your sites and devices, and the pool stops duplicate route distinguishers (medium)
+"""
+
+DIRECTIONS_NAMES_ONLY = """\
+**Q6 (direction):** Which direction should the model follow?
+
+- A. Lean model  **(Recommended)**
+- B. Standard model
+- C. Full model
+
+**Basis:** a lean model is easier to start with (weak basis)
+"""
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        pytest.param(DIRECTIONS, None, id="compliant"),
+        pytest.param(DIRECTIONS_VARIANT, None, id="compliant-variant-three-directions"),
+        pytest.param(DIRECTIONS_NAMES_ONLY, "direction A lists no decisions", id="violating-names-only"),
+        pytest.param(
+            DIRECTIONS.replace("(direction)", "(data)"),
+            "the question layer is 'data', not 'direction'", id="violating-not-a-direction-question",
+        ),
+        pytest.param(
+            DIRECTIONS.replace("entered by the requester", "allocated from a pool").replace(
+                "a list of sites on the VPN", "one L3VpnSite per customer site"
+            ).replace("Reuse: none", "Reuse: infrahub-demo-sp"),
+            "A and B make the same choice on every topic", id="near-miss-directions-differ-only-in-name",
+        ),
+        pytest.param(
+            DIRECTIONS.replace("entered by the requester", "allocated from a pool"),
+            "every direction makes the same choice on 'route distinguishers'", id="near-miss-topic-with-no-choice",
+        ),
+        pytest.param(
+            DIRECTIONS.replace("B3. VPN sites", "B3. Site roles"),
+            "direction B does not list the same topics as A", id="near-miss-different-topics",
+        ),
+        pytest.param(
+            DIRECTIONS.replace("A1. Reuse: infrahub-demo-sp", "A1. Pattern: infrahub-demo-sp").replace(
+                "B1. Reuse: none", "B1. Pattern: none"
+            ),
+            "direction A has no 'Reuse' decision", id="near-miss-no-reuse-decision",
+        ),
+        pytest.param(
+            DIRECTIONS.replace("A1. Reuse: infrahub-demo-sp", "A1. Reuse: our NetBox model"),
+            "A1 reuses neither a reference design, a Marketplace schema nor none", id="near-miss-reuse-names-nothing-reusable",
+        ),
+        pytest.param(
+            DIRECTIONS.replace("  - B1.", "  - A1.").replace("  - B2.", "  - A2.").replace("  - B3.", "  - A3."),
+            "decision ID A1 under direction B", id="near-miss-ids-do-not-name-their-direction",
+        ),
+        pytest.param(
+            DIRECTIONS.replace(
+                "**Basis:**",
+                "- C. Something else\n  - C1. Reuse: none\n  - C2. Route distinguishers: imported\n  - C3. VPN sites: none\n"
+                "- D. Yet another\n  - D1. Reuse: none\n  - D2. Route distinguishers: typed\n  - D3. VPN sites: a tag\n\n**Basis:**",
+            ),
+            "expected two or three directions, found 4", id="near-miss-four-directions",
+        ),
+        pytest.param(
+            DIRECTIONS.replace("  - A2.", "\n  - A2.").replace("**Basis:**", "Does that work?\n\n**Basis:**"),
+            "one-question-recommended", id="violating-second-question",
+        ),
+    ],
+)
+def test_design_directions(tmp_path: Path, answer: str, expected: str | None) -> None:
+    write(tmp_path, "output_dir/answer.md", answer)
+    assert_outcome(run_grader("check_design_directions.py", tmp_path), expected)
+
+
+# --------------------------------------------------------------------------
 # brief-decision-provenance
 # --------------------------------------------------------------------------
 
@@ -794,6 +907,7 @@ CIRCUIT_DECISIONS = """\
 | 3 | Bandwidth is entered by the requester | stated | |
 | 4 | Circuit endpoints use a generic for sites and PoPs | recommended | Both endpoint kinds share address and code (medium) |
 | 5 | Contract end dates are imported, not typed | recommended | Your carrier export has the dates (strong) |
+| 6 | Direction A (follow infrahub-demo-service-catalog), with B2 (contract fields on the circuit); not taken: B (a custom model) | stated | |
 """
 
 CIRCUIT_DECISIONS_VARIANT = """\
@@ -805,6 +919,7 @@ CIRCUIT_DECISIONS_VARIANT = """\
 | 3 | The requester enters bandwidth | **stated** | |
 | 4 | Endpoints use a generic | recommended | Sites and PoPs share address and code (medium) |
 | 2 | Providers are their own node kind | stated | |
+| 7 | **Direction `A`**: follow the service catalog demo, borrowing `B2` (contract fields on the circuit). Not taken: `B`, a custom model | Stated | |
 """
 
 CIRCUIT_VARIANT_OPEN = "1. **O1**: Who approves new carriers? (owner: procurement)\n"
@@ -868,6 +983,36 @@ CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
         pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace("| 3 | Bandwidth is entered by the requester | stated |", "| 3 | Bandwidth is entered by the requester | agreed |")),
             "has tag 'agreed'", id="near-miss-invented-tag",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions="".join(
+                line + "\n" for line in CIRCUIT_DECISIONS.splitlines() if "Direction" not in line
+            )),
+            "no decision names the direction", id="violating-no-direction-row",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "| 6 | Direction A (follow infrahub-demo-service-catalog), with B2 (contract fields on the circuit); not taken: B (a custom model) | stated | |",
+                "| 6 | Direction A (follow infrahub-demo-service-catalog), with B2 (contract fields on the circuit); not taken: B (a custom model) | recommended | The demo models circuits and contracts (strong) |",
+            )),
+            "the transcript makes it 'stated'", id="near-miss-mixed-direction-tagged-recommended",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "with B2 (contract fields on the circuit); ", "with contract fields on the circuit; ",
+            )),
+            "borrows [] where the transcript borrows ['B2']", id="near-miss-borrowed-decision-not-named-by-id",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace("; not taken: B (a custom model)", "")),
+            "does not name the directions not taken", id="near-miss-directions-not-taken-left-out",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "Direction A (follow infrahub-demo-service-catalog), with B2 (contract fields on the circuit); not taken: B (a custom model)",
+                "Direction B (a custom model), with A2 (a contract kind); not taken: A (follow infrahub-demo-service-catalog)",
+            )),
+            "records direction B; the transcript chose A", id="near-miss-other-direction-chosen",
         ),
     ],
 )

@@ -12,8 +12,8 @@ Every interview message is exactly one question block,
 and nothing else that asks anything:
 
 1. One line `**Q<n> (<layer>):** <question>?`, where the
-   layer is `inputs`, `business`, `service`, `scope` or
-   `data`.
+   layer is `inputs`, `business`, `service`, `scope`,
+   `direction` or `data`.
 2. Two to four options, `- A. ...`, each saying what it
    means in Infrahub.
 3. Exactly one option ends with `**(Recommended)**`.

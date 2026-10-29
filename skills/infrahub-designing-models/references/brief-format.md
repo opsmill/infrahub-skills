@@ -221,8 +221,14 @@ graph LR
 | 1 | Console ports are identified by server and port number | stated | |
 | 2 | Channel numbers come from a number pool | recommended | Pool avoids clashes; you allocate by hand today (strong) |
 | 3 | Who approves new OOB sites | open | O2 |
+| 4 | Direction A (follow infrahub-demo-otn), with B2 (strands as their own node kind); not taken: B (a custom model) | stated | |
 ```
 
+- The design direction is one row whose Decision cell
+  starts `Direction <letter>`, then names the IDs
+  borrowed from other directions and, after `not
+  taken:`, the directions not chosen. Its tag follows
+  [../rules/interview-design-directions.md](../rules/interview-design-directions.md).
 - `Basis` on a `recommended` row is the reason you
   recommended it. On an `open` row it is the open item
   that tracks the question, `O<n>`, which must be a real

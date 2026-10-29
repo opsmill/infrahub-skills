@@ -50,7 +50,7 @@ DECISION_TAGS = {"stated", "recommended", "open"}
 ARTIFACT_TYPES = {"schema", "objects", "generator", "check", "transform", "menu"}
 BASIS_STRENGTHS = ("(strong)", "(medium)", "(weak basis)")
 # Mirrors the layers named in rules/interview-one-question-recommended.md.
-QUESTION_LAYERS = {"inputs", "business", "service", "scope", "data"}
+QUESTION_LAYERS = {"inputs", "business", "service", "scope", "direction", "data"}
 # Cell values that stand in for an answer without being one. An unknown
 # value has to become an `open: O<n>` reference to a real open item.
 PLACEHOLDERS = {"", "-", "--", "?", "tbd", "tba", "todo", "unknown", "n/a",
@@ -316,7 +316,7 @@ def check_one_question_recommended(ws: Path) -> tuple[bool, str]:
     q_line = _QUESTION.match(lines[q_idx[0]])
     layer = q_line.group(2).strip().lower()
     if layer not in QUESTION_LAYERS:
-        return False, f"question layer {layer!r} is not one of inputs, business, service, scope, data"
+        return False, f"question layer {layer!r} is not one of inputs, business, service, scope, direction, data"
     if not q_line.group(3).rstrip().endswith("?"):
         return False, "the question line does not end with '?'"
 
@@ -381,6 +381,87 @@ def check_one_question_recommended(ws: Path) -> tuple[bool, str]:
     if tail:
         return False, f"content after the **Basis:** line, which must end the message: {tail[0][:60]!r}"
     return True, "one question block, one recommended option with a basis, no schema YAML"
+
+
+# --------------------------------------------------------------------------
+# Rule: interview-design-directions  (artifact: output_dir/answer.md)
+# --------------------------------------------------------------------------
+
+_SUB_ITEM = re.compile(r"^\s+[-*]\s+(.+?)\s*$")
+_DIRECTION_DECISION = re.compile(r"^([A-Z])(\d+)\.\s+([^:]+?)\s*:\s*(.+?)$")
+_DESIGN_URL = re.compile(r"github\.com/opsmill/infrahub-(?:demo|solution)-[a-z0-9-]+")
+REUSE_TOPIC = "reuse"
+
+
+def _choice(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip().rstrip(".;,").lower()
+
+
+def _reuses_something(choice: str) -> bool:
+    """A reference design, a Marketplace schema or collection, or none."""
+    return (
+        choice.startswith("none")
+        or any(name in choice for name in REFERENCE_DESIGNS)
+        or bool(_DESIGN_URL.search(choice) or _MARKETPLACE_ID.search(choice))
+    )
+
+
+def check_design_directions(ws: Path) -> tuple[bool, str]:
+    """The direction question offers two or three directions to choose from or combine.
+
+    Each direction lists its decisions as ``<letter><n>. <topic>: <choice>``
+    under its option. All directions list the same topics, starting with
+    what they reuse; every other topic has at least two different choices,
+    and no two directions make the same choice on every topic.
+    """
+    path = ws / ANSWER_PATH
+    if not path.is_file():
+        return False, f"no {ANSWER_PATH}"
+    lines = _lines_outside_fences(path.read_text())
+    question = next((_QUESTION.match(ln) for ln in lines if _QUESTION.match(ln)), None)
+    if question is None:
+        return False, "no '**Q<n> (direction):**' question line"
+    layer = question.group(2).strip().lower()
+    if layer != "direction":
+        return False, f"the question layer is {layer!r}, not 'direction'"
+    options = [(i, _OPTION.match(ln).group(1)) for i, ln in enumerate(lines) if _OPTION.match(ln)]
+    if not 2 <= len(options) <= 3:
+        return False, f"expected two or three directions, found {len(options)}"
+    basis = next((i for i, ln in enumerate(lines) if _BASIS.match(ln)), len(lines))
+    bounds = [i for i, _ in options[1:]] + [basis]
+
+    directions: dict[str, dict[str, str]] = {}
+    for (start, letter), end in zip(options, bounds):
+        decisions: dict[str, str] = {}
+        for line in lines[start + 1:end]:
+            item = _SUB_ITEM.match(line)
+            found = _DIRECTION_DECISION.match(_clean(item.group(1))) if item else None
+            if not found:
+                continue
+            if found.group(1) != letter:
+                return False, f"decision ID {found.group(1)}{found.group(2)} under direction {letter}; IDs start with their direction's letter"
+            decisions[_choice(found.group(3))] = _choice(found.group(4))
+        if not decisions:
+            return False, f"direction {letter} lists no decisions as '{letter}1. <topic>: <choice>'"
+        if REUSE_TOPIC not in decisions:
+            return False, f"direction {letter} has no 'Reuse' decision"
+        if not _reuses_something(decisions[REUSE_TOPIC]):
+            return False, f"{letter}1 reuses neither a reference design, a Marketplace schema nor none: {decisions[REUSE_TOPIC]!r}"
+        directions[letter] = decisions
+
+    letters = list(directions)
+    first = letters[0]
+    for letter in letters[1:]:
+        if set(directions[letter]) != set(directions[first]):
+            return False, f"direction {letter} does not list the same topics as {first}"
+    for i, a in enumerate(letters):
+        for b in letters[i + 1:]:
+            if directions[a] == directions[b]:
+                return False, f"{a} and {b} make the same choice on every topic, so there is nothing to choose"
+    for topic in directions[first]:
+        if topic != REUSE_TOPIC and len({directions[x][topic] for x in letters}) == 1:
+            return False, f"every direction makes the same choice on {topic!r}, so it is not a choice"
+    return True, f"{len(letters)} directions, each with its decisions by ID, differing on what they reuse or build"
 
 
 # --------------------------------------------------------------------------
@@ -769,6 +850,54 @@ def check_decision_tags_for(ws: Path, subjects: dict[str, tuple[re.Pattern, str]
                 f"(rows: {texts!r})"
             )
     return True, "each decision carries the provenance the transcript gives it"
+
+
+_DIRECTION_ROW = re.compile(r"^(?i:direction)\s+([A-Z])\b")
+_DIRECTION_ID = re.compile(r"\b([A-Z]\d+)\b")
+_NOT_TAKEN = re.compile(r"\bnot taken\b", re.IGNORECASE)
+_LISTED_LETTER = re.compile(r"(?:^|[,;:]|\band\b)\s*([A-Z])\b(?!\d)")
+
+
+def check_direction_recorded(
+    ws: Path, chosen: str, borrowed: set[str], not_taken: set[str], tag: str
+) -> tuple[bool, str]:
+    """One decision names the chosen direction, the IDs borrowed, and the directions not taken.
+
+    ``chosen``, ``borrowed``, ``not_taken`` and ``tag`` come from the task's
+    transcript: a user who combines directions has stated the result.
+    """
+    parts, err = _brief_sections(ws)
+    if parts is None:
+        return False, err
+    rows, tag_col, _, err = _decision_rows(parts)
+    if err:
+        return False, err
+    headers, _ = first_table(parts[DECISIONS_HEADING])
+    dec_col = _column(headers, "decision")
+    if dec_col is None:
+        return False, "Decision log has no 'Decision' column"
+    matching = [r for r in rows if _DIRECTION_ROW.match(_clean(r[dec_col]))]
+    if not matching:
+        return False, "no decision names the direction ('Direction A ..., with B2; not taken: ...')"
+    if len(matching) > 1:
+        return False, f"{len(matching)} decisions name the direction; the brief records it once"
+    cell = _clean(matching[0][dec_col])
+    letter = _DIRECTION_ROW.match(cell).group(1)
+    if letter != chosen:
+        return False, f"the brief records direction {letter}; the transcript chose {chosen}"
+    halves = _NOT_TAKEN.split(cell, maxsplit=1)
+    ids = set(_DIRECTION_ID.findall(halves[0]))
+    if ids != borrowed:
+        return False, f"the direction row borrows {sorted(ids)} where the transcript borrows {sorted(borrowed)}"
+    if len(halves) < 2:
+        return False, "the direction row does not name the directions not taken ('not taken: B ...')"
+    listed = set(_LISTED_LETTER.findall(halves[1]))
+    if listed != not_taken:
+        return False, f"the direction row names {sorted(listed)} as not taken; the transcript offered {sorted(not_taken)} too"
+    found = _clean(matching[0][tag_col]).lower()
+    if found != tag:
+        return False, f"the direction is tagged {found!r}; the transcript makes it {tag!r}"
+    return True, f"direction {chosen} recorded with what it borrows and what was not taken"
 
 
 # --------------------------------------------------------------------------
@@ -1500,6 +1629,7 @@ def check_value_drivers(ws: Path) -> tuple[bool, str]:
 
 CHECKS: dict[str, Callable[[Path], tuple[bool, str]]] = {
     "one-question-recommended": check_one_question_recommended,
+    "design-directions": check_design_directions,
     "scope-split-f1-only": check_scope_split_f1_only,
     "features-artifacts": check_features_artifacts,
     "reference-design": check_reference_design,

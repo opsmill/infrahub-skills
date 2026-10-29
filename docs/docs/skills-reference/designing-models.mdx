@@ -46,6 +46,7 @@ It writes no schema YAML.
 - **A scenario walkthrough**: before the brief is confirmed, one event such as an order or a decommission is walked through the model to find missing peers or unclear deletes
 - **Grounded in the managing skills**: each data question names the schema or best-practice rule its answer feeds, such as uniqueness scope, what happens on delete, or a resource pool instead of hand allocation, and no guess reaches the brief unconfirmed
 - **Start from a worked example and published schemas**: the brief names the closest OpsMill reference design and the Marketplace schemas it builds on, matched against each node kind from the whole catalog, or says why none fits. When the catalog cannot be searched, for example without network access, the brief says so and keeps it as an open item
+- **Two or three directions to choose from or combine**: before the data questions, you get two or three design directions, such as following a reference design, building on Marketplace schemas, or a custom model. Each lists only the decisions where it differs from the others, starting with what it reuses, and each decision has an ID, so you can answer "A, but with B2". The brief records the direction you chose, what you borrowed from another, and the directions you did not take
 - **Every generator, check and transform has its decisions**: each one the features list has a Mechanisms row saying what drives it, what it produces and when it runs, and a rule the schema can enforce, such as uniqueness, is a schema constraint rather than a check
 - **Next steps in order**: open items first, then each feature after the features it depends on
 - **Answers that land later**: each open item names the features it affects, so an answer given later updates the right features and flags those already specified or built
@@ -127,7 +128,24 @@ You answer "A". Then a service question separates what the customer orders from 
 
 You answer "A, but the route targets are ours to choose, not the customer's". The skill records the first half as an accepted recommendation and the second as your own decision.
 
-Before the data questions, the skill shows a draft of the model built from your file and the closest reference design, `infrahub-demo-sp`, which models L3VPN services with their sites. Each guess is marked `(guess)`, and the next questions go to the guesses that change the design most. Only the rows that changed come back after each answer:
+Before the data questions, the skill offers the directions the design could take. Each lists only the decisions where it differs from the other:
+
+```markdown
+Two directions fit what you described. Pick one, or combine them by ID, such as A with B2.
+
+**Q4 (direction):** Which direction should the VPN model follow?
+
+- A. Follow infrahub-demo-sp  **(Recommended)**
+  - A1. Reuse: infrahub-demo-sp, with infrahub/base-schemas for locations and devices
+  - A2. Route distinguishers: allocated from a pool
+- B. A custom model
+  - B1. Reuse: none
+  - B2. Route distinguishers: kept on the order, as in vpn-customers.xlsx
+
+**Basis:** infrahub-demo-sp models L3VPN services with their sites, and a pool stops the duplicate rd values in vpn-customers.xlsx (strong)
+```
+
+You answer "A". The skill then shows a draft of the model built from your file and that direction, which models L3VPN services with their sites as `infrahub-demo-sp` does. Each guess is marked `(guess)`, and the next questions go to the guesses that change the design most. Only the rows that changed come back after each answer:
 
 ```markdown
 | Feature | Node kind | Identified by | Peers (cardinality) | Owner |
@@ -212,6 +230,7 @@ graph LR
 | 2 | The customer orders one VPN, and sites are added to it | recommended | Every row in vpn-customers.xlsx is one VPN with a site list (strong) |
 | 3 | The network team chooses route targets, not the customer | stated | |
 | 4 | Who owns site records once a VPN is live | open | O1 |
+| 5 | Direction A (follow infrahub-demo-sp); not taken: B (a custom model) | recommended | infrahub-demo-sp models L3VPN services with their sites, and a pool stops the duplicate rd values (strong) |
 
 ## Open items
 

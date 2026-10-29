@@ -9253,6 +9253,48 @@ tasks:
       - The 1.11.0 removal of `infrahub git-agent` is flagged against tasks.py
 
   # --- Model Designer --- #
+  - name: design-directions
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: We're a regional ISP and want our L3VPN service in Infrahub. You
+      already asked me about the business and the service, so here are my
+      answers:
+
+      - What I want fixed first: an L3VPN order takes two weeks because
+        engineers pick route distinguishers and VRF names by hand in a
+        spreadsheet, and two customers once got the same route distinguisher.
+      - Who uses the data: the provisioning team and our order portal.
+      - Out of scope: the MPLS backbone itself and IP addressing for internet
+        customers.
+      - What a customer orders: a VPN, the sites on it, and the bandwidth per
+        site. The customer decides the sites and the bandwidth; we decide the
+        route distinguishers, route targets and VRF names.
+      - Lifecycle: ordered, provisioning, active, decommissioned. The
+        provisioning team moves a VPN to active.
+
+      I have no files for you. We'll keep going after this: write exactly the
+      next message you would send me to ./output_dir/answer.md and nothing
+      else.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_design_directions.py
+        weight: 1.0
+    expected_output: >-
+      One question block that offers two or three design directions, one
+      recommended, each listing its decisions by ID (A1, A2, ...), starting
+      with what it reuses, so the user can pick one or combine them.
+    expectations:
+      - The directions differ on real decisions, not only on their names
+      - Each direction says what it reuses, such as infrahub-demo-sp, a Marketplace schema, or nothing
+      - The user can combine directions by naming decision IDs
+    assertions:
+      - name: one-question-recommended
+        check: Exactly one question block with one recommended option, a basis, and no schema YAML
+      - name: design-directions
+        check: Two or three directions with decisions by ID, the same topics, starting with Reuse, all different
+
   - name: design-one-question-recommended
     trials: 3
     instruction: |
@@ -9462,6 +9504,11 @@ tasks:
         Me: yes.
       - You recommended importing contract end dates from carriers.xlsx, which
         has an end_date column, instead of typing them. Me: yes.
+      - You offered two directions. A, which you recommended: follow
+        infrahub-demo-service-catalog (A1 reuse: infrahub-demo-service-catalog;
+        A2 contracts: a CircuitContract kind per circuit). B: a custom model
+        (B1 reuse: none; B2 contracts: contract fields on the circuit).
+        Me: A, but with B2.
 
       The transport team owns circuits and providers; the carrier portal is
       the source of truth for circuit IDs. Write the design brief.
@@ -9472,15 +9519,19 @@ tasks:
     expected_output: >-
       A design brief whose decision log tags the three answers the user gave
       as stated and the two accepted recommendations as recommended, each
-      recommended row with its basis.
+      recommended row with its basis, and records direction A with B2
+      borrowed from B, tagged stated, naming B as not taken.
     expectations:
       - Accepted recommendations are not recorded as the user's own decisions
       - Each recommended decision keeps the reason it was recommended
+      - The combined direction is the user's own call, so it is stated
     assertions:
       - name: decision-provenance
         check: Each decision is tagged stated, recommended or open; recommended has a basis; open names an open item
       - name: decision-tags-match
         check: The three answers are tagged stated and the two accepted recommendations recommended
+      - name: direction-recorded
+        check: One decision records direction A, the borrowed B2, B as not taken, tagged stated
       - name: sketch-rows-complete
         check: Every sketch row has identity, source of truth and owner, or an open item
 

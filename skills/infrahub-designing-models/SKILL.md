@@ -107,9 +107,15 @@ skill for each artifact builds it from the brief.
    and go on. Also list newer demos once
    (references/reference-designs.md); when that listing
    fails, use the table there and do not retry it.
+   Then offer two or three design directions built from
+   what this step found, as one question block, so the
+   user can pick one or combine them by ID; read
+   [rules/interview-design-directions.md](./rules/interview-design-directions.md)
+   before writing it.
 6. **Draft the sketch, then question the draft,** for
-   F1 only. People correct a draft faster than they
-   answer questions about a model they cannot see.
+   F1 only, from the direction the user chose. People
+   correct a draft faster than they answer questions
+   about a model they cannot see.
    - **Draft.** Before the first data question, show
      F1's sketch table, and the Features table after a
      split. Fill each cell with a guess marked `(guess)`
@@ -211,15 +217,18 @@ default, and write the brief. Node kind names and the
 outcome of the skill's own rules, such as not
 splitting, are recorded, not opened. So are the value
 drivers: record the ones you recommend as
-`recommended`.
+`recommended`. Build on the recommended design direction
+and record it as an `open` decision whose open item
+names the directions not taken.
 
 ### When the user asks for every question at once
 
 Send one numbered set: the inputs question, then at
 most five business and service questions, each in the
 block layout of
-[rules/interview-one-question-recommended.md](./rules/interview-one-question-recommended.md).
-Follow it with the step 6 draft, and under the draft at
+[rules/interview-one-question-recommended.md](./rules/interview-one-question-recommended.md),
+then the design-direction block of step 5. Follow it
+with the step 6 draft for the recommended direction, and under the draft at
 most three data questions, as blocks, on the guesses
 that change the design most. The user corrects the rest
 by marking up the draft. Whatever they leave unanswered or
@@ -270,7 +279,7 @@ settled: the NOC owns cabling"). Read the brief, then:
 
 | Priority | Category | Prefix | Description |
 | -------- | -------- | ------ | ----------- |
-| CRITICAL | Interview | `interview-` | One question per message with a recommended answer; every input used as evidence |
+| CRITICAL | Interview | `interview-` | One question per message with a recommended answer; two or three design directions to pick or combine; every input used as evidence |
 | HIGH | Scope | `scope-` | Split a too-big scope into ordered features before the data questions; sketch F1 only |
 | HIGH | Brief | `brief-` | The value drivers the design serves, ranked, with each feature naming its own; complete sketch rows or open items; every decision tagged with its provenance; plan and model maps that match their tables; the closest reference design named; mechanisms that match the artifacts; open items that name the features they affect; next steps in order |
 

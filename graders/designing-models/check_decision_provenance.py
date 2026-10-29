@@ -2,8 +2,9 @@
 """Grader for eval task: design-decision-provenance.
 
 Every decision says whether the user stated it or accepted a recommendation.
-SUBJECTS mirrors the transcript in the task's prompt (three answers stated,
-two recommendations accepted); it is the task's own fixture.
+SUBJECTS and DIRECTION mirror the transcript in the task's prompt (three
+answers stated, two recommendations accepted, and direction A taken with B2
+borrowed from B); they are the task's own fixture.
 Usage: python check_decision_provenance.py [workspace_dir]
 Prints skillgrade JSON to stdout.
 """
@@ -15,7 +16,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from lib import check_decision_tags_for, run_checks  # noqa: E402
+from lib import check_decision_tags_for, check_direction_recorded, run_checks  # noqa: E402
 
 
 def _p(pattern: str) -> re.Pattern:
@@ -30,12 +31,19 @@ SUBJECTS = {
     "contract end dates": (_p(r"end[ _-]?date"), "recommended"),
 }
 
-CHECK_NAMES = ["decision-provenance", "decision-tags-match", "sketch-rows-complete"]
+# Chosen direction, IDs borrowed from others, directions not taken, and the tag:
+# combining two directions is the user's own call, so it is stated.
+DIRECTION = ("A", {"B2"}, {"B"}, "stated")
+
+CHECK_NAMES = ["decision-provenance", "decision-tags-match", "direction-recorded", "sketch-rows-complete"]
 
 
 def main() -> None:
     workspace = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
-    extra = {"decision-tags-match": lambda ws: check_decision_tags_for(ws, SUBJECTS)}
+    extra = {
+        "decision-tags-match": lambda ws: check_decision_tags_for(ws, SUBJECTS),
+        "direction-recorded": lambda ws: check_direction_recorded(ws, *DIRECTION),
+    }
     print(json.dumps(run_checks(CHECK_NAMES, workspace, extra)))
 
 
