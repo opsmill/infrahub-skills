@@ -249,6 +249,15 @@ Q_NEAR_TRAILING_FENCE = Q_COMPLIANT + """
 Reply with a letter and I will continue.
 ```
 """
+# The rule's own incorrect example: a schema as a four-space code block, no fence.
+Q_NEAR_INDENTED_YAML = """\
+Here is a first draft:
+
+    nodes:
+      - name: Cabinet
+        namespace: Colo
+
+""" + Q_COMPLIANT
 Q_NEAR_BROKEN_YAML = Q_COMPLIANT + """
 Draft so you can load it today:
 
@@ -273,6 +282,7 @@ nodes:
         ),
         pytest.param(Q_VIOLATING, "schema YAML", id="violating-yaml"),
         pytest.param(Q_NEAR_BROKEN_YAML, "schema YAML", id="near-miss-unparseable-yaml"),
+        pytest.param(Q_NEAR_INDENTED_YAML, "schema YAML", id="near-miss-indented-code-block-yaml"),
         pytest.param(Q_NEAR_SECOND_QUESTION, "a second question", id="near-miss-second-question"),
         pytest.param(Q_NEAR_BASIS_QUESTION, "a second question", id="near-miss-question-in-basis"),
         pytest.param(Q_NEAR_UNKNOWN_LAYER, "is not one of", id="near-miss-unknown-layer"),
@@ -916,6 +926,10 @@ DIRECTIONS_NAMES_ONLY = """\
             "A1 reuses neither a reference design, a Marketplace schema nor none", id="near-miss-reuse-names-nothing-reusable",
         ),
         pytest.param(
+            DIRECTIONS.replace("A1. Reuse: infrahub-demo-sp", "A1. Reuse: infrahub-demo-spx"),
+            "A1 reuses neither a reference design, a Marketplace schema nor none", id="near-miss-reuse-name-with-a-suffix",
+        ),
+        pytest.param(
             DIRECTIONS.replace("A1. Reuse: infrahub-demo-sp", "A1. Reuse: build everything and/or extend later"),
             "A1 reuses neither a reference design, a Marketplace schema nor none", id="near-miss-reuse-slash-between-words",
         ),
@@ -1056,6 +1070,17 @@ CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
                 "not taken: B (a custom model, A reuses more)",
             )),
             None, id="compliant-direction-reasons-name-questions-and-letters",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "with B2 (contract fields on the circuit)", "with B2 (contract fields, such as the end date, on the circuit)",
+            )),
+            None, id="compliant-direction-note-names-another-subject",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS
+                  + "| 7 | Contract end dates are fields on the circuit, as in direction B (B2) | stated | |\n"),
+            None, id="compliant-borrowed-decision-row-names-another-subject",
         ),
         pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
@@ -1338,6 +1363,12 @@ The closest worked example is below.
         pytest.param(
             REFERENCE_DC.replace("infrahub-demo-dc", "https://github.com/opsmill/infrahub-demo-campus"),
             None, id="compliant-discovered-repo-as-url",
+        ),
+        pytest.param(
+            REFERENCE_DC.replace(
+                "Closest: infrahub-demo-dc", "Closest: [infrahub-demo-dc](https://github.com/opsmill/infrahub-demo-dc)"
+            ),
+            None, id="compliant-design-as-markdown-link",
         ),
         pytest.param(
             REFERENCE_DC.replace("infrahub-demo-dc", "infrahub-demo-campus"),

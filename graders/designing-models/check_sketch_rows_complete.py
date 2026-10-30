@@ -20,7 +20,8 @@ from lib import check_open_item_for, run_checks  # noqa: E402
 SSID = re.compile(r"ssid", re.IGNORECASE)
 
 CHECK_NAMES = ["sketch-rows-complete", "unknown-owner-open", "model-map-matches", "open-items-name-features", "decision-provenance"]
-# Neighbouring rules this task also grades; a failure costs only its share.
+# Neighbouring rules this task also grades: a failure lowers the score by its
+# share instead of zeroing it. The pass threshold still decides the task.
 NEIGHBOURS = ("decision-provenance",)
 
 

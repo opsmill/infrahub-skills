@@ -16,7 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import run_checks  # noqa: E402
 
 CHECK_NAMES = ["one-question-recommended", "design-directions"]
-# Neighbouring rules this task also grades; a failure costs only its share.
+# Neighbouring rules this task also grades: a failure lowers the score by its
+# share instead of zeroing it. The pass threshold still decides the task.
 NEIGHBOURS = ("one-question-recommended",)
 
 

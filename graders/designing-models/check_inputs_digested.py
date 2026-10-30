@@ -42,7 +42,8 @@ SOURCES = {
 }
 
 CHECK_NAMES = ["inputs-digested", "sketch-rows-complete", "decision-provenance"]
-# Neighbouring rules this task also grades; a failure costs only its share.
+# Neighbouring rules this task also grades: a failure lowers the score by its
+# share instead of zeroing it. The pass threshold still decides the task.
 NEIGHBOURS = ("sketch-rows-complete", "decision-provenance")
 
 

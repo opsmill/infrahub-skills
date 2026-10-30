@@ -36,7 +36,8 @@ SUBJECTS = {
 DIRECTION = ("A", {"B2"}, {"B"}, "stated")
 
 CHECK_NAMES = ["decision-provenance", "decision-tags-match", "direction-recorded", "sketch-rows-complete"]
-# Neighbouring rules this task also grades; a failure costs only its share.
+# Neighbouring rules this task also grades: a failure lowers the score by its
+# share instead of zeroing it. The pass threshold still decides the task.
 NEIGHBOURS = ("sketch-rows-complete",)
 
 

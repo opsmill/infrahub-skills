@@ -5,12 +5,9 @@ Two artifacts are graded:
 
 - ``output_dir/answer.md``: the next message of an interview, which must be
   exactly one question block (rule interview-one-question-recommended).
-- ``design-brief.md``: the design brief the skill writes at the end of a
-  session, in an existing design-document location or under
-  ``docs/designs/<design-slug>/`` by default (rules
-  interview-inputs-digested,
-  scope-split-before-data-layer, brief-sketch-rows-complete,
-  brief-decision-provenance).
+- ``docs/designs/<design-slug>/design-brief.md``: the design brief the
+  skill writes at the end of a session (the interview-inputs-digested,
+  scope-split-before-data-layer and brief-* rules).
 
 Every check parses headings, tables and line structure; none of them
 substring-matches the answer. Exposes a CHECKS registry and run_checks(),
@@ -33,9 +30,8 @@ from typing import Callable
 import yaml
 
 ANSWER_PATH = Path("output_dir") / "answer.md"
-# These cover the default and the established location used by existing
-# fixtures; a session writes exactly one brief.
-# The one location references/brief-format.md gives the brief.
+# The one location references/brief-format.md gives the brief; a session
+# writes exactly one.
 BRIEF_GLOBS = ("docs/designs/*/design-brief.md",)
 
 SKETCH_HEADING = "data model sketch"
@@ -74,8 +70,9 @@ _OPEN_ID = re.compile(r"\b(O\d+)\b", re.IGNORECASE)
 _OPEN_ITEM = re.compile(r"^\s*(?:[-*]|\d+[.)])?\s*\**\s*(O\d+)\s*\**\s*:(.*)$", re.IGNORECASE)
 _TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
 _UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
-# A top-level schema key on its own line, whether or not the YAML parses.
-_SCHEMA_KEY_LINE = re.compile(r"^(nodes|generics):\s*$")
+# A schema key on its own line, whether or not the YAML parses. Indented
+# counts too: four spaces make a Markdown code block without any fence.
+_SCHEMA_KEY_LINE = re.compile(r"^\s*(nodes|generics):\s*$")
 _FILE_REF = re.compile(r"[\w.\-/]*\w\.[A-Za-z0-9]+")
 
 
@@ -119,22 +116,28 @@ def _lines_outside_fences(text: str) -> list[str]:
     return [line for kind, line in _fence_marks(text) if kind == "outside"]
 
 
-def fenced_blocks(text: str) -> list[str]:
-    """Every fenced block, not only the first; an unclosed one counts too."""
-    blocks: list[str] = []
+def _fenced(text: str) -> list[tuple[str, str]]:
+    """(opening fence line, body) for every fenced block; an unclosed one counts too."""
+    blocks: list[tuple[str, str]] = []
+    opener = ""
     current: list[str] | None = None
     for kind, line in _fence_marks(text):
         if kind == "edge":
             if current is None:
-                current = []
+                opener, current = line, []
             else:
-                blocks.append("\n".join(current))
+                blocks.append((opener, "\n".join(current)))
                 current = None
         elif kind == "inside" and current is not None:
             current.append(line)
-    if current:
-        blocks.append("\n".join(current))
+    if current is not None:
+        blocks.append((opener, "\n".join(current)))
     return blocks
+
+
+def fenced_blocks(text: str) -> list[str]:
+    """Every fenced block, not only the first; an unclosed one counts too."""
+    return [body for _, body in _fenced(text)]
 
 
 def sections(text: str) -> dict[str, str]:
@@ -329,7 +332,7 @@ def check_one_question_recommended(ws: Path) -> tuple[bool, str]:
     text = path.read_text()
 
     if _schema_yaml_blocks(text):
-        return False, "reply contains schema YAML (a fenced block with nodes: or generics:)"
+        return False, "reply contains schema YAML (a nodes: or generics: key, fenced or indented)"
 
     lines = _lines_outside_fences(text)
     q_idx = [i for i, ln in enumerate(lines) if _QUESTION.match(ln)]
@@ -422,7 +425,7 @@ def _reuses_something(choice: str) -> bool:
     """A reference design, a Marketplace schema or collection, or none."""
     return (
         choice.startswith("none")
-        or any(name in choice for name in REFERENCE_DESIGNS)
+        or any(re.search(rf"(?<![\w-]){re.escape(name)}(?![\w-])", choice) for name in REFERENCE_DESIGNS)
         or bool(re.search(_DESIGN_REPO, choice) or _marketplace_ids(choice))
     )
 
@@ -834,28 +837,30 @@ def check_decision_tags_for(parts: dict[str, str], subjects: dict[str, tuple[re.
     """Each named decision carries the tag the transcript gives it.
 
     Bound to the subject: swapping tags between a stated decision and an
-    accepted recommendation fails, although both tags still appear. A related
-    `open` row (a follow-up question about the same subject) is allowed, as
-    the rule allows open decisions; at least one row must carry the expected
-    tag and none the swapped one. ``subjects`` maps a label to (pattern on
-    the Decision cell, expected tag).
+    accepted recommendation fails, although both tags still appear, because
+    no row about the subject then carries its expected tag. Other rows that
+    mention the subject, such as a follow-up `open` question or a decision
+    borrowed from another direction, are allowed. ``subjects`` maps a label
+    to (pattern on the Decision cell, expected tag).
     """
     rows, dec_col, tag_col, _, err = _decision_rows(parts)
     if err:
         return False, err
     if dec_col is None:
         return False, "Decision log has no 'Decision' column"
+    # The direction row is graded by check_direction_recorded; its notes on
+    # borrowed decisions ("with B2 (contract fields on the circuit)") are not
+    # the decision about that subject.
+    rows = [r for r in rows if not _DIRECTION_ROW.match(_clean(r[dec_col]))]
     for label, (pattern, tag) in subjects.items():
         matching = [r for r in rows if pattern.search(_clean(r[dec_col]))]
         if not matching:
             return False, f"no decision about {label}"
         tags = {_clean(r[tag_col]).lower() for r in matching}
-        swapped = (tags - {tag, "open"})
-        if swapped or tag not in tags:
-            found = sorted(swapped) or sorted(tags)
+        if tag not in tags:
             texts = "; ".join(_clean(r[dec_col])[:90] for r in matching)
             return False, (
-                f"the decision about {label} is tagged {found[0]!r}; the transcript makes it {tag!r} "
+                f"the decision about {label} is tagged {sorted(tags)[0]!r}; the transcript makes it {tag!r} "
                 f"(rows: {texts!r})"
             )
     return True, "each decision carries the provenance the transcript gives it"
@@ -921,23 +926,10 @@ _KIND = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
 
 def _mermaid_blocks(section: str) -> list[str]:
     """Every fenced block in a section whose opener names mermaid."""
-    blocks: list[str] = []
-    current: list[str] | None = None
-    is_mermaid = False
-    for kind, line in _fence_marks(section):
-        if kind == "edge":
-            if current is None:
-                current = []
-                is_mermaid = line.strip().lstrip("`~").strip().lower().startswith("mermaid")
-            else:
-                if is_mermaid:
-                    blocks.append("\n".join(current))
-                current = None
-        elif kind == "inside" and current is not None:
-            current.append(line)
-    if current is not None and is_mermaid:
-        blocks.append("\n".join(current))
-    return blocks
+    return [
+        body for opener, body in _fenced(section)
+        if opener.strip().lstrip("`~").strip().lower().startswith("mermaid")
+    ]
 
 
 def parse_flowchart(block: str) -> tuple[dict[str, str], set[tuple[str, str]], str]:
@@ -1153,6 +1145,9 @@ _SLUG_PAIR = re.compile(r"(?<![\w./-])([a-z0-9][a-z0-9_-]*)/([a-z0-9][a-z0-9_-]*
 
 def _marketplace_ids(text: str) -> list[re.Match]:
     return [m for m in _SLUG_PAIR.finditer(text) if m.group(1) in MARKETPLACE_NAMESPACES]
+
+
+_MD_LINK = re.compile(r"\[([^\]]*)\]\(([^)\s]*)\)")
 _LABEL_LINE = re.compile(
     r"^\s*(?:[-*]\s*)?\**\s*(closest|reused|different|marketplace)\s*\**\s*:\s*\**\s*(.*?)\s*$", re.IGNORECASE
 )
@@ -1203,6 +1198,11 @@ def check_reference_design(parts: dict[str, str]) -> tuple[bool, str]:
             covers = re.sub(r"\band\b|[^A-Za-z]", "", marketplace[m.end():end])
             if not covers:
                 return False, f"'Marketplace:' names {m.group(0)} without the node kinds it covers"
+    # A Markdown link reads as its text when that names a design, else as its URL.
+    closest = _MD_LINK.sub(
+        lambda m: m.group(1) if m.group(1).strip().lower() in REFERENCE_DESIGNS else m.group(2),
+        closest,
+    )
     # The first word, read whole so a URL keeps its scheme; "none:" loses its colon.
     first = re.split(r"[\s(,;]", closest.strip(), maxsplit=1)[0].lower().rstrip(".:")
     if first == "none":
@@ -1651,7 +1651,9 @@ def run_checks(
     files a task provided), which have no place in the shared registry.
     Any failed check zeroes the score, so the others cannot carry the task
     past the threshold, except the checks ``neighbours`` names: neighbouring
-    rules the task also grades, which only cost their share.
+    rules the task also grades, which lower the score by their share. With
+    four checks or fewer, one such failure already falls below a 0.8
+    threshold, so there the neighbours change the score, not the outcome.
     """
     registry = {**CHECKS, **(extra or {})}
     results = []
