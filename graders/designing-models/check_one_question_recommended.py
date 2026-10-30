@@ -17,9 +17,13 @@ from lib import run_checks  # noqa: E402
 CHECK_NAMES = ["one-question-recommended"]
 
 
+def grade(workspace: Path) -> dict:
+    return run_checks(CHECK_NAMES, workspace)
+
+
 def main() -> None:
     workspace = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
-    print(json.dumps(run_checks(CHECK_NAMES, workspace)))
+    print(json.dumps(grade(workspace)))
 
 
 if __name__ == "__main__":

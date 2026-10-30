@@ -168,6 +168,22 @@ def _is_placeholder(value: str) -> bool:
     return value.lower().rstrip(".") in PLACEHOLDERS
 
 
+def _open_ref(value: str) -> str | None:
+    """The open item an ``open: O<n>`` cell defers to, upper-cased."""
+    ref = _OPEN_REF.search(value)
+    return ref.group(1).upper() if ref else None
+
+
+def _unanswered(value: str, open_ids: set[str]) -> str | None:
+    """Why a cell is neither an answer nor a listed open item, or None when it is one."""
+    ref = _open_ref(value)
+    if ref:
+        return None if ref in open_ids else f"references {ref}, which is not in Open items"
+    if _is_placeholder(value):
+        return f"is {value!r}, neither an answer nor an open item reference"
+    return None
+
+
 def _split_row(line: str) -> list[str]:
     body = line.strip()
     if body.startswith("|"):
@@ -407,7 +423,7 @@ def _reuses_something(choice: str) -> bool:
     return (
         choice.startswith("none")
         or any(name in choice for name in REFERENCE_DESIGNS)
-        or bool(re.search(_DESIGN_REPO, choice) or _MARKETPLACE_ID.search(choice))
+        or bool(re.search(_DESIGN_REPO, choice) or _marketplace_ids(choice))
     )
 
 
@@ -734,14 +750,9 @@ def check_sketch_rows_complete(parts: dict[str, str]) -> tuple[bool, str]:
             if mark:
                 return False, f"{kind}: {header} still carries {mark.group(0).lower()} from the draft; confirm it or make it an open item"
         for name, col in columns.items():
-            value = _clean(row.get(col, ""))
-            ref = _OPEN_REF.search(value)
-            if ref:
-                if ref.group(1).upper() not in open_ids:
-                    return False, f"{kind}: {name} references {ref.group(1)}, which is not in Open items"
-                continue
-            if _is_placeholder(value):
-                return False, f"{kind}: {name} is {value!r}, neither an answer nor an open item reference"
+            reason = _unanswered(_clean(row.get(col, "")), open_ids)
+            if reason:
+                return False, f"{kind}: {name} {reason}"
     return True, "every sketch row has identity, source of truth and owner, or an open item"
 
 
@@ -766,8 +777,7 @@ def check_open_item_for(parts: dict[str, str], kind: re.Pattern, column: str) ->
     open_ids = _open_item_ids(parts)
     for row in subject:
         value = _clean(row[value_col])
-        ref = _OPEN_REF.search(value)
-        if not ref or ref.group(1).upper() not in open_ids:
+        if _open_ref(value) not in open_ids:
             return False, (
                 f"{_clean(row[kind_col])}: {column} is {value!r}; the user did not "
                 "know it, so it must reference an open item"
@@ -1131,8 +1141,18 @@ REFERENCE_DESIGNS_FILE = Path("skills/infrahub-designing-models/references/refer
 # as a full URL into the opsmill organisation, never as a bare name.
 _DESIGN_REPO = r"github\.com/opsmill/infrahub-(?:demo|solution)-[a-z0-9-]+"
 _DISCOVERED_REPO = re.compile(rf"^https?://{_DESIGN_REPO}/?$")
-# A published schema or collection, e.g. infrahub/base-schemas.
-_MARKETPLACE_ID = re.compile(r"\b[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*\b")
+# The namespaces the Marketplace publishes under. On 2026-10-30 every schema
+# and collection in the catalog was under infrahub; a test pins this set to
+# the namespaces skills/infrahub-common/marketplace-reference.md shows.
+MARKETPLACE_NAMESPACES = frozenset({"infrahub"})
+# A published schema or collection as a token of its own, e.g.
+# infrahub/base-schemas or infrahub/module_port. A slash between two words
+# ("and/or") is not one, because its namespace is not a Marketplace namespace.
+_SLUG_PAIR = re.compile(r"(?<![\w./-])([a-z0-9][a-z0-9_-]*)/([a-z0-9][a-z0-9_-]*)(?![\w/-])")
+
+
+def _marketplace_ids(text: str) -> list[re.Match]:
+    return [m for m in _SLUG_PAIR.finditer(text) if m.group(1) in MARKETPLACE_NAMESPACES]
 _LABEL_LINE = re.compile(
     r"^\s*(?:[-*]\s*)?\**\s*(closest|reused|different|marketplace)\s*\**\s*:\s*\**\s*(.*?)\s*$", re.IGNORECASE
 )
@@ -1174,11 +1194,10 @@ def check_reference_design(parts: dict[str, str]) -> tuple[bool, str]:
         reason = re.sub(r"^(none( matched)?|not searched)\s*[:,(-]?\s*", "", lowered).strip(" .)")
         if not reason:
             return False, f"'Marketplace: {marketplace}' gives no reason"
-    elif not _MARKETPLACE_ID.search(marketplace):
+    elif not (ids := _marketplace_ids(marketplace)):
         return False, f"'Marketplace: {marketplace}' names no namespace/name schema, and is not 'none' or 'not searched' with a reason"
     else:
         # Each schema is followed by the node kinds it covers, before the next schema.
-        ids = list(_MARKETPLACE_ID.finditer(marketplace))
         for i, m in enumerate(ids):
             end = ids[i + 1].start() if i + 1 < len(ids) else len(marketplace)
             covers = re.sub(r"\band\b|[^A-Za-z]", "", marketplace[m.end():end])
@@ -1288,11 +1307,11 @@ def check_mechanisms_match_artifacts(parts: dict[str, str]) -> tuple[bool, str]:
         if fid == "F1":
             for name in ("driven by", "produces", "runs when"):
                 value = _clean(row[cols[name]])
-                ref = _OPEN_REF.search(value)
-                if ref and ref.group(1).upper() in open_ids:
-                    continue
                 if _is_placeholder(value):
                     return False, f"F1 mechanism '{behavior}' has no '{name}': {value!r}"
+                reason = _unanswered(value, open_ids)
+                if reason:
+                    return False, f"F1 mechanism '{behavior}': {name} {reason}"
             if mech == "generator":
                 words = set(re.findall(r"[a-z0-9_]+", _clean(row[cols["driven by"]]).lower()))
                 if not words & sketch_kinds:
@@ -1624,14 +1643,15 @@ def run_checks(
     names: list[str],
     workspace: Path,
     extra: dict[str, Callable[[Path], tuple[bool, str]]] | None = None,
-    gate: tuple[str, ...] = (),
+    neighbours: tuple[str, ...] = (),
 ) -> dict:
     """Run named checks and return skillgrade JSON.
 
     ``extra`` supplies checks bound to a task's own inputs (for example the
     files a task provided), which have no place in the shared registry.
-    ``gate`` names the checks the task exists for: one of them failing zeroes
-    the score, so the other checks cannot carry the task past the threshold.
+    Any failed check zeroes the score, so the others cannot carry the task
+    past the threshold, except the checks ``neighbours`` names: neighbouring
+    rules the task also grades, which only cost their share.
     """
     registry = {**CHECKS, **(extra or {})}
     results = []
@@ -1646,7 +1666,7 @@ def run_checks(
             passed, message = False, f"check crashed: {exc}"
         results.append({"name": name, "passed": passed, "message": message})
     score = sum(r["passed"] for r in results) / len(results) if results else 0.0
-    if any(r["name"] in gate and not r["passed"] for r in results):
+    if any(not r["passed"] and r["name"] not in neighbours for r in results):
         score = 0.0
     failures = "; ".join(f"{r['name']}: {r['message']}" for r in results if not r["passed"])
     return {

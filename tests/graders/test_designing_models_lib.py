@@ -1,12 +1,14 @@
 """Four-fixture tests for the infrahub-designing-models task graders.
 
-Each task grader is run as a subprocess, the way skillgrade runs it, against
+Each task grader is run in-process through its ``grade`` function against
 four hand-written workspaces: compliant, a compliant variant shaped the way
 the check's parsing is vulnerable to, violating, and a violating near miss
 that carries the check's tokens bound to the wrong subject. Compliant cases
 score 1.0. Every violating case scores below 1.0 *and* names the assertion it
 was built to break, so a fixture failing for some other reason is caught.
-Each allowlist value appears in at least one accepted case.
+Each allowlist value appears in at least one accepted case. Every task
+grader is also run once as a subprocess, the way skillgrade runs it, by
+test_empty_workspace_scores_zero.
 """
 from __future__ import annotations
 
@@ -17,6 +19,7 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 import yaml
@@ -32,7 +35,39 @@ LIB = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(LIB)
 
 
+_SCRIPTS: dict[str, ModuleType] = {}
+
+
+def _task_grader(script: str) -> ModuleType:
+    """Load a task grader once, with its ``from lib import`` bound to this skill's lib.
+
+    Every grader directory has a module named ``lib``, so sys.modules and
+    sys.path are put back afterwards for the other skills' tests.
+    """
+    if script not in _SCRIPTS:
+        saved_path, saved_lib = list(sys.path), sys.modules.get("lib")
+        sys.modules["lib"] = LIB
+        try:
+            spec = importlib.util.spec_from_file_location(f"designing_models_{Path(script).stem}", GRADER_DIR / script)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        finally:
+            sys.path[:] = saved_path
+            if saved_lib is None:
+                sys.modules.pop("lib", None)
+            else:
+                sys.modules["lib"] = saved_lib
+        _SCRIPTS[script] = module
+    return _SCRIPTS[script]
+
+
 def run_grader(script: str, workspace: Path) -> dict:
+    """The task grader's skillgrade JSON for ``workspace``, computed in-process."""
+    return json.loads(json.dumps(_task_grader(script).grade(workspace)))
+
+
+def run_grader_cli(script: str, workspace: Path) -> dict:
+    """The task grader's skillgrade JSON, run as skillgrade runs it."""
     proc = subprocess.run(
         [sys.executable, str(GRADER_DIR / script), str(workspace)],
         capture_output=True, text=True, check=True, cwd=workspace,
@@ -881,6 +916,14 @@ DIRECTIONS_NAMES_ONLY = """\
             "A1 reuses neither a reference design, a Marketplace schema nor none", id="near-miss-reuse-names-nothing-reusable",
         ),
         pytest.param(
+            DIRECTIONS.replace("A1. Reuse: infrahub-demo-sp", "A1. Reuse: build everything and/or extend later"),
+            "A1 reuses neither a reference design, a Marketplace schema nor none", id="near-miss-reuse-slash-between-words",
+        ),
+        pytest.param(
+            DIRECTIONS.replace("A1. Reuse: infrahub-demo-sp", "A1. Reuse: infrahub/module_port for the line cards"),
+            None, id="compliant-reuse-marketplace-schema-with-underscore",
+        ),
+        pytest.param(
             DIRECTIONS.replace("  - B1.", "  - A1.").replace("  - B2.", "  - A2.").replace("  - B3.", "  - A3."),
             "decision ID A1 under direction B", id="near-miss-ids-do-not-name-their-direction",
         ),
@@ -1051,7 +1094,7 @@ def test_decision_provenance(tmp_path: Path, text: str, expected: str | None) ->
 
 
 @pytest.mark.parametrize(
-    ("script", "text", "gate"),
+    ("script", "text", "core"),
     [
         pytest.param(
             "check_scope_split.py",
@@ -1074,12 +1117,13 @@ def test_decision_provenance(tmp_path: Path, text: str, expected: str | None) ->
         ),
     ],
 )
-def test_core_check_failure_zeroes_the_score(tmp_path: Path, script: str, text: str, gate: str) -> None:
+def test_core_check_failure_zeroes_the_score(tmp_path: Path, script: str, text: str, core: str) -> None:
     """The check a task exists for cannot fail while the other checks carry the task past 0.8."""
     write(tmp_path, BRIEF, text)
     result = run_grader(script, tmp_path)
-    assert [c["name"] for c in result["checks"] if not c["passed"]] == [gate], result["details"]
+    assert [c["name"] for c in result["checks"] if not c["passed"]] == [core], result["details"]
     assert result["score"] == 0.0, result["details"]
+
 
 
 def test_two_briefs_fail(tmp_path: Path) -> None:
@@ -1101,7 +1145,8 @@ def test_brief_outside_docs_designs_fails(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("script", sorted(p.name for p in GRADER_DIR.glob("check_*.py")))
 def test_empty_workspace_scores_zero(tmp_path: Path, script: str) -> None:
-    assert run_grader(script, tmp_path)["score"] == 0.0
+    """Runs each task grader as a subprocess, the way skillgrade calls it."""
+    assert run_grader_cli(script, tmp_path)["score"] == 0.0
 
 
 def test_every_grader_has_a_task() -> None:
@@ -1265,6 +1310,14 @@ The closest worked example is below.
         pytest.param(
             REFERENCE_DC.replace("Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)", "Marketplace: searched"),
             "names no namespace/name schema", id="near-miss-marketplace-searched-without-result",
+        ),
+        pytest.param(
+            REFERENCE_DC.replace("Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)", "Marketplace: infrahub/module_port (DcimModulePort)"),
+            None, id="compliant-schema-names-with-underscores",
+        ),
+        pytest.param(
+            REFERENCE_DC.replace("Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)", "Marketplace: searched and/or skipped (LocationSite)"),
+            "names no namespace/name schema", id="near-miss-slash-between-words-is-not-a-schema",
         ),
         pytest.param(
             REFERENCE_DC.replace("Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)", "Marketplace: not searched"),
@@ -1443,11 +1496,32 @@ def branch_brief(mechanisms: str = BRANCH_MECH) -> str:
             branch_brief(BRANCH_MECH.replace("| a branch is added | creates other nodes", "| TBD | creates other nodes")),
             "has no 'runs when'", id="near-miss-generator-runs-when-tbd",
         ),
+        pytest.param(
+            branch_brief(BRANCH_MECH.replace("| a branch is added | creates other nodes", "| open: O9 | creates other nodes")),
+            "references O9, which is not in Open items", id="near-miss-generator-runs-when-unlisted-open-item",
+        ),
     ],
 )
 def test_mechanisms(tmp_path: Path, text: str, expected: str | None) -> None:
     write(tmp_path, BRIEF, text)
     assert_outcome(run_grader("check_mechanisms.py", tmp_path), expected)
+
+
+def test_mechanisms_core_check_failure_zeroes_the_score(tmp_path: Path) -> None:
+    """A task with no gate list still cannot pass on its neighbouring checks."""
+    write(tmp_path, BRIEF, branch_brief(BRANCH_MECH.replace("| schema constraint | Vlan |", "| resource pool | Vlan |")))
+    result = run_grader("check_mechanisms.py", tmp_path)
+    assert [c["name"] for c in result["checks"] if not c["passed"]] == ["uniqueness-is-a-schema-constraint"], result["details"]
+    assert result["score"] == 0.0, result["details"]
+def test_neighbour_check_failure_costs_only_its_share(tmp_path: Path) -> None:
+    """A neighbouring rule the task also grades lowers the score without zeroing it."""
+    write(tmp_path, BRIEF, brief(
+        features=BRANCH_FEATURES, mechanisms=BRANCH_MECH,
+        sketch_rows=BRANCH_ROWS.replace("| AccessRouter (one) | Infrahub | Network team |", "| AccessRouter (one) | Infrahub | TBD |"),
+    ))
+    result = run_grader("check_mechanisms.py", tmp_path)
+    assert [c["name"] for c in result["checks"] if not c["passed"]] == ["sketch-rows-complete"], result["details"]
+    assert result["score"] == 0.67, result["details"]
 
 
 def test_uniqueness_rule_left_out_fails(tmp_path: Path) -> None:
@@ -1794,3 +1868,11 @@ def _code_spans_after(path: Path, lead: str) -> list[str]:
 def test_grader_lists_match_the_skill(path: Path, lead: str, grader_copy: set[str]) -> None:
     """The grader's copy of a list the skill defines holds the same values as the skill's text."""
     assert set(_code_spans_after(path, lead)) == set(grader_copy)
+
+
+def test_grader_marketplace_namespaces_match_the_reference() -> None:
+    """The namespaces the grader accepts are the ones the Marketplace reference shows."""
+    text = (REPO_ROOT / "skills/infrahub-common/marketplace-reference.md").read_text()
+    pairs = re.findall(r"`([a-z0-9][a-z0-9_-]*)/([a-z0-9][a-z0-9_-]*)`", text)
+    shown = {ns for ns, name in pairs if (ns, name) != ("namespace", "name")}
+    assert shown == set(LIB.MARKETPLACE_NAMESPACES)

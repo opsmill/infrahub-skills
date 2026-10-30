@@ -31,12 +31,18 @@ UNIQUENESS = re.compile(
 )
 
 CHECK_NAMES = ["mechanisms-match-artifacts", "uniqueness-is-a-schema-constraint", "sketch-rows-complete"]
+# Neighbouring rules this task also grades; a failure costs only its share.
+NEIGHBOURS = ("sketch-rows-complete",)
+
+
+def grade(workspace: Path) -> dict:
+    extra = {"uniqueness-is-a-schema-constraint": lambda ws: check_uniqueness_is_schema_constraint(ws, UNIQUENESS)}
+    return run_checks(CHECK_NAMES, workspace, extra, neighbours=NEIGHBOURS)
 
 
 def main() -> None:
     workspace = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
-    extra = {"uniqueness-is-a-schema-constraint": lambda ws: check_uniqueness_is_schema_constraint(ws, UNIQUENESS)}
-    print(json.dumps(run_checks(CHECK_NAMES, workspace, extra)))
+    print(json.dumps(grade(workspace)))
 
 
 if __name__ == "__main__":

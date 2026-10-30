@@ -42,12 +42,18 @@ SOURCES = {
 }
 
 CHECK_NAMES = ["inputs-digested", "sketch-rows-complete", "decision-provenance"]
+# Neighbouring rules this task also grades; a failure costs only its share.
+NEIGHBOURS = ("sketch-rows-complete", "decision-provenance")
+
+
+def grade(workspace: Path) -> dict:
+    extra = {"inputs-digested": lambda ws: check_inputs_digested(ws, INPUTS, SOURCES)}
+    return run_checks(CHECK_NAMES, workspace, extra, neighbours=NEIGHBOURS)
 
 
 def main() -> None:
     workspace = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
-    extra = {"inputs-digested": lambda ws: check_inputs_digested(ws, INPUTS, SOURCES)}
-    print(json.dumps(run_checks(CHECK_NAMES, workspace, extra)))
+    print(json.dumps(grade(workspace)))
 
 
 if __name__ == "__main__":

@@ -16,13 +16,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import run_checks  # noqa: E402
 
 CHECK_NAMES = ["one-question-recommended", "design-directions"]
-# The task exists for the directions; a plain question block cannot pass it.
-GATE = ("design-directions",)
+# Neighbouring rules this task also grades; a failure costs only its share.
+NEIGHBOURS = ("one-question-recommended",)
+
+
+def grade(workspace: Path) -> dict:
+    return run_checks(CHECK_NAMES, workspace, neighbours=NEIGHBOURS)
 
 
 def main() -> None:
     workspace = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
-    print(json.dumps(run_checks(CHECK_NAMES, workspace, gate=GATE)))
+    print(json.dumps(grade(workspace)))
 
 
 if __name__ == "__main__":

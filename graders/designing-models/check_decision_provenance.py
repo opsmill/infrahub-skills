@@ -36,15 +36,21 @@ SUBJECTS = {
 DIRECTION = ("A", {"B2"}, {"B"}, "stated")
 
 CHECK_NAMES = ["decision-provenance", "decision-tags-match", "direction-recorded", "sketch-rows-complete"]
+# Neighbouring rules this task also grades; a failure costs only its share.
+NEIGHBOURS = ("sketch-rows-complete",)
 
 
-def main() -> None:
-    workspace = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
+def grade(workspace: Path) -> dict:
     extra = {
         "decision-tags-match": lambda ws: check_decision_tags_for(ws, SUBJECTS),
         "direction-recorded": lambda ws: check_direction_recorded(ws, *DIRECTION),
     }
-    print(json.dumps(run_checks(CHECK_NAMES, workspace, extra)))
+    return run_checks(CHECK_NAMES, workspace, extra, neighbours=NEIGHBOURS)
+
+
+def main() -> None:
+    workspace = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
+    print(json.dumps(grade(workspace)))
 
 
 if __name__ == "__main__":
