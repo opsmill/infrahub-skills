@@ -116,7 +116,8 @@ workflow — explain them rather than assuming them:
    relationships.** An `Attribute` relationship keeps
    pointing at real objects.
 3. **Model data lives on the device type, not the
-   template.** That is why three files, in that order.
+   template.** That is why the device files are three,
+   in that order.
 
 New to Infrahub's data model, or explaining it to
 someone who is? [concepts.md](./concepts.md) covers
@@ -131,7 +132,7 @@ these with links to the Infrahub docs.
 | CRITICAL | Format | `format-` | Envelope, `Template<Kind>`, nested components |
 | HIGH | Naming | `naming-` | Slug-based, parent-namespaced, unique |
 | HIGH | Coverage | `coverage-` | Report what did not convert |
-| MEDIUM | Output | `output-` | Three files, load order, branch-first |
+| MEDIUM | Output | `output-` | Five files, load order, branch-first |
 
 Full index: [rules/_sections.md](./rules/_sections.md).
 

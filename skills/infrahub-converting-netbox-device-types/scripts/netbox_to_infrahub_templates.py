@@ -1558,7 +1558,7 @@ def render_report(conversion: Conversion, profile: Profile) -> str:
 
 
 def write_outputs(conversion: Conversion, profile: Profile, output_dir: Path) -> list[Path]:
-    """Write the three object files in load order.
+    """Write the non-empty object files in load order.
 
     Args:
         conversion: The aggregated conversion result.
