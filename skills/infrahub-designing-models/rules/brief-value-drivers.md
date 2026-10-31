@@ -50,11 +50,14 @@ drivers, spelled exactly like this:
   that line; F1's names the first. The format is in
   [../references/brief-format.md](../references/brief-format.md).
 - **No invented figures.** A number, in digits or words,
-  appears only on a
-  `stated` entry, with its source: `answer Q<n>`,
-  `request`, or `<input file>:<locator>`. A `Value`
-  cell names drivers only. A missing number is not an
-  open item.
+  appears only with its source in the same entry:
+  `answer Q<n>`, `request`, or `<input file>:<locator>`.
+  That holds for a `recommended` entry too, so a count
+  the user gave ("the two data centres, request") can
+  support your recommendation. A number you estimated
+  has no source, so it is never written. A `Value` cell
+  names drivers only. A missing number is not an open
+  item.
 
 ## Why it matters
 

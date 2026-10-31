@@ -1535,11 +1535,35 @@ def _input_files(parts: dict[str, str]) -> set[str]:
     return {n.lower() for row in rows for n in _file_names(row[col])} if col else set()
 
 
-def _has_figure(text: str) -> bool:
-    # Citations carry digits of their own (answer Q2, sites-2024.csv); a
-    # number left after removing them is a figure.
+_WORD_VALUES = {
+    word: n for n, word in enumerate(
+        "two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen "
+        "seventeen eighteen nineteen twenty".split(), start=2)
+} | {word: 10 * n for n, word in enumerate("thirty forty fifty sixty seventy eighty ninety".split(), start=3)}
+
+
+def _figures(text: str) -> set[str]:
+    """The figures in ``text``, normalised so "two" and "2", or "30%" and "30 percent", compare equal.
+
+    Citations carry digits of their own (answer Q2, sites-2024.csv); numbers
+    left after removing them are figures. Magnitude words ("thousands") and
+    the percent sign are kept as words.
+    """
     bare = _FILE_NAME.sub("", _ANSWER_REF.sub("", text))
-    return bool(_NUMBER.search(bare) or _NUMBER_WORD.search(bare))
+    found = set()
+    for m in _NUMBER.finditer(bare):
+        digits = m.group(0)
+        digits = digits.replace(",", "") if re.fullmatch(r"\d{1,3}(?:,\d{3})+", digits) else digits.replace(",", ".")
+        value = float(digits)
+        found.add(str(int(value)) if value.is_integer() else str(value))
+    for m in _NUMBER_WORD.finditer(bare):
+        word = m.group(0).lower()
+        found.add(str(_WORD_VALUES[word]) if word in _WORD_VALUES else "%" if word in ("%", "percent") else word.rstrip("s"))
+    return found
+
+
+def _has_figure(text: str) -> bool:
+    return bool(_figures(text))
 
 
 def _has_source(text: str, inputs: set[str]) -> bool:
@@ -1549,14 +1573,32 @@ def _has_source(text: str, inputs: set[str]) -> bool:
     )
 
 
+def _unsourced_figure(text: str, inputs: set[str], request_figures: frozenset[str] | None) -> str | None:
+    """Why a value entry's figures are not traced to their source, or None."""
+    figures = _figures(text)
+    if not figures:
+        return None
+    if not _has_source(text, inputs):
+        return "gives a figure without its source (answer Q<n>, request, or <input file>:<locator>)"
+    only_request = _REQUEST_REF.search(text) and not (
+        _ANSWER_REF.search(text) or _FILE_LOCATOR.search(text)
+    )
+    unknown = sorted(figures - request_figures) if request_figures is not None and only_request else []
+    if unknown:
+        return f"cites the request for {unknown}, which the request does not give"
+    return None
+
+
 @_on_brief
-def check_value_drivers(parts: dict[str, str]) -> tuple[bool, str]:
+def check_value_drivers(parts: dict[str, str], request_figures: frozenset[str] | None = None) -> tuple[bool, str]:
     """The brief ranks the value drivers it serves, and each feature names one.
 
     Business has one `Value:` line: drivers from the fixed list in rank
-    order, each tagged stated or recommended. A number is allowed only on a
-    stated entry that cites where it came from. The Features table has a
-    Value column naming drivers from that line, and F1 names the first.
+    order, each tagged stated or recommended. A number is allowed on either
+    when the entry cites where it came from. ``request_figures``, when a task
+    knows its own prompt, holds the figures that prompt gives: a figure an
+    entry cites only to the request must be one of them. The Features table
+    has a Value column naming drivers from that line, and F1 names the first.
     """
     if BUSINESS_HEADING not in parts:
         return False, "brief has no '## Business' section"
@@ -1576,8 +1618,9 @@ def check_value_drivers(parts: dict[str, str]) -> tuple[bool, str]:
             if not other.group("text").strip():
                 return False, "an 'Other' entry needs the user's own words after 'Other:'"
             words = other.group("text") + other.group("rest")
-            if _has_figure(words) and not _has_source(words, inputs):
-                return False, "the 'Other' entry gives a figure without its source (answer Q<n>, request, or <input file>:<locator>)"
+            reason = _unsourced_figure(words, inputs, request_figures)
+            if reason:
+                return False, f"the 'Other' entry {reason}: {words.strip()!r}"
             ranked.append(OTHER)
             continue
         match = _VALUE_ENTRY.match(entry)
@@ -1587,11 +1630,9 @@ def check_value_drivers(parts: dict[str, str]) -> tuple[bool, str]:
         if driver not in VALUE_DRIVERS:
             return False, f"'Value:' entry {match.group('driver')!r} is not one of the five value drivers"
         rest = match.group("rest")
-        if _has_figure(rest):
-            if match.group("tag").lower() != "stated":
-                return False, f"'Value:' entry '{driver}' gives a figure but is tagged recommended; only a figure the user stated may appear: {rest.strip()!r}"
-            if not _has_source(rest, inputs):
-                return False, f"'Value:' entry '{driver}' gives a figure without its source (answer Q<n>, request, or <input file>:<locator>): {rest.strip()!r}"
+        reason = _unsourced_figure(rest, inputs, request_figures)
+        if reason:
+            return False, f"'Value:' entry '{driver}' {reason}: {rest.strip()!r}"
         ranked.append(driver)
 
     headers, rows = first_table(parts.get(FEATURES_HEADING, ""))

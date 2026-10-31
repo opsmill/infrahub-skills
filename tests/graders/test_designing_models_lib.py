@@ -1781,15 +1781,15 @@ def value_brief(value: str | None = DEFAULT_VALUE, features: str = FEATURES, **k
         ),
         pytest.param(
             value_brief("Value: Reduced engineering effort (recommended: saves 40 hours a month)"),
-            "gives a figure but is tagged recommended", id="near-miss-invented-figure",
+            "gives a figure without its source", id="near-miss-invented-figure",
         ),
         pytest.param(
             value_brief("Value: Reduced engineering effort (recommended: saves forty hours a month)"),
-            "gives a figure but is tagged recommended", id="near-miss-invented-figure-in-words",
+            "gives a figure without its source", id="near-miss-invented-figure-in-words",
         ),
         pytest.param(
             value_brief("Value: Reduced engineering effort (recommended: cuts 30% of the work)"),
-            "gives a figure but is tagged recommended", id="near-miss-invented-percentage",
+            "gives a figure without its source", id="near-miss-invented-percentage",
         ),
         pytest.param(
             value_brief("Value: Less duplicated operational work (recommended: one source of truth instead of a spreadsheet and phpIPAM)"),
@@ -1817,15 +1817,35 @@ def value_brief(value: str | None = DEFAULT_VALUE, features: str = FEATURES, **k
         ),
         pytest.param(
             value_brief("Value: Faster service delivery (recommended: orders 3x faster)"),
-            "gives a figure but is tagged recommended", id="near-miss-multiplier-figure",
+            "gives a figure without its source", id="near-miss-multiplier-figure",
         ),
         pytest.param(
             value_brief("Value: Lower change failure costs (recommended: saves $2M a year)"),
-            "gives a figure but is tagged recommended", id="near-miss-figure-with-unit-suffix",
+            "gives a figure without its source", id="near-miss-figure-with-unit-suffix",
         ),
         pytest.param(
             value_brief("Value: Faster service delivery (recommended: orders ready in 3h)"),
-            "gives a figure but is tagged recommended", id="near-miss-figure-with-time-unit",
+            "gives a figure without its source", id="near-miss-figure-with-time-unit",
+        ),
+        pytest.param(
+            value_brief("Value: Reduced risk of service disruption (recommended: IP clashes across the two data centres, request)"),
+            None, id="compliant-recommended-count-cited-to-the-request",
+        ),
+        pytest.param(
+            value_brief("Value: Reduced engineering effort (recommended: 40 hours a month spent by hand, answer Q2)"),
+            None, id="compliant-recommended-figure-cited-to-an-answer",
+        ),
+        pytest.param(
+            value_brief("Value: Reduced risk of service disruption (recommended: IP clashes across the two data centres)"),
+            "gives a figure without its source", id="near-miss-recommended-count-without-source",
+        ),
+        pytest.param(
+            value_brief("Value: Reduced engineering effort (recommended: saves 40 hours a month, request)"),
+            "cites the request for ['40'], which the request does not give", id="near-miss-figure-cited-to-a-request-without-it",
+        ),
+        pytest.param(
+            value_brief("Value: Lower change failure costs (recommended: request, the same three causes surface as changes that break the network)"),
+            None, id="compliant-count-of-a-list-the-request-gives",
         ),
         pytest.param(
             value_brief("Value: Reduced engineering effort (stated: saves 40 hours a month)"),
@@ -1859,6 +1879,17 @@ def value_brief(value: str | None = DEFAULT_VALUE, features: str = FEATURES, **k
 def test_value_drivers(tmp_path: Path, text: str, expected: str | None) -> None:
     write(tmp_path, BRIEF, text)
     assert_outcome(run_grader("check_scope_split.py", tmp_path), expected)
+
+
+def _eval_instruction(task: str) -> str:
+    tasks = yaml.safe_load(EVAL_YAML.read_text())["tasks"]
+    return next(t["instruction"] for t in tasks if t["name"] == task)
+
+
+def test_scope_split_request_figures_match_the_prompt() -> None:
+    """The numbers the scope-split grader lets a brief cite to the request are the prompt's own."""
+    script = _task_grader("check_scope_split.py")
+    assert LIB._figures(_eval_instruction("design-scope-split")) == script.REQUEST_STATED
 
 
 def test_grader_value_drivers_match_the_rule() -> None:

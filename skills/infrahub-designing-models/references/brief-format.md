@@ -78,8 +78,9 @@ parentheses, followed by what it rests on. A value no
 driver fits is written in the user's words as
 `Other: audit evidence for every change (stated: answer Q1)`; it is
 always `stated`, and a feature names it as `Other`. A figure
-appears only on a `stated` entry, with its source:
-`answer Q<n>`, `request`, or `<input file>:<locator>`.
+appears only with its source, on a `stated` or a
+`recommended` entry: `answer Q<n>`, `request`, or
+`<input file>:<locator>`.
 
 ## Inputs table
 
