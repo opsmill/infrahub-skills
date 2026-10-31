@@ -1,0 +1,258 @@
+---
+name: infrahub-designing-models
+description: >-
+  Designs an Infrahub data model before any schema YAML exists.
+  TRIGGER when: someone has an idea or a problem but no agreed model,
+  asks "what should I model" or "help me design my data model", wants
+  diagrams, spreadsheets or exports turned into a design, has a scope
+  too big for one feature and needs it split, or is updating, extending
+  or fixing an existing design brief.
+  DO NOT TRIGGER when: a design or model sketch already exists and the
+  user wants schema YAML (use infrahub-managing-schemas), wants to load
+  data (use infrahub-managing-objects or infrahub-importing-data), or
+  wants to learn concepts (use infrahub-teaching-concepts).
+argument-hint: "[idea, problem or existing brief]"
+metadata:
+  version: 1.3.0
+  author: OpsMill
+---
+
+# Infrahub Model Designer
+
+## Overview
+
+An interview that ends in a design brief. It asks why
+the data matters, what is delivered, and only then what
+the model is, so the schema written later models the
+service rather than guessing node kinds from a short
+prompt. It recommends an answer to every question,
+splits a scope that is too big into ordered features,
+and writes no YAML or code: the `infrahub-managing-*`
+skill for each artifact builds it from the brief.
+
+## When to Use
+
+- "We want our L3VPN service in Infrahub" with no agreed
+  model behind it.
+- A customer or an OpsMill engineer brings diagrams,
+  spreadsheets or a requirements document and needs a
+  design out of them.
+- A request covers several domains ("fiber plant, DWDM
+  and customer wavelengths in one go").
+- An existing brief needs another feature or a changed
+  decision.
+
+## Quick reference
+
+| Step | Read first | What the user sees | Done when |
+| ---- | ---------- | ------------------ | --------- |
+| 1 Read | `.infrahub.yml`, `schemas/`, reference designs | nothing | you know what already exists |
+| 2 Inputs | interview-inputs-digested | one question asking for files | every file is listed |
+| 3 Start | - | one line with a confidence | - |
+| 4 Business, service | question-bank, one-question-recommended, value-drivers | one question block per message | about five questions asked |
+| 5 Scope, reuse | scope-split, brief-reference-design, reference-designs, interview-design-directions | the design directions | the user picked or combined one |
+| 6 Draft | grounding | F1's sketch, then one question per message | every node kind has an identity, a source of truth and an owner, or an open item |
+| 7 Confirm | - | one scenario, then the restated brief | the user said an explicit yes |
+| 8 Write | brief-format and the `brief-` rules | the brief | every section is written |
+| 9 Stop | - | the Next steps | - |
+
+## Workflow
+
+1. **Read before asking.** Read `.infrahub.yml`,
+   `schemas/`, any existing `design-brief.md`, and the
+   worked examples in
+   [references/reference-designs.md](./references/reference-designs.md).
+   These are local reads; the network searches wait for
+   step 5. Never ask what these already answer. Extending a
+   design means editing its brief, not starting another;
+   see "Extending a brief" in
+   [references/interview-paths.md](./references/interview-paths.md).
+2. **Ask for inputs once, first.** Before reading the
+   inputs and on every later turn, read
+   [rules/interview-inputs-digested.md](./rules/interview-inputs-digested.md):
+   every file the user provides is listed and used as
+   evidence, even when they say to skip it.
+3. **State the starting point** in one line, with a
+   confidence from 0 to 100. Below 70, name what is
+   missing.
+4. **Interview: business, then service, then data.**
+   Draw questions from
+   [references/question-bank.md](./references/question-bank.md).
+   Every message you send during the interview is one
+   question block; read
+   [rules/interview-one-question-recommended.md](./rules/interview-one-question-recommended.md)
+   before writing the first one. The first business
+   question is the value question, the only one that
+   takes several answers; read
+   [rules/brief-value-drivers.md](./rules/brief-value-drivers.md)
+   before asking it. Push back once on a
+   vague answer ("scalable", "everything"), then record
+   what the user says. When the user compares their model
+   to NetBox, read `../infrahub-common/netbox-vs-infrahub.md`
+   and name the differences it states that matter for
+   this design, instead of copying the NetBox shape. Keep the
+   business and service layers short, about five
+   questions together: the draft in step 6 shows which
+   of their gaps matter, and you can return to them.
+5. **Check the scope and choose the reference design
+   after the service layer,** before the data questions.
+   Read
+   [rules/scope-split-before-data-layer.md](./rules/scope-split-before-data-layer.md)
+   for the signals, the merge rule, and what a split
+   leaves in the sketch, and
+   [rules/brief-reference-design.md](./rules/brief-reference-design.md)
+   to choose the closest worked example from the
+   business and service answers and the user's inputs.
+   After a split, F1 is the feature that delivers the
+   leading value driver.
+   Then search the Marketplace and list newer demos, once
+   each, as
+   [references/reference-designs.md](./references/reference-designs.md)
+   § "Searching for reuse" describes.
+   Then offer two or three design directions built from
+   what this step found, as one question block, so the
+   user can pick one or combine them by ID; read
+   [rules/interview-design-directions.md](./rules/interview-design-directions.md)
+   before writing it.
+6. **Draft the sketch, then question the draft,** for
+   F1 only, from the direction the user chose. People
+   correct a draft faster than they answer questions
+   about a model they cannot see.
+   - **Draft.** Before the first data question, show
+     F1's sketch table, and the Features table after a
+     split. Fill each cell with a guess marked `(guess)`
+     that comes from the user's files, their answers, a
+     Marketplace schema that covers the node kind, the
+     reference design or an Infrahub default in the
+     question bank. Prefer a published schema's kind to a
+     new one, judged per generic, not per file. A cell none of these supports is
+     marked `(open)` and becomes a question. Never write
+     `?` in a cell: the message may hold only one
+     question. Do not invent
+     attributes or peers nobody mentioned.
+   - **Samples.** When the user gave rows of data, show
+     two or three sample objects built from them under
+     the draft (one VPN with two of its sites, say), so
+     a wrong identity or cardinality shows on real data.
+     Without rows, show none.
+   - **Value.** Add one or two lines on what the draft
+     gains for the leading value driver, from the files
+     and answers only, with no estimated figures.
+   - **Left out.** Add one line naming what you left out
+     because nobody mentioned it (a vendor, a serial
+     number, a status), so the user can bring it in.
+   - **Ground each guess** in the best-practice rules of
+     the other skills, and look up what they do not
+     settle in the current Infrahub documentation. Read
+     [references/grounding.md](./references/grounding.md)
+     before the first data question: it says which rules
+     to list, how to find documentation pages through
+     `llms.txt`, and where the brief names each one.
+   - **Question the draft.** Ask about the guesses that
+     change the design most, one question block per
+     message with the draft as its lead-in, and after
+     each answer show only the rows that changed.
+   - **Stop** when every node kind has an identity, a
+     source of truth and an owner, or an open item, and
+     you can predict the answers to your next three
+     questions. At about 25 questions, turn the
+     remaining `(guess)` and `(open)` cells into open
+     items (`open: O<n>`).
+7. **Walk one scenario through the model, then restate
+   and confirm.** Take one lifecycle event from the
+   service layer (an order, a change, a decommission) and
+   say which nodes it creates, changes or removes. A gap
+   it shows, such as a missing peer or an unclear delete,
+   becomes the next question, or an open item when the
+   user cannot reply. Restate and confirm only when the
+   user can reply (otherwise see "When the user cannot
+   reply").
+   First ask again about each accepted recommendation
+   whose basis was weak, one question block per
+   message, in the layout from the one-question rule.
+   Then restate the brief and end that message with one
+   question block asking for an explicit yes, with
+   options such as `A. Yes, write the brief` and
+   `B. Change something`; "sounds good" is not a yes.
+8. **Write the brief** in the format in
+   [references/brief-format.md](./references/brief-format.md).
+   Before writing Business and the Features table, read
+   [rules/brief-value-drivers.md](./rules/brief-value-drivers.md).
+   Before writing the sketch, read
+   [rules/brief-sketch-rows-complete.md](./rules/brief-sketch-rows-complete.md);
+   before writing the decision log, read
+   [rules/brief-decision-provenance.md](./rules/brief-decision-provenance.md).
+   Before writing Mechanisms, read
+   [rules/brief-mechanisms-match-artifacts.md](./rules/brief-mechanisms-match-artifacts.md).
+   Then draw the plan map and the model map from the
+   finished tables; read
+   [rules/brief-maps-match-tables.md](./rules/brief-maps-match-tables.md)
+   first. Name in each open item the features it
+   affects: [rules/brief-open-items-name-features.md](./rules/brief-open-items-name-features.md).
+   Last, write Next steps:
+   [rules/brief-next-steps.md](./rules/brief-next-steps.md).
+9. **Point to the Next steps and stop.** They hand F1
+   to the user's existing workflow, or name the skill for
+   each of its artifacts. Do not invoke them.
+
+### Other paths through the workflow
+
+Read
+[references/interview-paths.md](./references/interview-paths.md)
+as soon as one of these applies, before you write
+anything:
+
+- the user cannot reply, or gave every answer up front
+- the user asks for every question at once
+- an existing brief needs another feature or a changed
+  decision
+- the user comes back with the answer to an open item
+
+## Warning signs
+
+Stop and go back to the workflow when you notice one of
+these. Runs without this skill did each of them.
+
+| What you are about to do | What to do instead |
+| ------------------------ | ------------------ |
+| Write schema YAML because the user is in a hurry | Send one question block; the brief is the fast path to a schema that loads once |
+| Fill a gap with an assumption "so the user is not blocked" | Mark the cell `(guess)` and ask about it, or make it an open item when the user cannot reply |
+| List "design decisions I made for you" | Ask each one as a question with a recommended answer, or log it as `recommended` with its basis |
+| Invent example data, such as a customer name | Show sample objects only from rows the user gave |
+| Take "sounds good" or "whatever you suggest" as a yes | Restate the brief and ask for an explicit yes |
+| Skip a file because the user said to | List it in Inputs and use it as evidence |
+
+## Rule Categories
+
+| Priority | Category | Prefix | Description |
+| -------- | -------- | ------ | ----------- |
+| CRITICAL | Interview | `interview-` | One question per message with a recommended answer; two or three design directions to pick or combine; every input used as evidence |
+| HIGH | Scope | `scope-` | Split a too-big scope into ordered features before the data questions; sketch F1 only |
+| HIGH | Brief | `brief-` | The value drivers the design serves, ranked, with each feature naming its own; complete sketch rows or open items; every decision tagged with its provenance; plan and model maps that match their tables; the closest reference design named; mechanisms that match the artifacts; open items that name the features they affect; next steps in order |
+
+Full scope per prefix is in `rules/_sections.md`.
+
+## Supporting References
+
+- `references/brief-format.md`: the brief's location,
+  sections and tables. The single home for that format.
+- `references/question-bank.md`: questions by layer, the
+  schema and YAGNI rules each one serves, and the
+  Infrahub defaults a recommendation can rest on.
+- `references/reference-designs.md`: OpsMill worked
+  examples to build from, how to find newer ones, and
+  how to search the Marketplace.
+- `references/grounding.md`: which best-practice rules
+  to read for the draft, and how to look up what they do
+  not settle in the Infrahub documentation.
+- `references/interview-paths.md`: what changes when the
+  user cannot reply, asks for every question at once,
+  extends a brief, or comes back with an answer.
+- `../infrahub-managing-*/`: build each feature's
+  artifacts from the finished brief, schema first.
+- `../infrahub-common/marketplace-reference.md`: the
+  Marketplace commands and their minimum SDK version.
+- `../infrahub-common/rules/workflow-information-priority.md`:
+  the order to consult the skills and the Infrahub
+  documentation in, and how to find a page through
+  `llms.txt`.
