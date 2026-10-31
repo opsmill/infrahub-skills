@@ -129,17 +129,17 @@
     {
       "id": 7,
       "prompt": "I have `devices.csv` with an extra `gpu_count` column the schema\ndoes not declare:\n\n    name,role,status,gpu_count\n    spine-01,spine,active,0\n    gpu-rig-01,gpu,active,8\n    gpu-rig-02,gpu,active,8\n\nThe DcimDevice schema declares `name`, `role`, and `status` only \u2014 no\n`gpu_count` attribute. The schema is fixed and I have not approved any\nschema change.\n\nEmit whatever correct Infrahub object YAML you can to `./output_dir/`. Do\nNOT propose or write any schema changes; the skill fails closed on\nunmapped columns.",
-      "expected_output": "A directory ./output_dir/ that contains no schema documents (no file with top-level `version: \"1.0\"` plus `nodes:` / `generics:`), and nothing under a `schemas/` sub-path of the output dir. The skill should either emit partial object YAML (omitting the unmapped column) with a note about the unmapped `gpu_count`, or stop emission entirely and explain \u2014 but it must never write a schema mutation.",
+      "expected_output": "A directory ./output_dir/ that contains no schema documents (no file with top-level `version: \"1.0\"` plus `nodes:` / `generics:`), and nothing under a `schemas/` sub-path of the output dir. The skill fails closed on the unmapped `gpu_count`: it writes no object rows, names the column and the kinds it checked, and points at infrahub-managing-schemas. It never writes a schema mutation.",
       "files": [],
       "expectations": [
         "No file in ./output_dir/ is a schema document (version 1.0 + nodes / generics)",
         "No file lives under a schemas/ sub-path of ./output_dir/",
-        "Envelope is correct on any object YAML that is emitted"
+        "No object rows are emitted for an input with an unmapped column"
       ],
       "assertions": [
         {
-          "name": "envelope",
-          "check": "Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and spec.data list"
+          "name": "fail-closed",
+          "check": "No Object document in the output dir carries spec.data rows"
         },
         {
           "name": "no-schema-mutation",
@@ -402,8 +402,8 @@
     },
     {
       "id": 19,
-      "prompt": "I have `devices.csv` with these columns and rows:\n\n    name,role,status,tier_label\n    spine-01,spine,Active,gold\n    spine-02,spine,Maintenance,gold\n    leaf-01,leaf,Active,silver\n\nThe schema declares `DcimDevice` with attributes `name` (Text),\n`role` (Text), `status` (Dropdown: active/maintenance/retired). The\nschema has NO `tier_label` attribute on DcimDevice. DcimDevice has\n`human_friendly_id: [name__value]`. The schema is fixed.\n\nBefore emitting any file, surface every decision you need from me in\nONE batch \u2014 unmapped columns, dropdown-label translation, target\nfile naming, branch name, and lineage opt-in. Do not start writing\nuntil I confirm. Echo back the full plan before any file is created.\nSave planned output under `./output_dir/`.\n\nSave the batched questions and the echoed plan to\n`./output_dir/answer.md`. Write no object YAML in this task.",
-      "expected_output": "A single batched set of multi-choice questions covering every ambiguity (tier_label has no schema home; Status is a dropdown label; branch name; lineage opt-in) plus a confirm-and-lock summary of the proposed plan. No file is written until the user confirms.",
+      "prompt": "I have `devices.csv` with these columns and rows:\n\n    name,role,status,tier_label\n    spine-01,spine,Active,gold\n    spine-02,spine,Maintenance,gold\n    leaf-01,leaf,Active,silver\n\nThe schema declares `DcimDevice` with attributes `name` (Text),\n`role` (Text), `status` (Dropdown: active/maintenance/retired). The\nschema has NO `tier_label` attribute on DcimDevice. DcimDevice has\n`human_friendly_id: [name__value]`. The schema is fixed.\n\nBefore emitting any file, surface every decision you need from me in\nONE batch \u2014 unmapped columns, dropdown-label translation, target\nfile naming, branch name, and lineage opt-in. Do not start writing\nuntil I confirm. Echo back the full plan before any file is created.\nSave planned output under `./output_dir/`.\n\nSave the batched questions and the echoed plan to\n`./output_dir/answer.md`. That file is how you put the questions to\nme, not an import file, so write it now. Write no object YAML in\nthis task.",
+      "expected_output": "A single batched set of multi-choice questions covering every ambiguity (tier_label has no schema home; Status is a dropdown label; branch name; lineage opt-in) plus a confirm-and-lock summary of the proposed plan, saved to ./output_dir/answer.md. No object YAML is written until the user confirms.",
       "files": [],
       "expectations": [
         "Every ambiguity is surfaced in one batched round, not one-by-one",
@@ -411,7 +411,7 @@
         "Status values (Active/Maintenance) are flagged as dropdown labels",
         "A branch name is proposed (e.g., csv-import-YYYYMMDD-HHMM)",
         "Lineage opt-in is offered with an explanation of source vs. owner+is_protected",
-        "The plan is echoed back before any file is written"
+        "The plan is echoed back before any object YAML is written"
       ],
       "assertions": []
     },

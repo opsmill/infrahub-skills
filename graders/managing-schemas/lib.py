@@ -646,13 +646,21 @@ def check_generate_profile_concrete_only(schema: dict, **_: Any) -> tuple[bool, 
     return True, f"generate_profile: true on concrete nodes only: {', '.join(flagged)}"
 
 
-_FETCH_SCRIPT = (
-    Path(__file__).resolve().parents[2]
-    / "skills"
-    / "infrahub-managing-schemas"
-    / "scripts"
-    / "fetch_schema_limits.py"
-)
+def _skill_dir(name: str) -> Path:
+    """The copy of skill `name` this grader can read.
+
+    The repository keeps skills under skills/. A skillgrade trial has no
+    skills/ at its root: it copies them into .claude/skills/ and
+    .agents/skills/, so a path built from skills/ alone finds nothing.
+    """
+    root = Path(__file__).resolve().parents[2]
+    for base in ("skills", ".claude/skills", ".agents/skills"):
+        if (root / base / name).is_dir():
+            return root / base / name
+    return root / "skills" / name
+
+
+_FETCH_SCRIPT = _skill_dir("infrahub-managing-schemas") / "scripts" / "fetch_schema_limits.py"
 _SCHEMA_LIMITS_CACHE: dict[str, dict[str, int]] | None = None
 _SCHEMA_LIMITS_ERROR: str | None = None
 _SCHEMA_NAMES = ("NodeSchema", "GenericSchema",
