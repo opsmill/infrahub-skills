@@ -35,8 +35,10 @@ nothing, so it contains no question mark: the starting point, the current draft 
 during the data questions (SKILL.md step 6), or the
 restated brief before the final confirmation question
 (SKILL.md step 7). When the user explicitly asks for
-every question at once, follow SKILL.md "When the user
-asks for every question at once" instead. No schema YAML, ever, even when the user asks
+every question at once, follow "When the user asks for
+every question at once" in
+[../references/interview-paths.md](../references/interview-paths.md)
+instead. No schema YAML, ever, even when the user asks
 for it: the schema is written from the finished brief.
 
 ## Why it matters

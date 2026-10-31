@@ -35,8 +35,9 @@ without anyone noticing it needs a migration.
 - Write the list when you write the item, from the
   cells that refer to it and the features its question
   is about.
-- When the user returns with an answer, follow SKILL.md
-  "Coming back with an answer".
+- When the user returns with an answer, follow
+  "Coming back with an answer" in
+  [../references/interview-paths.md](../references/interview-paths.md).
 
 ## Correct
 

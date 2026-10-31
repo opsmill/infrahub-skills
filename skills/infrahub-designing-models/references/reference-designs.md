@@ -48,6 +48,26 @@ their pages. When you read it for this design (SKILL.md
 step 6), check it for a design that fits better than the
 table, and name that design by its repository's full URL.
 
+## Searching for reuse
+
+SKILL.md step 5 runs these once each, after the scope
+check.
+
+1. **The Marketplace.** Read the catalog whole, not by
+   keyword: `infrahubctl marketplace list --json` and
+   `infrahubctl marketplace list --collections --json`
+   (see `../../infrahub-common/marketplace-reference.md`).
+   Match it against each node kind the design needs (a
+   site, a VLAN, a circuit), not against the project's
+   name, and run `infrahubctl marketplace show` on at
+   most three candidates to see their generics. Record
+   the result in the brief's `Marketplace:` line. A
+   command that fails or does not return promptly is not
+   retried: write `Marketplace: not searched` with the
+   reason, keep it as an open item, and go on.
+2. **Newer demos.** List them as "Finding newer designs"
+   above describes.
+
 ## How to use it
 
 - Pick the row whose use case matches the business and

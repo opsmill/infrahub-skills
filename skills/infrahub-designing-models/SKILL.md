@@ -1,9 +1,7 @@
 ---
 name: infrahub-designing-models
 description: >-
-  Interviews the user about the business, the service and the data they
-  want in Infrahub, and writes a design brief with a data model sketch
-  and ordered features, before any schema YAML exists.
+  Designs an Infrahub data model before any schema YAML exists.
   TRIGGER when: someone has an idea or a problem but no agreed model,
   asks "what should I model" or "help me design my data model", wants
   diagrams, spreadsheets or exports turned into a design, has a scope
@@ -44,6 +42,20 @@ skill for each artifact builds it from the brief.
 - An existing brief needs another feature or a changed
   decision.
 
+## Quick reference
+
+| Step | Read first | What the user sees | Done when |
+| ---- | ---------- | ------------------ | --------- |
+| 1 Read | `.infrahub.yml`, `schemas/`, reference designs | nothing | you know what already exists |
+| 2 Inputs | interview-inputs-digested | one question asking for files | every file is listed |
+| 3 Start | - | one line with a confidence | - |
+| 4 Business, service | question-bank, one-question-recommended, value-drivers | one question block per message | about five questions asked |
+| 5 Scope, reuse | scope-split, brief-reference-design, reference-designs, interview-design-directions | the design directions | the user picked or combined one |
+| 6 Draft | grounding | F1's sketch, then one question per message | every node kind has an identity, a source of truth and an owner, or an open item |
+| 7 Confirm | - | one scenario, then the restated brief | the user said an explicit yes |
+| 8 Write | brief-format and the `brief-` rules | the brief | every section is written |
+| 9 Stop | - | the Next steps | - |
+
 ## Workflow
 
 1. **Read before asking.** Read `.infrahub.yml`,
@@ -53,7 +65,8 @@ skill for each artifact builds it from the brief.
    These are local reads; the network searches wait for
    step 5. Never ask what these already answer. Extending a
    design means editing its brief, not starting another;
-   see "Extending a brief" below.
+   see "Extending a brief" in
+   [references/interview-paths.md](./references/interview-paths.md).
 2. **Ask for inputs once, first.** Before reading the
    inputs and on every later turn, read
    [rules/interview-inputs-digested.md](./rules/interview-inputs-digested.md):
@@ -92,21 +105,10 @@ skill for each artifact builds it from the brief.
    business and service answers and the user's inputs.
    After a split, F1 is the feature that delivers the
    leading value driver.
-   Then read the Marketplace catalog whole, not by
-   keyword: `infrahubctl marketplace list --json` and
-   `infrahubctl marketplace list --collections --json`
-   (see `../infrahub-common/marketplace-reference.md`).
-   Match it against each node kind the design needs (a
-   site, a VLAN, a circuit), not against the project's
-   name, and run `infrahubctl marketplace show` on at most
-   three candidates to see their generics. Record the
-   result in the brief's `Marketplace:` line. A
-   Marketplace command that fails or does not return
-   promptly is not retried; write `Marketplace: not
-   searched` with the reason, keep it as an open item,
-   and go on. Also list newer demos once
-   (references/reference-designs.md); when that listing
-   fails, use the table there and do not retry it.
+   Then search the Marketplace and list newer demos, once
+   each, as
+   [references/reference-designs.md](./references/reference-designs.md)
+   § "Searching for reuse" describes.
    Then offer two or three design directions built from
    what this step found, as one question block, so the
    user can pick one or combine them by ID; read
@@ -139,35 +141,13 @@ skill for each artifact builds it from the brief.
    - **Left out.** Add one line naming what you left out
      because nobody mentioned it (a vendor, a serial
      number, a status), so the user can bring it in.
-   - **Ground each guess** in the current best-practice
-     rules, which grow over time: list the file names in
-     `../infrahub-managing-schemas/rules/` and the
-     `yagni-*` files in `../infrahub-auditing-repo/rules/`,
-     read only the rules that govern a decision in front
-     of you, and name the rule in the question's basis
-     by its plain name (uniqueness-constraints, not a
-     link). The question bank's links are starting
-     points, not the full set. When the design needs a
-     generator, a check or a transform, do the same with
-     that skill's rules (`../infrahub-managing-generators/`,
-     `../infrahub-managing-checks/`,
-     `../infrahub-managing-transforms/`) and ask what it
-     needs: what drives it, what it produces, when it
-     runs.
-   - **Look up what the rules do not settle** in the
-     current Infrahub documentation, such as what starts
-     a mechanism or how an Infrahub feature behaves, as
-     [../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)
-     describes: ask `https://docs.infrahub.app/llms.txt`
-     which pages cover the decision, then read them. The
-     documentation changes between releases, so find the
-     pages each time rather than using one you remember.
-     Name the page by its URL in the question's basis
-     and in the brief: on the decision's row, or in its
-     open item when the decision stays open. When a page
-     and a local rule disagree, name both and ask which
-     applies to the user's Infrahub version, or make it
-     an open item when the user cannot reply.
+   - **Ground each guess** in the best-practice rules of
+     the other skills, and look up what they do not
+     settle in the current Infrahub documentation. Read
+     [references/grounding.md](./references/grounding.md)
+     before the first data question: it says which rules
+     to list, how to find documentation pages through
+     `llms.txt`, and where the brief names each one.
    - **Question the draft.** Ask about the guesses that
      change the design most, one question block per
      message with the draft as its lead-in, and after
@@ -215,78 +195,32 @@ skill for each artifact builds it from the brief.
    to the user's existing workflow, or name the skill for
    each of its artifacts. Do not invoke them.
 
-### When the user cannot reply
+### Other paths through the workflow
 
-Some requests come with every answer up front, or say
-the user is away. When there are no answers at all,
-write only the next question block. Otherwise do not
-ask: take the answers as given, record each decision
-with its provenance, and skip step 7. Build the draft
-of step 6 for yourself but do not present it; go
-straight to the brief. Turn every
-design decision they did not answer, and every
-recommendation you would have asked them to confirm,
-into an `open` decision with an open item rather than a
-default, and write the brief. Node kind names and the
-outcome of the skill's own rules, such as not
-splitting, are recorded, not opened. So are the value
-drivers: record the ones you recommend as
-`recommended`. Build on the recommended design direction
-and record it as an `open` decision whose open item
-names the directions not taken.
+Read
+[references/interview-paths.md](./references/interview-paths.md)
+as soon as one of these applies, before you write
+anything:
 
-### When the user asks for every question at once
+- the user cannot reply, or gave every answer up front
+- the user asks for every question at once
+- an existing brief needs another feature or a changed
+  decision
+- the user comes back with the answer to an open item
 
-Send one numbered set: the inputs question, then at
-most five business and service questions, each in the
-block layout of
-[rules/interview-one-question-recommended.md](./rules/interview-one-question-recommended.md),
-then the design-direction block of step 5. Follow it
-with the step 6 draft for the recommended direction, and under the draft at
-most three data questions, as blocks, on the guesses
-that change the design most. The user corrects the rest
-by marking up the draft. Whatever they leave unanswered or
-uncorrected becomes an open item, as above.
+## Warning signs
 
-### Extending a brief
+Stop and go back to the workflow when you notice one of
+these. Runs without this skill did each of them.
 
-- Keep what was agreed: existing features, sketch rows
-  and decisions stay as they are unless the user changes
-  them.
-- Close each open item the user answers as in "Coming
-  back with an answer" below. Items still unanswered
-  stay.
-- Continue the numbering: the next feature ID, decision
-  number and `O<n>` after the highest in the brief.
-- A gap found in an agreed feature, such as a peer F1's
-  intent needs, becomes an open item proposing the
-  change, settled before that feature in Next steps.
-  Do not edit agreed rows on your own.
-- Update Summary, Business and Service with what the
-  user said, and redraw the maps and Next steps.
-
-### Coming back with an answer
-
-A user returns with an answer to an open item ("O2 is
-settled: the NOC owns cabling"). Read the brief, then:
-
-1. Record the answer as a `stated` decision, put it in
-   every cell that said `open: O2`, and remove O2 from
-   Open items and Next steps.
-2. Take the features O2 `affects`. For a `planned`
-   feature, update its rows and Handoff.
-3. For a `specified` or `built` feature, do not rewrite
-   it silently. Add a dated line to its Handoff saying
-   what changed, and a Next step that sends the change
-   on: re-specify it in the user's workflow, or, for a
-   loaded schema, change it with
-   `infrahub-managing-schemas`, which handles the
-   migration.
-4. If the answer adds node kinds or a new domain, run
-   the scope check of step 5 again; a new feature takes
-   the next ID, and no ID changes.
-5. Redraw the maps, and tell the user which features
-   the answer changed.
+| What you are about to do | What to do instead |
+| ------------------------ | ------------------ |
+| Write schema YAML because the user is in a hurry | Send one question block; the brief is the fast path to a schema that loads once |
+| Fill a gap with an assumption "so the user is not blocked" | Mark the cell `(guess)` and ask about it, or make it an open item when the user cannot reply |
+| List "design decisions I made for you" | Ask each one as a question with a recommended answer, or log it as `recommended` with its basis |
+| Invent example data, such as a customer name | Show sample objects only from rows the user gave |
+| Take "sounds good" or "whatever you suggest" as a yes | Restate the brief and ask for an explicit yes |
+| Skip a file because the user said to | List it in Inputs and use it as evidence |
 
 ## Rule Categories
 
@@ -306,7 +240,14 @@ Full scope per prefix is in `rules/_sections.md`.
   schema and YAGNI rules each one serves, and the
   Infrahub defaults a recommendation can rest on.
 - `references/reference-designs.md`: OpsMill worked
-  examples to build from, and how to find newer ones.
+  examples to build from, how to find newer ones, and
+  how to search the Marketplace.
+- `references/grounding.md`: which best-practice rules
+  to read for the draft, and how to look up what they do
+  not settle in the Infrahub documentation.
+- `references/interview-paths.md`: what changes when the
+  user cannot reply, asks for every question at once,
+  extends a brief, or comes back with an answer.
 - `../infrahub-managing-*/`: build each feature's
   artifacts from the finished brief, schema first.
 - `../infrahub-common/marketplace-reference.md`: the
