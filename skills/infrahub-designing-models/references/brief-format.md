@@ -186,7 +186,8 @@ graph LR
   for the node kind. `Evidence` is where you learned the
   row's facts: `file:column`, `file:element`,
   `answer Q<n>`, `request` (the user's opening message),
-  or the reference design's name.
+  the reference design's name, or the URL of the
+  documentation page it rests on.
 - `Peers` names each peer node kind spelled exactly as
   its `Node kind`, followed by the cardinality:
   `Strand (many)`. A peer this design does not define,
@@ -232,7 +233,8 @@ graph LR
   taken:`, the directions not chosen. Its tag follows
   [../rules/interview-design-directions.md](../rules/interview-design-directions.md).
 - `Basis` on a `recommended` row is the reason you
-  recommended it. On an `open` row it is the open item
+  recommended it, with the URL of the documentation page
+  when the reason comes from one. On an `open` row it is the open item
   that tracks the question, `O<n>`, which must be a real
   entry in Open items.
 

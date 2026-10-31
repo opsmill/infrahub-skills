@@ -9295,6 +9295,47 @@ tasks:
       - name: design-directions
         check: Two or three directions with decisions by ID, the same topics, starting with Reuse, all different
 
+  - name: design-docs-lookup
+    trials: 3
+    # Writes a full design brief and may read documentation pages; 300s is
+    # too close to the typical run under parallel load.
+    timeout: 480
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: We run a colocation business. When a sales rep creates a new cage
+      for a customer in Infrahub, the cage's patch panel and its cross-connect
+      VLAN must exist straight away. Nobody should have to run anything or
+      open a proposed change for that to happen.
+
+      I'm away today, so here are my answers: sales owns cages and creates
+      them; facilities owns patch panels. A cage is identified by its cage
+      code, a patch panel by its cage and panel number. Infrahub becomes the
+      source of truth for both. Each cage gets one patch panel with 24 ports.
+      VLAN IDs should never be chosen by hand.
+
+      Write the design brief.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_documented_decision.py
+        weight: 1.0
+    expected_output: >-
+      A design brief whose decision about what starts the cage generator when
+      a cage is created rests on the Infrahub documentation page that covers
+      it, found through https://docs.infrahub.app/llms.txt and cited in the
+      decision or its Mechanisms row.
+    expectations:
+      - The local skill rules are read first, and the documentation only for what they do not settle
+      - The documentation page is found through llms.txt, not recalled
+      - The decision about the trigger names the page it rests on
+    assertions:
+      - name: documented-decision
+        check: The decision about what starts the cage generator cites a docs.infrahub.app page
+      - name: mechanisms-match-artifacts
+        check: Each generator, check or transform artifact has a Mechanisms row, and each row an artifact
+      - name: sketch-rows-complete
+        check: Every sketch row has identity, source of truth and owner, or an open item
+
   - name: design-one-question-recommended
     trials: 3
     instruction: |

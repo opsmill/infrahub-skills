@@ -1538,6 +1538,106 @@ def test_mechanisms(tmp_path: Path, text: str, expected: str | None) -> None:
     assert_outcome(run_grader("check_mechanisms.py", tmp_path), expected)
 
 
+# --------------------------------------------------------------------------
+# Documentation lookup for a decision the local rules do not settle
+# --------------------------------------------------------------------------
+
+CAGE_FEATURES = """\
+| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| F1 | Cage provisioning | A new cage gets its patch panel and VLAN at once | Cage, PatchPanel, Vlan | schema, generator | - | planned | Build cage provisioning, as designed in F1 of docs/designs/colo-cages/design-brief.md. |
+"""
+
+CAGE_ROWS = """\
+| F1 | ColoCage | cage code | customer (stated) | PatchPanel (one) | Infrahub | Sales | answer Q2 |
+| F1 | PatchPanel | cage + panel number | ports (stated) | ColoCage (one) | Infrahub | Facilities | answer Q3 |
+"""
+
+CAGE_MECH = MECH_HEADER + """\
+| F1 | A new cage gets its patch panel and VLAN | generator | ColoCage | PatchPanel, VLAN | a cage is created | creates other nodes from a design |
+"""
+
+CAGE_DECISIONS = """\
+| # | Decision | Tag | Basis |
+| --- | --- | --- | --- |
+| 1 | Cages are identified by cage code | stated | |
+| 2 | An event action runs the cage generator when a cage is created | recommended | Event actions run a Generator on a node change; https://docs.infrahub.app/events/event-actions (strong) |
+"""
+
+
+def cage_brief(decisions: str = CAGE_DECISIONS, mechanisms: str = CAGE_MECH) -> str:
+    return brief(features=CAGE_FEATURES, sketch_rows=CAGE_ROWS, mechanisms=mechanisms, decisions=decisions)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        pytest.param(cage_brief(), None, id="compliant"),
+        pytest.param(
+            cage_brief(
+                decisions=CAGE_DECISIONS.replace(
+                    "Event actions run a Generator on a node change; https://docs.infrahub.app/events/event-actions (strong)",
+                    "Infrahub runs the generator on a node change ([Event actions](https://docs.infrahub.app/events/event-actions.md)) (medium)",
+                ),
+            ),
+            None, id="compliant-variant-linked-markdown-page",
+        ),
+        pytest.param(
+            cage_brief(mechanisms=CAGE_MECH.replace(
+                "| creates other nodes from a design |",
+                "| an event action starts it, per https://docs.infrahub.app/events/event-actions |",
+            ), decisions=CAGE_DECISIONS.replace(
+                "Event actions run a Generator on a node change; https://docs.infrahub.app/events/event-actions (strong)",
+                "Event actions run a Generator on a node change (strong)",
+            )),
+            None, id="compliant-page-cited-in-the-mechanisms-row",
+        ),
+        pytest.param(
+            cage_brief(decisions=CAGE_DECISIONS.replace("; https://docs.infrahub.app/events/event-actions", "")),
+            "cites no documentation page", id="violating-no-page-cited",
+        ),
+        pytest.param(
+            cage_brief(decisions=CAGE_DECISIONS.replace(
+                "https://docs.infrahub.app/events/event-actions", "https://docs.infrahub.app/llms.txt",
+            )),
+            "cites no documentation page", id="near-miss-index-instead-of-a-page",
+        ),
+        pytest.param(
+            cage_brief(decisions=CAGE_DECISIONS.replace("; https://docs.infrahub.app/events/event-actions", "")
+                       + "| 3 | Cross-connect VLANs come from a pool | recommended | https://docs.infrahub.app/python-sdk/guides/resource-manager (strong) |\n"),
+            "cites no documentation page", id="near-miss-page-cited-on-another-decision",
+        ),
+        pytest.param(
+            brief(
+                features=CAGE_FEATURES, sketch_rows=CAGE_ROWS, mechanisms=CAGE_MECH,
+                decisions=CAGE_DECISIONS.replace(
+                    "| recommended | Event actions run a Generator on a node change; https://docs.infrahub.app/events/event-actions (strong) |",
+                    "| open | O2 |",
+                ),
+                open_items="- O2: Can an event rule start the cage generator when a cage is created? The local generator rules "
+                           "say generators run in a proposed change; https://docs.infrahub.app/events/event-rules.md says an "
+                           "event rule can (owner: network automation; affects F1)\n",
+            ),
+            None, id="compliant-open-decision-cites-the-page-in-its-open-item",
+        ),
+        pytest.param(
+            cage_brief(
+                decisions=CAGE_DECISIONS.replace(
+                    "| 2 | An event action runs the cage generator when a cage is created |",
+                    "| 2 | The cage generator is run by hand from the UI |",
+                ).replace("Event actions run a Generator on a node change; https://docs.infrahub.app/events/event-actions (strong)",
+                          "Sales runs it after each new cage (weak basis)"),
+                mechanisms=CAGE_MECH.replace("| a cage is created |", "| someone clicks Run |"),
+            ),
+            "no decision or Mechanisms row says what starts", id="violating-trigger-never-decided",
+        ),
+    ],
+)
+def test_documented_decision(tmp_path: Path, text: str, expected: str | None) -> None:
+    write(tmp_path, BRIEF, text)
+    assert_outcome(run_grader("check_documented_decision.py", tmp_path), expected)
+
+
 def test_mechanisms_core_check_failure_zeroes_the_score(tmp_path: Path) -> None:
     """A task with no gate list still cannot pass on its neighbouring checks."""
     write(tmp_path, BRIEF, branch_brief(BRANCH_MECH.replace("| schema constraint | Vlan |", "| resource pool | Vlan |")))

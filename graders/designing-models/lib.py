@@ -914,6 +914,46 @@ def check_direction_recorded(
 
 
 # --------------------------------------------------------------------------
+# Documentation lookup (infrahub-common workflow-information-priority)
+# --------------------------------------------------------------------------
+
+# A page of the Infrahub documentation, as opposed to its llms.txt index.
+_DOC_URL = re.compile(r"https?://docs\.infrahub\.app/([^\s)\]>|]*)")
+_DOC_INDEXES = {"", "llms.txt", "llms-full.txt"}
+
+
+def _cites_doc_page(text: str) -> bool:
+    return any(m.group(1).strip("/") not in _DOC_INDEXES for m in _DOC_URL.finditer(text))
+
+
+@_on_brief
+def check_documented_decision(parts: dict[str, str], subject: re.Pattern, label: str) -> tuple[bool, str]:
+    """The decision the local rules do not settle names the documentation page it rests on.
+
+    ``subject`` matches the Decision log rows, Mechanisms rows and Open items
+    about that decision; one of them must cite a docs.infrahub.app page. An
+    open decision carries its page in its open item. The llms.txt index is
+    where the page is found, not what the decision rests on. The page path
+    is not checked, because the documentation moves.
+    """
+    rows = []
+    for heading in (DECISIONS_HEADING, MECHANISMS_HEADING):
+        _, table = first_table(parts.get(heading, ""))
+        rows += [" | ".join(_clean(cell) for cell in row.values()) for row in table]
+    rows += [_clean(line) for line in _lines_outside_fences(parts.get(OPEN_ITEMS_HEADING, ""))
+             if _OPEN_ITEM.match(line)]
+    about = [row for row in rows if subject.search(row)]
+    if not about:
+        return False, f"no decision or Mechanisms row says what starts {label}"
+    if not any(_cites_doc_page(row) for row in about):
+        return False, (
+            f"the decision about what starts {label} cites no documentation page "
+            "(https://docs.infrahub.app/<page>, found through llms.txt)"
+        )
+    return True, f"the decision about what starts {label} names the documentation page it rests on"
+
+
+# --------------------------------------------------------------------------
 # Rule: brief-maps-match-tables  (artifact: the brief)
 # --------------------------------------------------------------------------
 

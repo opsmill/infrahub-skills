@@ -42,6 +42,12 @@ the brief by its full URL,
 fails or does not return promptly, use the table and do
 not retry.
 
+The documentation index, `https://docs.infrahub.app/llms.txt`,
+also lists OpsMill reference designs and solutions with
+their pages. When you read it for this design (SKILL.md
+step 6), check it for a design that fits better than the
+table, and name that design by its repository's full URL.
+
 ## How to use it
 
 - Pick the row whose use case matches the business and

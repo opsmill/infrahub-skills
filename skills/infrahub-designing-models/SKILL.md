@@ -154,6 +154,20 @@ skill for each artifact builds it from the brief.
      `../infrahub-managing-transforms/`) and ask what it
      needs: what drives it, what it produces, when it
      runs.
+   - **Look up what the rules do not settle** in the
+     current Infrahub documentation, such as what starts
+     a mechanism or how an Infrahub feature behaves, as
+     [../infrahub-common/rules/workflow-information-priority.md](../infrahub-common/rules/workflow-information-priority.md)
+     describes: ask `https://docs.infrahub.app/llms.txt`
+     which pages cover the decision, then read them. The
+     documentation changes between releases, so find the
+     pages each time rather than using one you remember.
+     Name the page by its URL in the question's basis
+     and in the brief: on the decision's row, or in its
+     open item when the decision stays open. When a page
+     and a local rule disagree, name both and ask which
+     applies to the user's Infrahub version, or make it
+     an open item when the user cannot reply.
    - **Question the draft.** Ask about the guesses that
      change the design most, one question block per
      message with the draft as its lead-in, and after
@@ -297,3 +311,7 @@ Full scope per prefix is in `rules/_sections.md`.
   artifacts from the finished brief, schema first.
 - `../infrahub-common/marketplace-reference.md`: the
   Marketplace commands and their minimum SDK version.
+- `../infrahub-common/rules/workflow-information-priority.md`:
+  the order to consult the skills and the Infrahub
+  documentation in, and how to find a page through
+  `llms.txt`.
