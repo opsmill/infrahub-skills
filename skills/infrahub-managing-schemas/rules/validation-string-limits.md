@@ -66,8 +66,9 @@ that into context, never the raw 66 KB schema or
 100 KB OpenAPI document.**
 
 ```bash
+SKILL=/path/to/infrahub-managing-schemas   # this skill's own directory, wherever it is installed
 # Tier 1 — public JSON Schema (default)
-python skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py
+python "$SKILL/scripts/fetch_schema_limits.py"
 ```
 
 Exit 0 means the constraints are on stdout. Exit 1
@@ -83,7 +84,7 @@ here). Once it has established a reachable
 
 ```bash
 # Tier 2 — running Infrahub /api/openapi.json (fallback)
-python skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py \
+python "$SKILL/scripts/fetch_schema_limits.py" \
   --openapi "$BASE_URL"
 ```
 
@@ -163,11 +164,14 @@ it).
 
 `infrahubctl schema load` is too late: the branch is
 already pushed. The same script's `--check` mode
-validates files locally against the live caps:
+validates files locally against the live caps. CI has
+no plugin install, so commit a copy of the script to the
+repository once, while the skill is available, and have
+CI run that copy:
 
 ```bash
-python skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py \
-  --check schemas/*.yml
+mkdir -p scripts/ && cp "$SKILL/scripts/fetch_schema_limits.py" scripts/
+python scripts/fetch_schema_limits.py --check schemas/*.yml
 ```
 
 Exit 0 if all files pass *or* if the live source is

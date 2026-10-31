@@ -1,4 +1,4 @@
-"""Assert every bash snippet printed by a contributor skill actually parses.
+"""Assert every bash snippet printed by a skill, shipped or contributor, parses.
 
 These snippets are instructions an agent runs verbatim, so a syntax error in
 one is a broken instruction rather than a cosmetic defect. Two shipped here
@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-SKILL_DIR = ROOT / ".agents" / "skills"
+SKILL_DIRS = [ROOT / ".agents" / "skills", ROOT / "skills"]
 
 BASH_BLOCK = re.compile(r"```bash\n(.*?)```", re.S)
 PLACEHOLDER = re.compile(r"<[^>\n]+>")
@@ -32,7 +32,7 @@ PLACEHOLDER = re.compile(r"<[^>\n]+>")
 
 def _blocks() -> list[tuple[str, int, str]]:
     found = []
-    for path in sorted(SKILL_DIR.glob("*/*.md")):
+    for path in sorted(p for d in SKILL_DIRS for p in d.rglob("*.md")):
         rel = path.relative_to(ROOT).as_posix()
         for index, block in enumerate(BASH_BLOCK.findall(path.read_text())):
             found.append((rel, index, block))

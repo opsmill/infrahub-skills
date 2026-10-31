@@ -274,6 +274,51 @@ def test_description_stays_within_the_length_cap(path: Path) -> None:
     )
 
 
+def asks_for_request_as_args(description: str) -> bool:
+    """True when one sentence tells the caller to pass the request verbatim as args."""
+    return any(
+        re.search(r"\bpass\b", sentence, re.I)
+        and not re.search(r"\b(?:not|never|don't|no need to)\b[^.]{0,20}\bpass\b", sentence, re.I)
+        and re.search(r"\bverbatim\b", sentence, re.I)
+        and re.search(r"\bas args\b", sentence, re.I)
+        for sentence in re.split(r"(?<=[.!?])\s+", description)
+    )
+
+
+@pytest.mark.parametrize(
+    ("description", "expected"),
+    [
+        ("ALWAYS pass the user's question verbatim as args. It runs forked.", True),
+        ("Runs forked. Pass, as args, the user's request verbatim.", True),
+        ("Audits a repository. TRIGGER when: reviewing compliance.", False),
+        # Every token is present, but in two sentences about different things.
+        ("Quote the error verbatim. Pass the file path as args.", False),
+        ("Do not pass the user's request verbatim as args.", False),
+    ],
+)
+def test_args_instruction_detector_discriminates(description: str, expected: bool) -> None:
+    assert asks_for_request_as_args(description) is expected
+
+
+@pytest.mark.parametrize("path", _shipped_skill_files(), ids=lambda p: p.parent.name)
+def test_forked_skill_description_asks_for_the_request_as_args(path: Path) -> None:
+    """A `context: fork` skill cannot see the parent conversation.
+
+    Whatever the caller does not pass as args is lost: the pasted file, the
+    version, the constraint the workflow branches on. Eval prompts inline that
+    context, so no eval can catch the loss, and the description is the only
+    place that reaches the caller.
+    """
+    fm = _frontmatter(path)
+    if fm.get("context") != "fork":
+        return
+    description = " ".join((fm.get("description") or "").split())
+    assert asks_for_request_as_args(description), (
+        f"{path.parent.name}: runs with `context: fork` but its description never tells "
+        f"the caller to pass the user's request verbatim as args"
+    )
+
+
 @pytest.mark.parametrize("path", _shipped_skill_files(), ids=lambda p: p.parent.name)
 def test_artifact_skill_description_names_modification_triggers(path: Path) -> None:
     """A skill that produces an artifact also advertises changing what exists.
