@@ -31,9 +31,10 @@ After upgrading, you can plan an Infrahub upgrade before you run it, with every 
 
 :::note What to expect after upgrading
 
-Nothing about how you invoke the skills has changed. One item is worth a review on your side.
+Nothing about how you invoke the skills has changed. Two items are worth a review on your side.
 
 - Review committed protocol files that were generated offline with `--schemas`.
+- Expect permission prompts for shell commands and file writes while a skill is active.
 
 See [Upgrade notes](#upgrade-notes) for full details.
 
@@ -106,6 +107,14 @@ If: your repository commits a protocol file that you generated offline with `inf
 Then: regenerate it from a running Infrahub server that has the schema loaded, adding `--branch` when the schema is on a branch, and check the diff for classes or fields that disappear.
 
 Notes: offline output has no Profile or Template classes and no relationships added through `extensions`. Offline generation is still fine for a scratch file.
+
+### Permission prompts while a skill is active
+
+If: you relied on a skill running shell commands without asking, because every skill pre-approved `Bash` through `allowed-tools`.
+
+Then: approve each tool when Claude Code asks, or add the commands you trust to your Claude Code permission settings.
+
+Notes: the skills no longer list `allowed-tools`. While a skill is active, Bash, Write, and WebFetch now ask for permission, as they do outside a skill. The read-only commands in a skill's inline lines (`find`, `head`, `cat`, `echo`) still run without a prompt ([#215](https://github.com/opsmill/infrahub-skills/pull/215)).
 
 ## Full changelog
 
