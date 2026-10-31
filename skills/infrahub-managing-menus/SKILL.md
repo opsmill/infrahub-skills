@@ -6,7 +6,7 @@ description: >-
   DO NOT TRIGGER when: designing or modifying schemas, including setting menu_placement, icon, or order_weight on a schema node (use infrahub-managing-schemas), writing checks or transforms, populating data objects.
 argument-hint: "[menu-structure-description]"
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 

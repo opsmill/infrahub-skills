@@ -8,7 +8,7 @@ description: >-
 context: fork
 argument-hint: "[question about infrastructure data]"
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 

@@ -17,7 +17,7 @@ description: >-
   product; a one-off export of device types is in scope here).
 argument-hint: "[netbox-device-type-path...]"
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 

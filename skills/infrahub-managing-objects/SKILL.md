@@ -6,7 +6,7 @@ description: >-
   DO NOT TRIGGER when: designing or modifying schemas, including changing an attribute or relationship definition on a node kind (use infrahub-managing-schemas), writing Python checks/generators, querying live data.
 argument-hint: "[kind] [object-details...]"
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 

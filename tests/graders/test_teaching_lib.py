@@ -621,6 +621,23 @@ def test_own_artifacts_stale_kinds_from_another_schema_fail(tmp_path):
     assert not ok and "CampusSwitch" in msg
 
 
+def test_own_artifacts_ignores_kinds_from_graders_and_installed_skills(tmp_path):
+    """A trial directory also holds graders/ and the installed skills.
+
+    Their fixture schemas are not the learner's, so a lesson naming a
+    fixture's kind must not count as grounded.
+    """
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, schema=OTHER_SCHEMA)
+    for planted in ("graders/x/fixtures", ".claude/skills/y", ".agents/skills/y"):
+        (ws / planted).mkdir(parents=True)
+        (ws / planted / "schema.yml").write_text(
+            OTHER_SCHEMA.replace("Campus", "Testbed").replace("Switch", "Sensor")
+        )
+    assert teaching_lib.learner_kinds(ws) == {"CampusSwitch", "CampusSite"}
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert not ok and "CampusSwitch" in msg
+
+
 def test_own_artifacts_no_learner_schema(tmp_path):
     ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, schema=None)
     ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)

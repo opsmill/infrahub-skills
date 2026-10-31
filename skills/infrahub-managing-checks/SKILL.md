@@ -6,7 +6,7 @@ description: >-
   DO NOT TRIGGER when: designing schemas, querying live data, building transforms or generators.
 argument-hint: "[check-name] [description...]"
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 

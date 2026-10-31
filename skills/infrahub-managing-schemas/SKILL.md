@@ -6,7 +6,7 @@ description: >-
   DO NOT TRIGGER when: populating or editing object data files (use infrahub-managing-objects), writing checks/generators/transforms, querying live data, planning an Infrahub version upgrade (use infrahub-planning-upgrades).
 argument-hint: "[namespace] [node-names...]"
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 

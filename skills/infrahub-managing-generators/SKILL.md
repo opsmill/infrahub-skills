@@ -6,7 +6,7 @@ description: >-
   DO NOT TRIGGER when: designing schemas, writing data transforms, querying live data, populating static data files.
 argument-hint: "[generator-name] [description...]"
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 
