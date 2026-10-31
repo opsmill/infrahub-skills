@@ -1,27 +1,31 @@
 ---
-title: Emit Three Files in Load Order
+title: Emit Five Files in Load Order
 impact: MEDIUM
 tags: output, load-order, branch, references
 ---
 
-## Emit Three Files in Load Order
+## Emit Five Files in Load Order
 
 Impact: MEDIUM
 
-Split the output into manufacturers, device types, and
-templates, numbered in dependency order, and load them
-onto a dedicated branch.
+Split the output into manufacturers, device types,
+device templates, module types, and module templates,
+numbered in dependency order, and load them onto a
+dedicated branch. A file with nothing in it is not
+written, so a run with no `module-types/` input
+produces only the first three.
 
 ### Why it matters
 
 Each stage references the one before it by
 `human_friendly_id`. A device type names its
-manufacturer; a template names its device type. The
-loader resolves references against what already
-exists, so a template loaded before its device type
-fails with "reference not found" — and it fails after
-the earlier files have already written, leaving a
-branch in a partial state.
+manufacturer; a template names its device type. A
+module type names its manufacturer; a module template
+names its module type. The loader resolves references
+against what already exists, so a template loaded
+before its device type fails with "reference not
+found" — and it fails after the earlier files have
+already written, leaving a branch in a partial state.
 
 Numbering the filenames makes the order visible in a
 directory listing and lets a glob load them correctly:
@@ -31,6 +35,8 @@ generated/
 ├── 01_manufacturers.yml     # OrganizationManufacturer
 ├── 02_device_types.yml      # DcimDeviceType  → manufacturer
 ├── 03_device_templates.yml  # TemplateDcimDevice → device_type
+├── 04_module_types.yml      # DcimModuleType  → manufacturer
+├── 05_module_templates.yml  # TemplateDcimModule → module_type
 └── coverage-report.md
 ```
 
@@ -67,7 +73,11 @@ infrahubctl object load generated/03_device_templates.yml
 ### Common mistakes
 
 - **Loading templates before device types.** The
-  `device_type` reference cannot resolve.
+  `device_type` reference cannot resolve. The same holds
+  for module templates before module types.
+- **Loading only `01` to `03` after converting module
+  types.** The module files are written alongside the
+  device files; load them too, in number order.
 - **Assuming manufacturers already exist.** They may,
   and re-loading them is idempotent — but assuming
   wrongly breaks the whole batch.

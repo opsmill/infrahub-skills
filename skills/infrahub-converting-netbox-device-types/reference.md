@@ -338,7 +338,7 @@ netbox_to_infrahub_templates.py INPUT... --mapping PROFILE --output-dir DIR
 | -------- | ------- |
 | `INPUT...` | Files, directories (walked recursively), or globs |
 | `--mapping` | Mapping profile YAML |
-| `--output-dir` | Where the three object files are written |
+| `--output-dir` | Where the object files are written |
 | `--report` | Coverage report path; `-` writes it to stdout |
 
 | Exit code | Meaning |
