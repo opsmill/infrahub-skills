@@ -71,8 +71,15 @@ What changed:
 * Audit findings from the auditing-repo skill list only live reference sites in `sites`: a file that nothing registers or includes is reported as dead code instead. A kind whose Dropdown has a different choice list, or whose relationship has a different peer, now counts toward a duplicate shape, and the difference is recorded as a feasibility blocker.
 * Analyze a pasted log excerpt with the analyzing-diagnostics skill without first being asked where the bundle is; what the excerpt lacks is listed under Open questions. Every report now states the bundle manifest, including when every collector succeeded, and writes the exact `gh search issues` line for each query, including queries that could not be run.
 * Lessons from the teaching-concepts skill name each node by its full kind, such as `CampusSwitch`, as the schema and the API do.
+* The managing-checks skill now states which repository commit a proposed change's checks run, and how to get a check fix merged to `main` into an open proposed change on a branch synced with Git ([#194](https://github.com/opsmill/infrahub-skills/issues/194)).
 
 ## Minor changes
+
+**Plugin**
+
+* The skills no longer pre-approve tools through `allowed-tools`, and the `SessionStart` hook gives Claude the real plugin path instead of the literal `${CLAUDE_PLUGIN_ROOT}` text. A `plugin` branch now carries only the files the plugin ships ([#215](https://github.com/opsmill/infrahub-skills/pull/215)).
+* `claude plugin validate --strict` passes: the `SessionStart` hook path is quoted so it works when the plugin root contains spaces ([#212](https://github.com/opsmill/infrahub-skills/pull/212)).
+* The Claude plugin directory shows the Infrahub logo, with OpsMill as the publisher ([#214](https://github.com/opsmill/infrahub-skills/pull/214)).
 
 **Documentation**
 
@@ -106,6 +113,7 @@ Notes: offline output has no Profile or Template classes and no relationships ad
 
 * `netbox_export_device_types.py` in converting-netbox-device-types exports device types, module types, and component templates from a live NetBox instance ([#129](https://github.com/opsmill/infrahub-skills/issues/129)).
 * infrahub-planning-upgrades skill plans an upgrade one minor version at a time and checks every release's breaking changes against the repository and instance ([#159](https://github.com/opsmill/infrahub-skills/pull/159)).
+* managing-checks states which repository commit a proposed change's checks run ([#194](https://github.com/opsmill/infrahub-skills/issues/194)).
 
 ### Changed
 
@@ -134,6 +142,9 @@ Notes: offline output has no Profile or Template classes and no relationships ad
 * Skill-change pipeline checks other branches for existing pull requests ([#181](https://github.com/opsmill/infrahub-skills/pull/181)).
 * Watch grader checks match whole path segments and identity tokens ([#164](https://github.com/opsmill/infrahub-skills/pull/164)).
 * Evaluation graders and tasks that scored correct answers 0.0 on the release evaluation gate fixed, and evaluation trials run one at a time.
+* Claude plugin directory validation findings cleared, and a `plugin` branch built with only the shipped files ([#215](https://github.com/opsmill/infrahub-skills/pull/215)).
+* `claude plugin validate --strict` passes ([#212](https://github.com/opsmill/infrahub-skills/pull/212)).
+* Infrahub logo added and OpsMill named as the plugin author ([#214](https://github.com/opsmill/infrahub-skills/pull/214)).
 
 ## Skills included
 
