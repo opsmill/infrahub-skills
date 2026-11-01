@@ -110,8 +110,9 @@ files pasted into the conversation.
   can find the strands a cable uses by its cable ID`.
   The action is one someone else can watch being done,
   so the spec written from the Handoff can test it. "Know
-  which strand runs where" names an aim, not an action;
-  so do know, understand, track and manage on their own.
+  which strand runs where" names an aim, not an action,
+  and so does a sentence whose verb is know, understand,
+  track or manage.
   The people are the ones who act, never Infrahub.
 - `Value` names the drivers the feature serves, from the
   `Value:` line, and no figures. F1's names the first

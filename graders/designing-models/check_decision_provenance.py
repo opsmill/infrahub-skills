@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from lib import check_decision_tags_for, check_direction_recorded, check_learning_step, run_checks  # noqa: E402
+from lib import check_decision_tags_for, check_direction_recorded, run_checks  # noqa: E402
 
 
 def _p(pattern: str) -> re.Pattern:
@@ -35,18 +35,16 @@ SUBJECTS = {
 # combining two directions is the user's own call, so it is stated.
 DIRECTION = ("A", {"B2"}, {"B"}, "stated")
 
-CHECK_NAMES = ["decision-provenance", "decision-tags-match", "direction-recorded", "sketch-rows-complete", "no-learning-step"]
+CHECK_NAMES = ["decision-provenance", "decision-tags-match", "direction-recorded", "sketch-rows-complete"]
 # Neighbouring rules this task also grades: a failure lowers the score by its
 # share instead of zeroing it. The pass threshold still decides the task.
-NEIGHBOURS = ("sketch-rows-complete", "no-learning-step")
+NEIGHBOURS = ("sketch-rows-complete",)
 
 
 def grade(workspace: Path) -> dict:
     extra = {
         "decision-tags-match": lambda ws: check_decision_tags_for(ws, SUBJECTS),
         "direction-recorded": lambda ws: check_direction_recorded(ws, *DIRECTION),
-        # Nobody in the transcript asks what a concept is.
-        "no-learning-step": lambda ws: check_learning_step(ws),
     }
     return run_checks(CHECK_NAMES, workspace, extra, neighbours=NEIGHBOURS)
 

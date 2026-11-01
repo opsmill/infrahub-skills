@@ -171,7 +171,8 @@ skill for each artifact builds it from the brief.
    becomes the next question, or an open item when the
    user cannot reply. Restate and confirm only when the
    user can reply (otherwise see "When the user cannot
-   reply").
+   reply" in
+   [references/interview-paths.md](./references/interview-paths.md)).
    First ask again about each accepted recommendation
    whose basis was weak, one question block per
    message, in the layout from the one-question rule.

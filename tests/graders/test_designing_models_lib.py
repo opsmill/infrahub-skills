@@ -2081,6 +2081,20 @@ INTENT_TABLE = """\
             "Field engineers can find the strand a cable uses by its cable ID", "Planners can allocate",
             "names no object", id="near-miss-no-object",
         ),
+        pytest.param(
+            "Field engineers can find the strand a cable uses by its cable ID",
+            "Operators can deploy services", None, id="compliant-variant-one-word-object",
+        ),
+        pytest.param(
+            "Know which strand runs where so field engineers can find the strand by its cable ID",
+            "Planners can allocate a channel without a clash",
+            "does not open with who acts", id="near-miss-aim-before-a-can-clause",
+        ),
+        pytest.param(
+            "Field engineers can find the strand a cable uses by its cable ID",
+            "The Infrahub system can allocate channels without a clash",
+            "the actor", id="near-miss-software-phrase-as-actor",
+        ),
     ],
 )
 def test_feature_outcomes_observable(tmp_path: Path, f1: str, f2: str, expected: str | None) -> None:
@@ -2140,6 +2154,19 @@ ASKED = frozenset({"generators", "proposed-changes"})
         ),
         pytest.param(LEARN_STEPS, frozenset(), "asked about no concept", id="violating-unasked-learning-step"),
         pytest.param(
+            "1. Learn generators first.\n2. Build F1 Fiber plant: run the Schema Manager, then the Object Manager.\n",
+            frozenset(), "asked about no concept", id="near-miss-unasked-learning-step-without-the-tutor",
+        ),
+        pytest.param(
+            LEARN_STEPS.replace("generators and proposed-changes", "generators, proposed-changes and schema"),
+            ASKED, "adds ['schema']", id="near-miss-extra-concept",
+        ),
+        pytest.param(
+            "1. Settle O1 with the planning team; it affects F1.\n" + LEARN_STEPS.replace("1. ", "2. ", 1)
+            .replace("2. Build F1", "3. Build F1").replace("3. When F1", "4. When F1"),
+            ASKED, None, id="compliant-variant-open-item-names-f1-before-learning",
+        ),
+        pytest.param(
             "1. Build F1 Fiber plant: run the Schema Manager, then the Object Manager.\n2. When F1 is loaded, build F2 DWDM channels.\n",
             frozenset(), None, id="compliant-no-question-no-step",
         ),
@@ -2163,3 +2190,10 @@ def test_learning_handoff_concepts_match_the_tutor_map() -> None:
     concept_map = REPO_ROOT / "skills/infrahub-teaching-concepts/references/concept-map.md"
     slugs = set(re.findall(r"^\|\s*\d+\s*\|\s*([a-z][a-z0-9-]*)\s*\|", concept_map.read_text(), flags=re.M))
     assert _task_grader("check_learning_handoff.py").CONCEPTS <= slugs
+
+
+def test_grader_tutor_concepts_match_the_map() -> None:
+    """The grader's copy of the concept slugs is the tutor's map, both ways."""
+    concept_map = REPO_ROOT / "skills/infrahub-teaching-concepts/references/concept-map.md"
+    slugs = set(re.findall(r"^\|\s*\d+\s*\|\s*([a-z][a-z0-9-]*)\s*\|", concept_map.read_text(), flags=re.M))
+    assert set(LIB.TUTOR_CONCEPTS) == slugs

@@ -129,6 +129,10 @@
         {
           "name": "feature-outcomes-observable",
           "check": "Each feature's Intent says who can do what, with an action someone can watch"
+        },
+        {
+          "name": "no-learning-step",
+          "check": "Next steps add no learning step, since nobody asked what a concept is"
         }
       ]
     },
@@ -190,10 +194,6 @@
         {
           "name": "sketch-rows-complete",
           "check": "Every sketch row has identity, source of truth and owner, or an open item"
-        },
-        {
-          "name": "no-learning-step",
-          "check": "Next steps name no tutor, since nobody asked what a concept is"
         }
       ]
     },

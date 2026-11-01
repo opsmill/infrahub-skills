@@ -1387,6 +1387,17 @@ def check_uniqueness_is_schema_constraint(parts: dict[str, str], subject: re.Pat
     return True, "the uniqueness rule is a schema constraint"
 
 
+def _settles_only(text: str) -> bool:
+    """A step that settles an open item, not a feature's step.
+
+    "Settle O1 before building F1" names F1 but is not F1's step: it names an
+    open item and neither hands off nor names a skill.
+    """
+    builders = {n for names in ARTIFACT_SKILLS.values() for n in names} | set(IMPORTER_NAMES)
+    low = text.lower()
+    return bool(re.search(r"\bO\d+\b", text)) and not _HANDOFF.search(low) and not any(n in low for n in builders)
+
+
 @_on_brief
 def check_next_steps_in_order(parts: dict[str, str]) -> tuple[bool, str]:
     """Next steps take each feature once, after the features it depends on.
@@ -1405,13 +1416,7 @@ def check_next_steps_in_order(parts: dict[str, str]) -> tuple[bool, str]:
             steps.append(_clean(match.group(2)))
     if not steps:
         return False, "Next steps has no numbered steps"
-    builders = {n for names in ARTIFACT_SKILLS.values() for n in names} | set(IMPORTER_NAMES)
-
-    def settles_only(text: str) -> bool:
-        # "Settle O1 before building F1" names F1 but is not F1's step:
-        # it names an open item and neither hands off nor names a skill.
-        low = text.lower()
-        return bool(re.search(r"\bO\d+\b", text)) and not _HANDOFF.search(low) and not any(n in low for n in builders)
+    settles_only = _settles_only
 
     # A feature's step is the first one that leads with it; a feature named
     # only in passing ("hand off F1; F2 builds on it") falls back to its
@@ -1709,7 +1714,14 @@ _UNOBSERVABLE = frozenset({
     "know", "understand", "trust", "manage", "track", "handle", "support",
     "ensure", "improve", "have", "be", "get", "rely", "leverage", "benefit",
 })
-_NOT_A_PERSON = frozenset({"it", "this", "infrahub", "the system", "the model", "the feature", "the schema"})
+# A word in the actor that names software, not people ("The Infrahub system").
+_NOT_A_PERSON = frozenset({
+    "it", "this", "infrahub", "system", "model", "feature", "schema", "generator",
+    "check", "transform", "pool", "pipeline",
+})
+# A clause before "can" means the Intent opens with something other than the
+# actor: "Know which strand runs where so engineers can find it".
+_CLAUSE = frozenset({"so", "because", "where", "which", "when", "while", "if", "then"})
 _OUTCOME = re.compile(r"^(?P<who>[A-Za-z][\w' -]*?)\s+can\s+(?:now\s+)?(?P<verb>[a-z]+)\b(?P<rest>.*)$", re.I)
 
 
@@ -1734,16 +1746,27 @@ def check_feature_outcomes_observable(parts: dict[str, str]) -> tuple[bool, str]
         if not match:
             return False, f"F{ids[0]} Intent {intent!r} does not say who can do what: write '<who> can <action>'"
         who, verb, rest = match.group("who").strip().lower(), match.group("verb").lower(), match.group("rest")
-        if who in _NOT_A_PERSON:
+        words = who.split()
+        if words[0] in _UNOBSERVABLE or _CLAUSE & set(words):
+            return False, f"F{ids[0]} Intent {intent!r} does not open with who acts: write '<who> can <action>'"
+        if _NOT_A_PERSON & set(words):
             return False, f"F{ids[0]} Intent {intent!r} makes {who!r} the actor; name the people who act"
         if verb in _UNOBSERVABLE:
             return False, f"F{ids[0]} Intent {intent!r}: {verb!r} is not an action someone can watch"
-        if len(rest.split()) < 2:
+        if not rest.split():
             return False, f"F{ids[0]} Intent {intent!r} names no object of the action"
     return True, "every feature's Intent says who can do what"
 
 
 TUTOR = "infrahub-teaching-concepts"
+_LEARN = re.compile(r"\blearn(?:ing)?\b", re.I)
+# The concept slugs of the tutor's concept map
+# (skills/infrahub-teaching-concepts/references/concept-map.md). The eval
+# sandbox does not ship the tutor, so the grader keeps the list, and a test
+# pins it to the map.
+TUTOR_CONCEPTS = frozenset({
+    "foundations", "schema", "objects", "graphql", "branches", "repo-integration", "proposed-changes", "checks", "transforms", "generators", "menus",
+})
 
 
 @_on_brief
@@ -1765,8 +1788,9 @@ def check_learning_step(parts: dict[str, str], concepts: frozenset[str] = frozen
     ]
     tutor = [i for i, text in enumerate(steps) if TUTOR in text.lower()]
     if not concepts:
-        if tutor:
-            return False, f"Next steps name {TUTOR}, but the user asked about no concept"
+        learning = [i for i, text in enumerate(steps) if i in tutor or _LEARN.search(text)]
+        if learning:
+            return False, f"Next steps add a learning step ({steps[learning[0]]!r}), but the user asked about no concept"
         return True, "no learning step, as nobody asked about a concept"
     if len(tutor) != 1:
         return False, f"Next steps name {TUTOR} in {len(tutor)} steps; expected one"
@@ -1774,7 +1798,12 @@ def check_learning_step(parts: dict[str, str], concepts: frozenset[str] = frozen
     missing = sorted(c for c in concepts if not re.search(rf"(?<![\w-]){re.escape(c)}(?![\w-])", text))
     if missing:
         return False, f"the learning step does not name {missing}, as the concept map spells them"
-    features = [i for i, t in enumerate(steps) if i != tutor[0] and _FEATURE_ID.search(t)]
+    named = {c for c in TUTOR_CONCEPTS if re.search(rf"(?<![\w-]){re.escape(c)}(?![\w-])", text)}
+    if extra := sorted(named - concepts):
+        return False, f"the learning step adds {extra}, which the user did not ask about"
+    features = [
+        i for i, t in enumerate(steps) if i != tutor[0] and _FEATURE_ID.search(t) and not _settles_only(t)
+    ]
     if features and tutor[0] > features[0]:
         return False, "the learning step comes after the first feature's step"
     return True, f"one learning step names {sorted(concepts)} before the first feature"
