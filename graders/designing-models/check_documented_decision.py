@@ -31,7 +31,7 @@ NEIGHBOURS = ("mechanisms-match-artifacts", "sketch-rows-complete")
 
 
 def grade(workspace: Path) -> dict:
-    extra = {"documented-decision": lambda ws: check_documented_decision(ws, SUBJECT, "the cage generator")}
+    extra = {"documented-decision": lambda ws: check_documented_decision(ws, SUBJECT, "the cage generator", "generator")}
     return run_checks(CHECK_NAMES, workspace, extra, neighbours=NEIGHBOURS)
 
 

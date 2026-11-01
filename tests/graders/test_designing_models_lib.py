@@ -950,6 +950,13 @@ DIRECTIONS_NAMES_ONLY = """\
             "expected two or three directions, found 4", id="near-miss-four-directions",
         ),
         pytest.param(
+            "**Q6 (direction):** Which direction should the model follow?\n\n"
+            "- A. Follow infrahub-demo-sp  **(Recommended)**\n  - A1. Reuse: infrahub-demo-sp\n"
+            "- A. A custom model\n  - A1. Reuse: none\n\n"
+            "**Basis:** you sell L3VPN over an MPLS backbone, which is what infrahub-demo-sp models (strong)\n",
+            "directions share a letter", id="near-miss-two-directions-with-one-letter",
+        ),
+        pytest.param(
             DIRECTIONS.replace("  - A2.", "\n  - A2.").replace("**Basis:**", "Does that work?\n\n**Basis:**"),
             "one-question-recommended", id="violating-second-question",
         ),
@@ -1070,6 +1077,18 @@ CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
                 "not taken: B (a custom model, A reuses more)",
             )),
             None, id="compliant-direction-reasons-name-questions-and-letters",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "not taken: B (a custom model)", "not taken: B: A custom model with contract fields",
+            )),
+            None, id="compliant-not-taken-description-opens-with-a-capital",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "not taken: B (a custom model)", "not taken: direction B",
+            )),
+            None, id="compliant-not-taken-names-the-word-direction",
         ),
         pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
@@ -1335,6 +1354,11 @@ The closest worked example is below.
         pytest.param(
             REFERENCE_DC.replace("Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)", "Marketplace: searched"),
             "names no namespace/name schema", id="near-miss-marketplace-searched-without-result",
+        ),
+        pytest.param(
+            REFERENCE_DC.replace("Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)",
+                                 "Marketplace: infrahub/base-schemas\n(LocationSite, DcimDevice)"),
+            None, id="compliant-marketplace-kinds-wrapped-onto-the-next-line",
         ),
         pytest.param(
             REFERENCE_DC.replace("Marketplace: infrahub/base-schemas (LocationSite, DcimDevice)", "Marketplace: infrahub/module_port (DcimModulePort)"),
@@ -1608,6 +1632,26 @@ def cage_brief(decisions: str = CAGE_DECISIONS, mechanisms: str = CAGE_MECH) -> 
             "cites no documentation page", id="near-miss-page-cited-on-another-decision",
         ),
         pytest.param(
+            cage_brief(
+                decisions=CAGE_DECISIONS.replace("; https://docs.infrahub.app/events/event-actions", ""),
+                mechanisms=CAGE_MECH + "| F1 | Each cage gets a cross-connect VLAN | resource pool | ColoCage | a VLAN ID "
+                "| a cage is created | no hand allocation, per https://docs.infrahub.app/python-sdk/guides/resource-manager |\n",
+            ),
+            "cites no documentation page", id="near-miss-page-cited-on-a-pool-row-that-runs-on-creation",
+        ),
+        pytest.param(
+            cage_brief(decisions=CAGE_DECISIONS.replace("; https://docs.infrahub.app/events/event-actions", "")
+                       + "| 3 | Cross-connect VLANs are allocated automatically from a pool | recommended "
+                       "| https://docs.infrahub.app/python-sdk/guides/resource-manager (strong) |\n"),
+            "cites no documentation page", id="near-miss-page-cited-on-an-automatic-pool-decision",
+        ),
+        pytest.param(
+            cage_brief(decisions=CAGE_DECISIONS.replace(
+                "https://docs.infrahub.app/events/event-actions", "found through https://docs.infrahub.app/llms.txt.",
+            )),
+            "cites no documentation page", id="near-miss-index-followed-by-a-full-stop",
+        ),
+        pytest.param(
             brief(
                 features=CAGE_FEATURES, sketch_rows=CAGE_ROWS, mechanisms=CAGE_MECH,
                 decisions=CAGE_DECISIONS.replace(
@@ -1721,6 +1765,21 @@ def test_uniqueness_rule_left_out_fails(tmp_path: Path) -> None:
             F1_ROWS.replace("| DC team | answer Q4 |", "| open: O1 | answer Q4 |"),
             "- O1: Who owns sites? (owner: DC team)\n", "Next steps never take up F1", id="near-miss-f1-only-in-settle-step",
         ),
+        pytest.param(
+            NEXT_STEPS.replace("1. Build F1 DC fabric: Schema Manager, then Object Manager.",
+                               "1. Build F1 DC fabric: Schema Manager,\n   then Object Manager."),
+            F1_ROWS, "none\n", None, id="compliant-variant-step-wrapped-over-two-lines",
+        ),
+        pytest.param(
+            NEXT_STEPS.replace("1. Build F1 DC fabric: Schema Manager, then Object Manager.",
+                               "1. Build F1 DC fabric:\n   - Schema Manager\n   - then Object Manager"),
+            F1_ROWS, "none\n", None, id="compliant-variant-step-with-nested-list",
+        ),
+        pytest.param(
+            NEXT_STEPS.replace("1. Build F1 DC fabric: Schema Manager, then Object Manager.",
+                               "1. Build F1 DC fabric: Schema Manager.\n\n   Then load the racks."),
+            F1_ROWS, "none\n", "name the skill for its objects", id="near-miss-text-after-a-blank-line-is-not-the-step",
+        ),
     ],
 )
 def test_next_steps(tmp_path: Path, steps: str | None, rows: str, open_items: str, expected: str | None) -> None:
@@ -1770,6 +1829,15 @@ WIFI_TWO_FEATURES = WIFI_FEATURES + "| F2 | Guest portal | Guests self-register 
         pytest.param(
             WIFI_TWO_FEATURES, "- **O1**: Who owns SSID definitions? (owner: unknown) affects F1 and F2\n",
             None, id="compliant-variant-two-features",
+        ),
+        pytest.param(
+            WIFI_FEATURES, "- O1: Who owns SSID definitions? (owner: unknown, security or\n  the helpdesk; affects F1)\n",
+            None, id="compliant-variant-item-wrapped-over-two-lines",
+        ),
+        pytest.param(
+            WIFI_TWO_FEATURES, "- O1: Who owns SSID definitions? (owner: unknown)\n- O2: Who runs the guest portal? (owner: helpdesk;\n"
+            "  affects F2)\n",
+            "O1 names no feature", id="near-miss-next-item-wrapped-onto-does-not-count",
         ),
         pytest.param(WIFI_FEATURES, "- O1: Who owns SSID definitions? (owner: unknown)\n", "names no feature", id="violating-no-affects"),
         pytest.param(
@@ -1932,8 +2000,14 @@ def value_brief(value: str | None = DEFAULT_VALUE, features: str = FEATURES, **k
             None, id="compliant-recommended-count-cited-to-the-request",
         ),
         pytest.param(
+            # The scope-split prompt asks no questions, so its Q2 does not exist.
             value_brief("Value: Reduced engineering effort (recommended: 40 hours a month spent by hand, answer Q2)"),
-            None, id="compliant-recommended-figure-cited-to-an-answer",
+            "cites an answer for ['40'], which the task's prompt does not give",
+            id="near-miss-figure-cited-to-an-answer-the-prompt-never-gave",
+        ),
+        pytest.param(
+            value_brief("Value: Reduced engineering effort (recommended: saves 40 hours a month, request and answer Q1)"),
+            "cites an answer for ['40']", id="near-miss-invented-figure-cited-to-request-and-answer",
         ),
         pytest.param(
             value_brief("Value: Reduced risk of service disruption (recommended: IP clashes across the two data centres)"),
@@ -1979,6 +2053,23 @@ def value_brief(value: str | None = DEFAULT_VALUE, features: str = FEATURES, **k
 def test_value_drivers(tmp_path: Path, text: str, expected: str | None) -> None:
     write(tmp_path, BRIEF, text)
     assert_outcome(run_grader("check_scope_split.py", tmp_path), expected)
+
+
+@pytest.mark.parametrize(
+    ("prompt_figures", "expected"),
+    [
+        pytest.param(None, None, id="compliant-task-that-does-not-know-its-prompt"),
+        pytest.param(frozenset({"40"}), None, id="compliant-figure-the-transcript-gives"),
+        pytest.param(frozenset({"2"}), "cites an answer for ['40']", id="near-miss-figure-the-transcript-does-not-give"),
+    ],
+)
+def test_value_figure_cited_to_an_answer(tmp_path: Path, prompt_figures: frozenset | None, expected: str | None) -> None:
+    """A figure cited to an answer stands when the task's prompt holds that answer."""
+    write(tmp_path, BRIEF, value_brief("Value: Reduced engineering effort (recommended: 40 hours a month spent by hand, answer Q2)"))
+    ok, detail = LIB.check_value_drivers(tmp_path, prompt_figures)
+    assert ok is (expected is None), detail
+    if expected:
+        assert expected in detail, detail
 
 
 def _eval_instruction(task: str) -> str:
@@ -2095,6 +2186,15 @@ INTENT_TABLE = """\
             "The Infrahub system can allocate channels without a clash",
             "the actor", id="near-miss-software-phrase-as-actor",
         ),
+        pytest.param(
+            "NetOps, the security team and peering engineers can find the strand a cable uses by its cable ID",
+            "Planners can allocate a channel without a clash", None, id="compliant-variant-actor-is-a-list",
+        ),
+        pytest.param(
+            "Field engineers can find the strand a cable uses by its cable ID",
+            "NetOps, the security team and the config pipeline can allocate channels without a clash",
+            "the actor", id="near-miss-software-in-an-actor-list",
+        ),
     ],
 )
 def test_feature_outcomes_observable(tmp_path: Path, f1: str, f2: str, expected: str | None) -> None:
@@ -2170,6 +2270,20 @@ ASKED = frozenset({"generators", "proposed-changes"})
             "1. Build F1 Fiber plant: run the Schema Manager, then the Object Manager.\n2. When F1 is loaded, build F2 DWDM channels.\n",
             frozenset(), None, id="compliant-no-question-no-step",
         ),
+        pytest.param(
+            LEARN_STEPS.replace("Before you build, learn", "Before you build the schema, learn"),
+            ASKED, None, id="compliant-variant-concept-word-outside-the-list",
+        ),
+        pytest.param(
+            "1. Build F1 Fiber plant: run the Schema Manager, then the Object Manager.\n"
+            "2. When F1 is loaded, build F2 DWDM channels and MAC learning with the Schema Manager.\n",
+            frozenset(), None, id="compliant-feature-step-about-mac-learning",
+        ),
+        pytest.param(
+            "1. Before you build,\n   learn generators and proposed-changes with infrahub-teaching-concepts.\n"
+            "2. Build F1 Fiber plant: run the Schema Manager, then the Object Manager.\n",
+            ASKED, None, id="compliant-variant-learning-step-wrapped",
+        ),
     ],
 )
 def test_learning_step(tmp_path: Path, steps: str, concepts: frozenset, expected: str | None) -> None:
@@ -2197,3 +2311,24 @@ def test_grader_tutor_concepts_match_the_map() -> None:
     concept_map = REPO_ROOT / "skills/infrahub-teaching-concepts/references/concept-map.md"
     slugs = set(re.findall(r"^\|\s*\d+\s*\|\s*([a-z][a-z0-9-]*)\s*\|", concept_map.read_text(), flags=re.M))
     assert set(LIB.TUTOR_CONCEPTS) == slugs
+
+
+# --------------------------------------------------------------------------
+# The reference page's worked example is a brief every check accepts
+# --------------------------------------------------------------------------
+
+_ANSWER_CHECKS = {"one-question-recommended", "design-directions"}
+
+
+@pytest.mark.parametrize("name", sorted(set(LIB.CHECKS) - _ANSWER_CHECKS))
+def test_docs_example_brief_passes(tmp_path: Path, name: str) -> None:
+    """The brief the reference page shows readers passes every brief check.
+
+    It is the answer the rules' examples add up to, so a check that rejects
+    it, or an edit to it that breaks a rule, fails here.
+    """
+    page = (REPO_ROOT / "docs/docs/skills-reference/designing-models.mdx").read_text()
+    example = page.split("````markdown\n", 1)[1].split("\n````", 1)[0]
+    write(tmp_path, BRIEF, example)
+    ok, detail = LIB.CHECKS[name](tmp_path)
+    assert ok, detail

@@ -116,6 +116,32 @@ def _lines_outside_fences(text: str) -> list[str]:
     return [line for kind, line in _fence_marks(text) if kind == "outside"]
 
 
+# A line that starts a list item, or an open item written without a marker.
+_ITEM_START = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+|^\s*\**\s*O\d+\s*\**\s*:", re.IGNORECASE)
+
+
+def _list_items(text: str) -> list[str]:
+    """Each list item outside fences as one line, with its wrapped lines joined on.
+
+    A Markdown list item may wrap over several lines, and a nested list
+    belongs to its parent item; reading only the first line loses what the
+    wrap carried ("...; affects F1)" on the next line). An item runs until a
+    blank line or the next item at the same or a lower indent.
+    """
+    items: list[str] = []
+    joining, item_indent = False, 0
+    for line in _lines_outside_fences(text):
+        indent = len(line) - len(line.lstrip())
+        if not line.strip():
+            joining = False
+        elif _ITEM_START.match(line) and not (joining and indent > item_indent):
+            items.append(line.rstrip())
+            joining, item_indent = True, indent
+        elif joining:
+            items[-1] += " " + line.strip()
+    return items
+
+
 def _fenced(text: str) -> list[tuple[str, str]]:
     """(opening fence line, body) for every fenced block; an unclosed one counts too."""
     blocks: list[tuple[str, str]] = []
@@ -451,6 +477,9 @@ def check_design_directions(ws: Path) -> tuple[bool, str]:
     options = [(i, m.group(1)) for i, ln in enumerate(lines) if (m := _OPTION.match(ln))]
     if not 2 <= len(options) <= 3:
         return False, f"expected two or three directions, found {len(options)}"
+    letters = [letter for _, letter in options]
+    if len(set(letters)) != len(letters):
+        return False, f"directions share a letter ({', '.join(letters)}), so their decision IDs cannot be told apart"
     basis = next((i for i, ln in enumerate(lines) if _BASIS.match(ln)), len(lines))
     bounds = [i for i, _ in options[1:]] + [basis]
 
@@ -869,7 +898,9 @@ def check_decision_tags_for(parts: dict[str, str], subjects: dict[str, tuple[re.
 _DIRECTION_ROW = re.compile(r"^(?i:direction)\s+([A-Z])\b")
 _DIRECTION_ID = re.compile(r"\b([A-Z]\d+)\b")
 _NOT_TAKEN = re.compile(r"\bnot taken\b", re.IGNORECASE)
-_LISTED_LETTER = re.compile(r"(?:^|[,;:]|\band\b)\s*([A-Z])\b(?!\d)")
+# A direction letter standing as a list item of its own ("B", "direction B",
+# "B and C"), not the capital that opens a description ("B: A custom model").
+_LISTED_LETTER = re.compile(r"(?:^|[,;:]|\band\b)\s*(?:(?i:directions?)\s+)?([A-Z])(?=\s*(?:$|[,;:.]|\band\b))")
 
 
 @_on_brief
@@ -923,11 +954,15 @@ _DOC_INDEXES = {"", "llms.txt", "llms-full.txt"}
 
 
 def _cites_doc_page(text: str) -> bool:
-    return any(m.group(1).strip("/") not in _DOC_INDEXES for m in _DOC_URL.finditer(text))
+    # Sentence punctuation after the URL is not part of the path, so
+    # "found through https://docs.infrahub.app/llms.txt." is still the index.
+    return any(m.group(1).rstrip(".,;:!?'\"").strip("/") not in _DOC_INDEXES for m in _DOC_URL.finditer(text))
 
 
 @_on_brief
-def check_documented_decision(parts: dict[str, str], subject: re.Pattern, label: str) -> tuple[bool, str]:
+def check_documented_decision(
+    parts: dict[str, str], subject: re.Pattern, label: str, mechanism: str
+) -> tuple[bool, str]:
     """The decision the local rules do not settle names the documentation page it rests on.
 
     ``subject`` matches the Decision log rows, Mechanisms rows and Open items
@@ -935,13 +970,23 @@ def check_documented_decision(parts: dict[str, str], subject: re.Pattern, label:
     open decision carries its page in its open item. The llms.txt index is
     where the page is found, not what the decision rests on. The page path
     is not checked, because the documentation moves.
+
+    ``mechanism`` is what the decision starts. Only Mechanisms rows with that
+    mechanism, and Decision log rows and open items that name it, can be
+    about the decision, so a resource pool row that also runs "when a cage
+    is created" cannot lend it its documentation page.
     """
-    rows = []
-    for heading in (DECISIONS_HEADING, MECHANISMS_HEADING):
-        _, table = first_table(parts.get(heading, ""))
-        rows += [" | ".join(_clean(cell) for cell in row.values()) for row in table]
-    rows += [_clean(line) for line in _lines_outside_fences(parts.get(OPEN_ITEMS_HEADING, ""))
-             if _OPEN_ITEM.match(line)]
+    names_it = re.compile(rf"\b{re.escape(mechanism)}s?\b", re.IGNORECASE)
+    _, decisions = first_table(parts.get(DECISIONS_HEADING, ""))
+    rows = [text for text in (" | ".join(_clean(c) for c in r.values()) for r in decisions) if names_it.search(text)]
+    m_headers, mechanisms = first_table(parts.get(MECHANISMS_HEADING, ""))
+    mech_col = _column(m_headers, "mechanism")
+    rows += [
+        " | ".join(_clean(c) for c in r.values()) for r in mechanisms
+        if mech_col and _clean(r[mech_col]).lower() == mechanism
+    ]
+    rows += [_clean(item) for item in _list_items(parts.get(OPEN_ITEMS_HEADING, ""))
+             if _OPEN_ITEM.match(item) and names_it.search(item)]
     about = [row for row in rows if subject.search(row)]
     if not about:
         return False, f"no decision or Mechanisms row says what starts {label}"
@@ -1209,15 +1254,25 @@ def check_reference_design(parts: dict[str, str]) -> tuple[bool, str]:
         return False, "brief has no '## Reference design' section"
     labels: dict[str, str] = {}
     current: str | None = None
+    wrapped = False  # the line before was this label's, with no blank line between
     for line in _lines_outside_fences(parts[REFERENCE_HEADING]):
         match = _LABEL_LINE.match(line)
         if match:
             current = match.group(1).lower()
             labels.setdefault(current, _clean(match.group(2)))
-        elif current and line.strip() and (not labels.get(current) or re.match(r"\s*[-*]\s", line)):
+            wrapped = True
+        elif not line.strip():
+            wrapped = False
+        elif current and re.match(r"\s*[-*]\s", line):
             # A label's value in the bullets below it, every bullet kept.
             value = _clean(line.strip().lstrip("-*").strip())
             labels[current] = f"{labels[current]}; {value}" if labels.get(current) else value
+            wrapped = True
+        elif current and (wrapped or not labels.get(current)):
+            # A value wrapped onto the next line, or given below an empty label.
+            value = _clean(line)
+            labels[current] = f"{labels[current]} {value}" if labels.get(current) else value
+            wrapped = True
     closest = labels.get("closest")
     if not closest:
         return False, "Reference design has no 'Closest:' line"
@@ -1284,6 +1339,7 @@ ARTIFACT_SKILLS = {
 # A step that passes the feature on: "Handoff", "hand off", "hand it off", or spec-kit.
 # The data importer builds objects only from CSV or TSV files the brief lists in Inputs.
 IMPORTER_NAMES = ("data importer", "infrahub-importing-data")
+_BUILDERS = frozenset({n for names in ARTIFACT_SKILLS.values() for n in names} | set(IMPORTER_NAMES))
 _TABULAR = re.compile(r"\.(?:csv|tsv)$", re.IGNORECASE)
 _HANDOFF = re.compile(r"hand\s*-?\s*(?:it\s+)?off|/speckit\.specify", re.IGNORECASE)
 _STEP = re.compile(r"^\s*(\d+)[.)]\s+(.*\S)\s*$")
@@ -1393,9 +1449,16 @@ def _settles_only(text: str) -> bool:
     "Settle O1 before building F1" names F1 but is not F1's step: it names an
     open item and neither hands off nor names a skill.
     """
-    builders = {n for names in ARTIFACT_SKILLS.values() for n in names} | set(IMPORTER_NAMES)
     low = text.lower()
-    return bool(re.search(r"\bO\d+\b", text)) and not _HANDOFF.search(low) and not any(n in low for n in builders)
+    return bool(re.search(r"\bO\d+\b", text)) and not _HANDOFF.search(low) and not any(n in low for n in _BUILDERS)
+
+
+def _steps(parts: dict[str, str]) -> list[str]:
+    """The numbered Next steps, each with its wrapped lines joined on."""
+    return [
+        _clean(m.group(2)) for item in _list_items(parts.get(NEXT_STEPS_HEADING, ""))
+        if (m := _STEP.match(item))
+    ]
 
 
 @_on_brief
@@ -1409,14 +1472,9 @@ def check_next_steps_in_order(parts: dict[str, str]) -> tuple[bool, str]:
     arts, deps, order, err = _features(parts)
     if err:
         return False, err
-    steps = []
-    for line in _lines_outside_fences(parts[NEXT_STEPS_HEADING]):
-        match = _STEP.match(line)
-        if match:
-            steps.append(_clean(match.group(2)))
+    steps = _steps(parts)
     if not steps:
         return False, "Next steps has no numbered steps"
-    settles_only = _settles_only
 
     # A feature's step is the first one that leads with it; a feature named
     # only in passing ("hand off F1; F2 builds on it") falls back to its
@@ -1425,7 +1483,7 @@ def check_next_steps_in_order(parts: dict[str, str]) -> tuple[bool, str]:
     mentioned: dict[str, int] = {}
     open_step: dict[str, int] = {}
     for index, text in enumerate(steps):
-        if not settles_only(text):
+        if not _settles_only(text):
             named = _FEATURE_ID.findall(text)
             if named:
                 first_step.setdefault(f"F{named[0]}", index)
@@ -1473,7 +1531,7 @@ _AFFECTS = re.compile(r"affects\s*:?\s*((?:`?F\d+`?(?:\s*(?:,|and|&)\s*)?)+)", r
 def _open_item_features(parts: dict[str, str]) -> dict[str, set[str]]:
     """Open item ID -> the feature IDs its 'affects' list names."""
     items: dict[str, set[str]] = {}
-    for line in _lines_outside_fences(parts.get(OPEN_ITEMS_HEADING, "")):
+    for line in _list_items(parts.get(OPEN_ITEMS_HEADING, "")):
         match = _OPEN_ITEM.match(line)
         if not match:
             continue
@@ -1607,31 +1665,34 @@ def _figures(text: str) -> set[str]:
     return found
 
 
-def _has_figure(text: str) -> bool:
-    return bool(_figures(text))
-
-
-def _has_source(text: str, inputs: set[str]) -> bool:
-    return bool(
-        _ANSWER_REF.search(text) or _REQUEST_REF.search(text)
-        or {Path(m.group(1)).name.lower() for m in _FILE_LOCATOR.finditer(text)} & inputs
-    )
+def _cites_input(text: str, inputs: set[str]) -> bool:
+    """The entry cites a listed input file with a locator (``pops.csv:pop_code``)."""
+    return bool({Path(m.group(1)).name.lower() for m in _FILE_LOCATOR.finditer(text)} & inputs)
 
 
 def _unsourced_figure(text: str, inputs: set[str], request_figures: frozenset[str] | None) -> str | None:
-    """Why a value entry's figures are not traced to their source, or None."""
+    """Why a value entry's figures are not traced to their source, or None.
+
+    ``request_figures``, when the task knows its own prompt, holds every
+    figure that prompt gives. The prompt is the whole conversation, the
+    request and any answers in it, so a figure cited to either must be one
+    of them: an ``answer Q<n>`` the prompt never asked cannot carry an
+    invented saving.
+    """
     figures = _figures(text)
     if not figures:
         return None
-    if not _has_source(text, inputs):
+    cites_input = _cites_input(text, inputs)
+    if not (cites_input or _ANSWER_REF.search(text) or _REQUEST_REF.search(text)):
         return "gives a figure without its source (answer Q<n>, request, or <input file>:<locator>)"
-    only_request = _REQUEST_REF.search(text) and not (
-        _ANSWER_REF.search(text) or _FILE_LOCATOR.search(text)
-    )
-    unknown = sorted(figures - request_figures) if request_figures is not None and only_request else []
-    if unknown:
-        return f"cites the request for {unknown}, which the request does not give"
-    return None
+    if request_figures is None or cites_input:
+        return None
+    unknown = sorted(figures - request_figures)
+    if not unknown:
+        return None
+    if _ANSWER_REF.search(text):
+        return f"cites an answer for {unknown}, which the task's prompt does not give"
+    return f"cites the request for {unknown}, which the request does not give"
 
 
 @_on_brief
@@ -1642,7 +1703,7 @@ def check_value_drivers(parts: dict[str, str], request_figures: frozenset[str] |
     order, each tagged stated or recommended. A number is allowed on either
     when the entry cites where it came from. ``request_figures``, when a task
     knows its own prompt, holds the figures that prompt gives: a figure an
-    entry cites only to the request must be one of them. The Features table
+    entry cites to the request or to an answer must be one of them. The Features table
     has a Value column naming drivers from that line, and F1 names the first.
     """
     if BUSINESS_HEADING not in parts:
@@ -1722,7 +1783,8 @@ _NOT_A_PERSON = frozenset({
 # A clause before "can" means the Intent opens with something other than the
 # actor: "Know which strand runs where so engineers can find it".
 _CLAUSE = frozenset({"so", "because", "where", "which", "when", "while", "if", "then"})
-_OUTCOME = re.compile(r"^(?P<who>[A-Za-z][\w' -]*?)\s+can\s+(?:now\s+)?(?P<verb>[a-z]+)\b(?P<rest>.*)$", re.I)
+# The actor may be a list of people: "NetOps, the security team and peering engineers".
+_OUTCOME = re.compile(r"^(?P<who>[A-Za-z][\w' ,/&()-]*?)\s+can\s+(?:now\s+)?(?P<verb>[a-z]+)\b(?P<rest>.*)$", re.I)
 
 
 @_on_brief
@@ -1746,7 +1808,7 @@ def check_feature_outcomes_observable(parts: dict[str, str]) -> tuple[bool, str]
         if not match:
             return False, f"F{ids[0]} Intent {intent!r} does not say who can do what: write '<who> can <action>'"
         who, verb, rest = match.group("who").strip().lower(), match.group("verb").lower(), match.group("rest")
-        words = who.split()
+        words = re.findall(r"[a-z]+", who)
         if words[0] in _UNOBSERVABLE or _CLAUSE & set(words):
             return False, f"F{ids[0]} Intent {intent!r} does not open with who acts: write '<who> can <action>'"
         if _NOT_A_PERSON & set(words):
@@ -1767,6 +1829,31 @@ _LEARN = re.compile(r"\blearn(?:ing)?\b", re.I)
 TUTOR_CONCEPTS = frozenset({
     "foundations", "schema", "objects", "graphql", "branches", "repo-integration", "proposed-changes", "checks", "transforms", "generators", "menus",
 })
+# What joins two items of one list: ", ", " and ", ", and the ".
+_LIST_JOIN = re.compile(r"\s*(?:,\s*(?:(?:and|or)\s+)?|(?:and|or|&)\s+)(?:the\s+)?", re.IGNORECASE)
+
+
+def _learning_list(text: str, asked: frozenset[str]) -> set[str]:
+    """The concept slugs a learning step lists together with the asked ones.
+
+    "learn generators, proposed-changes and schema" lists schema; in "before
+    you build the schema, learn generators" schema is a word of the
+    sentence, not a concept to learn.
+    """
+    found = sorted(
+        (m.start(), m.end(), slug) for slug in TUTOR_CONCEPTS
+        for m in re.finditer(rf"(?<![\w-]){re.escape(slug)}(?![\w-])", text)
+    )
+    listed = {i for i, (_, _, slug) in enumerate(found) if slug in asked}
+    grew = True
+    while grew:
+        grew = False
+        for i in range(len(found) - 1):
+            joined = _LIST_JOIN.fullmatch(text[found[i][1]:found[i + 1][0]])
+            if joined and (i in listed) != (i + 1 in listed):
+                listed |= {i, i + 1}
+                grew = True
+    return {found[i][2] for i in listed}
 
 
 @_on_brief
@@ -1782,13 +1869,15 @@ def check_learning_step(parts: dict[str, str], concepts: frozenset[str] = frozen
         if not concepts:
             return True, "no Next steps, so no learning step"
         return False, "brief has no '## Next steps' section"
-    steps = [
-        _clean(m.group(2)) for line in _lines_outside_fences(parts[NEXT_STEPS_HEADING])
-        if (m := _STEP.match(line))
-    ]
+    steps = _steps(parts)
     tutor = [i for i, text in enumerate(steps) if TUTOR in text.lower()]
     if not concepts:
-        learning = [i for i, text in enumerate(steps) if i in tutor or _LEARN.search(text)]
+        # The learning step names no feature ID (brief-next-steps), so a
+        # feature's step about "MAC learning" is not one.
+        learning = [
+            i for i, text in enumerate(steps)
+            if i in tutor or (_LEARN.search(text) and not _FEATURE_ID.search(text))
+        ]
         if learning:
             return False, f"Next steps add a learning step ({steps[learning[0]]!r}), but the user asked about no concept"
         return True, "no learning step, as nobody asked about a concept"
@@ -1798,8 +1887,7 @@ def check_learning_step(parts: dict[str, str], concepts: frozenset[str] = frozen
     missing = sorted(c for c in concepts if not re.search(rf"(?<![\w-]){re.escape(c)}(?![\w-])", text))
     if missing:
         return False, f"the learning step does not name {missing}, as the concept map spells them"
-    named = {c for c in TUTOR_CONCEPTS if re.search(rf"(?<![\w-]){re.escape(c)}(?![\w-])", text)}
-    if extra := sorted(named - concepts):
+    if extra := sorted(_learning_list(text, concepts) - concepts):
         return False, f"the learning step adds {extra}, which the user did not ask about"
     features = [
         i for i, t in enumerate(steps) if i != tutor[0] and _FEATURE_ID.search(t) and not _settles_only(t)

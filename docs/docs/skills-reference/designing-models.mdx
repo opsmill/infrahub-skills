@@ -193,7 +193,7 @@ Marketplace: infrahub/base-schemas (locations and devices behind each VpnSite)
 | ID | Feature | Intent | Value | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | F1 | VPN service | The provisioning team can view each ordered VPN with its sites and a route distinguisher no other VPN uses | Lower change failure costs, Faster service delivery | L3Vpn, VpnSite, RD pool | schema, objects | - | planned | Design and implement the L3Vpn and VpnSite model with an RD pool, then populate it from the customer export, as designed in F1 of docs/designs/l3vpn-service/design-brief.md. |
-| F2 | Route target allocation | The network team can get a route target that no other VPN uses | Lower change failure costs | RT pool | schema, objects | F1 | planned | After F1, design the RT pool and populate the initial allocations, as designed in F2 of docs/designs/l3vpn-service/design-brief.md. |
+| F2 | Route target allocation | The network team can choose a route target that no other VPN uses | Lower change failure costs | RT pool | schema, objects | F1 | planned | After F1, design the RT pool and populate the initial allocations, as designed in F2 of docs/designs/l3vpn-service/design-brief.md. |
 
 ```mermaid
 graph LR
