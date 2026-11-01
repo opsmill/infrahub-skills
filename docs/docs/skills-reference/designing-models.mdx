@@ -22,7 +22,7 @@ A design brief at `docs/designs/<design-slug>/design-brief.md`. It holds:
 - **Inputs**: each file you provided and what was taken from it
 - **Business and service**: the value drivers the design serves, ranked, then who uses the data, what is ordered, and the service lifecycle
 - **Reference design**: the closest OpsMill demo or solution to build from, such as `infrahub-demo-sp` for an L3VPN service, what the design follows from it, and where it differs
-- **Features**: one row per feature in build order, with the value drivers it serves, the artifacts it needs (schema, objects, generator, check, transform, menu), its dependencies, and a handoff that names the brief and the feature ID, for any downstream workflow
+- **Features**: one row per feature in build order, with what someone can do once it is built ("Field engineers can find the strands a cable uses by its cable ID"), the value drivers it serves, the artifacts it needs (schema, objects, generator, check, transform, menu), its dependencies, and a handoff that names the brief and the feature ID, for any downstream workflow
 - **Data model sketch**: for the first feature, each node kind with how it is identified, its key attributes, its peers, its source of truth, its owner, and where each fact came from
 - **Mechanisms**: a table of each behavior and what delivers it (a generator, a check, a transform, a computed attribute, a resource pool or a schema constraint), with what drives it, what it produces and when it runs, so the skill that builds it has the decisions it needs
 - **Plan map and model map**: two Mermaid diagrams drawn from the Features table and the sketch, showing the build order and how the F1 node kinds relate
@@ -50,6 +50,7 @@ It writes no schema YAML.
 - **Two or three directions to choose from or combine**: before the data questions, you get two or three design directions, such as following a reference design, building on Marketplace schemas, or a custom model. Each lists only the decisions where it differs from the others, starting with what it reuses, and each decision has an ID, so you can answer "A, but with B2". The brief records the direction you chose, what you borrowed from another, and the directions you did not take
 - **Every generator, check and transform has its decisions**: each one the features list has a Mechanisms row saying what drives it, what it produces and when it runs, and a rule the schema can enforce, such as uniqueness, is a schema constraint rather than a check
 - **Next steps in order**: open items first, then each feature after the features it depends on
+- **Concepts explained as you go**: when you ask what an Infrahub concept is, the answer comes in a sentence or two with a link to the documentation, and the interview carries on. Next steps then suggest learning those concepts with [infrahub-teaching-concepts](./teaching-concepts.mdx) before you build
 - **Answers that land later**: each open item names the features it affects, so an answer given later updates the right features and flags those already specified or built
 - **Your files are evidence**: every file you provide is listed in the brief, and model rows built from it name it as their source
 - **Split before modelling**: a scope that covers several domains or many node kinds is split into ordered features, and only the first is modelled in depth
@@ -191,8 +192,8 @@ Marketplace: infrahub/base-schemas (locations and devices behind each VpnSite)
 
 | ID | Feature | Intent | Value | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | VPN service | One object per ordered VPN, with its sites and a route distinguisher no other VPN uses | Lower change failure costs, Faster service delivery | L3Vpn, VpnSite, RD pool | schema, objects | - | planned | Design and implement the L3Vpn and VpnSite model with an RD pool, then populate it from the customer export, as designed in F1 of docs/designs/l3vpn-service/design-brief.md. |
-| F2 | Route target allocation | No duplicate route targets | Lower change failure costs | RT pool | schema, objects | F1 | planned | After F1, design the RT pool and populate the initial allocations, as designed in F2 of docs/designs/l3vpn-service/design-brief.md. |
+| F1 | VPN service | The provisioning team can view each ordered VPN with its sites and a route distinguisher no other VPN uses | Lower change failure costs, Faster service delivery | L3Vpn, VpnSite, RD pool | schema, objects | - | planned | Design and implement the L3Vpn and VpnSite model with an RD pool, then populate it from the customer export, as designed in F1 of docs/designs/l3vpn-service/design-brief.md. |
+| F2 | Route target allocation | The provisioning team can assign route targets without a duplicate | Lower change failure costs | RT pool | schema, objects | F1 | planned | After F1, design the RT pool and populate the initial allocations, as designed in F2 of docs/designs/l3vpn-service/design-brief.md. |
 
 ```mermaid
 graph LR

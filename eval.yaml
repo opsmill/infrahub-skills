@@ -9478,6 +9478,8 @@ tasks:
         check: Every sketch row has identity, source of truth and owner, or an open item
       - name: value-drivers
         check: Business ranks value drivers from the fixed list, tagged, figures only with a source; F1 serves the first
+      - name: feature-outcomes-observable
+        check: Each feature's Intent says who can do what, with an action someone can watch
 
   - name: design-sketch-rows-complete
     trials: 3
@@ -9573,6 +9575,53 @@ tasks:
         check: The three answers are tagged stated and the two accepted recommendations recommended
       - name: direction-recorded
         check: One decision records direction A, the borrowed B2, B as not taken, tagged stated
+      - name: sketch-rows-complete
+        check: Every sketch row has identity, source of truth and owner, or an open item
+      - name: no-learning-step
+        check: Next steps name no tutor, since nobody asked what a concept is
+
+  - name: design-learning-handoff
+    trials: 3
+    # Writes a full design brief; 300s is too close to the typical run.
+    timeout: 480
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: We're new to Infrahub and want our branch-office connectivity in
+      it. Here is how our session went yesterday, before my laptop died:
+
+      - What identifies a branch? Me: its site code, like BR-0042.
+      - Each branch has one access router and one WAN circuit. Me: right, and
+        the circuit comes from the carrier's order.
+      - You recommended a generator that creates the router's WAN interface
+        when a branch is added. Me: what's a generator, exactly? You
+        explained, and I said yes.
+      - You recommended reviewing every new branch before it reaches the
+        default branch. Me: what is a proposed change? You explained, and I
+        said yes.
+
+      The branch-network team owns branches and routers; the carrier portal
+      is the source of truth for circuit IDs. I won't be around to reply.
+      Write the design brief.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_learning_handoff.py
+        weight: 1.0
+    expected_output: >-
+      A design brief whose Next steps include one step, before the first
+      feature's step, that names infrahub-teaching-concepts and the
+      generators and proposed-changes concepts, without invoking it.
+    expectations:
+      - The brief points the user to the tutor for the two concepts they asked about
+      - The learning step comes before building starts
+      - No other concept is added to the learning step
+    assertions:
+      - name: learning-step
+        check: >-
+          One Next steps step before the first feature names infrahub-teaching-concepts
+          with generators and proposed-changes
+      - name: next-steps-in-order
+        check: Each feature has a step after the features it depends on
       - name: sketch-rows-complete
         check: Every sketch row has identity, source of truth and owner, or an open item
 

@@ -535,10 +535,10 @@ def test_inputs_digested(tmp_path: Path, rel: str, text: str, expected: str | No
 FEATURES = """\
 | ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | DC fabric | Know what is racked where | Site, Rack, Device, Interface | schema, objects | - | planned | Design the fabric model and populate it from the rack inventory. |
-| F2 | IPAM | Allocate prefixes without clashes | Prefix, IP pool | schema | F1 | planned | After F1, design the prefix and pool model. |
-| F3 | Firewall policy | Rules follow zones | Zone, Rule | schema, check, transform | F1, F2 | planned | After F2, model zones, validate policy, and render the rules. |
-| F4 | Customer peering | Sessions per customer | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |
+| F1 | DC fabric | The DC team can find the rack of any device | Site, Rack, Device, Interface | schema, objects | - | planned | Design the fabric model and populate it from the rack inventory. |
+| F2 | IPAM | The network team can allocate a prefix without a clash | Prefix, IP pool | schema | F1 | planned | After F1, design the prefix and pool model. |
+| F3 | Firewall policy | The security team can trace each rule to its zones | Zone, Rule | schema, check, transform | F1, F2 | planned | After F2, model zones, validate policy, and render the rules. |
+| F4 | Customer peering | The peering team can list the sessions of each customer | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |
 """
 
 FEATURES_VARIANT = """\
@@ -546,10 +546,10 @@ The estate splits into four features, built in this order.
 
 | Depends on | ID | Feature | Intent | Scope boundary | Status | Handoff | Artifacts |
 |---|---|---|---|---|---|---|---|
-| none | `F1` | DC fabric | Know what is racked where | Site, Rack, Device | planned | Build the fabric model. | `schema` |
-| after F1 | `F2` | IPAM | Prefixes without clashes | Prefix, IP pool | planned | Add prefixes and pools after the fabric. | Schema; Objects |
-| after F1 and F2 | `F3` | Firewall policy | Rules follow zones | Zone, Rule | planned | Add policy validation and rendering after IPAM. | check and transform |
-| F2 | `F4` | Customer peering | Sessions per customer | Peer, Session | planned | Add automated peering after IPAM. | schema -> generator |
+| none | `F1` | DC fabric | The DC team can find the rack of any device | Site, Rack, Device | planned | Build the fabric model. | `schema` |
+| after F1 | `F2` | IPAM | The network team can allocate a prefix without a clash | Prefix, IP pool | planned | Add prefixes and pools after the fabric. | Schema; Objects |
+| after F1 and F2 | `F3` | Firewall policy | The security team can trace each rule to its zones | Zone, Rule | planned | Add policy validation and rendering after IPAM. | check and transform |
+| F2 | `F4` | Customer peering | The peering team can list the sessions of each customer | Peer, Session | planned | Add automated peering after IPAM. | schema -> generator |
 """
 
 PLAN_MAP = """\
@@ -636,8 +636,8 @@ ALL_ROWS = F1_ROWS + """\
         pytest.param(
             brief(
                 features=FEATURES.replace(
-                    "| F4 | Customer peering | Sessions per customer | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |",
-                    "| F4 | Customer peering | Sessions per customer | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |\n| F5 | Menus | Group the new kinds in the sidebar | Menu items | menu | - | planned | Add navigation for the new kinds. |",
+                    "| F4 | Customer peering | The peering team can list the sessions of each customer | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |",
+                    "| F4 | Customer peering | The peering team can list the sessions of each customer | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |\n| F5 | Menus | Operators can find the new kinds in one sidebar group | Menu items | menu | - | planned | Add navigation for the new kinds. |",
                 ),
                 sketch_rows=F1_ROWS,
                 plan_map=PLAN_MAP.replace("  F1 --> F2\n", '  F5["F5 Menus\n  menu"]\n  F1 --> F2\n'),
@@ -752,7 +752,7 @@ WIFI_OPEN = "- O1: Who owns SSID definitions? (owner: unknown; affects F1)\n"
 WIFI_FEATURES = """\
 | ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | Campus wireless | Guests stay off staff VLANs | WirelessAccessPoint, WirelessController, WirelessSsid | schema | - | planned | Build campus wireless, as designed in F1 of docs/designs/test/design-brief.md. |
+| F1 | Campus wireless | The network team can put guests on their own VLAN | WirelessAccessPoint, WirelessController, WirelessSsid | schema | - | planned | Build campus wireless, as designed in F1 of docs/designs/test/design-brief.md. |
 """
 
 WIFI_VARIANT_ROWS = """\
@@ -1186,7 +1186,7 @@ def test_every_grader_has_a_task() -> None:
 SINGLE_FEATURE = """\
 | ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | Campus wireless | Guests stay off staff VLANs | AccessPoint, Controller, Ssid | schema | - | planned | Design the wireless model from this brief. |
+| F1 | Campus wireless | The network team can put guests on their own VLAN | AccessPoint, Controller, Ssid | schema | - | planned | Design the wireless model from this brief. |
 """
 
 
@@ -1438,7 +1438,7 @@ def test_relative_markdown_links_resolve(doc: str) -> None:
 BRANCH_FEATURES = """\
 | ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | Branch service | A new branch gets its router, WAN prefix and VLAN without typing | LocationBranch, AccessRouter, Vlan | schema, objects, generator, transform | - | planned | Build the branch service, as designed in F1 of docs/designs/branch-service/design-brief.md. |
+| F1 | Branch service | The branch team can add a branch and get its router, WAN prefix and VLAN without typing | LocationBranch, AccessRouter, Vlan | schema, objects, generator, transform | - | planned | Build the branch service, as designed in F1 of docs/designs/branch-service/design-brief.md. |
 """
 
 BRANCH_ROWS = """\
@@ -1545,7 +1545,7 @@ def test_mechanisms(tmp_path: Path, text: str, expected: str | None) -> None:
 CAGE_FEATURES = """\
 | ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | Cage provisioning | A new cage gets its patch panel and VLAN at once | Cage, PatchPanel, Vlan | schema, generator | - | planned | Build cage provisioning, as designed in F1 of docs/designs/colo-cages/design-brief.md. |
+| F1 | Cage provisioning | The colocation team can add a cage and get its patch panel and VLAN at once | Cage, PatchPanel, Vlan | schema, generator | - | planned | Build cage provisioning, as designed in F1 of docs/designs/colo-cages/design-brief.md. |
 """
 
 CAGE_ROWS = """\
@@ -1806,10 +1806,10 @@ def test_missing_brief_names_stray_briefs_outside_skipped_folders(tmp_path: Path
 FEATURES_VALUE = """\
 | ID | Feature | Intent | Value | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | DC fabric | Know what is racked where | Lower change failure costs, Reduced engineering effort | Site, Rack, Device, Interface | schema, objects | - | planned | Design the fabric model and populate it from the rack inventory. |
-| F2 | IPAM | Allocate prefixes without clashes | Reduced engineering effort | Prefix, IP pool | schema | F1 | planned | After F1, design the prefix and pool model. |
-| F3 | Firewall policy | Rules follow zones | reduced risk of service disruption | Zone, Rule | schema, check, transform | F1, F2 | planned | After F2, model zones, validate policy, and render the rules. |
-| F4 | Customer peering | Sessions per customer | Reduced risk of service disruption | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |
+| F1 | DC fabric | The DC team can find the rack of any device | Lower change failure costs, Reduced engineering effort | Site, Rack, Device, Interface | schema, objects | - | planned | Design the fabric model and populate it from the rack inventory. |
+| F2 | IPAM | The network team can allocate a prefix without a clash | Reduced engineering effort | Prefix, IP pool | schema | F1 | planned | After F1, design the prefix and pool model. |
+| F3 | Firewall policy | The security team can trace each rule to its zones | reduced risk of service disruption | Zone, Rule | schema, check, transform | F1, F2 | planned | After F2, model zones, validate policy, and render the rules. |
+| F4 | Customer peering | The peering team can list the sessions of each customer | Reduced risk of service disruption | Peer, Session | schema, generator | F2 | planned | After F2, model peers and automate session creation. |
 """
 VALUE_THREE = (
     "Value: Lower change failure costs (stated, answer Q2: about 3 failed changes a month); "
@@ -2038,3 +2038,128 @@ def test_grader_marketplace_namespaces_match_the_reference() -> None:
     pairs = re.findall(r"`([a-z0-9][a-z0-9_-]*)/([a-z0-9][a-z0-9_-]*)`", text)
     shown = {ns for ns, name in pairs if (ns, name) != ("namespace", "name")}
     assert shown == set(LIB.MARKETPLACE_NAMESPACES)
+
+
+# --------------------------------------------------------------------------
+# Feature Intent says who can do what (brief-format.md, Features table)
+# --------------------------------------------------------------------------
+
+INTENT_TABLE = """\
+| ID | Feature | Intent | Scope boundary | Artifacts | Depends on | Status | Handoff |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| F1 | Fiber plant | {f1} | Site, FiberCable, Strand | schema, objects | - | planned | Design the fiber plant model. |
+| F2 | DWDM channels | {f2} | OpticalChannel | schema | F1 | planned | After F1, design the channel model. |
+"""
+
+
+@pytest.mark.parametrize(
+    "f1, f2, expected",
+    [
+        pytest.param(
+            "Field engineers can find the strand a cable uses by its cable ID",
+            "Planners can allocate a channel without a clash", None, id="compliant",
+        ),
+        pytest.param(
+            "The NOC can now trace a customer wavelength to its strands.",
+            "Planning engineers can reserve a channel on a span before ordering optics", None,
+            id="compliant-variant-now-and-full-stop",
+        ),
+        pytest.param(
+            "Know which strand runs where", "Planners can allocate a channel without a clash",
+            "does not say who can do what", id="violating-aim-without-actor",
+        ),
+        pytest.param(
+            "Field engineers can know which strand runs where", "Planners can allocate a channel without a clash",
+            "'know' is not an action", id="near-miss-can-with-unobservable-verb",
+        ),
+        pytest.param(
+            "Field engineers can find the strand a cable uses by its cable ID",
+            "Infrahub can allocate channels without clashes",
+            "makes 'infrahub' the actor", id="near-miss-software-as-actor",
+        ),
+        pytest.param(
+            "Field engineers can find the strand a cable uses by its cable ID", "Planners can allocate",
+            "names no object", id="near-miss-no-object",
+        ),
+    ],
+)
+def test_feature_outcomes_observable(tmp_path: Path, f1: str, f2: str, expected: str | None) -> None:
+    features = INTENT_TABLE.format(f1=f1, f2=f2)
+    rows = (
+        "| F1 | FiberCable | cable ID | length (stated) | Strand (many) | Infrahub | Planning team | request |\n"
+    )
+    write(tmp_path, BRIEF, brief(sketch_rows=rows, features=features))
+    ok, detail = LIB.check_feature_outcomes_observable(tmp_path)
+    assert ok is (expected is None), detail
+    if expected:
+        assert expected in detail, detail
+
+
+# --------------------------------------------------------------------------
+# Next steps name the tutor only for the concepts the user asked about
+# --------------------------------------------------------------------------
+
+LEARN_STEPS = """\
+1. Before you build, learn generators and proposed-changes with infrahub-teaching-concepts.
+2. Build F1 Fiber plant: run the Schema Manager, then the Object Manager.
+3. When F1 is loaded, build F2 DWDM channels with the Schema Manager.
+"""
+LEARN_FEATURES = INTENT_TABLE.format(
+    f1="Field engineers can find the strand a cable uses by its cable ID",
+    f2="Planners can allocate a channel without a clash",
+)
+LEARN_ROWS = "| F1 | FiberCable | cable ID | length (stated) | Strand (many) | Infrahub | Planning team | request |\n"
+ASKED = frozenset({"generators", "proposed-changes"})
+
+
+@pytest.mark.parametrize(
+    "steps, concepts, expected",
+    [
+        pytest.param(LEARN_STEPS, ASKED, None, id="compliant"),
+        pytest.param(
+            "1. Settle O1 with the planning team.\n"
+            "2. Learn the proposed-changes and generators concepts first, using the infrahub-teaching-concepts skill (the tutor).\n"
+            "3. Build F1 Fiber plant: run the Schema Manager, then the Object Manager.\n"
+            "4. When F1 is loaded, build F2 DWDM channels with the Schema Manager.\n",
+            ASKED, None, id="compliant-variant-after-open-item-reordered",
+        ),
+        pytest.param(
+            "1. Build F1 Fiber plant: run the Schema Manager, then the Object Manager.\n"
+            "2. When F1 is loaded, build F2 DWDM channels with the Schema Manager.\n",
+            ASKED, "name infrahub-teaching-concepts in 0 steps", id="violating-no-learning-step",
+        ),
+        pytest.param(
+            LEARN_STEPS.replace("generators and proposed-changes", "generators and proposed changes"),
+            ASKED, "does not name ['proposed-changes']", id="near-miss-concept-not-spelled-as-the-map",
+        ),
+        pytest.param(
+            "1. Build F1 Fiber plant: run the Schema Manager, then the Object Manager.\n"
+            "2. Learn generators and proposed-changes with infrahub-teaching-concepts.\n"
+            "3. When F1 is loaded, build F2 DWDM channels with the Schema Manager.\n",
+            ASKED, "after the first feature's step", id="near-miss-learning-after-building",
+        ),
+        pytest.param(LEARN_STEPS, frozenset(), "asked about no concept", id="violating-unasked-learning-step"),
+        pytest.param(
+            "1. Build F1 Fiber plant: run the Schema Manager, then the Object Manager.\n2. When F1 is loaded, build F2 DWDM channels.\n",
+            frozenset(), None, id="compliant-no-question-no-step",
+        ),
+    ],
+)
+def test_learning_step(tmp_path: Path, steps: str, concepts: frozenset, expected: str | None) -> None:
+    write(tmp_path, BRIEF, brief(sketch_rows=LEARN_ROWS, features=LEARN_FEATURES, next_steps=steps))
+    ok, detail = LIB.check_learning_step(tmp_path, concepts)
+    assert ok is (expected is None), detail
+    if expected:
+        assert expected in detail, detail
+
+
+def test_learning_handoff_task_grader(tmp_path: Path) -> None:
+    write(tmp_path, BRIEF, brief(sketch_rows=LEARN_ROWS, features=LEARN_FEATURES, next_steps=LEARN_STEPS))
+    assert_outcome(run_grader("check_learning_handoff.py", tmp_path), None)
+
+
+def test_learning_handoff_concepts_match_the_tutor_map() -> None:
+    """The task's concepts are spelled as the tutor's concept map spells them."""
+    concept_map = REPO_ROOT / "skills/infrahub-teaching-concepts/references/concept-map.md"
+    slugs = set(re.findall(r"^\|\s*\d+\s*\|\s*([a-z][a-z0-9-]*)\s*\|", concept_map.read_text(), flags=re.M))
+    assert _task_grader("check_learning_handoff.py").CONCEPTS <= slugs

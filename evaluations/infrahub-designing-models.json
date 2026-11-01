@@ -125,6 +125,10 @@
         {
           "name": "value-drivers",
           "check": "Business ranks value drivers from the fixed list, tagged, figures only with a source; F1 serves the first"
+        },
+        {
+          "name": "feature-outcomes-observable",
+          "check": "Each feature's Intent says who can do what, with an action someone can watch"
         }
       ]
     },
@@ -186,11 +190,40 @@
         {
           "name": "sketch-rows-complete",
           "check": "Every sketch row has identity, source of truth and owner, or an open item"
+        },
+        {
+          "name": "no-learning-step",
+          "check": "Next steps name no tutor, since nobody asked what a concept is"
         }
       ]
     },
     {
       "id": 8,
+      "prompt": "We're new to Infrahub and want our branch-office connectivity in\nit. Here is how our session went yesterday, before my laptop died:\n\n- What identifies a branch? Me: its site code, like BR-0042.\n- Each branch has one access router and one WAN circuit. Me: right, and\n  the circuit comes from the carrier's order.\n- You recommended a generator that creates the router's WAN interface\n  when a branch is added. Me: what's a generator, exactly? You\n  explained, and I said yes.\n- You recommended reviewing every new branch before it reaches the\n  default branch. Me: what is a proposed change? You explained, and I\n  said yes.\n\nThe branch-network team owns branches and routers; the carrier portal\nis the source of truth for circuit IDs. I won't be around to reply.\nWrite the design brief.",
+      "expected_output": "A design brief whose Next steps include one step, before the first feature's step, that names infrahub-teaching-concepts and the generators and proposed-changes concepts, without invoking it.",
+      "files": [],
+      "expectations": [
+        "The brief points the user to the tutor for the two concepts they asked about",
+        "The learning step comes before building starts",
+        "No other concept is added to the learning step"
+      ],
+      "assertions": [
+        {
+          "name": "learning-step",
+          "check": "One Next steps step before the first feature names infrahub-teaching-concepts with generators and proposed-changes"
+        },
+        {
+          "name": "next-steps-in-order",
+          "check": "Each feature has a step after the features it depends on"
+        },
+        {
+          "name": "sketch-rows-complete",
+          "check": "Every sketch row has identity, source of truth and owner, or an open item"
+        }
+      ]
+    },
+    {
+      "id": 9,
       "prompt": "We run managed connectivity for branch offices and want it in\nInfrahub. Each branch is a site with one access router. When we add a\nnew branch, we want Infrahub to create its access router, carve a /29\nfor the WAN link and assign it a VLAN, without anyone typing those in.\nWe also want something that stops anyone giving two branches the same\nVLAN. And every access router needs its configuration rendered so our\ndeployment pipeline can push it.\n\nI'm away for the day, so here are my answers: the network team owns\nbranches and routers and decides when a branch is added. The branch\nlist is ours; Infrahub becomes the source of truth for it. Routers are\nidentified by hostname, branches by a branch code. The deployment\npipeline reads one rendered configuration per router. VLAN IDs and the\n/29s should never be chosen by hand.\n\nWrite the design brief.",
       "expected_output": "A design brief whose Mechanisms table has a generator row driven by the branch, a transform row for each router's configuration, and the VLAN uniqueness rule as a schema constraint rather than a check.",
       "files": [],

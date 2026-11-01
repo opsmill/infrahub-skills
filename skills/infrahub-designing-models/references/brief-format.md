@@ -99,12 +99,20 @@ files pasted into the conversation.
 ```markdown
 | ID | Feature | Intent | Value | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | Fiber plant | Know which strand runs where | Reduced engineering effort | Site, FiberCable, Strand | schema, objects, generator | - | planned | Design and implement the fiber plant model, then populate its initial objects, as designed in F1 of docs/designs/metro-optical/design-brief.md. |
-| F2 | DWDM channels | Allocate channels without clashes | Lower change failure costs | OpticalChannel, channel pool | schema | F1 | planned | After F1, design the channel model and allocation pool, as designed in F2 of docs/designs/metro-optical/design-brief.md. |
+| F1 | Fiber plant | Field engineers can find the strands a cable uses by its cable ID | Reduced engineering effort | Site, FiberCable, Strand | schema, objects, generator | - | planned | Design and implement the fiber plant model, then populate its initial objects, as designed in F1 of docs/designs/metro-optical/design-brief.md. |
+| F2 | DWDM channels | Planners can allocate a channel without a clash | Lower change failure costs | OpticalChannel, channel pool | schema | F1 | planned | After F1, design the channel model and allocation pool, as designed in F2 of docs/designs/metro-optical/design-brief.md. |
 ```
 
 - `ID` is `F1`, `F2`, ... in build order. An ID never
   changes once a spec refers to it.
+- `Intent` says who can do what once the feature is
+  built: `<who> can <action>`, such as `Field engineers
+  can find the strands a cable uses by its cable ID`.
+  The action is one someone else can watch being done,
+  so the spec written from the Handoff can test it. "Know
+  which strand runs where" names an aim, not an action;
+  so do know, understand, track and manage on their own.
+  The people are the ones who act, never Infrahub.
 - `Value` names the drivers the feature serves, from the
   `Value:` line, and no figures. F1's names the first
   driver on that line.
@@ -285,6 +293,10 @@ that refers to it.
 - One numbered step per feature, after the features it
   depends on. Open items that F1's sketch waits on come
   first, one step per owner.
+- When the user asked what an Infrahub concept is during
+  the interview, one step before the first feature's step
+  names `infrahub-teaching-concepts` and those concepts:
+  [../rules/brief-next-steps.md](../rules/brief-next-steps.md).
 - Name skills as the mapping above does
   (`infrahub-managing-schemas`), optionally with their
   short name (Schema Manager).

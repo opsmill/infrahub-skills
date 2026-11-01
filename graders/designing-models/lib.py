@@ -1703,6 +1703,83 @@ def check_value_drivers(parts: dict[str, str], request_figures: frozenset[str] |
 # Registry
 # --------------------------------------------------------------------------
 
+# "<who> can <action>": the action is something a person does that someone
+# else can watch. These verbs name a state of mind or an aim, not an action.
+_UNOBSERVABLE = frozenset({
+    "know", "understand", "trust", "manage", "track", "handle", "support",
+    "ensure", "improve", "have", "be", "get", "rely", "leverage", "benefit",
+})
+_NOT_A_PERSON = frozenset({"it", "this", "infrahub", "the system", "the model", "the feature", "the schema"})
+_OUTCOME = re.compile(r"^(?P<who>[A-Za-z][\w' -]*?)\s+can\s+(?:now\s+)?(?P<verb>[a-z]+)\b(?P<rest>.*)$", re.I)
+
+
+@_on_brief
+def check_feature_outcomes_observable(parts: dict[str, str]) -> tuple[bool, str]:
+    """Each feature's Intent says who can do what once it is built.
+
+    `Know which strand runs where` names an aim nobody can watch being met;
+    `Field engineers can find the strand a cable uses by its cable ID` names
+    an action someone can check. The spec written from the Handoff tests it.
+    """
+    headers, rows = first_table(parts.get(FEATURES_HEADING, ""))
+    id_col, intent_col = _column(headers, "id"), _column(headers, "intent")
+    if not rows or None in (id_col, intent_col):
+        return False, "Features table has no 'ID' and 'Intent' columns"
+    for row in rows:
+        ids = _FEATURE_ID.findall(_clean(row[id_col]))
+        if not ids:
+            continue
+        intent = _clean(row[intent_col]).rstrip(".")
+        match = _OUTCOME.match(intent)
+        if not match:
+            return False, f"F{ids[0]} Intent {intent!r} does not say who can do what: write '<who> can <action>'"
+        who, verb, rest = match.group("who").strip().lower(), match.group("verb").lower(), match.group("rest")
+        if who in _NOT_A_PERSON:
+            return False, f"F{ids[0]} Intent {intent!r} makes {who!r} the actor; name the people who act"
+        if verb in _UNOBSERVABLE:
+            return False, f"F{ids[0]} Intent {intent!r}: {verb!r} is not an action someone can watch"
+        if len(rest.split()) < 2:
+            return False, f"F{ids[0]} Intent {intent!r} names no object of the action"
+    return True, "every feature's Intent says who can do what"
+
+
+TUTOR = "infrahub-teaching-concepts"
+
+
+@_on_brief
+def check_learning_step(parts: dict[str, str], concepts: frozenset[str] = frozenset()) -> tuple[bool, str]:
+    """Next steps send the user to the tutor only for the concepts they asked about.
+
+    With `concepts`, one step before the first feature's step names the tutor
+    and each concept, spelled as the tutor's concept map spells it. Without,
+    no step names the tutor: a learning step nobody asked for is noise.
+    """
+    if NEXT_STEPS_HEADING not in parts:
+        # A missing section is next-steps-in-order's failure, not this one's.
+        if not concepts:
+            return True, "no Next steps, so no learning step"
+        return False, "brief has no '## Next steps' section"
+    steps = [
+        _clean(m.group(2)) for line in _lines_outside_fences(parts[NEXT_STEPS_HEADING])
+        if (m := _STEP.match(line))
+    ]
+    tutor = [i for i, text in enumerate(steps) if TUTOR in text.lower()]
+    if not concepts:
+        if tutor:
+            return False, f"Next steps name {TUTOR}, but the user asked about no concept"
+        return True, "no learning step, as nobody asked about a concept"
+    if len(tutor) != 1:
+        return False, f"Next steps name {TUTOR} in {len(tutor)} steps; expected one"
+    text = steps[tutor[0]].lower()
+    missing = sorted(c for c in concepts if not re.search(rf"(?<![\w-]){re.escape(c)}(?![\w-])", text))
+    if missing:
+        return False, f"the learning step does not name {missing}, as the concept map spells them"
+    features = [i for i, t in enumerate(steps) if i != tutor[0] and _FEATURE_ID.search(t)]
+    if features and tutor[0] > features[0]:
+        return False, "the learning step comes after the first feature's step"
+    return True, f"one learning step names {sorted(concepts)} before the first feature"
+
+
 CHECKS: dict[str, Callable[[Path], tuple[bool, str]]] = {
     "one-question-recommended": check_one_question_recommended,
     "design-directions": check_design_directions,
@@ -1717,6 +1794,7 @@ CHECKS: dict[str, Callable[[Path], tuple[bool, str]]] = {
     "sketch-rows-complete": check_sketch_rows_complete,
     "decision-provenance": check_decision_provenance,
     "value-drivers": check_value_drivers,
+    "feature-outcomes-observable": check_feature_outcomes_observable,
 }
 
 

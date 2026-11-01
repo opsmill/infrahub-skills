@@ -101,7 +101,7 @@ the rest of the brief.
 Value: Lower change failure costs (recommended: duplicate rd values in vpn-customers.xlsx); Reduced engineering effort (stated: answer Q1)
 
 | ID | Feature | Intent | Value | ... |
-| F1 | VPN service | One object per ordered VPN | Lower change failure costs | ... |
+| F1 | VPN service | The provisioning team can view each ordered VPN with its sites | Lower change failure costs | ... |
 ```
 
 ## Incorrect
@@ -115,7 +115,7 @@ the line does not list.
 Value: Reduced engineering effort (recommended: saves 40 hours a month)
 
 | ID | Feature | Intent | Value | ... |
-| F1 | VPN service | One object per ordered VPN | Faster service delivery | ... |
+| F1 | VPN service | The provisioning team can view each ordered VPN with its sites | Faster service delivery | ... |
 ```
 
 ## Common mistakes

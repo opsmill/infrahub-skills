@@ -85,7 +85,12 @@ skill for each artifact builds it from the brief.
    question is the value question, the only one that
    takes several answers; read
    [rules/brief-value-drivers.md](./rules/brief-value-drivers.md)
-   before asking it. Push back once on a
+   before asking it. When the user asks what an Infrahub
+   concept is ("what's a generator?"), answer in one or
+   two sentences in that question's basis, with the
+   documentation page's URL, and go on with the same
+   question; the brief's Next steps send them to the
+   tutor for it. Push back once on a
    vague answer ("scalable", "everything"), then record
    what the user says. When the user compares their model
    to NetBox, read `../infrahub-common/netbox-vs-infrahub.md`

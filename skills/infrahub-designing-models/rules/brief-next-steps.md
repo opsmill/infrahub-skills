@@ -25,6 +25,17 @@ that a person can follow.
    specification or planning setup gets the Handoff; with
    none, the step names the skill for each artifact, in
    the order of the `Artifacts` cell.
+4. When the user asked what an Infrahub concept is
+   during the interview, or said they are new to
+   Infrahub and then asked about one, add one step before
+   the first feature's step: `Before you build, learn
+   <concepts> with infrahub-teaching-concepts.` Name only
+   the concepts they asked about, spelled as the
+   `Concept` column of
+   [../../infrahub-teaching-concepts/references/concept-map.md](../../infrahub-teaching-concepts/references/concept-map.md)
+   spells them (`generators`, `proposed-changes`). Name
+   the tutor; do not invoke it. When nobody asked, write
+   no learning step.
 
 The Handoff cells stay workflow-neutral. Only Next steps
 names the reader's own workflow.
@@ -43,6 +54,8 @@ tables for tools and one short list for people.
   table and Open items.
 - Keep one step per feature; put independent features in
   any order after their dependencies.
+- The learning step names no feature ID, so it is never
+  read as a feature's step.
 
 ## Correct
 
@@ -52,6 +65,16 @@ tables for tools and one short list for people.
 1. Settle O1 with network operations.
 2. Build F1 Console access: run the Schema Manager, then the Object Manager and the Generator Manager.
 3. When F1 is loaded, build F2 Console audit with the Schema Manager and the Check Manager.
+```
+
+With a user who asked what a generator is:
+
+```markdown
+## Next steps
+
+1. Settle O1 with network operations.
+2. Before you build, learn generators with infrahub-teaching-concepts.
+3. Build F1 Console access: run the Schema Manager, then the Object Manager and the Generator Manager.
 ```
 
 ## Incorrect

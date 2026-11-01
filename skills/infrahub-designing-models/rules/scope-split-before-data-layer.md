@@ -97,9 +97,9 @@ implementation workflow they already use.
 ```markdown
 | ID | Feature | Intent | Value | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | Fiber plant | Know which strand runs where | Reduced engineering effort | Site, FiberCable, Strand | schema, objects | - | planned | Design and implement the fiber plant model, then populate its initial objects, as designed in F1 of docs/designs/metro-optical/design-brief.md. |
-| F2 | DWDM channels | Allocate channels without clashes | Lower change failure costs | OpticalChannel, channel pool | schema | F1 | planned | After F1, design the channel model and allocation pool, as designed in F2 of docs/designs/metro-optical/design-brief.md. |
-| F3 | Wavelength service | One service per customer wavelength | Faster service delivery | WavelengthService | schema, generator | F2 | planned | After F2, design the service model and automate service creation from the channel pool, as designed in F3 of docs/designs/metro-optical/design-brief.md. |
+| F1 | Fiber plant | Field engineers can find the strands a cable uses by its cable ID | Reduced engineering effort | Site, FiberCable, Strand | schema, objects | - | planned | Design and implement the fiber plant model, then populate its initial objects, as designed in F1 of docs/designs/metro-optical/design-brief.md. |
+| F2 | DWDM channels | Planners can allocate a channel without a clash | Lower change failure costs | OpticalChannel, channel pool | schema | F1 | planned | After F1, design the channel model and allocation pool, as designed in F2 of docs/designs/metro-optical/design-brief.md. |
+| F3 | Wavelength service | The service desk can trace each customer wavelength to its channel | Faster service delivery | WavelengthService | schema, generator | F2 | planned | After F2, design the service model and automate service creation from the channel pool, as designed in F3 of docs/designs/metro-optical/design-brief.md. |
 ```
 
 ## Incorrect
@@ -110,8 +110,8 @@ before the schema it reads.
 ```markdown
 | ID | Feature | Intent | Value | Scope boundary | Artifacts | Depends on | Status | Handoff |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | Fiber plant | Know which strand runs where | Reduced engineering effort | Site, FiberCable, Strand | schema | - | planned | |
-| F2 | Wavelength service | One service per customer wavelength | Faster service delivery | WavelengthService | generator, schema | | planned | Run the framework's specify command for this feature. |
+| F1 | Fiber plant | Field engineers can find the strands a cable uses by its cable ID | Reduced engineering effort | Site, FiberCable, Strand | schema | - | planned | |
+| F2 | Wavelength service | The service desk can trace each customer wavelength to its channel | Faster service delivery | WavelengthService | generator, schema | | planned | Run the framework's specify command for this feature. |
 ```
 
 ```markdown
