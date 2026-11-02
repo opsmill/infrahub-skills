@@ -9,7 +9,7 @@ description: >-
   in any opsmill/infrahub-* project (SDK, Ansible, VS Code, MCP, Helm, schema-library, sync, backup, nornir, skills).
   DO NOT TRIGGER when: the user wants to fix the bug themselves locally, write a test, or debug code without filing.
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 

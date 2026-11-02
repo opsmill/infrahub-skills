@@ -15,7 +15,7 @@ description: >-
   (use infrahub-analyzing-data), or planning an upgrade that has not run yet
   (use infrahub-planning-upgrades).
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 

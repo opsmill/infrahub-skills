@@ -46,7 +46,11 @@ analysis to the artifact the user actually means.
   already settled: the user gave a path in their
   request, or they pasted the relevant bundle
   contents directly — re-asking then is friction
-  with no gain.
+  with no gain. A pasted excerpt settles it even
+  when it is a single log: analyze what was pasted,
+  and list what it lacks (the manifest, the services
+  not shown) under Open questions instead of asking
+  for the rest first.
 - If the user has no bundle at all, hand off to
   `infrahub-collecting-diagnostics`; do not
   improvise collection.
