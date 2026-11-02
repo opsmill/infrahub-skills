@@ -2072,6 +2072,26 @@ def test_value_figure_cited_to_an_answer(tmp_path: Path, prompt_figures: frozens
         assert expected in detail, detail
 
 
+@pytest.mark.parametrize(
+    ("entry", "expected"),
+    [
+        pytest.param("40 hours a month spent by hand, pops.csv:hours", None, id="compliant-figure-cited-to-an-input-only"),
+        pytest.param(
+            "saves 40 hours a month, answer Q1 and pops.csv:pop_code",
+            "cites an answer for ['40']", id="near-miss-input-cited-next-to-an-invented-answer",
+        ),
+        pytest.param(
+            "saves 40 hours a month, request and pops.csv:pop_code",
+            "cites the request for ['40']", id="near-miss-input-cited-next-to-the-request",
+        ),
+    ],
+)
+def test_input_citation_does_not_excuse_an_answer_figure(entry: str, expected: str | None) -> None:
+    """A cited input file covers its own figures, not those cited to the prompt."""
+    detail = LIB._unsourced_figure(entry, {"pops.csv"}, frozenset({"2"}))
+    assert detail is None if expected is None else expected in (detail or ""), detail
+
+
 def _eval_instruction(task: str) -> str:
     tasks = yaml.safe_load(EVAL_YAML.read_text())["tasks"]
     return next(t["instruction"] for t in tasks if t["name"] == task)

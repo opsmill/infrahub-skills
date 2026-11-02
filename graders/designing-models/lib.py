@@ -1682,10 +1682,12 @@ def _unsourced_figure(text: str, inputs: set[str], request_figures: frozenset[st
     figures = _figures(text)
     if not figures:
         return None
-    cites_input = _cites_input(text, inputs)
-    if not (cites_input or _ANSWER_REF.search(text) or _REQUEST_REF.search(text)):
+    cites_conversation = bool(_ANSWER_REF.search(text) or _REQUEST_REF.search(text))
+    if not (cites_conversation or _cites_input(text, inputs)):
         return "gives a figure without its source (answer Q<n>, request, or <input file>:<locator>)"
-    if request_figures is None or cites_input:
+    # An input file's figures are not in the prompt, but a file cited next to
+    # an answer or the request does not excuse the figures cited to those.
+    if request_figures is None or not cites_conversation:
         return None
     unknown = sorted(figures - request_figures)
     if not unknown:
