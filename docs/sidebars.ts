@@ -56,6 +56,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Build your model',
       items: [
+        'skills-reference/designing-models',
         'skills-reference/managing-schemas',
         'skills-reference/managing-objects',
         'skills-reference/managing-menus',
