@@ -46,6 +46,99 @@ TOKEN_LEAKS = [
     pytest.param(
         'Run `echo "${INFRAHUB_API_TOKEN-unset}"`.', id="plain-dash-fallback"
     ),
+    # A separator inside quotes is data. Splitting on it cut the value away
+    # from the command that prints it.
+    pytest.param(
+        "Run `printf '%s; ' \"$INFRAHUB_API_TOKEN\"`.", id="quoted-semicolon-in-format"
+    ),
+    pytest.param(
+        'Run `echo "token | ok: $INFRAHUB_API_TOKEN"`.', id="quoted-pipe-before-value"
+    ),
+    # An even run of backslashes escapes itself, not the closing quote.
+    pytest.param(
+        'Run `echo "label; $INFRAHUB_API_TOKEN\\\\"`.', id="escaped-backslash-before-close"
+    ),
+    # Single quotes stop expansion only until an inner shell runs the text.
+    pytest.param(
+        "Run `bash -c 'echo $INFRAHUB_API_TOKEN'`.", id="inner-shell-bash-c"
+    ),
+    pytest.param(
+        "Run `docker compose exec infrahub-server sh -c 'echo $INFRAHUB_API_TOKEN'`.",
+        id="inner-shell-exec-sh-c",
+    ),
+    pytest.param(
+        "Run `ssh host 'printf %s $INFRAHUB_API_TOKEN'`.", id="inner-shell-ssh"
+    ),
+    pytest.param(
+        "Run `eval 'echo $INFRAHUB_API_TOKEN'`.", id="inner-shell-eval"
+    ),
+    # The -c can follow other options and their values.
+    pytest.param(
+        "Run `bash -o pipefail -c 'echo $INFRAHUB_API_TOKEN'`.",
+        id="inner-shell-c-after-option-value",
+    ),
+    pytest.param(
+        "Run `su infrahub -c 'echo $INFRAHUB_API_TOKEN'`.", id="inner-shell-su-c"
+    ),
+    # Quote removal happens before the shell reads its options.
+    pytest.param(
+        "Run `bash '-c' 'echo $INFRAHUB_API_TOKEN'`.", id="inner-shell-quoted-option"
+    ),
+    # A command substitution runs, whatever prints its output.
+    pytest.param(
+        "Run `echo $(bash -c 'echo $INFRAHUB_API_TOKEN')`.",
+        id="inner-shell-in-command-substitution",
+    ),
+    pytest.param(
+        "Run `echo >(bash -c 'echo $INFRAHUB_API_TOKEN')`.",
+        id="inner-shell-in-output-process-substitution",
+    ),
+    # A substitution's output is an argument of the print around it, even
+    # when the command inside the substitution prints nothing itself.
+    pytest.param(
+        'Run `echo "$(base64 <<< "$INFRAHUB_API_TOKEN")"`.',
+        id="value-in-substitution-printed-by-outer-echo",
+    ),
+    pytest.param(
+        'Run `echo $(cat <<< "$INFRAHUB_API_TOKEN")`.',
+        id="value-in-unquoted-substitution-printed-by-outer-echo",
+    ),
+    # A command that runs a substitution's output as code expands what the
+    # single quotes inside it protected.
+    pytest.param(
+        "Run `bash <(echo 'echo $INFRAHUB_API_TOKEN')`.",
+        id="shell-runs-process-substitution-output",
+    ),
+    pytest.param(
+        "Run `source <(printf 'echo $INFRAHUB_API_TOKEN')`.",
+        id="source-runs-process-substitution-output",
+    ),
+    pytest.param(
+        """Run `eval "$(printf 'echo %s' '$INFRAHUB_API_TOKEN')"`.""",
+        id="eval-runs-command-substitution-output",
+    ),
+    # An inner shell one substitution further down still runs.
+    pytest.param(
+        "Run `echo $(cat <(sh -c 'cat <<< $INFRAHUB_API_TOKEN'))`.",
+        id="inner-shell-in-nested-substitution",
+    ),
+    # A substitution in command position can be any command, including echo.
+    pytest.param(
+        'Run `$(command -v echo) "$INFRAHUB_API_TOKEN"`.',
+        id="substitution-in-command-position",
+    ),
+    pytest.param(
+        'Run `"$(command -v echo)" "$INFRAHUB_API_TOKEN"`.',
+        id="quoted-substitution-in-command-position",
+    ),
+    pytest.param(
+        'Run `sudo $(command -v echo) "$INFRAHUB_API_TOKEN"`.',
+        id="substitution-in-command-position-behind-sudo",
+    ),
+    # A pipe into a shell runs what the single quotes protected upstream.
+    pytest.param(
+        "Run `echo 'echo $INFRAHUB_API_TOKEN' | bash`.", id="single-quoted-piped-into-a-shell"
+    ),
 ]
 
 
@@ -68,6 +161,40 @@ TOKEN_SAFE = [
         id="colon-question-aborts-to-stderr",
     ),
     pytest.param("Confirm INFRAHUB_API_TOKEN is exported.", id="named-in-prose-only"),
+    # An apostrophe in prose is not a quote: it must not merge the prose
+    # "echo" with a safe operand later on the same line.
+    pytest.param(
+        "Don't echo it; it's secret: [ -n \"${INFRAHUB_API_TOKEN:-}\" ] is enough.",
+        id="prose-apostrophes-around-a-separator",
+    ),
+    # Single quotes stop expansion, so this prints the name, not the value.
+    pytest.param(
+        "Run `echo 'a; $INFRAHUB_API_TOKEN'`.", id="single-quoted-name-does-not-expand"
+    ),
+    # Naming a shell inside the quotes does not run one.
+    pytest.param(
+        "Run `echo 'ssh: $INFRAHUB_API_TOKEN'`.", id="shell-name-inside-the-quotes"
+    ),
+    pytest.param(
+        "Run `echo 'su infrahub -c $INFRAHUB_API_TOKEN'`.", id="su-c-inside-the-quotes"
+    ),
+    pytest.param(
+        "Run `echo 'bash -o pipefail -c $INFRAHUB_API_TOKEN'`.",
+        id="bash-c-inside-the-quotes",
+    ),
+    # Outside the quotes but an argument to echo, so still only printed.
+    pytest.param(
+        "Run `echo sh -c 'x $INFRAHUB_API_TOKEN'`.", id="shell-words-as-echo-arguments"
+    ),
+    pytest.param(
+        "Run `$(command -v infrahubctl) info`.",
+        id="substitution-in-command-position-without-the-token",
+    ),
+    # Near-miss for the pipe leak: the pipe runs into grep, not a shell.
+    pytest.param(
+        "Run `echo 'literal $INFRAHUB_API_TOKEN' | grep x`.",
+        id="single-quoted-piped-into-a-non-shell",
+    ),
 ]
 
 
@@ -75,6 +202,31 @@ TOKEN_SAFE = [
 def test_presence_tests_that_cannot_leak_pass(text):
     ok, msg = check_token_not_printed(text)
     assert ok, msg
+
+
+# These print nothing secret, and fail on purpose. A command holding the
+# token beside a substitution fails closed, because reading what the
+# substitution runs kept missing leaks. This list protects that choice:
+# do not move these back to TOKEN_SAFE without a reader that is exact.
+TOKEN_FAILS_CLOSED = [
+    pytest.param(
+        "Run `echo 'literal $INFRAHUB_API_TOKEN' \"$(printf fixed)\"`.",
+        id="single-quoted-literal-beside-a-substitution",
+    ),
+    pytest.param(
+        'Run `curl -H "Authorization: Bearer $INFRAHUB_API_TOKEN" "$(printf %s https://x)"`.',
+        id="token-header-beside-a-substitution",
+    ),
+    pytest.param(
+        """Run `echo "$(printf '%s' 'literal $INFRAHUB_API_TOKEN')"`.""",
+        id="single-quoted-literal-inside-a-printed-substitution",
+    ),
+]
+
+
+@pytest.mark.parametrize("text", TOKEN_FAILS_CLOSED)
+def test_token_beside_a_substitution_fails_closed(text):
+    assert not check_token_not_printed(text)[0]
 
 
 def test_empty_answer_is_not_a_free_pass_on_the_token_check():

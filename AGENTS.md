@@ -166,41 +166,30 @@ the skill fires at all.
 A new rule under `skills/<skill>/rules/` ships with its
 eval coverage in the same change: the rule linked from
 `SKILL.md`, a check function in `graders/<skill>/lib.py`,
-an `eval.yaml` task, a task grader run against four
+an `eval.yaml` task and its task grader, four committed
 fixtures, contradicted claims swept, and
-`evaluations/*.json` regenerated.
+`evaluations/*.json` regenerated. A verified rule that no
+prompt can make a current model break drops the task and
+its task grader together. A rule correcting our reference
+against an upstream surface replaces them with a pytest
+asserting the reference both ways.
 
-Two of those steps carry a carve-out, for a verified rule
-no prompt can make a current model break: the `eval.yaml`
-task, **and the task grader script that would have no task
-behind it**. Dropping only the first leaves a dead
-`check_<task>.py`, which is the defect #147 was opened on.
-It is a measured exception, not a judgement call, and
-[rule-equals-test.md](dev/guidelines/rule-equals-test.md)
-§ "When no task can score the rule" sets the bar.
-
-The seven steps and what each one guards against live in
+The steps, the carve-out's bar, and what each step guards
+against are in
 [dev/guidelines/rule-equals-test.md](dev/guidelines/rule-equals-test.md),
-which loads automatically when you touch a rule, a
-grader, or `eval.yaml`. Full walkthrough in
+which loads when you touch a rule, a grader, or
+`eval.yaml`. Walkthrough:
 [dev/guides/adding-a-rule.md](dev/guides/adding-a-rule.md).
-
-A rule without a grader is a rule that can rot silently
-— the next refactor of the skill's prose loses the
-constraint with no failing test to flag it. A grader
-that cannot fail is worse: it reports the rule as
-covered forever.
-
-A grader that contradicts its rule is the third case.
-The check is what scores, so it wins by default and the
-rule rots unnoticed. Which side moves is a decision to
-take when you add either one.
 
 ### Changelog
 
 The changelog is assembled by [towncrier](https://towncrier.readthedocs.io/) from news fragments in
 `changelog/`, so every change carries its own entry instead of everyone editing `CHANGELOG.md`.
-Skill and tooling work goes under `housekeeping`. Add a fragment in the same PR as the change:
+Pick the type by what a plugin user notices: a corrected skill behavior is `fixed`, a new skill or
+rule is `added`, changed guidance is `changed`, and graders, tests, scripts, CI, and contributor docs
+are `housekeeping`. Towncrier copies the fragment verbatim into the release body, so state only what
+you checked: run `git tag --contains <sha>` before writing "since vX". Add a fragment in the same PR
+as the change:
 
 - `uv run towncrier create -c "Added the thing" 42.added.md` — one fragment per change, named
   `<issue>.<type>.md`. Without an issue or PR number, use a descriptive slug prefixed with `+`,

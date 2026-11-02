@@ -183,17 +183,136 @@ _PRINTS_TO_STDOUT = re.compile(r"\b(?:echo|printf|print)\b")
 # containing the word "echo" counted as one command, so a safe
 # `${TOKEN:-}` test operand quoted later in the same sentence was reported
 # as a leak — the very presence test the rule recommends.
-_COMMAND_BREAK = re.compile(r";|\|\||&&|\||\n|`|\bthen\b|\bdo\b|\bfi\b|\bdone\b")
+_LINE_BREAK = re.compile(r"\n|`")
+_COMMAND_BREAK = re.compile(r";|\|\||&&|\||\bthen\b|\bdo\b|\bfi\b|\bdone\b")
+
+
+def _quoted_spans(segment: str) -> list[tuple[int, int, str]] | None:
+    """Return the quoted spans of a shell segment, or None if quotes don't balance.
+
+    An apostrophe between two letters is a contraction ("don't", "it's"), not
+    a quote. Quotes that still do not balance mean prose; the caller then
+    splits on every separator as before.
+    """
+    spans: list[tuple[int, int, str]] = []
+    quote = None
+    start = 0
+    for i, ch in enumerate(segment):
+        if ch == "'" and 0 < i < len(segment) - 1 and segment[i - 1].isalpha() and segment[i + 1].isalpha():
+            continue
+        if quote is None and ch in "'\"":
+            quote, start = ch, i
+        elif ch == quote and not (quote == '"' and _escaped(segment, i)):
+            spans.append((start, i, quote))
+            quote = None
+    return None if quote else spans
+
+
+def _escaped(segment: str, i: int) -> bool:
+    """Whether the character at ``i`` follows an odd run of backslashes."""
+    run = len(segment[:i]) - len(segment[:i].rstrip("\\"))
+    return run % 2 == 1
+
+
+# Programs that run a quoted argument as shell code, which expands what the
+# single quotes protected here.
+_SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "su"}
+_SHELL_RUN_OPTION = re.compile(r"-[A-Za-z]*c")
+_PRINT_COMMANDS = {"echo", "printf", "print"}
+
+
+def _runs_inner_shell(piece: str) -> bool:
+    """Whether the piece runs code the single quotes do not protect.
+
+    Read from shell tokens, after quote removal, so `bash '-c' '...'` counts
+    and `echo 'su x -c ...'` does not. A shell word printed by `echo` or
+    `printf` is an argument, not a command. Fails closed: a piece that does
+    not tokenize keeps its quoted text. A piece with a substitution never
+    gets here: the caller fails it closed.
+    """
+    try:
+        tokens = shlex.split(piece)
+    except ValueError:
+        return True
+    if not tokens or tokens[0] in _PRINT_COMMANDS:
+        return False
+    for i, token in enumerate(tokens):
+        name = token.rsplit("/", 1)[-1]
+        if name == "eval" or (name == "ssh" and i + 1 < len(tokens)):
+            return True
+        if name in _SHELLS and any(
+            _SHELL_RUN_OPTION.fullmatch(t) for t in tokens[i + 1 :]
+        ):
+            return True
+    return False
+
+
+# A substitution's output is unknown when the check runs: it can be the
+# command itself, a value the command prints, or code a shell runs.
+_SUBSTITUTION = re.compile(r"[$<>]\(")
+
+# A pipe into a program that runs its input as code: `... | bash`,
+# `... | sudo sh`, `... | source /dev/stdin`. `||` is not a pipe.
+_PIPE_INTO = re.compile(r"(?<!\|)\|(?!\|)\s*(?:sudo\s+)?(\S+)")
+_RUNS_INPUT = _SHELLS | {"eval", "source", "."}
+
+
+def _blank_spans(piece: str, quotes: str) -> str:
+    """Blank out the text inside quotes of the given kinds."""
+    for start, end, quote in _quoted_spans(piece) or []:
+        if quote in quotes:
+            piece = piece[:start] + " " * (end - start + 1) + piece[end + 1 :]
+    return piece
+
+
+def _unquote_single(piece: str) -> str:
+    """Blank out single-quoted text, which the shell never expands.
+
+    Unless the piece runs that text in an inner shell (`sh -c '...'`,
+    `eval`, `ssh host '...'`), which does expand it.
+    """
+    if _runs_inner_shell(piece):
+        return piece
+    return _blank_spans(piece, "'")
+
+
+def _segments(text: str) -> list[tuple[int, int]]:
+    """The line and backtick segments of the text, as (start, end) offsets."""
+    bounds = [m.start() for m in _LINE_BREAK.finditer(text)] + [len(text)]
+    return [(0 if i == 0 else bounds[i - 1] + 1, end) for i, end in enumerate(bounds)]
+
+
+def _pipes_into_code(segment: str) -> bool:
+    """Whether the segment pipes into a shell, `eval`, `source` or `.`.
+
+    A pipe inside quotes is data. Quotes that do not balance count every
+    pipe, so the check fails closed.
+    """
+    spans = _quoted_spans(segment) or []
+    return any(
+        m.group(1).rsplit("/", 1)[-1] in _RUNS_INPUT
+        for m in _PIPE_INTO.finditer(segment)
+        if not any(a < m.start() < b for a, b, _ in spans)
+    )
 
 
 def _command_pieces(text: str) -> list[tuple[int, str]]:
-    """Split into command-sized pieces, keeping each piece's offset."""
+    """Split into command-sized pieces, keeping each piece's offset.
+
+    A separator inside quotes is data: `printf '%s; ' "$TOKEN"` is one
+    command, and splitting on its `;` cut the value away from the printf.
+    """
     pieces: list[tuple[int, str]] = []
-    pos = 0
-    for match in _COMMAND_BREAK.finditer(text):
-        pieces.append((pos, text[pos : match.start()]))
-        pos = match.end()
-    pieces.append((pos, text[pos:]))
+    for seg_start, seg_end in _segments(text):
+        segment = text[seg_start:seg_end]
+        spans = _quoted_spans(segment) or []
+        pos = 0
+        for match in _COMMAND_BREAK.finditer(segment):
+            if any(a < match.start() < b for a, b, _ in spans):
+                continue
+            pieces.append((seg_start + pos, segment[pos : match.start()]))
+            pos = match.end()
+        pieces.append((seg_start + pos, segment[pos:]))
     return pieces
 
 
@@ -227,12 +346,27 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
         for m in _TOKEN_FALLBACK.finditer(text)
         if not _is_negated(text, m.start())
     }
+    # Fails closed where reading the shell exactly has kept missing shapes:
+    # a command holding the token beside a substitution, and a line piped
+    # into something that runs its input as code. Either counts as a leak,
+    # quoted text included.
+    piped = [
+        (start, end)
+        for start, end in _segments(text)
+        if _pipes_into_code(text[start:end])
+    ]
     for start, piece in _command_pieces(text):
-        if not _PRINTS_TO_STDOUT.search(piece):
-            continue
         if _is_negated(text, start):
             continue
-        offenders.update(m.group(0) for m in _TOKEN_VALUE.finditer(piece))
+        values = {m.group(0) for m in _TOKEN_VALUE.finditer(piece)}
+        if not values:
+            continue
+        if _SUBSTITUTION.search(piece) or any(a <= start < b for a, b in piped):
+            offenders |= values
+        elif _PRINTS_TO_STDOUT.search(piece):
+            offenders.update(
+                m.group(0) for m in _TOKEN_VALUE.finditer(_unquote_single(piece))
+            )
     if offenders:
         return False, (
             f"expansion(s) that print the token's value: {sorted(offenders)}; "
