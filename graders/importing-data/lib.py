@@ -459,9 +459,13 @@ def check_no_schema_mutation(
     A schema document is identifiable by top-level ``version: "1.0"`` plus
     ``nodes:`` or ``generics:`` keys. Also fails if any file lives under a
     ``schemas/`` sub-path inside the emission directory.
+
+    An output dir with no YAML passes: it holds no schema document, and
+    writing nothing is what the fail-closed rule requires when a column has
+    no schema home. ``fail-closed`` is the check that rejects object rows.
     """
     if not parsed_files:
-        return False, "No YAML files in output directory"
+        return True, "No YAML emitted, so no schema mutation in the output dir"
 
     base = output_dir.resolve() if output_dir else None
     violations: list[str] = []
@@ -1293,6 +1297,20 @@ def check_error_traced_to_source_row(
     return True, "error traced to inventory.csv row 12, with the YAML marked off-limits"
 
 
+def _skill_dir(name: str) -> Path:
+    """The copy of skill `name` this grader can read.
+
+    The repository keeps skills under skills/. A skillgrade trial has no
+    skills/ at its root: it copies them into .claude/skills/ and
+    .agents/skills/, so a path built from skills/ alone finds nothing.
+    """
+    root = Path(__file__).resolve().parents[2]
+    for base in ("skills", ".claude/skills", ".agents/skills"):
+        if (root / base / name).is_dir():
+            return root / base / name
+    return root / "skills" / name
+
+
 def check_names_real_managing_objects_rules(
     parsed_files: dict[Path, list[dict]], output_dir: Path = Path("output_dir"), **_: Any
 ) -> tuple[bool, str]:
@@ -1305,18 +1323,21 @@ def check_names_real_managing_objects_rules(
     text = load_answer(output_dir)
     if not text:
         return False, "no answer.md found in the output directory"
-    rules_dir = Path(__file__).resolve().parents[2] / "skills" / "infrahub-managing-objects" / "rules"
+    rules_dir = _skill_dir("infrahub-managing-objects") / "rules"
     real = {p.name.lower() for p in rules_dir.glob("*.md")} if rules_dir.is_dir() else set()
     if not real:
         return False, f"could not read {rules_dir} to verify rule names"
     cited = set(re.findall(r"[a-z0-9][a-z0-9-]*\.md", text))
     cited = {c for c in cited if not c.startswith("_")}
-    if not cited:
+    if not cited & real:
         return False, "the answer names no managing-objects rule file"
-    bogus = sorted(c for c in cited if c not in real)
+    # The answer also cites this skill's own files (its self-check rule,
+    # SKILL.md). Those are real; only a name neither skill has is invented.
+    own = {p.name.lower() for p in _skill_dir("infrahub-importing-data").rglob("*.md")}
+    bogus = sorted(c for c in cited if c not in real | own)
     if bogus:
         return False, f"answer cites rule file(s) that do not exist: {bogus}"
-    return True, f"all {len(cited)} cited rule file(s) exist under managing-objects/rules/"
+    return True, f"cited managing-objects rule file(s) exist: {sorted(cited & real)}"
 
 
 def check_no_emission_before_confirmation(

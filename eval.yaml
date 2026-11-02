@@ -4410,19 +4410,18 @@ tasks:
     expected_output: >-
       A directory ./output_dir/ that contains no schema documents (no file with
       top-level `version: "1.0"` plus `nodes:` / `generics:`), and nothing under
-      a `schemas/` sub-path of the output dir. The skill should either emit
-      partial object YAML (omitting the unmapped column) with a note about the
-      unmapped `gpu_count`, or stop emission entirely and explain — but it must
-      never write a schema mutation.
+      a `schemas/` sub-path of the output dir. The skill fails closed on the
+      unmapped `gpu_count`: it writes no object rows, names the column and the
+      kinds it checked, and points at infrahub-managing-schemas. It never
+      writes a schema mutation.
     expectations:
       - No file in ./output_dir/ is a schema document (version 1.0 + nodes / generics)
       - No file lives under a schemas/ sub-path of ./output_dir/
-      - Envelope is correct on any object YAML that is emitted
+      - No object rows are emitted for an input with an unmapped column
     assertions:
-      - name: envelope
+      - name: fail-closed
         check: >-
-          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
-          spec.data list
+          No Object document in the output dir carries spec.data rows
       - name: no-schema-mutation
         check: >-
           Output dir contains no schema document and no schemas/ sub-path
@@ -7945,7 +7944,9 @@ tasks:
       Save planned output under `./output_dir/`.
 
       Save the batched questions and the echoed plan to
-      `./output_dir/answer.md`. Write no object YAML in this task.
+      `./output_dir/answer.md`. That file is how you put the questions to
+      me, not an import file, so write it now. Write no object YAML in
+      this task.
     graders:
       - type: deterministic
         run: python graders/importing-data/check_up_front_interview.py
@@ -7954,14 +7955,15 @@ tasks:
       A single batched set of multi-choice questions covering every
       ambiguity (tier_label has no schema home; Status is a dropdown
       label; branch name; lineage opt-in) plus a confirm-and-lock summary
-      of the proposed plan. No file is written until the user confirms.
+      of the proposed plan, saved to ./output_dir/answer.md. No object
+      YAML is written until the user confirms.
     expectations:
       - Every ambiguity is surfaced in one batched round, not one-by-one
       - The unmapped tier_label column is called out explicitly
       - Status values (Active/Maintenance) are flagged as dropdown labels
       - A branch name is proposed (e.g., csv-import-YYYYMMDD-HHMM)
       - Lineage opt-in is offered with an explanation of source vs. owner+is_protected
-      - The plan is echoed back before any file is written
+      - The plan is echoed back before any object YAML is written
 
   - name: csv-import-profile-sample
     trials: 3

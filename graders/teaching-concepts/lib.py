@@ -472,7 +472,10 @@ def learner_kinds(ws: Path) -> set[str]:
     """
     kinds: set[str] = set()
     for path in sorted(ws.rglob("*.y*ml")):
-        if LEARNING_DIR in path.parts:
+        # A trial directory also holds the graders and the installed skills,
+        # whose fixtures declare kinds the learner never wrote; counting them
+        # credits a lesson that names a fixture's kind instead of the learner's.
+        if set(path.relative_to(ws).parts) & {LEARNING_DIR, *_NOT_LEARNER_DIRS}:
             continue
         try:
             parsed = yaml.safe_load(path.read_text())
@@ -488,6 +491,9 @@ def learner_kinds(ws: Path) -> set[str]:
                 if name and namespace:
                     kinds.add(f"{namespace}{name}")
     return kinds
+
+
+_NOT_LEARNER_DIRS = ("graders", ".claude", ".agents")
 
 
 def check_own_artifacts(ws: Path) -> tuple[bool, str]:
@@ -553,13 +559,21 @@ def check_graduation_pointer(ws: Path) -> tuple[bool, str]:
     return True, "graduation pointer present"
 
 
-CONCEPT_MAP = (
-    Path(__file__).resolve().parents[2]
-    / "skills"
-    / "infrahub-teaching-concepts"
-    / "references"
-    / "concept-map.md"
-)
+def _skill_dir(name: str) -> Path:
+    """The copy of skill `name` this grader can read.
+
+    The repository keeps skills under skills/. A skillgrade trial has no
+    skills/ at its root: it copies them into .claude/skills/ and
+    .agents/skills/, so a path built from skills/ alone crashes every trial.
+    """
+    root = Path(__file__).resolve().parents[2]
+    for base in ("skills", ".claude/skills", ".agents/skills"):
+        if (root / base / name).is_dir():
+            return root / base / name
+    return root / "skills" / name
+
+
+CONCEPT_MAP = _skill_dir("infrahub-teaching-concepts") / "references" / "concept-map.md"
 _MAP_ROW = re.compile(r"^\|\s*\d+\s*\|\s*([a-z][a-z0-9-]*)\s*\|")
 
 
