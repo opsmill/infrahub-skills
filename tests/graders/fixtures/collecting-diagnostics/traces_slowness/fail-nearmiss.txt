@@ -1,0 +1,10 @@
+## Plan
+
+I added traces to the bundle, because the instance is slow. Do you want the bundle in ./infrahub_bundles?
+
+```bash
+infrahub-collect environment detect
+infrahub-collect create --include-traces --traces-since 2h  # traces? yes, always for slowness
+```
+
+Review the bundle before sharing it.

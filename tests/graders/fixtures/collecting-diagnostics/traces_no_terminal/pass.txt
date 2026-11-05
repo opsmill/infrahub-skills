@@ -1,0 +1,12 @@
+## Plan
+
+Do you want to include traces of the slow requests from the last hour?
+
+I cannot read a hidden prompt, so set the token in your own shell. Never paste it in this conversation:
+
+```bash
+read -rs INFRAHUB_TRACES_API_TOKEN && export INFRAHUB_TRACES_API_TOKEN
+infrahub-collect create --include-traces --traces-since 1h
+```
+
+You can also run the command yourself, and it asks for the token without showing it.

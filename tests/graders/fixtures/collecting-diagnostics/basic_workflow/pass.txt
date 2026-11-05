@@ -1,0 +1,10 @@
+## Plan
+
+```bash
+infrahub-collect version
+infrahub-collect environment detect
+infrahub-collect create
+```
+
+Review the bundle before sharing it; masking covers key names only.
+To file a public issue afterwards, use infrahub-reporting-issues.

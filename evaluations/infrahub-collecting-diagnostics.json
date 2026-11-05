@@ -71,7 +71,8 @@
         "Recommends `infrahub-collect create`",
         "Surfaces a review-before-sharing caution",
         "Cross-links infrahub-reporting-issues for a public issue",
-        "Does not resurrect hand-rolled manifest.yml/flags.yml artifacts"
+        "Does not resurrect hand-rolled manifest.yml/flags.yml artifacts",
+        "Does not offer traces for a problem that is not slowness"
       ],
       "assertions": [
         {
@@ -93,6 +94,91 @@
         {
           "name": "no-legacy-artifacts",
           "check": "Plan does not reference manifest.yml/flags.yml/redaction-report.txt"
+        },
+        {
+          "name": "traces-not-offered",
+          "check": "Plan does not offer or add trace options for a problem that is not slowness"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "This afternoon, from about 14:00 to 15:30 UTC, every GraphQL query in\nInfrahub took 20 to 30 seconds. It is fast again now. We run Docker Compose\nwith the observability stack (Tempo and Grafana) turned on. Prepare a\ndiagnostic bundle for OpsMill support so they can see what was slow. Do NOT\nactually run any commands; write out the exact commands and steps.",
+      "expected_output": "A command plan that asks the operator whether to include the traces of slow requests and confirms the window, then gives `infrahub-collect create --include-traces --traces-start <start> --traces-end <end>` to run after a yes, says that only a share of requests has a trace, and cautions the user to review the bundle before sharing.",
+      "files": [],
+      "expectations": [
+        "Recommends `infrahub-collect create`",
+        "Asks before adding `--include-traces`, and gives the window options",
+        "Surfaces a review-before-sharing caution",
+        "Does not resurrect hand-rolled manifest.yml/flags.yml artifacts"
+      ],
+      "assertions": [
+        {
+          "name": "mentions-create",
+          "check": "Plan recommends `infrahub-collect create`"
+        },
+        {
+          "name": "traces-offered-with-window",
+          "check": "Plan asks about traces and gives `--include-traces` with a window"
+        },
+        {
+          "name": "review-before-sharing",
+          "check": "Plan cautions to review the bundle before sharing"
+        },
+        {
+          "name": "no-legacy-artifacts",
+          "check": "Plan does not reference manifest.yml/flags.yml/redaction-report.txt"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Opening the device list page in Infrahub takes about 40 seconds, every\ntime, for every user. I can make it happen whenever I want. We run Kubernetes\nin the namespace infrahub and have tracing turned on with a low sampling\nratio. I want OpsMill support to see exactly where the time goes. Do NOT\nactually run any commands; write out the exact commands and steps.",
+      "expected_output": "A command plan that asks whether to include traces, tells a super admin to raise the sampling ratio for a limited time with `PUT /api/troubleshooting/trace-sample-ratio` before reproducing the slowness, gives `infrahub-collect create --include-traces --traces-since <window>`, and tells the super admin to remove the temporary ratio with `DELETE` after the bundle is created.",
+      "files": [],
+      "expectations": [
+        "Asks before adding `--include-traces`, and gives the window options",
+        "Raises the sampling ratio for a limited time before reproducing",
+        "Removes the temporary ratio after the bundle is created",
+        "Leaves the ratio change to the operator rather than running it itself"
+      ],
+      "assertions": [
+        {
+          "name": "mentions-create",
+          "check": "Plan recommends `infrahub-collect create`"
+        },
+        {
+          "name": "traces-offered-with-window",
+          "check": "Plan asks about traces and gives `--include-traces` with a window"
+        },
+        {
+          "name": "ratio-raise-and-remove",
+          "check": "Plan raises the ratio with PUT and removes it with DELETE"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Infrahub has been very slow for the last hour on our Docker Compose\ndeployment with the observability stack. You will run the commands for me\nthrough your shell tool, because I am on my phone and cannot type in a\nterminal. I have a super_admin API token ready if you need it. Do NOT\nactually run any commands yet; write out the exact commands and steps you\nwill run, and what you need from me.",
+      "expected_output": "A command plan that asks whether to include traces for the last hour, tells the operator to set INFRAHUB_TRACES_API_TOKEN in their own shell or to run the command themselves, and never asks for the token value in the conversation.",
+      "files": [],
+      "expectations": [
+        "Asks before adding `--include-traces`, and gives the window options",
+        "Names INFRAHUB_TRACES_API_TOKEN for the operator's own shell",
+        "Never asks for the token value in the conversation"
+      ],
+      "assertions": [
+        {
+          "name": "mentions-create",
+          "check": "Plan recommends `infrahub-collect create`"
+        },
+        {
+          "name": "traces-offered-with-window",
+          "check": "Plan asks about traces and gives `--include-traces` with a window"
+        },
+        {
+          "name": "token-env-not-asked",
+          "check": "Plan names INFRAHUB_TRACES_API_TOKEN and does not ask for the token value"
         }
       ]
     }

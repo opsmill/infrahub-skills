@@ -1,0 +1,25 @@
+## Plan
+
+Do you want to include traces of the slow page loads? Since you can reproduce it, the window can be
+the next 30 minutes.
+
+Only a share of requests has a trace. Ask a super admin to raise the sampling ratio for 30 minutes
+before you reproduce the slowness:
+
+```bash
+curl -X PUT "$INFRAHUB_ADDRESS/api/troubleshooting/trace-sample-ratio" \
+  -H "X-INFRAHUB-KEY: $SUPER_ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"ratio": 1.0, "duration_seconds": 1800}'
+```
+
+Open the page three times, then create the bundle after your yes:
+
+```bash
+infrahub-collect create --include-traces --traces-since 30m
+```
+
+After the bundle is created, remove the temporary ratio:
+
+```bash
+curl -X DELETE "$INFRAHUB_ADDRESS/api/troubleshooting/trace-sample-ratio" -H "X-INFRAHUB-KEY: $SUPER_ADMIN_TOKEN"
+```

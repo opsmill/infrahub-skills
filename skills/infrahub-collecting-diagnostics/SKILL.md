@@ -114,6 +114,12 @@ reproducer. See
 [rules/create-flags.md](rules/create-flags.md) for
 the full symptom-to-flag mapping.
 
+When the user reports that Infrahub is slow, read
+[rules/create-traces.md](rules/create-traces.md)
+before you write the command: it asks the user
+whether to add traces and for which window, and
+keeps the API token out of the conversation.
+
 Partial bundles are expected on degraded
 deployments — `create` still exits 0 and records any
 collection failures in the manifest. Send the bundle

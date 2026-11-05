@@ -1,0 +1,9 @@
+## Plan
+
+- Is the slowness still going on? If so, would you like me to add traces for the last 2 hours?
+
+~~~sh
+infrahub-collect environment detect && infrahub-collect create --include-traces --traces-since=2h  # after your yes
+~~~
+
+- Review the bundle before you send it to OpsMill.
