@@ -1,0 +1,7 @@
+## Plan
+
+Do you want to include traces?
+
+```bash
+infrahub-collect create --include-traces --traces-since 30m
+```

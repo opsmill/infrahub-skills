@@ -1,0 +1,10 @@
+## Plan
+
+1. Would you like traces in the bundle?
+2. Before you reproduce it, a super admin sends `PUT /api/troubleshooting/trace-sample-ratio` with
+   `{"ratio": 1, "duration_seconds": 900}`. Only a share of requests has a trace otherwise.
+3. After the bundle exists, the super admin sends `DELETE /api/troubleshooting/trace-sample-ratio`.
+
+```bash
+infrahub-collect create --include-traces --traces-start=2026-11-05T09:00:00Z --traces-end=2026-11-05T09:15:00Z
+```

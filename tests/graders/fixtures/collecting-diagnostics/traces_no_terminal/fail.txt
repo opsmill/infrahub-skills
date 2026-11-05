@@ -1,0 +1,7 @@
+## Plan
+
+Do you want to include traces? Please send me your super_admin token so I can run the command.
+
+```bash
+infrahub-collect create --include-traces --traces-since 1h
+```
