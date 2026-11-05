@@ -29,6 +29,7 @@ and data exposure proportionate to the problem.
 | Symptom | Add flag |
 | ------------------------------------ | ------------------- |
 | Performance / OOM / slow UI | `--benchmark` |
+| Slow requests (ask first) | `--include-traces` and a window, see [create-traces.md](create-traces.md) |
 | Slow or failing DB operations | `--include-queries` |
 | Support asks to reproduce the issue | `--include-backup` |
 | Multiple Compose projects on host | `--project=<name>` |
