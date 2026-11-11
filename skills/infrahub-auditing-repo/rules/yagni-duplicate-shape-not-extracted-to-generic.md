@@ -33,7 +33,7 @@ SDK type generation also collapse to one definition instead of N.
 1. Three or more nodes whose attribute lists are >70% identical by
    name and kind. Likely candidates for a shared generic. A Dropdown
    with a different choice list, or a relationship with a different
-   peer, still counts toward the match: list that kind in `sites` and
+   peer, still counts toward the match: list that kind's file in `sites` and
    record the difference as a feasibility blocker below.
 2. Repeated attribute blocks across nodes for `name`, `description`,
    `status`, `owner`, `notes` — the canonical "common metadata"
