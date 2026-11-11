@@ -132,7 +132,7 @@ these with links to the Infrahub docs.
 | CRITICAL | Format | `format-` | Envelope, `Template<Kind>`, nested components |
 | HIGH | Naming | `naming-` | Slug-based, parent-namespaced, unique |
 | HIGH | Coverage | `coverage-` | Report what did not convert |
-| MEDIUM | Output | `output-` | Five files, load order, branch-first |
+| MEDIUM | Output | `output-` | Up to five files, load order, branch-first |
 
 Full index: [rules/_sections.md](./rules/_sections.md).
 

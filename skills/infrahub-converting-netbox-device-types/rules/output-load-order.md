@@ -1,10 +1,10 @@
 ---
-title: Emit Five Files in Load Order
+title: Emit Up to Five Files in Load Order
 impact: MEDIUM
 tags: output, load-order, branch, references
 ---
 
-## Emit Five Files in Load Order
+## Emit Up to Five Files in Load Order
 
 Impact: MEDIUM
 
@@ -12,12 +12,22 @@ Split the output into manufacturers, device types,
 device templates, module types, and module templates,
 numbered in dependency order, and load them onto a
 dedicated branch. A file with nothing in it is not
-written, so a run with no `module-types/` input
-produces only the first three.
+written, so the files in a run depend on the input and
+the mapping profile:
+
+- With no `module-types/` input, the converter writes
+  only `01` to `03`.
+- With module types but a profile that has no module
+  template section, such as `schema-library-modules.yml`,
+  it does not write `05`.
+- With only module types, it writes `01`, `04` and, if
+  the profile has a module template section, `05`.
+
+Load every numbered file that exists, in number order.
 
 ### Why it matters
 
-Each stage references the one before it by
+Each file references a file loaded before it by
 `human_friendly_id`. A device type names its
 manufacturer; a template names its device type. A
 module type names its manufacturer; a module template
