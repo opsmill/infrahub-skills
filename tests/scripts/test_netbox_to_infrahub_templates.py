@@ -5,6 +5,7 @@ component nesting, coverage reporting, and the CLI exit codes.
 """
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -1474,3 +1475,108 @@ def test_ordinary_rounding_to_zero_is_not_counted_as_a_zero_weight(tmp_path):
     report = render_report(conversion, profile)
 
     assert "Weights rounded to 0" not in report
+
+
+# ---------------------------------------------------------------------------
+# The output rule documents the files write_outputs emits. It is the one place
+# in the skill that governs load order, so it must list every entry of
+# OUTPUT_FILENAMES, in order, and nothing else (#135).
+# ---------------------------------------------------------------------------
+
+OUTPUT_FILENAMES = _mod.OUTPUT_FILENAMES
+_OUTPUT_RULE = _SKILL_DIR / "rules" / "output-load-order.md"
+_FENCE = re.compile(r"^```(\w*)\n(.*?)^```", re.MULTILINE | re.DOTALL)
+_NUMBERED_FILE = re.compile(r"\b(\d{2}_[a-z_]+\.yml)\b")
+_COUNT_WORDS = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+}
+
+
+def _documented_output_tree(markdown: str) -> list[str]:
+    """Return the numbered filenames in the rule's `generated/` tree block.
+
+    Only the `text` fence that draws the output directory counts, so a
+    filename mentioned in prose or in a load command does not satisfy it.
+    """
+    for language, body in _FENCE.findall(markdown):
+        if language == "text" and "generated/" in body:
+            return [
+                match.group(1)
+                for line in body.splitlines()
+                if (match := _NUMBERED_FILE.search(line))
+            ]
+    return []
+
+
+def _stated_file_counts(markdown: str) -> list[int]:
+    """Return every count a title or heading states as "<N> Files"."""
+    counts = []
+    for line in markdown.splitlines():
+        if line.startswith(("title:", "#")):
+            for word in re.findall(r"\b(\w+) files\b", line, re.IGNORECASE):
+                if word.lower() in _COUNT_WORDS:
+                    counts.append(_COUNT_WORDS[word.lower()])
+    return counts
+
+
+_FIVE = list(OUTPUT_FILENAMES.values())
+
+
+@pytest.mark.parametrize(
+    ("markdown", "matches"),
+    [
+        pytest.param(
+            "```text\ngenerated/\n" + "".join(f"├── {name}\n" for name in _FIVE) + "```\n",
+            True,
+            id="compliant",
+        ),
+        pytest.param(
+            "Intro.\n\n```text\ngenerated/\n"
+            + "".join(f"|-- {name}    # comment\n" for name in _FIVE)
+            + "`-- coverage-report.md\n```\n\n```bash\ninfrahubctl object load x\n```\n",
+            True,
+            id="compliant-variant",
+        ),
+        pytest.param(
+            "```text\ngenerated/\n" + "".join(f"├── {name}\n" for name in _FIVE[:3]) + "```\n",
+            False,
+            id="violating",
+        ),
+        pytest.param(
+            "```text\ngenerated/\n"
+            + "".join(f"├── {name}\n" for name in [*_FIVE[:3], _FIVE[4], _FIVE[3]])
+            + "```\n\nModule output lands in `04_module_types.yml`.\n",
+            False,
+            id="violating-near-miss",
+        ),
+    ],
+)
+def test_documented_output_tree_helper_discriminates(markdown, matches):
+    assert (_documented_output_tree(markdown) == _FIVE) is matches
+
+
+def test_output_rule_lists_every_emitted_file_in_load_order():
+    documented = _documented_output_tree(_OUTPUT_RULE.read_text(encoding="utf-8"))
+
+    assert documented == list(OUTPUT_FILENAMES.values()), (
+        f"{_OUTPUT_RULE.name} documents {documented}; "
+        f"write_outputs emits {list(OUTPUT_FILENAMES.values())}"
+    )
+
+
+def test_output_rule_title_states_the_emitted_file_count():
+    stated = _stated_file_counts(_OUTPUT_RULE.read_text(encoding="utf-8"))
+
+    assert all(count == len(OUTPUT_FILENAMES) for count in stated), (
+        f"{_OUTPUT_RULE.name} title or heading says {stated} files; "
+        f"OUTPUT_FILENAMES has {len(OUTPUT_FILENAMES)}"
+    )
