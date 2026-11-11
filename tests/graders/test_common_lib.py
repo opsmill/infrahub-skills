@@ -138,6 +138,21 @@ TOKEN_LEAKS = [
     pytest.param(
         "Run `echo 'echo $INFRAHUB_API_TOKEN' | bash`.", id="single-quoted-piped-into-a-shell"
     ),
+    pytest.param(
+        "Run `echo 'echo $INFRAHUB_API_TOKEN' | sudo -E bash`.",
+        id="single-quoted-piped-into-sudo-with-options",
+    ),
+    pytest.param(
+        "Run `echo 'echo $INFRAHUB_API_TOKEN' | env bash`.",
+        id="single-quoted-piped-into-env",
+    ),
+    pytest.param(
+        "Run `echo 'echo $INFRAHUB_API_TOKEN' |& bash`.",
+        id="single-quoted-piped-with-stderr",
+    ),
+    pytest.param(
+        "Run `bash <<< 'echo $INFRAHUB_API_TOKEN'`.", id="single-quoted-here-string"
+    ),
 ]
 
 
@@ -189,10 +204,11 @@ TOKEN_SAFE = [
         "Run `$(command -v infrahubctl) info`.",
         id="substitution-in-command-position-without-the-token",
     ),
-    # Near-miss for the pipe leak: the pipe runs into grep, not a shell.
+    # Near-miss for the pipe leaks: `||` runs the next command only on
+    # failure and feeds it nothing, so it is not a pipe.
     pytest.param(
-        "Run `echo 'literal $INFRAHUB_API_TOKEN' | grep x`.",
-        id="single-quoted-piped-into-a-non-shell",
+        'Run `[ -n "${INFRAHUB_API_TOKEN:-}" ] || echo "not set"`.',
+        id="or-operator-is-not-a-pipe",
     ),
 ]
 
@@ -204,10 +220,15 @@ def test_presence_tests_that_cannot_leak_pass(text):
 
 
 # These print nothing secret, and fail on purpose. A command holding the
-# token beside a substitution fails closed, because reading what the
-# substitution runs kept missing leaks. This list protects that choice:
-# do not move these back to TOKEN_SAFE without a reader that is exact.
+# token beside a substitution, or on a line with a pipe or a here-string,
+# fails closed, because reading what the next program runs kept missing
+# leaks. This list protects that choice: do not move these back to
+# TOKEN_SAFE without a reader that is exact.
 TOKEN_FAILS_CLOSED = [
+    pytest.param(
+        "Run `echo 'literal $INFRAHUB_API_TOKEN' | grep x`.",
+        id="single-quoted-piped-into-a-non-shell",
+    ),
     pytest.param(
         "Run `echo 'literal $INFRAHUB_API_TOKEN' \"$(printf fixed)\"`.",
         id="single-quoted-literal-beside-a-substitution",
@@ -224,7 +245,7 @@ TOKEN_FAILS_CLOSED = [
 
 
 @pytest.mark.parametrize("text", TOKEN_FAILS_CLOSED)
-def test_token_beside_a_substitution_fails_closed(text):
+def test_token_beside_a_substitution_or_pipe_fails_closed(text):
     assert not check_token_not_printed(text)[0]
 
 

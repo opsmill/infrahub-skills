@@ -244,10 +244,10 @@ def _runs_inner_shell(piece: str) -> bool:
 # command itself, a value the command prints, or code a shell runs.
 _SUBSTITUTION = re.compile(r"[$<>]\(")
 
-# A pipe into a program that runs its input as code: `... | bash`,
-# `... | sudo sh`, `... | source /dev/stdin`. `||` is not a pipe.
-_PIPE_INTO = re.compile(r"(?<!\|)\|(?!\|)\s*(?:sudo\s+)?(\S+)")
-_RUNS_INPUT = _SHELLS | {"eval", "source", "."}
+# A pipe (`|` or `|&`, not `||`) or a here-string feeds text to another
+# program, which can run it as code: `| bash`, `| sudo -E bash`,
+# `| env bash`, `bash <<< '...'`. Which programs do that is not listed.
+_FEEDS_INPUT = re.compile(r"(?<!\|)\|(?!\|)|<<<")
 
 
 def _blank_spans(piece: str, quotes: str) -> str:
@@ -275,17 +275,15 @@ def _segments(text: str) -> list[tuple[int, int]]:
     return [(0 if i == 0 else bounds[i - 1] + 1, end) for i, end in enumerate(bounds)]
 
 
-def _pipes_into_code(segment: str) -> bool:
-    """Whether the segment pipes into a shell, `eval`, `source` or `.`.
+def _feeds_input(segment: str) -> bool:
+    """Whether the segment has a pipe or a here-string outside quotes.
 
-    A pipe inside quotes is data. Quotes that do not balance count every
-    pipe, so the check fails closed.
+    Quotes that do not balance count every one, so the check fails closed.
     """
     spans = _quoted_spans(segment) or []
     return any(
-        m.group(1).rsplit("/", 1)[-1] in _RUNS_INPUT
-        for m in _PIPE_INTO.finditer(segment)
-        if not any(a < m.start() < b for a, b, _ in spans)
+        not any(a < m.start() < b for a, b, _ in spans)
+        for m in _FEEDS_INPUT.finditer(segment)
     )
 
 
@@ -340,13 +338,13 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
         if not _is_negated(text, m.start())
     }
     # Fails closed where reading the shell exactly has kept missing shapes:
-    # a command holding the token beside a substitution, and a line piped
-    # into something that runs its input as code. Either counts as a leak,
-    # quoted text included.
+    # a command holding the token beside a substitution, and a line with a
+    # pipe or a here-string, whose text the next program may run as code.
+    # Either counts as a leak, quoted text included.
     piped = [
         (start, end)
         for start, end in _segments(text)
-        if _pipes_into_code(text[start:end])
+        if _feeds_input(text[start:end])
     ]
     for start, piece in _command_pieces(text):
         if _is_negated(text, start):
