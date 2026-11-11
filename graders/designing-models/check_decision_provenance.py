@@ -43,7 +43,7 @@ NEIGHBOURS = ("sketch-rows-complete",)
 
 def grade(workspace: Path) -> dict:
     extra = {
-        "decision-tags-match": lambda ws: check_decision_tags_for(ws, SUBJECTS),
+        "decision-tags-match": lambda ws: check_decision_tags_for(ws, SUBJECTS, frozenset(DIRECTION[1])),
         "direction-recorded": lambda ws: check_direction_recorded(ws, *DIRECTION),
     }
     return run_checks(CHECK_NAMES, workspace, extra, neighbours=NEIGHBOURS)

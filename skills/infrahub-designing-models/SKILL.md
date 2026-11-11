@@ -110,8 +110,8 @@ skill for each artifact builds it from the brief.
    business and service answers and the user's inputs.
    After a split, F1 is the feature that delivers the
    leading value driver.
-   Then search the Marketplace and list newer demos, once
-   each, as
+   Then search the Marketplace, list newer demos and check
+   the documentation index for a closer design, once each, as
    [references/reference-designs.md](./references/reference-designs.md)
    § "Searching for reuse" describes.
    Then offer two or three design directions built from

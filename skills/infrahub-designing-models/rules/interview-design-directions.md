@@ -81,7 +81,9 @@ request exactly but has to be maintained.
 - Log each decision of the chosen direction as its own
   decision row as well: `recommended` when it came with
   the recommended direction, `stated` when the user
-  borrowed it from another.
+  borrowed it from another. When the user cannot reply,
+  these rows are `open` and name the direction row's
+  open item.
 
 ## Correct
 

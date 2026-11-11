@@ -123,22 +123,30 @@ _ITEM_START = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+|^\s*\**\s*O\d+\s*\**\s*:", r
 def _list_items(text: str) -> list[str]:
     """Each list item outside fences as one line, with its wrapped lines joined on.
 
-    A Markdown list item may wrap over several lines, and a nested list
-    belongs to its parent item; reading only the first line loses what the
-    wrap carried ("...; affects F1)" on the next line). An item runs until a
-    blank line or the next item at the same or a lower indent.
+    A Markdown list item may wrap over several lines; reading only the first
+    line loses what the wrap carried ("...; affects F1)" on the next line).
+    A nested item is an item of its own and is also part of each item it is
+    nested in, so open items or numbered steps under a grouping bullet are
+    read, and a step keeps the sub-bullets that finish it. An item runs
+    until a blank line or the next item at the same or a lower indent.
     """
     items: list[str] = []
-    joining, item_indent = False, 0
+    # (indent, index into items) of each item the current line is nested in.
+    open_items: list[tuple[int, int]] = []
     for line in _lines_outside_fences(text):
         indent = len(line) - len(line.lstrip())
         if not line.strip():
-            joining = False
-        elif _ITEM_START.match(line) and not (joining and indent > item_indent):
+            open_items = []
+            continue
+        starts = bool(_ITEM_START.match(line))
+        if starts:
+            while open_items and open_items[-1][0] >= indent:
+                open_items.pop()
+        for _, i in open_items:
+            items[i] += " " + line.strip()
+        if starts:
             items.append(line.rstrip())
-            joining, item_indent = True, indent
-        elif joining:
-            items[-1] += " " + line.strip()
+            open_items.append((indent, len(items) - 1))
     return items
 
 
@@ -862,15 +870,18 @@ def check_decision_provenance(parts: dict[str, str]) -> tuple[bool, str]:
 
 
 @_on_brief
-def check_decision_tags_for(parts: dict[str, str], subjects: dict[str, tuple[re.Pattern, str]]) -> tuple[bool, str]:
+def check_decision_tags_for(
+    parts: dict[str, str], subjects: dict[str, tuple[re.Pattern, str]], borrowed: frozenset[str] = frozenset()
+) -> tuple[bool, str]:
     """Each named decision carries the tag the transcript gives it.
 
     Bound to the subject: swapping tags between a stated decision and an
-    accepted recommendation fails, although both tags still appear, because
-    no row about the subject then carries its expected tag. Other rows that
-    mention the subject, such as a follow-up `open` question or a decision
-    borrowed from another direction, are allowed. ``subjects`` maps a label
-    to (pattern on the Decision cell, expected tag).
+    accepted recommendation fails, although both tags still appear. At least
+    one row about the subject carries its expected tag, and every other row
+    about it carries that tag or `open` (a follow-up question). A row that
+    names a decision ID in ``borrowed`` is exempt: the user stated it by
+    borrowing it from another direction. ``subjects`` maps a label to
+    (pattern on the Decision cell, expected tag).
     """
     rows, dec_col, tag_col, _, err = _decision_rows(parts)
     if err:
@@ -885,11 +896,14 @@ def check_decision_tags_for(parts: dict[str, str], subjects: dict[str, tuple[re.
         matching = [r for r in rows if pattern.search(_clean(r[dec_col]))]
         if not matching:
             return False, f"no decision about {label}"
-        tags = {_clean(r[tag_col]).lower() for r in matching}
-        if tag not in tags:
+        own = [r for r in matching if not set(_DIRECTION_ID.findall(_clean(r[dec_col]))) & borrowed]
+        tags = {_clean(r[tag_col]).lower() for r in own}
+        swapped = tags - {tag, "open"}
+        if swapped or tag not in tags:
+            found = sorted(swapped) or sorted(tags) or ["nothing"]
             texts = "; ".join(_clean(r[dec_col])[:90] for r in matching)
             return False, (
-                f"the decision about {label} is tagged {sorted(tags)[0]!r}; the transcript makes it {tag!r} "
+                f"the decision about {label} is tagged {found[0]!r}; the transcript makes it {tag!r} "
                 f"(rows: {texts!r})"
             )
     return True, "each decision carries the provenance the transcript gives it"
@@ -899,8 +913,12 @@ _DIRECTION_ROW = re.compile(r"^(?i:direction)\s+([A-Z])\b")
 _DIRECTION_ID = re.compile(r"\b([A-Z]\d+)\b")
 _NOT_TAKEN = re.compile(r"\bnot taken\b", re.IGNORECASE)
 # A direction letter standing as a list item of its own ("B", "direction B",
-# "B and C"), not the capital that opens a description ("B: A custom model").
-_LISTED_LETTER = re.compile(r"(?:^|[,;:]|\band\b)\s*(?:(?i:directions?)\s+)?([A-Z])(?=\s*(?:$|[,;:.]|\band\b))")
+# "B and C", "B because ...", "B — it duplicates ..."), not the capital that
+# opens a description after a letter's colon ("B: A custom model").
+_LISTED_LETTER = re.compile(
+    r"(?:^|[,;]|(?<![A-Z])(?<![A-Z]\s):|\band\b)\s*(?:(?i:directions?)\s+)?([A-Z])"
+    r"(?=\s*(?:$|[,;:.–—-]|\band\b)|\s+[a-z])"
+)
 
 
 @_on_brief

@@ -27,16 +27,22 @@ names the directions not taken.
 
 ## When the user asks for every question at once
 
-Send one numbered set: the inputs question, then at
-most five business and service questions, each in the
-block layout of
-[rules/interview-one-question-recommended.md](../rules/interview-one-question-recommended.md),
-then the design-direction block of step 5. Follow it
-with the step 6 draft for the recommended direction, and under the draft at
-most three data questions, as blocks, on the guesses
-that change the design most. The user corrects the rest
-by marking up the draft. Whatever they leave unanswered or
-uncorrected becomes an open item, as above.
+Send the questions in two numbered sets, one per message.
+The design directions rest on the business and service
+answers, so they cannot go out with those questions.
+
+1. The inputs question, then at most five business and
+   service questions, each in the block layout of
+   [rules/interview-one-question-recommended.md](../rules/interview-one-question-recommended.md).
+2. Once the user answers, run step 5 and send the
+   design-direction block, then the step 6 draft for the
+   recommended direction, and under the draft at most
+   three data questions, as blocks, on the guesses that
+   change the design most. The user picks a direction and
+   corrects the rest by marking up the draft.
+
+Whatever they leave unanswered or uncorrected becomes an
+open item, as above.
 
 ## Extending a brief
 

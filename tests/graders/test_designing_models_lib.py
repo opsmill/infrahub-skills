@@ -1092,6 +1092,23 @@ CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
         ),
         pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "not taken: B (a custom model)", "not taken: B \u2014 it duplicates contract data",
+            )),
+            None, id="compliant-not-taken-letter-then-a-dash",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "not taken: B (a custom model)", "not taken: B because a custom model costs more",
+            )),
+            None, id="compliant-not-taken-letter-then-a-reason",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS
+                  + "| 7 | Providers come from the demo's provider kind | recommended | The demo has one (strong) |\n"),
+            "tagged 'recommended'; the transcript makes it 'stated'", id="near-miss-one-subject-with-contradicting-tags",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
                 "with B2 (contract fields on the circuit)", "with B2 (contract fields, such as the end date, on the circuit)",
             )),
             None, id="compliant-direction-note-names-another-subject",
@@ -1776,6 +1793,10 @@ def test_uniqueness_rule_left_out_fails(tmp_path: Path) -> None:
             F1_ROWS, "none\n", None, id="compliant-variant-step-with-nested-list",
         ),
         pytest.param(
+            "- In this order:\n" + "".join("  " + line + "\n" for line in NEXT_STEPS.splitlines() if line.strip()),
+            F1_ROWS, "none\n", None, id="compliant-variant-steps-nested-under-a-grouping-bullet",
+        ),
+        pytest.param(
             NEXT_STEPS.replace("1. Build F1 DC fabric: Schema Manager, then Object Manager.",
                                "1. Build F1 DC fabric: Schema Manager.\n\n   Then load the racks."),
             F1_ROWS, "none\n", "name the skill for its objects", id="near-miss-text-after-a-blank-line-is-not-the-step",
@@ -1833,6 +1854,16 @@ WIFI_TWO_FEATURES = WIFI_FEATURES + "| F2 | Guest portal | Guests self-register 
         pytest.param(
             WIFI_FEATURES, "- O1: Who owns SSID definitions? (owner: unknown, security or\n  the helpdesk; affects F1)\n",
             None, id="compliant-variant-item-wrapped-over-two-lines",
+        ),
+        pytest.param(
+            WIFI_TWO_FEATURES, "- Wireless\n  - O1: Who owns SSID definitions? (owner: unknown; affects F1)\n"
+            "  - O2: Who runs the guest portal? (owner: helpdesk; affects F2)\n",
+            None, id="compliant-variant-items-nested-under-a-grouping-bullet",
+        ),
+        pytest.param(
+            WIFI_TWO_FEATURES, "- Wireless\n  - O1: Who owns SSID definitions? (owner: unknown)\n"
+            "  - O2: Who runs the guest portal? (owner: helpdesk; affects F1 and F2)\n",
+            "O1 names no feature", id="near-miss-nested-item-does-not-borrow-its-sibling",
         ),
         pytest.param(
             WIFI_TWO_FEATURES, "- O1: Who owns SSID definitions? (owner: unknown)\n- O2: Who runs the guest portal? (owner: helpdesk;\n"
@@ -2314,9 +2345,42 @@ def test_learning_step(tmp_path: Path, steps: str, concepts: frozenset, expected
         assert expected in detail, detail
 
 
-def test_learning_handoff_task_grader(tmp_path: Path) -> None:
-    write(tmp_path, BRIEF, brief(sketch_rows=LEARN_ROWS, features=LEARN_FEATURES, next_steps=LEARN_STEPS))
-    assert_outcome(run_grader("check_learning_handoff.py", tmp_path), None)
+@pytest.mark.parametrize(
+    ("steps", "expected"),
+    [
+        pytest.param(LEARN_STEPS, None, id="compliant"),
+        pytest.param(
+            "1. Settle O1 with the planning team.\n"
+            "2. Learn the proposed-changes and generators concepts first, using the infrahub-teaching-concepts skill (the tutor).\n"
+            "3. Build F1 Fiber plant: run the Schema Manager, then the Object Manager.\n"
+            "4. When F1 is loaded, build F2 DWDM channels with the Schema Manager.\n",
+            None, id="compliant-variant-after-open-item-reordered",
+        ),
+        pytest.param(
+            "1. Build F1 Fiber plant: run the Schema Manager, then the Object Manager.\n"
+            "2. When F1 is loaded, build F2 DWDM channels with the Schema Manager.\n",
+            "name infrahub-teaching-concepts in 0 steps", id="violating-no-learning-step",
+        ),
+        pytest.param(
+            LEARN_STEPS.replace("generators and proposed-changes", "generators and proposed changes"),
+            "does not name ['proposed-changes']", id="near-miss-concept-not-spelled-as-the-map",
+        ),
+        pytest.param(
+            "1. Build F1 Fiber plant: run the Schema Manager, then the Object Manager.\n"
+            "2. Learn generators and proposed-changes with infrahub-teaching-concepts.\n"
+            "3. When F1 is loaded, build F2 DWDM channels with the Schema Manager.\n",
+            "after the first feature's step", id="near-miss-learning-after-building",
+        ),
+        pytest.param(
+            LEARN_STEPS.replace("generators and proposed-changes", "generators, proposed-changes and schema"),
+            "adds ['schema']", id="near-miss-extra-concept",
+        ),
+    ],
+)
+def test_learning_handoff_task_grader(tmp_path: Path, steps: str, expected: str | None) -> None:
+    """The task grader, with its own CONCEPTS, scores the four fixtures as the check does."""
+    write(tmp_path, BRIEF, brief(sketch_rows=LEARN_ROWS, features=LEARN_FEATURES, next_steps=steps))
+    assert_outcome(run_grader("check_learning_handoff.py", tmp_path), expected)
 
 
 def test_learning_handoff_concepts_match_the_tutor_map() -> None:
