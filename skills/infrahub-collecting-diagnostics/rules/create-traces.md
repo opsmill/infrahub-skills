@@ -25,7 +25,9 @@ between services. It is the most direct evidence of a
 slowness. The traces come from the operator's own
 Tempo, so they also carry names from their deployment,
 and the operator decides whether they leave the
-deployment. That is why the option is asked, not
+deployment. The operator also reviews
+`bundle/traces/` before sharing the bundle (see
+[review-before-sharing.md](review-before-sharing.md)). That is why the option is asked, not
 added.
 
 Traces also need a window. A wrong window gives an

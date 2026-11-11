@@ -133,7 +133,8 @@ names (`password`/`secret`/`token`/`key` →
 `********`). It does not scrub log or query
 contents, or secrets stored under other key names.
 Walk the user through scanning `bundle/logs/` and
-`bundle/server/` for hostnames, IPs, customer data,
+`bundle/server/` (and `bundle/traces/` when the
+bundle has traces) for hostnames, IPs, customer data,
 or secrets under non-standard keys, and get explicit
 confirmation before sharing. See
 [rules/review-before-sharing.md](rules/review-before-sharing.md).

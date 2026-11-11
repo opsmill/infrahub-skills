@@ -28,8 +28,9 @@
    not build it by hand.
 
 7. **Review (review-)** -- CRITICAL. Masking covers
-   key names only; user reviews `bundle/logs/` and
-   `bundle/server/` before sharing.
+   key names only; user reviews `bundle/logs/`,
+   `bundle/server/` and, with traces,
+   `bundle/traces/` before sharing.
 
 8. **Cross-linking (cross-link-)** -- MEDIUM. At
    workflow end, point users to `infrahub-reporting-

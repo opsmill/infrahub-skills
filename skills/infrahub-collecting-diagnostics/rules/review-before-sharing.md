@@ -39,6 +39,12 @@ sharing:
 - `bundle/server/` — config/env output; scan for
   secrets under non-standard key names that the
   key-name masking wouldn't catch.
+- `bundle/traces/`, when the bundle was created with
+  `--include-traces` — the collector removes query
+  text, URLs and IP addresses, but the attributes it
+  keeps can still carry names from the deployment,
+  such as service, branch or GraphQL operation names.
+  See [create-traces.md](create-traces.md).
 
 Get explicit confirmation from the user that the
 bundle is OK to share before handing it off. Don't
