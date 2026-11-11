@@ -4409,13 +4409,13 @@ tasks:
         weight: 1.0
     expected_output: >-
       A directory ./output_dir/ that contains no schema documents (no file with
-      top-level `version: "1.0"` plus `nodes:` / `generics:`), and nothing under
+      top-level `version: "1.0"` plus `nodes:` / `generics:` / `extensions:`), and nothing under
       a `schemas/` sub-path of the output dir. The skill fails closed on the
       unmapped `gpu_count`: it writes no object rows, names the column and the
       kinds it checked, and points at infrahub-managing-schemas. It never
       writes a schema mutation.
     expectations:
-      - No file in ./output_dir/ is a schema document (version 1.0 + nodes / generics)
+      - No file in ./output_dir/ is a schema document (version 1.0 + nodes / generics / extensions)
       - No file lives under a schemas/ sub-path of ./output_dir/
       - No object rows are emitted for an input with an unmapped column
     assertions:

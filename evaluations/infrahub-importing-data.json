@@ -129,10 +129,10 @@
     {
       "id": 7,
       "prompt": "I have `devices.csv` with an extra `gpu_count` column the schema\ndoes not declare:\n\n    name,role,status,gpu_count\n    spine-01,spine,active,0\n    gpu-rig-01,gpu,active,8\n    gpu-rig-02,gpu,active,8\n\nThe DcimDevice schema declares `name`, `role`, and `status` only \u2014 no\n`gpu_count` attribute. The schema is fixed and I have not approved any\nschema change.\n\nEmit whatever correct Infrahub object YAML you can to `./output_dir/`. Do\nNOT propose or write any schema changes; the skill fails closed on\nunmapped columns.",
-      "expected_output": "A directory ./output_dir/ that contains no schema documents (no file with top-level `version: \"1.0\"` plus `nodes:` / `generics:`), and nothing under a `schemas/` sub-path of the output dir. The skill fails closed on the unmapped `gpu_count`: it writes no object rows, names the column and the kinds it checked, and points at infrahub-managing-schemas. It never writes a schema mutation.",
+      "expected_output": "A directory ./output_dir/ that contains no schema documents (no file with top-level `version: \"1.0\"` plus `nodes:` / `generics:` / `extensions:`), and nothing under a `schemas/` sub-path of the output dir. The skill fails closed on the unmapped `gpu_count`: it writes no object rows, names the column and the kinds it checked, and points at infrahub-managing-schemas. It never writes a schema mutation.",
       "files": [],
       "expectations": [
-        "No file in ./output_dir/ is a schema document (version 1.0 + nodes / generics)",
+        "No file in ./output_dir/ is a schema document (version 1.0 + nodes / generics / extensions)",
         "No file lives under a schemas/ sub-path of ./output_dir/",
         "No object rows are emitted for an input with an unmapped column"
       ],

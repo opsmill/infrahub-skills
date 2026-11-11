@@ -3,7 +3,7 @@
 
 Asserts that the skill fails closed on unmapped columns: no Object document
 carries rows, no YAML file in the emitted output directory is a schema
-document (``version: 1.0`` + ``nodes:`` / ``generics:``), and no file lives
+document (``version: 1.0`` + ``nodes:`` / ``generics:`` / ``extensions:``), and no file lives
 under a ``schemas/`` sub-path of the output dir.
 
 ``envelope`` is not bundled here. It fails an empty output dir, and an

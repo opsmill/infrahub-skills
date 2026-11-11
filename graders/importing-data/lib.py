@@ -456,9 +456,11 @@ def check_no_schema_mutation(
 ) -> tuple[bool, str]:
     """Within the emitted output dir, no file is a schema document.
 
-    A schema document is identifiable by top-level ``version: "1.0"`` plus
-    ``nodes:`` or ``generics:`` keys. Also fails if any file lives under a
-    ``schemas/`` sub-path inside the emission directory.
+    A schema document is identifiable by top-level ``version: "1.0"`` (quoted
+    or not) plus ``nodes:``, ``generics:`` or ``extensions:`` keys. An
+    ``extensions:`` document adds attributes to an existing node, so it is a
+    schema change too. Also fails if any file lives under a ``schemas/``
+    sub-path inside the emission directory.
 
     An output dir with no YAML passes: it holds no schema document, and
     writing nothing is what the fail-closed rule requires when a column has
@@ -479,11 +481,13 @@ def check_no_schema_mutation(
             except ValueError:
                 pass
         for doc in docs:
-            version = doc.get("version")
-            has_schema_keys = "nodes" in doc or "generics" in doc
+            # An unquoted `version: 1.0` loads as a float, so compare as text.
+            version = str(doc.get("version"))
+            has_schema_keys = "nodes" in doc or "generics" in doc or "extensions" in doc
             if version == "1.0" and has_schema_keys:
                 violations.append(
-                    f"{file_path.name}: schema document (version 1.0 + nodes/generics)"
+                    f"{file_path.name}: schema document "
+                    "(version 1.0 + nodes/generics/extensions)"
                 )
                 break
 
