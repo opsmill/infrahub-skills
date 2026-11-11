@@ -251,10 +251,19 @@ def _runs_inner_shell(piece: str) -> bool:
 # command itself, a value the command prints, or code a shell runs.
 _SUBSTITUTION = re.compile(r"[$<>]\(")
 
-# A pipe (`|` or `|&`, not `||`) or a here-string feeds printed text to
-# another program, which can run it as code: `| bash`, `| sudo -E bash`,
-# `| env bash`, `bash <<< '...'`. Which programs do that is not listed.
+# A pipe (`|` or `|&`, not `||`) or a here-string feeds text to another
+# program, which can expand or run it: `| bash`, `| sudo -E bash`,
+# `| env bash`, `bash <<< '...'`, `envsubst <<< '...'`. Which programs do
+# that is not listed.
 _FEEDS_INPUT = re.compile(r"(?<!\|)\|(?!\|)|<<<")
+
+
+def _single_quoted(piece: str) -> str:
+    """The single-quoted text of the piece, or all of it if quotes do not balance."""
+    spans = _quoted_spans(piece)
+    if spans is None:
+        return piece
+    return " ".join(piece[a + 1 : b] for a, b, q in spans if q == "'")
 
 
 def _blank_spans(piece: str, quotes: str) -> str:
@@ -346,8 +355,9 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
     }
     # Fails closed where reading the shell exactly has kept missing shapes.
     # A command holding the token beside a substitution is a leak. On a line
-    # with a pipe or a here-string, the next program may run printed text as
-    # code, so single-quoted text there still counts.
+    # with a pipe or a here-string, the next program may expand or run
+    # single-quoted text (`| bash`, `envsubst <<< '...'`), so a token there
+    # counts in any command, printing or not.
     fed = [
         (start, end)
         for start, end in _segments(text)
@@ -361,10 +371,15 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
             continue
         if _SUBSTITUTION.search(piece):
             offenders |= values
-        elif _PRINTS_TO_STDOUT.search(piece):
-            if not any(a <= start < b for a, b in fed):
-                piece = _unquote_single(piece)
-            offenders.update(m.group(0) for m in _TOKEN_VALUE.finditer(piece))
+            continue
+        if any(a <= start < b for a, b in fed):
+            offenders.update(
+                m.group(0) for m in _TOKEN_VALUE.finditer(_single_quoted(piece))
+            )
+        if _PRINTS_TO_STDOUT.search(piece):
+            offenders.update(
+                m.group(0) for m in _TOKEN_VALUE.finditer(_unquote_single(piece))
+            )
     if offenders:
         return False, (
             f"expansion(s) that print the token's value: {sorted(offenders)}; "
