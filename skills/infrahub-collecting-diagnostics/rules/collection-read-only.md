@@ -13,6 +13,15 @@ The diagnostic skill never mutates Infrahub state.
 the skill must not add any command around it that
 isn't.
 
+One change is part of the plan but not run by the
+agent: for a slowness the operator can reproduce, a
+super admin raises the trace sampling ratio for a
+limited time and removes it after the bundle (`PUT`
+and `DELETE` on
+`/api/troubleshooting/trace-sample-ratio`). The
+operator runs both calls. See
+[create-traces.md](create-traces.md).
+
 ### Why it matters
 
 A user running this skill is already in a broken
@@ -31,12 +40,15 @@ Run only `infrahub-collect` subcommands
 `kubectl get pods`, `kubectl logs`) if the user needs
 extra context beyond what the bundle captured.
 
-On Kubernetes, `infrahub-collect` only needs read
-access to `pods/log` and `pods/exec` — no write or
-scale permissions. Never run `kubectl delete`,
-`kubectl scale`, `docker compose down`, `docker
-compose restart`, or any command that mutates cluster
-or container state.
+On Kubernetes, `infrahub-collect` needs read access
+to `pods/log` and `pods/exec`, and no write or scale
+permissions. `--include-traces` also needs `create`
+on `pods/portforward` and `list` on `services`, to
+reach the Tempo pod (see
+[create-traces.md](create-traces.md)). Never run
+`kubectl delete`, `kubectl scale`, `docker compose
+down`, `docker compose restart`, or any command that
+mutates cluster or container state.
 
 ### Compliant
 
@@ -58,9 +70,10 @@ kubectl scale deployment task-worker --replicas=0  # mutates
 
 - "Restarting just to see if it helps" — not
   diagnostics, mutation.
-- Requesting broader Kubernetes RBAC than
-  `pods/log` + `pods/exec` read access "just in
-  case" — the tool never needs more than that.
+- Requesting broader Kubernetes RBAC than the
+  collection needs "just in case": `pods/log` and
+  `pods/exec`, plus `pods/portforward` (`create`) and
+  `services` (`list`) only with `--include-traces`.
 - Reaching for `docker compose exec`/`kubectl exec`
   to "poke around" instead of trusting
   `infrahub-collect create` to gather what's needed.

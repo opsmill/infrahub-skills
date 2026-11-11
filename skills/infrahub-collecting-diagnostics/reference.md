@@ -150,7 +150,9 @@ Kubernetes, the target namespace's pods need the label
 
 **Permission denied on Kubernetes.**
 `infrahub-collect` needs read access to `pods/log` and
-`pods/exec` in the target namespace. Ask the user (or
+`pods/exec` in the target namespace, plus `create` on
+`pods/portforward` and `list` on `services` with
+`--include-traces`. Ask the user (or
 their platform team) to grant that RBAC rather than
 escalating to broader access.
 

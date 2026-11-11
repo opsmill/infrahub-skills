@@ -48,7 +48,9 @@ infrahub-collect environment list
 No Infrahub API token is required for any of this —
 the tool reuses the user's existing Docker or
 `kubectl` access. On Kubernetes it only needs
-read access to `pods/log` and `pods/exec`.
+read access to `pods/log` and `pods/exec`. Only
+`--include-traces` uses a token and more permissions;
+see [create-traces.md](create-traces.md).
 
 ### Compliant
 
@@ -75,8 +77,11 @@ kubectl -n infrahub get pods
 - Assuming the default namespace or Compose project
   without running `environment list` when detection
   reports ambiguity.
-- Asking the user for an Infrahub API token — the
-  tool never needs one; it only needs the
-  Docker/kubectl access already on the host.
+- Asking the user for an Infrahub API token for
+  detection or a bundle without traces — the tool
+  only needs the Docker/kubectl access already on the
+  host. With `--include-traces`, the token stays out
+  of the conversation, as
+  [create-traces.md](create-traces.md) says.
 
 Reference: [Install infrahub-collect](https://docs.infrahub.app/backup/collect/install)

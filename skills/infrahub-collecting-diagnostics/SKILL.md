@@ -97,7 +97,8 @@ non-default K8s namespace), run
 `infrahub-collect environment list` and disambiguate
 with `--project=<name>` or `--k8s-namespace=<ns>`.
 No Infrahub API token is needed — the tool reuses
-existing Docker/kubectl access. See
+existing Docker/kubectl access. Only `--include-traces`
+in step 4 uses one. See
 [rules/deployment-detection.md](rules/deployment-detection.md).
 
 ### 4. Create the bundle
