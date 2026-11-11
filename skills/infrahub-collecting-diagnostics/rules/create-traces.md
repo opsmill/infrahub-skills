@@ -75,11 +75,22 @@ created again for a slowness that already ended.
    `INFRAHUB_TRACES_TEMPO_TOKEN`. In a terminal, it
    asks for them with a prompt that does not show what
    the operator types. When the agent runs the command
-   through a tool, there is no prompt: tell the
-   operator to set the variables in their own shell, or
-   to run the command themselves. Never ask for a
-   token value in the conversation. A token pasted in
-   the conversation is stored in the transcript.
+   through a tool, there is no prompt, and a variable
+   the operator exports in another terminal does not
+   reach the agent's process. Give the operator one of
+   these choices:
+   - Export the variables, then start the agent
+     session from that same shell.
+   - Save the token in a file that the agent never
+     opens, and let the command read it:
+     `INFRAHUB_TRACES_API_TOKEN="$(cat ~/.infrahub-admin-token)" infrahub-collect create ...`
+   - Run the command themselves in their own terminal.
+
+   Without the token, `create` still collects the
+   traces but does not record the sampling ratio.
+   Never ask for a token value in the conversation. A
+   token pasted in the conversation is stored in the
+   transcript.
 
 ### Compliant
 
@@ -91,12 +102,13 @@ created again for a slowness that already ended.
 >
 > [operator: yes, 14:00 to 15:30 UTC today]
 >
-> infrahub-collect create --include-traces \
->   --traces-start 2026-11-05T14:00:00Z --traces-end 2026-11-05T15:30:00Z
+> Only a share of requests has a trace. Save your
+> super_admin token in ~/.infrahub-admin-token; I will
+> not open that file, and do not paste the token here.
 >
-> Only a share of requests has a trace. Set
-> INFRAHUB_TRACES_API_TOKEN in your own shell before
-> the run; do not paste the token here.
+> INFRAHUB_TRACES_API_TOKEN="$(cat ~/.infrahub-admin-token)" \
+>   infrahub-collect create --include-traces \
+>   --traces-start 2026-11-05T14:00:00Z --traces-end 2026-11-05T15:30:00Z
 ```
 
 ### Non-compliant

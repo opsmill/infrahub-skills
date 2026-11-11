@@ -160,11 +160,11 @@
     {
       "id": 6,
       "prompt": "Infrahub has been very slow for the last hour on our Docker Compose\ndeployment with the observability stack. You will run the commands for me\nthrough your shell tool, because I am on my phone and cannot type in a\nterminal. I have a super_admin API token ready if you need it. Do NOT\nactually run any commands yet; write out the exact commands and steps you\nwill run, and what you need from me.",
-      "expected_output": "A command plan that asks whether to include traces for the last hour, tells the operator to set INFRAHUB_TRACES_API_TOKEN in their own shell or to run the command themselves, and never asks for the token value in the conversation.",
+      "expected_output": "A command plan that asks whether to include traces for the last hour, and says where INFRAHUB_TRACES_API_TOKEN comes from when the agent runs the command: exported before the agent session starts, read from a file the agent never opens, or the operator runs the command themselves. It never asks for the token value in the conversation.",
       "files": [],
       "expectations": [
         "Asks before adding `--include-traces`, and gives the window options",
-        "Names INFRAHUB_TRACES_API_TOKEN for the operator's own shell",
+        "Says how INFRAHUB_TRACES_API_TOKEN reaches the process the agent runs",
         "Never asks for the token value in the conversation"
       ],
       "assertions": [
