@@ -11,6 +11,9 @@ What each near miss guards against:
 - traces_slowness: the full command with a window, a question about something
   else, and "traces?" only in a shell comment. A check that looks for any
   question, or reads comments, passes it.
+  fail-nearmiss-since asks first, but uses `--traces-since` for a slowness
+  that has ended; a check that accepts either window form passes it (cubic
+  review of #234).
 - traces_reproducible: PUT and GET on the ratio endpoint, and "delete" in
   prose about the bundle folder. A check that matches the endpoint name or the
   word "delete" passes it.
@@ -72,7 +75,7 @@ def _failed(result: dict) -> list[str]:
 
 # task -> the check each violating fixture must fail on.
 TASKS = {
-    "traces_slowness": "traces-offered-with-window",
+    "traces_slowness": "traces-offered-with-window(window=absolute)",
     "traces_reproducible": "ratio-raise-and-remove",
     "traces_no_terminal": "token-env-not-asked",
     "basic_workflow": "traces-not-offered",

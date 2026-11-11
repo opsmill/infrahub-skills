@@ -1,0 +1,12 @@
+## Plan
+
+The slowness lasted from 14:00 to 15:30 UTC. Do you want to include the traces of the slow requests?
+
+If yes, run this now; a 4-hour window covers it:
+
+```bash
+infrahub-collect environment detect
+infrahub-collect create --include-traces --traces-since 4h
+```
+
+Review the bundle before sharing it.

@@ -177,21 +177,30 @@ def _asks_about_traces(text: str) -> bool:
     )
 
 
-def check_traces_offered_with_window(text: str, **_: object) -> CheckResult:
-    """For a slow instance: ask about traces, and give the command with a window."""
+def check_traces_offered_with_window(text: str, *, window: str = "any", **_: object) -> CheckResult:
+    """For a slow instance: ask about traces, and give the command with a window.
+
+    `window` is the window the scenario calls for: "absolute" for a slowness
+    that has ended (`--traces-start` and `--traces-end`), "any" when either
+    form fits.
+    """
+    def has_window(names: set[str]) -> bool:
+        absolute = {"--traces-start", "--traces-end"} <= names
+        if window == "absolute":
+            return absolute and "--traces-since" not in names
+        return absolute or "--traces-since" in names
+
     with_window = [
         opts for opts in _create_options(text)
-        if "--include-traces" in _trace_options(opts)
-        and (
-            "--traces-since" in _trace_options(opts)
-            or {"--traces-start", "--traces-end"} <= _trace_options(opts)
-        )
+        if "--include-traces" in _trace_options(opts) and has_window(_trace_options(opts))
     ]
     if not with_window:
-        return False, (
-            "no `infrahub-collect create --include-traces` command with "
-            "`--traces-since` or `--traces-start` and `--traces-end`"
+        wanted = (
+            "`--traces-start` and `--traces-end` (the slowness has ended)"
+            if window == "absolute"
+            else "`--traces-since` or `--traces-start` and `--traces-end`"
         )
+        return False, f"no `infrahub-collect create --include-traces` command with {wanted}"
     if not _asks_about_traces(text):
         return False, "adds traces without asking the operator first (no question names traces)"
     return True, "asks about traces and gives the command with a window"

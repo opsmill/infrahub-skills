@@ -10,7 +10,8 @@ from lib import run_checks  # noqa: E402
 
 CHECKS = [
     "mentions-create",
-    "traces-offered-with-window",
+    # The slowness in this task has ended, so the window must be absolute.
+    ("traces-offered-with-window", {"window": "absolute"}),
     "review-before-sharing",
     "no-legacy-artifacts",
 ]

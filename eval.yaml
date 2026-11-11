@@ -3193,14 +3193,14 @@ tasks:
       to review the bundle before sharing.
     expectations:
       - Recommends `infrahub-collect create`
-      - Asks before adding `--include-traces`, and gives the window options
+      - Asks before adding `--include-traces`, and gives `--traces-start` and `--traces-end` for the slowness that ended
       - Surfaces a review-before-sharing caution
       - Does not resurrect hand-rolled manifest.yml/flags.yml artifacts
     assertions:
       - name: mentions-create
         check: Plan recommends `infrahub-collect create`
       - name: traces-offered-with-window
-        check: Plan asks about traces and gives `--include-traces` with a window
+        check: Plan asks about traces and gives `--include-traces` with `--traces-start` and `--traces-end`
       - name: review-before-sharing
         check: Plan cautions to review the bundle before sharing
       - name: no-legacy-artifacts

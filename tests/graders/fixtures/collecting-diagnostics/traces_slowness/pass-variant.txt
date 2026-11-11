@@ -1,9 +1,9 @@
 ## Plan
 
-- Is the slowness still going on? If so, would you like me to add traces for the last 2 hours?
+- Would you like me to add the traces of the slow requests? Did the slowness start at 14:00 and end at 15:30 UTC?
 
 ~~~sh
-infrahub-collect environment detect && infrahub-collect create --include-traces --traces-since=2h  # after your yes
+infrahub-collect environment detect && infrahub-collect create --include-traces --traces-start=2026-11-05T14:00:00Z --traces-end=2026-11-05T15:30:00Z  # after your yes
 ~~~
 
 - Review the bundle before you send it to OpsMill.
