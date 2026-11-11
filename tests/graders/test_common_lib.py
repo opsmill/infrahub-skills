@@ -211,6 +211,16 @@ TOKEN_SAFE = [
         'Run `[ -n "${INFRAHUB_API_TOKEN:-}" ] || echo "not set"`.',
         id="or-operator-is-not-a-pipe",
     ),
+    # A pipe keeps quoted text live only in a command that prints. A token
+    # sent in a header, or a presence test, on a piped line prints nothing.
+    pytest.param(
+        'Run `curl -s -H "X-INFRAHUB-KEY: $INFRAHUB_API_TOKEN" "$INFRAHUB_ADDRESS/graphql" -d @q.json | jq .`.',
+        id="token-in-a-header-piped-to-jq",
+    ),
+    pytest.param(
+        'Run `[ -n "${INFRAHUB_API_TOKEN:-}" ] && echo set | tee check.log`.',
+        id="presence-test-on-a-piped-line",
+    ),
 ]
 
 
@@ -221,9 +231,9 @@ def test_presence_tests_that_cannot_leak_pass(text):
 
 
 # These print nothing secret, and fail on purpose. A command holding the
-# token beside a substitution, or on a line with a pipe or a here-string,
-# fails closed, because reading what the next program runs kept missing
-# leaks. This list protects that choice: do not move these back to
+# token beside a substitution, or printing quoted text on a line with a
+# pipe or a here-string, fails closed, because reading what the next
+# program runs kept missing leaks. This list protects that choice: do not move these back to
 # TOKEN_SAFE without a reader that is exact.
 TOKEN_FAILS_CLOSED = [
     pytest.param(

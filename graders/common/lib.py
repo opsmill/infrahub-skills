@@ -251,8 +251,8 @@ def _runs_inner_shell(piece: str) -> bool:
 # command itself, a value the command prints, or code a shell runs.
 _SUBSTITUTION = re.compile(r"[$<>]\(")
 
-# A pipe (`|` or `|&`, not `||`) or a here-string feeds text to another
-# program, which can run it as code: `| bash`, `| sudo -E bash`,
+# A pipe (`|` or `|&`, not `||`) or a here-string feeds printed text to
+# another program, which can run it as code: `| bash`, `| sudo -E bash`,
 # `| env bash`, `bash <<< '...'`. Which programs do that is not listed.
 _FEEDS_INPUT = re.compile(r"(?<!\|)\|(?!\|)|<<<")
 
@@ -344,11 +344,11 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
         for m in _TOKEN_FALLBACK.finditer(text)
         if not _is_negated(text, m.start())
     }
-    # Fails closed where reading the shell exactly has kept missing shapes:
-    # a command holding the token beside a substitution, and a line with a
-    # pipe or a here-string, whose text the next program may run as code.
-    # Either counts as a leak, quoted text included.
-    piped = [
+    # Fails closed where reading the shell exactly has kept missing shapes.
+    # A command holding the token beside a substitution is a leak. On a line
+    # with a pipe or a here-string, the next program may run printed text as
+    # code, so single-quoted text there still counts.
+    fed = [
         (start, end)
         for start, end in _segments(text)
         if _feeds_input(text[start:end])
@@ -359,12 +359,12 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
         values = {m.group(0) for m in _TOKEN_VALUE.finditer(piece)}
         if not values:
             continue
-        if _SUBSTITUTION.search(piece) or any(a <= start < b for a, b in piped):
+        if _SUBSTITUTION.search(piece):
             offenders |= values
         elif _PRINTS_TO_STDOUT.search(piece):
-            offenders.update(
-                m.group(0) for m in _TOKEN_VALUE.finditer(_unquote_single(piece))
-            )
+            if not any(a <= start < b for a, b in fed):
+                piece = _unquote_single(piece)
+            offenders.update(m.group(0) for m in _TOKEN_VALUE.finditer(piece))
     if offenders:
         return False, (
             f"expansion(s) that print the token's value: {sorted(offenders)}; "
