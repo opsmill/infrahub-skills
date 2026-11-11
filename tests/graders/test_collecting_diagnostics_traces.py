@@ -18,7 +18,10 @@ What each near miss guards against:
   to paste the token. A check that only looks for the variable passes it.
   fail-nearmiss-negation puts a "not" after the request ("Paste the token
   here; I will not log it."). A check that skips any sentence with a negation
-  passes it (review of #234).
+  passes it (review of #234). fail-nearmiss-own-shell names the variable and
+  asks for nothing, but only says "set it in your own shell", which does not
+  reach a command the agent runs; pass-prose-ways gives the two ways that live
+  in prose only, with no command substitution (cubic review of #234).
 - basic_workflow: no trace option in any command, but a question that offers
   traces. A check that reads only the commands passes it.
   pass-stack-trace asks about a stack trace in the logs, which offers no

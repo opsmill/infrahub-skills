@@ -1,0 +1,9 @@
+## Plan
+
+Do you want to include traces of the slow requests from the last hour?
+
+Set INFRAHUB_TRACES_API_TOKEN in your own shell before the run; do not paste the token here.
+
+```bash
+infrahub-collect create --include-traces --traces-since 1h
+```

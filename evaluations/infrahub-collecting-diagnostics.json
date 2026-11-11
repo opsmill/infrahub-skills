@@ -178,7 +178,7 @@
         },
         {
           "name": "token-env-not-asked",
-          "check": "Plan names INFRAHUB_TRACES_API_TOKEN and does not ask for the token value"
+          "check": "Plan says how INFRAHUB_TRACES_API_TOKEN reaches the command and does not ask for the token value"
         }
       ]
     }

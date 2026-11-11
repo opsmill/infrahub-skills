@@ -271,14 +271,60 @@ def _asks_for_token(sentence: str) -> bool:
     return False
 
 
+# How the token reaches a command the agent runs (rules/create-traces.md,
+# step 5). A variable exported in the operator's own terminal does not reach
+# the agent's process, so "set it in your shell" alone is not a way. The three
+# ways, strongest evidence first:
+# 1. a command assigns the variable from a command substitution, such as
+#    INFRAHUB_TRACES_API_TOKEN="$(cat ~/.infrahub-admin-token)";
+# 2. the operator runs the command themselves;
+# 3. the operator starts the agent session from the shell that exported it.
+_TOKEN_VAR = "INFRAHUB_TRACES_API_TOKEN"
+_RUN_YOURSELF_RE = re.compile(
+    r"\brun\b.{0,40}\b(yourself|themselves|in your (own )?terminal)\b", re.IGNORECASE
+)
+_START_AGENT_FROM_SHELL_RE = re.compile(
+    r"\b(start|launch|open|restart)\w*\b.{0,60}\b(session|agent|assistant|claude)\b"
+    r".{0,60}\b(shell|terminal)\b",
+    re.IGNORECASE,
+)
+
+
+def _token_from_substitution(text: str) -> bool:
+    """A command assigns the token variable from a command substitution."""
+    for cmd in _shell_commands(text):
+        for tok in cmd:
+            name, sep, value = tok.partition("=")
+            if sep and name.split()[-1] == _TOKEN_VAR and ("$(" in value or "`" in value):
+                return True
+    return False
+
+
+def _token_way_in_prose(text: str) -> bool:
+    """A sentence tells the operator to run the command or start the agent from their shell."""
+    for s in _sentences(_prose(text)):
+        for clause in _CLAUSE_SPLIT_RE.split(s):
+            for regex in (_RUN_YOURSELF_RE, _START_AGENT_FROM_SHELL_RE):
+                m = regex.search(clause)
+                if m and not _NEGATION_BEFORE_RE.search(clause[: m.start()]):
+                    return True
+    return False
+
+
 def check_token_env_not_asked(text: str, **_: object) -> CheckResult:
-    """Name the token variable for the operator's shell; never ask for the value."""
+    """Never ask for the token value; say how INFRAHUB_TRACES_API_TOKEN reaches the command."""
     asks = [s for s in _sentences(_prose(text)) if _asks_for_token(s)]
     if asks:
         return False, f"asks for the token value in the conversation: {asks[0]!r}"
-    if "INFRAHUB_TRACES_API_TOKEN" not in text:
-        return False, "does not name INFRAHUB_TRACES_API_TOKEN for the operator's shell"
-    return True, "names INFRAHUB_TRACES_API_TOKEN and does not ask for the token value"
+    if _TOKEN_VAR not in text:
+        return False, f"does not name {_TOKEN_VAR}"
+    if not (_token_from_substitution(text) or _token_way_in_prose(text)):
+        return False, (
+            f"does not say how {_TOKEN_VAR} reaches the command the agent runs "
+            "(read from a file in the command, the operator runs it, or the agent "
+            "session starts from the shell that exported it)"
+        )
+    return True, f"names {_TOKEN_VAR}, says how it reaches the command, and does not ask for the value"
 
 
 CHECKS: dict[str, CheckFn] = {

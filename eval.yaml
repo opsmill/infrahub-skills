@@ -3277,7 +3277,7 @@ tasks:
       - name: traces-offered-with-window
         check: Plan asks about traces and gives `--include-traces` with a window
       - name: token-env-not-asked
-        check: Plan names INFRAHUB_TRACES_API_TOKEN and does not ask for the token value
+        check: Plan says how INFRAHUB_TRACES_API_TOKEN reaches the command and does not ask for the token value
 
   # --- Diagnostics Analyzer --- #
   - name: analyzing-diagnostics-traceback-triage
