@@ -21,6 +21,9 @@ What each near miss guards against:
   passes it (review of #234).
 - basic_workflow: no trace option in any command, but a question that offers
   traces. A check that reads only the commands passes it.
+  pass-stack-trace asks about a stack trace in the logs, which offers no
+  traces. A check that matches any question with "trace" fails it (review
+  of #234).
 
 The compliant fixture of traces_slowness wraps its question over two lines,
 which a line-by-line sentence split read as no question.

@@ -163,10 +163,16 @@ def _trace_options(options: list[str]) -> set[str]:
     return names
 
 
+# Traces in the sense of the collected traces, not an error's stack trace:
+# "Did you get a stack trace in the task-worker logs?" is a normal question for
+# a schema load failure and offers nothing.
+_TRACES_WORD_RE = re.compile(r"(?<!stack )(?<!stack-)\btrac(e|es|ing)\b", re.IGNORECASE)
+
+
 def _asks_about_traces(text: str) -> bool:
-    """A question in the prose that names traces."""
+    """A question in the prose that names the collected traces."""
     return any(
-        s.endswith("?") and re.search(r"trac(e|es|ing)\b", s, re.IGNORECASE)
+        s.endswith("?") and _TRACES_WORD_RE.search(s)
         for s in _sentences(_prose(text))
     )
 
