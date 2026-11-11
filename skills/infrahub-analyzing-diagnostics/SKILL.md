@@ -76,11 +76,11 @@ Mentioning the default as a hint is fine
 (`./infrahub_bundles/` when `--output-dir` wasn't
 set), but the user names the path. Skip the question
 only when the user already gave a path or pasted
-bundle contents, even a single log excerpt. Once
-given, confirm it looks like
+bundle contents, even a single log excerpt. When the
+user gave a path, confirm it looks like
 an `infrahub-collect` bundle — a `bundle/` directory
-containing `bundle_information.json`. If there is no
-bundle at all, stop and hand off to
+containing `bundle_information.json`. If the user has
+neither a bundle nor pasted contents, stop and hand off to
 `infrahub-collecting-diagnostics`; do not scrape
 `docker compose logs`/`kubectl logs` as a substitute.
 See
