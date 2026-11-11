@@ -16,6 +16,9 @@ What each near miss guards against:
   word "delete" passes it.
 - traces_no_terminal: names INFRAHUB_TRACES_API_TOKEN, but asks the operator
   to paste the token. A check that only looks for the variable passes it.
+  fail-nearmiss-negation puts a "not" after the request ("Paste the token
+  here; I will not log it."). A check that skips any sentence with a negation
+  passes it (review of #234).
 - basic_workflow: no trace option in any command, but a question that offers
   traces. A check that reads only the commands passes it.
 
@@ -70,15 +73,29 @@ TASKS = {
 }
 
 
-@pytest.mark.parametrize("task", sorted(TASKS))
-@pytest.mark.parametrize("fixture", ["pass", "pass-variant"])
+def _fixtures(prefix: str) -> list[tuple[str, str]]:
+    """Every (task, fixture) pair whose file name starts with the prefix.
+
+    The four required fixtures are named pass, pass-variant, fail and
+    fail-nearmiss; a review can add more under the same prefixes.
+    """
+    pairs = [
+        (task, f.stem)
+        for task in sorted(TASKS)
+        for f in sorted((_FIXTURES / task).glob(f"{prefix}*.txt"))
+    ]
+    for task in TASKS:
+        assert any(t == task for t, _ in pairs), f"{task} has no {prefix} fixture"
+    return pairs
+
+
+@pytest.mark.parametrize(("task", "fixture"), _fixtures("pass"))
 def test_compliant_fixture_scores_full(task: str, fixture: str) -> None:
     result = run_checks(_task_checks(task), _FIXTURES / task / f"{fixture}.txt")
     assert result["score"] == 1.0, result["details"]
 
 
-@pytest.mark.parametrize("task", sorted(TASKS))
-@pytest.mark.parametrize("fixture", ["fail", "fail-nearmiss"])
+@pytest.mark.parametrize(("task", "fixture"), _fixtures("fail"))
 def test_violating_fixture_fails_on_the_rule(task: str, fixture: str) -> None:
     result = run_checks(_task_checks(task), _FIXTURES / task / f"{fixture}.txt")
     assert result["score"] < 1.0, result["details"]

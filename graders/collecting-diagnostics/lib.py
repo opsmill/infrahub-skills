@@ -249,12 +249,25 @@ _ASK_TOKEN_RE = re.compile(
 )
 
 
+# Clause boundaries inside a sentence. A negation counts only in the clause
+# that holds the ask verb, and only before that verb: "Paste the token here; I
+# will not log it." is still a request, but "Do not send me the token." is not.
+_CLAUSE_SPLIT_RE = re.compile(r"[;:,]|\s+[—–-]\s+|\s+(?:and|but|so|then)\s+", re.IGNORECASE)
+_NEGATION_BEFORE_RE = re.compile(r"\b(never|not|no|don't|don’t|do not|without)\b", re.IGNORECASE)
+
+
+def _asks_for_token(sentence: str) -> bool:
+    """A clause of the sentence asks for the token value, with no negation before the ask."""
+    for clause in _CLAUSE_SPLIT_RE.split(sentence):
+        m = _ASK_TOKEN_RE.search(clause)
+        if m and not _NEGATION_BEFORE_RE.search(clause[: m.start()]):
+            return True
+    return False
+
+
 def check_token_env_not_asked(text: str, **_: object) -> CheckResult:
     """Name the token variable for the operator's shell; never ask for the value."""
-    asks = [
-        s for s in _sentences(_prose(text))
-        if _ASK_TOKEN_RE.search(s) and not _NEGATION_RE.search(s)
-    ]
+    asks = [s for s in _sentences(_prose(text)) if _asks_for_token(s)]
     if asks:
         return False, f"asks for the token value in the conversation: {asks[0]!r}"
     if "INFRAHUB_TRACES_API_TOKEN" not in text:
