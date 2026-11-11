@@ -33,6 +33,37 @@ updates:
       prefix-development: chore(deps-dev)
       include: scope
 
+  - package-ecosystem: npm
+    directory: /docs
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 10
+    groups:
+      # react-dom pins react as a peer at the same major, so a bump of one
+      # without the other fails `npm ci`. Listed first so it takes both
+      # packages for every update type, majors included.
+      react:
+        applies-to: version-updates
+        patterns:
+          - react
+          - react-dom
+      npm-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    labels:
+      - changes/patch
+      - type/housekeeping
+      - ci/skip-changelog
+    commit-message:
+      prefix: chore(deps)
+      prefix-development: chore(deps-dev)
+      include: scope
+
   - package-ecosystem: uv
     directory: /
     schedule:

@@ -2,24 +2,22 @@
 # Mapping profile for the OpsMill schema-library **v2** DCIM schema, covering
 # NetBox device types AND module types.
 #
-# Schema prerequisites (all on schema-library main since v2, #75):
+# Schema prerequisites, all on schema-library main:
 #
-#   base/dcim.yml                              DcimDevice already carries
+#   base/dcim.yml                              DcimDevice carries
 #                                              generate_template: true
 #   extensions/device_module/device_module.yml DcimModuleBay, DcimModule,
-#                                              DcimModuleType (concrete nodes —
-#                                              v2 no longer ships generics only)
-#   extensions/module_port/module_port.yml     DcimModulePort  [schema-library #76]
+#                                              DcimModuleType (concrete nodes)
 #
-# Requires schema-library #76 for three things. Against v2 main today, drop
-# the `label` line from module-bays and the `weight` line from module_type;
-# everything else converts.
+# Three fields below depend on schema-library #76 (merged 2026-09-09), so a
+# schema-library checkout from before then needs the `label` line dropped
+# from module-bays and the `weight` line from module_type, and `position`
+# from module-bays too (or retyped to Text in the schema):
 #
-#   DcimModuleBay.position   v2 types it Number with min_value: 1, rejecting
-#                            the free-form positions NetBox actually uses
-#                            (`F1`, `PSU-1`, `'0'` — 15 of the DCS-7508N's 24
-#                            bays). #76 retypes it to Text. The attribute
-#                            exists either way, so this fails at load, not at
+#   DcimModuleBay.position   Text since #76. Before it, Number with
+#                            min_value: 1, which rejects the free-form
+#                            positions NetBox uses (`F1`, `PSU-1`, `'0'` — 15
+#                            of the DCS-7508N's 24 bays) at load, not at
 #                            conversion.
 #   DcimModuleBay.bay_label  added by #76
 #   DcimGenericModuleType.weight_grams  added by #76
@@ -29,11 +27,10 @@
 #   device types  -> DcimDeviceType + TemplateDcimDevice (+ interfaces, bays)
 #   module types  -> DcimModuleType records
 #
-# Module ports are NOT converted here. A module's ports carry NetBox's
-# {module} bay-position token, which cannot be resolved at conversion time;
-# extensions/module_port gives them a home and the bundled
-# materialize_module_ports.py generator resolves the token once a module is
-# installed in a bay. See ../../generators-module-ports.md.
+# Module ports are NOT converted here; they are reported as skipped. To carry
+# them, use schema-library-module-ports.yml, which emits module templates with
+# their ports as DcimModulePort declarations for the bundled generator to
+# resolve. See ../../generators-module-ports.md.
 version: 1
 name: schema-library-modules
 
@@ -58,8 +55,8 @@ device_type:
       transform: boolean
     # Infrahub has no float attribute kind — Number is integer-backed — so a
     # weight must be a whole number. Kilograms match schema-library's
-    # `Weight (kg)` attribute but round 302 published device types (sub-500g
-    # transceivers and APs) to 0; the report calls each one out. If that
+    # `Weight (kg)` attribute but round 1,597 published device types (sub-500g
+    # transceivers and APs) to 0; the report counts them in its summary. If that
     # matters, add a grams attribute to your schema and switch to weight_g,
     # which keeps every value distinct.
     weight:
@@ -111,9 +108,7 @@ components:
       label: bay_label
 
 module_type:
-  # v2 ships this concrete node (inherits DcimGenericModuleType) — no need to
-  # define one yourself any more. DeviceLinecardType from
-  # experimental/modules_linecards/ is an alternative if you have loaded it.
+  # The concrete node schema-library ships (inherits DcimGenericModuleType).
   kind: DcimModuleType
   manufacturer_relationship: manufacturer
   # Module types carry no slug; `model` is unique across all published
@@ -132,7 +127,6 @@ module_type:
       target: weight_grams
       transform: weight_g
 
-  # Module ports: see the header. Enabling a module template here would need a
-  # concrete module node carrying `generate_template: true`; v2's DcimModule
-  # does not, so TemplateDcimModule is not generated and the ports are
-  # reported as skipped. That is the honest outcome until the generator runs.
+  # No module template: schema-library's DcimModule does not set
+  # generate_template, so TemplateDcimModule does not exist. See
+  # schema-library-module-ports.yml for the profile that adds one.

@@ -13,13 +13,6 @@ description: >-
   (use infrahub-collecting-diagnostics), filing the issue itself
   (use infrahub-reporting-issues), or querying live data
   (use infrahub-analyzing-data).
-allowed-tools:
-  - Read
-  - Bash
-  - Grep
-  - Glob
-  - Write
-  - WebFetch
 metadata:
   version: 1.3.0
   author: OpsMill

@@ -4,12 +4,6 @@ description: >-
   Creates, modifies and debugs Infrahub check definitions — Python validation logic, GraphQL queries, and YAML-driven tests for proposed change pipelines.
   TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes, writing or running tests for a check, modifying or extending an existing check, debugging why a check fails, passes when it should not, or flags the wrong nodes.
   DO NOT TRIGGER when: designing schemas, querying live data, building transforms or generators.
-allowed-tools:
-  - Read
-  - Write
-  - Edit
-  - Bash
-  - Grep
 argument-hint: "[check-name] [description...]"
 metadata:
   version: 1.3.0
@@ -58,7 +52,7 @@ Existing queries:
 | HIGH | API Reference | `api-` | Class attributes, instance properties, methods, lifecycle, and which API surfaces a rejection (a GraphQL error is a 200) |
 | HIGH | Registration | `registration-` | .infrahub.yml config, query name matching, parameters |
 | MEDIUM (HIGH for `patterns-shared-module`) | Patterns | `patterns-` | Error collection, shared utilities, scoped validation, relationship-traversal validation, sharing a module across artifact types |
-| HIGH | Testing | `testing-` | Resources Testing Framework (YAML-driven tests), infrahubctl check commands |
+| HIGH | Testing | `testing-` | Resources Testing Framework (YAML-driven tests), infrahubctl check commands, which repository commit a proposed change's checks run |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -138,7 +132,7 @@ class MyCheck(InfrahubCheck):
 > repository config model uses `extra="forbid"`, so
 > putting `query:` under `check_definitions:` makes
 > the whole repo config fail validation. This is the
-> #1 confusion vs. `generator_definitions:`, which
+> most common confusion vs. `generator_definitions:`, which
 > *does* take a top-level `query:`. See
 > [rules/registration-config.md](./rules/registration-config.md).
 
@@ -186,6 +180,12 @@ Follow these steps when creating a check:
 6. **Test locally** — Run `infrahubctl check` to validate
    against a feature branch. See
    [rules/testing-commands.md](./rules/testing-commands.md).
+   To run a changed check against an existing proposed
+   change, read
+   [rules/testing-proposed-change-commit.md](./rules/testing-proposed-change-commit.md):
+   the pipeline runs the code at the source branch's
+   repository commit, not `main`'s, and a branch rebase
+   does not move it on a branch synced with Git.
 
 ## Supporting References
 

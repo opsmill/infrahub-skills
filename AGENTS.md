@@ -91,7 +91,7 @@ Path-scoped rules live in [dev/guidelines/](dev/guidelines/), which `.claude/rul
 
 [`.agents/`](.agents/) is the source of truth for everything this repo authors for its own agents: [`.agents/skills/`](.agents/skills/) holds the contributor skills, and `.agents/rules` points at `dev/guidelines/`. `.claude/` and `.codex/` are adapters — they hold nothing but relative symlinks into `.agents/`, so any agent that looks in its own conventional directory finds the same skills and rules, with no second copy of any of them and no adapter owning the originals.
 
-[`skills/`](skills/) at the root is deliberately outside that scheme. It is the product: the skills the plugin ships, which `plugin.json` exposes and which `eval.yaml` reads directly. No agent working *on* this repo needs to invoke them — doing so loads the installed plugin, not your edit — so nothing routes to them. That leaves five links, and `scripts/check-symlinks.py` is what keeps them true.
+[`skills/`](skills/) at the root is deliberately outside that scheme. It is the product: the skills the plugin ships, which `plugin.json` exposes and which `eval.yaml` reads directly. No agent working *on* this repo needs to invoke them — doing so loads the installed plugin, not your edit — so nothing routes to them. That leaves five directory links, plus `.claude/CLAUDE.md`, which points at this file so Claude Code loads it without a `CLAUDE.md` at the plugin root. `scripts/check-symlinks.py` keeps all six true.
 
 | Rule | What it constrains |
 | ---- | ------------------ |

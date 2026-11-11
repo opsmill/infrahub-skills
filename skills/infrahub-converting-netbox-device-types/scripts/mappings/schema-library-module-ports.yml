@@ -1,0 +1,165 @@
+---
+# Mapping profile for the OpsMill schema-library DCIM schema, covering NetBox
+# device types AND module types, with each module type's ports carried as
+# DcimModulePort declarations on a module template.
+#
+# It is schema-library-modules.yml plus the module template. Use it when the
+# bundled materialize_module_ports generator should create the real device
+# interfaces once a module is installed; see ../../generators-module-ports.md.
+#
+# Schema prerequisites, in load order:
+#
+#   base/dcim.yml
+#   extensions/device_module/device_module.yml
+#   extensions/module_port/module_port.yml     DcimModulePort, and the `ports`
+#                                              Component on DcimGenericModule
+#   generate_template: true on DcimModule      not in schema-library; see
+#                                              ../../extending-your-schema.md
+#                                              § Carrying the ports too
+#
+# Port names keep NetBox's {module} token. It cannot be resolved at conversion
+# time, because a template is not bound to a bay; the generator resolves it
+# from the bay a module is installed in. Do not set position_placeholder with
+# this profile: it would write one fixed position into every module.
+#
+# Verified against Infrahub 1.11.4 and schema-library 5dd97b2: the templates
+# load, a module created from one carries its port declarations, and the
+# generator turns the interface ports into device interfaces. Console ports
+# need a console interface kind in the schema; power ports stay declarations.
+version: 1
+name: schema-library-module-ports
+
+manufacturer:
+  kind: OrganizationManufacturer
+  name_field: name
+
+device_type:
+  kind: DcimDeviceType
+  manufacturer_relationship: manufacturer
+  fields:
+    model: name
+    part_number: part_number
+    description:
+      target: description
+      fallback: comments
+    u_height:
+      target: height
+      transform: number
+    is_full_depth:
+      target: full_depth
+      transform: boolean
+    # Infrahub has no float attribute kind — Number is integer-backed — so a
+    # weight must be a whole number. Kilograms match schema-library's
+    # `Weight (kg)` attribute but round 1,597 published device types (sub-500g
+    # transceivers and APs) to 0; the report counts them in its summary. If that
+    # matters, add a grams attribute to your schema and switch to weight_g,
+    # which keeps every value distinct.
+    weight:
+      target: weight
+      transform: weight_kg
+
+template:
+  kind: TemplateDcimDevice
+  template_name: "{slug}"
+  device_type_relationship: device_type
+  defaults:
+    status: active
+
+components:
+  interfaces:
+    kind: TemplateInterfacePhysical
+    relationship: interfaces
+    template_name: "{template_name}__{name}"
+    fields:
+      name: name
+      description:
+        target: description
+        fallback: label
+    derived:
+      role:
+        when:
+          mgmt_only: true
+        value: management
+    defaults:
+      status: active
+
+  # Module bays convert as of schema-library v2: DcimPhysicalDevice.module_bays
+  # is a Component relationship to DcimModuleBay, so Infrahub generates
+  # TemplateDcimModuleBay. This is what turns a modular chassis from an empty
+  # template into a useful one — a DCS-7508N carries 24 bays and no interfaces.
+  #
+  # Needs schema-library #76: bay `position` must be Text (see the header).
+  module-bays:
+    kind: TemplateDcimModuleBay
+    relationship: module_bays
+    template_name: "{template_name}__bay__{name}"
+    fields:
+      name: name
+      position: position
+      # NetBox's `label` goes to `bay_label`, never an attribute named
+      # `label`: Infrahub auto-populates a `label` attribute from `name` and
+      # title-cases it, so "NetBox supplied no label" would be
+      # indistinguishable from "label equals name".
+      label: bay_label
+
+module_type:
+  # The concrete node schema-library ships (inherits DcimGenericModuleType).
+  kind: DcimModuleType
+  manufacturer_relationship: manufacturer
+  # Module types carry no slug; `model` is unique across all published
+  # module types, so it is the identity.
+  key: "{model}"
+  fields:
+    model: name
+    part_number: part_number
+    description:
+      target: description
+      fallback: comments
+    # weight_grams [schema-library #76] is grams-denominated, so module
+    # weights keep full resolution — unlike DcimDeviceType.weight, which is
+    # kilograms and rounds sub-500g hardware to 0.
+    weight:
+      target: weight_grams
+      transform: weight_g
+
+  template:
+    kind: TemplateDcimModule
+    template_name: "mod-{model}"
+    module_type_relationship: module_type
+  # Three NetBox lists share the module's one `ports` relationship and are
+  # told apart by `category`, which the generator routes on. Each list gets
+  # its own template_name prefix so their names cannot collide.
+  components:
+    interfaces:
+      kind: TemplateDcimModulePort
+      relationship: ports
+      template_name: "{template_name}__{name}"
+      fields:
+        name: name
+        type: port_type
+        mgmt_only:
+          target: mgmt_only
+          transform: boolean
+      defaults:
+        category: interface
+    console-ports:
+      kind: TemplateDcimModulePort
+      relationship: ports
+      template_name: "{template_name}__console__{name}"
+      fields:
+        name: name
+        type: port_type
+      defaults:
+        category: console
+    power-ports:
+      kind: TemplateDcimModulePort
+      relationship: ports
+      template_name: "{template_name}__power__{name}"
+      fields:
+        name: name
+        type: port_type
+        maximum_draw:
+          target: maximum_draw
+          transform: number
+      defaults:
+        category: power

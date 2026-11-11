@@ -18,8 +18,9 @@ passes a bare string `kind` to the SDK — `client.create/get/all/filters/count`
 with `kind="DcimDevice"` (or the kind as a positional string) — or hand-builds
 node payloads as untyped dicts, when a generated protocol class for that kind
 is available. Importing the class and passing it instead gives dev-time type
-checking and autocomplete, so a later schema change surfaces as a type error
-on the exact line rather than a runtime failure in the pipeline.
+checking and autocomplete on attribute reads, so a later schema change
+surfaces as a type error on the exact line rather than a runtime failure in
+the pipeline. Field names passed to `create()` stay unchecked either way.
 
 ## Why it matters
 
@@ -29,7 +30,9 @@ as a string, you can use the corresponding protocol instead. A bare-string
 and a renamed or retyped attribute compiles fine and fails only at runtime,
 deep in a proposed-change pipeline or a failed artifact generation. With the
 generated class, the type checker turns that same schema drift into a list of
-errors pointing at the exact lines to fix. The cost of *not* adopting
+errors pointing at the exact lines that read a renamed attribute or use a
+retyped one in a way its new type does not allow. It does not check the field
+names passed to `create()`. The cost of *not* adopting
 protocols is paid later, and in a worse place.
 
 ## Checks
@@ -39,8 +42,9 @@ protocols is paid later, and in a worse place.
    protocol class available — a repo module (`protocols.py`,
    `schema_protocols.py`, a `*_sync.py` / `*_async.py` protocols file) or
    `infrahub_sdk.protocols`.
-2. Node payloads hand-built as untyped `dict`s and passed to `create` /
-   `update` instead of constructed against a protocol class.
+2. Node payloads hand-built as untyped `dict`s and passed to `create` with a
+   string kind. A protocol class as the kind types attribute reads on the
+   returned node; the payload's field names stay unchecked either way.
 3. Multiple such call sites, or one file reading/writing many attributes or
    several kinds — i.e. non-trivial schema-coupled Python, not a one-off.
 
@@ -66,8 +70,9 @@ protocols is paid later, and in a worse place.
   `await client.create(IpamIPAddress, address=...)`.
 - A transform fetching `client.filters(kind="NetworkLink", ...)` and reading
   many untyped `["value"]` fields, when `NetworkLink` is already generated.
-- Untyped `dict` payloads assembled field-by-field for `create`, losing every
-  attribute-name and optionality check the protocol class would enforce.
+- Untyped `dict` payloads assembled field-by-field for `create` with a string
+  kind. A protocol class as the kind types attribute reads on the returned
+  node; it does not check the payload's field names.
 
 ## Related
 

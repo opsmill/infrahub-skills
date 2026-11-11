@@ -14,12 +14,6 @@ description: >-
   and edition included: this skill runs in a forked context and cannot see the parent
   conversation.
 context: fork
-allowed-tools:
-  - Read
-  - Bash
-  - Grep
-  - Glob
-  - Write
 argument-hint: "[the user's upgrade request, verbatim]"
 metadata:
   version: 1.3.0

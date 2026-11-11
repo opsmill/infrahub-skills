@@ -198,7 +198,7 @@ plus:
 | `cardinality` | enum | **`"many"`** | `"one"`/`"many"` | Count |
 | `optional` | boolean | **`true`** | - | **Optional by default** |
 | `direction` | enum | `"bidirectional"` | bi/out/in | Direction |
-| `on_delete` | enum | null | no-action/cascade | Delete behavior |
+| `on_delete` | enum | `cascade` on Component, `no-action` on other kinds | no-action/cascade | Delete behavior |
 | `order_weight` | integer | null | - | Display order |
 | `min_count` | integer | 0 | - | Min related objects |
 | `max_count` | integer | 0 | - | Max (0=unlimited) |

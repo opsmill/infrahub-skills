@@ -66,6 +66,11 @@ are required; read what is present and skip the rest.
 | `skills/<candidate>/rules/_sections.md` | the category prefixes a new rule has to fit or extend |
 | `skills/<candidate>/SKILL.md` | the workflow step a new rule would be linked from |
 
+When the input carries an issue number, run Part A of
+[`../skill-pipeline-common/handoff-format.md`](../skill-pipeline-common/handoff-format.md)
+§ "Searching for existing pull requests" before the first question. An idea
+someone is already building does not need an interview.
+
 ## How to interview
 
 One question at a time, in your own message, never batched into a list the
@@ -106,6 +111,14 @@ prefixes already in use. A new prefix has to land in `_sections.md`, the
 `Rule Categories` table in `SKILL.md`, and any severity or ladder legend
 the skill keeps, or the skill never emits the rule while its eval still
 passes.
+
+With the target skill picked, run Part B of the existing-PR search in
+[`../skill-pipeline-common/handoff-format.md`](../skill-pipeline-common/handoff-format.md)
+§ "Searching for existing pull requests" on `skills/<skill>/` and the
+skill's grader directory (`graders/<skill>/` without the `infrahub-` prefix),
+before the next lens. A match is a candidate, not a
+confirmed duplicate: if the user chooses to stop, the interview ends here;
+if they choose to continue, resume at Lens 4.
 
 ## Lens 4: What can a grader actually assert
 
@@ -167,10 +180,14 @@ needs a new file. Record the rung the idea stops at.
    [`../skill-pipeline-common/handoff-format.md`](../skill-pipeline-common/handoff-format.md).
    Record the SHA as `Based on`. If the fetch fails, stop and report the
    failure rather than writing a brief with a guessed baseline.
-2. Write the design brief to `.skill-change-<key>.md`, following the template
+2. Run Part B of the existing-PR search again, on every path the brief will
+   name in `Target`, `Rule path`, and `Test plan`. The later lenses often
+   add paths Lens 3 could not know, such as a `scripts/` check or a docs
+   page, and a PR touching only those was not searched yet.
+3. Write the design brief to `.skill-change-<key>.md`, following the template
    in the same file, with `Track: feature` and `Defect class` set to exactly
    one of `guidance` (a new rule) or `script` (a new consistency check).
-3. Confirm `.skill-change-*.md` is covered by `.gitignore`. It is a working
+4. Confirm `.skill-change-*.md` is covered by `.gitignore`. It is a working
    file for this pipeline, not a repository artifact.
 
 The `Test plan` section must name the eval task, the grader check and the

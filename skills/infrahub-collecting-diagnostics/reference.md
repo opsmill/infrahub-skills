@@ -150,5 +150,5 @@ as-is — don't try to patch the gap by hand.
 
 ## Docs
 
-- [Install infrahub-collect](https://docs.infrahub.app/backup/guides/install-collect)
-- [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+- [Install infrahub-collect](https://docs.infrahub.app/backup/collect/install)
+- [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)

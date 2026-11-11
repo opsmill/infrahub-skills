@@ -1,0 +1,1 @@
+Made `claude plugin validate --strict` pass: quoted the `SessionStart` hook path so it survives a plugin root with spaces, and moved the contributor `CLAUDE.md` to `.claude/CLAUDE.md` (a symlink to `AGENTS.md`), because a `CLAUDE.md` at the plugin root is never loaded for people who install the plugin.

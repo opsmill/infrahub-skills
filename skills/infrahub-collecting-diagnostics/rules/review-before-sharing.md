@@ -78,4 +78,4 @@ clean."
   `bundle/logs/`, where unmasked query text and log
   lines are most likely to carry sensitive data.
 
-Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle)
+Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)

@@ -63,7 +63,7 @@ infrahubctl generator create_dc \
   tracking
 - Test with a small design first (1-2 elements) before
   scaling
-- Check that target `CoreGeneratorGroup` exists and has
+- Check that the target group exists and has
   members
 - Verify query variables match `parameters` mapping in
   `.infrahub.yml`

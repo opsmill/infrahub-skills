@@ -33,8 +33,8 @@ miss when building from scratch:
   load-bearing (display label, hfid, uniqueness) or
   informational. See
   [rules/attribute-computed-jinja2.md](./rules/attribute-computed-jinja2.md).
-- **Cascade vs no-action deletes** — `on_delete:`
-  is independent of `kind: Component`; pick
+- **Cascade vs no-action deletes** — `kind: Component`
+  cascades unless `on_delete: no-action` is set; pick
   `cascade` only for owned children whose existence
   has no meaning without the parent. See
   [rules/relationship-on-delete.md](./rules/relationship-on-delete.md).

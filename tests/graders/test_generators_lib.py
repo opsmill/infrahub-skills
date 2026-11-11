@@ -2,6 +2,10 @@
 
 import ast
 import importlib.util
+import json
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -1146,3 +1150,264 @@ def test_gen_watch_no_third_party_leaves_first_party_paths_alone(watch):
 def test_gen_watch_no_third_party_catches_installed_packages(watch):
     ok, _ = check_gen_watch_no_third_party(_gen_manifest(watch))
     assert ok is False
+
+
+# ---------------------------------------------------------------------------
+# generator-targets-existing-group (generator-target-standard-group task)
+# ---------------------------------------------------------------------------
+
+_TARGET_FIXTURES = (
+    _REPO_ROOT / "tests" / "graders" / "fixtures" / "generator-target-standard-group"
+)
+_TARGET_GRADER_PATH = (
+    _REPO_ROOT / "graders" / "managing-generators" / "check_generator_target_standard_group.py"
+)
+
+
+def _run_target_grader(fixture: str, tmp_path: Path) -> dict:
+    """Drive the task grader the way skillgrade does: output.md in the cwd."""
+    shutil.copy(_TARGET_FIXTURES / f"{fixture}.md", tmp_path / "output.md")
+    result = subprocess.run(
+        [sys.executable, str(_TARGET_GRADER_PATH)],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+@pytest.mark.parametrize(
+    ("fixture", "passes"),
+    [
+        ("pass", True),
+        ("pass-variant", True),
+        ("fail", False),
+        ("fail-nearmiss", False),
+    ],
+)
+def test_generator_targets_existing_group_four_fixtures(fixture, passes, tmp_path):
+    result = _run_target_grader(fixture, tmp_path)
+    check = next(c for c in result["checks"] if c["name"] == "generator-targets-existing-group")
+    assert check["passed"] is passes, check["message"]
+    assert (result["score"] == 1.0) is passes, result["details"]
+
+
+def _target_answer(tmp_path, body: str) -> dict:
+    path = tmp_path / "output.md"
+    path.write_text(body, encoding="utf-8")
+    return _mod.load_output(path)
+
+
+_TARGET_MANIFEST = """```yaml
+generator_definitions:
+  - name: create_dc
+    file_path: generators/generate_dc.py
+    query: topology_dc
+    targets: topologies_dc
+    class_name: DCTopologyGenerator
+    parameters:
+      name: name__value
+    watch:
+      files: []
+```
+"""
+
+
+def test_generator_targets_existing_group_fails_on_group_converted_to_other_kind(tmp_path):
+    body = _TARGET_MANIFEST + (
+        "\n```yaml\n- kind: CoreGraphQLQueryGroup\n  data:\n    - name: topologies_dc\n```\n"
+    )
+    ok, msg = _mod.CHECKS["generator-targets-existing-group"](_target_answer(tmp_path, body))
+    assert ok is False
+    assert "redeclares topologies_dc" in msg
+
+
+def test_generator_targets_existing_group_ignores_kind_named_only_in_a_comment(tmp_path):
+    body = _TARGET_MANIFEST.replace(
+        "    targets: topologies_dc\n",
+        "    # any CoreGroup kind works; no CoreGeneratorGroup needed\n"
+        "    targets: topologies_dc\n",
+    )
+    ok, msg = _mod.CHECKS["generator-targets-existing-group"](_target_answer(tmp_path, body))
+    assert ok is True, msg
+
+
+def test_generator_targets_existing_group_fails_without_a_manifest(tmp_path):
+    ok, msg = _mod.CHECKS["generator-targets-existing-group"](
+        _target_answer(tmp_path, "targets: topologies_dc\n")
+    )
+    assert ok is False
+    assert "no generator_definitions" in msg
+
+
+_GENERATOR_GROUP_FENCE = (
+    "\n```yaml\n{label}\n---\napiVersion: infrahub.app/v1\nkind: Object\n"
+    "spec:\n  kind: CoreGeneratorGroup\n  data:\n    - name: dc_generator_targets\n```\n"
+)
+
+
+def test_generator_targets_existing_group_reads_a_manifest_opening_with_an_instruction(tmp_path):
+    """A negated instruction as the first comment is not a WRONG label."""
+    body = _TARGET_MANIFEST.replace(
+        "```yaml\n",
+        "```yaml\n# Do not create a new group: target the existing one\n",
+        1,
+    )
+    ok, msg = _mod.CHECKS["generator-targets-existing-group"](_target_answer(tmp_path, body))
+    assert ok is True, msg
+
+
+def test_generator_targets_existing_group_grades_a_violation_opening_with_an_instruction(tmp_path):
+    """`# Never edit by hand` does not hide a CoreGeneratorGroup fence."""
+    body = _TARGET_MANIFEST + _GENERATOR_GROUP_FENCE.format(label="# Never edit by hand")
+    ok, msg = _mod.CHECKS["generator-targets-existing-group"](_target_answer(tmp_path, body))
+    assert ok is False
+    assert "CoreGeneratorGroup" in msg
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "# WRONG: do not create a generator group",
+        "# Incorrect",
+        "# BAD - a second group",
+        "# AVOID: a second group",
+        "# AVOID — a second group",
+        "# Don't do this",
+        "# Avoid this:",
+        "# Never use this",
+        "# FAILS: creates a second group",
+        "# FAIL",
+        "# Don't do it this way",
+        "# Avoid the following",
+        "# WRONG — a second group",
+        "# DOES NOT RESOLVE",
+        "# **Wrong**: a second group",
+        "# Anti-pattern (creates a second group)",
+        "# Bad example",
+        "# WRONG approach: a second group",
+        "# WRONG!",
+        "# Incorrect usage",
+        "# Wrong way",
+        "# BAD, do not copy",
+        "# WRONG; a second group",
+        "# WRONG/INCORRECT",
+    ],
+)
+def test_generator_targets_existing_group_skips_a_fence_labelled_wrong(label, tmp_path):
+    """A label that describes the block as the wrong form still skips it."""
+    body = _TARGET_MANIFEST + _GENERATOR_GROUP_FENCE.format(label=label)
+    ok, msg = _mod.CHECKS["generator-targets-existing-group"](_target_answer(tmp_path, body))
+    assert ok is True, msg
+
+
+@pytest.mark.parametrize(
+    "label",
+    ["# FAILS: creates a second group", "# Don't do it this way", "# Avoid the following"],
+)
+def test_generator_target_grader_passes_an_answer_showing_the_anti_pattern_after_the_manifest(
+    label, tmp_path
+):
+    """The task grader scores 1.0 when a labelled wrong example follows the right manifest."""
+    body = (
+        "Register the generator against the existing group.\n\n"
+        + _TARGET_MANIFEST
+        + "\nDo not create a CoreGeneratorGroup for the targets:\n"
+        + _GENERATOR_GROUP_FENCE.format(label=label)
+    )
+    (tmp_path / "output.md").write_text(body, encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(_TARGET_GRADER_PATH)],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+    assert result.returncode == 0, result.stderr
+    graded = json.loads(result.stdout)
+    assert graded["score"] == 1.0, graded["details"]
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "# Bad things happen if the dispatcher finds no generator group",
+        "# Wrong group kinds are rejected by the dispatcher",
+        "# Broken targets get a dedicated generator group",
+        "# Fail fast: the dispatcher needs a generator group",
+        "# Fails silently as a CoreStandardGroup: the dispatcher needs a CoreGeneratorGroup",
+        "# Anti-pattern checks run against a generator group",
+        "# Does not resolve without a generator group",
+    ],
+)
+def test_generator_targets_existing_group_grades_a_violation_opening_with_a_verdict_word_sentence(
+    label, tmp_path
+):
+    """A verdict word that starts a sentence is not a WRONG label."""
+    body = _TARGET_MANIFEST + _GENERATOR_GROUP_FENCE.format(label=label)
+    ok, msg = _mod.CHECKS["generator-targets-existing-group"](_target_answer(tmp_path, body))
+    assert ok is False, msg
+    assert "CoreGeneratorGroup" in msg
+
+
+def test_generator_target_grader_fails_a_converted_target_under_a_fails_sentence(tmp_path):
+    """A model holding the old belief explains its conversion; it must not hide it."""
+    body = (
+        _TARGET_MANIFEST
+        + "\n```yaml\n"
+        "# Fails silently as a CoreStandardGroup: the dispatcher needs a CoreGeneratorGroup\n"
+        "---\napiVersion: infrahub.app/v1\nkind: Object\n"
+        "spec:\n  kind: CoreGeneratorGroup\n  data:\n    - name: topologies_dc\n```\n"
+    )
+    (tmp_path / "output.md").write_text(body, encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(_TARGET_GRADER_PATH)],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+    assert result.returncode == 0, result.stderr
+    graded = json.loads(result.stdout)
+    check = next(c for c in graded["checks"] if c["name"] == "generator-targets-existing-group")
+    assert check["passed"] is False, check["message"]
+    assert graded["score"] < 1.0, graded["details"]
+
+
+def _grade_target_answer(body: str, tmp_path: Path) -> dict:
+    (tmp_path / "output.md").write_text(body, encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(_TARGET_GRADER_PATH)],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+_FAILS_SILENTLY = (
+    "# Fails silently as a CoreStandardGroup: the dispatcher needs a CoreGeneratorGroup"
+)
+
+
+@pytest.mark.parametrize(
+    ("label", "passes"),
+    [
+        # The skill's own rules/_template.md labels its contrast block this way.
+        ("# Bad example", True),
+        (_FAILS_SILENTLY, False),
+    ],
+)
+def test_generator_target_grader_skips_a_bad_example_but_grades_a_fails_sentence(
+    label, passes, tmp_path
+):
+    """`# Bad example` labels a contrast block; `# Fails silently ...` opens the answer."""
+    body = (
+        "Register the generator against the existing group.\n\n"
+        + _TARGET_MANIFEST
+        + _GENERATOR_GROUP_FENCE.format(label=label)
+    )
+    graded = _grade_target_answer(body, tmp_path)
+    check = next(c for c in graded["checks"] if c["name"] == "generator-targets-existing-group")
+    assert check["passed"] is passes, check["message"]
+    assert (graded["score"] == 1.0) is passes, graded["details"]

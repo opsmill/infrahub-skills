@@ -243,6 +243,32 @@
           "check": "generate_rack, which has no first-party import, declares watch.files as []"
         }
       ]
+    },
+    {
+      "id": 10,
+      "prompt": "I wrote a Generator that builds a data center fabric from each\nTopologyDataCenter design object. Register it in `.infrahub.yml` so it\nruns once for every design we have. The query `topology_dc` is already\ndeclared in the `queries:` section; it takes one variable, `$name`, the\ndesign's name. The class is `DCTopologyGenerator` in\n`generators/generate_dc.py`, and it imports nothing from the repository.\n\nOur designs are already loaded from object files, and they are already\ngrouped:\n\nobjects/groups.yml:\n```yaml\n---\napiVersion: infrahub.app/v1\nkind: Object\nspec:\n  kind: CoreStandardGroup\n  data:\n    - name: topologies_dc\n      description: Data center designs\n```\n\nobjects/designs.yml:\n```yaml\n---\napiVersion: infrahub.app/v1\nkind: Object\nspec:\n  kind: TopologyDataCenter\n  data:\n    - name: dc-ams1\n      member_of_groups:\n        - topologies_dc\n    - name: dc-fra1\n      member_of_groups:\n        - topologies_dc\n```\n\nAdd the `generator_definitions` entry, and create or change any object\nfiles the Generator needs before it will run.\n\nSave your answer to: output.md. For every file you create or change,\nwrite its path on its own line, followed by its full content in a\nfenced yaml code block.",
+      "expected_output": "A generator_definitions entry for DCTopologyGenerator whose targets is the existing topologies_dc group, with parameters mapping name to name__value and a watch block. No second group and no change to the kind of topologies_dc: targets accepts any CoreGroup kind, so the existing CoreStandardGroup is the target as it is. The answer may restate topologies_dc as a CoreStandardGroup, and no object file declares a CoreGeneratorGroup.",
+      "files": [],
+      "expectations": [
+        "The generator_definitions entry has targets: topologies_dc",
+        "No object file declares a CoreGeneratorGroup",
+        "topologies_dc stays a CoreStandardGroup",
+        "The entry carries a watch block in the object form"
+      ],
+      "assertions": [
+        {
+          "name": "generator-targets-existing-group",
+          "check": "Every generator_definitions entry targets topologies_dc, no object data declares a CoreGeneratorGroup, and none redeclares topologies_dc as a kind other than CoreStandardGroup"
+        },
+        {
+          "name": "gen-watch-present",
+          "check": "Every generator_definitions entry has a watch key"
+        },
+        {
+          "name": "gen-watch-object-form",
+          "check": "Every watch block is the object form {files: [...]}, not a bare list"
+        }
+      ]
     }
   ]
 }

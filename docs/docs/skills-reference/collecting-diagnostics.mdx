@@ -4,7 +4,7 @@ title: Diagnostics Collector
 
 Skill: `infrahub-collecting-diagnostics`
 
-The Diagnostics Collector guides you through producing a support bundle with OpsMill's [`infrahub-collect`](https://docs.infrahub.app/backup/guides/install-collect) tool when Infrahub is misbehaving. It installs and verifies the binary, detects your Docker Compose or Kubernetes deployment, runs `infrahub-collect create` with the flags that match your symptom, explains how to review the bundle before you share it, and hands off, without diagnosing root cause or filing anything on your behalf.
+The Diagnostics Collector guides you through producing a support bundle with OpsMill's [`infrahub-collect`](https://docs.infrahub.app/backup/collect/install) tool when Infrahub is misbehaving. It installs and verifies the binary, detects your Docker Compose or Kubernetes deployment, runs `infrahub-collect create` with the flags that match your symptom, explains how to review the bundle before you share it, and hands off, without diagnosing root cause or filing anything on your behalf.
 
 ## When to use
 
@@ -92,7 +92,7 @@ infrahub-collect create --include-queries    # slow/failing database queries
 :::
 
 :::tip
-Collector failures on a degraded deployment are expected: a stopped container can't answer status queries. `create` still exits successfully and records each failure in the manifest; send the partial bundle as-is. See the [troubleshooting-bundle guide](https://docs.infrahub.app/backup/guides/collect-troubleshooting-bundle) for the full workflow.
+Collector failures on a degraded deployment are expected: a stopped container can't answer status queries. `create` still exits successfully and records each failure in the manifest; send the partial bundle as-is. See the [troubleshooting-bundle guide](https://docs.infrahub.app/backup/collect/create) for the full workflow.
 :::
 
 ## Not sure this is the right skill?

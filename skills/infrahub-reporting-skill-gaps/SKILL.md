@@ -11,12 +11,6 @@ description: >-
   kept failing or needed so many retries, or wants a gap in an Infrahub skill's guidance reported.
   DO NOT TRIGGER when: reporting a bug in Infrahub itself or any other opsmill/infrahub-* product (use
   infrahub-reporting-issues instead), or for ordinary Infrahub work where nothing went wrong.
-allowed-tools:
-  - Read
-  - Bash
-  - Grep
-  - Glob
-  - WebFetch
 metadata:
   version: 1.3.0
   author: OpsMill

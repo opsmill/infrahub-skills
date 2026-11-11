@@ -13,6 +13,11 @@ product: the skills the plugin ships, which `plugin.json` exposes and the
 eval suite reads directly. No agent working *on* this repo needs to invoke
 them, so nothing routes to them.
 
+`.claude/CLAUDE.md` is the one file link: it points at `AGENTS.md` so Claude
+Code loads the contributor instructions. A `CLAUDE.md` at the repo root would
+sit at the plugin root, where `claude plugin validate` warns that installed
+plugins never load it.
+
 git materializes a symlink as a regular text file when `core.symlinks` is
 false, and every agent then silently loads nothing from that path: no
 error, no failing job, just guidance that stops arriving. This is the
@@ -33,6 +38,7 @@ LINKS = (
     (ROOT / ".agents" / "rules", ROOT / "dev" / "guidelines"),
     (ROOT / ".codex" / "skills", ROOT / ".agents" / "skills"),
     (ROOT / ".codex" / "rules", ROOT / "dev" / "guidelines"),
+    (ROOT / ".claude" / "CLAUDE.md", ROOT / "AGENTS.md"),
 )
 
 # The link targets that must be real directories. Every link above resolves
@@ -46,10 +52,11 @@ def _check(link: Path, target: Path) -> str | None:
     rel = link.relative_to(ROOT)
     if not link.exists():
         return f"BROKEN: {rel} does not exist."
-    if not link.is_dir():
+    if not link.is_symlink():
+        contents = repr(link.read_text()[:80]) if link.is_file() else "(a directory)"
         return (
             f"BROKEN: {rel} is a regular file, not a symlink.\n"
-            f"    Contents: {link.read_text()[:80]!r}\n"
+            f"    Contents: {contents}\n"
             "    git wrote it this way because core.symlinks is false."
         )
     if link.resolve() != target.resolve():
@@ -105,7 +112,8 @@ def main() -> int:
         "    rm -f .claude/skills && ln -s ../.agents/skills .claude/skills\n"
         "    rm -f .agents/rules && ln -s ../dev/guidelines .agents/rules\n"
         "    rm -f .codex/skills && ln -s ../.agents/skills .codex/skills\n"
-        "    rm -f .codex/rules && ln -s ../dev/guidelines .codex/rules"
+        "    rm -f .codex/rules && ln -s ../dev/guidelines .codex/rules\n"
+        "    rm -f .claude/CLAUDE.md && ln -s ../AGENTS.md .claude/CLAUDE.md"
     )
     return 1
 

@@ -30,7 +30,7 @@
 
 5. **Registration (registration-)** -- HIGH.
    .infrahub.yml generator_definitions config, query name
-   matching, targets (CoreGeneratorGroup), parameters
+   matching, targets (any group kind), parameters
    mapping, declaring the Generator's dependency closure
    with `watch.files` so it re-runs on the right file
    changes and only those, and populating the target group:

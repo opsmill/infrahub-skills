@@ -1,0 +1,34 @@
+---
+# yamllint disable rule:truthy
+# The Claude plugin directory tracks the `plugin` branch, which holds only
+# the files the plugin ships. See scripts/build-plugin-branch.py for why.
+name: Publish plugin branch
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-plugin-branch
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Build and push the plugin branch
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          python scripts/build-plugin-branch.py

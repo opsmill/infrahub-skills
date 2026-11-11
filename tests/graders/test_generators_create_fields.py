@@ -1,0 +1,639 @@
+"""Tests for check_create_fields_exist_on_kind in graders/managing-generators/lib.py.
+
+``client.create()`` keeps only the keys that name an attribute or relationship
+of the kind and drops the rest without an error (issue #193). The check reads
+every create() call, resolves its kind and its fields, and compares them with
+graders/managing-generators/fixtures/create_fields_interfaces_schema.yml.
+
+These tests guard the check, not the skill's prose. No eval task runs the
+check: no task tried made a model break either claim of the rule, so it took
+the carve-out in dev/guidelines/rule-equals-test.md § "When no task can score
+the rule", where the #193 entry records the measurements. The check and these
+fixtures are what a future task would wire.
+
+The four fixtures under fixtures/managing-generators/create-fields-match-kind/
+are the compliant, compliant variant, violating, and violating near-miss
+cases. They are `.txt` so ruff does not lint them as part of this package.
+"""
+
+import ast
+import importlib.util
+from pathlib import Path
+
+import pytest
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_GRADER_DIR = _REPO_ROOT / "graders" / "managing-generators"
+_FIXTURES = (
+    Path(__file__).resolve().parent
+    / "fixtures"
+    / "managing-generators"
+    / "create-fields-match-kind"
+)
+
+# Load lib.py by path under a unique name, so it does not collide with every
+# other grader's lib.py in sys.modules.
+_spec = importlib.util.spec_from_file_location(
+    "managing_generators_create_fields_lib", _GRADER_DIR / "lib.py"
+)
+_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
+
+check = _mod.check_create_fields_exist_on_kind
+load_output_py = _mod.load_output_py
+CHECKS = _mod.CHECKS
+
+
+def _run(src: str) -> tuple[bool, str]:
+    return check(ast.parse(src))
+
+
+def _run_file(path: Path) -> tuple[bool, str]:
+    tree, _raw = load_output_py(path)
+    return check(tree)
+
+
+def test_check_is_registered():
+    assert CHECKS["create-fields-exist-on-kind"] is check
+
+
+# ---------------------------------------------------------------------------
+# The four fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("case", ["pass", "pass-variant"])
+def test_compliant_fixture_passes(case):
+    ok, msg = _run_file(_FIXTURES / f"{case}.txt")
+    assert ok, msg
+
+
+@pytest.mark.parametrize("case", ["fail", "fail-nearmiss"])
+def test_violating_fixture_fails_on_the_unknown_field(case):
+    ok, msg = _run_file(_FIXTURES / f"{case}.txt")
+    assert not ok
+    assert "create(DcimVirtualInterface) passes lag" in msg, msg
+
+
+# ---------------------------------------------------------------------------
+# Fails closed
+# ---------------------------------------------------------------------------
+
+
+def test_missing_output_fails(tmp_path):
+    ok, _msg = _run_file(tmp_path / "output.py")
+    assert not ok
+
+
+def test_unparseable_output_fails(tmp_path):
+    out = tmp_path / "output.py"
+    out.write_text(
+        "def generate(:\n    self.client.create(kind='DcimVirtualInterface', lag=x)\n"
+    )
+    ok, _msg = _run_file(out)
+    assert not ok
+
+
+def test_no_create_call_fails():
+    ok, msg = _run("async def generate(self):\n    pass\n")
+    assert not ok
+    assert "no create() call targets DcimPhysicalInterface, DcimVirtualInterface" in msg
+
+
+def test_skipping_one_kind_fails():
+    """An answer that drops the loopback cannot pass by omission."""
+    ok, msg = _run(
+        "async def generate(self, device, lag):\n"
+        "    await self.client.create(kind='DcimPhysicalInterface', name='eth1', device=device, lag=lag)\n"
+    )
+    assert not ok
+    assert "no create() call targets DcimVirtualInterface" in msg
+
+
+@pytest.mark.parametrize(
+    "src, expected",
+    [
+        pytest.param(
+            "async def make(self, kind, device):\n"
+            "    await self.client.create(kind=kind, name='lo0', device=device, lag=None)\n",
+            "cannot read the kind",
+            id="kind-from-parameter",
+        ),
+        pytest.param(
+            "async def generate(self, device):\n"
+            "    await self.client.create(kind='DcimVirtualInterface', data=build(device))\n",
+            "cannot read the DcimVirtualInterface fields",
+            id="data-from-call",
+        ),
+        pytest.param(
+            "async def generate(self, device, extra):\n"
+            "    await self.client.create(kind='DcimVirtualInterface', name='lo0', device=device, **extra)\n",
+            "cannot read the DcimVirtualInterface fields",
+            id="kwargs-splat-from-parameter",
+        ),
+        pytest.param(
+            "async def generate(self, device, key):\n"
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    payload[key] = 1\n"
+            "    await self.client.create(kind='DcimVirtualInterface', data=payload)\n",
+            "cannot read the DcimVirtualInterface fields",
+            id="non-literal-subscript-key",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    for payload in [{'name': 'lo0', 'lag': lag}]:\n"
+            "        await self.client.create(kind='DcimVirtualInterface', data=payload)\n",
+            "cannot read the DcimVirtualInterface fields from payload, bound by a for loop",
+            id="data-from-for-target",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    for extra in [{'lag': lag}]:\n"
+            "        await self.client.create(kind='DcimVirtualInterface', name='lo0', **extra)\n",
+            "cannot read the DcimVirtualInterface fields from extra, bound by a for loop",
+            id="kwargs-splat-from-for-target",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    with ctx() as payload:\n"
+            "        await self.client.create(kind='DcimVirtualInterface', data=payload)\n",
+            "cannot read the DcimVirtualInterface fields from payload, bound by a with statement",
+            id="data-from-with-target",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    payload, other = {'name': 'lo0', 'lag': lag}, None\n"
+            "    await self.client.create(kind='DcimVirtualInterface', data=payload)\n",
+            "cannot read the DcimVirtualInterface fields from payload, bound by unpacking",
+            id="data-from-tuple-unpacking",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    [await self.client.create(kind='DcimVirtualInterface', data=payload)\n"
+            "     for payload in [{'name': 'lo0', 'lag': lag}]]\n",
+            "cannot read the DcimVirtualInterface fields from payload, bound by a comprehension",
+            id="data-from-comprehension-target",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag, msg):\n"
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    match msg:\n"
+            "        case {'body': payload}:\n"
+            "            await self.client.create(kind='DcimVirtualInterface', data=payload)\n",
+            "cannot read the DcimVirtualInterface fields from payload, bound by a match pattern",
+            id="data-from-match-capture",
+        ),
+        pytest.param(
+            "from consts import VIRTUAL\n"
+            "async def generate(self, device, lag):\n"
+            "    await self.client.create(kind=VIRTUAL, name='lo0', device=device, lag=lag)\n",
+            "cannot read the kind",
+            id="kind-imported-from-a-non-protocols-module",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    await self.client.create(kind=VIRTUAL, name='lo0', device=device, lag=lag)\n",
+            "cannot read the kind",
+            id="kind-from-unbound-name",
+        ),
+        pytest.param(
+            "VIRTUAL = 'DcimPhysicalInterface'\n"
+            "def configure():\n"
+            "    global VIRTUAL\n"
+            "    VIRTUAL = 'DcimVirtualInterface'\n"
+            "async def generate(self, device, lag):\n"
+            "    await self.client.create(kind=VIRTUAL, name='lo0', device=device, lag=lag)\n",
+            "cannot read the kind",
+            id="kind-rebound-through-global",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    kind = 'DcimVirtual'\n"
+            "    kind += 'Interface'\n"
+            "    await self.client.create(kind=kind, name='lo0', device=device, lag=lag)\n",
+            "cannot read the kind",
+            id="kind-built-by-augmented-assignment",
+        ),
+        pytest.param(
+            "import consts\n"
+            "async def generate(self, device, lag):\n"
+            "    await self.client.create(kind=consts.VIRTUAL, name='lo0', device=device, lag=lag)\n",
+            "cannot read the kind",
+            id="kind-from-attribute-of-a-non-protocols-module",
+        ),
+        pytest.param(
+            "import consts.sub\n"
+            "async def generate(self, device, lag):\n"
+            "    await self.client.create(kind=consts.sub.VIRTUAL, name='lo0', device=device, lag=lag)\n",
+            "cannot read the kind",
+            id="kind-from-dotted-path-of-a-non-protocols-module",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    await self.client.create(kind=lib.protocols.DcimDevice, name='lo0')\n",
+            "cannot read the kind",
+            id="kind-from-dotted-path-with-unbound-root",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    await self.client.create(kind=self.protocols.DcimDevice, name='lo0')\n",
+            "cannot read the kind",
+            id="kind-from-dotted-path-rooted-at-a-parameter",
+        ),
+        pytest.param(
+            "import protocols.consts as c\n"
+            "async def generate(self, device, lag):\n"
+            "    await self.client.create(kind=c.DcimDevice, name='lo0')\n",
+            "cannot read the kind",
+            id="kind-from-a-module-inside-a-protocols-package",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    try:\n"
+            "        pass\n"
+            "    except Exception as payload:\n"
+            "        await self.client.create(kind='DcimVirtualInterface', data=payload)\n",
+            "cannot read the DcimVirtualInterface fields from payload, bound by an except clause",
+            id="data-from-except-name-inside-the-handler",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    def helper():\n"
+            "        nonlocal payload\n"
+            "        payload = {'name': 'lo0', 'lag': lag}\n"
+            "    await self.client.create(kind='DcimVirtualInterface', data=payload)\n",
+            "cannot read the DcimVirtualInterface fields from payload, bound by a global or nonlocal statement",
+            id="data-rebound-through-nonlocal",
+        ),
+        pytest.param(
+            "async def generate(self, device, lag):\n"
+            "    extra = {'data': {'name': 'lo0', 'lag': lag}}\n"
+            "    await self.client.create(kind='DcimVirtualInterface', name='lo0', **extra)\n",
+            "cannot read the DcimVirtualInterface fields from **extra, which passes data",
+            id="data-passed-through-kwargs-splat",
+        ),
+    ],
+)
+def test_unreadable_create_call_fails(src, expected):
+    ok, msg = _run(src)
+    assert not ok
+    assert expected in msg, msg
+
+
+# ---------------------------------------------------------------------------
+# Laundering: the same unknown field reached another way
+# ---------------------------------------------------------------------------
+
+_PHYSICAL = "    await self.client.create(kind='DcimPhysicalInterface', name='eth1', device=device, lag=lag)\n"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param(
+            "    await self.client.create('DcimVirtualInterface', {'name': 'lo0', 'lag': lag})\n",
+            id="positional-data",
+        ),
+        pytest.param(
+            "    base = {'name': 'lo0', 'device': device}\n"
+            "    await self.client.create(kind='DcimVirtualInterface', data={**base, 'lag': lag})\n",
+            id="dict-unpacking",
+        ),
+        pytest.param(
+            "    payload = dict(name='lo0', device=device)\n"
+            "    payload.update(lag=lag)\n"
+            "    await self.client.create(kind='DcimVirtualInterface', data=payload)\n",
+            id="update-keyword",
+        ),
+        pytest.param(
+            "    payload = {'name': 'lo0'}\n"
+            "    payload.setdefault('lag', lag)\n"
+            "    await self.client.create(kind='DcimVirtualInterface', data=payload)\n",
+            id="setdefault",
+        ),
+        pytest.param(
+            "    extra = {'lag': lag}\n"
+            "    await self.client.create(kind='DcimVirtualInterface', name='lo0', **extra)\n",
+            id="kwargs-splat",
+        ),
+        pytest.param(
+            "    sdk = self.client\n"
+            "    await sdk.create(kind='DcimVirtualInterface', name='lo0', lag=lag)\n",
+            id="aliased-client",
+        ),
+        pytest.param(
+            "    kind = 'DcimVirtualInterface'\n"
+            "    await self.client.create(kind=kind, name='lo0', lag=lag)\n",
+            id="kind-from-local-string",
+        ),
+        pytest.param(
+            "    await self.client.create(protocols.DcimVirtualInterface, name='lo0', lag=lag)\n",
+            id="kind-from-module-attribute",
+        ),
+        pytest.param(
+            "    await self.client.create(kind='DcimVirtualInterface', name='lo0', nmae='lo0')\n",
+            id="misspelled-attribute",
+        ),
+        pytest.param(
+            "    if (payload := {'name': 'lo0', 'lag': lag}):\n"
+            "        await self.client.create(kind='DcimVirtualInterface', data=payload)\n",
+            id="data-from-walrus",
+        ),
+    ],
+)
+def test_unknown_field_reached_another_way_fails(body):
+    ok, msg = _run("async def generate(self, device, lag):\n" + _PHYSICAL + body)
+    assert not ok
+    assert "create(DcimVirtualInterface) passes" in msg, msg
+
+
+@pytest.mark.parametrize(
+    "header, kind",
+    [
+        pytest.param("VIRTUAL = 'DcimVirtualInterface'\n", "VIRTUAL", id="module-level-string"),
+        pytest.param("VIRTUAL: str = 'DcimVirtualInterface'\n", "VIRTUAL", id="module-level-annotated-string"),
+        pytest.param(
+            "from .protocols import DcimVirtualInterface as Virtual\n", "Virtual", id="aliased-protocol-import"
+        ),
+        pytest.param(
+            "from .schema_protocols import DcimVirtualInterface as Virtual\n",
+            "Virtual",
+            id="aliased-schema-protocols-import",
+        ),
+        pytest.param(
+            "from infrahub_sdk.protocols import DcimVirtualInterface as Virtual\n",
+            "Virtual",
+            id="aliased-sdk-protocols-import",
+        ),
+    ],
+)
+def test_kind_bound_at_module_level_is_resolved(header, kind):
+    """A kind name bound outside the function is read, not assumed to be another kind."""
+    ok, msg = _run(
+        header
+        + "async def generate(self, device, lag):\n"
+        + _PHYSICAL
+        + f"    await self.client.create(kind={kind}, name='lo0', device=device, lag=lag)\n"
+    )
+    assert not ok
+    assert "create(DcimVirtualInterface) passes lag" in msg, msg
+
+
+def test_kind_bound_at_module_level_passes_when_fields_match():
+    ok, msg = _run(
+        "VIRTUAL = 'DcimVirtualInterface'\n"
+        "from protocols import DcimLagInterface\n"
+        "import lib.protocols as p\n"
+        "async def generate(self, device, lag):\n"
+        + _PHYSICAL
+        + "    await self.client.create(kind=VIRTUAL, name='lo0', device=device)\n"
+        "    await self.client.create(kind=DcimLagInterface, name='po1', members=[])\n"
+        "    await self.client.create(kind=p.DcimLagInterface, name='po2', members=[])\n"
+    )
+    assert ok, msg
+
+
+@pytest.mark.parametrize(
+    "header, kind",
+    [
+        pytest.param("from .schema_protocols import DcimDevice\n", "DcimDevice", id="schema-protocols-import"),
+        pytest.param("import schema_protocols as sp\n", "sp.DcimDevice", id="schema-protocols-module-alias"),
+        pytest.param("from . import schema_protocols as sp\n", "sp.DcimDevice", id="schema-protocols-relative-module"),
+        pytest.param("from app import schema_protocols\n", "schema_protocols.DcimDevice", id="schema-protocols-module"),
+        pytest.param(
+            "import infrahub_sdk.protocols\n",
+            "infrahub_sdk.protocols.CoreStandardGroup",
+            id="sdk-protocols-dotted-path",
+        ),
+        pytest.param(
+            "import app.schema_protocols as sp\n", "sp.DcimDevice", id="dotted-schema-protocols-module-alias"
+        ),
+    ],
+)
+def test_protocol_kind_outside_the_schema_passes(header, kind):
+    """The file ``infrahubctl protocols`` writes by default is ``schema_protocols.py``."""
+    ok, msg = _run(
+        header
+        + "async def generate(self, device, lag):\n"
+        + _PHYSICAL
+        + "    await self.client.create(kind='DcimVirtualInterface', name='lo0', device=device)\n"
+        + f"    await self.client.create(kind={kind}, name='leaf1')\n"
+    )
+    assert ok, msg
+
+
+# ---------------------------------------------------------------------------
+# Keyword fields next to a non-empty data: create() uses ``data or kwargs``
+# ---------------------------------------------------------------------------
+
+_VIRTUAL = "    await self.client.create(kind='DcimVirtualInterface', name='lo0', device=device)\n"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param(
+            "    await self.client.create(kind='DcimPhysicalInterface', data={'name': 'eth1', 'device': device}, lag=lag)\n",
+            id="data-literal-and-keyword",
+        ),
+        pytest.param(
+            "    await self.client.create('DcimPhysicalInterface', {'name': 'eth1', 'device': device}, lag=lag)\n",
+            id="positional-data-and-keyword",
+        ),
+        pytest.param(
+            "    payload = {'name': 'eth1'}\n"
+            "    payload['device'] = device\n"
+            "    await self.client.create(kind='DcimPhysicalInterface', data=payload, lag=lag)\n",
+            id="data-name-and-keyword",
+        ),
+        pytest.param(
+            "    extra = {'lag': lag}\n"
+            "    await self.client.create(kind='DcimPhysicalInterface', data={'name': 'eth1', 'device': device}, **extra)\n",
+            id="data-and-kwargs-splat",
+        ),
+    ],
+)
+def test_keyword_field_next_to_non_empty_data_fails(body):
+    """Every field is valid on the kind, but create() ignores the keywords."""
+    ok, msg = _run("async def generate(self, device, lag):\n" + _VIRTUAL + body)
+    assert not ok
+    assert "create(DcimPhysicalInterface) passes lag as a keyword next to a non-empty data" in msg, msg
+
+
+def test_keyword_field_next_to_data_that_cannot_be_read_fails():
+    ok, msg = _run(
+        "async def generate(self, device, lag):\n"
+        + _VIRTUAL
+        + "    await self.client.create(kind='DcimPhysicalInterface', data=build(device), lag=lag)\n"
+    )
+    assert not ok
+    assert "create(DcimPhysicalInterface) passes lag as a keyword next to a data the check cannot read" in msg, msg
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param(
+            "    await self.client.create(kind='DcimPhysicalInterface', data={}, name='eth1', device=device, lag=lag)\n",
+            id="empty-data-literal",
+        ),
+        pytest.param(
+            "    await self.client.create(kind='DcimPhysicalInterface', data=dict(), name='eth1', device=device, lag=lag)\n",
+            id="empty-dict-call",
+        ),
+        pytest.param(
+            "    await self.client.create(kind='DcimPhysicalInterface', data={'name': 'eth1', 'device': device, 'lag': lag}, branch='main', timeout=10)\n",
+            id="data-with-create-params",
+        ),
+        pytest.param(
+            "    opts = {'branch': 'main'}\n"
+            "    await self.client.create(kind='DcimPhysicalInterface', data={'name': 'eth1', 'device': device, 'lag': lag}, **opts)\n",
+            id="data-with-create-params-splat",
+        ),
+    ],
+)
+def test_keywords_used_only_with_empty_data_or_as_create_params_pass(body):
+    ok, msg = _run("async def generate(self, device, lag):\n" + _VIRTUAL + body)
+    assert ok, msg
+
+
+# ---------------------------------------------------------------------------
+# Boundaries
+# ---------------------------------------------------------------------------
+
+
+def test_payload_in_another_function_does_not_leak():
+    """A ``payload`` that gets ``lag`` in one function is not the one in another."""
+    ok, msg = _run(
+        "async def physical(self, device, lag):\n"
+        "    payload = {'name': 'eth1', 'device': device}\n"
+        "    payload['lag'] = lag\n"
+        "    await self.client.create(kind='DcimPhysicalInterface', data=payload)\n"
+        "\n"
+        "async def virtual(self, device):\n"
+        "    payload = {'name': 'lo0', 'device': device}\n"
+        "    await self.client.create(kind='DcimVirtualInterface', data=payload)\n"
+    )
+    assert ok, msg
+
+
+def test_payload_change_after_the_call_does_not_count():
+    """A key added to a reused payload after create() is not in that call."""
+    ok, msg = _run(
+        "async def generate(self, device, lag):\n"
+        "    payload = {'name': 'lo0', 'device': device}\n"
+        "    await self.client.create(kind='DcimVirtualInterface', data=payload)\n"
+        "    payload['lag'] = lag\n"
+        "    await self.client.create(kind='DcimPhysicalInterface', data=payload)\n"
+        "    payload = {'name': 'eth2', 'device': device, 'lag': lag}\n"
+        "    await self.client.create(kind='DcimPhysicalInterface', data=payload)\n"
+    )
+    assert ok, msg
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param(
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    for _ in range(2):\n"
+            "        await self.client.create(kind='DcimVirtualInterface', data=payload)\n"
+            "        payload['lag'] = lag\n",
+            id="loop-carried-key",
+        ),
+        pytest.param(
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    while True:\n"
+            "        await self.client.create(kind='DcimVirtualInterface', data=payload)\n"
+            "        payload = {'name': 'lo1', 'lag': lag}\n",
+            id="loop-carried-rebinding",
+        ),
+        pytest.param(
+            "    payload = {'name': 'lo0', 'device': device}\n"
+            "    await self.client.create(kind='DcimVirtualInterface', data=payload)\n"
+            "    def add_lag():\n"
+            "        payload['lag'] = lag\n",
+            id="nested-function-key",
+        ),
+    ],
+)
+def test_payload_change_that_can_reach_the_call_counts(body):
+    """Later lines still count when a loop or a nested function can run them first."""
+    ok, msg = _run("async def generate(self, device, lag):\n" + _PHYSICAL + body)
+    assert not ok
+    assert "create(DcimVirtualInterface) passes lag" in msg, msg
+
+
+def test_comprehension_target_does_not_rebind_the_function():
+    """A comprehension's loop name is local to it, so the outer payload and kind stand."""
+    ok, msg = _run(
+        "async def generate(self, device, lag, rows):\n"
+        + _PHYSICAL
+        + "    payload = {'name': 'lo0', 'device': device}\n"
+        "    kind = 'DcimVirtualInterface'\n"
+        "    names = [payload['name'] for payload in rows]\n"
+        "    kinds = {kind for kind in rows}\n"
+        "    await self.client.create(kind=kind, data=payload)\n"
+    )
+    assert ok, msg
+
+
+def test_except_name_does_not_outlive_its_handler():
+    """Python deletes an ``except ... as`` name when the handler ends."""
+    ok, msg = _run(
+        "async def generate(self, device, lag):\n"
+        + _PHYSICAL
+        + "    try:\n"
+        "        pass\n"
+        "    except Exception as payload:\n"
+        "        log(payload)\n"
+        "    except ValueError as kind:\n"
+        "        log(kind)\n"
+        "    payload = {'name': 'lo0', 'device': device}\n"
+        "    kind = 'DcimVirtualInterface'\n"
+        "    await self.client.create(kind=kind, data=payload)\n"
+    )
+    assert ok, msg
+
+
+def test_nested_function_local_does_not_rebind_the_function():
+    """An assignment inside a nested def or class is local to it."""
+    ok, msg = _run(
+        "async def generate(self, device, lag):\n"
+        + _PHYSICAL
+        + "    payload = {'name': 'lo0', 'device': device}\n"
+        "    kind = 'DcimVirtualInterface'\n"
+        "    def helper():\n"
+        "        payload = {'name': 'lo0', 'lag': lag}\n"
+        "        kind = 'DcimPhysicalInterface'\n"
+        "        return payload, kind\n"
+        "    class Defaults:\n"
+        "        payload = {'lag': lag}\n"
+        "    await self.client.create(kind=kind, data=payload)\n"
+    )
+    assert ok, msg
+
+
+def test_create_params_are_not_fields():
+    ok, msg = _run(
+        "async def generate(self, device, lag):\n"
+        "    await self.client.create(kind='DcimPhysicalInterface', name='eth1', lag=lag, branch='main', timeout=10)\n"
+        "    await self.client.create(kind='DcimVirtualInterface', data=None, name='lo0', branch='main')\n"
+    )
+    assert ok, msg
+
+
+def test_create_for_a_kind_outside_the_schema_is_ignored():
+    ok, msg = _run(
+        "async def generate(self, device, lag):\n"
+        + _PHYSICAL
+        + "    await self.client.create(kind='DcimVirtualInterface', name='lo0', device=device)\n"
+        "    await self.client.create(kind='DcimLagInterface', name='po1', device=device, members=[])\n"
+    )
+    assert ok, msg

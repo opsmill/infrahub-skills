@@ -20,8 +20,13 @@ on:
         required: false
         default: "regression"
 
+# A called workflow can only narrow the permissions its caller grants, never
+# widen them. skill-evals.yml asks for pull-requests: write (its report job
+# comments on PRs, and is skipped here), so granting less fails the run at
+# startup before any job is created.
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   regression:

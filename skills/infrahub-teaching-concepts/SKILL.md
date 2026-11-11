@@ -12,11 +12,6 @@ description: >-
   infrahub-managing-* skills), wants live operational answers (use
   infrahub-analyzing-data), or is debugging a failure (use
   infrahub-collecting-diagnostics).
-allowed-tools:
-  - Read
-  - Write
-  - Edit
-  - Bash
 argument-hint: "[concept-or-question]"
 metadata:
   version: 1.3.0

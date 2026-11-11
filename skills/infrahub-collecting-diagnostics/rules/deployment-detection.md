@@ -79,4 +79,4 @@ kubectl -n infrahub get pods
   tool never needs one; it only needs the
   Docker/kubectl access already on the host.
 
-Reference: [Install infrahub-collect](https://docs.infrahub.app/backup/guides/install-collect)
+Reference: [Install infrahub-collect](https://docs.infrahub.app/backup/collect/install)

@@ -6,9 +6,6 @@ description: >-
   DO NOT TRIGGER when: writing automated checks, building transforms, designing schemas, populating data files, planning an Infrahub version upgrade (use infrahub-planning-upgrades).
   ALWAYS pass the user's question verbatim as args — this skill runs in a forked context and cannot see the parent conversation. Invoking without args will fail.
 context: fork
-allowed-tools:
-  - Read
-  - Bash
 argument-hint: "[question about infrastructure data]"
 metadata:
   version: 1.3.0

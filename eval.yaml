@@ -227,6 +227,126 @@ tasks:
           a two-element [Builtin, IPAM] list; another built-in section
           does not count, and the concatenated string does not resolve
 
+  - name: menu-remove-synced-items
+    instruction: |
+      Read the skill at skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
+
+      Task: Our Infrahub instance is connected to this git repository, and
+      menus/campus.yml is registered under `menus:` in .infrahub.yml, so Infrahub
+      picks it up whenever we push to main. This is the file today:
+
+      ```yaml
+      ---
+      apiVersion: infrahub.app/v1
+      kind: Menu
+      spec:
+        data:
+          - namespace: Campus
+            name: SitesMenu
+            label: Sites
+            icon: "mdi:office-building"
+            children:
+              data:
+                - namespace: Campus
+                  name: BuildingMenu
+                  label: Buildings
+                  kind: CampusBuilding
+                  icon: "mdi:domain"
+                - namespace: Campus
+                  name: FloorMenu
+                  label: Floors
+                  kind: CampusFloor
+                  icon: "mdi:floor-plan"
+          - namespace: Campus
+            name: SwitchingMenu
+            label: Switching
+            icon: "mdi:switch"
+            children:
+              data:
+                - namespace: Campus
+                  name: SwitchMenu
+                  label: Switches
+                  kind: CampusSwitch
+                  icon: "mdi:switch"
+          - namespace: Campus
+            name: WirelessMenu
+            label: Wireless
+            icon: "mdi:wifi"
+            children:
+              data:
+                - namespace: Campus
+                  name: AccessPointMenu
+                  label: Access Points
+                  kind: CampusAccessPoint
+                  icon: "mdi:access-point"
+                - namespace: Campus
+                  name: ControllerMenu
+                  label: Wireless Controllers
+                  kind: CampusWirelessController
+                  icon: "mdi:router-wireless"
+      ```
+
+      Separately, a while ago a colleague added a temporary Lab entry to the
+      sidebar by hand, with `infrahubctl menu load lab.yml` (namespace Campus,
+      name LabMenu). That file was never committed here.
+
+      We are retiring the wireless inventory and no longer track floors. Take the
+      whole Wireless section and the Floors entry out of the sidebar, and get rid
+      of the Lab entry too. Everything else stays as it is.
+
+      Save the updated menu file to: output.yml
+      Put the commands I run next in: notes.md
+    graders:
+      - type: deterministic
+        run: python graders/managing-menus/check_remove_synced_items.py
+        weight: 1.0
+    expected_output: >-
+      output.yml is the same menu without FloorMenu and without the Wireless
+      section (WirelessMenu, AccessPointMenu, ControllerMenu). notes.md commits
+      and pushes the file and leaves those four to the repository sync, which
+      deletes the items it loaded before and no longer finds (Infrahub 1.3.0+).
+      LabMenu was loaded by hand and never synced, so the sync never touches it:
+      notes.md deletes it explicitly, with infrahubctl object delete
+      CoreMenuItem Campus/LabMenu or CoreMenuItemDelete by [namespace, name]
+      HFID, and never touches a Builtin item.
+    expectations:
+      - "File starts with apiVersion: infrahub.app/v1 and kind: Menu"
+      - >-
+        The menu file no longer contains FloorMenu, WirelessMenu,
+        AccessPointMenu or ControllerMenu, and keeps SitesMenu, BuildingMenu,
+        SwitchingMenu and SwitchMenu
+      - >-
+        notes.md pushes the change and does not delete the four dropped file
+        items by hand; the git sync removes them
+      - >-
+        notes.md deletes LabMenu explicitly, since it was loaded outside the
+        sync and no sync or menu load removes it
+      - No step deletes a protected Builtin menu item
+    assertions:
+      - name: apiversion-and-kind
+        check: >-
+          File has apiVersion: infrahub.app/v1 and kind: Menu
+      - name: name-and-namespace
+        check: >-
+          Every menu item has both name and namespace properties
+      - name: children-data-wrapper
+        check: >-
+          Children use children.data wrapper, not children directly
+          as a list
+      - name: removed-items-dropped
+        check: >-
+          The menu file omits the four removed items and keeps the four
+          others
+      - name: removed-items-deleted
+        check: >-
+          notes.md deletes Campus/LabMenu by [namespace, name] HFID, through
+          GraphQL CoreMenuItemDelete (a graphql or untagged fence, a JSON
+          request body, or a curl payload) or infrahubctl object delete
+          CoreMenuItem, runs a git commit and then a git push so the sync
+          happens at all, deletes
+          none of the four items the sync removes, no kept item, and no
+          Builtin item
+
   # --- Schema Creator --- #
   - name: vlan-management
     instruction: |
@@ -635,20 +755,22 @@ tasks:
         run: python graders/managing-schemas/check_service_cascade.py
         weight: 1.0
     expected_output: >-
-      A schema where the VIPService → HealthCheck Component relationship
-      sets on_delete: cascade explicitly (so health checks are removed
-      when the parent VIP is deleted), and the VIPService → IP
-      relationship either omits on_delete or sets on_delete: no-action
-      (so the shared IP is preserved). Any kind: Parent relationship has
+      A schema where the relationship to HealthCheck resolves to
+      on_delete: cascade, either set explicitly or omitted on a
+      Component kind (so health checks are removed when the parent VIP
+      is deleted), and the VIPService → IP
+      relationship either sets on_delete: no-action or omits on_delete
+      on a non-Component kind (so the shared IP is preserved). Any kind: Parent relationship has
       optional: false.
     expectations:
       - >-
-        At least one relationship sets on_delete: cascade — the owned
-        HealthCheck children whose existence has no meaning without the
-        VIPService
+        A relationship to HealthCheck resolves to on_delete: cascade
+        (explicit, or omitted on a Component kind), since health checks
+        have no meaning without the VIPService
       - >-
         The IP-address reference does NOT set on_delete: cascade
-        (no-action or omitted, since the IP is shared infrastructure)
+        (no-action, or omitted on a non-Component kind, since the IP is
+        shared infrastructure)
       - >-
         Any kind: Parent relationship has optional: false and
         cardinality: one
@@ -664,8 +786,12 @@ tasks:
         check: "Schema starts with version: '1.0'"
       - name: on-delete-cascade-present
         check: >-
-          At least one relationship sets on_delete: cascade for owned
-          children
+          A relationship to the HealthCheck node resolves to on_delete:
+          cascade (explicit value, or omitted on a Component kind)
+      - name: ip-reference-not-cascade
+        check: >-
+          Every relationship to the IP address resolves to on_delete:
+          no-action (explicit value, or omitted on a non-Component kind)
       - name: parent-rel-optional-false
         check: >-
           Any kind: Parent relationship has optional: false and
@@ -1464,6 +1590,70 @@ tasks:
         check: >-
           Every python_transforms and generator_definitions entry declares
           a `watch:` mapping
+
+  - name: check-proposed-change-commit
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-managing-checks/SKILL.md and
+      follow its workflow and rules.
+
+      Task: We fixed a false positive in our `check_rack_power_budget`
+      check. The fix is merged to `main` in our Git repository
+      (`git@git.example.com:netops/infra-repo.git`), and Infrahub's `main`
+      branch already shows the new repository commit. Fourteen proposed
+      changes are still open and still fail with the old message. All of
+      their branches were created by our intake bot, which calls the GraphQL
+      `BranchCreate` mutation with only a name and a description. Our
+      runbook says "to refresh a branch, run `infrahubctl branch rebase
+      <branch>`, then retry the checks".
+
+      Write a bash script that gets every open proposed change re-validated
+      with the fixed check. Our Infrahub address is in `INFRAHUB_ADDRESS`
+      and the API token in `INFRAHUB_API_TOKEN`.
+
+      Save the script to: output.sh
+    graders:
+      - type: deterministic
+        run: python graders/managing-checks/check_proposed_change_commit.py
+        weight: 1.0
+    expected_output: >-
+      A script that moves the repository commit each proposed change runs:
+      for each open proposed change it merges main into the Git branch that
+      has the same name as the source branch, and pushes that branch. A loop
+      of `infrahubctl branch rebase` and `CoreProposedChangeRunCheck` alone
+      is wrong, because on branches synced with Git it reruns the old
+      commit. A Git rebase of the branch onto main is wrong too: it rewrites
+      the branch, so a plain push is rejected; on Infrahub 1.11 and
+      earlier the repository sync also cannot pull a force-pushed branch.
+      A plain `git pull` of main counts as a merge only with `--no-rebase`
+      or `pull.rebase=false`, since it otherwise rebases or stops on a
+      diverged branch. Opening a new branch and
+      proposed change is wrong, because a branch cut from main has none of
+      the old branch's data or commits.
+    expectations:
+      - >-
+        Explains that the proposed change pipeline runs the check code at
+        the repository commit recorded on the source branch
+      - >-
+        States that on branches synced with Git, as the intake bot creates
+        them, a rebase plus a retry of the checks reruns the old commit
+      - >-
+        Merges main into each source branch's Git branch and pushes it,
+        without rebasing that Git branch and without opening a new branch
+        and proposed change in its place
+      - >-
+        Waits for the repository sync to record the new commit before
+        rerunning the checks
+      - >-
+        Recommends `infrahubctl check <name> --branch <branch>` as the fast
+        loop while editing a check, since it runs the local code with no
+        commit
+    assertions:
+      - name: moves-source-branch-commit
+        check: >-
+          A `git push` to each source branch follows a merge of main into
+          that branch; a rebase-and-retry loop, a Git rebase onto main, or
+          a new branch and proposed change alone fails
 
   # --- Generators: relationship reference encoding --- #
   - name: generator-relationship-hfid-encoding
@@ -2598,6 +2788,114 @@ tasks:
       - name: cli-commands-exist
         check: No invented infrahubctl subcommand appears in the answer
 
+  - name: common-protocols-regenerate-from-server
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-common/SKILL.md and follow
+      its rules.
+
+      Task: I added two attributes to `NetworkCircuit` in
+      `schemas/circuit.yml`: `commit_rate` and `circuit_ref`. My
+      repository keeps its generated protocol module in
+      `lib/protocols.py`, checked into git. These are the two schema
+      files:
+
+      ```yaml
+      # schemas/circuit.yml
+      ---
+      version: "1.0"
+      nodes:
+        - name: Circuit
+          namespace: Network
+          generate_template: true
+          attributes:
+            - name: name
+              kind: Text
+              unique: true
+            - name: commit_rate
+              kind: Number
+            - name: circuit_ref
+              kind: Text
+              optional: true
+      ```
+
+      ```yaml
+      # schemas/provider.yml
+      ---
+      version: "1.0"
+      nodes:
+        - name: Provider
+          namespace: Organization
+          attributes:
+            - name: name
+              kind: Text
+              unique: true
+      extensions:
+        nodes:
+          - kind: NetworkCircuit
+            relationships:
+              - name: provider
+                peer: OrganizationProvider
+                cardinality: one
+                optional: true
+      ```
+
+      Regenerate `lib/protocols.py` for this change. Give me the
+      commands, so I can commit the regenerated file together with the
+      schema change.
+
+      Save your answer to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/common/check_protocols_regenerated.py
+        weight: 0.7
+      # As with the other common tasks, the deterministic half cannot see a
+      # command written as bare prose.
+      - type: llm_rubric
+        provider: anthropic
+        weight: 0.3
+        rubric: |
+          Read output.md. Score each criterion 0.0 or 1.0; return the
+          average.
+
+          1. The command that writes `lib/protocols.py` reads the schema
+             from a running Infrahub server that has the change loaded,
+             not from the local files with `--schemas`. An answer that
+             writes `lib/protocols.py` with `--schemas`, as the main
+             command or as an alternative, scores 0.0.
+          2. The answer says why the local `--schemas` form is wrong for
+             the committed file: it emits no Template (or Profile)
+             classes, so `TemplateNetworkCircuit` would disappear, and it
+             leaves out the `provider` relationship that
+             `schemas/provider.yml` adds through `extensions`.
+    expected_output: >-
+      An answer that loads the schema change into Infrahub (on a branch,
+      or on the default branch of a throwaway local instance) and then
+      regenerates the committed file from the
+      server, for example `infrahubctl protocols --branch <branch> --out
+      lib/protocols.py`, then diffs it against the committed file before
+      committing. It does not write `lib/protocols.py` with
+      `infrahubctl protocols --schemas schemas/`, because that output has
+      no `TemplateNetworkCircuit` class and no `provider` relationship from
+      the `extensions` block.
+    expectations:
+      - >-
+        The command that writes `lib/protocols.py` reads the schema from a
+        running server, not from the local files with `--schemas`
+      - >-
+        Says the `--schemas` output drops `TemplateNetworkCircuit` and the
+        `provider` relationship added through `extensions`
+      - Every infrahubctl command named in the answer actually exists
+    assertions:
+      - name: protocols-regenerated-from-server
+        check: >-
+          Writes `lib/protocols.py` with an `infrahubctl protocols` command
+          that has no `--schemas`, after an `infrahubctl schema load` of the
+          same branch, and no recommended command writes it with
+          `--schemas`
+      - name: cli-commands-exist
+        check: No invented infrahubctl subcommand appears in the answer
+
   # --- Issue Reporter --- #
   - name: bug-sanitization
     instruction: |
@@ -3591,6 +3889,86 @@ tasks:
         check: >-
           generate_rack, which has no first-party import, declares
           watch.files as []
+
+  - name: generator-target-standard-group
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: I wrote a Generator that builds a data center fabric from each
+      TopologyDataCenter design object. Register it in `.infrahub.yml` so it
+      runs once for every design we have. The query `topology_dc` is already
+      declared in the `queries:` section; it takes one variable, `$name`, the
+      design's name. The class is `DCTopologyGenerator` in
+      `generators/generate_dc.py`, and it imports nothing from the repository.
+
+      Our designs are already loaded from object files, and they are already
+      grouped:
+
+      objects/groups.yml:
+      ```yaml
+      ---
+      apiVersion: infrahub.app/v1
+      kind: Object
+      spec:
+        kind: CoreStandardGroup
+        data:
+          - name: topologies_dc
+            description: Data center designs
+      ```
+
+      objects/designs.yml:
+      ```yaml
+      ---
+      apiVersion: infrahub.app/v1
+      kind: Object
+      spec:
+        kind: TopologyDataCenter
+        data:
+          - name: dc-ams1
+            member_of_groups:
+              - topologies_dc
+          - name: dc-fra1
+            member_of_groups:
+              - topologies_dc
+      ```
+
+      Add the `generator_definitions` entry, and create or change any object
+      files the Generator needs before it will run.
+
+      Save your answer to: output.md. For every file you create or change,
+      write its path on its own line, followed by its full content in a
+      fenced yaml code block.
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_generator_target_standard_group.py
+        weight: 1.0
+    expected_output: >-
+      A generator_definitions entry for DCTopologyGenerator whose targets is
+      the existing topologies_dc group, with parameters mapping name to
+      name__value and a watch block. No second group and no change to the
+      kind of topologies_dc: targets accepts any CoreGroup kind, so the
+      existing CoreStandardGroup is the target as it is. The answer may
+      restate topologies_dc as a CoreStandardGroup, and no object file
+      declares a CoreGeneratorGroup.
+    expectations:
+      - "The generator_definitions entry has targets: topologies_dc"
+      - "No object file declares a CoreGeneratorGroup"
+      - "topologies_dc stays a CoreStandardGroup"
+      - "The entry carries a watch block in the object form"
+    assertions:
+      - name: generator-targets-existing-group
+        check: >-
+          Every generator_definitions entry targets topologies_dc, no object
+          data declares a CoreGeneratorGroup, and none redeclares
+          topologies_dc as a kind other than CoreStandardGroup
+      - name: gen-watch-present
+        check: >-
+          Every generator_definitions entry has a watch key
+      - name: gen-watch-object-form
+        check: >-
+          Every watch block is the object form {files: [...]}, not a bare list
 
   - name: practices-watch-dependencies
     trials: 3
@@ -7457,6 +7835,87 @@ tasks:
       - name: module-type-object
         check: >-
           Module type objects are uniquely named and each names a manufacturer
+      - name: coverage-report
+        check: >-
+          A Markdown report names the NetBox component lists that did not
+          convert
+
+  - name: netbox-convert-bundled-scripts
+    trials: 3
+    instruction: |
+      Read the skill at
+      skills/infrahub-converting-netbox-device-types/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Convert this NetBox device type into Infrahub object templates
+      for the OpsMill schema-library DCIM schema, which has
+      `generate_template: true` on `DcimDevice`.
+
+          ---
+          manufacturer: Cisco
+          model: Catalyst 9300-24P
+          slug: cisco-c9300-24p
+          part_number: C9300-24P
+          u_height: 1
+          is_full_depth: true
+          weight: 7.59
+          weight_unit: kg
+          airflow: front-to-rear
+          console-ports:
+            - name: con 0
+              type: rj-45
+          interfaces:
+            - name: GigabitEthernet1/0/1
+              type: 1000base-t
+              poe_mode: pse
+            - name: GigabitEthernet1/0/2
+              type: 1000base-t
+              poe_mode: pse
+
+      Write the emitted files under `./output_dir/` (create the directory),
+      and tell me what did not convert.
+    graders:
+      - type: deterministic
+        run: python graders/converting-netbox-device-types/check_bundled_scripts.py output_dir
+        weight: 1.0
+    expected_output: >-
+      A ./output_dir/ produced by the bundled converter: the 7.59 kg weight
+      is carried through as the whole number 8, rather than written as a
+      float that Infrahub's integer-backed Number attributes cannot hold or
+      dropped to avoid the problem, component children nest under a kind +
+      data wrapper, and a coverage report names the console-ports and the
+      dropped interface fields.
+    expectations:
+      - The device type weight is the whole number 8, neither 7.59 nor absent
+      - Component children nest under a kind + data wrapper
+      - A coverage report is written naming what did not convert
+      - The console-ports list and the interface type/poe_mode fields are accounted for
+    assertions:
+      - name: envelope
+        check: >-
+          Every emitted YAML doc has apiVersion, kind: Object, spec.kind,
+          and spec.data list
+      - name: template-kind
+        check: >-
+          Templates are authored under a Template<Kind> and every row has a
+          template_name
+      - name: bundled-script-output
+        check: >-
+          Numerics are integers and a coverage report exists — guarantees a
+          hand-rolled conversion loses. Its choice-object predicate cannot
+          fire here: the input is devicetype-library YAML, which carries no
+          {value, label} wrappers. Feeding this task API-shaped input to
+          exercise it would fail the correct answer instead, since unwrapping
+          is the exporter's job and the converter does not do it.
+      - name: weight-rounds-to-a-whole-number
+        check: >-
+          The device type's weight is present and equals 8, bare or in the
+          {value, source} form — the registry check can only reject a float,
+          so dropping the field scored full marks
+      - name: component-kind-wrapper
+        check: >-
+          Component children nest under a kind + data wrapper naming a
+          Template* kind
       - name: coverage-report
         check: >-
           A Markdown report names the NetBox component lists that did not

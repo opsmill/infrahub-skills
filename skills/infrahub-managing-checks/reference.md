@@ -208,6 +208,10 @@ infrahubctl check --list
 Local runs hit the same SDK path as the pipeline, so
 a successful local run means the pipeline will
 behave the same way against the same branch state.
+The local run uses your working copy; the pipeline
+uses the code at the source branch's repository
+commit (see
+[rules/testing-proposed-change-commit.md](./rules/testing-proposed-change-commit.md)).
 
 See [rules/testing-commands.md](./rules/testing-commands.md)
 for the full command surface and

@@ -228,7 +228,6 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 │   ├── infrahub-teaching-concepts/ # Guided tutor for Infrahub concepts
 │   ├── infrahub-converting-netbox-device-types/ # NetBox device types → object templates
 │   └── infrahub-planning-upgrades/ # Version-by-version upgrade plans
-├── CLAUDE.md
 ├── README.md
 └── LICENSE                      # Apache 2.0
 ```

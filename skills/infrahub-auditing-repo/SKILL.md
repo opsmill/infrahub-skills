@@ -6,12 +6,6 @@ description: >-
   DO NOT TRIGGER when: creating schemas, writing checks/generators, querying live data, populating objects, planning an Infrahub version upgrade (use infrahub-planning-upgrades).
   ALWAYS pass the user's request verbatim as args, with any scope, path, or focus they named. This skill runs in a forked context and cannot see the parent conversation.
 context: fork
-allowed-tools:
-  - Read
-  - Bash
-  - Grep
-  - Glob
-  - Write
 argument-hint: "[focus-area]"
 metadata:
   version: 1.3.0

@@ -27,7 +27,7 @@ order nobody chose, producing output that looks fine
 and quietly discards whichever field lost. Map only
 one and you lose every record that populated the
 other: in the published library, `comments` is set on
-66% of device types but `description` on only 4%, so
+74% of device types but `description` on only 4%, so
 either choice alone throws away real data.
 
 A declared fallback fixes both problems. The preferred
@@ -72,7 +72,7 @@ the tidier one:**
 
 ```yaml
 fields:
-  description: description    # loses `comments` on 66% of the library
+  description: description    # loses `comments` on 74% of the library
 ```
 
 ### Common mistakes

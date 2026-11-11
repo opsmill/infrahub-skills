@@ -13,9 +13,14 @@ success: `no-customer-identifiers` reports "none of N seeded identifiers
 found" whether the draft correctly redacted everything, or the seed was
 renamed in eval.yaml and this list was never updated. That is a fail-open
 trap for the one eval that must never rot, so `_verify_seeds_against_eval_yaml`
-below reads eval.yaml directly and refuses to grade at all if any seed
-here no longer appears in that task's prompt. Seed drift then fails
-closed and loudly instead of silently going green.
+below reads eval.yaml directly and exits non-zero if any seed here no
+longer appears in that task's prompt. Seed drift then fails closed and
+loudly instead of silently going green.
+
+The guard runs in pytest (tests/graders/test_grader_sandbox.py),
+not at grade time: skillgrade copies graders/ and skills/ into the trial
+sandbox but not eval.yaml, so calling it from `__main__` crashed every
+trial before any check ran.
 """
 from __future__ import annotations
 import json
@@ -91,6 +96,5 @@ def _verify_seeds_against_eval_yaml(
 
 
 if __name__ == "__main__":
-    _verify_seeds_against_eval_yaml(SEEDED_IDENTIFIERS)
-    out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("output.md")
+    out =Path(sys.argv[1]) if len(sys.argv) > 1 else Path("output.md")
     print(json.dumps(run_checks(CHECKS, out)))
