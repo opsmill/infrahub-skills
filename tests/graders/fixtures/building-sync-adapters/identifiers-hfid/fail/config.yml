@@ -1,3 +1,4 @@
+---
 name: from-servicenow
 source:
   name: servicenow
@@ -8,31 +9,31 @@ destination:
   settings:
     url: http://localhost:8000
 order:
-- LocationSite
-- NetworkDevice
+  - LocationSite
+  - NetworkDevice
 schema_mapping:
-- name: LocationSite
-  mapping: cmn_location
-  identifiers:
-  - name
-  fields:
-  - name: name
-    mapping: name
-  - name: city
-    mapping: city
-  - name: servicenow_sys_id
-    mapping: sys_id
-- name: NetworkDevice
-  mapping: cmdb_ci_netgear
-  fields:
-  - name: name
-    mapping: name
-  - name: ip_address
-    mapping: ip_address
-  - name: serial_number
-    mapping: serial_number
-  - name: servicenow_sys_id
-    mapping: sys_id
-  - name: location
-    mapping: location_name
-    reference: LocationSite
+  - name: LocationSite
+    mapping: cmn_location
+    identifiers:
+      - name
+    fields:
+      - name: name
+        mapping: name
+      - name: city
+        mapping: city
+      - name: servicenow_sys_id
+        mapping: sys_id
+  - name: NetworkDevice
+    mapping: cmdb_ci_netgear
+    fields:
+      - name: name
+        mapping: name
+      - name: ip_address
+        mapping: ip_address
+      - name: serial_number
+        mapping: serial_number
+      - name: servicenow_sys_id
+        mapping: sys_id
+      - name: location
+        mapping: location_name
+        reference: LocationSite

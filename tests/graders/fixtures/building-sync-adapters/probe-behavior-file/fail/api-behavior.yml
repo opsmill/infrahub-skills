@@ -1,32 +1,33 @@
+---
 endpoints:
-- path: /api/now/table/cmdb_ci_netgear
-  method: GET
-  pagination:
-    type: link_header
-    cursor_param: sysparm_offset
-    next_link_carries:
-    - sysparm_limit
-    - sysparm_fields
-    - sysparm_query
-    total_header: X-Total-Count
-  required_headers:
-  - Accept
-  default_fields: all
-  field_selection: sysparm_fields
-  filters_supported:
-  - sysparm_query
-  rate_limit:
-    status: 429
-    retry_after_header: true
-    reset_header: X-RateLimit-Reset
-  empty_result_is_valid: true
-  captures:
-  - cmdb_ci_netgear_page1.json
-  - cmdb_ci_netgear_429.json
-  field_quirks:
-    reference_set: object
-    reference_empty: empty_string
-    unknown_selected_field: dropped_silently
-    value_types: string
-  subclass_rows:
-    discriminator: sys_class_name
+  - path: /api/now/table/cmdb_ci_netgear
+    method: GET
+    pagination:
+      type: link_header
+      cursor_param: sysparm_offset
+      next_link_carries:
+        - sysparm_limit
+        - sysparm_fields
+        - sysparm_query
+      total_header: X-Total-Count
+    required_headers:
+      - Accept
+    default_fields: all
+    field_selection: sysparm_fields
+    filters_supported:
+      - sysparm_query
+    rate_limit:
+      status: 429
+      retry_after_header: true
+      reset_header: X-RateLimit-Reset
+    empty_result_is_valid: true
+    captures:
+      - cmdb_ci_netgear_page1.json
+      - cmdb_ci_netgear_429.json
+    field_quirks:
+      reference_set: object
+      reference_empty: empty_string
+      unknown_selected_field: dropped_silently
+      value_types: string
+    subclass_rows:
+      discriminator: sys_class_name
