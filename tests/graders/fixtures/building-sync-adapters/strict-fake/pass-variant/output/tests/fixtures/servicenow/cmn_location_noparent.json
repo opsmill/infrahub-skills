@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/now/table/cmn_location?sysparm_limit=1&sysparm_fields=sys_id,name,parent&sysparm_query=parentISEMPTY"
+  },
+  "status": 200,
+  "headers": {
+    "Date": "Wed, 11 Nov 2026 17:29:38 GMT",
+    "Content-Type": "application/json;charset=UTF-8",
+    "Link": "<https://example.service-now.com/api/now/table/cmn_location?sysparm_limit=1&sysparm_fields=sys_id,name,parent&sysparm_query=parentISEMPTY&sysparm_offset=0>;rel=\"first\",<https://example.service-now.com/api/now/table/cmn_location?sysparm_limit=1&sysparm_fields=sys_id,name,parent&sysparm_query=parentISEMPTY&sysparm_offset=-1>;rel=\"prev\",<https://example.service-now.com/api/now/table/cmn_location?sysparm_limit=1&sysparm_fields=sys_id,name,parent&sysparm_query=parentISEMPTY&sysparm_offset=1>;rel=\"next\",<https://example.service-now.com/api/now/table/cmn_location?sysparm_limit=1&sysparm_fields=sys_id,name,parent&sysparm_query=parentISEMPTY&sysparm_offset=5>;rel=\"last\"",
+    "X-Total-Count": "6"
+  },
+  "body": {
+    "result": [
+      {
+        "sys_id": "6808184aeb211100420124e05206fe12",
+        "parent": "",
+        "name": "3260 Jay Street, Santa Clara, CA"
+      }
+    ]
+  }
+}
