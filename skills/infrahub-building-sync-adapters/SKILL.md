@@ -80,14 +80,15 @@ These are out of scope:
 ## Approval Points
 
 Stop and wait for the user's explicit approval at these
-four points, and at no others unless something fails:
+five points, and at no others unless something fails:
 
 | # | When | What the user approves |
 | - | ---- | ---------------------- |
 | 1 | End of phase 1 | `api-behavior.yml` |
 | 2 | End of phase 2 | The spec |
-| 3 | Phase 5, before the first `infrahub-sync sync` | Writing to the Infrahub branch, after the user has seen the `diff` |
-| 4 | Phase 6, before push and pull request | The pull request description and the commits |
+| 3 | Phase 4, only when the sync needs a new or changed schema | The schema change |
+| 4 | Phase 5, before the first `infrahub-sync sync` | Writing to the Infrahub branch, after the user has seen the `diff` |
+| 5 | Phase 6, before push and pull request | The pull request description and the commits |
 
 ## Rule Categories
 
@@ -189,8 +190,8 @@ Work in the customer's repository.
       as two nodes leave it empty. Never map a computed
       attribute.
    3. If no node exists, hand off to
-      `infrahub-managing-schemas`, and wait for the user's
-      approval of the new schema.
+      `infrahub-managing-schemas`. **Approval point 3:**
+      wait for the user's approval of the new schema.
 2. **Sync config.** Write `sync/<project>/config.yml`.
    Read
    [rules/mapping-identifiers-match-hfid.md](./rules/mapping-identifiers-match-hfid.md)
@@ -209,7 +210,7 @@ Work in the customer's repository.
 2. Create an Infrahub branch and load the schema on it.
 3. Run `infrahub-sync generate`, then `infrahub-sync
    diff` against that branch, and show the user the diff.
-4. **Approval point 3:** run `infrahub-sync sync` to the
+4. **Approval point 4:** run `infrahub-sync sync` to the
    branch only after the user approves.
 5. Run `infrahub-sync diff` again. It must report no
    changes; any change means the adapter or the mapping
@@ -231,7 +232,7 @@ including the news fragment, the docs pages and the spec
 documents re-read against the code. Mark every numbered
 requirement of the spec met, partly met or not met.
 
-**Approval point 4:** show the user the pull request
+**Approval point 5:** show the user the pull request
 description, with its checks section, and the commits.
 Push and open the pull request only after the user
 approves.

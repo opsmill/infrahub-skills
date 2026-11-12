@@ -76,7 +76,9 @@ any code depends on them.
    [../reference.md](../reference.md#api-behavior-file-api-behavioryml),
    including `pagination` (with `type` and
    `next_link_carries`), `rate_limit` (with `status` and
-   `retry_after_header`) and `field_quirks` (with
+   `retry_after_header` when a throttled response was
+   captured, `observed: false` otherwise) and
+   `field_quirks` (with
    `reference_set`, `reference_empty` and
    `unknown_selected_field`).
 5. **Take every value from the captures.** Read

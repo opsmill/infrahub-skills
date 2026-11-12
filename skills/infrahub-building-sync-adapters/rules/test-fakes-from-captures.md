@@ -114,10 +114,12 @@ def _page_key(path: str, params: dict[str, str]) -> tuple:
 class FakeSession:
     def __init__(self, captures: list[dict]) -> None:
         self.requests: list[tuple[str, dict[str, str]]] = []
-        self.queued: list[dict] = []  # error captures (429, 503) a test serves next
+        self.queued: list[dict] = []  # error captures a test serves next: queued.append(errors[429])
+        self.errors: dict[int, dict] = {}  # the captured error responses (429, 503), by status
         self._pages: dict[tuple, dict] = {}
         for capture in captures:
             if capture["status"] != 200:
+                self.errors[capture["status"]] = capture
                 continue
             path, params = _query(capture["request"]["path"], None)
             key = _page_key(path, params)

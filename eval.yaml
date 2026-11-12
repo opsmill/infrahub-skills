@@ -9616,12 +9616,14 @@ tasks:
     expected_output: >-
       A PR description with a checks section naming every repository check for
       an adapter PR: format, lint, ty, unit tests, rumdl, the docs build,
-      infrahub-sync generate and diff on the example, the news fragment, the
-      docs sidebar entry, and the spec documents matched to the code.
+      infrahub-sync list, generate and diff on the example, the news fragment,
+      the docs page, its sidebar entry and its choosing-an-adapter row, and the
+      spec documents matched to the code.
     expectations:
       - The checks section names the docs build
       - The checks section names the changelog news fragment
-      - The checks section names infrahub-sync generate and diff on the example
+      - The checks section names infrahub-sync list, generate and diff on the example
+      - The checks section names the docs page, the sidebar entry and the choosing-an-adapter row
       - The checks section names the spec documents
     assertions:
       - name: pr-checks-complete

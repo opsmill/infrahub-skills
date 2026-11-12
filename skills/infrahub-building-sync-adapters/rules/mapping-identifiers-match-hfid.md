@@ -134,14 +134,14 @@ from collections import Counter
 def precheck(records: list[dict], identifiers: list[str], parent_field: str | None, known_parents: set) -> dict:
     """records: one dict per source record, with the mapped field values the sync will send."""
     keys = [tuple(record.get(field) for field in identifiers) for record in records]
+    # An empty parent marks a root record, such as a top-level site: it is not a missing parent.
+    parents = {record.get(parent_field) for record in records} if parent_field else set()
     return {
         "duplicate_identifiers": [key for key, count in Counter(keys).items() if count > 1],
         "empty_identifiers": [key for key in keys if any(value in (None, "") for value in key)],
         "missing_parents": sorted(
-            {record.get(parent_field) for record in records if record.get(parent_field) not in known_parents}
-        )
-        if parent_field
-        else [],
+            (parent for parent in parents if parent not in (None, "") and parent not in known_parents), key=str
+        ),
     }
 ```
 

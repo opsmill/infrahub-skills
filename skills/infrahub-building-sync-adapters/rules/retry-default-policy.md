@@ -127,9 +127,10 @@ class NetinventoryClient:
                 retry_after = _retry_after_seconds(response.headers.get("Retry-After"))
                 if retry_after is not None and retry_after > MAX_RETRY_AFTER:
                     reset = response.headers.get(RESET_HEADER) if RESET_HEADER else None
-                    resets_at = (
-                        datetime.fromtimestamp(int(reset), tz=timezone.utc).isoformat() if reset and reset.isdigit() else None
-                    )
+                    try:
+                        resets_at = datetime.fromtimestamp(int(reset), tz=timezone.utc).isoformat() if reset else None
+                    except (ValueError, OverflowError, OSError):
+                        resets_at = None  # milliseconds, a date string or out of range: report without it
                     msg = (
                         f"{url}: HTTP {response.status_code}, the API asks to wait {retry_after:.0f} s, "
                         f"more than the {MAX_RETRY_AFTER} s limit"
