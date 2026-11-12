@@ -115,3 +115,7 @@ Read the coverage report before loading anything. Against the stock `schema-libr
 :::tip
 Module port names contain NetBox's `{module}` token, which no conversion can resolve, because the bay position is known only once a module is installed. With the schema-library module extensions loaded, `generate_template: true` added to `DcimModule`, and the `schema-library-module-ports.yml` profile, each module template carries its ports as declarations, and a bundled generator resolves the token per installed module and creates the real device interfaces. Only interface ports become interfaces: console ports need a console interface kind in the schema, and power ports stay declarations.
 :::
+
+## Not sure this is the right skill?
+
+See [Data Importer, NetBox Device Type Converter, Sync Adapter Builder](../choosing-a-skill.mdx#data-importer-netbox-device-type-converter-sync-adapter-builder).

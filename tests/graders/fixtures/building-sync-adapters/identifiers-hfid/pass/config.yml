@@ -1,21 +1,42 @@
+---
 name: from-servicenow
-source: {name: servicenow, settings: {url: "https://example.service-now.com"}}
-destination: {name: infrahub, settings: {url: "http://localhost:8000"}}
-order: [LocationSite, NetworkDevice]
+source:
+  name: servicenow
+  settings:
+    url: https://example.service-now.com
+destination:
+  name: infrahub
+  settings:
+    url: http://localhost:8000
+order:
+  - LocationSite
+  - NetworkDevice
 schema_mapping:
   - name: LocationSite
     mapping: cmn_location
-    identifiers: [name]
+    identifiers:
+      - name
     fields:
-      - {name: name, mapping: name}
-      - {name: city, mapping: city}
-      - {name: servicenow_sys_id, mapping: sys_id}
+      - name: name
+        mapping: name
+      - name: city
+        mapping: city
+      - name: servicenow_sys_id
+        mapping: sys_id
   - name: NetworkDevice
     mapping: cmdb_ci_netgear
-    identifiers: [name, location]
+    identifiers:
+      - name
+      - location
     fields:
-      - {name: name, mapping: name}
-      - {name: ip_address, mapping: ip_address}
-      - {name: serial_number, mapping: serial_number}
-      - {name: servicenow_sys_id, mapping: sys_id}
-      - {name: location, mapping: location_name, reference: LocationSite}
+      - name: name
+        mapping: name
+      - name: ip_address
+        mapping: ip_address
+      - name: serial_number
+        mapping: serial_number
+      - name: servicenow_sys_id
+        mapping: sys_id
+      - name: location
+        mapping: location_name
+        reference: LocationSite
