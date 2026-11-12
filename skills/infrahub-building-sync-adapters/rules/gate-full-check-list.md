@@ -88,7 +88,7 @@ pending". A reviewer can rerun a command and open a
 path; a bare word gives them nothing to check.
 
 Show the user the description before pushing: it is
-approval point 4.
+approval point 5.
 
 ### Correct
 

@@ -53,12 +53,13 @@ The Sync Adapter Builder guides you through adding a source adapter to [infrahub
 
 ## Approval points
 
-The skill stops for your approval at four points:
+The skill stops for your approval at five points:
 
 1. After the API behavior file
 2. After the spec
-3. Before the first `sync` that writes to Infrahub
-4. Before the push and the pull request
+3. Before a new or changed schema, when the sync needs one
+4. Before the first `sync` that writes to Infrahub
+5. Before the push and the pull request
 
 :::note
 The skill builds source adapters on the infrahub-sync `main` branch. Destination adapters, source-side incremental reads, and the `feature/v3-develop` adapter contract are out of scope. Infrahub-side incremental reads (`sync --no-full-extract`) still apply to the adapters it builds.

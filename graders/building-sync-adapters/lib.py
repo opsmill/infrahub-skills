@@ -467,12 +467,21 @@ PR_ITEMS: dict[str, Callable[[list[str]], bool]] = {
         or "docusaurus" in t
         or _has_seq(t, ["npm", "run", "build"])
     ),
+    "infrahub-sync list": lambda t: _has_seq(t, ["infrahub-sync", "list"]),
     "infrahub-sync generate": lambda t: _has_seq(t, ["infrahub-sync", "generate"]),
     "infrahub-sync diff": lambda t: _has_seq(t, ["infrahub-sync", "diff"]),
     "news fragment": lambda t: (
         "towncrier" in t or any(re.match(r"^changelog/.+\.md$", x) for x in t)
     ),
+    "docs page": lambda t: any(
+        re.match(r"^docs/docs/adapters/[^/]+\.mdx$", x)
+        and not x.endswith("choosing-an-adapter.mdx")
+        for x in t
+    ),
     "docs sidebar": lambda t: any(x.endswith("sidebars.ts") for x in t),
+    "choosing-an-adapter row": lambda t: any(
+        x.endswith("choosing-an-adapter.mdx") for x in t
+    ),
     "spec documents": lambda t: any("specs/" in x for x in t),
 }
 
@@ -688,6 +697,13 @@ def _handler_names(handler: ast.ExceptHandler) -> set[str]:
     }
 
 
+def _reraises(handler: ast.ExceptHandler) -> bool:
+    nodes = [n for stmt in handler.body for n in ast.walk(stmt)]
+    return any(isinstance(n, ast.Raise) for n in nodes) and not any(
+        isinstance(n, ast.Continue) for n in nodes
+    )
+
+
 def check_no_tls_retry(ctx: dict) -> tuple[bool, str]:
     """A handler that retries connection errors handles SSLError first, so TLS errors are not retried."""
     tree = ctx["py"]
@@ -701,7 +717,9 @@ def check_no_tls_retry(ctx: dict) -> tuple[bool, str]:
         for handler in node.handlers:
             names = _handler_names(handler)
             if "SSLError" in names:
-                ssl_handled = True
+                # Only a handler that re-raises excludes TLS errors; one that
+                # continues or swallows the error still retries them.
+                ssl_handled = _reraises(handler)
                 continue
             if names & _BROAD:
                 broad_seen = True
@@ -765,21 +783,18 @@ def check_identifiers_match_hfid(ctx: dict) -> tuple[bool, str]:
     ):
         return False, "identifiers-match-hfid: no schema_mapping list in config.yml"
     hfids = schema_hfids(ctx["schema"])
-    problems, graded = [], 0
+    problems = []
     for mapping in config["schema_mapping"]:
         if not isinstance(mapping, dict) or mapping.get("name") not in hfids:
             continue
-        graded += 1
         want = hfids[mapping["name"]]
         got = mapping.get("identifiers") or []
         if not isinstance(got, list) or set(map(str, got)) != set(want):
             problems.append(
                 f"{mapping['name']}: identifiers {got} vs human_friendly_id fields {want}"
             )
-    if graded < len(hfids):
-        mapped = {
-            m.get("name") for m in config["schema_mapping"] if isinstance(m, dict)
-        }
+    mapped = {m.get("name") for m in config["schema_mapping"] if isinstance(m, dict)}
+    if set(hfids) - mapped:
         problems.append(f"no mapping for {sorted(set(hfids) - mapped)}")
     if problems:
         return False, "identifiers-match-hfid: " + "; ".join(problems)

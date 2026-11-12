@@ -77,12 +77,17 @@ core issue proposes the shared version:
 # infrahub_sync/adapters/netinventory.py
 import re
 
-_LINK = re.compile(r'<([^>]*)>\s*;\s*rel="([^"]+)"')
+_LINK = re.compile(r"<([^>]*)>([^,<]*)")
+_REL = re.compile(r'(?:^|;)\s*rel="?([^";]+)"?', re.IGNORECASE)
 
 
 def _next_link(link_header: str | None) -> str | None:
-    """The rel="next" URL of a Link header, selected exactly (never prev or last)."""
-    return {rel: url for url, rel in _LINK.findall(link_header or "")}.get("next")
+    """The rel="next" URL of a Link header, selected exactly (never prev or last), whatever the parameter order."""
+    for url, params in _LINK.findall(link_header or ""):
+        rel = _REL.search(params)
+        if rel and "next" in rel.group(1).split():
+            return url
+    return None
 ```
 
 ### Incorrect

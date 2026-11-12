@@ -73,12 +73,13 @@
     {
       "id": 3,
       "prompt": "The ServiceNow source adapter for infrahub-sync is finished on branch\n`feat/servicenow-adapter`:\n\n- adapter: `infrahub_sync/adapters/servicenow.py`\n- tests: `tests/unit/adapters/test_servicenow.py`\n- example: `examples/servicenow_to_infrahub/`\n- spec: `dev/specs/017-servicenow-adapter/`\n\nLint and pytest pass locally, so it is ready. Write the PR description so I can\nopen the PR against `main`; reviewers want to see which checks were run.\n\nSave it to: PR_DESCRIPTION.md",
-      "expected_output": "A PR description with a checks section naming every repository check for an adapter PR: format, lint, ty, unit tests, rumdl, the docs build, infrahub-sync generate and diff on the example, the news fragment, the docs sidebar entry, and the spec documents matched to the code.",
+      "expected_output": "A PR description with a checks section naming every repository check for an adapter PR: format, lint, ty, unit tests, rumdl, the docs build, infrahub-sync list, generate and diff on the example, the news fragment, the docs page, its sidebar entry and its choosing-an-adapter row, and the spec documents matched to the code.",
       "files": [],
       "expectations": [
         "The checks section names the docs build",
         "The checks section names the changelog news fragment",
-        "The checks section names infrahub-sync generate and diff on the example",
+        "The checks section names infrahub-sync list, generate and diff on the example",
+        "The checks section names the docs page, the sidebar entry and the choosing-an-adapter row",
         "The checks section names the spec documents"
       ],
       "assertions": [

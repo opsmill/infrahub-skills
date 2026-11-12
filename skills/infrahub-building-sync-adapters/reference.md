@@ -281,7 +281,7 @@ uv run --project "<infrahub-sync-checkout>" infrahub-sync list --directory sync
 uv run --project "<infrahub-sync-checkout>" infrahub-sync generate --name "<project>" --directory sync
 uv run --project "<infrahub-sync-checkout>" infrahub-sync diff --name "<project>" --directory sync --branch "<test-branch>"
 
-# Approval point 3. Only after the user approves:
+# Approval point 4. Only after the user approves:
 uv run --project "<infrahub-sync-checkout>" infrahub-sync sync --name "<project>" --directory sync --branch "<test-branch>"
 
 # Expect no changes.

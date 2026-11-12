@@ -7,6 +7,8 @@ as skillgrade runs them, from the fixture directory, so the test covers the
 script and the library together.
 """
 
+import ast
+import importlib.util
 import json
 import subprocess
 import sys
@@ -79,3 +81,88 @@ def test_fake_probe_blocks_network(tmp_path: Path) -> None:
     result = json.loads(proc.stdout)
     assert result["score"] == 0.0
     assert "blocked" in json.dumps(result)
+
+
+# --------------------------------------------------------------------------
+# Library checks: cases the four task fixtures do not reach
+# --------------------------------------------------------------------------
+
+# Loaded under its own name: every grader directory has a lib.py, and a bare
+# ``import lib`` would shadow the other skills' modules for the whole session.
+_lib_spec = importlib.util.spec_from_file_location(
+    "building_sync_adapters_graders_lib", _GRADERS / "lib.py"
+)
+lib = importlib.util.module_from_spec(_lib_spec)
+_lib_spec.loader.exec_module(lib)
+
+_PASS_PR = _FIXTURES / "pr-check-list" / "pass" / "PR_DESCRIPTION.md"
+
+
+@pytest.mark.parametrize(
+    ("dropped", "item"),
+    [
+        ("- `infrahub-sync list --directory examples/`\n", "infrahub-sync list"),
+        ("Docs page `docs/docs/adapters/servicenow.mdx`, ", "docs page"),
+        (
+            ", row in `docs/docs/adapters/choosing-an-adapter.mdx`",
+            "choosing-an-adapter row",
+        ),
+    ],
+)
+def test_pr_checks_require_every_docs_item(dropped: str, item: str) -> None:
+    text = _PASS_PR.read_text()
+    assert dropped in text
+    ok, details = lib.check_pr_checks_complete({"pr_text": text.replace(dropped, "")})
+    assert not ok
+    assert item in details
+
+
+def test_identifiers_duplicate_mapping_does_not_hide_a_missing_kind() -> None:
+    schema = {
+        "nodes": [
+            {
+                "namespace": "Location",
+                "name": "Site",
+                "human_friendly_id": ["name__value"],
+            },
+            {
+                "namespace": "Network",
+                "name": "Device",
+                "human_friendly_id": ["name__value"],
+            },
+        ]
+    }
+    config = {
+        "schema_mapping": [
+            {"name": "LocationSite", "identifiers": ["name"]},
+            {"name": "LocationSite", "identifiers": ["name"]},
+        ]
+    }
+    ok, details = lib.check_identifiers_match_hfid({"config": config, "schema": schema})
+    assert not ok
+    assert "NetworkDevice" in details
+
+
+_TLS_CLIENT = """
+import requests
+
+def get(session, url):
+    while True:
+        try:
+            return session.get(url)
+        except requests.exceptions.SSLError:
+            {ssl_body}
+        except requests.exceptions.ConnectionError:
+            continue
+"""
+
+
+@pytest.mark.parametrize(
+    ("ssl_body", "expected"), [("raise", True), ("continue", False), ("pass", False)]
+)
+def test_no_tls_retry_requires_the_ssl_handler_to_reraise(
+    ssl_body: str, expected: bool
+) -> None:
+    tree = ast.parse(_TLS_CLIENT.format(ssl_body=ssl_body))
+    ok, details = lib.check_no_tls_retry({"py": tree, "py_err": None})
+    assert ok is expected, details
