@@ -20,7 +20,9 @@ from lib import check_decision_tags_for, check_direction_recorded, run_checks  #
 
 
 def _p(pattern: str) -> re.Pattern:
-    return re.compile(pattern, re.IGNORECASE)
+    # Not inside a node kind name: "OrganizationProvider" names a kind a reuse
+    # decision supplies, not the decision about providers.
+    return re.compile(r"(?-i:(?<![a-z]))(?:" + pattern + ")", re.IGNORECASE)
 
 
 SUBJECTS = {

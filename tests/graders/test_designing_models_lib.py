@@ -1119,6 +1119,21 @@ CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
             None, id="compliant-borrowed-decision-row-names-another-subject",
         ),
         pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS
+                  + "| 7 | Marketplace schemas supply DcimCircuit and OrganizationProvider | recommended | They cover circuits (strong) |\n"),
+            None, id="compliant-variant-node-kind-names-another-subject",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS
+                  + "| 7 | One feature, no split: circuits, providers and endpoints are one domain | recommended | Skill rule (strong) |\n"),
+            None, id="compliant-variant-subject-listed-in-another-decision",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS
+                  + "| 7 | Circuits and providers: providers come from the demo's provider kind | recommended | The demo has one (strong) |\n"),
+            "tagged 'recommended'; the transcript makes it 'stated'", id="near-miss-listed-once-then-decided-again",
+        ),
+        pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
                 "| 6 | Direction A (follow infrahub-demo-service-catalog), with B2 (contract fields on the circuit); not taken: B (a custom model) | stated | |",
                 "| 6 | Direction A (follow infrahub-demo-service-catalog), with B2 (contract fields on the circuit); not taken: B (a custom model) | recommended | The demo models circuits and contracts (strong) |",

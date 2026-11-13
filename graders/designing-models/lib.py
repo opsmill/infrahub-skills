@@ -894,7 +894,9 @@ def check_decision_tags_for(
     one row about the subject carries its expected tag, and every other row
     about it carries that tag or `open` (a follow-up question). A row that
     names a decision ID in ``borrowed`` is exempt: the user stated it by
-    borrowing it from another direction. ``subjects`` maps a label to
+    borrowing it from another direction. So is a row that names the subject
+    only as one item of a list ("circuits, providers and endpoints are one
+    domain"): it records another decision. ``subjects`` maps a label to
     (pattern on the Decision cell, expected tag).
     """
     rows, dec_col, tag_col, _, err = _decision_rows(parts)
@@ -912,7 +914,8 @@ def check_decision_tags_for(
             return False, f"no decision about {label}"
         own = [r for r in matching if not set(_DIRECTION_ID.findall(_clean(r[dec_col]))) & borrowed]
         tags = {_clean(r[tag_col]).lower() for r in own}
-        swapped = tags - {tag, "open"}
+        about = [r for r in own if not _only_listed(pattern, _clean(r[dec_col]))]
+        swapped = {_clean(r[tag_col]).lower() for r in about} - {tag, "open"}
         if swapped or tag not in tags:
             found = sorted(swapped) or sorted(tags) or ["nothing"]
             texts = "; ".join(_clean(r[dec_col])[:90] for r in matching)
@@ -921,6 +924,18 @@ def check_decision_tags_for(
                 f"(rows: {texts!r})"
             )
     return True, "each decision carries the provenance the transcript gives it"
+
+
+_LIST_BEFORE = re.compile(r"(?:,|\b(?:and|or))\s*$", re.IGNORECASE)
+_LIST_AFTER = re.compile(r"^\s*(?:,|(?:and|or)\b)", re.IGNORECASE)
+
+
+def _only_listed(pattern: re.Pattern, text: str) -> bool:
+    """Whether every mention of ``pattern`` in ``text`` is one item of a list."""
+    hits = list(pattern.finditer(text))
+    return bool(hits) and all(
+        _LIST_BEFORE.search(text[: m.start()]) or _LIST_AFTER.match(text[m.end():]) for m in hits
+    )
 
 
 _DIRECTION_ROW = re.compile(r"^(?i:direction)\s+([A-Z])\b")
