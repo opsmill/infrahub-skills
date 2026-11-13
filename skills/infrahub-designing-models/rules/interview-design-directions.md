@@ -84,8 +84,8 @@ request exactly but has to be maintained.
   borrowed it from another. When the user cannot reply,
   these rows are `open` and name the direction row's
   open item, unless the user's answers state the
-  decision (`stated`) or the skill's own rules settle
-  it.
+  decision (`stated`), or the skill's own rules settle
+  it (`recommended`, with the rule as its Basis).
 
 ## Correct
 

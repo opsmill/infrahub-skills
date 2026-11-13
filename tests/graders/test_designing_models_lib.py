@@ -1130,6 +1130,29 @@ CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
         ),
         pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS
+                  + "| 7 | Marketplace schemas supply ProviderAccount | recommended | They cover accounts (strong) |\n"),
+            None, id="compliant-variant-node-kind-starts-with-a-subject",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "Contract end dates are imported, not typed", "contractEndDate is imported, not typed",
+            )),
+            None, id="compliant-variant-subject-as-a-camel-case-attribute",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS
+                  + "| 7 | Circuits come from the carrier export, providers come from the demo's kind | recommended | The demo has one (strong) |\n"),
+            "tagged 'recommended'; the transcript makes it 'stated'", id="near-miss-subject-after-a-clause-comma",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "| 2 | Providers are a separate node kind | stated | |",
+                "| 2 | The transport team owns circuits and providers | stated | |",
+            )),
+            "no decision about providers", id="near-miss-subject-only-listed",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS
                   + "| 7 | Circuits and providers: providers come from the demo's provider kind | recommended | The demo has one (strong) |\n"),
             "tagged 'recommended'; the transcript makes it 'stated'", id="near-miss-listed-once-then-decided-again",
         ),
