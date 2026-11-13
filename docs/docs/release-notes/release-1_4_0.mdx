@@ -56,8 +56,8 @@ Export device types from a running NetBox and convert them with the [converting-
 
 What changed:
 
-* Run `netbox_export_device_types.py` with `--url`, `--output-dir`, and a `NETBOX_TOKEN` to pull device types, module types, and their component templates over pynetbox. It writes them in the devicetype-library layout that the bundled converter already reads.
-* Narrow the export with `--in-use`, which keeps only types that NetBox counts at least one device or module for, and with `--manufacturer` or `--slug`.
+* Run `netbox_export_device_types.py` with `--url`, `--output-dir`, and a `NETBOX_TOKEN` to pull device types and their component templates over pynetbox. Add `--module-types` to export module types and their templates as well. It writes them in the devicetype-library layout that the bundled converter already reads.
+* Narrow the export with `--in-use`, which keeps only types that NetBox counts at least one device for, or at least one module for when you pass `--module-types`, and with `--manufacturer` or `--slug`.
 * Load device types without silent overwrites: device types that share a model are now refused, where before they overwrote each other on load. An unknown `--manufacturer` exits with code 2.
 * Carry module ports for the generator with the new `schema-library-module-ports.yml` mapping profile.
 
@@ -79,7 +79,7 @@ What changed:
 * The common skill now says to regenerate the committed protocol file from a running Infrahub server with the schema loaded, with `--branch` when the schema is on a branch, and to check the diff for classes or fields that disappear ([#192](https://github.com/opsmill/infrahub-skills/issues/192)).
 * Remove items from a loaded menu with the menus skill: a git sync deletes items dropped from a synced file, while items loaded with `infrahubctl menu load` stay until you delete them with `infrahubctl object delete` ([#25](https://github.com/opsmill/infrahub-skills/issues/25)).
 * The duplicate-issue search in the reporting-issues and reporting-skill-gaps skills returns results again. It no longer passes `--state all`, which `gh search issues` rejects ([#136](https://github.com/opsmill/infrahub-skills/issues/136)).
-* Audit findings from the auditing-repo skill list only live reference sites in `sites`: a file that nothing registers or includes is reported as dead code instead. A kind whose Dropdown has a different choice list, or whose relationship has a different peer, now counts toward a duplicate shape, and the difference is recorded as a feasibility blocker.
+* Audit findings from the auditing-repo skill list only live reference sites in `sites`: a file that nothing registers, includes, or imports is reported as dead code instead. A kind whose Dropdown has a different choice list, or whose relationship has a different peer, now counts toward a duplicate shape, and the difference is recorded as a feasibility blocker.
 * Analyze a pasted log excerpt with the analyzing-diagnostics skill without first being asked where the bundle is; what the excerpt lacks is listed under Open questions. Every report now states the bundle manifest, including when every collector succeeded, and writes the exact `gh search issues` line for each query, including queries that could not be run.
 * Lessons from the teaching-concepts skill name each node by its full kind, such as `CampusSwitch`, as the schema and the API do.
 * The managing-checks skill now states which repository commit a proposed change's checks run, and how to get a check fix merged to `main` into an open proposed change on a branch synced with Git ([#194](https://github.com/opsmill/infrahub-skills/issues/194)).
