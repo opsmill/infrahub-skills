@@ -361,6 +361,28 @@
           "check": "Remediation appears as a recommendation the analysis did not execute"
         }
       ]
+    },
+    {
+      "id": 11,
+      "prompt": "A customer says every GraphQL query took 20 to 30 seconds this\nmorning between 08:45 and 08:55 UTC. They sent the bundle below, collected\nwith `infrahub-collect create --include-traces`. The logs show no error.\nI am the OpsMill support engineer, and I have Docker on my laptop. Write\nthe findings report and the exact steps I follow to find which component\ntook the time. Do NOT actually run any commands; include the exact\ncommands in the report.\n\nbundle/bundle_information.json:\n{\"infrahub_version\": \"1.12.1\", \"environment\": {\"type\": \"docker-compose\", \"project\": \"infrahub-prod\"},\n \"collectors\": [\n   {\"name\": \"logs\", \"status\": \"success\"},\n   {\"name\": \"traces\", \"status\": \"success\",\n    \"details\": {\"backend\": \"http://tempo.monitoring.acme.internal:3200\",\n                \"window\": {\"start\": \"2026-11-13T08:45:00Z\", \"end\": \"2026-11-13T08:55:00Z\"},\n                \"min_duration_used\": \"1s\", \"traces_found\": 35, \"traces_written\": 35,\n                \"traces_left_out\": 0,\n                \"sample_ratio\": {\"enabled\": true, \"ratio_in_force\": 0.1}}}]}\n\nls bundle/traces/:\n0001-6c26f0d2e9c893ed614173cb81d8d534.json\n0002-b8847743a1b1d7c6dd8b89a68eb5831f.json\n0003-580f6b6e0dd0abbc2d4a0196ae50e47e.json\n... (35 files)\n\nbundle/logs/server/infrahub-server-1.log (tail):\n2026-11-13 08:47:12 INFO infrahub.graphql query=DeviceList duration=27.41s",
+      "expected_output": "A findings report that reads the `traces` entry of bundle_information.json first (35 written, none left out, sampling ratio 0.1), posts every file of bundle/traces/ to a local Tempo with `curl -X POST http://localhost:4318/v1/traces`, never to the customer's Tempo at tempo.monitoring.acme.internal, and opens each trace in Grafana by the trace ID in its file name, from 0001, rather than with a search.",
+      "files": [],
+      "expectations": [
+        "Reads bundle_information.json and the traces entry before the traces",
+        "Posts the files of bundle/traces/ to a local Tempo with POST /v1/traces",
+        "Does not post the traces to the customer's Tempo",
+        "Opens each trace by the trace ID in its file name, from 0001"
+      ],
+      "assertions": [
+        {
+          "name": "mentions-manifest",
+          "check": "Report references bundle_information.json / the manifest"
+        },
+        {
+          "name": "traces-replayed-by-id",
+          "check": "A curl command posts the files of bundle/traces/ to /v1/traces on a local Tempo, not the customer's, and the report opens the traces by trace ID"
+        }
+      ]
     }
   ]
 }

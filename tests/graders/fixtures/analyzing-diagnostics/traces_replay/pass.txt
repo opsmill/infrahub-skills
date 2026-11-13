@@ -1,0 +1,28 @@
+# Findings report
+
+## Deployment context
+
+`bundle/bundle_information.json`: Infrahub 1.12.1 on Docker Compose (`infrahub-prod`).
+
+## Traces
+
+The manifest has a `traces` entry with status `success`: 35 traces written, 0 left out, window
+08:45-08:55 UTC, minimum duration 1s. The sampling ratio in force is 0.1, so only about one request
+in ten has a trace.
+
+Replay the traces into a local Tempo on your laptop. Do not post them to the customer's Tempo.
+
+```bash
+for f in bundle/traces/*.json; do
+  curl -sf -X POST "http://localhost:4318/v1/traces" \
+    -H "Content-Type: application/json" \
+    --data-binary @"$f" || echo "rejected: $f"
+done
+```
+
+Then open each trace in Grafana Explore by the trace ID in its file name, from `0001` (the slowest):
+`6c26f0d2e9c893ed614173cb81d8d534`. A search does not find replayed traces with old timestamps.
+
+## Open questions
+
+- Which service and operation took the time in trace 0001: read the slowest spans after the replay.

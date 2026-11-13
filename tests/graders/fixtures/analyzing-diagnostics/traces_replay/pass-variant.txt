@@ -1,0 +1,18 @@
+## Report
+
+Manifest first (bundle_information.json): the traces collector succeeded with 35 traces, sampling
+ratio 0.1.
+
+1. Start Tempo and Grafana locally.
+2. Load each file:
+
+```console
+$ curl -X POST http://127.0.0.1:4318/v1/traces -H 'Content-Type: application/json' --data-binary @bundle/traces/0001-6c26f0d2e9c893ed614173cb81d8d534.json
+$ curl -X POST http://127.0.0.1:4318/v1/traces -H 'Content-Type: application/json' --data-binary @bundle/traces/0002-b8847743a1b1d7c6dd8b89a68eb5831f.json
+```
+
+3. Fetch the slowest one:
+
+```console
+$ curl -H 'Accept: application/json' http://127.0.0.1:3200/api/v2/traces/6c26f0d2e9c893ed614173cb81d8d534
+```
