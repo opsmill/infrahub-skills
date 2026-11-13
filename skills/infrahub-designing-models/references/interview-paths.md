@@ -39,7 +39,10 @@ answers, so they cannot go out with those questions.
    recommended direction, and under the draft at most
    three data questions, as blocks, on the guesses that
    change the design most. The user picks a direction and
-   corrects the rest by marking up the draft.
+   corrects the rest by marking up the draft. When they
+   pick another direction or combine them, redraw the
+   draft for their choice before writing the brief, and
+   keep the answers that still apply.
 
 Whatever they leave unanswered or uncorrected becomes an
 open item, as above.

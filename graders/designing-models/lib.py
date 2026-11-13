@@ -125,28 +125,40 @@ def _list_items(text: str) -> list[str]:
 
     A Markdown list item may wrap over several lines; reading only the first
     line loses what the wrap carried ("...; affects F1)" on the next line).
-    A nested item is an item of its own and is also part of each item it is
-    nested in, so open items or numbered steps under a grouping bullet are
-    read, and a step keeps the sub-bullets that finish it. An item runs
-    until a blank line or the next item at the same or a lower indent.
+    A nested item is an item of its own, so open items or numbered steps
+    under a grouping bullet are read. A plain sub-bullet is also part of the
+    items it is nested in, so a step keeps the sub-bullets that finish it;
+    a nested open item or numbered step is not, so its parent does not
+    borrow its text ("affects F1"). An item runs until a blank line or the
+    next item at the same or a lower indent.
     """
     items: list[str] = []
-    # (indent, index into items) of each item the current line is nested in.
-    open_items: list[tuple[int, int]] = []
+    # (indent, index into items, stands alone) of each item the current line
+    # is nested in, outermost first.
+    nest: list[tuple[int, int, bool]] = []
+
+    def join(line: str) -> None:
+        # Into the innermost item and outwards, up to the first that stands alone.
+        for _, i, alone in reversed(nest):
+            items[i] += " " + line.strip()
+            if alone:
+                break
+
     for line in _lines_outside_fences(text):
         indent = len(line) - len(line.lstrip())
         if not line.strip():
-            open_items = []
+            nest = []
             continue
-        starts = bool(_ITEM_START.match(line))
-        if starts:
-            while open_items and open_items[-1][0] >= indent:
-                open_items.pop()
-        for _, i in open_items:
-            items[i] += " " + line.strip()
-        if starts:
-            items.append(line.rstrip())
-            open_items.append((indent, len(items) - 1))
+        if not _ITEM_START.match(line):
+            join(line)
+            continue
+        while nest and nest[-1][0] >= indent:
+            nest.pop()
+        alone = bool(_OPEN_ITEM.match(line) or _STEP.match(line))
+        if not alone:
+            join(line)
+        items.append(line.rstrip())
+        nest.append((indent, len(items) - 1, alone))
     return items
 
 

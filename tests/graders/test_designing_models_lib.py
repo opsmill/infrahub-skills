@@ -1798,6 +1798,11 @@ def test_uniqueness_rule_left_out_fails(tmp_path: Path) -> None:
         ),
         pytest.param(
             NEXT_STEPS.replace("1. Build F1 DC fabric: Schema Manager, then Object Manager.",
+                               "1. Build F1 DC fabric.\n   1. Schema Manager, then Object Manager."),
+            F1_ROWS, "none\n", "neither hand it off nor name the skill", id="near-miss-step-does-not-borrow-its-nested-step",
+        ),
+        pytest.param(
+            NEXT_STEPS.replace("1. Build F1 DC fabric: Schema Manager, then Object Manager.",
                                "1. Build F1 DC fabric: Schema Manager.\n\n   Then load the racks."),
             F1_ROWS, "none\n", "name the skill for its objects", id="near-miss-text-after-a-blank-line-is-not-the-step",
         ),
@@ -1864,6 +1869,11 @@ WIFI_TWO_FEATURES = WIFI_FEATURES + "| F2 | Guest portal | Guests self-register 
             WIFI_TWO_FEATURES, "- Wireless\n  - O1: Who owns SSID definitions? (owner: unknown)\n"
             "  - O2: Who runs the guest portal? (owner: helpdesk; affects F1 and F2)\n",
             "O1 names no feature", id="near-miss-nested-item-does-not-borrow-its-sibling",
+        ),
+        pytest.param(
+            WIFI_TWO_FEATURES, "- O1: Who owns SSID definitions? (owner: unknown)\n"
+            "  - O2: Who runs the guest portal? (owner: helpdesk; affects F1 and F2)\n",
+            "O1 names no feature", id="near-miss-open-item-does-not-borrow-its-nested-item",
         ),
         pytest.param(
             WIFI_TWO_FEATURES, "- O1: Who owns SSID definitions? (owner: unknown)\n- O2: Who runs the guest portal? (owner: helpdesk;\n"
