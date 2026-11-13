@@ -194,6 +194,10 @@ def test_token_from_substitution_accepts_a_token_that_starts_with_equals() -> No
         "Paste the token here and I will not log it.",
         # A file is named, but as where the token comes from, not where it goes.
         "Send me the token from the file ~/.infrahub-admin-token.",
+        "Tell me the token in ~/.infrahub-admin-token.",
+        # "and" still separates two clauses when the first is not a bare
+        # negated verb (cubic review of #234).
+        "Don't worry about the token and just send me the token here.",
     ],
 )
 def test_asks_for_token_matches_a_request(sentence: str) -> None:
@@ -253,3 +257,41 @@ def test_four_backtick_fence_holds_a_three_backtick_line() -> None:
     plan = "````markdown\n```bash\ninfrahub-collect create\n```\n````\n\nAfter the block.\n"
     assert _mod._fenced_blocks(plan) == ["```bash\ninfrahub-collect create\n```\n"]
     assert "After the block." in _mod._prose(plan)
+
+
+@pytest.mark.parametrize(
+    ("sentence", "expected"),
+    [
+        ("Review the bundle, including the traces, before you send it.", True),
+        ("Check the traces/ folder before sharing the bundle.", True),
+        ("You do not need to review the traces.", False),
+        ("The traces are readable in Grafana.", False),
+        ("Review the traces after sharing the bundle.", False),
+        ("The traces are in the bundle; review the logs.", False),
+    ],
+)
+def test_traces_review_reads_an_instruction(sentence: str, expected: bool) -> None:
+    """cubic review of #234: a review verb, then the traces, before sharing."""
+    plan = (
+        "Do you want the traces?\n\n```bash\ninfrahub-collect create --include-traces "
+        "--traces-since 1h --traces-min-duration 1s\n```\n\n" + sentence + "\n"
+    )
+    assert _mod.check_traces_review(plan)[0] is expected
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("INFRAHUB_ADDRESS=https://infrahub.example.com", True),
+        ("export INFRAHUB_ADDRESS=https://infrahub.example.com", True),
+        ("INFRAHUB_ADDRESS=http://$(kubectl -n infrahub get svc infrahub-server -o name):8000", True),
+        # A prefix sets the variable for that one command only (cubic review of #234).
+        ("INFRAHUB_ADDRESS=https://infrahub.example.com echo setup", False),
+    ],
+)
+def test_ratio_address_set_reads_the_assignment(line: str, expected: bool) -> None:
+    plan = (
+        f"```bash\n{line}\n"
+        'curl -X DELETE "$INFRAHUB_ADDRESS/api/troubleshooting/trace-sample-ratio"\n```\n'
+    )
+    assert _mod.check_ratio_address_set(plan)[0] is expected
