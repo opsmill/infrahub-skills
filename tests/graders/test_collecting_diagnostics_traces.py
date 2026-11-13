@@ -178,3 +178,40 @@ def test_asks_for_token_matches_a_request(sentence: str) -> None:
 )
 def test_asks_for_token_ignores_other_sentences(sentence: str) -> None:
     assert not _mod._asks_for_token(sentence)
+
+
+_DELETE = 'curl -X DELETE "${INFRAHUB_ADDRESS:-http://localhost:8000}/api/troubleshooting/trace-sample-ratio"'
+
+
+@pytest.mark.parametrize(
+    "plan",
+    [
+        # A `console` block with a shell prompt in front of the command.
+        f"```console\n$ {_DELETE}\n```\n",
+        # A block opened and closed with four backticks.
+        f"````bash\n{_DELETE}\n````\n",
+        # A block with a tilde fence, inside a list item.
+        f"1. Run:\n\n   ~~~bash\n   {_DELETE}\n   ~~~\n",
+    ],
+)
+def test_shell_commands_reads_the_call(plan: str) -> None:
+    """The parser finds the curl call whatever the block format.
+
+    A trial whose agent summary showed this call scored "no curl call", and
+    these two formats were the ones the parser missed.
+    """
+    commands = _mod._shell_commands(plan)
+    assert [c[:3] for c in commands] == [["curl", "-X", "DELETE"]], commands
+
+
+def test_shell_commands_keeps_a_dollar_variable_at_line_start() -> None:
+    """Only `$ ` with a space is a prompt; `$VAR` at the start of a line is not."""
+    commands = _mod._shell_commands('```bash\n"$CURL" -X DELETE "$INFRAHUB_ADDRESS/x"\n```\n')
+    assert commands == [["$CURL", "-X", "DELETE", "$INFRAHUB_ADDRESS/x"]], commands
+
+
+def test_four_backtick_fence_holds_a_three_backtick_line() -> None:
+    """A four-backtick block ends only at four backticks, not at a ``` line inside it."""
+    plan = "````markdown\n```bash\ninfrahub-collect create\n```\n````\n\nAfter the block.\n"
+    assert _mod._fenced_blocks(plan) == ["```bash\ninfrahub-collect create\n```\n"]
+    assert "After the block." in _mod._prose(plan)

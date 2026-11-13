@@ -79,7 +79,11 @@ def check_no_legacy_artifacts(text: str, **_: object) -> CheckResult:
 # token and the HTTP calls from the prose split into sentences. The fences are
 # removed from the prose first, so a command is never read as a sentence.
 
-_FENCE_RE = re.compile(r"^[ \t]*(```|~~~)[^\n]*\n(.*?)^[ \t]*\1[ \t]*$", re.MULTILINE | re.DOTALL)
+# A fence opens with three or more backticks or tildes and closes with the same
+# run, so a plan that wraps its block in four backticks is still read.
+_FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})[^\n]*\n(.*?)^[ \t]*\1[ \t]*$", re.MULTILINE | re.DOTALL)
+# A shell prompt in front of a command, as in a `console` block: `$ curl ...`.
+_PROMPT_RE = re.compile(r"^([ \t]*)\$[ \t]+", re.MULTILINE)
 _TRACE_OPTION_RE = re.compile(r"^--(include-traces|traces-[a-z-]+)(=|$)")
 _NEGATION_RE = re.compile(r"\b(never|not|no|don't|do not|without)\b", re.IGNORECASE)
 # The full path, so a call to another endpoint with the same last segment does not count.
@@ -131,7 +135,7 @@ def _shell_commands(text: str) -> list[list[str]]:
     """Every shell command in the fences, as shlex tokens without comments."""
     commands: list[list[str]] = []
     for block in _fenced_blocks(text):
-        joined = re.sub(r"\\\n", " ", block)
+        joined = re.sub(r"\\\n", " ", _PROMPT_RE.sub(r"\1", block))
         for line in joined.splitlines():
             try:
                 tokens = shlex.split(line, comments=True)
