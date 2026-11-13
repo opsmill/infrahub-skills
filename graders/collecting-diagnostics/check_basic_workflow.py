@@ -14,6 +14,7 @@ CHECKS = [
     "review-before-sharing",
     "cross-link-reporting-issues",
     "no-legacy-artifacts",
+    "traces-not-offered",
 ]
 
 if __name__ == "__main__":

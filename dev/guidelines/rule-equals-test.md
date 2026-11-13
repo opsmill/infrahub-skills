@@ -190,6 +190,58 @@ the keyword, it read `create()` in the installed SDK, found
 `tests/graders/test_generators_create_fields.py`, guarding
 the check.
 
+Taken again, for the address of the sampling ratio calls in
+`skills/infrahub-collecting-diagnostics/rules/create-traces.md`.
+In a manual test of the skill, the agent copied the rule's
+`curl -X DELETE "$INFRAHUB_ADDRESS/..."` example into a reply,
+the operator's shell had no `INFRAHUB_ADDRESS`, and `curl`
+stopped with `URL rejected: No host part in the URL`, which
+leaves the raised ratio in place. The rule now says to set the
+address before the calls or write it in them. Two scenarios,
+five trials with the old rule, all scored by
+`check_ratio_address_set`:
+
+- `collecting-diagnostics-traces-reproducible`, a full plan for
+  a Kubernetes deployment (1 trial): passed. The answer file
+  was not kept, so the form of its address is not known. Two
+  trials with the new rule wrote a placeholder and an example
+  URL.
+- A task that asked only for the command to remove a temporary
+  ratio on Docker Compose (4 trials): 3 passed, each with
+  `${INFRAHUB_ADDRESS:-http://localhost:8000}`. The fourth
+  scored 0 with "no curl call", while the agent's summary showed
+  the same command. Its sandbox was gone, so the file could not
+  be read. The same pull request then found two block formats
+  that the parser of the check missed, a shell prompt (`$`) and a
+  four-backtick fence, so the 0 most likely comes from the
+  grader and not from the answer. A score that comes from a
+  grader fault says nothing about the rule, the same way as a
+  trial that read the grader (step 4), so the trial is void: it
+  counts neither as a pass nor as a fail. It was not run again,
+  because the task was removed (see below).
+
+The mechanism: a task that asks for a command to paste is the
+precondition for the bug, and it also supplies the answer. The
+command has to work on its own, so the model writes a fallback
+address or a placeholder unprompted. The placeholders and the
+example URL of the new-rule trials have a host, so they pass the
+check; they show the rule followed, not the bug. The defect
+appeared in a long session, where the agent copied the example
+into a follow-up reply. A one-prompt task does not recreate that
+context, so no task built so far scores below 1.0.
+
+Disposition: the carve-out is taken for the address part of the
+rule only. The command task, built only for it, was removed with
+its grader script and fixtures.
+`collecting-diagnostics-traces-reproducible` stays in
+`eval.yaml`, because it scores other parts of the rule: the
+traces offer, and the raise and removal of the sampling ratio.
+`check_ratio_address_set` is one more assertion of that task,
+with its fixtures in
+`tests/graders/test_collecting_diagnostics_traces.py`. It guards
+the check and the plans that task produces. It is not proof that
+the rule changes the answer.
+
 The reference-drift remedy was taken once, for
 `skills/infrahub-managing-schemas/rules/relationship-on-delete.md`
 (#190). The rule said an omitted `on_delete` defaults to

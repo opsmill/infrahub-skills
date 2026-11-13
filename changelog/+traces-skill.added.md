@@ -1,0 +1,1 @@
+The Diagnostics Collector skill offers `infrahub-collect create --include-traces` for a slow instance, after the operator agrees, with a time window. It explains how a super admin raises the trace sampling ratio for a limited time, and keeps the API token out of the conversation. The option needs `infrahub-collect` 2.5.0 or later.

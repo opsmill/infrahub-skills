@@ -1,0 +1,24 @@
+# Diagnostic bundle plan
+
+1. Check the tool: `infrahub-collect version`.
+2. Detect the deployment:
+
+```bash
+infrahub-collect environment detect
+```
+
+3. The instance was slow between 14:00 and 15:30 UTC today. Do you want to include the traces of
+   the slow requests? They show where the time went. When exactly did the slowness start and end?
+
+If you answer yes, run:
+
+```bash
+infrahub-collect create --benchmark --include-traces \
+  --traces-start 2026-11-05T14:00:00Z --traces-end 2026-11-05T15:30:00Z
+```
+
+If you answer no, run `infrahub-collect create --benchmark`.
+
+Only a share of requests has a trace, set by the sampling ratio.
+
+4. Review the bundle and its `traces/` folder before sharing it: the masking covers key names only.

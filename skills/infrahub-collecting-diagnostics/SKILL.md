@@ -97,7 +97,8 @@ non-default K8s namespace), run
 `infrahub-collect environment list` and disambiguate
 with `--project=<name>` or `--k8s-namespace=<ns>`.
 No Infrahub API token is needed — the tool reuses
-existing Docker/kubectl access. See
+existing Docker/kubectl access. Only `--include-traces`
+in step 4 uses one. See
 [rules/deployment-detection.md](rules/deployment-detection.md).
 
 ### 4. Create the bundle
@@ -114,6 +115,13 @@ reproducer. See
 [rules/create-flags.md](rules/create-flags.md) for
 the full symptom-to-flag mapping.
 
+When the user reports that Infrahub is slow, read
+[rules/create-traces.md](rules/create-traces.md)
+before you write the command: it asks the user
+whether to add traces, for which window and from
+which minimum duration, and
+keeps the API token out of the conversation.
+
 Partial bundles are expected on degraded
 deployments — `create` still exits 0 and records any
 collection failures in the manifest. Send the bundle
@@ -126,7 +134,8 @@ names (`password`/`secret`/`token`/`key` →
 `********`). It does not scrub log or query
 contents, or secrets stored under other key names.
 Walk the user through scanning `bundle/logs/` and
-`bundle/server/` for hostnames, IPs, customer data,
+`bundle/server/` (and `bundle/traces/` when the
+bundle has traces) for hostnames, IPs, customer data,
 or secrets under non-standard keys, and get explicit
 confirmation before sharing. See
 [rules/review-before-sharing.md](rules/review-before-sharing.md).

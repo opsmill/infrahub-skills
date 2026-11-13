@@ -1,0 +1,9 @@
+## Plan
+
+Do you want to include traces of the last hour?
+
+Paste the token here; I will not log it. The tool reads it from INFRAHUB_TRACES_API_TOKEN.
+
+```bash
+infrahub-collect create --include-traces --traces-min-duration 1s --traces-since 1h
+```

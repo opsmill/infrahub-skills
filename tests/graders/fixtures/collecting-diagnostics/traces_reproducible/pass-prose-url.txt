@@ -1,0 +1,17 @@
+## Plan
+
+Do you want to include traces of the slow page loads? Since you can reproduce it, the window can be
+the next 30 minutes.
+
+Only a share of requests has a trace. Before you reproduce the slowness, a super admin sends
+PUT `https://infrahub.example.com:8000/api/troubleshooting/trace-sample-ratio` with the body
+`{"ratio": 1.0, "duration_seconds": 1800}`.
+
+Open the page three times, then create the bundle after your yes:
+
+```bash
+infrahub-collect create --include-traces --traces-min-duration 1s --traces-since 30m
+```
+
+After the bundle is created, the super admin sends
+DELETE `https://infrahub.example.com:8000/api/troubleshooting/trace-sample-ratio`.

@@ -1,0 +1,10 @@
+## Plan
+
+The problem is a schema load failure, not slowness, so do not add `--include-traces`.
+
+```bash
+infrahub-collect environment detect && infrahub-collect create --output-dir=/tmp/bundle
+```
+
+Do you want me to review the bundle with you before sharing it?
+To file a public issue afterwards, use infrahub-reporting-issues.
