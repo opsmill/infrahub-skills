@@ -12,6 +12,7 @@ CHECKS = [
     "mentions-create",
     # The slowness in this task has ended, so the window must be absolute.
     ("traces-offered-with-window", {"window": "absolute"}),
+    "sampling-caveat",
     "review-before-sharing",
     "no-legacy-artifacts",
 ]

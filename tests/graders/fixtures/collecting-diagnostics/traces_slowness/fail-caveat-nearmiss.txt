@@ -1,0 +1,13 @@
+## Plan
+
+The instance was slow from 14:00 to 15:30 UTC. Do you want to include the traces of the slow requests?
+
+Every request has a trace, with no sampling to worry about.
+
+```bash
+infrahub-collect environment detect
+# only a share of requests is sampled
+infrahub-collect create --include-traces --traces-start 2026-11-05T14:00:00Z --traces-end 2026-11-05T15:30:00Z
+```
+
+Review the bundle before sharing it.

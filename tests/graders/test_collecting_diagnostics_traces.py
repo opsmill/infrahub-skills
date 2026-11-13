@@ -14,9 +14,17 @@ What each near miss guards against:
   fail-nearmiss-since asks first, but uses `--traces-since` for a slowness
   that has ended; a check that accepts either window form passes it (cubic
   review of #234).
+  fail-caveat and fail-caveat-nearmiss grade the sampling caveat instead: the
+  near miss says "no sampling" in prose and "only a share" in a shell comment
+  only. A check that matches the word "sampling", or reads comments, passes it
+  (cubic review of #234).
 - traces_reproducible: PUT and GET on the ratio endpoint, and "delete" in
   prose about the bundle folder. A check that matches the endpoint name or the
   word "delete" passes it.
+  fail-nearmiss-negation gives DELETE only in a negated sentence ("Never send
+  DELETE ..."); fail-nearmiss-path calls /api/trace-sample-ratio, not the
+  /api/troubleshooting/ endpoint. A check that ignores negation, or matches
+  only the last path segment, passes them (cubic review of #234).
 - traces_no_terminal: names INFRAHUB_TRACES_API_TOKEN, but asks the operator
   to paste the token. A check that only looks for the variable passes it.
   fail-nearmiss-negation puts a "not" after the request ("Paste the token
@@ -82,6 +90,19 @@ TASKS = {
 }
 
 
+# Violating fixtures that grade a second check of the task, by name prefix.
+OTHER_CHECKS = {
+    ("traces_slowness", "fail-caveat"): "sampling-caveat",
+}
+
+
+def _expected_failure(task: str, fixture: str) -> str:
+    for (t, prefix), check in OTHER_CHECKS.items():
+        if t == task and fixture.startswith(prefix):
+            return check
+    return TASKS[task]
+
+
 def _fixtures(prefix: str) -> list[tuple[str, str]]:
     """Every (task, fixture) pair whose file name starts with the prefix.
 
@@ -108,7 +129,7 @@ def test_compliant_fixture_scores_full(task: str, fixture: str) -> None:
 def test_violating_fixture_fails_on_the_rule(task: str, fixture: str) -> None:
     result = run_checks(_task_checks(task), _FIXTURES / task / f"{fixture}.txt")
     assert result["score"] < 1.0, result["details"]
-    assert _failed(result) == [TASKS[task]], result["details"]
+    assert _failed(result) == [_expected_failure(task, fixture)], result["details"]
 
 
 def test_token_from_substitution_accepts_a_token_that_starts_with_equals() -> None:
@@ -118,3 +139,30 @@ def test_token_from_substitution_accepts_a_token_that_starts_with_equals() -> No
     """
     text = "```bash\necho =foo\n```\n"
     assert _mod._token_from_substitution(text) is False
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Tell me your super_admin token.",
+        "What's your token?",
+        "What’s your super_admin token?",
+        "I need your super_admin token to run the command.",
+        "Paste the token here.",
+    ],
+)
+def test_asks_for_token_matches_a_request(sentence: str) -> None:
+    assert _mod._asks_for_token(sentence)
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Do not tell me your token.",
+        "Never paste the token in this conversation.",
+        "Save your super_admin token in ~/.infrahub-admin-token.",
+        "The command asks for the token without showing it.",
+    ],
+)
+def test_asks_for_token_ignores_other_sentences(sentence: str) -> None:
+    assert not _mod._asks_for_token(sentence)

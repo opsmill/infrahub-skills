@@ -6,4 +6,5 @@
 infrahub-collect environment detect && infrahub-collect create --include-traces --traces-start=2026-11-05T14:00:00Z --traces-end=2026-11-05T15:30:00Z  # after your yes
 ~~~
 
+- Not every request is traced: the deployment keeps a sample of them.
 - Review the bundle before you send it to OpsMill.

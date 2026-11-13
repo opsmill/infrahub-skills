@@ -82,7 +82,16 @@ def check_no_legacy_artifacts(text: str, **_: object) -> CheckResult:
 _FENCE_RE = re.compile(r"^[ \t]*(```|~~~)[^\n]*\n(.*?)^[ \t]*\1[ \t]*$", re.MULTILINE | re.DOTALL)
 _TRACE_OPTION_RE = re.compile(r"^--(include-traces|traces-[a-z-]+)(=|$)")
 _NEGATION_RE = re.compile(r"\b(never|not|no|don't|do not|without)\b", re.IGNORECASE)
-_RATIO_PATH = "trace-sample-ratio"
+# The full path, so a call to another endpoint with the same last segment does not count.
+_RATIO_PATH = "/api/troubleshooting/trace-sample-ratio"
+
+
+# Clause boundaries inside a sentence. A negation counts only in the clause
+# that holds the verb, and only before that verb: "Paste the token here; I
+# will not log it." is still a request, but "Do not send me the token." is not.
+# The same holds for the HTTP method of a call in prose.
+_CLAUSE_SPLIT_RE = re.compile(r"[;:,]|\s+[—–-]\s+|\s+(?:and|but|so|then)\s+", re.IGNORECASE)
+_NEGATION_BEFORE_RE = re.compile(r"\b(never|not|no|don't|don’t|do not|without)\b", re.IGNORECASE)
 
 
 def _fenced_blocks(text: str) -> list[str]:
@@ -222,6 +231,34 @@ def check_traces_not_offered(text: str, **_: object) -> CheckResult:
     return True, "does not offer traces"
 
 
+# The caveat of rules/create-traces.md, step 3: only a share of requests has a
+# trace. A sentence that names traces and says "only a share", "not every", or
+# names the sampling, with no negation before "sampl" ("Every request has a
+# trace, with no sampling." says the opposite).
+_TRACED_RE = re.compile(r"(?<!stack )(?<!stack-)\btrac(e|es|ed|ing)\b", re.IGNORECASE)
+_SHARE_RE = re.compile(
+    r"\b(only|just)\s+(a\s+)?(share|part|fraction|subset|portion|sample|some)\b|\bnot\s+(every|all)\b",
+    re.IGNORECASE,
+)
+_SAMPLING_RE = re.compile(r"\bsampl(ed|ing)\b", re.IGNORECASE)
+
+
+def _states_sampling_caveat(sentence: str) -> bool:
+    if not _TRACED_RE.search(sentence):
+        return False
+    if _SHARE_RE.search(sentence):
+        return True
+    m = _SAMPLING_RE.search(sentence)
+    return bool(m) and not _NEGATION_BEFORE_RE.search(sentence[: m.start()])
+
+
+def check_sampling_caveat(text: str, **_: object) -> CheckResult:
+    """Say that only a share of requests has a trace, set by the sampling ratio."""
+    if any(_states_sampling_caveat(s) for s in _sentences(_prose(text))):
+        return True, "says that only a share of requests has a trace"
+    return False, "does not say that only a share of requests has a trace (sampling)"
+
+
 def _ratio_methods(text: str) -> set[str]:
     """HTTP methods the plan gives for the sampling ratio endpoint."""
     methods: set[str] = set()
@@ -238,8 +275,11 @@ def _ratio_methods(text: str) -> set[str]:
                 method = tok.split("=", 1)[1].upper()
         methods.add(method)
     for s in _sentences(_prose(text)):
-        for m in re.finditer(r"\b(PUT|DELETE|GET)\b[`\s]*\S*" + re.escape(_RATIO_PATH), s):
-            methods.add(m.group(1))
+        for clause in _CLAUSE_SPLIT_RE.split(s):
+            for m in re.finditer(r"\b(PUT|DELETE|GET)\b[`\s]*\S*" + re.escape(_RATIO_PATH), clause):
+                # "Never send DELETE ..." does not give the call.
+                if not _NEGATION_BEFORE_RE.search(clause[: m.start()]):
+                    methods.add(m.group(1))
     return methods
 
 
@@ -250,25 +290,20 @@ def check_ratio_raise_and_remove(text: str, **_: object) -> CheckResult:
     if missing:
         return False, (
             f"sampling ratio advice lacks {' and '.join(missing)} on "
-            f"/api/troubleshooting/{_RATIO_PATH} (found: {sorted(methods) or 'none'})"
+            f"{_RATIO_PATH} (found: {sorted(methods) or 'none'})"
         )
     return True, "raises the sampling ratio with PUT and removes it with DELETE"
 
 
 _ASK_TOKEN_RE = re.compile(
-    r"\b(paste|send|share|give|provide|type|enter|post)\b.{0,60}\btoken\b.{0,60}"
+    r"\b(paste|send|share|give|provide|type|enter|post|tell)\b.{0,60}\btoken\b.{0,60}"
     r"\b(me|here|chat|conversation|reply|message)\b"
-    r"|\b(send|give|share)\s+me\b.{0,60}\btoken\b"
-    r"|\bwhat\s+is\s+your\b.{0,40}\btoken\b",
+    r"|\b(send|give|share|tell)\s+me\b.{0,60}\btoken\b"
+    r"|\bwhat(\s+is|'s|’s)\s+your\b.{0,40}\btoken\b"
+    r"|\b(i|we)\s+need\s+your\b.{0,40}\btoken\b",
     re.IGNORECASE,
 )
 
-
-# Clause boundaries inside a sentence. A negation counts only in the clause
-# that holds the ask verb, and only before that verb: "Paste the token here; I
-# will not log it." is still a request, but "Do not send me the token." is not.
-_CLAUSE_SPLIT_RE = re.compile(r"[;:,]|\s+[—–-]\s+|\s+(?:and|but|so|then)\s+", re.IGNORECASE)
-_NEGATION_BEFORE_RE = re.compile(r"\b(never|not|no|don't|don’t|do not|without)\b", re.IGNORECASE)
 
 
 def _asks_for_token(sentence: str) -> bool:
@@ -340,6 +375,7 @@ CHECKS: dict[str, CheckFn] = {
     "traces-offered-with-window": check_traces_offered_with_window,
     "traces-not-offered": check_traces_not_offered,
     "ratio-raise-and-remove": check_ratio_raise_and_remove,
+    "sampling-caveat": check_sampling_caveat,
     "token-env-not-asked": check_token_env_not_asked,
     "mentions-create": check_mentions_create,
     "mentions-env-detect": check_mentions_env_detect,

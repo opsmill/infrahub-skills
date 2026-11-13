@@ -5,4 +5,6 @@ infrahub-collect environment detect
 infrahub-collect create --benchmark --include-traces --traces-since 2h
 ```
 
+Only a share of requests has a trace, set by the sampling ratio.
+
 Review the bundle before sharing it.

@@ -109,6 +109,7 @@
       "expectations": [
         "Recommends `infrahub-collect create`",
         "Asks before adding `--include-traces`, and gives `--traces-start` and `--traces-end` for the slowness that ended",
+        "Says that only a share of requests has a trace",
         "Surfaces a review-before-sharing caution",
         "Does not resurrect hand-rolled manifest.yml/flags.yml artifacts"
       ],
@@ -120,6 +121,10 @@
         {
           "name": "traces-offered-with-window",
           "check": "Plan asks about traces and gives `--include-traces` with `--traces-start` and `--traces-end`"
+        },
+        {
+          "name": "sampling-caveat",
+          "check": "Plan says that only a share of requests has a trace"
         },
         {
           "name": "review-before-sharing",
