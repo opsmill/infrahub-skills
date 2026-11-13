@@ -304,7 +304,7 @@ def _token_from_substitution(text: str) -> bool:
     for cmd in _shell_commands(text):
         for tok in cmd:
             name, sep, value = tok.partition("=")
-            if sep and name.split()[-1] == _TOKEN_VAR and ("$(" in value or "`" in value):
+            if sep and name.split()[-1:] == [_TOKEN_VAR] and ("$(" in value or "`" in value):
                 return True
     return False
 

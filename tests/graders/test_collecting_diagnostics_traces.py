@@ -109,3 +109,12 @@ def test_violating_fixture_fails_on_the_rule(task: str, fixture: str) -> None:
     result = run_checks(_task_checks(task), _FIXTURES / task / f"{fixture}.txt")
     assert result["score"] < 1.0, result["details"]
     assert _failed(result) == [TASKS[task]], result["details"]
+
+
+def test_token_from_substitution_accepts_a_token_that_starts_with_equals() -> None:
+    """A shell token such as `=foo` has an empty name before the `=`.
+
+    `name.split()[-1]` raised IndexError on it (cubic review of #234).
+    """
+    text = "```bash\necho =foo\n```\n"
+    assert _mod._token_from_substitution(text) is False
