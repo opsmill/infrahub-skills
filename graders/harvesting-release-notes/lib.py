@@ -175,6 +175,23 @@ def check_finding_fields_present(text: str, **_) -> tuple[bool, str]:
     return True, f"All {len(findings)} finding(s) carry every field"
 
 
+def check_affected_paths_exist(text: str, root: Path, **_) -> tuple[bool, str]:
+    """Every passage a finding names exists in the workspace, at a line the
+    file has. A change that touches no passage is not a finding, so a finding
+    for one has to name a file or a line that is not there."""
+    findings = _findings(text)
+    if not findings:
+        return False, "No findings to check"
+    for i, finding in enumerate(findings, start=1):
+        for path, line in _affected_paths(finding.get("affected", "")):
+            target = root / path
+            if not target.is_file():
+                return False, f"Finding {i} names {path}, which does not exist"
+            if int(line) > len(target.read_text(errors="ignore").splitlines()):
+                return False, f"Finding {i}: {path}:{line} is past the end of the file"
+    return True, "Every affected passage exists"
+
+
 def check_target_finding_present(text: str, affected_path: str, **_) -> tuple[bool, str]:
     """A finding points at the skill passage the release changed."""
     if _target(text, affected_path) is None:
@@ -191,7 +208,9 @@ def check_evidence_pinned(text: str, start: str, end: str, **_) -> tuple[bool, s
         return False, "No findings to check"
     lo, hi = _full(start), _full(end)
     for i, finding in enumerate(findings, start=1):
-        for field in ("deprecated in", "removed in", "verified in"):
+        # Every field, not only the version fields: a beta named in the gate
+        # is cited just the same.
+        for field in FIELDS:
             for v in _versions(_clean(finding.get(field, ""))):
                 if v[3]:
                     return False, f"Finding {i} '{field}' cites a pre-release ({v[0]}.{v[1]}.{v[2]}{v[3]})"
@@ -327,6 +346,7 @@ def check_skill_unchanged(text: str, root: Path, files: dict[str, str], **_) -> 
 CHECKS = {
     "report-has-findings": check_report_has_findings,
     "finding-fields-present": check_finding_fields_present,
+    "affected-paths-exist": check_affected_paths_exist,
     "target-finding-present": check_target_finding_present,
     "evidence-pinned": check_evidence_pinned,
     "gate-boundaries": check_gate_boundaries,

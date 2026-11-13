@@ -82,7 +82,7 @@ def load_releases(repo: str, releases_json: Path | None, notes_dir: Path | None)
     if releases_json is not None:
         return json.loads(releases_json.read_text())
     if notes_dir is not None:
-        # A pre-release is recognised from the tag itself (`1.7.0b1`).
+        # A pre-release is recognised from the tag itself (`1.12.0b1`).
         return [
             {"tagName": p.stem, "isPrerelease": version_key(p.stem)[3] == 0}
             for p in sorted(notes_dir.glob("*.md"))

@@ -134,9 +134,9 @@ release where the new behavior became available, and
 may run on until the removal.
 
 ```markdown
-Infrahub 1.6 and later: use `name__contains`. It is
-required from 1.7, which removed `name__like`.
-Before 1.7: `name__like` still works.
+Infrahub <available> and later: <new guidance>. It is
+required from <removal>, which removed <old>.
+Before <available>: <old guidance>.
 ```
 
 When there was no deprecation period, both boundaries
@@ -144,8 +144,9 @@ are the same release. Name it once, and keep the old
 guidance for the releases before it:
 
 ```markdown
-Infrahub 1.12 and later: <new guidance>.
-Before 1.12: <old guidance>.
+infrahub-sdk 1.24.0 and later: pass `--branch`, or the
+run targets the configured default branch.
+Before 1.24.0: the run targets the current Git branch.
 ```
 
 `harvesting-release-notes` recommends gates in these

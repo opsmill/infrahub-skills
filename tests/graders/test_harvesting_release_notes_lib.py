@@ -99,17 +99,24 @@ def test_compliant_fixture_scores_full(tmp_path, case):
     assert result["score"] == 1.0, result["checks"]
 
 
+def _messages(result: dict) -> dict[str, str]:
+    return {c["name"]: c["message"] for c in result["checks"] if not c["passed"]}
+
+
 def test_violating_fixture_fails_on_the_gate_and_the_edit(tmp_path):
+    """Each failure names the shape that broke, not only the check."""
     result = run_checks(_task_checks(), _workspace(tmp_path, "fail"))
-    failed = _failed(result)
+    messages = _messages(result)
     assert result["score"] < 1.0
-    for name in ("gate-boundaries", "gate-keeps-old-guidance", "evidence-pinned", "skill-unchanged"):
-        assert name in failed, failed
+    assert "'Deprecated in' is 'none', expected 1.6" in messages["gate-boundaries"]
+    assert "No Gate clause keeps 'name__like' up to 1.6" in messages["gate-keeps-old-guidance"]
+    assert "names no source path" in messages["evidence-pinned"]
+    assert "rules/filters.md was edited" in messages["skill-unchanged"]
 
 
 def test_near_miss_fails_only_on_gate_boundaries(tmp_path):
     result = run_checks(_task_checks(), _workspace(tmp_path, "fail-nearmiss"))
-    assert _failed(result) == ["gate-boundaries"], result["checks"]
+    assert _messages(result) == {"gate-boundaries": "Gate names 1.6; expected exactly 1.6, 1.7"}
 
 
 def _gate_report(gate: str) -> str:
@@ -153,6 +160,9 @@ def test_keeps_old_guidance_accepts_a_clause_reaching_the_removal(gate):
         "From 1.7: `name__contains`. Before 1.6: `name__like`.",
         # The old filter stops before the new one is available.
         "Before 1.5: `name__like`. From 1.6: `name__contains`, required from 1.7.",
+        # Past the removal: 1.7 has no `name__like`, so neither clause is true.
+        "Before 1.8: `name__like`. From 1.6: `name__contains`, required from 1.7.",
+        "Infrahub 1.7 and earlier: `name__like`. From 1.6: `name__contains`, required from 1.7.",
         # The old filter appears only in the clause that removes it.
         "1.7 and later: `name__like` is removed, use `name__contains` (available from 1.6).",
         # The old guidance kept with no version at all.
@@ -188,6 +198,67 @@ def test_a_field_ends_at_the_first_blank_line(tmp_path):
     report.write_text(report.read_text() + "\n" + unverified)
     ok, msg = _mod.check_evidence_pinned(report.read_text(), start="1.6.0", end="1.7.0")
     assert ok, msg
+
+
+_VERIFIED = "- Verified in: infrahub-v1.7.0:backend/infrahub/graphql/filters.py"
+
+
+@pytest.mark.parametrize(
+    ("verified", "ok"),
+    [
+        # Both ends of the range are inside it; one release past either end is not.
+        ("infrahub-v1.6.0:backend/infrahub/graphql/filters.py", True),
+        ("infrahub-v1.7.0:backend/infrahub/graphql/filters.py", True),
+        ("infrahub-v1.5.9:backend/infrahub/graphql/filters.py", False),
+        ("infrahub-v1.8.0:backend/infrahub/graphql/filters.py", False),
+        # Seven hex characters pin a commit; six do not.
+        ("abcdef1:backend/infrahub/graphql/filters.py", True),
+        ("abcdef:backend/infrahub/graphql/filters.py", False),
+        # A path with nothing pinning it.
+        ("backend/infrahub/graphql/filters.py", False),
+    ],
+)
+def test_evidence_pinned_boundaries(verified, ok):
+    report = (_FIXTURES / "pass.txt").read_text().replace(_VERIFIED, f"- Verified in: {verified}")
+    passed, msg = _mod.check_evidence_pinned(report, start="1.6.0", end="1.7.0")
+    assert passed is ok, msg
+
+
+def test_a_prerelease_cited_in_any_field_fails():
+    """Not only the three version fields: a beta named in the gate is cited too."""
+    report = _gate_report(
+        "From infrahub-v1.7.0b1 use `name__contains`; available from 1.6. Before 1.7: `name__like`."
+    )
+    passed, msg = _mod.check_evidence_pinned(report, start="1.6.0", end="1.7.0")
+    assert not passed
+    assert "'gate' cites a pre-release (1.7.0b1)" in msg
+
+
+def test_affected_paths_must_exist(tmp_path):
+    """A change that touches no passage is not a finding. A finding for one
+    names a file that is not there, or a line past the end of the file."""
+    report = _workspace(tmp_path, "pass")
+    assert _mod.check_affected_paths_exist(report.read_text(), root=tmp_path)[0]
+
+    lines = len((tmp_path / "skills/acme-querying-inventory/rules/filters.md").read_text().splitlines())
+    last = report.read_text().replace("rules/filters.md:9", f"rules/filters.md:{lines}")
+    assert _mod.check_affected_paths_exist(last, root=tmp_path)[0]
+
+    past_end = report.read_text().replace("rules/filters.md:9", f"rules/filters.md:{lines + 1}")
+    ok, msg = _mod.check_affected_paths_exist(past_end, root=tmp_path)
+    assert not ok
+    assert f"rules/filters.md:{lines + 1} is past the end" in msg
+
+    invented = report.read_text().replace(
+        "## Not reported",
+        "### Finding 2\n\n- Repository: opsmill/infrahub\n- Severity: Medium\n"
+        "- Affected: skills/acme-querying-inventory/rules/cache.md:3\n- Deprecated in: none\n"
+        "- Removed in: infrahub-v1.7.0\n- Verified in: infrahub-v1.7.0:backend/infrahub/config.py\n"
+        "- Gate: Before 1.7: set `INFRAHUB_LEGACY_CACHE`.\n\n## Not reported",
+    )
+    ok, msg = _mod.check_affected_paths_exist(invented, root=tmp_path)
+    assert not ok
+    assert "Finding 2 names skills/acme-querying-inventory/rules/cache.md, which does not exist" in msg
 
 
 def test_missing_report_fails(tmp_path):

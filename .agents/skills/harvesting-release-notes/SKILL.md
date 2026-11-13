@@ -71,6 +71,19 @@ the user names that holds one subdirectory per tag.
 
 ## Workflow
 
+### 0. Find where the last harvest stopped
+
+Every issue this skill files names its range on a
+`Release harvest:` line (step 8). When the user names no
+range, start after the last one harvested:
+
+```bash
+gh search issues --repo opsmill/infrahub-skills "Release harvest:" --json number,title,body --limit 20
+```
+
+A range that produced no finding files no issue, so it
+leaves no record. Say so in the report.
+
 ### 1. List the releases
 
 ```bash
@@ -119,7 +132,11 @@ opsmill/infrahub-sdk-python` and `Removed in: v1.24.0
 
 ### 3. Find the skill passages each change touches
 
-Search `skills/` twice for each change:
+Search `skills/`, `graders/`, and `eval.yaml` twice for
+each change. A grader check or an eval expectation can
+encode the old behavior too, and it then fails the
+corrected prose, which invites a revert. List those lines
+in `Affected` with the passages, so they move together.
 
 - **For the name it concerns:** the command, flag,
   field, filter, tool, or setting. Use word boundaries
@@ -155,9 +172,14 @@ previous release as evidence, and start `Gate:` with "No
 version gate; this applies to every release." followed by
 the corrected text.
 
-Pin the evidence: `Verified in: <tag or commit>:<path>`.
-A path with no tag or commit does not say which version
-you read. When the source does not confirm the change,
+Pin the evidence: `Verified in: <tag or commit>:<path>`,
+citing final releases, never a pre-release. A path with
+no tag or commit does not say which version you read.
+Name the call path you read too, and claim nothing beyond
+it: when a note covers `infrahubctl transform` and
+`render` and you read only `transform`, the finding
+covers `transform`, and `render` goes under "Not
+confirmed". When the source does not confirm the change,
 write `Verified in: UNVERIFIED` and `Gate: none`, and make
 no recommendation. When the source shows the skill is
 still correct, drop the finding.
@@ -210,17 +232,18 @@ paragraph after the list:
 ```markdown
 ### Finding 1
 
-- Repository: opsmill/infrahub
-- Severity: High
-- Affected: skills/<skill>/rules/<file>.md:<line>
-- Deprecated in: infrahub-v1.6.0
-- Removed in: infrahub-v1.7.0
-- Verified in: infrahub-v1.7.0:backend/infrahub/<path>
-- Gate: Infrahub 1.6 and later: use <new>. It is required from 1.7. Before 1.7: <old> still works.
+- Repository: opsmill/infrahub-sdk-python
+- Severity: Critical
+- Affected: skills/infrahub-managing-generators/reference.md:57, skills/infrahub-managing-generators/reference.md:214
+- Deprecated in: none
+- Removed in: v1.24.0 (shipped with infrahub-v1.12.0)
+- Verified in: v1.24.0:infrahub_sdk/operation.py, `branch_name` (`infrahubctl generator`)
+- Gate: infrahub-sdk 1.24.0 and later: the branch passed with `--branch`, otherwise the configured default branch. Before 1.24.0: the current Git branch.
 ```
 
 After the findings, list the releases read, the
-pre-releases skipped, and the changes not reported.
+pre-releases skipped, the changes not confirmed, and the
+changes not reported.
 
 ### 8. File each verified finding as an issue
 
@@ -235,34 +258,12 @@ to the user and files nothing without approval.
 
 One finding is one issue. Do not file an UNVERIFIED
 finding: leave it in the report for a person to check.
+Put the harvested range in each issue body as a line of
+its own, `Release harvest: <owner/repo> <range>`, so the
+next run finds where this one stopped (step 0).
 
 Once an issue exists, `analyzing-skill-bugs <issue number>`
 starts the fix from it.
-
-## Common mistakes
-
-- **Recommending a replacement.** "Use `name__contains`"
-  alone leaves users on the earlier release with guidance
-  that does not work for them.
-- **Gating on the deprecation release.** Guidance is not
-  wrong until the removal release, so a gate that names
-  only the deprecation release points users at the wrong
-  boundary.
-- **Citing a pre-release.** A beta tag is not a release
-  users install. Cite the final release.
-- **A path with no version.** `backend/infrahub/x.py` does
-  not say which release you read. Pin a tag or a commit.
-- **Ranking a quiet deletion below a loud error.** A
-  change that deletes data without an error is Critical,
-  above a renamed flag that fails at once.
-- **Editing the skill.** This skill writes the report.
-  The change goes through an issue, then the test-first
-  pipeline.
-- **Gating an old defect.** When the previous release
-  behaves the same way, a version gate tells users on that
-  release the old guidance was right. It was not.
-- **Citing Infrahub for an SDK change.** The code is in
-  the SDK commit the Infrahub tag pins; cite that.
 
 ## Boundaries
 

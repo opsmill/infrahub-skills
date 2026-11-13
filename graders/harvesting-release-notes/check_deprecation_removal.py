@@ -8,7 +8,8 @@ filter and 1.7.0 removes it, so a correct report recommends a gate naming
 both releases, leaves no release without working guidance (`name__like` up to
 at least 1.6, `name__contains` from 1.6), pins its evidence,
 rates the finding High (the old guidance now fails with an error), and leaves
-the skill files untouched.
+the skill files untouched. Every affected passage must exist, so the 1.7.0
+removal of INFRAHUB_LEGACY_CACHE, which no skill mentions, cannot be a finding.
 
 The hashes pin the workspace skill files as shipped; the test in
 tests/graders/test_harvesting_release_notes_lib.py fails if they drift from
@@ -34,6 +35,7 @@ SKILL_FILES = {
 CHECKS = [
     "report-has-findings",
     "finding-fields-present",
+    "affected-paths-exist",
     ("target-finding-present", {"affected_path": AFFECTED}),
     ("evidence-pinned", {"start": "1.6.0", "end": "1.7.0"}),
     ("gate-boundaries", {"affected_path": AFFECTED, "deprecated": "1.6", "removed": "1.7"}),
