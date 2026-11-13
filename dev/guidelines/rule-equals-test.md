@@ -202,8 +202,10 @@ five trials with the old rule, all scored by
 `check_ratio_address_set`:
 
 - `collecting-diagnostics-traces-reproducible`, a full plan for
-  a Kubernetes deployment (1 trial): passed. The plan used a
-  placeholder for the URL.
+  a Kubernetes deployment (1 trial): passed. The answer file
+  was not kept, so the form of its address is not known. Two
+  trials with the new rule wrote a placeholder and an example
+  URL.
 - A task that asked only for the command to remove a temporary
   ratio on Docker Compose (4 trials): 3 passed, each with
   `${INFRAHUB_ADDRESS:-http://localhost:8000}`. The fourth
