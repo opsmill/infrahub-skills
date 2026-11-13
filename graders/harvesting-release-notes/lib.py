@@ -82,7 +82,8 @@ def _sections(text: str) -> list[str]:
 
 def _fields(body: str) -> dict[str, str]:
     """The known fields of one finding. A value runs on to the following
-    lines until the next known field, so a multi-line gate is kept whole."""
+    lines, so a multi-line gate is kept whole, and ends at the next known
+    field or the first blank line: prose after the list is not a field."""
     out: dict[str, str] = {}
     current = None
     for line in body.splitlines():
@@ -91,7 +92,9 @@ def _fields(body: str) -> dict[str, str]:
         if key in FIELDS:
             current = key
             out[key] = m.group("value").strip()
-        elif current is not None and line.strip() and not line.strip().startswith("```"):
+        elif not line.strip():
+            current = None
+        elif current is not None and not line.strip().startswith("```"):
             out[current] = f"{out[current]}\n{line.strip()}"
     return out
 
@@ -254,28 +257,47 @@ def check_gate_keeps_old_guidance(
     old_token: str,
     removed: str,
     deprecated: str | None = None,
+    new_token: str | None = None,
     **_,
 ) -> tuple[bool, str]:
-    """The Gate keeps the old guidance for every version before the removal
-    release. One clause names the old token and reaches up to the removal
-    release: 'before <removed>', or '<last working release> and earlier',
-    where the last working release is at least the deprecation release.
-    'Before <deprecated>' alone leaves the deprecation window uncovered."""
+    """The Gate leaves no release without working guidance.
+
+    The new behavior is available from the deprecation release (or from the
+    removal release when there was none). The old guidance must reach that
+    release: one clause names the old token with 'before <v>' or '<v> and
+    earlier', where v lies between the availability release and the removal
+    release. With a deprecation release, a clause naming the new token must
+    also name the availability release, so the new guidance starts where the
+    old one stops. 'From 1.7: new. Before 1.6: old.' leaves 1.6 uncovered.
+    """
     finding = _target(text, affected_path)
     if finding is None:
         return False, f"No finding names {affected_path}"
     rem = _minor(removed)
-    floor = _minor(deprecated) if deprecated else None
-    for clause in _clauses(_clean(finding.get("gate", ""))):
+    avail = _minor(deprecated) if deprecated else rem
+    clauses = _clauses(_clean(finding.get("gate", "")))
+    old_reaches = False
+    for clause in clauses:
         if old_token not in clause:
             continue
         versions = {(v[0], v[1]) for v in _versions(clause)}
-        if rem in versions and _BEFORE_WORDS.search(clause):
-            return True, f"Gate keeps '{old_token}' for versions before {removed}"
-        last = [v for v in versions if v < rem and (floor is None or v >= floor)]
-        if last and _INCLUSIVE_WORDS.search(clause):
-            return True, f"Gate keeps '{old_token}' up to {last[0][0]}.{last[0][1]}"
-    return False, f"No Gate clause keeps '{old_token}' for every version before {removed}"
+        if any(avail <= v <= rem for v in versions) and _BEFORE_WORDS.search(clause):
+            old_reaches = True
+        if any(avail <= v < rem for v in versions) and _INCLUSIVE_WORDS.search(clause):
+            old_reaches = True
+    if not old_reaches:
+        return False, (
+            f"No Gate clause keeps '{old_token}' up to {avail[0]}.{avail[1]}, "
+            f"where the new behavior became available"
+        )
+    if deprecated and new_token:
+        starts = any(
+            new_token in clause and avail in {(v[0], v[1]) for v in _versions(clause)}
+            for clause in clauses
+        )
+        if not starts:
+            return False, f"No Gate clause starts '{new_token}' at {deprecated}, so a release has no guidance"
+    return True, f"Gate covers every release: '{old_token}' up to {avail[0]}.{avail[1]}, then '{new_token or 'the new behavior'}'"
 
 
 def check_severity(text: str, affected_path: str, expected: str, **_) -> tuple[bool, str]:

@@ -123,6 +123,7 @@ def _gate_report(gate: str) -> str:
 _KEEPS_OLD = {
     "affected_path": "skills/acme-querying-inventory/rules/filters.md",
     "old_token": "name__like",
+    "new_token": "name__contains",
     "removed": "1.7",
     "deprecated": "1.6",
 }
@@ -134,6 +135,10 @@ _KEEPS_OLD = {
         "Before 1.7: `name__like`. From 1.6: `name__contains`, required from 1.7.",
         "Infrahub 1.6 and earlier: `name__like` still works; `name__contains` from 1.6, required from 1.7.",
         "Up to 1.6: `name__like`. Available from 1.6 and required from 1.7: `name__contains`.",
+        # A live trial: the switch happens where the new filter became
+        # available, so every release still has working guidance.
+        "Infrahub 1.6 and later: use `name__contains`. It is required from 1.7, where `name__like` "
+        "fails. Before 1.6: `name__like` is the only substring filter and still works.",
     ],
 )
 def test_keeps_old_guidance_accepts_a_clause_reaching_the_removal(gate):
@@ -146,6 +151,8 @@ def test_keeps_old_guidance_accepts_a_clause_reaching_the_removal(gate):
     [
         # Names 1.6 and 1.7, keeps the old filter, but leaves 1.6.x uncovered.
         "From 1.7: `name__contains`. Before 1.6: `name__like`.",
+        # The old filter stops before the new one is available.
+        "Before 1.5: `name__like`. From 1.6: `name__contains`, required from 1.7.",
         # The old filter appears only in the clause that removes it.
         "1.7 and later: `name__like` is removed, use `name__contains` (available from 1.6).",
         # The old guidance kept with no version at all.
@@ -155,6 +162,32 @@ def test_keeps_old_guidance_accepts_a_clause_reaching_the_removal(gate):
 def test_keeps_old_guidance_rejects_a_clause_that_stops_short(gate):
     ok, msg = _mod.check_gate_keeps_old_guidance(_gate_report(gate), root=Path("."), **_KEEPS_OLD)
     assert not ok, msg
+
+
+def test_a_field_ends_at_the_first_blank_line(tmp_path):
+    """Prose after the field list is not part of the last field. A paragraph
+    naming another version after `Gate:` must not change what the gate names,
+    and one after an UNVERIFIED finding's `Gate: none` must not turn it into a
+    recommendation."""
+    report = _workspace(tmp_path, "pass")
+    report.write_text(
+        report.read_text().replace(
+            "## Not reported",
+            "Why High: on 1.8 and 1.9 the query still fails the same way.\n\n## Not reported",
+        )
+    )
+    result = run_checks(_task_checks(), report)
+    assert result["score"] == 1.0, result["checks"]
+
+    unverified = (
+        "### Finding 2\n\n- Repository: opsmill/infrahub\n- Severity: Medium\n"
+        "- Affected: skills/acme-querying-inventory/SKILL.md:15\n- Deprecated in: none\n"
+        "- Removed in: none\n- Verified in: UNVERIFIED\n- Gate: none\n\n"
+        "The notes mention this, but the source did not confirm it.\n"
+    )
+    report.write_text(report.read_text() + "\n" + unverified)
+    ok, msg = _mod.check_evidence_pinned(report.read_text(), start="1.6.0", end="1.7.0")
+    assert ok, msg
 
 
 def test_missing_report_fails(tmp_path):

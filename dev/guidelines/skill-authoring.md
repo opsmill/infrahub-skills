@@ -128,7 +128,10 @@ skill, and the old guidance is still correct for them.
 Name both boundaries: the release where the new
 behavior became available, and the first release where
 the old guidance is wrong. Deprecation alone does not
-make guidance wrong.
+make guidance wrong. Leave no release without working
+guidance: the old guidance must reach at least the
+release where the new behavior became available, and
+may run on until the removal.
 
 ```markdown
 Infrahub 1.6 and later: use `name__contains`. It is

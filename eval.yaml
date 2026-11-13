@@ -9291,11 +9291,15 @@ tasks:
       A REPORT.md with one finding for skills/acme-querying-inventory/rules/filters.md,
       rated High, with evidence pinned to infrahub-v1.7.0 or a commit, and a
       recommended gate that names both 1.6 (name__contains available, name__like
-      deprecated) and 1.7 (name__like removed) while keeping name__like for versions
-      before 1.7. The skill files are left unchanged.
+      deprecated) and 1.7 (name__like removed) and leaves no release without
+      working guidance: name__like up to at least 1.6, name__contains from 1.6.
+      The skill files are left unchanged.
     expectations:
       - The finding cites infrahub-v1.6.0 for the deprecation and infrahub-v1.7.0 for the removal
       - The pre-release infrahub-v1.7.0b1 is not cited
-      - The gate keeps `name__like` for Infrahub versions before 1.7 instead of replacing it
+      - >-
+        The gate keeps `name__like` up to at least 1.6 and starts `name__contains`
+        at 1.6, instead of replacing the old filter
+      - Each verified finding is offered for filing as an issue, and nothing is filed without approval
       - The removal of INFRAHUB_LEGACY_CACHE is not reported as a finding, since no skill mentions it
       - The files under skills/ are not edited

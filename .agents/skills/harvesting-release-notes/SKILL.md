@@ -4,7 +4,7 @@ description: >-
   Reads the release notes of Infrahub, infrahub-sdk, or the Infrahub MCP server
   for one release or a range, checks each breaking change and deprecation
   against this repository's shipped skills and against source at the release
-  tag, and writes a ranked REPORT.md of version-gated changes. Reports only.
+  tag, and writes a ranked report of version-gated changes. Reports only.
   Follow the workflow in the body; the description does not summarize it.
   TRIGGER when: a new Infrahub, SDK, or MCP server release is out and the
   skills may still teach what it changed; someone asks which skills a release
@@ -35,16 +35,21 @@ server behaves, and the skills in `skills/` go on
 teaching the old behavior until someone notices. This
 skill reads the releases in a range, finds every skill
 passage a change touches, confirms the change in source
-at the release tag, and writes `REPORT.md`: one ranked
-finding per affected passage, each with the version-gated
-text to put in the skill.
+at the release tag, and writes a report: one ranked
+finding per change, listing every passage it affects,
+each with the version-gated text to put in the skill.
+
+Write the report to `.release-harvest-<range>.md` at the
+repository root, which `.gitignore` covers, unless the
+user names another path. A report is a working file, not
+a repository artifact.
 
 **It reports; it does not edit skills.** Even when the
 user asks to "update the skills", write the report and
-say that each finding goes through `analyzing-skill-bugs`,
-which runs the repository's test-first pipeline. An edit
-made here skips the failing test that proves the change
-was needed.
+offer to file each finding as an issue (step 8). The fix
+then starts from that issue in the repository's
+test-first pipeline. An edit made here skips the failing
+test that proves the change was needed.
 
 ## Input
 
@@ -95,12 +100,41 @@ Each repository names its sections differently:
 Read the release highlights too. A new capability can make
 a skill's guidance outdated without breaking it.
 
+**Infrahub release notes also report SDK changes.** Each
+Infrahub tag pins an `infrahub-sdk` commit as the
+`python_sdk` submodule, and a note about `infrahubctl`,
+the SDK, protocols, or Generator tracking usually lives in
+that SDK code. Find the commit pinned by the release and
+by the one before it:
+
+```bash
+git -C <infrahub checkout> ls-tree <tag> python_sdk
+git -C <infrahub-sdk-python checkout> describe --tags <commit>
+```
+
+Read and cite the SDK at those commits, and name the SDK
+release in the finding: `Repository:
+opsmill/infrahub-sdk-python` and `Removed in: v1.24.0
+(shipped with infrahub-v1.12.0)`.
+
 ### 3. Find the skill passages each change touches
 
-Search `skills/` for the name the change concerns: the
-command, flag, field, filter, tool, or setting. Record
-each hit as `path:line`. A change that touches no passage
-is not a finding: list it in one line under "Not
+Search `skills/` twice for each change:
+
+- **For the name it concerns:** the command, flag,
+  field, filter, tool, or setting. Use word boundaries
+  (`grep -rnw`, or `\b` in a pattern): a short name such
+  as `sso` or `agnostic` otherwise matches "also" and
+  "diagnostic".
+- **For what the skill claims happens:** the old
+  behavior in plain words. A passage can be wrong without
+  naming anything from the notes. "The generator produces
+  nothing" and "auto-detected from git" were both wrong
+  after 1.12, and neither contains a name the notes use.
+
+Record each hit as `path:line`. Passages that need the
+same fix belong to one finding. A change that touches no
+passage is not a finding: list it in one line under "Not
 reported" so the reader knows it was read.
 
 ### 4. Confirm each change in source at the tag
@@ -111,6 +145,15 @@ for the reads. With a named source directory, read
 `<directory>/<tag>/<path>` instead of the local checkout.
 Read the release where the behavior changed and the one
 before it, so you see both sides of the change.
+
+**Release notes also document behavior that did not
+change.** When the code is the same in the previous
+release, the skill was already wrong and the note only
+exposed it. That is a correction, not a version change:
+write `Removed in: none, not version-bound`, cite the
+previous release as evidence, and start `Gate:` with "No
+version gate; this applies to every release." followed by
+the corrected text.
 
 Pin the evidence: `Verified in: <tag or commit>:<path>`.
 A path with no tag or commit does not say which version
@@ -146,18 +189,23 @@ Before writing any recommendation:
    gate. If it does, there is no finding.
 3. Write the gate in the form
    [`dev/guidelines/skill-authoring.md` § "Release-gate what you teach"](../../../dev/guidelines/skill-authoring.md#release-gate-what-you-teach)
-   gives. Name both boundaries, and keep the old guidance
-   for the releases before the removal. Never recommend
+   gives. Name both boundaries, and leave no release
+   without working guidance: the old guidance covers at
+   least every release before the new behavior became
+   available, and the new guidance starts there. Never recommend
    replacing it: users on earlier releases still read the
    skill.
 4. When there was no deprecation period, both boundaries
    are the same release. Name it once and write
    `Deprecated in: none`.
 
-### 7. Write `REPORT.md`
+### 7. Write the report
 
 Order findings Critical, then High, then Medium. Use this
-shape for each, with every field:
+shape for each, with every field. `Affected` lists every
+passage the change touches, separated by commas. A field
+ends at the first blank line, so put any explanation in a
+paragraph after the list:
 
 ```markdown
 ### Finding 1
@@ -174,11 +222,22 @@ shape for each, with every field:
 After the findings, list the releases read, the
 pre-releases skipped, and the changes not reported.
 
-### 8. Hand off
+### 8. File each verified finding as an issue
 
-Offer `analyzing-skill-bugs` for each verified finding,
-passing the finding as its input. One finding is one
-change.
+Offer to file each verified finding as an issue in
+`opsmill/infrahub-skills` with `infrahub-reporting-skill-gaps`.
+Pass the finding as its evidence: the affected passages
+are its coverage read, and the pinned source is evidence
+no session can give. That skill checks the tracker for an
+existing report, drafts and redacts the issue, and hands
+it to `infrahub-reporting-issues`, which shows the draft
+to the user and files nothing without approval.
+
+One finding is one issue. Do not file an UNVERIFIED
+finding: leave it in the report for a person to check.
+
+Once an issue exists, `analyzing-skill-bugs <issue number>`
+starts the fix from it.
 
 ## Common mistakes
 
@@ -197,7 +256,13 @@ change.
   change that deletes data without an error is Critical,
   above a renamed flag that fails at once.
 - **Editing the skill.** This skill writes the report.
-  The change goes through `analyzing-skill-bugs`.
+  The change goes through an issue, then the test-first
+  pipeline.
+- **Gating an old defect.** When the previous release
+  behaves the same way, a version gate tells users on that
+  release the old guidance was right. It was not.
+- **Citing Infrahub for an SDK change.** The code is in
+  the SDK commit the Infrahub tag pins; cite that.
 
 ## Boundaries
 

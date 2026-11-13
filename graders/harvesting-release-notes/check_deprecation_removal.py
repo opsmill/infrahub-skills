@@ -5,7 +5,8 @@ The workspace holds release notes for infrahub-v1.6.0 to infrahub-v1.7.0
 (plus a 1.7.0b1 pre-release), source snapshots per tag, and a skill that
 teaches the `name__like` filter with no version gate. 1.6.0 deprecates the
 filter and 1.7.0 removes it, so a correct report recommends a gate naming
-both releases, keeps `name__like` for versions before 1.7, pins its evidence,
+both releases, leaves no release without working guidance (`name__like` up to
+at least 1.6, `name__contains` from 1.6), pins its evidence,
 rates the finding High (the old guidance now fails with an error), and leaves
 the skill files untouched.
 
@@ -41,6 +42,7 @@ CHECKS = [
         {
             "affected_path": AFFECTED,
             "old_token": "name__like",
+            "new_token": "name__contains",
             "removed": "1.7",
             "deprecated": "1.6",
         },
