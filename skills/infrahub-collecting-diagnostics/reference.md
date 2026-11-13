@@ -84,7 +84,7 @@ infrahub-collect create [flags]
 | `--include-queries` | Include DB query logs. Off by default — may contain customer data |
 | `--benchmark` | Run a host resource benchmark. Pulls an OpsMill image; skipped with a warning if unavailable (e.g. airgapped) |
 | `--include-backup` | Include a backup, for support-requested reproduction |
-| `--include-traces` | Include the traces of slow requests from the deployment's Tempo. Ask first, see [rules/create-traces.md](rules/create-traces.md). Needs a release that has the option |
+| `--include-traces` | Include the traces of slow requests from the deployment's Tempo. Ask first, see [rules/create-traces.md](rules/create-traces.md). Needs `infrahub-collect` 2.5.0 or later |
 | `--traces-since=<duration>` | Window that ends now (default `2h`) |
 | `--traces-start=<time>`, `--traces-end=<time>` | Window that ended, in RFC 3339; give both |
 | `--traces-min-duration=<duration>` | Shortest trace kept (default `1s`) |

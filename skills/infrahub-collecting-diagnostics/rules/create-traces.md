@@ -13,8 +13,8 @@ which minimum duration of trace to keep. Add
 `--include-traces` only after a yes. For any other
 problem, do not offer traces.
 
-Requires an `infrahub-collect` release that has
-`--include-traces`. When `infrahub-collect create
+Requires `infrahub-collect` 2.5.0 or later, the
+first release with `--include-traces`. When `infrahub-collect create
 --help` does not list it, say that this version cannot
 collect traces and create the bundle without them.
 
