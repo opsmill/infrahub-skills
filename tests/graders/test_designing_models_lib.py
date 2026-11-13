@@ -1797,6 +1797,11 @@ def test_uniqueness_rule_left_out_fails(tmp_path: Path) -> None:
             F1_ROWS, "none\n", None, id="compliant-variant-steps-nested-under-a-grouping-bullet",
         ),
         pytest.param(
+            "1. Settle with the DC team before building F1:\n   - O1: who owns sites\n" + NEXT_STEPS,
+            F1_ROWS.replace("| DC team | answer Q4 |", "| open: O1 | answer Q4 |"),
+            "- O1: Who owns sites? (owner: DC team)\n", None, id="compliant-variant-open-item-grouped-under-a-step",
+        ),
+        pytest.param(
             NEXT_STEPS.replace("1. Build F1 DC fabric: Schema Manager, then Object Manager.",
                                "1. Build F1 DC fabric.\n   1. Schema Manager, then Object Manager."),
             F1_ROWS, "none\n", "neither hand it off nor name the skill", id="near-miss-step-does-not-borrow-its-nested-step",
@@ -1864,6 +1869,10 @@ WIFI_TWO_FEATURES = WIFI_FEATURES + "| F2 | Guest portal | Guests self-register 
             WIFI_TWO_FEATURES, "- Wireless\n  - O1: Who owns SSID definitions? (owner: unknown; affects F1)\n"
             "  - O2: Who runs the guest portal? (owner: helpdesk; affects F2)\n",
             None, id="compliant-variant-items-nested-under-a-grouping-bullet",
+        ),
+        pytest.param(
+            WIFI_FEATURES, "1. O1: Who owns SSID definitions?\n   1. Owner: unknown\n   2. Affects F1\n",
+            None, id="compliant-variant-numbered-sub-list-under-an-open-item",
         ),
         pytest.param(
             WIFI_TWO_FEATURES, "- Wireless\n  - O1: Who owns SSID definitions? (owner: unknown)\n"

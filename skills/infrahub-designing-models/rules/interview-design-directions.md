@@ -83,7 +83,9 @@ request exactly but has to be maintained.
   the recommended direction, `stated` when the user
   borrowed it from another. When the user cannot reply,
   these rows are `open` and name the direction row's
-  open item.
+  open item, unless the user's answers state the
+  decision (`stated`) or the skill's own rules settle
+  it.
 
 ## Correct
 

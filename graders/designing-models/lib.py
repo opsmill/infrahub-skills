@@ -120,17 +120,19 @@ def _lines_outside_fences(text: str) -> list[str]:
 _ITEM_START = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+|^\s*\**\s*O\d+\s*\**\s*:", re.IGNORECASE)
 
 
-def _list_items(text: str) -> list[str]:
+def _list_items(text: str, own_item: re.Pattern[str]) -> list[str]:
     """Each list item outside fences as one line, with its wrapped lines joined on.
 
     A Markdown list item may wrap over several lines; reading only the first
     line loses what the wrap carried ("...; affects F1)" on the next line).
     A nested item is an item of its own, so open items or numbered steps
-    under a grouping bullet are read. A plain sub-bullet is also part of the
-    items it is nested in, so a step keeps the sub-bullets that finish it;
-    a nested open item or numbered step is not, so its parent does not
-    borrow its text ("affects F1"). An item runs until a blank line or the
-    next item at the same or a lower indent.
+    under a grouping bullet are read. A nested line that matches `own_item`
+    (the section's own kind of item: `_OPEN_ITEM` in Open items, `_STEP` in
+    Next steps) is not part of its parent, so the parent does not borrow its
+    text ("affects F1"). Any other sub-item is, so a step keeps the open
+    items grouped under it and an open item keeps its numbered details. An
+    item runs until a blank line or the next item at the same or a lower
+    indent.
     """
     items: list[str] = []
     # (indent, index into items, stands alone) of each item the current line
@@ -154,7 +156,7 @@ def _list_items(text: str) -> list[str]:
             continue
         while nest and nest[-1][0] >= indent:
             nest.pop()
-        alone = bool(_OPEN_ITEM.match(line) or _STEP.match(line))
+        alone = bool(own_item.match(line))
         if not alone:
             join(line)
         items.append(line.rstrip())
@@ -1015,7 +1017,7 @@ def check_documented_decision(
         " | ".join(_clean(c) for c in r.values()) for r in mechanisms
         if mech_col and _clean(r[mech_col]).lower() == mechanism
     ]
-    rows += [_clean(item) for item in _list_items(parts.get(OPEN_ITEMS_HEADING, ""))
+    rows += [_clean(item) for item in _list_items(parts.get(OPEN_ITEMS_HEADING, ""), _OPEN_ITEM)
              if _OPEN_ITEM.match(item) and names_it.search(item)]
     about = [row for row in rows if subject.search(row)]
     if not about:
@@ -1486,7 +1488,7 @@ def _settles_only(text: str) -> bool:
 def _steps(parts: dict[str, str]) -> list[str]:
     """The numbered Next steps, each with its wrapped lines joined on."""
     return [
-        _clean(m.group(2)) for item in _list_items(parts.get(NEXT_STEPS_HEADING, ""))
+        _clean(m.group(2)) for item in _list_items(parts.get(NEXT_STEPS_HEADING, ""), _STEP)
         if (m := _STEP.match(item))
     ]
 
@@ -1561,7 +1563,7 @@ _AFFECTS = re.compile(r"affects\s*:?\s*((?:`?F\d+`?(?:\s*(?:,|and|&)\s*)?)+)", r
 def _open_item_features(parts: dict[str, str]) -> dict[str, set[str]]:
     """Open item ID -> the feature IDs its 'affects' list names."""
     items: dict[str, set[str]] = {}
-    for line in _list_items(parts.get(OPEN_ITEMS_HEADING, "")):
+    for line in _list_items(parts.get(OPEN_ITEMS_HEADING, ""), _OPEN_ITEM):
         match = _OPEN_ITEM.match(line)
         if not match:
             continue
