@@ -10,4 +10,4 @@ infrahub-collect environment detect
 infrahub-collect create --include-traces --traces-min-duration 1s --traces-start 2026-11-05T14:00:00Z --traces-end 2026-11-05T15:30:00Z
 ```
 
-Review the bundle before sharing it.
+Review the bundle and its `traces/` folder before sharing it.

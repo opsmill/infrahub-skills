@@ -14,6 +14,8 @@ CHECKS = [
     ("traces-offered-with-window", {"window": "absolute"}),
     "sampling-caveat",
     "review-before-sharing",
+    # The review step names the traces (rules/review-before-sharing.md).
+    "traces-review",
     "no-legacy-artifacts",
 ]
 

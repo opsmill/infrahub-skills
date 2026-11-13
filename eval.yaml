@@ -3191,14 +3191,14 @@ tasks:
       --include-traces --traces-start <start> --traces-end <end>
       --traces-min-duration <duration>` to run after a
       yes, says that only a share of requests has a trace, and cautions the user
-      to review the bundle before sharing.
+      to review the bundle and its traces before sharing.
     expectations:
       - Recommends `infrahub-collect create`
       - >-
         Asks before adding `--include-traces`, and gives `--traces-start` and
         `--traces-end` for the slowness that ended, with `--traces-min-duration`
       - Says that only a share of requests has a trace
-      - Surfaces a review-before-sharing caution
+      - Surfaces a review-before-sharing caution that names the traces
       - Does not resurrect hand-rolled manifest.yml/flags.yml artifacts
     assertions:
       - name: mentions-create
@@ -3211,6 +3211,8 @@ tasks:
         check: Plan says that only a share of requests has a trace
       - name: review-before-sharing
         check: Plan cautions to review the bundle before sharing
+      - name: traces-review
+        check: Plan asks the operator to review the traces before sharing the bundle
       - name: no-legacy-artifacts
         check: Plan does not reference manifest.yml/flags.yml/redaction-report.txt
 
@@ -3244,7 +3246,10 @@ tasks:
       - Raises the sampling ratio for a limited time before reproducing
       - Removes the temporary ratio after the bundle is created
       - Leaves the ratio change to the operator rather than running it itself
-      - Sets the Infrahub address before the ratio calls, or writes it in them
+      - >-
+        Gives every ratio call a host: sets the address variable before the
+        call, writes the URL or a placeholder in it, uses a `${VAR:-<url>}`
+        fallback, or gives the call in prose only
     assertions:
       - name: mentions-create
         check: Plan recommends `infrahub-collect create`
@@ -3253,7 +3258,9 @@ tasks:
       - name: ratio-raise-and-remove
         check: Plan raises the ratio with PUT and removes it with DELETE
       - name: ratio-address-set
-        check: Plan sets the Infrahub address before the ratio calls, or writes it in them
+        check: >-
+          Every ratio call in a command has a host: a variable in its URL is set
+          on an earlier line or has a `${VAR:-<url>}` fallback
 
   - name: collecting-diagnostics-traces-no-terminal
     trials: 3
@@ -3274,7 +3281,9 @@ tasks:
         run: python graders/collecting-diagnostics/check_traces_no_terminal.py output.md
         weight: 1.0
     expected_output: >-
-      A command plan that asks whether to include traces for the last hour, and
+      A command plan that asks whether to include traces for the last hour,
+      gives `infrahub-collect create --include-traces --traces-since 1h
+      --traces-min-duration <duration>`, and
       says where INFRAHUB_TRACES_API_TOKEN comes from when the agent runs the
       command: exported before the agent session starts, read from a file the
       agent never opens, or the operator runs the command themselves. It never

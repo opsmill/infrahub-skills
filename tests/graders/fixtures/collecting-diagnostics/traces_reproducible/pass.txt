@@ -9,7 +9,7 @@ before you reproduce the slowness:
 ```bash
 export INFRAHUB_ADDRESS="https://infrahub.example.com"
 curl -X PUT "$INFRAHUB_ADDRESS/api/troubleshooting/trace-sample-ratio" \
-  -H "X-INFRAHUB-KEY: $SUPER_ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -H "X-INFRAHUB-KEY: $(cat ~/.infrahub-admin-token)" -H "Content-Type: application/json" \
   -d '{"ratio": 1.0, "duration_seconds": 1800}'
 ```
 
@@ -22,5 +22,5 @@ infrahub-collect create --include-traces --traces-min-duration 1s --traces-since
 After the bundle is created, remove the temporary ratio:
 
 ```bash
-curl -X DELETE "$INFRAHUB_ADDRESS/api/troubleshooting/trace-sample-ratio" -H "X-INFRAHUB-KEY: $SUPER_ADMIN_TOKEN"
+curl -X DELETE "$INFRAHUB_ADDRESS/api/troubleshooting/trace-sample-ratio" -H "X-INFRAHUB-KEY: $(cat ~/.infrahub-admin-token)"
 ```

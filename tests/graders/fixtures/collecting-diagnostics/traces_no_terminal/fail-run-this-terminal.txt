@@ -1,0 +1,16 @@
+## Plan
+
+Do you want to include traces of the slow requests from the last hour?
+
+Run this in your own terminal first, with your super_admin token. Never paste the token in this
+conversation.
+
+```bash
+export INFRAHUB_TRACES_API_TOKEN=<your super_admin token>
+```
+
+Then I run:
+
+```bash
+infrahub-collect create --include-traces --traces-min-duration 1s --traces-since 1h
+```

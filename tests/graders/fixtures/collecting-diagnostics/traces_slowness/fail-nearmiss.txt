@@ -9,4 +9,4 @@ infrahub-collect create --include-traces --traces-min-duration 1s --traces-since
 
 Only a share of requests has a trace, set by the sampling ratio.
 
-Review the bundle before sharing it.
+Review the bundle and its `traces/` folder before sharing it.

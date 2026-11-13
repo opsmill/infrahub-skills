@@ -21,4 +21,4 @@ If you answer no, run `infrahub-collect create --benchmark`.
 
 Only a share of requests has a trace, set by the sampling ratio.
 
-4. Review the bundle before sharing it: the masking covers key names only.
+4. Review the bundle and its `traces/` folder before sharing it: the masking covers key names only.

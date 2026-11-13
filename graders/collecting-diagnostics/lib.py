@@ -94,7 +94,10 @@ _RATIO_PATH = "/api/troubleshooting/trace-sample-ratio"
 # that holds the verb, and only before that verb: "Paste the token here; I
 # will not log it." is still a request, but "Do not send me the token." is not.
 # The same holds for the HTTP method of a call in prose.
-_CLAUSE_SPLIT_RE = re.compile(r"[;:,]|\s+[—–-]\s+|\s+(?:and|but|so|then)\s+", re.IGNORECASE)
+# "and" is not a boundary: "Do not copy and paste the token here." keeps its
+# negation on both verbs. A colon is a boundary only before whitespace, so the
+# colon of `https://` or of `host:8000` does not cut a URL in two.
+_CLAUSE_SPLIT_RE = re.compile(r"[;,]|:(?=\s)|\s+[—–-]\s+|\s+(?:but|so|then)\s+", re.IGNORECASE)
 _NEGATION_BEFORE_RE = re.compile(r"\b(never|not|no|don't|don’t|do not|without)\b", re.IGNORECASE)
 
 
@@ -131,18 +134,24 @@ def _sentences(prose: str) -> list[str]:
     return parts
 
 
-def _shell_commands(text: str) -> list[list[str]]:
-    """Every shell command in the fences, as shlex tokens without comments."""
-    commands: list[list[str]] = []
+def _shell_lines(text: str) -> list[tuple[str, list[list[str]]]]:
+    """Every shell line in the fences, in order: the raw line and its commands.
+
+    Each command is a list of shlex tokens without comments. A line that
+    shlex cannot split keeps its raw text with no commands.
+    """
+    lines: list[tuple[str, list[list[str]]]] = []
     for block in _fenced_blocks(text):
         joined = re.sub(r"\\\n", " ", _PROMPT_RE.sub(r"\1", block))
         for line in joined.splitlines():
             try:
                 tokens = shlex.split(line, comments=True)
             except ValueError:
+                lines.append((line, []))
                 continue
             # A line may chain commands; shlex keeps `&&`, `;` and `|` as tokens
             # when they stand apart, so split on those tokens only.
+            commands: list[list[str]] = []
             current: list[str] = []
             for tok in tokens:
                 if tok in ("&&", "||", ";", "|"):
@@ -153,7 +162,13 @@ def _shell_commands(text: str) -> list[list[str]]:
                     current.append(tok)
             if current:
                 commands.append(current)
-    return commands
+            lines.append((line, commands))
+    return lines
+
+
+def _shell_commands(text: str) -> list[list[str]]:
+    """Every shell command in the fences, as shlex tokens without comments."""
+    return [cmd for _, commands in _shell_lines(text) for cmd in commands]
 
 
 def _create_options(text: str) -> list[list[str]]:
@@ -165,6 +180,16 @@ def _create_options(text: str) -> list[list[str]]:
                 found.append(cmd[i + 2:])
                 break
     return found
+
+
+def _option_value(options: list[str], name: str) -> str:
+    """The value of an option, as `--name value` or `--name=value`; empty when absent."""
+    for i, opt in enumerate(options):
+        if opt.startswith(f"{name}="):
+            return opt.split("=", 1)[1]
+        if opt == name and i + 1 < len(options) and not options[i + 1].startswith("-"):
+            return options[i + 1]
+    return ""
 
 
 def _trace_options(options: list[str]) -> set[str]:
@@ -216,8 +241,8 @@ def check_traces_offered_with_window(text: str, *, window: str = "any", **_: obj
             else "`--traces-since` or `--traces-start` and `--traces-end`"
         )
         return False, f"no `infrahub-collect create --include-traces` command with {wanted}"
-    if not any("--traces-min-duration" in _trace_options(opts) for opts in with_window):
-        return False, "the traces command with a window does not pass `--traces-min-duration`"
+    if not all(_option_value(opts, "--traces-min-duration") for opts in with_window):
+        return False, "a traces command with a window does not pass `--traces-min-duration <duration>`"
     if not _asks_about_traces(text):
         return False, "adds traces without asking the operator first (no question names traces)"
     return True, "asks about traces and gives the command with a window"
@@ -315,9 +340,12 @@ def check_ratio_raise_and_remove(text: str, **_: object) -> CheckResult:
     return True, "raises the sampling ratio with PUT and removes it with DELETE"
 
 
-_URL_VAR_RE = re.compile(r"^\$\{?([A-Za-z_][A-Za-z0-9_]*)")
-# `${VAR:-value}` with a value falls back to a host when VAR is unset or empty.
-_URL_DEFAULT_RE = re.compile(r"^\$\{[A-Za-z_][A-Za-z0-9_]*:-[^}]+\}")
+# A variable anywhere in a URL argument: `$VAR`, `${VAR}`, or `${VAR:-value}`.
+# The third has a host when VAR is not set, so it needs no assignment.
+_URL_VAR_RE = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)(:-[^}]+)?\}|([A-Za-z_][A-Za-z0-9_]*))")
+# An assignment read on the raw line, because shlex splits an unquoted `$(...)`
+# value into several words: `export VAR=http://$(kubectl ... ):8000`.
+_LINE_ASSIGN_RE = re.compile(r"^\s*(export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(\S+)")
 
 
 def check_ratio_address_set(text: str, **_: object) -> CheckResult:
@@ -333,21 +361,32 @@ def check_ratio_address_set(text: str, **_: object) -> CheckResult:
     """
     assigned: set[str] = set()
     unset: list[str] = []
-    for cmd in _shell_commands(text):
-        words = cmd[1:] if cmd[0] == "export" else cmd
+    for line, commands in _shell_lines(text):
+        first = commands[0] if commands else []
+        words = first[1:] if first[:1] == ["export"] else first
         pairs = [_ASSIGN_RE.match(w) for w in words]
         if words and all(pairs):
-            assigned.update(m.group(1) for m in pairs if m.group(2).strip())
+            assigned.update(m.group(1) for m in pairs if m.group(2).strip("\"' "))
             continue
-        command = _without_env_prefix(cmd)
-        if not command or not command[0].endswith("curl"):
+        # A line that starts with an assignment and runs no curl call sets the
+        # variable, even when shlex split its value into several words.
+        m = _LINE_ASSIGN_RE.match(line)
+        rest = _without_env_prefix(first)
+        if m and m.group(3).strip("\"'") and (m.group(1) or not rest or not rest[0].endswith("curl")):
+            assigned.add(m.group(2))
             continue
-        for tok in cmd:
-            if "trace-sample-ratio" not in tok:
+        for cmd in commands:
+            command = _without_env_prefix(cmd)
+            if not command or not command[0].endswith("curl"):
                 continue
-            m = _URL_VAR_RE.match(tok)
-            if m and m.group(1) not in assigned and not _URL_DEFAULT_RE.match(tok):
-                unset.append(m.group(1))
+            for tok in cmd:
+                if "trace-sample-ratio" not in tok:
+                    continue
+                for v in _URL_VAR_RE.finditer(tok):
+                    name = v.group(1) or v.group(3)
+                    has_default = bool(v.group(2))
+                    if name not in assigned and not has_default:
+                        unset.append(name)
     if unset:
         return False, (
             f"ratio call uses ${sorted(set(unset))[0]} with no earlier line that sets it; "
@@ -367,12 +406,24 @@ _ASK_TOKEN_RE = re.compile(
 
 
 
+# "Tell me when the token is saved in ~/.infrahub-admin-token." asks for no
+# value: it is the file route of rules/create-traces.md, step 5. The token is
+# followed by a word that puts it in a file, then a path or the word "file".
+_TOKEN_IN_FILE_RE = re.compile(
+    r"\btoken\b.{0,40}\b(saved|stored|written|kept|put|in|into)\b\s+(\S*/\S*|(a|the|your|that)?\s*file\b)",
+    re.IGNORECASE,
+)
+
+
 def _asks_for_token(sentence: str) -> bool:
     """A clause of the sentence asks for the token value, with no negation before the ask."""
     for clause in _CLAUSE_SPLIT_RE.split(sentence):
         m = _ASK_TOKEN_RE.search(clause)
-        if m and not _NEGATION_BEFORE_RE.search(clause[: m.start()]):
-            return True
+        if not m or _NEGATION_BEFORE_RE.search(clause[: m.start()]):
+            continue
+        if _TOKEN_IN_FILE_RE.search(clause[m.start():]):
+            continue
+        return True
     return False
 
 
@@ -387,6 +438,12 @@ def _asks_for_token(sentence: str) -> bool:
 _TOKEN_VAR = "INFRAHUB_TRACES_API_TOKEN"
 _RUN_YOURSELF_RE = re.compile(
     r"\brun\b.{0,40}\b(yourself|themselves|in your (own )?terminal)\b", re.IGNORECASE
+)
+# What the operator runs must be the collection itself. "Run this in your own
+# terminal first" before an `export` fence is the own-shell advice that does
+# not reach the agent's process.
+_CREATE_OBJECT_RE = re.compile(
+    r"infrahub-collect|\bcreate\b|\bcollect(ion)?\b|\bbundle\b", re.IGNORECASE
 )
 _START_AGENT_FROM_SHELL_RE = re.compile(
     r"\b(start|launch|open|restart)\w*\b.{0,60}\b(session|agent|assistant|claude)\b"
@@ -411,8 +468,11 @@ def _token_way_in_prose(text: str) -> bool:
         for clause in _CLAUSE_SPLIT_RE.split(s):
             for regex in (_RUN_YOURSELF_RE, _START_AGENT_FROM_SHELL_RE):
                 m = regex.search(clause)
-                if m and not _NEGATION_BEFORE_RE.search(clause[: m.start()]):
-                    return True
+                if not m or _NEGATION_BEFORE_RE.search(clause[: m.start()]):
+                    continue
+                if regex is _RUN_YOURSELF_RE and not _CREATE_OBJECT_RE.search(clause):
+                    continue
+                return True
     return False
 
 
@@ -432,7 +492,32 @@ def check_token_env_not_asked(text: str, **_: object) -> CheckResult:
     return True, f"names {_TOKEN_VAR}, says how it reaches the command, and does not ask for the value"
 
 
+_REVIEW_RE = re.compile(r"\b(review|check|inspect|read|look\s+(through|at|over))\w*\b", re.IGNORECASE)
+
+
+def check_traces_review(text: str, **_: object) -> CheckResult:
+    """With `--include-traces`, a review sentence names the traces (rules/review-before-sharing.md).
+
+    The traces carry names from the operator's deployment, so the review step
+    must name them: a review of "the bundle" alone does not. A prose sentence
+    names the traces and has a review verb with no negation before it in its
+    clause, so "Review the bundle, including the traces." counts and "You do
+    not need to review the traces." does not.
+    """
+    if not any("--include-traces" in _trace_options(o) for o in _create_options(text)):
+        return True, "no traces command, so no traces review is needed"
+    for s in _sentences(_prose(text)):
+        if not _TRACED_RE.search(s):
+            continue
+        for clause in _CLAUSE_SPLIT_RE.split(s):
+            m = _REVIEW_RE.search(clause)
+            if m and not _NEGATION_BEFORE_RE.search(clause[: m.start()]):
+                return True, "asks the operator to review the traces before sharing"
+    return False, "the review step does not name the traces (`bundle/traces/`)"
+
+
 CHECKS: dict[str, CheckFn] = {
+    "traces-review": check_traces_review,
     "traces-offered-with-window": check_traces_offered_with_window,
     "traces-not-offered": check_traces_not_offered,
     "ratio-raise-and-remove": check_ratio_raise_and_remove,

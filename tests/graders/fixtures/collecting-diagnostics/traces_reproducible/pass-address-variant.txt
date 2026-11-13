@@ -4,7 +4,7 @@ Do you want to include traces of the slow page loads? Only a share of requests h
 super admin raises the sampling ratio before you reproduce the slowness.
 
 ```bash
-INFRAHUB_ADDRESS=http://localhost:8000
+INFRAHUB_ADDRESS=https://infrahub.example.com
 curl -X PUT "https://infrahub.example.com/api/troubleshooting/trace-sample-ratio" -d '{"ratio": 1.0, "duration_seconds": 1800}'
 infrahub-collect create --include-traces --traces-min-duration 1s --traces-since 30m
 ```

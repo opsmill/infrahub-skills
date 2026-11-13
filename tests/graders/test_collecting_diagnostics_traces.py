@@ -19,6 +19,15 @@ What each near miss guards against:
   #234). fail-min-duration-nearmiss names the option in prose and in a
   shell comment only; a check that matches the option name anywhere in the
   plan passes it.
+  fail-min-duration-novalue passes the option with no duration, and
+  fail-min-duration-second-command gives a second traces command without it;
+  a check that looks for the option name in any one command passes them
+  (cubic review of #234).
+  fail-review and fail-review-nearmiss grade the review of the traces
+  (rules/review-before-sharing.md): the first reviews "the bundle" only, the
+  near miss says "You do not need to review the traces" and names traces/
+  in a shell comment. A check that looks for "review" and "bundle" passes
+  them (BeArchiTek review of #234).
   fail-caveat and fail-caveat-nearmiss grade the sampling caveat instead: the
   near miss says "no sampling" in prose and "only a share" in a shell comment
   only. A check that matches the word "sampling", or reads comments, passes it
@@ -37,7 +46,13 @@ What each near miss guards against:
   INFRAHUB_ADDRESS" in prose; fail-address-nearmiss-order exports it after
   the calls. A check that looks for any assignment passes them.
   pass-address-variant writes one URL out and sets the variable with a bare
-  assignment in another fence, used as ${INFRAHUB_ADDRESS}.
+  assignment in another fence, used as ${INFRAHUB_ADDRESS}; both calls go to
+  the same host. pass-address-kubectl sets the address from an unquoted
+  `$(kubectl ...)`, which shlex splits into several words.
+  fail-address-host-in-url uses `https://$INFRAHUB_HOST/...`, a variable
+  that does not start the URL and that nothing sets. pass-prose-url gives
+  both calls in prose with a full `https://host:8000` URL, which a split on
+  every colon cut in two (BeArchiTek and cubic reviews of #234).
   pass-address-default uses ${INFRAHUB_ADDRESS:-http://localhost:8000},
   which has a host when the variable is not set. Trials with the old rule
   wrote this form; a check that rejects any variable fails it.
@@ -45,7 +60,14 @@ What each near miss guards against:
   to paste the token. A check that only looks for the variable passes it.
   fail-nearmiss-negation puts a "not" after the request ("Paste the token
   here; I will not log it."). A check that skips any sentence with a negation
-  passes it (review of #234). fail-nearmiss-own-shell names the variable and
+  passes it (review of #234). pass-copy-and-paste says "Do not copy and
+  paste the token here.", and pass-token-file says "Tell me when the token is
+  saved in ~/.infrahub-admin-token."; a check that splits on "and", or reads
+  any "tell ... token ... me" as a request, fails them. fail-run-this-terminal
+  says "Run this in your own terminal first" before an `export` fence, the
+  own-shell advice the rule rules out; a check that accepts any "run ...
+  yourself" passes it (BeArchiTek review of #234).
+  fail-nearmiss-own-shell names the variable and
   asks for nothing, but only says "set it in your own shell", which does not
   reach a command the agent runs; pass-prose-ways gives the two ways that live
   in prose only, with no command substitution (cubic review of #234).
@@ -110,6 +132,7 @@ TASKS = {
 OTHER_CHECKS = {
     ("traces_slowness", "fail-caveat"): "sampling-caveat",
     ("traces_reproducible", "fail-address"): "ratio-address-set",
+    ("traces_slowness", "fail-review"): "traces-review",
 }
 
 
@@ -166,6 +189,11 @@ def test_token_from_substitution_accepts_a_token_that_starts_with_equals() -> No
         "What’s your super_admin token?",
         "I need your super_admin token to run the command.",
         "Paste the token here.",
+        # The negation comes after the verb, so these still ask.
+        "Paste the token here; I will not log it.",
+        "Paste the token here and I will not log it.",
+        # A file is named, but as where the token comes from, not where it goes.
+        "Send me the token from the file ~/.infrahub-admin-token.",
     ],
 )
 def test_asks_for_token_matches_a_request(sentence: str) -> None:
@@ -179,6 +207,11 @@ def test_asks_for_token_matches_a_request(sentence: str) -> None:
         "Never paste the token in this conversation.",
         "Save your super_admin token in ~/.infrahub-admin-token.",
         "The command asks for the token without showing it.",
+        # "and" does not cut the negation off the second verb (BeArchiTek
+        # review of #234).
+        "Do not copy and paste the token here.",
+        # The file route of the rule (BeArchiTek review of #234).
+        "Tell me when the token is saved in ~/.infrahub-admin-token.",
     ],
 )
 def test_asks_for_token_ignores_other_sentences(sentence: str) -> None:
