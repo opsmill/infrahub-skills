@@ -1,0 +1,13 @@
+"""GraphQL attribute filters for node queries."""
+
+ATTRIBUTE_FILTERS = {
+    "value": "exact match",
+    "values": "match any of the given values",
+    "contains": "substring match",
+}
+
+
+def build_filter(attribute: str, operator: str, value: str) -> dict:
+    if operator not in ATTRIBUTE_FILTERS:
+        raise ValueError(f'Unknown argument "{attribute}__{operator}"')
+    return {"attribute": attribute, "operator": operator, "value": value}

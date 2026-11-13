@@ -1,0 +1,12 @@
+[
+  {"tagName": "infrahub-v1.12.1", "isPrerelease": false, "publishedAt": "2026-11-12T10:10:57Z"},
+  {"tagName": "infrahub-v1.11.12", "isPrerelease": false, "publishedAt": "2026-11-10T09:54:06Z"},
+  {"tagName": "infrahub-v1.12.0", "isPrerelease": false, "publishedAt": "2026-11-10T15:27:00Z"},
+  {"tagName": "infrahub-v1.12.0b1", "isPrerelease": true, "publishedAt": "2026-11-06T12:13:07Z"},
+  {"tagName": "infrahub-v1.11.11", "isPrerelease": false, "publishedAt": "2026-10-28T08:00:00Z"},
+  {"tagName": "infrahub-v1.11.0", "isPrerelease": false, "publishedAt": "2026-08-04T08:00:00Z"},
+  {"tagName": "infrahub-v1.10.2", "isPrerelease": false, "publishedAt": "2026-07-01T08:00:00Z"},
+  {"tagName": "infrahub-v1.10.0", "isPrerelease": false, "publishedAt": "2026-06-02T08:00:00Z"},
+  {"tagName": "infrahub-v1.9.4", "isPrerelease": false, "publishedAt": "2026-05-20T08:00:00Z"},
+  {"tagName": "infrahub-v1.9.0", "isPrerelease": false, "publishedAt": "2026-04-01T08:00:00Z"}
+]

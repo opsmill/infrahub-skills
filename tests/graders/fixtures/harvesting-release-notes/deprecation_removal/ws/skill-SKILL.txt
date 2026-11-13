@@ -1,0 +1,16 @@
+---
+name: acme-querying-inventory
+description: >-
+  Writes GraphQL queries against the ACME Infrahub instance to find
+  devices, interfaces and sites. TRIGGER when: someone asks to look up
+  inventory in Infrahub.
+---
+
+# Querying the ACME inventory
+
+## Workflow
+
+1. Identify the node kind the question is about.
+2. Build the query. To match part of a name, read
+   [rules/filters.md](./rules/filters.md).
+3. Run the query with the Infrahub MCP server and summarize the result.

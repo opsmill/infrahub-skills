@@ -23,6 +23,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 EVAL_YAML = REPO_ROOT / "eval.yaml"
 EVALS_DIR = REPO_ROOT / "evaluations"
 SKILLS_DIR = REPO_ROOT / "skills"
+# Shipped skills first: some tasks name a shipped skill by its sandbox path
+# (`.agents/skills/infrahub-common/`). Contributor skills live only here.
+CONTRIBUTOR_SKILLS_DIR = REPO_ROOT / ".agents" / "skills"
 
 
 def extract_prompt(instruction: str) -> str:
@@ -70,6 +73,8 @@ def main() -> None:
     for skill_dir, tasks in sorted(skills.items()):
         # Derive skill name from SKILL.md frontmatter
         skill_md = SKILLS_DIR / skill_dir / "SKILL.md"
+        if not skill_md.exists():
+            skill_md = CONTRIBUTOR_SKILLS_DIR / skill_dir / "SKILL.md"
         skill_name = f"infrahub-{skill_dir}"
         if skill_md.exists():
             text = skill_md.read_text()

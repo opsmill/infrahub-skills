@@ -36,7 +36,10 @@ Contributor skills live outside `dev/`, in
 where this repo keeps the guidance it writes for its
 own agents:
 [`harvesting-skill-review`](../.agents/skills/harvesting-skill-review/SKILL.md)
-turns a PR's review threads into rules, and the
+turns a PR's review threads into rules,
+[`harvesting-release-notes`](../.agents/skills/harvesting-release-notes/SKILL.md)
+reports which skill passages a release or range of
+releases changed, with version-gated fixes, and the
 skill-change pipeline
 ([`analyzing-skill-bugs`](../.agents/skills/analyzing-skill-bugs/SKILL.md),
 [`grilling-skill-features`](../.agents/skills/grilling-skill-features/SKILL.md),

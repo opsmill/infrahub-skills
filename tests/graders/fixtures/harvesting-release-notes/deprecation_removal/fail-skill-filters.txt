@@ -1,0 +1,20 @@
+---
+title: Filter devices by part of a name
+impact: MEDIUM
+---
+
+## Filter devices by part of a name
+
+To find devices whose name contains a string, pass the
+`name__contains` filter on the node query:
+
+```graphql
+query {
+  DcimDevice(name__contains: "spine") {
+    edges { node { name { value } } }
+  }
+}
+```
+
+The match is case-sensitive. Use `name__value` instead when you
+know the full name.

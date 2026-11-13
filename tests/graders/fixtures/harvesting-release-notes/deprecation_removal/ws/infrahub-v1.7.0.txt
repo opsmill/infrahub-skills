@@ -1,0 +1,35 @@
+# Infrahub - v1.7.0
+
+## Release highlights
+
+### Faster diff for large branches
+
+Computing the diff of a branch with many changes is faster.
+
+## Before you upgrade
+
+Back up the database before upgrading.
+
+## Breaking changes and required actions
+
+### GraphQL filters
+
+The `<attribute>__like` filter, deprecated in Infrahub 1.6, is removed.
+A query that still uses it fails with:
+
+```text
+Unknown argument "name__like" on field "DcimDevice"
+```
+
+Replace `__like` with `__contains`, available since Infrahub 1.6.
+
+### Deployment
+
+The `INFRAHUB_LEGACY_CACHE` environment variable is removed. The cache
+backend is always the one set in `INFRAHUB_CACHE_DRIVER`.
+
+## Full changelog
+
+- Removed the `__like` attribute filter.
+- Removed the `INFRAHUB_LEGACY_CACHE` environment variable.
+- Improved diff performance on large branches.

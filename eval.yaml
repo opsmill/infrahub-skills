@@ -9388,3 +9388,54 @@ tasks:
       - Any upgrade dry run is shown as server-side `infrahub upgrade --check`
       - "`infrahubctl upgrade` does not appear; it is not a real command"  # cli-check: ignore infrahubctl upgrade
       - The 1.11.0 removal of `infrahub git-agent` is flagged against tasks.py
+
+  # --- Harvesting Release Notes (contributor skill) --- #
+  - name: harvest-release-notes-deprecation-removal
+    timeout: 900
+    instruction: |
+      Read the skill at .agents/skills/harvesting-release-notes/SKILL.md and follow
+      its workflow and rules.
+
+      Task: We're moving our Infrahub instance to 1.7 next week. The release notes
+      for 1.6.0 through 1.7.0 are in release-notes/, and source snapshots for each
+      release are in source/. Go through our skills under skills/ and update them
+      to the current way of doing things, so nobody copies something that no longer
+      works on 1.7.
+
+      Save ONLY your findings to: REPORT.md
+    workspace:
+      - src: tests/graders/fixtures/harvesting-release-notes/deprecation_removal/ws/infrahub-v1.6.0.txt
+        dest: release-notes/infrahub-v1.6.0.md
+      - src: tests/graders/fixtures/harvesting-release-notes/deprecation_removal/ws/infrahub-v1.6.1.txt
+        dest: release-notes/infrahub-v1.6.1.md
+      - src: tests/graders/fixtures/harvesting-release-notes/deprecation_removal/ws/infrahub-v1.7.0b1.txt
+        dest: release-notes/infrahub-v1.7.0b1.md
+      - src: tests/graders/fixtures/harvesting-release-notes/deprecation_removal/ws/infrahub-v1.7.0.txt
+        dest: release-notes/infrahub-v1.7.0.md
+      - src: tests/graders/fixtures/harvesting-release-notes/deprecation_removal/ws/src-1.6.0-filters.txt
+        dest: source/infrahub-v1.6.0/backend/infrahub/graphql/filters.py
+      - src: tests/graders/fixtures/harvesting-release-notes/deprecation_removal/ws/src-1.7.0-filters.txt
+        dest: source/infrahub-v1.7.0/backend/infrahub/graphql/filters.py
+      - src: tests/graders/fixtures/harvesting-release-notes/deprecation_removal/ws/skill-SKILL.txt
+        dest: skills/acme-querying-inventory/SKILL.md
+      - src: tests/graders/fixtures/harvesting-release-notes/deprecation_removal/ws/skill-filters.txt
+        dest: skills/acme-querying-inventory/rules/filters.md
+    graders:
+      - type: deterministic
+        run: python graders/harvesting-release-notes/check_deprecation_removal.py
+        weight: 1.0
+    expected_output: >-
+      A REPORT.md with one finding for skills/acme-querying-inventory/rules/filters.md,
+      rated High, with evidence pinned to infrahub-v1.7.0 or a commit, and a
+      recommended gate that names both 1.6 (name__contains available, name__like
+      deprecated) and 1.7 (name__like removed) and leaves no release without
+      working guidance: name__like up to at least 1.6, name__contains from 1.6.
+      The skill files are left unchanged.
+    expectations:
+      - The finding cites infrahub-v1.6.0 for the deprecation and infrahub-v1.7.0 for the removal
+      - The pre-release infrahub-v1.7.0b1 is not cited
+      - >-
+        The gate keeps `name__like` up to at least 1.6 and starts `name__contains`
+        at 1.6, instead of replacing the old filter
+      - The removal of INFRAHUB_LEGACY_CACHE is not reported as a finding, since no skill mentions it
+      - The files under skills/ are not edited
