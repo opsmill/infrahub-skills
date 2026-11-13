@@ -1,0 +1,160 @@
+{
+  "skill_name": "infrahub-building-sync-adapters",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We are starting an infrahub-sync source adapter for a customer's ServiceNow\nCMDB: network gear (`cmdb_ci_netgear`) goes to `NetworkDevice` and locations\n(`cmn_location`) go to `LocationSite`. I already queried their instance with our\nread-only integration user. The raw responses are below, hostname replaced.\n\nBefore anyone writes the spec, write down how this API behaves, endpoint by\nendpoint, so the spec and the unit tests can rely on it. The ServiceNow docs say\npagination is plain `sysparm_offset`/`sysparm_limit`, so that part can stay short.\n\n```text\nRequest (GET):\n/api/now/table/cmdb_ci_netgear?sysparm_limit=2&sysparm_fields=sys_id,name,ip_address,location,model_id,manufacturer,serial_number&sysparm_query=operational_status=1%5EORDERBYname\nResponse status: 200\nContent-Type: application/json;charset=UTF-8\nLink:\n<https://example.service-now.com/api/now/table/cmdb_ci_netgear?sysparm_limit=2&sysparm_fields=sys_id,name,ip_address,location,model_id,manufacturer,serial_number&sysparm_query=operational_status=1%5EORDERBYname&sysparm_offset=0>;rel=\"first\"\n<https://example.service-now.com/api/now/table/cmdb_ci_netgear?sysparm_limit=2&sysparm_fields=sys_id,name,ip_address,location,model_id,manufacturer,serial_number&sysparm_query=operational_status=1%5EORDERBYname&sysparm_offset=2>;rel=\"next\"\n<https://example.service-now.com/api/now/table/cmdb_ci_netgear?sysparm_limit=2&sysparm_fields=sys_id,name,ip_address,location,model_id,manufacturer,serial_number&sysparm_query=operational_status=1%5EORDERBYname&sysparm_offset=8>;rel=\"last\"\nX-Total-Count: 9\n\n{\n \"result\": [\n  {\n   \"sys_id\": \"108a9205c611227500786e160f9d343e\",\n   \"name\": \"DataNoc.gw01.lanset.net\",\n   \"location\": {\n    \"link\": \"https://example.service-now.com/api/now/table/cmn_location/25ab92490a0a0bb30070567e7225ec2b\",\n    \"value\": \"25ab92490a0a0bb30070567e7225ec2b\"\n   },\n   \"serial_number\": \"\",\n   \"ip_address\": \"208.187.161.1\",\n   \"model_id\": {\n    \"link\": \"https://example.service-now.com/api/now/table/cmdb_model/0faa6b3f3763100044e0bfc8bcbe5d95\",\n    \"value\": \"0faa6b3f3763100044e0bfc8bcbe5d95\"\n   }\n  },\n  {\n   \"sys_id\": \"1743cde17f701200bee45f19befa917b\",\n   \"name\": \"IP-Router-1\",\n   \"location\": \"\",\n   \"serial_number\": \"\",\n   \"ip_address\": \"10.0.0.1\",\n   \"model_id\": {\n    \"link\": \"https://example.service-now.com/api/now/table/cmdb_model/e573cde17f701200bee45f19befa9125\",\n    \"value\": \"e573cde17f701200bee45f19befa9125\"\n   }\n  }\n ]\n}\n```\n\n```text\nRequest (GET):\n/api/now/table/cmdb_ci_netgear?sysparm_limit=1&sysparm_fields=sys_id\nResponse status: 429\nContent-Type: application/json;charset=UTF-8\nRetry-After: 1422\nX-RateLimit-Rule: d9e2f4bc5324df10a080f7e0a0490eb5\nX-RateLimit-Limit: 10\nX-RateLimit-Reset: 1794420000\n\n{\n \"error\": {\n  \"message\": \"Rate limit exceeded\",\n  \"detail\": \"Rate limit of 10 requests per hour for Table API exceeded\"\n },\n \"status\": \"failure\"\n}\n```\n\n```text\nRequest (GET):\n/api/now/table/cmn_location?sysparm_limit=2&sysparm_fields=sys_id,name,parent,city,country\nResponse status: 200\nContent-Type: application/json;charset=UTF-8\nLink:\n<https://example.service-now.com/api/now/table/cmn_location?sysparm_limit=2&sysparm_fields=sys_id,name,parent,city,country&sysparm_offset=0>;rel=\"first\"\n<https://example.service-now.com/api/now/table/cmn_location?sysparm_limit=2&sysparm_fields=sys_id,name,parent,city,country&sysparm_offset=2>;rel=\"next\"\n<https://example.service-now.com/api/now/table/cmn_location?sysparm_limit=2&sysparm_fields=sys_id,name,parent,city,country&sysparm_offset=426>;rel=\"last\"\nX-Total-Count: 427\n\n{\n \"result\": [\n  {\n   \"sys_id\": \"0002c0a93790200044e0bfc8bcbe5df5\",\n   \"parent\": {\n    \"link\": \"https://example.service-now.com/api/now/table/cmn_location/821c169bac1d55eb68ede6e36aa35112\",\n    \"value\": \"821c169bac1d55eb68ede6e36aa35112\"\n   },\n   \"country\": \"Japan\",\n   \"city\": \"Tokyo\",\n   \"name\": \"2-10-1 Yurakucho, Chiyoda-ku, Tokyo\"\n  },\n  {\n   \"sys_id\": \"0594ed7437d0200044e0bfc8bcbe5df0\",\n   \"parent\": {\n    \"link\": \"https://example.service-now.com/api/now/table/cmn_location/fa55153437d0200044e0bfc8bcbe5dd3\",\n    \"value\": \"fa55153437d0200044e0bfc8bcbe5dd3\"\n   },\n   \"country\": \"Colombia\",\n   \"city\": \"Colombia\",\n   \"name\": \"Colombia\"\n  }\n ]\n}\n```\n\n```text\nRequest (GET):\n/api/now/table/cmn_location?sysparm_limit=1&sysparm_fields=sys_id,name,parent&sysparm_query=parentISEMPTY\nResponse status: 200\nContent-Type: application/json;charset=UTF-8\nLink:\n<https://example.service-now.com/api/now/table/cmn_location?sysparm_limit=1&sysparm_fields=sys_id,name,parent&sysparm_query=parentISEMPTY&sysparm_offset=0>;rel=\"first\"\n<https://example.service-now.com/api/now/table/cmn_location?sysparm_limit=1&sysparm_fields=sys_id,name,parent&sysparm_query=parentISEMPTY&sysparm_offset=-1>;rel=\"prev\"\n<https://example.service-now.com/api/now/table/cmn_location?sysparm_limit=1&sysparm_fields=sys_id,name,parent&sysparm_query=parentISEMPTY&sysparm_offset=1>;rel=\"next\"\n<https://example.service-now.com/api/now/table/cmn_location?sysparm_limit=1&sysparm_fields=sys_id,name,parent&sysparm_query=parentISEMPTY&sysparm_offset=5>;rel=\"last\"\nX-Total-Count: 6\n\n{\n \"result\": [\n  {\n   \"sys_id\": \"6808184aeb211100420124e05206fe12\",\n   \"parent\": \"\",\n   \"name\": \"3260 Jay Street, Santa Clara, CA\"\n  }\n ]\n}\n```\n\nSave the notes to: api-behavior.yml",
+      "expected_output": "An api-behavior.yml with one entry per endpoint carrying the fixed key set, where the pagination, rate-limit and field quirks are taken from the captured responses rather than from the vendor documentation.",
+      "files": [],
+      "expectations": [
+        "Both captured endpoints have an entry",
+        "next_link_carries lists sysparm_limit, sysparm_fields and sysparm_query, which the captured next links repeat",
+        "The netgear entry records the captured 429 with Retry-After",
+        "field_quirks records references as an object when set and an empty string when empty",
+        "field_quirks records unknown selected fields as dropped silently"
+      ],
+      "assertions": [
+        {
+          "name": "behavior-keys",
+          "check": "Every endpoint entry carries the fixed key set"
+        },
+        {
+          "name": "behavior-covers-endpoints",
+          "check": "Every captured endpoint has an entry"
+        },
+        {
+          "name": "behavior-next-link",
+          "check": "next_link_carries holds every parameter the captured next link repeats"
+        },
+        {
+          "name": "behavior-rate-limit",
+          "check": "Endpoints with a captured 429 record status 429 and retry_after_header true"
+        },
+        {
+          "name": "behavior-field-quirks",
+          "check": "field_quirks records the reference shapes and the silently dropped field the captures show"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "The unit tests of our new ServiceNow source adapter for infrahub-sync need a\nfake HTTP session. The adapter calls `session.get(url, params=..., headers=...,\ntimeout=...)`, reads `.status_code`, `.headers` and `.json()`, and follows the\n`rel=\"next\"` link. Our conftest imports `make_fake_session()` from\n`tests/fakes/servicenow.py`.\n\nThe adapter already asks for exactly the fields it needs, so the fake can return\nthe rows as captured. Here are the probe notes and the captured responses\n(hostname replaced).\n\n`api-behavior.yml`:\n\n```yaml\nendpoints:\n  - path: /api/now/table/cmdb_ci_netgear\n    method: GET\n    pagination:\n      type: link_header\n      cursor_param: sysparm_offset\n      next_link_carries: [sysparm_limit, sysparm_fields, sysparm_query]\n      total_header: X-Total-Count\n    required_headers: [Accept]\n    default_fields: all\n    field_selection: sysparm_fields\n    filters_supported: [sysparm_query]\n    rate_limit: {status: 429, retry_after_header: true, reset_header: X-RateLimit-Reset}\n    empty_result_is_valid: true\n    captures: [cmdb_ci_netgear_page1.json, cmdb_ci_netgear_429.json]\n    field_quirks:\n      reference_set: object\n      reference_empty: empty_string\n      unknown_selected_field: dropped_silently\n      value_types: string\n    subclass_rows: {discriminator: sys_class_name}\n  - path: /api/now/table/cmn_location\n    method: GET\n    pagination:\n      type: link_header\n      cursor_param: sysparm_offset\n      next_link_carries: [sysparm_limit, sysparm_fields, sysparm_query]\n    required_headers: [Accept]\n    default_fields: all\n    field_selection: sysparm_fields\n    filters_supported: [sysparm_query]\n    rate_limit: {status: 429, retry_after_header: true}\n    empty_result_is_valid: true\n    captures: [cmn_location_page1.json, cmn_location_noparent.json]\n    field_quirks: {reference_set: object, reference_empty: empty_string, unknown_selected_field: dropped_silently}\n    subclass_rows: none\n```\n\n```text\nRequest (GET):\n/api/now/table/cmdb_ci_netgear?sysparm_limit=2&sysparm_fields=sys_id,name,ip_address,location,model_id,manufacturer,serial_number&sysparm_query=operational_status=1%5EORDERBYname\nResponse status: 200\nContent-Type: application/json;charset=UTF-8\nLink:\n<https://example.service-now.com/api/now/table/cmdb_ci_netgear?sysparm_limit=2&sysparm_fields=sys_id,name,ip_address,location,model_id,manufacturer,serial_number&sysparm_query=operational_status=1%5EORDERBYname&sysparm_offset=0>;rel=\"first\"\n<https://example.service-now.com/api/now/table/cmdb_ci_netgear?sysparm_limit=2&sysparm_fields=sys_id,name,ip_address,location,model_id,manufacturer,serial_number&sysparm_query=operational_status=1%5EORDERBYname&sysparm_offset=2>;rel=\"next\"\n<https://example.service-now.com/api/now/table/cmdb_ci_netgear?sysparm_limit=2&sysparm_fields=sys_id,name,ip_address,location,model_id,manufacturer,serial_number&sysparm_query=operational_status=1%5EORDERBYname&sysparm_offset=8>;rel=\"last\"\nX-Total-Count: 9\n\n{\n \"result\": [\n  {\n   \"sys_id\": \"108a9205c611227500786e160f9d343e\",\n   \"name\": \"DataNoc.gw01.lanset.net\",\n   \"location\": {\n    \"link\": \"https://example.service-now.com/api/now/table/cmn_location/25ab92490a0a0bb30070567e7225ec2b\",\n    \"value\": \"25ab92490a0a0bb30070567e7225ec2b\"\n   },\n   \"serial_number\": \"\",\n   \"ip_address\": \"208.187.161.1\",\n   \"model_id\": {\n    \"link\": \"https://example.service-now.com/api/now/table/cmdb_model/0faa6b3f3763100044e0bfc8bcbe5d95\",\n    \"value\": \"0faa6b3f3763100044e0bfc8bcbe5d95\"\n   }\n  },\n  {\n   \"sys_id\": \"1743cde17f701200bee45f19befa917b\",\n   \"name\": \"IP-Router-1\",\n   \"location\": \"\",\n   \"serial_number\": \"\",\n   \"ip_address\": \"10.0.0.1\",\n   \"model_id\": {\n    \"link\": \"https://example.service-now.com/api/now/table/cmdb_model/e573cde17f701200bee45f19befa9125\",\n    \"value\": \"e573cde17f701200bee45f19befa9125\"\n   }\n  }\n ]\n}\n```\n\n```text\nRequest (GET):\n/api/now/table/cmn_location?sysparm_limit=2&sysparm_fields=sys_id,name,parent,city,country\nResponse status: 200\nContent-Type: application/json;charset=UTF-8\nLink:\n<https://example.service-now.com/api/now/table/cmn_location?sysparm_limit=2&sysparm_fields=sys_id,name,parent,city,country&sysparm_offset=0>;rel=\"first\"\n<https://example.service-now.com/api/now/table/cmn_location?sysparm_limit=2&sysparm_fields=sys_id,name,parent,city,country&sysparm_offset=2>;rel=\"next\"\n<https://example.service-now.com/api/now/table/cmn_location?sysparm_limit=2&sysparm_fields=sys_id,name,parent,city,country&sysparm_offset=426>;rel=\"last\"\nX-Total-Count: 427\n\n{\n \"result\": [\n  {\n   \"sys_id\": \"0002c0a93790200044e0bfc8bcbe5df5\",\n   \"parent\": {\n    \"link\": \"https://example.service-now.com/api/now/table/cmn_location/821c169bac1d55eb68ede6e36aa35112\",\n    \"value\": \"821c169bac1d55eb68ede6e36aa35112\"\n   },\n   \"country\": \"Japan\",\n   \"city\": \"Tokyo\",\n   \"name\": \"2-10-1 Yurakucho, Chiyoda-ku, Tokyo\"\n  },\n  {\n   \"sys_id\": \"0594ed7437d0200044e0bfc8bcbe5df0\",\n   \"parent\": {\n    \"link\": \"https://example.service-now.com/api/now/table/cmn_location/fa55153437d0200044e0bfc8bcbe5dd3\",\n    \"value\": \"fa55153437d0200044e0bfc8bcbe5dd3\"\n   },\n   \"country\": \"Colombia\",\n   \"city\": \"Colombia\",\n   \"name\": \"Colombia\"\n  }\n ]\n}\n```\n\nSave the fake to ./output/tests/fakes/servicenow.py and any data it loads under\n./output/tests/fixtures/servicenow/.",
+      "expected_output": "A fake session that serves the captured rows and enforces the behavior file: it applies sysparm_fields, drops unknown field names silently with HTTP 200, keeps references as objects when set and empty strings when empty, and serves the captured next link unchanged.",
+      "files": [],
+      "expectations": [
+        "Rows come from the captured responses",
+        "A request for sys_id,name returns only those fields",
+        "A request naming a field the table lacks returns HTTP 200 without that field",
+        "The captured page is served with its next link unchanged"
+      ],
+      "assertions": [
+        {
+          "name": "fake-serves-captures",
+          "check": "The fake's rows carry captured sys_id values"
+        },
+        {
+          "name": "fake-field-selection",
+          "check": "A request with sysparm_fields=sys_id,name gets only those fields"
+        },
+        {
+          "name": "fake-drops-unknown",
+          "check": "A request with sysparm_fields=sys_id,nmae gets HTTP 200 and rows with only sys_id"
+        },
+        {
+          "name": "fake-reference-shapes",
+          "check": "location comes back as {link, value} when set and an empty string when empty"
+        },
+        {
+          "name": "fake-next-link",
+          "check": "The captured page's rel=next link is served exactly as captured"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "The ServiceNow source adapter for infrahub-sync is finished on branch\n`feat/servicenow-adapter`:\n\n- adapter: `infrahub_sync/adapters/servicenow.py`\n- tests: `tests/unit/adapters/test_servicenow.py`\n- example: `examples/servicenow_to_infrahub/`\n- spec: `dev/specs/017-servicenow-adapter/`\n\nLint and pytest pass locally, so it is ready. Write the PR description so I can\nopen the PR against `main`; reviewers want to see which checks were run.\n\nSave it to: PR_DESCRIPTION.md",
+      "expected_output": "A PR description with a checks section naming every repository check for an adapter PR: format, lint, ty, unit tests, rumdl, the docs build, infrahub-sync list, generate and diff on the example, the news fragment, the docs page, its sidebar entry and its choosing-an-adapter row, and the spec documents matched to the code.",
+      "files": [],
+      "expectations": [
+        "The checks section names the docs build",
+        "The checks section names the changelog news fragment",
+        "The checks section names infrahub-sync list, generate and diff on the example",
+        "The checks section names the docs page, the sidebar entry and the choosing-an-adapter row",
+        "The checks section names the spec documents"
+      ],
+      "assertions": [
+        {
+          "name": "pr-checks-complete",
+          "check": "The checks section names every required check as a command or path"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Our ServiceNow adapter's HTTP client has no retry logic yet:\n\n```python\nclass ServiceNowClient:\n    def __init__(self, session):\n        self.session = session\n\n    def get(self, url, params=None):\n        resp = self.session.get(url, params=params, timeout=60)\n        resp.raise_for_status()\n        return resp\n```\n\nThe customer's instance has a rate-limit rule on the Table API, and yesterday a\nsync run died on this response:\n\n```text\nRequest (GET):\n/api/now/table/cmdb_ci_netgear?sysparm_limit=1&sysparm_fields=sys_id\nResponse status: 429\nContent-Type: application/json;charset=UTF-8\nRetry-After: 1422\nX-RateLimit-Rule: d9e2f4bc5324df10a080f7e0a0490eb5\nX-RateLimit-Limit: 10\nX-RateLimit-Reset: 1794420000\n\n{\n \"error\": {\n  \"message\": \"Rate limit exceeded\",\n  \"detail\": \"Rate limit of 10 requests per hour for Table API exceeded\"\n },\n \"status\": \"failure\"\n}\n```\n\nMake the client resilient to throttling and to transient errors. Sleeping a bit\nand retrying on 429 should do.\n\nSave the complete module to: servicenow_client.py",
+      "expected_output": "A client that retries 429, 502, 503 and 504 and dropped or timed-out connections from one budget, honors Retry-After, stops with an error when Retry-After exceeds 300 s, backs off exponentially with jitter capped at 60 s, and never retries TLS errors.",
+      "files": [],
+      "expectations": [
+        "The retried statuses are exactly 429, 502, 503 and 504",
+        "Retry-After is read from the response",
+        "A Retry-After above 300 s raises an error instead of sleeping",
+        "Backoff is capped at 60 s with random jitter",
+        "SSLError is not retried"
+      ],
+      "assertions": [
+        {
+          "name": "retry-status-set",
+          "check": "A collection equal to {429, 502, 503, 504} drives the retry"
+        },
+        {
+          "name": "retry-after-honored",
+          "check": "The Retry-After header is read"
+        },
+        {
+          "name": "retry-after-cap",
+          "check": "A branch comparing against 300 raises"
+        },
+        {
+          "name": "backoff-capped-jitter",
+          "check": "Backoff uses min(..., 60) or a 60 s comparison, plus random jitter"
+        },
+        {
+          "name": "no-tls-retry",
+          "check": "Handlers that retry connection errors handle SSLError first"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Finish the infrahub-sync config that syncs the customer's ServiceNow network\ngear into their Infrahub. Their schema is fixed and already loaded:\n\n```yaml\nversion: \"1.0\"\ngenerics:\n  - name: GenericDevice\n    namespace: Dcim\n    human_friendly_id: [name__value, location__name__value]\n    attributes:\n      - {name: name, kind: Text}\n      - {name: description, kind: Text, optional: true}\n    relationships:\n      - {name: location, peer: LocationSite, cardinality: one, optional: false}\n  - name: GenericEndpoint\n    namespace: Dcim\n    attributes:\n      - {name: address, kind: IPHost, optional: true}\nnodes:\n  - name: Site\n    namespace: Location\n    human_friendly_id: [name__value]\n    attributes:\n      - {name: name, kind: Text, unique: true}\n      - {name: city, kind: Text, optional: true}\n      - {name: servicenow_sys_id, kind: Text, optional: true}\n  - name: Device\n    namespace: Network\n    inherit_from: [DcimGenericDevice, DcimGenericEndpoint]\n    attributes:\n      - {name: ip_address, kind: Text, optional: true}\n      - {name: serial_number, kind: Text, optional: true}\n      - {name: servicenow_sys_id, kind: Text, optional: true}\n```\n\nMy draft config:\n\n```yaml\nname: from-servicenow\nsource:\n  name: servicenow\n  settings:\n    url: \"https://example.service-now.com\"\ndestination:\n  name: infrahub\n  settings:\n    url: \"http://localhost:8000\"\norder: [LocationSite, NetworkDevice]\nschema_mapping:\n  - name: LocationSite\n    mapping: cmn_location\n    identifiers: [name]\n    fields:\n      - {name: name, mapping: name}\n      - {name: city, mapping: city}\n  - name: NetworkDevice\n    mapping: cmdb_ci_netgear\n    identifiers: [servicenow_sys_id]\n    fields:\n      - {name: servicenow_sys_id, mapping: sys_id}\n      - {name: name, mapping: name}\n      - {name: location, mapping: location_name, reference: LocationSite}\n```\n\nWe key devices on the ServiceNow `sys_id` because the network team renames\ndevices regularly and the `sys_id` never changes. The device mapping still\nneeds `ip_address` and `serial_number`, and the sites should carry their\n`sys_id` too.\n\nSave the complete config to: config.yml",
+      "expected_output": "A config whose NetworkDevice identifiers are name and location, matching the human_friendly_id [name__value, location__name__value], so the Infrahub upsert cannot merge two devices that share a name.",
+      "files": [],
+      "expectations": [
+        "NetworkDevice identifiers are name and location",
+        "LocationSite identifiers are name"
+      ],
+      "assertions": [
+        {
+          "name": "identifiers-match-hfid",
+          "check": "Each mapping's identifiers equal the fields of the destination kind's human_friendly_id"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Add pagination to our ServiceNow source adapter in infrahub-sync. Today\n`infrahub_sync/adapters/servicenow.py` subclasses `GenericrestapiAdapter` and only\nreads the first page, because `RestApiClient` in\n`infrahub_sync/adapters/rest_api_client.py` fetches one page per resource:\n\n```python\n# infrahub_sync/adapters/rest_api_client.py (excerpt)\nclass RestApiClient:\n    def get(self, endpoint, params=None):\n        response = self.session.get(f\"{self.base_url}/{endpoint}\", params=params, timeout=self.timeout)\n        response.raise_for_status()\n        return response.json()\n```\n\n```python\n# infrahub_sync/adapters/servicenow.py (excerpt)\nclass ServicenowAdapter(GenericrestapiAdapter):\n    type = \"Servicenow\"\n\n    def get_resource_data(self, resource_name, params=None):\n        return self.client.get(f\"api/now/table/{resource_name}\", params=params)[\"result\"]\n```\n\nServiceNow paginates with a `Link` header: `rel=\"next\"` repeats every query\nparameter and moves `sysparm_offset`. The cleanest fix is probably a `next_link`\nhelper in `infrahub_sync/adapters/utils.py` or in the REST client, so other\nadapters benefit too.\n\nWrite every file you create or change under ./output/, keeping\nrepository-relative paths (for example ./output/infrahub_sync/adapters/servicenow.py).",
+      "expected_output": "Pagination implemented inside infrahub_sync/adapters/servicenow.py, plus tests, docs or a changelog fragment; no change to rest_api_client.py, utils.py or any other infrahub-sync core file, with a drafted issue for the core improvement if one is proposed.",
+      "files": [],
+      "expectations": [
+        "infrahub_sync/adapters/servicenow.py is changed",
+        "No file under infrahub_sync/ other than the adapter module is changed"
+      ],
+      "assertions": [
+        {
+          "name": "diff-stays-in-adapter",
+          "check": "Every changed file is the adapter module or a test, example, doc, changelog, spec or top-level note"
+        }
+      ]
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 title: Which skill do I use?
 ---
 
-Sixteen skills is a lot to hold in your head. You do not have to: start from whatever
+Seventeen skills is a lot to hold in your head. You do not have to: start from whatever
 you already have in front of you, and each row names the skill that takes it from there.
 
 ## Start from what you have
@@ -39,6 +39,7 @@ the stage you are at. Each skill's `infrahub-*` name is in the
 | --- | --- | --- |
 | A CSV or TSV export from another system | Those rows as Infrahub objects | [Data Importer](./skills-reference/importing-data.mdx) |
 | A NetBox device-type repository | Infrahub Object Templates | [NetBox Device Type Converter](./skills-reference/converting-netbox-device-types.mdx) |
+| An external system with an API and no infrahub-sync adapter | A source adapter that keeps Infrahub in sync with it | [Sync Adapter Builder](./skills-reference/building-sync-adapters.mdx) |
 
 ### Operate and inspect
 
@@ -79,6 +80,16 @@ Sequential, not alternatives. Collect first, then analyze.
 | You need the right `infrahub-collect` command for your symptom | You need to know what the collected logs actually say |
 | Output is a support bundle on disk | Output is a findings report citing that bundle |
 | The next step is sharing it with OpsMill | The next step is an upgrade, a comment on an existing issue, or a new report |
+
+### Data Importer, NetBox Device Type Converter, Sync Adapter Builder
+
+All three bring data from another system into Infrahub. They differ in how often the data moves.
+
+| Use the Data Importer when... | Use the NetBox Device Type Converter when... | Use the Sync Adapter Builder when... |
+| --- | --- | --- |
+| You have a one-off CSV or TSV export | You have NetBox device-type or module-type definitions | You need the data kept in sync with a live system |
+| The source is a file | The source is the devicetype-library or a NetBox instance | The source is an API with no infrahub-sync adapter yet |
+| Output is object YAML loaded on a branch | Output is Object Template YAML | Output is an adapter pull request for infrahub-sync and a sync config validated against the live system |
 
 ### Upgrade Planner, Repo Auditor, Diagnostics Collector
 

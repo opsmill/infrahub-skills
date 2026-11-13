@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/now/table/cmdb_ci_netgear?sysparm_limit=1&sysparm_fields=sys_id"
+  },
+  "status": 429,
+  "headers": {
+    "Date": "Wed, 11 Nov 2026 17:36:17 GMT",
+    "Content-Type": "application/json;charset=UTF-8",
+    "Retry-After": "1422",
+    "X-RateLimit-Rule": "d9e2f4bc5324df10a080f7e0a0490eb5",
+    "X-RateLimit-Limit": "10",
+    "X-RateLimit-Reset": "1794420000"
+  },
+  "body": {
+    "error": {
+      "message": "Rate limit exceeded",
+      "detail": "Rate limit of 10 requests per hour for Table API exceeded"
+    },
+    "status": "failure"
+  }
+}

@@ -1,0 +1,52 @@
+---
+# Notes from the probe. Keys in a different order, full URLs as paths.
+endpoints:
+  - subclass_rows:
+      discriminator: sys_class_name
+      seen:
+        - cmdb_ci_ip_router
+        - cmdb_ci_ip_switch
+    field_quirks:
+      unknown_selected_field: dropped_silently
+      reference_empty: empty_string
+      reference_set: object
+    captures:
+      - cmdb_ci_netgear_page1.json
+    empty_result_is_valid: true
+    rate_limit:
+      retry_after_header: true
+      status: 429
+    filters_supported:
+      - sysparm_query
+    field_selection: sysparm_fields
+    default_fields: all
+    required_headers: []
+    pagination:
+      next_link_carries:
+        - sysparm_query
+        - sysparm_fields
+        - sysparm_limit
+        - sysparm_offset
+      type: link_header
+    method: GET
+    path: https://example.service-now.com/api/now/table/cmdb_ci_netgear
+  - path: https://example.service-now.com/api/now/table/cmn_location
+    method: GET
+    pagination:
+      type: link_header
+      next_link_carries:
+        - sysparm_fields
+        - sysparm_limit
+        - sysparm_query
+    required_headers: []
+    default_fields: all
+    field_selection: sysparm_fields
+    filters_supported:
+      - sysparm_query
+    rate_limit: null
+    empty_result_is_valid: true
+    captures:
+      - cmn_location_page1.json
+    field_quirks:
+      reference_set: object
+    subclass_rows: none

@@ -1,0 +1,70 @@
+---
+title: Sync Adapter Builder
+---
+
+Skill: `infrahub-building-sync-adapters`
+
+The Sync Adapter Builder guides you through adding a source adapter to [infrahub-sync](https://github.com/opsmill/infrahub-sync), so that Infrahub stays in sync with an external system that has an API. It queries the live API before anything is designed, builds the unit tests from the responses it captured, maps the data onto the schema the customer already has, and runs the sync against the real system before the pull request is opened.
+
+## When to use
+
+- Adding an infrahub-sync adapter for a system that has none yet, such as a CMDB, a collaboration platform, or an identity provider
+- Validating a new adapter against a customer's live system before its pull request
+- Writing the sync config that maps a source system onto an existing Infrahub schema
+- Re-running the live validation after the source API or the schema changed
+
+## What it produces
+
+- Raw API responses captured from the live system, with customer values replaced by invented ones
+- `api-behavior.yml`, one entry per endpoint: pagination, the parameters the next-page link repeats, field selection, rate limiting, and how field values are shaped
+- A spec that cites the behavior file
+- The adapter module, with unit tests whose fakes serve the captured responses
+- A sync config whose `identifiers` match each destination kind's human-friendly ID
+- A live validation run: `generate`, `diff`, `sync` to an Infrahub branch, then a second `diff` that shows no changes
+- A pull request description that lists every repository check with its result
+- Drafted issues for any infrahub-sync core change the work needs, instead of the change itself
+
+## Example prompts
+
+- "Build an infrahub-sync adapter for our ServiceNow CMDB and sync network gear and locations into Infrahub"
+- "The Webex adapter passes its tests but fails against the customer's org; work out why"
+- "Write the sync config that maps Entra ID users onto the customer's existing user schema"
+- "Prepare the pull request for the new adapter"
+
+## Key rules enforced
+
+- **Probe before the spec**: the live API is queried first, and the spec cites the behavior file built from what the responses show, not from vendor documentation
+- **Fakes built from captures**: unit-test fakes serve the captured bodies and headers and behave like the real API, neither looser nor stricter
+- **Default retry policy**: 429, 502, 503 and 504 and dropped connections are retried, `Retry-After` is honored up to 300 seconds, backoff is capped at 60 seconds with jitter, and TLS errors are never retried
+- **Identifiers match the human-friendly ID**: the sync `identifiers` equal the destination kind's `human_friendly_id`, including one inherited from a generic, because the Infrahub upsert matches on it
+- **Adapter files only**: the change touches the adapter module, its tests, example, docs, changelog fragment and spec, and nothing else in infrahub-sync
+- **Every check before the pull request**: format, lint, type check, tests, Markdown lint, docs build, the example's `generate` and `diff`, the news fragment, and the docs sidebar
+
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --- | --- |
+| Writing the spec from vendor documentation | Captures real responses first and records what they show in `api-behavior.yml` |
+| Hand-written test data that the real API never returns | Builds the fakes from the captured responses, so a next-page link or field-selection bug fails in CI |
+| Retrying on a fixed sleep, or retrying TLS errors | Applies the default policy, overridden only by values recorded in the behavior file |
+| Keying a sync on a stable source ID while the schema identifies nodes by name | Aligns `identifiers` with the human-friendly ID, or proposes a schema change for approval |
+| Adding a shared helper to infrahub-sync core in the adapter pull request | Keeps the helper private to the adapter and drafts a core issue |
+| Opening the pull request after lint and tests only | Runs and lists the full check list, including the docs build and the news fragment |
+
+## Approval points
+
+The skill stops for your approval at five points:
+
+1. After the API behavior file
+2. After the spec
+3. Before a new or changed schema, when the sync needs one
+4. Before the first `sync` that writes to Infrahub
+5. Before the push and the pull request
+
+:::note
+The skill builds source adapters on the infrahub-sync `main` branch. Destination adapters, source-side incremental reads, and the `feature/v3-develop` adapter contract are out of scope. Infrahub-side incremental reads (`sync --no-full-extract`) still apply to the adapters it builds.
+:::
+
+## Not sure this is the right skill?
+
+See [Data Importer, NetBox Device Type Converter, Sync Adapter Builder](../choosing-a-skill.mdx#data-importer-netbox-device-type-converter-sync-adapter-builder).
