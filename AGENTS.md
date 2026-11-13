@@ -20,6 +20,7 @@ The skills themselves are Markdown: each one is a directory under `skills/` hold
 | What commands are available? | [§ Commands](#commands) |
 | Where do AI command definitions live? | [dev/commands/](dev/commands/) |
 | How do I turn PR review feedback into rules? | [.agents/skills/harvesting-skill-review/](.agents/skills/harvesting-skill-review/) |
+| Which skill changes does a new Infrahub, SDK or MCP release require? | [.agents/skills/harvesting-release-notes/](.agents/skills/harvesting-release-notes/) |
 | How do I fix a bug or add a rule in this repo? | [.agents/skills/](.agents/skills/) — `analyzing-skill-bugs` or `grilling-skill-features`, then `test-driving-skill-changes` and `implementing-skill-changes` |
 
 Index of the whole tree: [dev/README.md](dev/README.md).

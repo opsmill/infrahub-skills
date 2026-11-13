@@ -104,7 +104,7 @@ of re-checking. Before encoding a customer or PoC lesson
 as a rule, verify it against current stable Infrahub —
 a lesson that upstream already fixed rots the skill.
 
-## Release-gate a command you teach
+## Release-gate what you teach
 
 A command is only teachable once it is released. Name
 the minimum version and give an observable fallback, so
@@ -120,6 +120,33 @@ documented happy path, and `infrahub-common`'s
 information-priority rule tells agents this plugin
 outranks the docs, so they trust the broken instruction.
 One skill made an unreleased command step 6 of 7.
+
+When a release changes behavior a skill already
+teaches, gate the new guidance instead of replacing
+the old. Users on the earlier release still read the
+skill, and the old guidance is still correct for them.
+Name both boundaries: the release where the new
+behavior became available, and the first release where
+the old guidance is wrong. Deprecation alone does not
+make guidance wrong.
+
+```markdown
+Infrahub 1.6 and later: use `name__contains`. It is
+required from 1.7, which removed `name__like`.
+Before 1.7: `name__like` still works.
+```
+
+When there was no deprecation period, both boundaries
+are the same release. Name it once, and keep the old
+guidance for the releases before it:
+
+```markdown
+Infrahub 1.12 and later: <new guidance>.
+Before 1.12: <old guidance>.
+```
+
+`harvesting-release-notes` recommends gates in these
+forms when it reads a release.
 
 One home per pin, as above:
 `skills/infrahub-common/marketplace-reference.md` owns
