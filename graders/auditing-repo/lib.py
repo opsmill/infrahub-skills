@@ -1066,6 +1066,59 @@ def check_yagni_finding_replacement_mentions(
     return False, f"{rule} prose does not disclose {group}"
 
 
+_LINE_NUMBER = re.compile(r"(\d+)(?:\s*[-–]\s*(\d+))?")
+
+
+def _finding_lines(finding: dict) -> list[int]:
+    """Line numbers a finding cites, from ``line`` or a ``path:line`` file.
+
+    ``"12"``, ``12``, ``"12-14"`` and ``"generators/x.py:12"`` all count. A
+    range contributes both ends.
+    """
+    cited: list[str] = []
+    line = finding.get("line")
+    if isinstance(line, int):
+        cited.append(str(line))
+    elif isinstance(line, str):
+        cited.append(line)
+    file_ = str(finding.get("file", ""))
+    if ":" in file_:
+        cited.append(file_.rsplit(":", 1)[1])
+    out: list[int] = []
+    for text in cited:
+        m = _LINE_NUMBER.search(text)
+        if m:
+            out.append(int(m.group(1)))
+            if m.group(2):
+                out.append(int(m.group(2)))
+    return out
+
+
+def check_finding_line_in_range(
+    findings: list[dict], rule: str, substring: str, lo: int, hi: int
+) -> tuple[bool, str]:
+    """Assert a ``rule`` finding on ``substring``'s file cites a line in
+    ``[lo, hi]``.
+
+    A file-level match passes a finding raised on the right file for the
+    wrong reason. Pinning the cited line binds the finding to the construct
+    the rule is about. A finding that cites no line cannot be bound and
+    fails.
+    """
+    on_file = [
+        f for f in _find_all(findings, rule)
+        if substring in str(f.get("file", ""))
+    ]
+    if not on_file:
+        return False, f"no {rule} finding on a file matching {substring!r}"
+    cited = [n for f in on_file for n in _finding_lines(f)]
+    if any(lo <= n <= hi for n in cited):
+        return True, f"{rule} on {substring} cites a line in {lo}-{hi}"
+    if not cited:
+        return False, f"{rule} on {substring} cites no line, so it cannot be tied to lines {lo}-{hi}"
+    return False, f"{rule} on {substring} cites line(s) {sorted(set(cited))}, none in {lo}-{hi}"
+
+
 def check_yagni_no_finding_on_file(
     findings: list[dict], substring: str
 ) -> tuple[bool, str]:
@@ -1603,6 +1656,9 @@ _CHECKS: dict[str, tuple[Any, list[str]]] = {
     "yagni-finding-ladder-step": (check_yagni_finding_ladder_step, ["str", "int"]),
     "yagni-finding-file": (check_yagni_finding_file, ["str", "str"]),
     "yagni-finding-file-excludes": (check_yagni_no_finding_on_file, ["str"]),
+    "finding-line-in-range": (
+        check_finding_line_in_range, ["str", "str", "int", "int"]
+    ),
     "yagni-finding-discloses": (check_yagni_finding_replacement_mentions, ["str", "str"]),
     "yagni-findings-sorted": (check_yagni_findings_sorted_by_ladder, []),
     "yagni-bootstrap-carveout": (check_yagni_finding_carves_out_bootstrap, []),

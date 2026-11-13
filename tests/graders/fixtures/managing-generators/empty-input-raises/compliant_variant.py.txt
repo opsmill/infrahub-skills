@@ -1,0 +1,28 @@
+from infrahub_sdk.generator import InfrahubGenerator
+
+
+class EmptyDesignError(Exception):
+    pass
+
+
+def _fail(name: str) -> None:
+    raise EmptyDesignError(f"pod {name} has no racks yet")
+
+
+class PodLeafGenerator(InfrahubGenerator):
+    def _racks(self, data: dict) -> list[dict]:
+        pod = data["TopologyPod"]["edges"][0]["node"]
+        racks = [e["node"] for e in pod["racks"]["edges"]]
+        has_racks = len(racks) > 0
+        if has_racks:
+            return racks
+        else:
+            _fail(pod["name"]["value"])
+
+    async def generate(self, data: dict) -> None:
+        for rack in self._racks(data):
+            leaf = await self.client.create(
+                kind="DcimDevice",
+                data={"name": f"leaf-{rack['name']['value']}", "rack": rack["id"]},
+            )
+            await leaf.save(allow_upsert=True)

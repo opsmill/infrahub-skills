@@ -1060,6 +1060,306 @@ def check_no_raw_create_without_handler(
 
 
 # ---------------------------------------------------------------------------
+# Empty-input guard (output.py)
+# ---------------------------------------------------------------------------
+#
+# From infrahub-sdk 1.24.0 a generator run that saves nothing deletes every
+# object the previous run with the same parameters tracked. The tracking
+# context only reconciles the group when generate() exits without an
+# exception, so the guard has to raise: returning early is a run that saved
+# nothing.
+
+_LOOPS = (ast.For, ast.AsyncFor, ast.While)
+_FUNCS = (ast.FunctionDef, ast.AsyncFunctionDef)
+
+
+def _function_defs(tree: ast.Module) -> dict[str, list[ast.AST]]:
+    """Every function or method in the module, by name."""
+    out: dict[str, list[ast.AST]] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, _FUNCS):
+            out.setdefault(node.name, []).append(node)
+    return out
+
+
+def _walk_outside_loops(fn: ast.AST) -> Iterator[ast.AST]:
+    """Walk ``fn``'s body, skipping loop bodies and nested definitions.
+
+    A guard inside a loop is a per-item check, not a check on the input as a
+    whole, so it cannot be the guard this rule asks for.
+    """
+    stack = list(getattr(fn, "body", []))
+    while stack:
+        node = stack.pop()
+        yield node
+        if isinstance(node, _LOOPS + _FUNCS + (ast.ClassDef, ast.Lambda)):
+            continue
+        stack.extend(ast.iter_child_nodes(node))
+
+
+def _called_names(node: ast.AST) -> list[str]:
+    """Names of ``f(...)`` and ``self.f(...)`` calls anywhere under ``node``."""
+    names: list[str] = []
+    for sub in ast.walk(node):
+        if not isinstance(sub, ast.Call):
+            continue
+        func = sub.func
+        if isinstance(func, ast.Name):
+            names.append(func.id)
+        elif (
+            isinstance(func, ast.Attribute)
+            and isinstance(func.value, ast.Name)
+            and func.value.id in ("self", "cls")
+        ):
+            names.append(func.attr)
+    return names
+
+
+def _reachable_functions(tree: ast.Module, depth: int = 3) -> list[ast.AST]:
+    """``generate()`` plus the module functions and methods it calls."""
+    defs = _function_defs(tree)
+    seen: list[ast.AST] = []
+    frontier = list(defs.get("generate", []))
+    for _ in range(depth + 1):
+        nxt: list[ast.AST] = []
+        for fn in frontier:
+            if any(fn is s for s in seen):
+                continue
+            seen.append(fn)
+            for name in _called_names(fn):
+                nxt.extend(defs.get(name, []))
+        frontier = nxt
+    return seen
+
+
+def _is_len_call(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "len"
+    )
+
+
+def _is_empty_literal(node: ast.AST) -> bool:
+    return isinstance(node, (ast.List, ast.Dict, ast.Tuple)) and not (
+        getattr(node, "elts", None) or getattr(node, "keys", None)
+    )
+
+
+def _is_zero(node: ast.AST) -> bool:
+    return isinstance(node, ast.Constant) and node.value == 0
+
+
+def _resolve_local(test: ast.expr, fn: ast.AST) -> ast.expr:
+    """Follow ``flag = <expr>; if flag:`` one level inside ``fn``."""
+    if not isinstance(test, ast.Name):
+        return test
+    for node in ast.walk(fn):
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == test.id
+        ):
+            return node.value
+    return test
+
+
+def _strip_len(node: ast.expr) -> ast.expr:
+    return node.args[0] if _is_len_call(node) and node.args else node
+
+
+def _emptiness(test: ast.expr, fn: ast.AST) -> tuple[str, ast.expr] | None:
+    """Classify a guard test and return the collection it tests.
+
+    ``("empty", subject)`` when ``test`` is true on an empty ``subject``,
+    ``("nonempty", subject)`` when it is true on a non-empty one, else
+    ``None``.
+    """
+    test = _resolve_local(test, fn)
+    if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+        return "empty", _strip_len(test.operand)
+    if isinstance(test, ast.Compare) and len(test.ops) == 1:
+        left, op, right = test.left, test.ops[0], test.comparators[0]
+        if _is_len_call(left) and _is_zero(right):
+            if isinstance(op, (ast.Eq, ast.LtE)):
+                return "empty", _strip_len(left)
+            if isinstance(op, (ast.Gt, ast.NotEq)):
+                return "nonempty", _strip_len(left)
+        if _is_len_call(left) and isinstance(right, ast.Constant) and right.value == 1:
+            if isinstance(op, ast.Lt):
+                return "empty", _strip_len(left)
+            if isinstance(op, ast.GtE):
+                return "nonempty", _strip_len(left)
+        if _is_zero(left) and _is_len_call(right) and isinstance(op, ast.Eq):
+            return "empty", _strip_len(right)
+        if _is_empty_literal(right) or _is_empty_literal(left):
+            subject = left if _is_empty_literal(right) else right
+            if isinstance(op, (ast.Eq, ast.Is)):
+                return "empty", subject
+            if isinstance(op, (ast.NotEq, ast.IsNot)):
+                return "nonempty", subject
+    if isinstance(test, (ast.Name, ast.Attribute, ast.Subscript)) or _is_len_call(test):
+        return "nonempty", _strip_len(test)
+    return None
+
+
+def _assigned_value(name: str, fn: ast.AST) -> ast.expr | None:
+    for node in ast.walk(fn):
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == name
+        ):
+            return node.value
+    return None
+
+
+def _subject_keys(
+    expr: ast.expr, fn: ast.AST, defs: dict[str, list[ast.AST]], depth: int = 3
+) -> set[str]:
+    """Every spelling of the collection ``expr`` names, followed through
+    local assignments, comprehensions, and helpers that return it."""
+    keys = {ast.unparse(expr)}
+    if depth <= 0:
+        return keys
+    if isinstance(expr, ast.Name):
+        value = _assigned_value(expr.id, fn)
+        if value is not None:
+            keys |= _subject_keys(value, fn, defs, depth - 1)
+    elif isinstance(expr, (ast.ListComp, ast.SetComp, ast.GeneratorExp)):
+        for gen in expr.generators:
+            keys |= _subject_keys(gen.iter, fn, defs, depth - 1)
+    elif isinstance(expr, ast.Call):
+        for name in _called_names(ast.Expr(value=expr)):
+            for helper in defs.get(name, []):
+                for node in ast.walk(helper):
+                    if isinstance(node, ast.Return) and node.value is not None:
+                        keys |= _subject_keys(node.value, helper, defs, depth - 1)
+    return keys
+
+
+def _loop_keys(
+    functions: list[ast.AST], defs: dict[str, list[ast.AST]]
+) -> set[str]:
+    """Spellings of every collection a for loop or comprehension iterates."""
+    keys: set[str] = set()
+    for fn in functions:
+        for node in ast.walk(fn):
+            if isinstance(node, (ast.For, ast.AsyncFor)):
+                keys |= _subject_keys(node.iter, fn, defs)
+            elif isinstance(node, ast.comprehension):
+                keys |= _subject_keys(node.iter, fn, defs)
+    return keys
+
+
+# Group-context calls that put the previous run's members back into this
+# run's group, so the cleanup at the end of the run finds nothing unused.
+_RECLAIM_METHODS = {"add_related_nodes", "add_related_groups"}
+
+
+def _reclaims(node: ast.AST) -> bool:
+    return any(
+        isinstance(c.func, ast.Attribute) and c.func.attr in _RECLAIM_METHODS
+        for c in ast.walk(node)
+        if isinstance(c, ast.Call)
+    )
+
+
+def _branch_outcome(stmts: list[ast.stmt], defs: dict[str, list[ast.AST]]) -> str:
+    """``"raise"``, ``"return"``, or ``"other"`` for the statements a guard runs.
+
+    A call to a helper whose own body raises counts as raising. A branch
+    that re-claims the previous run's members through the group context
+    before returning keeps the output too, so it counts with raising.
+    """
+    block = ast.Module(body=stmts, type_ignores=[])
+    for node in ast.walk(block):
+        if isinstance(node, ast.Raise):
+            return "raise"
+    if _reclaims(block):
+        return "raise"
+    for name in _called_names(block):
+        for helper in defs.get(name, []):
+            if any(isinstance(s, ast.Raise) for s in helper.body) or _reclaims(helper):
+                return "raise"
+    if any(isinstance(node, ast.Return) for node in ast.walk(block)):
+        return "return"
+    return "other"
+
+
+def check_empty_input_raises(
+    tree: ast.Module | None, **_: Any
+) -> tuple[bool, str]:
+    """generate() raises, never returns, when the collection it builds from
+    is empty.
+
+    From infrahub-sdk 1.24.0 a run that saves nothing deletes everything the
+    previous run tracked, and the cleanup is skipped only when generate()
+    raises. A guard that returns early is still a run that saved nothing.
+
+    The guard has to test a collection the generator loops over. A guard on
+    something else (the query returning no design object, a missing name)
+    raises in other cases and lets an empty collection through to a run that
+    saves nothing. A generator with no loop at all has nothing to bind the
+    guard to, and fails closed.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+    defs = _function_defs(tree)
+    if "generate" not in defs:
+        return False, "No generate() method found"
+
+    functions = _reachable_functions(tree)
+    loop_keys = _loop_keys(functions, defs)
+    if not loop_keys:
+        return False, "generate() iterates no collection, so no guard can be bound to one"
+
+    raising = False
+    for fn in functions:
+        for node in _walk_outside_loops(fn):
+            if isinstance(node, ast.Assert):
+                guard = _emptiness(node.test, fn)
+                if (
+                    guard is not None
+                    and guard[0] == "nonempty"
+                    and _subject_keys(guard[1], fn, defs) & loop_keys
+                ):
+                    raising = True
+                continue
+            if not isinstance(node, ast.If):
+                continue
+            guard = _emptiness(node.test, fn)
+            if guard is None or not (_subject_keys(guard[1], fn, defs) & loop_keys):
+                continue
+            kind = guard[0]
+            if kind == "empty":
+                branch = node.body
+            elif kind == "nonempty" and node.orelse:
+                branch = node.orelse
+            else:
+                continue
+            outcome = _branch_outcome(branch, defs)
+            if outcome == "return":
+                return False, (
+                    f"{fn.name}() returns early on empty input (line "
+                    f"{node.lineno}); from infrahub-sdk 1.24.0 a run that saves "
+                    "nothing deletes the previous run's output, so raise instead"
+                )
+            if outcome == "raise":
+                raising = True
+
+    if not raising:
+        return False, (
+            "generate() has no guard that raises when the collection it loops "
+            "over is empty; a run that saves nothing deletes the previous "
+            "run's output from infrahub-sdk 1.24.0"
+        )
+    return True, "generate() keeps the previous output on empty input (raises, or re-claims the previous members)"
+
+
+# ---------------------------------------------------------------------------
 # from_graphql hydration checks
 #
 # Each check has the signature:
@@ -3231,6 +3531,7 @@ CHECKS: dict[str, Any] = {
     "detach-precedes-peer-delete": check_detach_precedes_peer_delete,
     "detach-iterates-id-list": check_detach_iterates_id_list,
     "create-fields-exist-on-kind": check_create_fields_exist_on_kind,
+    "empty-input-raises": check_empty_input_raises,
     # from_graphql hydration family (output.md)
     "imports-infrahub-node": check_imports_infrahub_node,
     "uses-from-graphql": check_uses_from_graphql,

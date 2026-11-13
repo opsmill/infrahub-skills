@@ -1,0 +1,21 @@
+import logging
+
+from infrahub_sdk.generator import InfrahubGenerator
+
+log = logging.getLogger(__name__)
+
+
+class PodLeafGenerator(InfrahubGenerator):
+    async def generate(self, data: dict) -> None:
+        pod = data["TopologyPod"]["edges"][0]["node"]
+        racks = pod["racks"]["edges"]
+        if not racks:
+            log.warning("pod %s has no racks yet, skipping", pod["name"]["value"])
+            return
+        for edge in racks:
+            rack = edge["node"]
+            leaf = await self.client.create(
+                kind="DcimDevice",
+                data={"name": f"leaf-{rack['name']['value']}", "rack": rack["id"]},
+            )
+            await leaf.save(allow_upsert=True)

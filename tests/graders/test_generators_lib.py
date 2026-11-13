@@ -1411,3 +1411,111 @@ def test_generator_target_grader_skips_a_bad_example_but_grades_a_fails_sentence
     check = next(c for c in graded["checks"] if c["name"] == "generator-targets-existing-group")
     assert check["passed"] is passes, check["message"]
     assert (graded["score"] == 1.0) is passes, graded["details"]
+
+
+# ---------------------------------------------------------------------------
+# empty-input-raises (#239)
+#
+# From infrahub-sdk 1.24.0 a run that saves nothing deletes everything the
+# previous run tracked. The tracking context skips that cleanup only when
+# generate() raises, so the guard on the collection the generator loops over
+# has to raise, not return.
+# ---------------------------------------------------------------------------
+
+_EMPTY_FIXTURES = (
+    Path(__file__).resolve().parent
+    / "fixtures"
+    / "managing-generators"
+    / "empty-input-raises"
+)
+check_empty_input_raises = _mod.check_empty_input_raises
+
+
+def test_empty_input_raises_is_registered():
+    assert _mod.CHECKS["empty-input-raises"] is check_empty_input_raises
+
+
+@pytest.mark.parametrize(
+    ("fixture", "expected", "reason"),
+    [
+        ("compliant.py.txt", True, "keeps the previous output"),
+        # Guard in a helper, hoisted into a flag, on a rebound comprehension.
+        ("compliant_variant.py.txt", True, "keeps the previous output"),
+        # No guard on racks; the only raise is a per-rack check in the loop.
+        ("violating.py.txt", False, "no guard that raises"),
+        # Raises, but on the pod list, not on the racks the loop builds from.
+        ("violating_near_miss.py.txt", False, "no guard that raises"),
+        ("returns_early.py.txt", False, "returns early"),
+        # Re-claims the previous run's members before returning: keeps them.
+        ("compliant_reclaim.py.txt", True, "keeps the previous output"),
+    ],
+)
+def test_empty_input_raises_fixtures(fixture, expected, reason):
+    tree, _raw = load_output_py(_EMPTY_FIXTURES / fixture)
+    ok, msg = check_empty_input_raises(tree)
+    assert ok is expected, msg
+    assert reason in msg
+
+
+def _gen(body: str) -> ast.Module:
+    lines = "".join(f"        {line}\n" for line in body.splitlines())
+    return _parse(f"class G:\n    async def generate(self, data):\n{lines}")
+
+
+def test_empty_input_raises_accepts_assert_on_loop_subject():
+    ok, msg = check_empty_input_raises(_gen(
+        "racks = data['racks']\n"
+        "assert racks, 'no racks'\n"
+        "for r in racks:\n"
+        "    await self.client.create(kind='X', data={}).save(allow_upsert=True)"
+    ))
+    assert ok, msg
+
+
+def test_empty_input_raises_rejects_len_guard_that_returns():
+    ok, msg = check_empty_input_raises(_gen(
+        "racks = data['racks']\n"
+        "if len(racks) == 0:\n"
+        "    return\n"
+        "for r in racks:\n"
+        "    pass"
+    ))
+    assert not ok
+    assert "returns early" in msg
+
+
+def test_empty_input_raises_guard_inside_loop_does_not_count():
+    # Boundary: the same guard one level down is a per-item check.
+    ok, msg = check_empty_input_raises(_gen(
+        "for pod in data['pods']:\n"
+        "    if not data['pods']:\n"
+        "        raise ValueError('x')"
+    ))
+    assert not ok
+    assert "no guard that raises" in msg
+
+
+def test_empty_input_raises_comment_does_not_count():
+    ok, msg = check_empty_input_raises(_gen(
+        "racks = data['racks']\n"
+        "# if not racks: raise ValueError('no racks')\n"
+        "for r in racks:\n"
+        "    pass"
+    ))
+    assert not ok
+    assert "no guard that raises" in msg
+
+
+def test_empty_input_raises_fails_closed_without_a_loop():
+    ok, msg = check_empty_input_raises(_gen(
+        "if not data:\n"
+        "    raise ValueError('x')"
+    ))
+    assert not ok
+    assert "iterates no collection" in msg
+
+
+def test_empty_input_raises_fails_without_generate():
+    ok, msg = check_empty_input_raises(_parse("def build(data):\n    raise ValueError('x')\n"))
+    assert not ok
+    assert "No generate()" in msg

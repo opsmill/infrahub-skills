@@ -1802,6 +1802,59 @@ tasks:
       - name: add-relationships-passes-ids
         check: related_nodes carries peer id strings rather than node objects
 
+  - name: generator-empty-input-guard
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-managing-generators/SKILL.md and
+      follow its workflow and rules.
+
+      Task: Write an Infrahub Generator, `PodLeafGenerator`, that builds one
+      leaf switch for every rack of a `TopologyPod` design: a `DcimDevice`
+      named `leaf-<rack name>` with its `rack` relationship set to that rack.
+      Its query `pod_racks` returns the pod's `name` and its `racks`, each
+      with `id` and `name`. We run Infrahub 1.12.
+
+      A nightly import job owns each pod's rack list. It clears the list and
+      then attaches the pod's current racks, so a generator run that lands
+      in between sees an empty `racks` list. Last week that showed up as a
+      red generator check on three proposed changes, and reviewers had to
+      re-run them by hand. An empty list is a normal state between imports,
+      so the generator must not fail on it: the next run builds the leaves.
+
+      Save ONLY the final Python file to: output.py
+    graders:
+      - type: deterministic
+        run: python graders/managing-generators/check_empty_input_guard.py
+        weight: 1.0
+    expected_output: >-
+      A generator that, when the racks list it loops over is empty, either
+      raises in generate() or re-claims the previous run's tracked members
+      (get_group(store_peers=True) then add_related_nodes) before it
+      returns. From infrahub-sdk 1.24.0 (bundled with Infrahub 1.12.0) a
+      run that saves nothing deletes every object the previous run with
+      the same parameters tracked, so a plain early return deletes the
+      pod's existing leaf switches. Each leaf is written idempotently, by
+      save(allow_upsert=True) or a preflight get of the same kind.
+    expectations:
+      - "generate() raises, or re-claims the previous run's members, when the racks list it loops over is empty"
+      - "generate() does not return early on an empty racks list without re-claiming the previous members"
+      - "Each DcimDevice is written with save(allow_upsert=True) or after a preflight get"
+    assertions:
+      - name: empty-input-raises
+        check: >-
+          A guard outside any loop, in generate() or a helper it calls,
+          tests a collection the generator loops over and either raises
+          or re-claims the previous members (add_related_nodes or
+          add_related_groups) when it is empty; no such guard returns
+          without doing either.
+      - name: preflight-or-upsert
+        check: >-
+          Either client.get precedes create for the same kind, OR
+          save(allow_upsert=True) is called.
+      - name: no-raw-create-without-handler
+        check: >-
+          client.create has either a preflight get OR allow_upsert=True.
+
   - name: generator-natural-key-preflight
     trials: 3
     instruction: |
