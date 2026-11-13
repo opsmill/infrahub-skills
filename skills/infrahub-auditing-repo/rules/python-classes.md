@@ -52,7 +52,14 @@ by static inspection of the class definitions.
 1. Class inherits from `InfrahubGenerator`
 2. Implements `async generate(self, data: dict)`
 3. Calls `save(allow_upsert=True)` on created objects
-4. Handles empty data gracefully
+4. Raises when the collection it builds from is empty and
+   that means something is wrong. Flag a `return`, or no
+   guard at all, on that collection: from infrahub-sdk
+   1.24.0 a run that saves nothing deletes the previous
+   run's output
+   ([why](../../infrahub-managing-generators/rules/tracking-idempotent.md#a-run-that-saves-nothing-deletes-the-previous-output)).
+   A guard that adds the previous run's members back
+   before returning is compliant.
 
 ### Transforms
 

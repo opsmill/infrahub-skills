@@ -190,6 +190,33 @@ the keyword, it read `create()` in the installed SDK, found
 `tests/graders/test_generators_create_fields.py`, guarding
 the check.
 
+Taken a third time, for Generators check 4 in
+`skills/infrahub-auditing-repo/rules/python-classes.md`
+(#239), which said "handles empty data gracefully". From
+infrahub-sdk 1.24.0 the quiet return that wording invites
+deletes the previous run's output. Two scenarios, two valid
+trials, with the skill read and the old wording in place.
+An early return on an empty rack list scored 1.00. The model
+downloaded SDK 1.24.0 from PyPI and flagged the return. A
+generator with no guard, looping over an empty list, scored
+0.67. The model flagged the right line for the right reason
+and lost the point on an INFO note about the compliant file.
+
+The precondition is the cue again. The finding only holds
+on a stated Infrahub version, and once the prompt states it,
+the model reads that SDK's source and finds the behavior,
+rule or no rule. The generator side of the same change did
+get a task (`generator-empty-input-guard`), because writing
+code under a user's "must not fail" pushes the model to the
+quiet return without checking the version.
+
+The reference-drift pytest does not fit either: the repo
+pins infrahub-sdk 1.23.2, so no test here can read the
+1.24.0 behavior. `check_finding_line_in_range` and its
+fixtures stay in
+`tests/graders/test_auditing_repo_generator_empty_input.py`,
+guarding the check.
+
 The reference-drift remedy was taken once, for
 `skills/infrahub-managing-schemas/rules/relationship-on-delete.md`
 (#190). The rule said an omitted `on_delete` defaults to

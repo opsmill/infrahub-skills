@@ -100,9 +100,12 @@ Dispatcher invokes run() for each target object
 That last step — `delete_unused_nodes=True` is the
 default in `run()` — is what makes a generator a
 declarative driver of its target state. The catch:
-**a buggy generator that creates nothing also
-deletes everything from the previous run**. Test
-locally before letting it run in the pipeline.
+from infrahub-sdk 1.24.0, **a generator run that
+saves nothing deletes everything from the previous
+run**, so raise on empty input that means something
+is wrong
+([tracking-idempotent.md](rules/tracking-idempotent.md#a-run-that-saves-nothing-deletes-the-previous-output)).
+Test locally before letting it run in the pipeline.
 
 ---
 

@@ -292,7 +292,10 @@ convention).
 - Must use `await self.client.create()` for object
   creation
 - Must call `save(allow_upsert=True)` on created objects
-- Should handle empty/missing data gracefully
+- Should raise, not return, when the collection it builds
+  from is empty and that means something is wrong. From
+  infrahub-sdk 1.24.0 a run that saves nothing deletes the
+  previous run's output (python-classes check 4)
 
 ### 4.3 Transform classes
 

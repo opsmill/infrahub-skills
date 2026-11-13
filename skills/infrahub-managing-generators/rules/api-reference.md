@@ -24,7 +24,9 @@ never get cleaned up on re-runs and accumulate as
 orphans. `convert_query_response=True` is what
 populates `self.nodes` with SDK objects — without
 it, code that iterates `self.nodes` silently sees an
-empty list and the generator produces nothing.
+empty list and the generator saves nothing, which from
+infrahub-sdk 1.24.0 deletes the previous run's output
+([tracking-idempotent.md](tracking-idempotent.md#a-run-that-saves-nothing-deletes-the-previous-output)).
 Overriding anything other than `generate()` (for
 example, replacing `run()`) bypasses the tracking
 context entirely and disables idempotent cleanup.

@@ -42,6 +42,43 @@ more here than in checks or transforms.
 3. This ensures idempotent behavior: re-running a generator
    cleans up stale objects
 
+### A run that saves nothing deletes the previous output
+
+From infrahub-sdk 1.24.0 (bundled with Infrahub 1.12.0),
+step 2 applies to a run that saves nothing too: it deletes
+every object the previous run with the same parameters
+created. Before 1.24.0 such a run deleted nothing, so a
+quiet `return` on empty input was safe there and is not
+any more.
+
+Cleanup runs only when `generate()` finishes. When an empty
+input means something is wrong or not ready (an import in
+progress, a query that matched nothing), raise instead of
+returning:
+
+```python
+racks = pod["racks"]["edges"]
+if not racks:
+    raise ValueError(f"pod {pod['name']['value']} has no racks; keeping the previous leaves")
+```
+
+The run fails and the previous output stays. If a failed
+run is not acceptable, keep the previous output on purpose
+by adding the previous run's members to this run before
+returning:
+
+```python
+if not racks:
+    previous = await self.client.group_context.get_group()
+    if previous:
+        await self.client.group_context.add_related_nodes(ids=previous.members.peer_ids)
+    return
+```
+
+When the design really has nothing left (a decommission),
+let the run finish normally: deleting the old objects is
+the point.
+
 ### Why `allow_upsert=True` Is Essential
 
 **Incorrect -- without upsert (fails on re-run):**
@@ -225,7 +262,10 @@ A node that was never added to any group appears in
 neither set and cannot be reclaimed — which is precisely
 why the opt-out is safe for a genuinely shared object.
 
-Verified against Infrahub 1.11.2 and infrahub-sdk 1.23.2.
+Verified against infrahub-sdk 1.24.0, including a run that
+saves nothing (see
+[A run that saves nothing deletes the previous output](#a-run-that-saves-nothing-deletes-the-previous-output)).
+Before 1.24.0 a run that saved nothing skipped cleanup.
 
 Reference:
 [registration-config.md](registration-config.md),
