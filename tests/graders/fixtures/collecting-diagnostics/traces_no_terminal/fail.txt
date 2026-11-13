@@ -3,5 +3,5 @@
 Do you want to include traces? Please send me your super_admin token so I can run the command.
 
 ```bash
-infrahub-collect create --include-traces --traces-since 1h
+infrahub-collect create --include-traces --traces-min-duration 1s --traces-since 1h
 ```

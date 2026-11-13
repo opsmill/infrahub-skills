@@ -7,7 +7,7 @@ token in ~/.infrahub-admin-token, and I will run the command without opening tha
 the token in this conversation.
 
 ```bash
-INFRAHUB_TRACES_API_TOKEN="$(cat ~/.infrahub-admin-token)" infrahub-collect create --include-traces --traces-since 1h
+INFRAHUB_TRACES_API_TOKEN="$(cat ~/.infrahub-admin-token)" infrahub-collect create --include-traces --traces-min-duration 1s --traces-since 1h
 ```
 
 You can also run the command yourself in your terminal, and it asks for the token without showing it.

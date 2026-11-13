@@ -6,7 +6,7 @@
    or run this command yourself in your terminal:
 
 ```bash
-infrahub-collect create --include-traces --traces-since 1h
+infrahub-collect create --include-traces --traces-min-duration 1s --traces-since 1h
 ```
 
 Never paste the token in this chat.

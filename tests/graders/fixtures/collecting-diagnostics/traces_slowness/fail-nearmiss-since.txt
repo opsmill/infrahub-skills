@@ -6,7 +6,7 @@ If yes, run this now; a 4-hour window covers it:
 
 ```bash
 infrahub-collect environment detect
-infrahub-collect create --include-traces --traces-since 4h
+infrahub-collect create --include-traces --traces-min-duration 1s --traces-since 4h
 ```
 
 Only a share of requests has a trace, set by the sampling ratio.

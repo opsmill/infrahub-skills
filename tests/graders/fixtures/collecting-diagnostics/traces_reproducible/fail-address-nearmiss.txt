@@ -5,6 +5,6 @@ URL you open Infrahub at; a super admin raises the ratio before you reproduce th
 
 ```bash
 INFRAHUB_ADDRESS=https://infrahub.example.com curl -X PUT "$INFRAHUB_ADDRESS/api/troubleshooting/trace-sample-ratio" -d '{"ratio": 1.0, "duration_seconds": 1800}'
-infrahub-collect create --include-traces --traces-since 30m
+infrahub-collect create --include-traces --traces-min-duration 1s --traces-since 30m
 INFRAHUB_ADDRESS=https://infrahub.example.com curl -X DELETE "$INFRAHUB_ADDRESS/api/troubleshooting/trace-sample-ratio"
 ```

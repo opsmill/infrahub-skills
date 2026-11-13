@@ -104,11 +104,11 @@
     {
       "id": 4,
       "prompt": "This afternoon, from about 14:00 to 15:30 UTC, every GraphQL query in\nInfrahub took 20 to 30 seconds. It is fast again now. We run Docker Compose\nwith the observability stack (Tempo and Grafana) turned on. Prepare a\ndiagnostic bundle for OpsMill support so they can see what was slow. Do NOT\nactually run any commands; write out the exact commands and steps.",
-      "expected_output": "A command plan that asks the operator whether to include the traces of slow requests and confirms the window, then gives `infrahub-collect create --include-traces --traces-start <start> --traces-end <end>` to run after a yes, says that only a share of requests has a trace, and cautions the user to review the bundle before sharing.",
+      "expected_output": "A command plan that asks the operator whether to include the traces of slow requests and confirms the window, then gives `infrahub-collect create --include-traces --traces-start <start> --traces-end <end> --traces-min-duration <duration>` to run after a yes, says that only a share of requests has a trace, and cautions the user to review the bundle before sharing.",
       "files": [],
       "expectations": [
         "Recommends `infrahub-collect create`",
-        "Asks before adding `--include-traces`, and gives `--traces-start` and `--traces-end` for the slowness that ended",
+        "Asks before adding `--include-traces`, and gives `--traces-start` and `--traces-end` for the slowness that ended, with `--traces-min-duration`",
         "Says that only a share of requests has a trace",
         "Surfaces a review-before-sharing caution",
         "Does not resurrect hand-rolled manifest.yml/flags.yml artifacts"
@@ -120,7 +120,7 @@
         },
         {
           "name": "traces-offered-with-window",
-          "check": "Plan asks about traces and gives `--include-traces` with `--traces-start` and `--traces-end`"
+          "check": "Plan asks about traces and gives `--include-traces` with `--traces-start`, `--traces-end` and `--traces-min-duration`"
         },
         {
           "name": "sampling-caveat",
@@ -139,10 +139,10 @@
     {
       "id": 5,
       "prompt": "Opening the device list page in Infrahub takes about 40 seconds, every\ntime, for every user. I can make it happen whenever I want. We run Kubernetes\nin the namespace infrahub and have tracing turned on with a low sampling\nratio. I want OpsMill support to see exactly where the time goes. Do NOT\nactually run any commands; write out the exact commands and steps.",
-      "expected_output": "A command plan that asks whether to include traces, tells a super admin to raise the sampling ratio for a limited time with `PUT /api/troubleshooting/trace-sample-ratio` before reproducing the slowness, gives `infrahub-collect create --include-traces --traces-since <window>`, and tells the super admin to remove the temporary ratio with `DELETE` after the bundle is created.",
+      "expected_output": "A command plan that asks whether to include traces, tells a super admin to raise the sampling ratio for a limited time with `PUT /api/troubleshooting/trace-sample-ratio` before reproducing the slowness, gives `infrahub-collect create --include-traces --traces-since <window> --traces-min-duration <duration>`, and tells the super admin to remove the temporary ratio with `DELETE` after the bundle is created.",
       "files": [],
       "expectations": [
-        "Asks before adding `--include-traces`, and gives the window options",
+        "Asks before adding `--include-traces`, and gives the window options and `--traces-min-duration`",
         "Raises the sampling ratio for a limited time before reproducing",
         "Removes the temporary ratio after the bundle is created",
         "Leaves the ratio change to the operator rather than running it itself",
@@ -155,7 +155,7 @@
         },
         {
           "name": "traces-offered-with-window",
-          "check": "Plan asks about traces and gives `--include-traces` with a window"
+          "check": "Plan asks about traces and gives `--include-traces` with a window and `--traces-min-duration`"
         },
         {
           "name": "ratio-raise-and-remove",
@@ -173,7 +173,7 @@
       "expected_output": "A command plan that asks whether to include traces for the last hour, and says where INFRAHUB_TRACES_API_TOKEN comes from when the agent runs the command: exported before the agent session starts, read from a file the agent never opens, or the operator runs the command themselves. It never asks for the token value in the conversation.",
       "files": [],
       "expectations": [
-        "Asks before adding `--include-traces`, and gives the window options",
+        "Asks before adding `--include-traces`, and gives the window options and `--traces-min-duration`",
         "Says how INFRAHUB_TRACES_API_TOKEN reaches the process the agent runs",
         "Never asks for the token value in the conversation"
       ],
@@ -184,7 +184,7 @@
         },
         {
           "name": "traces-offered-with-window",
-          "check": "Plan asks about traces and gives `--include-traces` with a window"
+          "check": "Plan asks about traces and gives `--include-traces` with a window and `--traces-min-duration`"
         },
         {
           "name": "token-env-not-asked",

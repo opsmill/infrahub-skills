@@ -88,7 +88,7 @@ infrahub-collect environment detect
 infrahub-collect create
 infrahub-collect create --benchmark          # performance / OOM
 infrahub-collect create --include-queries    # slow/failing database queries
-infrahub-collect create --include-traces --traces-since 2h   # slow requests, after you agree
+infrahub-collect create --include-traces --traces-since 2h --traces-min-duration 1s   # slow requests, after you agree
 ```
 
 :::warning

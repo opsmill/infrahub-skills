@@ -6,5 +6,5 @@ Paste the super_admin token here and I will export INFRAHUB_TRACES_API_TOKEN bef
 
 ```bash
 export INFRAHUB_TRACES_API_TOKEN=<token>
-infrahub-collect create --include-traces --traces-since 1h
+infrahub-collect create --include-traces --traces-min-duration 1s --traces-since 1h
 ```

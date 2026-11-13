@@ -14,6 +14,11 @@ What each near miss guards against:
   fail-nearmiss-since asks first, but uses `--traces-since` for a slowness
   that has ended; a check that accepts either window form passes it (cubic
   review of #234).
+  fail-min-duration gives the window but leaves out `--traces-min-duration`,
+  which the rule asks for in every traces command (BeArchiTek review of
+  #234). fail-min-duration-nearmiss names the option in prose and in a
+  shell comment only; a check that matches the option name anywhere in the
+  plan passes it.
   fail-caveat and fail-caveat-nearmiss grade the sampling caveat instead: the
   near miss says "no sampling" in prose and "only a share" in a shell comment
   only. A check that matches the word "sampling", or reads comments, passes it

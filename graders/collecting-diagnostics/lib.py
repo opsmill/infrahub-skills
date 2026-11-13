@@ -195,7 +195,9 @@ def check_traces_offered_with_window(text: str, *, window: str = "any", **_: obj
 
     `window` is the window the scenario calls for: "absolute" for a slowness
     that has ended (`--traces-start` and `--traces-end`), "any" when either
-    form fits.
+    form fits. The command also passes `--traces-min-duration`, which the rule
+    asks for even when the operator keeps the default `1s`. The option counts
+    only as a token of the command, not in a shell comment or in prose.
     """
     def has_window(names: set[str]) -> bool:
         absolute = {"--traces-start", "--traces-end"} <= names
@@ -214,6 +216,8 @@ def check_traces_offered_with_window(text: str, *, window: str = "any", **_: obj
             else "`--traces-since` or `--traces-start` and `--traces-end`"
         )
         return False, f"no `infrahub-collect create --include-traces` command with {wanted}"
+    if not any("--traces-min-duration" in _trace_options(opts) for opts in with_window):
+        return False, "the traces command with a window does not pass `--traces-min-duration`"
     if not _asks_about_traces(text):
         return False, "adds traces without asking the operator first (no question names traces)"
     return True, "asks about traces and gives the command with a window"

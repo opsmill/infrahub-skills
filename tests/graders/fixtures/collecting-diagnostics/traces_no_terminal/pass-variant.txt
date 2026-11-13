@@ -5,5 +5,5 @@
 
 ```bash
 INFRAHUB_TRACES_API_TOKEN="$(cat ~/.infrahub-admin-token)" infrahub-collect create \
-  --include-traces --traces-start 2026-11-05T10:00:00Z --traces-end 2026-11-05T11:00:00Z
+  --include-traces --traces-min-duration 1s --traces-start 2026-11-05T10:00:00Z --traces-end 2026-11-05T11:00:00Z
 ```

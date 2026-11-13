@@ -3188,12 +3188,15 @@ tasks:
     expected_output: >-
       A command plan that asks the operator whether to include the traces of slow
       requests and confirms the window, then gives `infrahub-collect create
-      --include-traces --traces-start <start> --traces-end <end>` to run after a
+      --include-traces --traces-start <start> --traces-end <end>
+      --traces-min-duration <duration>` to run after a
       yes, says that only a share of requests has a trace, and cautions the user
       to review the bundle before sharing.
     expectations:
       - Recommends `infrahub-collect create`
-      - Asks before adding `--include-traces`, and gives `--traces-start` and `--traces-end` for the slowness that ended
+      - >-
+        Asks before adding `--include-traces`, and gives `--traces-start` and
+        `--traces-end` for the slowness that ended, with `--traces-min-duration`
       - Says that only a share of requests has a trace
       - Surfaces a review-before-sharing caution
       - Does not resurrect hand-rolled manifest.yml/flags.yml artifacts
@@ -3201,7 +3204,9 @@ tasks:
       - name: mentions-create
         check: Plan recommends `infrahub-collect create`
       - name: traces-offered-with-window
-        check: Plan asks about traces and gives `--include-traces` with `--traces-start` and `--traces-end`
+        check: >-
+          Plan asks about traces and gives `--include-traces` with `--traces-start`,
+          `--traces-end` and `--traces-min-duration`
       - name: sampling-caveat
         check: Plan says that only a share of requests has a trace
       - name: review-before-sharing
@@ -3230,11 +3235,12 @@ tasks:
       A command plan that asks whether to include traces, tells a super admin to
       raise the sampling ratio for a limited time with `PUT
       /api/troubleshooting/trace-sample-ratio` before reproducing the slowness,
-      gives `infrahub-collect create --include-traces --traces-since <window>`, and
+      gives `infrahub-collect create --include-traces --traces-since <window>
+      --traces-min-duration <duration>`, and
       tells the super admin to remove the temporary ratio with `DELETE` after the
       bundle is created.
     expectations:
-      - Asks before adding `--include-traces`, and gives the window options
+      - Asks before adding `--include-traces`, and gives the window options and `--traces-min-duration`
       - Raises the sampling ratio for a limited time before reproducing
       - Removes the temporary ratio after the bundle is created
       - Leaves the ratio change to the operator rather than running it itself
@@ -3243,7 +3249,7 @@ tasks:
       - name: mentions-create
         check: Plan recommends `infrahub-collect create`
       - name: traces-offered-with-window
-        check: Plan asks about traces and gives `--include-traces` with a window
+        check: Plan asks about traces and gives `--include-traces` with a window and `--traces-min-duration`
       - name: ratio-raise-and-remove
         check: Plan raises the ratio with PUT and removes it with DELETE
       - name: ratio-address-set
@@ -3274,14 +3280,14 @@ tasks:
       agent never opens, or the operator runs the command themselves. It never
       asks for the token value in the conversation.
     expectations:
-      - Asks before adding `--include-traces`, and gives the window options
+      - Asks before adding `--include-traces`, and gives the window options and `--traces-min-duration`
       - Says how INFRAHUB_TRACES_API_TOKEN reaches the process the agent runs
       - Never asks for the token value in the conversation
     assertions:
       - name: mentions-create
         check: Plan recommends `infrahub-collect create`
       - name: traces-offered-with-window
-        check: Plan asks about traces and gives `--include-traces` with a window
+        check: Plan asks about traces and gives `--include-traces` with a window and `--traces-min-duration`
       - name: token-env-not-asked
         check: Plan says how INFRAHUB_TRACES_API_TOKEN reaches the command and does not ask for the token value
 

@@ -13,7 +13,7 @@ infrahub-collect environment detect
 If you answer yes, run:
 
 ```bash
-infrahub-collect create --benchmark --include-traces \
+infrahub-collect create --benchmark --include-traces --traces-min-duration 1s \
   --traces-start 2026-11-05T14:00:00Z --traces-end 2026-11-05T15:30:00Z
 ```
 
