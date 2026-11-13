@@ -1,0 +1,12 @@
+## Report
+
+Manifest first (bundle_information.json): the traces collector succeeded with 35 traces.
+
+```bash
+for f in bundle/traces/*.json; do
+  curl -X POST "http://localhost:4318/v1/traces" -H "Content-Type: application/json" --data-binary @"$f"
+done
+```
+
+Then, in Grafana Explore, search the Tempo data source for traces longer than 1s between 08:45 and
+08:55 UTC, and open the slowest result.

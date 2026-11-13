@@ -1,0 +1,13 @@
+## Report
+
+Manifest first (bundle_information.json): the traces collector succeeded with 35 traces, read from
+the customer's Tempo.
+
+```bash
+for f in bundle/traces/*.json; do
+  curl -X POST "http://tempo.monitoring.acme.internal:4318/v1/traces" \
+    -H "Content-Type: application/json" --data-binary @"$f"
+done
+```
+
+Then open each trace by the trace ID in its file name, from 0001.

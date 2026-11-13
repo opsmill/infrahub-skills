@@ -1,0 +1,7 @@
+## Report
+
+Manifest first (bundle_information.json): the traces collector succeeded with 35 traces.
+
+Open `bundle/traces/0001-6c26f0d2e9c893ed614173cb81d8d534.json` in an editor and compare the
+`startTimeUnixNano` and `endTimeUnixNano` values of its spans. Then search Grafana for traces
+longer than 1s in the window 08:45-08:55.

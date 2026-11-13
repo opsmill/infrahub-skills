@@ -1,0 +1,1 @@
+The Diagnostics Analyzer skill opens the traces of a bundle collected with `infrahub-collect create --include-traces`. It reads the `traces` entry of `bundle_information.json`, posts every file of `bundle/traces/` to a local Tempo, and opens each trace in Grafana by the trace ID in its file name, from the slowest. It then reports which service and which operation took the time.

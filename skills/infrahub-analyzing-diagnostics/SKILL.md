@@ -129,6 +129,16 @@ performance-shaped, the report must recommend a
 next bundle with `--benchmark`. See
 [rules/triage-benchmark-results.md](rules/triage-benchmark-results.md).
 
+If the manifest has a `traces` entry with traces
+written (`create --include-traces`), open them
+before you conclude on a slowness: post every file
+of `bundle/traces/` to a local Tempo, and open each
+trace in Grafana by the trace ID in its file name,
+from `0001` (the slowest). A search does not find
+them. Report the service and the operation that took
+the time. See
+[rules/triage-traces.md](rules/triage-traces.md).
+
 ### 4. Correlate into incidents
 
 Group the raw signals by timestamp and causal chain

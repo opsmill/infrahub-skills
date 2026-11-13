@@ -15,7 +15,8 @@
    restart evidence and read its tail. Evaluate
    benchmark results when present; for performance
    symptoms without them, recommend a `--benchmark`
-   bundle.
+   bundle. Open the traces of a bundle by trace ID
+   in a local Tempo, from `0001` (the slowest).
 
 3. **Correlation (correlate-)** -- HIGH. Group raw
    signals by timestamp and causal chain into
