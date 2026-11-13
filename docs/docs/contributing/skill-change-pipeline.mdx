@@ -16,16 +16,20 @@ flowchart LR
   test --> implement["implementing-skill-changes"]
   implement --> pr["pull request"]
   pr -.-> harvest["harvesting-skill-review"]
+  release["a release"] -.-> relnotes["harvesting-release-notes"]
+  relnotes -.->|"an issue"| analyze
 
   classDef entrance fill:#e8f0fe,stroke:#4285f4
   classDef stage fill:#e6f4ea,stroke:#34a853
-  class bug,idea entrance
+  class bug,idea,release entrance
   class analyze,grill,test,implement stage
 ```
 
-The dotted edge marks `harvesting-skill-review` as outside the pipeline: it
-runs after the pull request, on review feedback, rather than as a stage
-the change has to pass through.
+The dotted edges mark the two harvesting skills as outside the pipeline.
+`harvesting-skill-review` runs after the pull request, on review feedback.
+`harvesting-release-notes` runs when Infrahub, the SDK, or the MCP server
+ships a release, and its findings enter the pipeline as issues. Neither is
+a stage a change has to pass through.
 
 These live in
 [`.agents/skills/`](https://github.com/opsmill/infrahub-skills/tree/main/.agents/skills),
@@ -154,6 +158,30 @@ durable rules. It is not part of the pipeline and runs on its own, after
 the fact. It reports first and edits only with approval, and its governing
 instruction is to refine rather than accrete: a review lesson usually
 belongs inside an existing rule, not in a new one beside it.
+
+## After a release
+
+**`harvesting-release-notes`** reads the release notes of Infrahub,
+`infrahub-sdk`, or the Infrahub MCP server for one release or a range, and
+finds the skill passages each change makes wrong. Without a range, it
+starts after the last one it harvested.
+
+For each change it:
+
+- checks the change in source at the release tag, and in the release
+  before it, so a defect the notes only describe is not mistaken for a
+  version change;
+- rates it by what happens to a user who follows the skill: deleted data
+  first, then an error or a wrong result, then deprecated guidance;
+- writes the version-gated text for each affected passage, in the form
+  [`dev/guidelines/skill-authoring.md`](https://github.com/opsmill/infrahub-skills/blob/main/dev/guidelines/skill-authoring.md)
+  gives, so users on an earlier release keep guidance that works for them.
+
+It does not edit skills. It offers each verified finding as an issue
+through `infrahub-reporting-skill-gaps`, which files nothing without
+approval, and `analyzing-skill-bugs` then starts the fix from that issue.
+Each issue records the harvested range on a `Release harvest:` line, which
+is how the next run finds where to start.
 
 ## Shared references
 
