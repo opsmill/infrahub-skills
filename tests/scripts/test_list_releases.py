@@ -112,3 +112,17 @@ def test_unparseable_spec_fails_loudly():
     result = _run("latest-ish", "infrahub.json")
     assert result.returncode != 0
     assert result.stderr.strip()
+
+
+@pytest.mark.parametrize("spec", ["1.12.1..1.11.0", "sdk 1.24.0..1.23.0"])
+def test_reversed_range_fails_loudly(spec):
+    result = _run(spec, "sdk.json" if spec.startswith("sdk") else "infrahub.json")
+    assert result.returncode != 0
+    assert "before" in result.stderr
+
+
+@pytest.mark.parametrize("spec", ["1.11.0..", "..1.12.1"])
+def test_range_with_an_empty_end_fails_loudly(spec):
+    result = _run(spec, "infrahub.json")
+    assert result.returncode != 0
+    assert result.stderr.strip()

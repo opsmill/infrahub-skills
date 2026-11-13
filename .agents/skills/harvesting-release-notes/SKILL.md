@@ -65,21 +65,35 @@ both ends. Pre-releases (`1.12.0b1`) are left out unless
 the user asks for them or names one as an end of the range.
 
 The release notes come from `gh` unless the user names a
-directory holding them as `<tag>.md`. Source comes from
-the local `opsmill/infrahub` checkout, or from a directory
-the user names that holds one subdirectory per tag.
+directory holding them as `<tag>.md`. Source comes from a
+local checkout of the repository the spec names
+(`opsmill/infrahub`, `opsmill/infrahub-sdk-python`, or
+`opsmill/infrahub-mcp-server`), or from a directory the
+user names that holds one subdirectory per tag. An
+`opsmill/infrahub` checkout also gives the SDK commit each
+Infrahub release pins (step 2).
 
 ## Workflow
 
 ### 0. Find where the last harvest stopped
 
+Skip this step when the user names a release or a range.
+
 Every issue this skill files names its range on a
-`Release harvest:` line (step 8). When the user names no
-range, start after the last one harvested:
+`Release harvest: <owner/repo> <range>` line (step 8).
+When the user names neither, find the last range
+harvested for each repository:
 
 ```bash
 gh search issues --repo opsmill/infrahub-skills "Release harvest:" --json number,title,body --limit 20
 ```
+
+Take the highest end release among the lines for that
+repository. The range to harvest runs from the first
+final release after it to the latest final release, for
+example `1.12.2..1.13.0` after `1.12.0..1.12.1`. When no
+line names the repository, there is no starting point:
+ask the user for a release or a range.
 
 A range that produced no finding files no issue, so it
 leaves no record. Say so in the report.
@@ -97,6 +111,9 @@ an older minor is often published after the next minor's
 pre-release.
 
 ### 2. Read the breaking sections of each release
+
+With a notes directory, read `<directory>/<tag>.md`.
+Otherwise read the notes from GitHub:
 
 ```bash
 gh release view <tag> -R <owner/repo> --json body -q .body

@@ -129,9 +129,10 @@ Name both boundaries: the release where the new
 behavior became available, and the first release where
 the old guidance is wrong. Deprecation alone does not
 make guidance wrong. Leave no release without working
-guidance: the old guidance must reach at least the
-release where the new behavior became available, and
-may run on until the removal.
+guidance: the old guidance covers every release before
+the one where the new behavior became available, and
+the new guidance starts at that release. The old
+guidance may also run on until the removal.
 
 ```markdown
 Infrahub <available> and later: <new guidance>. It is

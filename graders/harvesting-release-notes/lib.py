@@ -50,10 +50,24 @@ _FIELD_RE = re.compile(
 _VERSION_RE = re.compile(
     r"(?<![\w.])(?:infrahub-)?v?(?P<major>\d+)\.(?P<minor>\d+)(?:\.(?P<patch>\d+))?(?P<pre>(?:a|b|rc)\d+)?(?![\w])"
 )
-_SHA_RE = re.compile(r"(?<![0-9a-f])[0-9a-f]{7,40}(?![0-9a-f])")
-# A path: at least one slash and a file extension.
-_PATH_RE = re.compile(r"[\w.-]+(?:/[\w.-]+)+\.\w+")
-_AFFECTED_RE = re.compile(r"(?P<path>[\w./-]+\.\w+):(?P<line>\d+)(?:-\d+)?")
+# A commit pins evidence only in the `<commit>:<path>` form, so a file name
+# made of hex letters is not mistaken for one.
+_SHA_RE = re.compile(r"(?<![\w./-])[0-9a-f]{7,40}:")
+# A path: zero or more directories and a file extension that starts with a
+# letter, so a version such as `infrahub-v1.7.0` is not read as a path.
+_PATH_RE = re.compile(r"[\w.-]+(?:/[\w.-]+)*\.[A-Za-z]\w*")
+_AFFECTED_RE = re.compile(r"(?P<path>[\w./-]+\.\w+):(?P<line>\d+)(?:-(?P<end>\d+))?")
+# A note in brackets, such as "(shipped with infrahub-v1.12.0)", names the
+# release that carried the change, not a boundary.
+_BRACKETS_RE = re.compile(r"\([^)]*\)")
+# Words saying the old token stopped working. Only the text before the first
+# of them counts as keeping the old guidance, so "`name__like` was removed
+# before 1.7" keeps nothing, while "Before 1.6: `name__like` works, but fails
+# from 1.7" still does.
+_GONE_WORDS = re.compile(
+    r"\b(removed|fails?|failed|no longer|dropped|unsupported|not (?:work|supported|available))\b",
+    re.IGNORECASE,
+)
 # "Before 1.7" excludes 1.7 itself: the qualifier for the removal release.
 _BEFORE_WORDS = re.compile(r"\b(before|prior to|pre|until|below)\b|<(?!=)", re.IGNORECASE)
 # "1.6 and earlier" includes 1.6: the qualifier for the last release where the
@@ -113,9 +127,19 @@ def _versions(text: str) -> list[tuple[int, int, int | None, str | None]]:
     return out
 
 
-def _minor(spec: str) -> tuple[int, int]:
-    major, minor = spec.split(".")[:2]
-    return int(major), int(minor)
+def _precision(*specs: str | None) -> int:
+    """2 when every boundary is a minor release, 3 when one names a patch,
+    so a deprecation in 1.12.0 and a removal in 1.12.1 stay two boundaries."""
+    return max([2] + [len(s.split(".")) for s in specs if s])
+
+
+def _cut(v: tuple, n: int) -> tuple[int, ...]:
+    """A parsed version at n parts; a missing patch reads as 0."""
+    return (v[0], v[1], v[2] or 0)[:n]
+
+
+def _boundary(spec: str, n: int) -> tuple[int, ...]:
+    return _full(spec)[:n]
 
 
 def _full(spec: str) -> tuple[int, int, int]:
@@ -129,6 +153,14 @@ def _is_unverified(finding: dict[str, str]) -> bool:
 
 def _affected_paths(value: str) -> list[tuple[str, str]]:
     return [(m.group("path"), m.group("line")) for m in _AFFECTED_RE.finditer(_clean(value))]
+
+
+def _affected_spans(value: str) -> list[tuple[str, int, int]]:
+    out = []
+    for m in _AFFECTED_RE.finditer(_clean(value)):
+        start = int(m.group("line"))
+        out.append((m.group("path"), start, int(m.group("end") or start)))
+    return out
 
 
 def _target(text: str, affected_path: str) -> dict[str, str] | None:
@@ -182,13 +214,18 @@ def check_affected_paths_exist(text: str, root: Path, **_) -> tuple[bool, str]:
     findings = _findings(text)
     if not findings:
         return False, "No findings to check"
+    base = root.resolve()
     for i, finding in enumerate(findings, start=1):
-        for path, line in _affected_paths(finding.get("affected", "")):
-            target = root / path
+        for path, start, end in _affected_spans(finding.get("affected", "")):
+            target = (root / path).resolve()
+            if not target.is_relative_to(base):
+                return False, f"Finding {i} names {path}, which is outside the workspace"
             if not target.is_file():
                 return False, f"Finding {i} names {path}, which does not exist"
-            if int(line) > len(target.read_text(errors="ignore").splitlines()):
-                return False, f"Finding {i}: {path}:{line} is past the end of the file"
+            if start < 1 or end < start:
+                return False, f"Finding {i}: {path}:{start}-{end} is not a line range"
+            if end > len(target.read_text(errors="ignore").splitlines()):
+                return False, f"Finding {i}: {path}:{end} is past the end of the file"
     return True, "Every affected passage exists"
 
 
@@ -244,23 +281,29 @@ def check_gate_boundaries(
     finding = _target(text, affected_path)
     if finding is None:
         return False, f"No finding names {affected_path}"
-    want = {_minor(removed)} | ({_minor(deprecated)} if deprecated else set())
+    n = _precision(deprecated, removed)
+    want = {_boundary(removed, n)} | ({_boundary(deprecated, n)} if deprecated else set())
 
-    dep_field = _clean(finding.get("deprecated in", ""))
-    dep_seen = {(v[0], v[1]) for v in _versions(dep_field)}
-    if deprecated and dep_seen != {_minor(deprecated)}:
+    def seen_in(value: str) -> set[tuple[int, ...]]:
+        return {_cut(v, n) for v in _versions(value)}
+
+    def boundary_field(name: str) -> tuple[str, set[tuple[int, ...]]]:
+        value = _clean(finding.get(name, ""))
+        return value, seen_in(_BRACKETS_RE.sub("", value))
+
+    dep_field, dep_seen = boundary_field("deprecated in")
+    if deprecated and dep_seen != {_boundary(deprecated, n)}:
         return False, f"'Deprecated in' is '{dep_field}', expected {deprecated}"
     if not deprecated and dep_seen:
         return False, f"'Deprecated in' is '{dep_field}', expected none"
-    rem_field = _clean(finding.get("removed in", ""))
-    if {(v[0], v[1]) for v in _versions(rem_field)} != {_minor(removed)}:
+    rem_field, rem_seen = boundary_field("removed in")
+    if rem_seen != {_boundary(removed, n)}:
         return False, f"'Removed in' is '{rem_field}', expected {removed}"
 
-    gate = _clean(finding.get("gate", ""))
-    seen = {(v[0], v[1]) for v in _versions(gate)}
+    seen = seen_in(_clean(finding.get("gate", "")))
     if seen != want:
-        names = ", ".join(f"{a}.{b}" for a, b in sorted(seen)) or "no version"
-        expect = ", ".join(f"{a}.{b}" for a, b in sorted(want))
+        names = ", ".join(".".join(map(str, v)) for v in sorted(seen)) or "no version"
+        expect = ", ".join(".".join(map(str, v)) for v in sorted(want))
         return False, f"Gate names {names}; expected exactly {expect}"
     return True, "Gate names the deprecation and removal releases"
 
@@ -292,31 +335,36 @@ def check_gate_keeps_old_guidance(
     finding = _target(text, affected_path)
     if finding is None:
         return False, f"No finding names {affected_path}"
-    rem = _minor(removed)
-    avail = _minor(deprecated) if deprecated else rem
+    n = _precision(deprecated, removed)
+    rem = _boundary(removed, n)
+    avail = _boundary(deprecated, n) if deprecated else rem
+    label = ".".join(map(str, avail))
+    old_re = re.compile(rf"(?<![\w]){re.escape(old_token)}(?![\w])")
     clauses = _clauses(_clean(finding.get("gate", "")))
     old_reaches = False
     for clause in clauses:
-        if old_token not in clause:
+        gone = _GONE_WORDS.search(clause)
+        clause = clause[: gone.start()] if gone else clause
+        if not old_re.search(clause):
             continue
-        versions = {(v[0], v[1]) for v in _versions(clause)}
+        versions = {_cut(v, n) for v in _versions(clause)}
         if any(avail <= v <= rem for v in versions) and _BEFORE_WORDS.search(clause):
             old_reaches = True
         if any(avail <= v < rem for v in versions) and _INCLUSIVE_WORDS.search(clause):
             old_reaches = True
     if not old_reaches:
         return False, (
-            f"No Gate clause keeps '{old_token}' up to {avail[0]}.{avail[1]}, "
-            f"where the new behavior became available"
+            f"No Gate clause keeps '{old_token}' up to {label}, "
+            f"where the new behavior became available. Gate: {' | '.join(clauses) or 'empty'}"
         )
     if deprecated and new_token:
         starts = any(
-            new_token in clause and avail in {(v[0], v[1]) for v in _versions(clause)}
+            new_token in clause and avail in {_cut(v, n) for v in _versions(clause)}
             for clause in clauses
         )
         if not starts:
             return False, f"No Gate clause starts '{new_token}' at {deprecated}, so a release has no guidance"
-    return True, f"Gate covers every release: '{old_token}' up to {avail[0]}.{avail[1]}, then '{new_token or 'the new behavior'}'"
+    return True, f"Gate covers every release: '{old_token}' up to {label}, then '{new_token or 'the new behavior'}'"
 
 
 def check_severity(text: str, affected_path: str, expected: str, **_) -> tuple[bool, str]:

@@ -65,7 +65,9 @@ def parse_spec(spec: str) -> tuple[str, str, str]:
         repo_word, span = None, words[0]
     else:
         raise ValueError(f"cannot parse release spec {spec!r}")
-    start, _, end = span.partition("..")
+    start, sep, end = span.partition("..")
+    if sep and not (start and end):
+        raise ValueError(f"{spec!r} is a range with an empty end; name both releases")
     end = end or start
     for end_point in (start, end):
         if version_key(end_point) is None:
@@ -103,6 +105,8 @@ def expand(spec: str, releases: list[dict], include_prereleases: bool) -> list[s
     repo, start, end = parse_spec(spec)
     by_version = {version_key(r["tagName"]): r for r in releases if version_key(r["tagName"]) is not None}
     lo, hi = version_key(start), version_key(end)
+    if lo > hi:
+        raise ValueError(f"{spec!r} is reversed: {end} comes before {start}")
     for end_point, key in ((start, lo), (end, hi)):
         if key not in by_version:
             raise LookupError(f"{end_point} is not a release of {repo} (spec {spec!r})")

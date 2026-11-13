@@ -146,6 +146,11 @@ _KEEPS_OLD = {
         # available, so every release still has working guidance.
         "Infrahub 1.6 and later: use `name__contains`. It is required from 1.7, where `name__like` "
         "fails. Before 1.6: `name__like` is the only substring filter and still works.",
+        # The clause that keeps the old filter also says when it stops working.
+        "From 1.6: `name__contains`, required from 1.7. Before 1.6: `name__like` still works, "
+        "but it fails from 1.7.",
+        "Infrahub 1.6.0 and later: use `name__contains`. It is required from 1.7.0, which removed "
+        "`name__like`. Before 1.6.0: `name__like`.",
     ],
 )
 def test_keeps_old_guidance_accepts_a_clause_reaching_the_removal(gate):
@@ -307,3 +312,130 @@ def test_eval_workspace_stays_out_of_graders():
     would hand the model the compliant answer."""
     for w in _eval_task().get("workspace", []):
         assert not w["src"].startswith("graders/"), w["src"]
+
+
+def test_keeps_old_guidance_rejects_a_clause_saying_the_old_token_stopped_working():
+    """A clause that names the old filter only to say it is gone keeps nothing."""
+    gate = "`name__like` was removed before 1.7. From 1.6: `name__contains`, required from 1.7."
+    ok, msg = _mod.check_gate_keeps_old_guidance(_gate_report(gate), root=Path("."), **_KEEPS_OLD)
+    assert not ok, msg
+
+
+def test_keeps_old_guidance_matches_the_old_token_as_a_whole_word():
+    gate = "Before 1.7: `name__likeness` still works. From 1.6: `name__contains`, required from 1.7."
+    ok, msg = _mod.check_gate_keeps_old_guidance(_gate_report(gate), root=Path("."), **_KEEPS_OLD)
+    assert not ok, msg
+
+
+def _patch_report(deprecated: str, removed: str, gate: str) -> str:
+    return (
+        "### Finding 1\n\n- Repository: opsmill/infrahub\n- Severity: High\n"
+        "- Affected: skills/acme-querying-inventory/rules/filters.md:9\n"
+        f"- Deprecated in: {deprecated}\n- Removed in: {removed}\n"
+        "- Verified in: infrahub-v1.12.1:backend/infrahub/graphql/filters.py\n"
+        f"- Gate: {gate}\n"
+    )
+
+
+_PATCH = {
+    "affected_path": "skills/acme-querying-inventory/rules/filters.md",
+    "deprecated": "1.12.0",
+    "removed": "1.12.1",
+}
+_PATCH_GATE = (
+    "Infrahub 1.12.0 and later: use `name__contains`. It is required from 1.12.1. "
+    "Before 1.12.0: `name__like` still works."
+)
+
+
+def test_gate_boundaries_tell_patch_releases_apart():
+    """A deprecation in 1.12.0 and a removal in 1.12.1 are two boundaries."""
+    good = _patch_report("infrahub-v1.12.0", "infrahub-v1.12.1", _PATCH_GATE)
+    ok, msg = _mod.check_gate_boundaries(good, **_PATCH)
+    assert ok, msg
+
+    collapsed = _patch_report("infrahub-v1.12.0", "infrahub-v1.12.0", _PATCH_GATE)
+    ok, msg = _mod.check_gate_boundaries(collapsed, **_PATCH)
+    assert not ok
+    assert "'Removed in'" in msg
+
+    one_boundary = _patch_report(
+        "infrahub-v1.12.0",
+        "infrahub-v1.12.1",
+        "Infrahub 1.12 and later: use `name__contains`. Before 1.12: `name__like` still works.",
+    )
+    ok, msg = _mod.check_gate_boundaries(one_boundary, **_PATCH)
+    assert not ok, msg
+
+
+def test_keeps_old_guidance_tells_patch_releases_apart():
+    kwargs = {**_PATCH, "old_token": "name__like", "new_token": "name__contains"}
+    ok, msg = _mod.check_gate_keeps_old_guidance(
+        _patch_report("infrahub-v1.12.0", "infrahub-v1.12.1", _PATCH_GATE), **kwargs
+    )
+    assert ok, msg
+    # The new filter starts at 1.12.1, so 1.12.0 has no guidance.
+    gap = "From 1.12.1: `name__contains`. Before 1.12.0: `name__like` still works."
+    ok, msg = _mod.check_gate_keeps_old_guidance(
+        _patch_report("infrahub-v1.12.0", "infrahub-v1.12.1", gap), **kwargs
+    )
+    assert not ok, msg
+
+
+def test_gate_boundaries_ignore_the_release_named_in_brackets():
+    """The skill's SDK form names the Infrahub release that shipped it."""
+    report = (_FIXTURES / "pass.txt").read_text().replace(
+        "- Removed in: infrahub-v1.7.0",
+        "- Removed in: infrahub-v1.7.0 (shipped with infrahub-sdk v1.30.0)",
+    )
+    ok, msg = _mod.check_gate_boundaries(
+        report, affected_path=_KEEPS_OLD["affected_path"], deprecated="1.6", removed="1.7"
+    )
+    assert ok, msg
+
+
+@pytest.mark.parametrize(
+    ("verified", "ok"),
+    [
+        # A source file at the root of the repository.
+        ("infrahub-v1.7.0:pyproject.toml", True),
+        # A file name made of hex letters is not a commit.
+        ("backend/deadbeef.py", False),
+        ("backend/infrahub/deadbeef1.py", False),
+        # A version alone is not a path.
+        ("infrahub-v1.7.0", False),
+    ],
+)
+def test_evidence_pinned_reads_the_commit_and_the_path_apart(verified, ok):
+    report = (_FIXTURES / "pass.txt").read_text().replace(_VERIFIED, f"- Verified in: {verified}")
+    passed, msg = _mod.check_evidence_pinned(report, start="1.6.0", end="1.7.0")
+    assert passed is ok, msg
+
+
+@pytest.mark.parametrize(
+    ("location", "ok"),
+    [
+        ("rules/filters.md:9-13", True),
+        ("rules/filters.md:9-999", False),
+        ("rules/filters.md:0", False),
+        ("rules/filters.md:13-9", False),
+    ],
+)
+def test_affected_line_range_lies_inside_the_file(tmp_path, location, ok):
+    report = _workspace(tmp_path, "pass")
+    text = report.read_text().replace("rules/filters.md:9", location)
+    passed, msg = _mod.check_affected_paths_exist(text, root=tmp_path)
+    assert passed is ok, msg
+
+
+def test_affected_path_stays_inside_the_workspace(tmp_path):
+    root = tmp_path / "ws"
+    root.mkdir()
+    report = _workspace(root, "pass")
+    (tmp_path / "outside.md").write_text("one\ntwo\n")
+    text = report.read_text().replace(
+        "skills/acme-querying-inventory/rules/filters.md:9", "../outside.md:1"
+    )
+    ok, msg = _mod.check_affected_paths_exist(text, root=root)
+    assert not ok
+    assert "outside the workspace" in msg
