@@ -63,7 +63,10 @@ Disambiguate with:
 On Kubernetes, only read access to `pods/log` and
 `pods/exec` is required. `--include-traces` also needs
 `create` on `pods/portforward` and `list` on
-`services`, to reach the Tempo pod.
+`services`, to reach the Tempo pod in the cluster.
+With `--traces-tempo-url`, the collector does not look
+for that pod, and it does not need these two
+permissions.
 
 See [rules/deployment-detection.md](rules/deployment-detection.md).
 
@@ -152,7 +155,7 @@ Kubernetes, the target namespace's pods need the label
 `infrahub-collect` needs read access to `pods/log` and
 `pods/exec` in the target namespace, plus `create` on
 `pods/portforward` and `list` on `services` with
-`--include-traces`. Ask the user (or
+`--include-traces` and without `--traces-tempo-url`. Ask the user (or
 their platform team) to grant that RBAC rather than
 escalating to broader access.
 

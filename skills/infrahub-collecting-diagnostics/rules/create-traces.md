@@ -8,7 +8,8 @@ tags: create, flags, traces, slowness, token
 
 When the operator reports that Infrahub is slow, ask
 whether to add the traces of the slow requests to the
-bundle, and ask when the slowness happened. Add
+bundle, ask when the slowness happened, and ask
+which minimum duration of trace to keep. Add
 `--include-traces` only after a yes. For any other
 problem, do not offer traces.
 
@@ -37,13 +38,19 @@ created again for a slowness that already ended.
 ### What to do
 
 1. Ask whether to include traces. Then ask whether the
-   slowness is still going on.
+   slowness is still going on, and which minimum
+   duration of trace to keep. Propose the default,
+   `1s`, and say that shorter traces are left out.
 2. Choose the window from the answer:
    - Still going on: `--traces-since <duration>`, a
      window that ends now (default `2h`).
    - Ended: `--traces-start <time>` and
      `--traces-end <time>`, both in RFC 3339 (for
      example `2026-11-04T14:00:00Z`).
+
+   Pass the minimum duration with
+   `--traces-min-duration <duration>`, also when the
+   operator keeps `1s`, so the command shows it.
 3. Say that only a share of requests has a trace, set
    by the trace sampling ratio of the deployment.
 4. When the operator can reproduce the slowness, tell
@@ -100,9 +107,10 @@ created again for a slowness that already ended.
 > The instance was slow. Do you want me to add the
 > traces of the slow requests to the bundle? Is the
 > slowness still going on, or when did it start and
-> end?
+> end? I keep traces of 1s or longer; is that
+> right?
 >
-> [operator: yes, 14:00 to 15:30 UTC today]
+> [operator: yes, 14:00 to 15:30 UTC today, 1s is fine]
 >
 > Only a share of requests has a trace. Save your
 > super_admin token in ~/.infrahub-admin-token; I will
@@ -110,7 +118,8 @@ created again for a slowness that already ended.
 >
 > INFRAHUB_TRACES_API_TOKEN="$(cat ~/.infrahub-admin-token)" \
 >   infrahub-collect create --include-traces \
->   --traces-start 2026-11-05T14:00:00Z --traces-end 2026-11-05T15:30:00Z
+>   --traces-start 2026-11-05T14:00:00Z --traces-end 2026-11-05T15:30:00Z \
+>   --traces-min-duration 1s
 ```
 
 ### Non-compliant

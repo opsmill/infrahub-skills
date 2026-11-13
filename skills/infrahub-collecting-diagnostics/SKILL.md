@@ -118,7 +118,8 @@ the full symptom-to-flag mapping.
 When the user reports that Infrahub is slow, read
 [rules/create-traces.md](rules/create-traces.md)
 before you write the command: it asks the user
-whether to add traces and for which window, and
+whether to add traces, for which window and from
+which minimum duration, and
 keeps the API token out of the conversation.
 
 Partial bundles are expected on degraded

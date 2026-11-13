@@ -41,11 +41,12 @@ Run only `infrahub-collect` subcommands
 extra context beyond what the bundle captured.
 
 On Kubernetes, `infrahub-collect` needs read access
-to `pods/log` and `pods/exec`, and no write or scale
-permissions. `--include-traces` also needs `create`
-on `pods/portforward` and `list` on `services`, to
-reach the Tempo pod (see
-[create-traces.md](create-traces.md)). Never run
+to `pods/log` and `pods/exec`, and no permission to
+change or scale workloads. `--include-traces` also
+needs `create` on `pods/portforward` and `list` on
+`services`, to reach the Tempo pod in the cluster (see
+[create-traces.md](create-traces.md)). With
+`--traces-tempo-url`, it does not need these two. Never run
 `kubectl delete`, `kubectl scale`, `docker compose
 down`, `docker compose restart`, or any command that
 mutates cluster or container state.
@@ -73,7 +74,8 @@ kubectl scale deployment task-worker --replicas=0  # mutates
 - Requesting broader Kubernetes RBAC than the
   collection needs "just in case": `pods/log` and
   `pods/exec`, plus `pods/portforward` (`create`) and
-  `services` (`list`) only with `--include-traces`.
+  `services` (`list`) only with `--include-traces`
+  and without `--traces-tempo-url`.
 - Reaching for `docker compose exec`/`kubectl exec`
   to "poke around" instead of trusting
   `infrahub-collect create` to gather what's needed.
