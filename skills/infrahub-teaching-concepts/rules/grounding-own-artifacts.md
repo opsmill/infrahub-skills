@@ -26,7 +26,9 @@ environments only.
 
 During environment detection, read the learner's schema and object files
 (or query the instance read-only). Anchor the Explain section to their
-node kinds, attribute names, and real objects. Instantiate the exercise
+node kinds, attribute names, and real objects. Name each node by its full
+kind, namespace plus name (`CampusSwitch`, not `Switch`), as the schema
+and the API do. Instantiate the exercise
 spec against their artifacts. Fall back to the concept map's generic
 examples only when no learner artifacts exist.
 
