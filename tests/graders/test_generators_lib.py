@@ -1419,7 +1419,9 @@ def test_generator_target_grader_skips_a_bad_example_but_grades_a_fails_sentence
 # From infrahub-sdk 1.24.0 a run that saves nothing deletes everything the
 # previous run tracked. The tracking context skips that cleanup only when
 # generate() raises, so the guard on the collection the generator loops over
-# has to raise, not return.
+# has to raise, or re-claim the previous members before it returns.
+# empty-input-reclaims accepts only the re-claim, for a task where the run
+# must not fail.
 # ---------------------------------------------------------------------------
 
 _EMPTY_FIXTURES = (
@@ -1519,3 +1521,120 @@ def test_empty_input_raises_fails_without_generate():
     ok, msg = check_empty_input_raises(_parse("def build(data):\n    raise ValueError('x')\n"))
     assert not ok
     assert "No generate()" in msg
+
+
+def test_empty_input_raises_accepts_helper_that_raises_on_every_branch():
+    # The helper's raise sits under if/else; both arms raise.
+    ok, msg = check_empty_input_raises(_parse(
+        "def _fail(name, strict):\n"
+        "    if strict:\n"
+        "        raise ValueError(name)\n"
+        "    else:\n"
+        "        raise RuntimeError(name)\n"
+        "class G:\n"
+        "    async def generate(self, data):\n"
+        "        racks = data['racks']\n"
+        "        if not racks:\n"
+        "            _fail('pod', True)\n"
+        "        for r in racks:\n"
+        "            pass\n"
+    ))
+    assert ok, msg
+
+
+def test_empty_input_raises_rejects_helper_that_raises_only_sometimes():
+    ok, msg = check_empty_input_raises(_parse(
+        "def _fail(name, strict):\n"
+        "    if strict:\n"
+        "        raise ValueError(name)\n"
+        "class G:\n"
+        "    async def generate(self, data):\n"
+        "        racks = data['racks']\n"
+        "        if not racks:\n"
+        "            _fail('pod', False)\n"
+        "            return\n"
+        "        for r in racks:\n"
+        "            pass\n"
+    ))
+    assert not ok
+    assert "returns early" in msg
+
+
+def test_empty_input_raises_rejects_conditional_raise_then_return():
+    ok, msg = check_empty_input_raises(_gen(
+        "racks = data['racks']\n"
+        "if not racks:\n"
+        "    if self.params.get('strict'):\n"
+        "        raise ValueError('no racks')\n"
+        "    return\n"
+        "for r in racks:\n"
+        "    pass"
+    ))
+    assert not ok
+    assert "returns early" in msg
+
+
+def test_empty_input_raises_rejects_add_related_nodes_without_previous_group():
+    # add_related_nodes fed by anything but the previous group keeps nothing.
+    ok, msg = check_empty_input_raises(_gen(
+        "racks = data['racks']\n"
+        "if not racks:\n"
+        "    await self.client.group_context.add_related_nodes(ids=[])\n"
+        "    return\n"
+        "for r in racks:\n"
+        "    pass"
+    ))
+    assert not ok
+    assert "returns early" in msg
+
+
+check_empty_input_reclaims = _mod.check_empty_input_reclaims
+
+
+def test_empty_input_reclaims_is_registered():
+    assert _mod.CHECKS["empty-input-reclaims"] is check_empty_input_reclaims
+
+
+@pytest.mark.parametrize(
+    ("fixture", "expected", "reason"),
+    [
+        ("compliant_reclaim.py.txt", True, "keeps the previous output"),
+        # A raise fails the run, which the task forbids.
+        ("compliant.py.txt", False, "raises on empty input"),
+        ("compliant_variant.py.txt", False, "raises on empty input"),
+        ("returns_early.py.txt", False, "returns early"),
+        ("violating.py.txt", False, "no guard that re-claims"),
+        ("violating_near_miss.py.txt", False, "no guard that re-claims"),
+    ],
+)
+def test_empty_input_reclaims_fixtures(fixture, expected, reason):
+    tree, _raw = load_output_py(_EMPTY_FIXTURES / fixture)
+    ok, msg = check_empty_input_reclaims(tree)
+    assert ok is expected, msg
+    assert reason in msg
+
+
+def test_empty_input_reclaims_accepts_previous_group_read_before_the_guard():
+    # The skill's documented form, with the read hoisted above the guard.
+    ok, msg = check_empty_input_reclaims(_gen(
+        "previous = await self.client.group_context.get_group()\n"
+        "racks = data['racks']\n"
+        "if not racks:\n"
+        "    if previous:\n"
+        "        await self.client.group_context.add_related_nodes(ids=previous.members.peer_ids)\n"
+        "    return\n"
+        "for r in racks:\n"
+        "    pass"
+    ))
+    assert ok, msg
+
+
+def test_empty_input_reclaims_rejects_assert():
+    ok, msg = check_empty_input_reclaims(_gen(
+        "racks = data['racks']\n"
+        "assert racks, 'no racks'\n"
+        "for r in racks:\n"
+        "    pass"
+    ))
+    assert not ok
+    assert "fails the run" in msg

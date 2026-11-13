@@ -1827,26 +1827,28 @@ tasks:
         run: python graders/managing-generators/check_empty_input_guard.py
         weight: 1.0
     expected_output: >-
-      A generator that, when the racks list it loops over is empty, either
-      raises in generate() or re-claims the previous run's tracked members
-      (get_group(store_peers=True) then add_related_nodes) before it
-      returns. From infrahub-sdk 1.24.0 (bundled with Infrahub 1.12.0) a
-      run that saves nothing deletes every object the previous run with
-      the same parameters tracked, so a plain early return deletes the
-      pod's existing leaf switches. Each leaf is written idempotently, by
-      save(allow_upsert=True) or a preflight get of the same kind.
+      A generator that, when the racks list it loops over is empty,
+      re-claims the previous run's tracked members
+      (group_context.get_group(), then add_related_nodes with the previous
+      group's member ids) before it returns. From infrahub-sdk 1.24.0
+      (bundled with Infrahub 1.12.0) a run that saves nothing deletes
+      every object the previous run with the same parameters tracked, so a
+      plain early return deletes the pod's existing leaf switches. A raise
+      keeps them but fails the run, which the task rules out. Each leaf is
+      written idempotently, by save(allow_upsert=True) or a preflight get
+      of the same kind.
     expectations:
-      - "generate() raises, or re-claims the previous run's members, when the racks list it loops over is empty"
-      - "generate() does not return early on an empty racks list without re-claiming the previous members"
+      - "generate() re-claims the previous run's members when the racks list it loops over is empty"
+      - "generate() neither raises nor returns early without re-claiming on an empty racks list"
       - "Each DcimDevice is written with save(allow_upsert=True) or after a preflight get"
     assertions:
-      - name: empty-input-raises
+      - name: empty-input-reclaims
         check: >-
           A guard outside any loop, in generate() or a helper it calls,
-          tests a collection the generator loops over and either raises
-          or re-claims the previous members (add_related_nodes or
-          add_related_groups) when it is empty; no such guard returns
-          without doing either.
+          tests a collection the generator loops over and, when it is
+          empty, calls add_related_nodes or add_related_groups, with the
+          previous group read by get_group(); no such guard raises,
+          asserts, or returns without re-claiming.
       - name: preflight-or-upsert
         check: >-
           Either client.get precedes create for the same kind, OR

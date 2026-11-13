@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Grader for the generator-empty-input-guard eval task.
 
-Reads ``output.py`` from CWD and asserts that the generator raises, rather
-than returns, when its input is empty, alongside the idempotent-write
-baseline.
+Reads ``output.py`` from CWD and asserts that, when the collection it loops
+over is empty, the generator re-claims the previous run's members before it
+returns, alongside the idempotent-write baseline. A raise also keeps the
+previous output, but it fails the run, and the task says the run must not
+fail on an empty list.
 
 Prints skillgrade JSON to stdout.
 """
@@ -18,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import run_checks  # noqa: E402
 
 CHECKS = [
-    "empty-input-raises",
+    "empty-input-reclaims",
     "preflight-or-upsert",
     "no-raw-create-without-handler",
 ]

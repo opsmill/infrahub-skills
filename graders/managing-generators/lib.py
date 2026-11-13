@@ -1259,45 +1259,120 @@ def _loop_keys(
 _RECLAIM_METHODS = {"add_related_nodes", "add_related_groups"}
 
 
-def _reclaims(node: ast.AST) -> bool:
+def _calls_method(node: ast.AST, names: set[str]) -> bool:
     return any(
-        isinstance(c.func, ast.Attribute) and c.func.attr in _RECLAIM_METHODS
+        isinstance(c, ast.Call)
+        and isinstance(c.func, ast.Attribute)
+        and c.func.attr in names
         for c in ast.walk(node)
-        if isinstance(c, ast.Call)
     )
 
 
-def _branch_outcome(stmts: list[ast.stmt], defs: dict[str, list[ast.AST]]) -> str:
-    """``"raise"``, ``"return"``, or ``"other"`` for the statements a guard runs.
+def _reclaims(stmts: list[ast.stmt], defs: dict[str, list[ast.AST]]) -> bool:
+    """The statements, or a helper they call, re-claim group members.
 
-    A call to a helper whose own body raises counts as raising. A branch
-    that re-claims the previous run's members through the group context
-    before returning keeps the output too, so it counts with raising.
+    The call may sit under a condition: the documented form re-claims only
+    when a previous group exists, and with no previous group there is
+    nothing to delete.
     """
     block = ast.Module(body=stmts, type_ignores=[])
-    for node in ast.walk(block):
-        if isinstance(node, ast.Raise):
-            return "raise"
-    if _reclaims(block):
+    if _calls_method(block, _RECLAIM_METHODS):
+        return True
+    return any(
+        _calls_method(helper, _RECLAIM_METHODS)
+        for name in _called_names(block)
+        for helper in defs.get(name, [])
+    )
+
+
+def _endings(
+    stmts: list[ast.stmt], defs: dict[str, list[ast.AST]], depth: int = 3
+) -> set[str]:
+    """How a run through ``stmts`` can end: ``raise``, ``return`` or ``fall``.
+
+    A raise under a condition only ends the paths where the condition
+    holds, so ``if strict: raise`` followed by ``return`` can still return.
+    A call to a helper counts as a raise only when every path through the
+    helper raises.
+    """
+    ends: set[str] = set()
+    for stmt in stmts:
+        here = _stmt_endings(stmt, defs, depth)
+        ends |= here - {"fall"}
+        if "fall" not in here:
+            return ends
+    ends.add("fall")
+    return ends
+
+
+def _stmt_endings(
+    stmt: ast.stmt, defs: dict[str, list[ast.AST]], depth: int
+) -> set[str]:
+    if isinstance(stmt, ast.Raise):
+        return {"raise"}
+    if isinstance(stmt, ast.Return):
+        return {"return"}
+    if isinstance(stmt, ast.If):
+        return _endings(stmt.body, defs, depth) | _endings(stmt.orelse, defs, depth)
+    if isinstance(stmt, (ast.With, ast.AsyncWith)):
+        return _endings(stmt.body, defs, depth)
+    if isinstance(stmt, ast.Try):
+        body = _endings(stmt.body, defs, depth)
+        ends = body - {"fall"}
+        if "fall" in body:
+            ends |= _endings(stmt.orelse, defs, depth)
+        for handler in stmt.handlers:
+            ends |= _endings(handler.body, defs, depth)
+        return ends
+    if isinstance(stmt, _LOOPS):
+        # The body may run zero times.
+        return _endings(stmt.body, defs, depth) | {"fall"}
+    if isinstance(stmt, _FUNCS + (ast.ClassDef,)):
+        return {"fall"}
+    if depth > 0:
+        for name in _called_names(stmt):
+            for helper in defs.get(name, []):
+                if _endings(helper.body, defs, depth - 1) == {"raise"}:
+                    return {"raise"}
+    return {"fall"}
+
+
+def _branch_outcome(
+    stmts: list[ast.stmt], defs: dict[str, list[ast.AST]], reads_previous: bool
+) -> str:
+    """``"reclaim"``, ``"raise"``, ``"return"``, or ``"other"`` for a guard.
+
+    ``reclaim``: the branch puts the previous run's members back into this
+    run's group, which needs the previous group read somewhere
+    (``reads_previous``). An ``add_related_nodes`` call fed by anything else
+    keeps nothing. ``raise``: every path through the branch raises.
+    ``return``: some path returns without either.
+    """
+    if reads_previous and _reclaims(stmts, defs):
+        return "reclaim"
+    ends = _endings(stmts, defs)
+    if ends == {"raise"}:
         return "raise"
-    for name in _called_names(block):
-        for helper in defs.get(name, []):
-            if any(isinstance(s, ast.Raise) for s in helper.body) or _reclaims(helper):
-                return "raise"
-    if any(isinstance(node, ast.Return) for node in ast.walk(block)):
+    if "return" in ends:
         return "return"
     return "other"
 
 
 def check_empty_input_raises(
-    tree: ast.Module | None, **_: Any
+    tree: ast.Module | None, *, allow_raise: bool = True, **_: Any
 ) -> tuple[bool, str]:
-    """generate() raises, never returns, when the collection it builds from
-    is empty.
+    """generate() keeps the previous run's output when the collection it
+    builds from is empty: it raises, or it re-claims the previous members.
 
     From infrahub-sdk 1.24.0 a run that saves nothing deletes everything the
     previous run tracked, and the cleanup is skipped only when generate()
-    raises. A guard that returns early is still a run that saved nothing.
+    raises. A guard that returns early is still a run that saved nothing,
+    unless it first re-claims the previous run's members
+    (``group_context.get_group()``, then ``add_related_nodes``).
+
+    With ``allow_raise=False`` (registered as ``empty-input-reclaims``) only
+    the re-claim passes. That is the rule's answer when the user says the
+    run must not fail on empty input, since a raise fails the run.
 
     The guard has to test a collection the generator loops over. A guard on
     something else (the query returning no design object, a missing name)
@@ -1315,8 +1390,9 @@ def check_empty_input_raises(
     loop_keys = _loop_keys(functions, defs)
     if not loop_keys:
         return False, "generate() iterates no collection, so no guard can be bound to one"
+    reads_previous = _calls_method(tree, {"get_group"})
 
-    raising = False
+    kept = False
     for fn in functions:
         for node in _walk_outside_loops(fn):
             if isinstance(node, ast.Assert):
@@ -1326,7 +1402,13 @@ def check_empty_input_raises(
                     and guard[0] == "nonempty"
                     and _subject_keys(guard[1], fn, defs) & loop_keys
                 ):
-                    raising = True
+                    if not allow_raise:
+                        return False, (
+                            f"{fn.name}() asserts the input is not empty (line "
+                            f"{node.lineno}), which fails the run; re-claim the "
+                            "previous members instead"
+                        )
+                    kept = True
                 continue
             if not isinstance(node, ast.If):
                 continue
@@ -1340,23 +1422,39 @@ def check_empty_input_raises(
                 branch = node.orelse
             else:
                 continue
-            outcome = _branch_outcome(branch, defs)
+            outcome = _branch_outcome(branch, defs, reads_previous)
             if outcome == "return":
                 return False, (
                     f"{fn.name}() returns early on empty input (line "
-                    f"{node.lineno}); from infrahub-sdk 1.24.0 a run that saves "
-                    "nothing deletes the previous run's output, so raise instead"
+                    f"{node.lineno}) without re-claiming the previous members; "
+                    "from infrahub-sdk 1.24.0 a run that saves nothing deletes "
+                    "the previous run's output"
                 )
-            if outcome == "raise":
-                raising = True
+            if outcome == "raise" and not allow_raise:
+                return False, (
+                    f"{fn.name}() raises on empty input (line {node.lineno}), "
+                    "which fails the run; re-claim the previous members instead"
+                )
+            if outcome in ("raise", "reclaim"):
+                kept = True
 
-    if not raising:
+    if not kept:
+        wanted = "raises or re-claims" if allow_raise else "re-claims the previous members"
         return False, (
-            "generate() has no guard that raises when the collection it loops "
-            "over is empty; a run that saves nothing deletes the previous "
-            "run's output from infrahub-sdk 1.24.0"
+            f"generate() has no guard that {wanted} when the collection it "
+            "loops over is empty; a run that saves nothing deletes the "
+            "previous run's output from infrahub-sdk 1.24.0"
         )
-    return True, "generate() keeps the previous output on empty input (raises, or re-claims the previous members)"
+    how = "raises, or re-claims the previous members" if allow_raise else "re-claims the previous members"
+    return True, f"generate() keeps the previous output on empty input ({how})"
+
+
+def check_empty_input_reclaims(
+    tree: ast.Module | None, **kw: Any
+) -> tuple[bool, str]:
+    """``check_empty_input_raises`` with only the re-claim accepted."""
+    kw.pop("allow_raise", None)
+    return check_empty_input_raises(tree, allow_raise=False, **kw)
 
 
 # ---------------------------------------------------------------------------
@@ -3532,6 +3630,7 @@ CHECKS: dict[str, Any] = {
     "detach-iterates-id-list": check_detach_iterates_id_list,
     "create-fields-exist-on-kind": check_create_fields_exist_on_kind,
     "empty-input-raises": check_empty_input_raises,
+    "empty-input-reclaims": check_empty_input_reclaims,
     # from_graphql hydration family (output.md)
     "imports-infrahub-node": check_imports_infrahub_node,
     "uses-from-graphql": check_uses_from_graphql,
