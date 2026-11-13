@@ -2,8 +2,9 @@
 
 These guard the check, not the audit prose. No eval task wires the check:
 an audit task for the empty-input guard could not be made to fail on the
-defect, because the model reads the installed SDK source and finds the
-1.24.0 behavior with or without the rule (see
+defect: the model reaches the 1.24.0 behavior through the SDK source or
+the generator skill's general cleanup rule, with or without the audit
+rule (see
 dev/guidelines/rule-equals-test.md § "When no task can score the rule").
 
 The scenario the fixtures model: generators/pod_leaf.py returns early on an

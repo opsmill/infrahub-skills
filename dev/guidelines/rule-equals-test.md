@@ -194,21 +194,31 @@ Taken a third time, for Generators check 4 in
 `skills/infrahub-auditing-repo/rules/python-classes.md`
 (#239), which said "handles empty data gracefully". From
 infrahub-sdk 1.24.0 the quiet return that wording invites
-deletes the previous run's output. Two scenarios, two valid
-trials, with the skill read and the old wording in place.
-An early return on an empty rack list scored 1.00. The model
-downloaded SDK 1.24.0 from PyPI and flagged the return. A
-generator with no guard, looping over an empty list, scored
-0.67. The model flagged the right line for the right reason
-and lost the point on an INFO note about the compliant file.
+deletes the previous run's output. Three scenarios, three
+valid trials, with the skill read and the old wording in
+place.
 
-The precondition is the cue again. The finding only holds
-on a stated Infrahub version, and once the prompt states it,
-the model reads that SDK's source and finds the behavior,
-rule or no rule. The generator side of the same change did
-get a task (`generator-empty-input-guard`), because writing
-code under a user's "must not fail" pushes the model to the
-quiet return without checking the version.
+- An early return on an empty rack list, with the prompt
+  saying the list is sometimes empty, scored 1.00. The model
+  downloaded SDK 1.24.0 from PyPI and flagged the return.
+- A generator with no guard, looping over the rack list,
+  same hint, scored 0.67. The model flagged the right line
+  for the right reason and lost the point on an INFO note
+  about the compliant file.
+- The same unguarded loop with no hint, behind a decoy
+  `raise` on a missing pod, scored 1.00. The model flagged
+  the loop without reading any SDK source. It reasoned from
+  the generator skill's unversioned "objects from a previous
+  run that are not saved in this run are deleted".
+
+The answer has two routes, and every scenario leaves one
+open. A stated Infrahub version sends the model to that
+SDK's source. Without it, the skill's general cleanup rule
+already implies the deletion. Closing both leaves a finding
+the auditor cannot support. The generator side of the same
+change did get a task (`generator-empty-input-guard`),
+because writing code under a user's "must not fail" pushes
+the model to the quiet return without checking either.
 
 The reference-drift pytest does not fit either: the repo
 pins infrahub-sdk 1.23.2, so no test here can read the
