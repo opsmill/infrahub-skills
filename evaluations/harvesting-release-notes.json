@@ -1,0 +1,19 @@
+{
+  "skill_name": "infrahub-harvesting-release-notes",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We're moving our Infrahub instance to 1.7 next week. The release notes\nfor 1.6.0 through 1.7.0 are in release-notes/, and source snapshots for each\nrelease are in source/. Go through our skills under skills/ and update them\nto the current way of doing things, so nobody copies something that no longer\nworks on 1.7.",
+      "expected_output": "A REPORT.md with one finding for skills/acme-querying-inventory/rules/filters.md, rated High, with evidence pinned to infrahub-v1.7.0 or a commit, and a recommended gate that names both 1.6 (name__contains available, name__like deprecated) and 1.7 (name__like removed) while keeping name__like for versions before 1.7. The skill files are left unchanged.",
+      "files": [],
+      "expectations": [
+        "The finding cites infrahub-v1.6.0 for the deprecation and infrahub-v1.7.0 for the removal",
+        "The pre-release infrahub-v1.7.0b1 is not cited",
+        "The gate keeps `name__like` for Infrahub versions before 1.7 instead of replacing it",
+        "The removal of INFRAHUB_LEGACY_CACHE is not reported as a finding, since no skill mentions it",
+        "The files under skills/ are not edited"
+      ],
+      "assertions": []
+    }
+  ]
+}

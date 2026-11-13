@@ -1,0 +1,13 @@
+# Infrahub - v1.7.0b1 (pre-release)
+
+This is a beta release for testing. Do not run it in production.
+
+## Breaking changes and required actions
+
+### GraphQL filters
+
+The `<attribute>__like` filter is removed in this beta.
+
+## Full changelog
+
+- Removed the `__like` attribute filter.

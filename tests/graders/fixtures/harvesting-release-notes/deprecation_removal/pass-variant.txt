@@ -1,0 +1,29 @@
+# Skills affected by Infrahub 1.6.0 to 1.7.0
+
+## Findings
+
+#### Finding 1: query step may rely on a removed MCP behavior
+
+- **Severity:** Medium
+- **Repository:** opsmill/infrahub
+- **Affected:** `skills/acme-querying-inventory/SKILL.md:15`
+- **Deprecated in:** none
+- **Removed in:** none
+- **Verified in:** UNVERIFIED, no source snapshot covers the MCP server
+- **Gate:** none
+
+#### Finding 2: `__like` filter removed
+
+- **Verified in:** `3f9c2a1:backend/infrahub/graphql/filters.py`, checked against `source/infrahub-v1.6.0/backend/infrahub/graphql/filters.py`
+- **Removed in:** `infrahub-v1.7.0`
+- **Deprecated in:** `infrahub-v1.6.0`
+- **Affected:** `skills/acme-querying-inventory/rules/filters.md:9-13`
+- **Severity:** **High** (the old filter fails with `Unknown argument`)
+- **Repository:** opsmill/infrahub
+- **Gate:**
+  Before Infrahub 1.7: `name__like` still works.
+  From 1.6, `name__contains` is available, and from 1.7 it is required.
+
+## Changes that touch no skill
+
+- `INFRAHUB_LEGACY_CACHE` removed in 1.7.0.

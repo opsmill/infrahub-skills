@@ -1,0 +1,12 @@
+# Release notes harvest
+
+I updated the skill to the current filter.
+
+### Finding 1
+
+- Repository: opsmill/infrahub
+- Severity: High
+- Affected: skills/acme-querying-inventory/rules/filters.md:9
+- Deprecated in: none
+- Removed in: infrahub-v1.7.0
+- Gate: Replace `name__like` with `name__contains`.
