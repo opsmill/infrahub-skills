@@ -61,7 +61,24 @@ created again for a slowness that already ended.
    agent: the skill does not change Infrahub state
    (see [collection-read-only.md](collection-read-only.md)).
 
+   Give the address of this deployment in the
+   commands. The operator often runs them in a shell
+   where `INFRAHUB_ADDRESS` is not set. Then `curl`
+   gets a URL with no host and stops with
+   `URL rejected: No host part in the URL`, and a
+   failed `DELETE` leaves the raised ratio in place.
+   Take the address from the conversation or ask the
+   operator for the URL they open Infrahub at. On
+   Docker Compose, the published port of
+   `infrahub-server` gives it:
+   `docker compose -p <project> port infrahub-server 8000`.
+   Set the variable at the top of the commands, or
+   write the URL in each command.
+
    ```bash
+   # The URL the operator opens Infrahub at
+   export INFRAHUB_ADDRESS="http://localhost:8000"
+
    # Before reproducing: record every new request for 30 minutes
    curl -X PUT "$INFRAHUB_ADDRESS/api/troubleshooting/trace-sample-ratio" \
      -H "X-INFRAHUB-KEY: $INFRAHUB_API_TOKEN" -H "Content-Type: application/json" \
@@ -141,6 +158,10 @@ created again for a slowness that already ended.
 - Running the `PUT` or `DELETE` call on the sampling
   ratio from the agent, or leaving the raised ratio in
   place after the bundle is created.
+- Giving the `PUT` or `DELETE` call with
+  `$INFRAHUB_ADDRESS` and no line that sets it. The
+  call fails in a shell where the variable is not
+  set.
 - Asking the operator to paste a token in the
   conversation.
 

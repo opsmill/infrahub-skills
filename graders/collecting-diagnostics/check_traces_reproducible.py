@@ -12,6 +12,7 @@ CHECKS = [
     "mentions-create",
     "traces-offered-with-window",
     "ratio-raise-and-remove",
+    "ratio-address-set",
 ]
 
 if __name__ == "__main__":

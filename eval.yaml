@@ -3238,6 +3238,7 @@ tasks:
       - Raises the sampling ratio for a limited time before reproducing
       - Removes the temporary ratio after the bundle is created
       - Leaves the ratio change to the operator rather than running it itself
+      - Sets the Infrahub address before the ratio calls, or writes it in them
     assertions:
       - name: mentions-create
         check: Plan recommends `infrahub-collect create`
@@ -3245,6 +3246,8 @@ tasks:
         check: Plan asks about traces and gives `--include-traces` with a window
       - name: ratio-raise-and-remove
         check: Plan raises the ratio with PUT and removes it with DELETE
+      - name: ratio-address-set
+        check: Plan sets the Infrahub address before the ratio calls, or writes it in them
 
   - name: collecting-diagnostics-traces-no-terminal
     trials: 3

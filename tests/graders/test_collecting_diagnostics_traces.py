@@ -25,6 +25,17 @@ What each near miss guards against:
   DELETE ..."); fail-nearmiss-path calls /api/trace-sample-ratio, not the
   /api/troubleshooting/ endpoint. A check that ignores negation, or matches
   only the last path segment, passes them (cubic review of #234).
+  fail-address grades the address instead: the calls use $INFRAHUB_ADDRESS
+  and no line sets it, so they fail in a shell without it (manual test of
+  the skill). fail-address-nearmiss sets it only as a prefix of each call,
+  which the shell applies after it expands $INFRAHUB_ADDRESS, and says "Set
+  INFRAHUB_ADDRESS" in prose; fail-address-nearmiss-order exports it after
+  the calls. A check that looks for any assignment passes them.
+  pass-address-variant writes one URL out and sets the variable with a bare
+  assignment in another fence, used as ${INFRAHUB_ADDRESS}.
+  pass-address-default uses ${INFRAHUB_ADDRESS:-http://localhost:8000},
+  which has a host when the variable is not set. Trials with the old rule
+  wrote this form; a check that rejects any variable fails it.
 - traces_no_terminal: names INFRAHUB_TRACES_API_TOKEN, but asks the operator
   to paste the token. A check that only looks for the variable passes it.
   fail-nearmiss-negation puts a "not" after the request ("Paste the token
@@ -93,6 +104,7 @@ TASKS = {
 # Violating fixtures that grade a second check of the task, by name prefix.
 OTHER_CHECKS = {
     ("traces_slowness", "fail-caveat"): "sampling-caveat",
+    ("traces_reproducible", "fail-address"): "ratio-address-set",
 }
 
 

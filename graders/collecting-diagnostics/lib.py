@@ -259,11 +259,23 @@ def check_sampling_caveat(text: str, **_: object) -> CheckResult:
     return False, "does not say that only a share of requests has a trace (sampling)"
 
 
+_ASSIGN_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+
+
+def _without_env_prefix(cmd: list[str]) -> list[str]:
+    """The command from its command word on, without `VAR=value` prefixes."""
+    i = 0
+    while i < len(cmd) and _ASSIGN_RE.match(cmd[i]):
+        i += 1
+    return cmd[i:]
+
+
 def _ratio_methods(text: str) -> set[str]:
     """HTTP methods the plan gives for the sampling ratio endpoint."""
     methods: set[str] = set()
     for cmd in _shell_commands(text):
-        if not any(_RATIO_PATH in tok for tok in cmd) or not cmd[0].endswith("curl"):
+        cmd = _without_env_prefix(cmd)
+        if not any(_RATIO_PATH in tok for tok in cmd) or not cmd or not cmd[0].endswith("curl"):
             continue
         method = "GET"
         for i, tok in enumerate(cmd):
@@ -293,6 +305,47 @@ def check_ratio_raise_and_remove(text: str, **_: object) -> CheckResult:
             f"{_RATIO_PATH} (found: {sorted(methods) or 'none'})"
         )
     return True, "raises the sampling ratio with PUT and removes it with DELETE"
+
+
+_URL_VAR_RE = re.compile(r"^\$\{?([A-Za-z_][A-Za-z0-9_]*)")
+# `${VAR:-value}` with a value falls back to a host when VAR is unset or empty.
+_URL_DEFAULT_RE = re.compile(r"^\$\{[A-Za-z_][A-Za-z0-9_]*:-[^}]+\}")
+
+
+def check_ratio_address_set(text: str, **_: object) -> CheckResult:
+    """Every curl call on the ratio endpoint gets a host: a variable in its URL is set before it.
+
+    A variable counts as set only by a command that does nothing else
+    (`export VAR=value` or `VAR=value`), with a value, earlier in the fences.
+    A prefix on the call itself (`VAR=value curl "$VAR/..."`) does not count:
+    the shell expands `$VAR` before it applies the prefix. A literal URL or a
+    `<placeholder>` passes, and so does `${VAR:-<url>}`, which falls back
+    to a host when the variable is not set, and so does a plan that gives the calls in prose
+    only, since it hands the operator no command that fails.
+    """
+    assigned: set[str] = set()
+    unset: list[str] = []
+    for cmd in _shell_commands(text):
+        words = cmd[1:] if cmd[0] == "export" else cmd
+        pairs = [_ASSIGN_RE.match(w) for w in words]
+        if words and all(pairs):
+            assigned.update(m.group(1) for m in pairs if m.group(2).strip())
+            continue
+        command = _without_env_prefix(cmd)
+        if not command or not command[0].endswith("curl"):
+            continue
+        for tok in cmd:
+            if "trace-sample-ratio" not in tok:
+                continue
+            m = _URL_VAR_RE.match(tok)
+            if m and m.group(1) not in assigned and not _URL_DEFAULT_RE.match(tok):
+                unset.append(m.group(1))
+    if unset:
+        return False, (
+            f"ratio call uses ${sorted(set(unset))[0]} with no earlier line that sets it; "
+            "the call fails in a shell where it is not set"
+        )
+    return True, "every ratio call has an address the plan sets or writes out"
 
 
 _ASK_TOKEN_RE = re.compile(
@@ -375,6 +428,7 @@ CHECKS: dict[str, CheckFn] = {
     "traces-offered-with-window": check_traces_offered_with_window,
     "traces-not-offered": check_traces_not_offered,
     "ratio-raise-and-remove": check_ratio_raise_and_remove,
+    "ratio-address-set": check_ratio_address_set,
     "sampling-caveat": check_sampling_caveat,
     "token-env-not-asked": check_token_env_not_asked,
     "mentions-create": check_mentions_create,

@@ -7,6 +7,7 @@ Only a share of requests has a trace. Ask a super admin to raise the sampling ra
 before you reproduce the slowness:
 
 ```bash
+export INFRAHUB_ADDRESS="https://infrahub.example.com"
 curl -X PUT "$INFRAHUB_ADDRESS/api/troubleshooting/trace-sample-ratio" \
   -H "X-INFRAHUB-KEY: $SUPER_ADMIN_TOKEN" -H "Content-Type: application/json" \
   -d '{"ratio": 1.0, "duration_seconds": 1800}'

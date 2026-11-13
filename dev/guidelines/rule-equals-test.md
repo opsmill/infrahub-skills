@@ -190,6 +190,39 @@ the keyword, it read `create()` in the installed SDK, found
 `tests/graders/test_generators_create_fields.py`, guarding
 the check.
 
+Taken again, for the address of the sampling ratio calls in
+`skills/infrahub-collecting-diagnostics/rules/create-traces.md`.
+In a manual test of the skill, the agent copied the rule's
+`curl -X DELETE "$INFRAHUB_ADDRESS/..."` example into a reply,
+the operator's shell had no `INFRAHUB_ADDRESS`, and `curl`
+stopped with `URL rejected: No host part in the URL`, which
+leaves the raised ratio in place. The rule now says to set the
+address before the calls or write it in them. Two scenarios,
+five trials with the old rule, all scored by
+`check_ratio_address_set`:
+
+- `collecting-diagnostics-traces-reproducible`, a full plan for
+  a Kubernetes deployment (1 trial): passed. The plan used a
+  placeholder for the URL.
+- A task that asked only for the command to remove a temporary
+  ratio on Docker Compose (4 trials): 3 passed, each with
+  `${INFRAHUB_ADDRESS:-http://localhost:8000}`. The fourth
+  scored 0 with "no curl call", while the agent's summary showed
+  the same command. Its sandbox was gone, so the file could not
+  be read, and the trial does not count.
+
+When a prompt asks for a command to paste, the model adds a
+fallback address or a placeholder on its own. The defect
+appeared in a long session, where the agent copied the example
+into a follow-up reply. A one-prompt task does not recreate that
+context, so no task built so far scores below 1.0. The command
+task was removed with its grader script and fixtures.
+`check_ratio_address_set` stays as an assertion of
+`collecting-diagnostics-traces-reproducible`, with its fixtures
+in `tests/graders/test_collecting_diagnostics_traces.py`. It
+guards the check and the plans that task produces, not proof
+that the rule changes the answer.
+
 The reference-drift remedy was taken once, for
 `skills/infrahub-managing-schemas/rules/relationship-on-delete.md`
 (#190). The rule said an omitted `on_delete` defaults to

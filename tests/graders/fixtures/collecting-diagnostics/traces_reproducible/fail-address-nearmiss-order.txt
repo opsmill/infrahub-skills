@@ -1,0 +1,16 @@
+## Plan
+
+Do you want to include traces? Only a share of requests has a trace, so a super admin raises the
+ratio before you reproduce the slowness:
+
+```bash
+curl -X PUT "$INFRAHUB_ADDRESS/api/troubleshooting/trace-sample-ratio" -d '{"ratio": 1.0, "duration_seconds": 1800}'
+infrahub-collect create --include-traces --traces-since 30m
+curl -X DELETE "$INFRAHUB_ADDRESS/api/troubleshooting/trace-sample-ratio"
+```
+
+If a call fails, set the address and run it again:
+
+```bash
+export INFRAHUB_ADDRESS="https://infrahub.example.com"
+```
