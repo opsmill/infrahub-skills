@@ -63,7 +63,7 @@ The bundle itself is written by `infrahub-collect` (by default under `./infrahub
 | Collecting logs and config manually | Runs `infrahub-collect`, which captures every replica and previous-container logs consistently |
 | Trusting the automatic masking as complete | Stops for a review-before-sharing pass, because masking is key-name-only |
 | Piling every flag onto `create` | Adds `--benchmark` / `--include-queries` / `--include-backup` only when the symptom matches |
-| Sending an Infrahub API token to collect state | Uses existing Docker/kubectl access; the one optional token, for traces, stays in your shell |
+| Sending an Infrahub API token to collect state | Uses existing Docker/kubectl access; the optional tokens for traces stay in your shell |
 | Adding traces without asking, or for a problem that is not slowness | Asks first, and only for a slow instance, with a window that covers the slowness |
 | Discarding a partial bundle on a degraded deployment | Sends the partial bundle as-is; `create` records collector failures in the manifest and still exits cleanly |
 | Filing a GitHub issue from here | Hands off to the Issue Reporter for that |

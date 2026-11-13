@@ -73,20 +73,29 @@ created again for a slowness that already ended.
    `infrahub-server` gives it:
    `docker compose -p <project> port infrahub-server 8000`.
    Set the variable at the top of the commands, or
-   write the URL in each command.
+   write the URL in each command. Replace the
+   placeholder below with that URL.
+
+   The calls need the `super_admin` token too. Read it
+   from the same place as in step 5, such as the file
+   `~/.infrahub-admin-token`. A key variable that is
+   not set sends an empty key: Infrahub rejects the
+   call, and a rejected `DELETE` also leaves the
+   raised ratio in place.
 
    ```bash
    # The URL the operator opens Infrahub at
-   export INFRAHUB_ADDRESS="http://localhost:8000"
+   export INFRAHUB_ADDRESS="<URL the operator opens Infrahub at>"
 
    # Before reproducing: record every new request for 30 minutes
    curl -X PUT "$INFRAHUB_ADDRESS/api/troubleshooting/trace-sample-ratio" \
-     -H "X-INFRAHUB-KEY: $INFRAHUB_API_TOKEN" -H "Content-Type: application/json" \
+     -H "X-INFRAHUB-KEY: $(cat ~/.infrahub-admin-token)" \
+     -H "Content-Type: application/json" \
      -d '{"ratio": 1.0, "duration_seconds": 1800}'
 
    # After the bundle is created: go back to the default ratio
    curl -X DELETE "$INFRAHUB_ADDRESS/api/troubleshooting/trace-sample-ratio" \
-     -H "X-INFRAHUB-KEY: $INFRAHUB_API_TOKEN"
+     -H "X-INFRAHUB-KEY: $(cat ~/.infrahub-admin-token)"
    ```
 
    The sampling ratio endpoint exists in Infrahub 1.12
@@ -162,6 +171,9 @@ created again for a slowness that already ended.
   `$INFRAHUB_ADDRESS` and no line that sets it. The
   call fails in a shell where the variable is not
   set.
+- Giving the `PUT` or `DELETE` call with a key
+  variable, such as `$INFRAHUB_API_TOKEN`, that
+  nothing sets. Infrahub rejects the empty key.
 - Asking the operator to paste a token in the
   conversation.
 
