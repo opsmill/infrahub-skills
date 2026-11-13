@@ -14,7 +14,10 @@
 4. **Create flags (create-)** -- HIGH. Symptom-to-flag
    mapping for `infrahub-collect create`
    (`--benchmark`, `--include-queries`,
-   `--include-backup`, etc.).
+   `--include-backup`, etc.). `--include-traces` for a
+   slow instance only after the user agrees, with a
+   window, and with the API token kept out of the
+   conversation.
 
 5. **Collection (collection-)** -- CRITICAL. Read-only
    tool and read-only surrounding commands. No
@@ -25,8 +28,9 @@
    not build it by hand.
 
 7. **Review (review-)** -- CRITICAL. Masking covers
-   key names only; user reviews `bundle/logs/` and
-   `bundle/server/` before sharing.
+   key names only; user reviews `bundle/logs/`,
+   `bundle/server/` and, with traces,
+   `bundle/traces/` before sharing.
 
 8. **Cross-linking (cross-link-)** -- MEDIUM. At
    workflow end, point users to `infrahub-reporting-
