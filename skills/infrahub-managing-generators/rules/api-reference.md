@@ -37,7 +37,7 @@ context entirely and disables idempotent cleanup.
 | --- | --- | --- | --- |
 | `query` | `str` | required | GraphQL query name |
 | `client` | Client | required | SDK client |
-| `branch` | `str` | `""` | Branch name (auto-detected from git) |
+| `branch` | `str` | `""` | Branch name. infrahub-sdk 1.24.0 and later (Infrahub 1.12 and later): the branch passed with `--branch`, otherwise `INFRAHUB_DEFAULT_BRANCH` (`main` unless set); `INFRAHUB_DEFAULT_BRANCH_FROM_GIT=true` restores the Git lookup. Before 1.24.0: the current Git branch |
 | `root_directory` | `str` | `""` | Repo root path |
 | `params` | `dict` | `None` | Query parameters |
 | `convert_query_response` | `bool` | `False` | Convert response to InfrahubNode objects |
