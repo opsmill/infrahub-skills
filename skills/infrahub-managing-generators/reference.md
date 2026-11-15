@@ -224,7 +224,11 @@ Local runs share the tracking group with pipeline
 runs, so a successful local run reconciles state the
 same way the pipeline would — including the
 delete-unused-nodes cleanup. Test on a branch first
-unless you're sure the generator won't delete data.
+unless you're sure the generator won't delete data. A
+branch run does not protect objects of a
+`branch: agnostic` kind: cleanup deletes them on every
+branch at once, including the default branch
+([tracking-idempotent.md](rules/tracking-idempotent.md#how-tracking-works)).
 
 See [rules/testing-commands.md](./rules/testing-commands.md)
 for the parameter-binding details and

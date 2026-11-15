@@ -39,7 +39,15 @@ more here than in checks or transforms.
 1. Objects created/updated during `generate()` are tracked
 2. Objects from a previous run that are NOT created/updated
    in the current run are automatically deleted
-3. This ensures idempotent behavior: re-running a generator
+3. When the deleted object's kind is `branch: agnostic`
+   ([branch-agnostic nodes](../../infrahub-managing-schemas/rules/attribute-branch-agnostic.md)),
+   the delete applies to every branch at once, including the
+   default branch, even when the generator runs on another
+   branch. A branch run does not protect it. An object of
+   such a kind that must outlive the generator producing it
+   stays out of the group, by one of the
+   [three ways to honour it](#three-ways-to-honour-it)
+4. This ensures idempotent behavior: re-running a generator
    cleans up stale objects
 
 ### A run that saves nothing deletes the previous output
