@@ -1875,3 +1875,69 @@ def test_generator_run_names_branch_ignores_prose():
     )
     assert not ok
     assert "no `infrahubctl generator <name>` run command" in msg
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "export INFRAHUB_DEFAULT_BRANCH=feat; infrahubctl generator g d=x",
+        "export INFRAHUB_DEFAULT_BRANCH=feat && infrahubctl generator g d=x",
+    ],
+)
+def test_generator_run_names_branch_splits_command_separators(line):
+    ok, msg = check_generator_run_names_branch(_sh(line))
+    assert ok, msg
+
+
+def test_generator_run_names_branch_finds_run_after_separator():
+    # The run after `&&` has no branch: it must be seen, and fail.
+    ok, msg = check_generator_run_names_branch(_sh(
+        "infrahubctl generator --list --branch feat && infrahubctl generator g d=x"
+    ))
+    assert not ok
+    assert "does not select" in msg
+
+
+def test_generator_run_names_branch_keeps_quoted_separator():
+    # A `;` inside a quoted argument does not start a new command.
+    ok, msg = check_generator_run_names_branch(_sh(
+        "infrahubctl generator g 'd=a;b' --branch feat"
+    ))
+    assert ok, msg
+
+
+def test_opt_out_releases_existing_member_rejects_unrelated_group():
+    # remove_relationships("members") on a group that is not the generator's.
+    ok, msg = check_opt_out_releases_existing_member(_md(
+        "await trunk.save(update_group_context=False)\n"
+        "other = await self.client.get(kind='CoreStandardGroup', name__value='x')\n"
+        "await other.remove_relationships('members', [trunk.id])"
+    ))
+    assert not ok
+    assert "never removed from the generator group" in msg
+
+
+def test_opt_out_releases_existing_member_accepts_generator_group_get():
+    ok, msg = check_opt_out_releases_existing_member(_md(
+        "await trunk.save(update_group_context=False)\n"
+        "group = await self.client.get(kind='CoreGeneratorGroup', name__value='g')\n"
+        "await group.remove_relationships('members', [trunk.id])"
+    ))
+    assert ok, msg
+
+
+def test_opt_out_releases_existing_member_follows_deep_helpers():
+    # The removal sits five calls below generate().
+    src = "class G:\n"
+    for i in range(5):
+        src += f"    async def h{i}(self, n):\n        await self.h{i + 1}(n)\n"
+    src += (
+        "    async def h5(self, n):\n"
+        "        group = await self.client.group_context.get_group()\n"
+        "        await group.remove_relationships('members', [n])\n"
+        "    async def generate(self, data):\n"
+        "        await trunk.save(update_group_context=False)\n"
+        "        await self.h0(trunk.id)\n"
+    )
+    ok, msg = check_opt_out_releases_existing_member({"python": src, "python_all": src})
+    assert ok, msg

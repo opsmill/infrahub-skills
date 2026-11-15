@@ -2486,8 +2486,9 @@ _BRANCH_ENV = ("INFRAHUB_DEFAULT_BRANCH=", "INFRAHUB_DEFAULT_BRANCH_FROM_GIT=")
 def _shell_lines(block: str) -> list[list[str]]:
     """Each command line of a shell fence, split by shlex.
 
-    ``$ `` and ``% `` prompts are dropped, ``\\`` continuations joined, and
-    comments removed by shlex itself. A line shlex cannot split is kept as
+    ``$ `` and ``% `` prompts are dropped, ``\\`` continuations joined,
+    comments removed, and a line split into one command per ``;``, ``&&``,
+    ``||``, ``|`` or ``&``. A line shlex cannot split is kept as
     one token, so it can never pass as a run that names its branch.
     """
     joined: list[str] = []
@@ -2507,12 +2508,27 @@ def _shell_lines(block: str) -> list[list[str]]:
     for text in joined:
         if not text:
             continue
+        lexer = shlex.shlex(text, posix=True, punctuation_chars=";&|")
+        lexer.whitespace_split = True
+        lexer.commenters = "#"
         try:
-            tokens = shlex.split(text, comments=True)
+            tokens = list(lexer)
         except ValueError:
-            tokens = [text]
-        if tokens:
-            out.append(tokens)
+            out.append([text])
+            continue
+        # `;`, `&&`, `||`, `|` and `&` end one command and start the next.
+        # shlex keeps quoted separators inside their token, so a `;` in a
+        # quoted argument does not split it.
+        command: list[str] = []
+        for tok in tokens:
+            if tok and set(tok) <= set(";&|"):
+                if command:
+                    out.append(command)
+                command = []
+            else:
+                command.append(tok)
+        if command:
+            out.append(command)
     return out
 
 
@@ -2575,6 +2591,27 @@ def _positional_or_kw(call: ast.Call, index: int, name: str) -> ast.AST | None:
     return value
 
 
+def _names_bound_to_generator_group(tree: ast.Module) -> set[str]:
+    """Names assigned from ``get_group()`` or a ``CoreGeneratorGroup`` get."""
+    names: set[str] = set()
+    for stmt in ast.walk(tree):
+        if not isinstance(stmt, (ast.Assign, ast.AnnAssign)):
+            continue
+        value = stmt.value
+        if isinstance(value, ast.Await):
+            value = value.value
+        if not (isinstance(value, ast.Call) and isinstance(value.func, ast.Attribute)):
+            continue
+        attr = value.func.attr
+        if attr == "get_group" or (
+            attr == "get" and _kind_of_call(value) == "CoreGeneratorGroup"
+        ):
+            targets = stmt.targets if isinstance(stmt, ast.Assign) else [stmt.target]
+            for tgt in targets:
+                names.update(_target_names(tgt))
+    return names
+
+
 def _removes_group_members(call: ast.Call) -> bool:
     """``<x>.remove_relationships("members", [<ids>])``, with ids given."""
     relation = _positional_or_kw(call, 0, "relation_to_update")
@@ -2601,9 +2638,9 @@ def check_opt_out_releases_existing_member(
     asserts only the removal. The removal is a
     ``remove_relationships("members", ...)`` call on the group, reachable
     from ``generate()``: cleanup reads the group after ``generate()``
-    returns, so a removal during the run is in time. The check does not
-    tie the receiver to ``get_group()``; ``"members"`` is the group's
-    relationship.
+    returns, so a removal during the run is in time. The receiver has to be
+    the generator group: a name bound to ``group_context.get_group()``, or
+    to a ``get`` of kind ``CoreGeneratorGroup``.
 
     No eval task wires this check (#240): the model answered correctly with
     the old prose. See dev/guidelines/rule-equals-test.md § "When no task
@@ -2615,10 +2652,14 @@ def check_opt_out_releases_existing_member(
     if "generate" not in _function_defs(tree):
         return False, "No generate() method found"
 
-    calls = [c for fn in _reachable_functions(tree) for c in _iter_calls(fn)]
+    defs = _function_defs(tree)
+    reachable = _reachable_functions(tree, depth=sum(len(v) for v in defs.values()))
+    calls = [c for fn in reachable for c in _iter_calls(fn)]
+    groups = _names_bound_to_generator_group(tree)
     removes = any(
         isinstance(c.func, ast.Attribute)
         and c.func.attr == "remove_relationships"
+        and ast.unparse(c.func.value) in groups
         and _removes_group_members(c)
         for c in calls
     )
