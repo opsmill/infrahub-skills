@@ -279,6 +279,53 @@ fixtures stay in
 `tests/graders/test_auditing_repo_generator_empty_input.py`,
 guarding the check.
 
+Taken three more times in one change, for three corrections
+to `skills/infrahub-managing-generators/` found in the
+Infrahub 1.12.0 release notes: #240, #241 and #238. Each
+had one task built for it, run with the skill read and the
+old prose in place. Every valid trial scored 1.00, and the
+model reached the answer by a different route each time.
+
+- #240, an object opted out of tracking stays in the group
+  an earlier run put it in, and the next run deletes it.
+  `generator-opt-out-existing-member` gave a generator that
+  had saved a shared container for a year and asked for no
+  run to own it. A first prompt, which mentioned that a
+  decommissioned service's run could delete the container,
+  scored 1.00. A second prompt without that hint scored 0.5,
+  but the 0.5 came from the check: the model stopped
+  writing the container and removed it from the group, and
+  the check required an opt-out save. With the check fixed
+  the answer passes. Both times the model read the SDK's
+  cleanup code in the sandbox, and the skill already gives
+  the formula, `previous_group.members -
+  nodes_saved_this_run`. Two timed-out trials are void.
+- #241, cleanup deletes an object of a `branch: agnostic`
+  kind on every branch. `generator-agnostic-kind-branch-run`
+  showed the schema and a user planning a branch run. The
+  model opted the agnostic kind out and said the skill does
+  not mention branch-agnostic nodes: it answered from its
+  own knowledge of `branch: agnostic`.
+- #238, the generator's branch no longer comes from Git.
+  `generator-local-run-branch` asked for the commands to
+  run a generator on the user's branch. The model passed
+  `--branch`, as `testing-commands.md` and
+  `testing-integration.md` already do, so the wrong rows in
+  the two reference tables lost to the skill's own
+  examples.
+
+The mechanism differs, but the result is the same: the
+prose was wrong or missing, and the task that sets up the
+precondition hands the model the answer through the SDK
+source, its training, or a sibling example. The
+reference-drift pytest does not fit #238 either, for the
+reason given for #239: the repo pins infrahub-sdk 1.23.2.
+The three tasks and their grader scripts were removed. The
+check functions `opt-out-releases-existing-member`,
+`agnostic-saves-opt-out` and `generator-run-names-branch`
+and their fixtures stay in
+`tests/graders/test_generators_lib.py`, guarding the checks.
+
 The reference-drift remedy was taken once, for
 `skills/infrahub-managing-schemas/rules/relationship-on-delete.md`
 (#190). The rule said an omitted `on_delete` defaults to
