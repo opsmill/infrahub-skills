@@ -54,7 +54,7 @@ class MyGenerator(InfrahubGenerator):
 | --------- | ---- | ------- | ----------- |
 | `query` | `str` | required | GraphQL query name from `.infrahub.yml` |
 | `client` | `InfrahubClient` | required | Tracking-enabled SDK client |
-| `branch` | `str` | `""` | Branch the run is targeting (auto-detected from git) |
+| `branch` | `str` | `""` | Branch the run is targeting. infrahub-sdk 1.24.0 and later (Infrahub 1.12 and later): the branch passed with `--branch`, otherwise `INFRAHUB_DEFAULT_BRANCH` (`main` unless set); `INFRAHUB_DEFAULT_BRANCH_FROM_GIT=true` restores the Git lookup. Before 1.24.0: the current Git branch |
 | `root_directory` | `str` | `""` | Repo root path on disk |
 | `params` | `dict` | `None` | Query parameters (resolved from `targets`/`parameters`) |
 | `convert_query_response` | `bool` | `False` | Populate `self.nodes` with `InfrahubNode` objects |
@@ -214,7 +214,7 @@ via `member_of_groups: [...]` — see
 
 ```bash
 # Run a generator against a target object
-infrahubctl generator pop_topology design=pop-par-01
+infrahubctl generator pop_topology design=pop-par-01 --branch=my-branch
 
 # Listing generators registered in .infrahub.yml
 infrahubctl generator --list
