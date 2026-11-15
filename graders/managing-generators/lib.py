@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import ast
 import re
+import shlex
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -2400,6 +2401,239 @@ def check_shared_save_opts_out_of_tracking(
     return True, f"the shared {_SHARED_KIND} is saved with update_group_context=False"
 
 
+# The scenario the check was built for declares this kind ``branch:
+# agnostic`` and DcimDevice branch-aware. No eval task wires the check (#241,
+# see dev/guidelines/rule-equals-test.md § "When no task can score the
+# rule"); its pytest fixtures guard the check, not the prose.
+_AGNOSTIC_KIND = "OpsAssetTag"
+_AWARE_KIND = "DcimDevice"
+
+
+def _saves_on(saves: list[ast.Call], names: set[str]) -> list[ast.Call]:
+    return [
+        c for c in saves
+        if isinstance(c.func, ast.Attribute)
+        and isinstance(c.func.value, (ast.Name, ast.Attribute))
+        and ast.unparse(c.func.value) in names
+    ]
+
+
+def check_agnostic_saves_opt_out(output: dict, **_: Any) -> tuple[bool, str]:
+    """Objects of a branch-agnostic kind stay out of the generator group.
+
+    A delete of a node whose kind is ``branch: agnostic`` runs on the global
+    branch, so generator cleanup removes it from every branch at once,
+    including the default branch, even during a run on a feature branch. An
+    agnostic object that must outlive the generator producing it has to stay
+    out of the tracking group: every save of it passes
+    ``update_group_context=False``, or it is written only with
+    ``add_relationships()``, or the generator never writes it. The
+    branch-aware kind keeps at least one tracked save, so opting the whole
+    run out does not pass.
+
+    No eval task wires this check (#241): the model answered correctly with
+    the old prose. See dev/guidelines/rule-equals-test.md § "When no task
+    can score the rule".
+    """
+    tree = _answer_tree(output)
+    if tree is None:
+        return False, "no parseable Python block found"
+    if "generate" not in _function_defs(tree):
+        return False, "No generate() method found"
+
+    saves = _save_calls(tree)
+    aware_saves = _saves_on(saves, _vars_bound_to_kind(tree, _AWARE_KIND))
+
+    created = _vars_bound_to_kind(tree, _AGNOSTIC_KIND, {"create", "upsert"})
+    agnostic_vars = created | _vars_bound_to_kind(tree, _AGNOSTIC_KIND, {"get"})
+    agnostic_saves = _saves_on(saves, agnostic_vars)
+    tracked = [c for c in agnostic_saves if not _save_opts_out(c)]
+    if tracked:
+        return False, (
+            f"the branch-agnostic {_AGNOSTIC_KIND} is saved without "
+            "update_group_context=False (line "
+            f"{tracked[0].lineno}); cleanup deletes it on every branch, "
+            "including the default branch, even during a branch run"
+        )
+    if created and not agnostic_saves:
+        unresolved = sorted({
+            ast.unparse(c.func.value)
+            for c in saves
+            if isinstance(c.func, ast.Attribute)
+            and ast.unparse(c.func.value) not in agnostic_vars
+            and c not in aware_saves
+        })
+        if unresolved and not _calls_to(tree, {"add_relationships"}):
+            return False, (
+                f"the generator creates the {_AGNOSTIC_KIND}, and the save "
+                f"receiver(s) {unresolved} cannot be tied back to it"
+            )
+    if not any(not _save_opts_out(c) for c in aware_saves):
+        return False, (
+            f"no tracked save of the branch-aware {_AWARE_KIND}; only the "
+            f"branch-agnostic {_AGNOSTIC_KIND} should leave the generator group"
+        )
+    return True, (
+        f"the branch-agnostic {_AGNOSTIC_KIND} stays out of the generator "
+        f"group and the {_AWARE_KIND} stays tracked"
+    )
+
+
+_SHELL_FENCE = re.compile(r"```(?:bash|sh|shell|console|zsh)[ \t]*\n(.*?)```", re.DOTALL)
+_BRANCH_ENV = ("INFRAHUB_DEFAULT_BRANCH=", "INFRAHUB_DEFAULT_BRANCH_FROM_GIT=")
+
+
+def _shell_lines(block: str) -> list[list[str]]:
+    """Each command line of a shell fence, split by shlex.
+
+    ``$ `` and ``% `` prompts are dropped, ``\\`` continuations joined, and
+    comments removed by shlex itself. A line shlex cannot split is kept as
+    one token, so it can never pass as a run that names its branch.
+    """
+    joined: list[str] = []
+    buf = ""
+    for line in block.splitlines():
+        text = line.strip()
+        if not buf and text[:2] in ("$ ", "% "):
+            text = text[2:]
+        if text.endswith("\\"):
+            buf += text[:-1] + " "
+            continue
+        joined.append(buf + text)
+        buf = ""
+    if buf:
+        joined.append(buf)
+    out: list[list[str]] = []
+    for text in joined:
+        if not text:
+            continue
+        try:
+            tokens = shlex.split(text, comments=True)
+        except ValueError:
+            tokens = [text]
+        if tokens:
+            out.append(tokens)
+    return out
+
+
+def check_generator_run_names_branch(output: dict, **_: Any) -> tuple[bool, str]:
+    """Every local ``infrahubctl generator`` run selects its Infrahub branch.
+
+    From infrahub-sdk 1.24.0 (Infrahub 1.12.0) a run with no branch uses
+    ``INFRAHUB_DEFAULT_BRANCH``, ``main`` unless set, instead of the current
+    Git branch. So a run counts when it passes ``--branch``, or carries an
+    ``INFRAHUB_DEFAULT_BRANCH=`` or ``INFRAHUB_DEFAULT_BRANCH_FROM_GIT=``
+    prefix, or follows an ``export`` of either in the same fence.
+    ``--list`` lists generators and runs nothing, so it does not count.
+
+    No eval task wires this check (#238): the model answered correctly with
+    the old prose. See dev/guidelines/rule-equals-test.md § "When no task
+    can score the rule".
+    """
+    blocks = [m.group(1) for m in _SHELL_FENCE.finditer(output.get("raw", ""))]
+    runs = 0
+    for block in blocks:
+        exported = False
+        for tokens in _shell_lines(block):
+            if tokens[0] == "export" and any(
+                t.startswith(_BRANCH_ENV) for t in tokens[1:]
+            ):
+                exported = True
+                continue
+            prefix: list[str] = []
+            rest = tokens
+            # Strip `VAR=value` assignments and runner wrappers before argv[0].
+            while rest and (
+                ("=" in rest[0] and not rest[0].startswith("-"))
+                or rest[0] in ("env", "uv", "run", "uvx", "poetry")
+            ):
+                prefix.append(rest[0])
+                rest = rest[1:]
+            if len(rest) < 2 or rest[0] != "infrahubctl" or rest[1] != "generator":
+                continue
+            args = rest[2:]
+            if "--list" in args:
+                continue
+            runs += 1
+            named = any(a == "--branch" or a.startswith("--branch=") for a in args)
+            named = named or exported or any(p.startswith(_BRANCH_ENV) for p in prefix)
+            if not named:
+                return False, (
+                    f"`{' '.join(rest)}` does not select an Infrahub branch; from "
+                    "infrahub-sdk 1.24.0 it runs on INFRAHUB_DEFAULT_BRANCH (main "
+                    "unless set), not on the current Git branch. Pass --branch"
+                )
+    if not runs:
+        return False, "no `infrahubctl generator <name>` run command in a shell fence"
+    return True, "every infrahubctl generator run selects its Infrahub branch"
+
+
+def _positional_or_kw(call: ast.Call, index: int, name: str) -> ast.AST | None:
+    value = get_kwarg(call, name)
+    if value is None and len(call.args) > index:
+        value = call.args[index]
+    return value
+
+
+def _removes_group_members(call: ast.Call) -> bool:
+    """``<x>.remove_relationships("members", [<ids>])``, with ids given."""
+    relation = _positional_or_kw(call, 0, "relation_to_update")
+    if not (isinstance(relation, ast.Constant) and relation.value == "members"):
+        return False
+    nodes = _positional_or_kw(call, 1, "related_nodes")
+    if nodes is None:
+        return False
+    return not (isinstance(nodes, (ast.List, ast.Tuple, ast.Set)) and not nodes.elts)
+
+
+def check_opt_out_releases_existing_member(
+    output: dict, **_: Any
+) -> tuple[bool, str]:
+    """A generator that stops owning an object an earlier run tracked also
+    removes it from the generator group.
+
+    Cleanup deletes the group's previous members that this run did not
+    track. ``save(update_group_context=False)``, ``add_relationships()`` or
+    no longer writing the object all keep it out of this run's members, but
+    none removes it from the group, so on an existing generator the first
+    such run deletes the object it was meant to protect. How the object is
+    written is graded by ``shared-save-opts-out-of-tracking``; this check
+    asserts only the removal. The removal is a
+    ``remove_relationships("members", ...)`` call on the group, reachable
+    from ``generate()``: cleanup reads the group after ``generate()``
+    returns, so a removal during the run is in time. The check does not
+    tie the receiver to ``get_group()``; ``"members"`` is the group's
+    relationship.
+
+    No eval task wires this check (#240): the model answered correctly with
+    the old prose. See dev/guidelines/rule-equals-test.md § "When no task
+    can score the rule".
+    """
+    tree = _answer_tree(output)
+    if tree is None:
+        return False, "no parseable Python block found"
+    if "generate" not in _function_defs(tree):
+        return False, "No generate() method found"
+
+    calls = [c for fn in _reachable_functions(tree) for c in _iter_calls(fn)]
+    removes = any(
+        isinstance(c.func, ast.Attribute)
+        and c.func.attr == "remove_relationships"
+        and _removes_group_members(c)
+        for c in calls
+    )
+    if not removes:
+        return False, (
+            "the object is no longer owned by the run but never removed from "
+            "the generator group; an earlier run already made it a member, "
+            "so the next run's cleanup deletes it"
+        )
+    return True, (
+        "the opted-out object is removed from the generator group's members "
+        "during the run"
+    )
+
+
 # Labels an answer uses to mark the half it is arguing against. The rules
 # in this repository use all three spellings, so the grader has to know all
 # three rather than guess which one it is looking at.
@@ -3609,6 +3843,9 @@ CHECKS: dict[str, Any] = {
     "traversal-uses-relationship-filter": check_traversal_uses_relationship_filter,
     "traversal-enumerates-and-checks-truncation": check_traversal_enumerates_and_checks_truncation,
     "shared-save-opts-out-of-tracking": check_shared_save_opts_out_of_tracking,
+    "opt-out-releases-existing-member": check_opt_out_releases_existing_member,
+    "agnostic-saves-opt-out": check_agnostic_saves_opt_out,
+    "generator-run-names-branch": check_generator_run_names_branch,
     "group-membership-from-member-side": check_group_membership_from_member_side,
     "generator-targets-existing-group": check_generator_targets_existing_group,
     "path-hop-shape": check_path_hop_shape,
