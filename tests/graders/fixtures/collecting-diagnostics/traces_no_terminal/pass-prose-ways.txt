@@ -1,0 +1,12 @@
+## Plan
+
+1. Would you like traces of the last hour in the bundle?
+2. My shell tool cannot see a variable exported in your terminal. Either export
+   INFRAHUB_TRACES_API_TOKEN, then start a new agent session from that same shell,
+   or run this command yourself in your terminal:
+
+```bash
+infrahub-collect create --include-traces --traces-min-duration 1s --traces-since 1h
+```
+
+Never paste the token in this chat.

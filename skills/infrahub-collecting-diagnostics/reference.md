@@ -61,7 +61,12 @@ Disambiguate with:
   `app.kubernetes.io/name=infrahub`.
 
 On Kubernetes, only read access to `pods/log` and
-`pods/exec` is required.
+`pods/exec` is required. `--include-traces` also needs
+`create` on `pods/portforward` and `list` on
+`services`, to reach the Tempo pod in the cluster.
+With `--traces-tempo-url`, the collector does not look
+for that pod, and it does not need these two
+permissions.
 
 See [rules/deployment-detection.md](rules/deployment-detection.md).
 
@@ -79,6 +84,12 @@ infrahub-collect create [flags]
 | `--include-queries` | Include DB query logs. Off by default — may contain customer data |
 | `--benchmark` | Run a host resource benchmark. Pulls an OpsMill image; skipped with a warning if unavailable (e.g. airgapped) |
 | `--include-backup` | Include a backup, for support-requested reproduction |
+| `--include-traces` | Include the traces of slow requests from the deployment's Tempo. Ask first, see [rules/create-traces.md](rules/create-traces.md). Needs `infrahub-collect` 2.5.0 or later |
+| `--traces-since=<duration>` | Window that ends now (default `2h`) |
+| `--traces-start=<time>`, `--traces-end=<time>` | Window that ended, in RFC 3339; give both |
+| `--traces-min-duration=<duration>` | Shortest trace kept (default `1s`) |
+| `--traces-max-size=<MB>` | Size limit of `traces/`, uncompressed (default `100`) |
+| `--traces-tempo-url=<url>` | Read the operator's own Tempo-compatible backend instead of the deployment's Tempo |
 | *(log volume)* | A flag exists to adjust the log volume limit collected per service — check `infrahub-collect create --help` for the current flag name/default rather than assuming one |
 
 Match flags to the reported symptom rather than adding
@@ -91,6 +102,16 @@ all of them by default — see
 | -------- | ------------- |
 | `INFRAHUB_PROJECT` | `--project` |
 | `INFRAHUB_OUTPUT_DIR` | `--output-dir` |
+
+Two credentials have no flag, so they never appear on
+a command line. `create` reads them from the
+environment, or asks for them with a hidden prompt in
+a terminal:
+
+| Variable | Used for |
+| -------- | -------- |
+| `INFRAHUB_TRACES_API_TOKEN` | API token with `super_admin`, to record the trace sampling ratio |
+| `INFRAHUB_TRACES_TEMPO_TOKEN` | Token of the backend given with `--traces-tempo-url` |
 
 `create` exits `0` even on a partial collection —
 failures are recorded in the manifest, not raised as
@@ -132,7 +153,9 @@ Kubernetes, the target namespace's pods need the label
 
 **Permission denied on Kubernetes.**
 `infrahub-collect` needs read access to `pods/log` and
-`pods/exec` in the target namespace. Ask the user (or
+`pods/exec` in the target namespace, plus `create` on
+`pods/portforward` and `list` on `services` with
+`--include-traces` and without `--traces-tempo-url`. Ask the user (or
 their platform team) to grant that RBAC rather than
 escalating to broader access.
 

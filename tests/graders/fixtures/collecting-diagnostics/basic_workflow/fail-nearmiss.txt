@@ -1,0 +1,10 @@
+## Plan
+
+```bash
+infrahub-collect environment detect
+infrahub-collect create
+```
+
+Do you also want traces of the last two hours in the bundle?
+Review the bundle before sharing it.
+To file a public issue afterwards, use infrahub-reporting-issues.

@@ -1,0 +1,16 @@
+## Plan
+
+Do you want to include traces of the slow page loads? Only a share of requests has a trace, so a
+super admin raises the sampling ratio before you reproduce the slowness.
+
+```bash
+INFRAHUB_ADDRESS=https://infrahub.example.com
+curl -X PUT "https://infrahub.example.com/api/troubleshooting/trace-sample-ratio" -d '{"ratio": 1.0, "duration_seconds": 1800}'
+infrahub-collect create --include-traces --traces-min-duration 1s --traces-since 30m
+```
+
+After the bundle is created, the super admin removes the temporary ratio:
+
+```bash
+curl -X DELETE "${INFRAHUB_ADDRESS}/api/troubleshooting/trace-sample-ratio"
+```
