@@ -15,7 +15,10 @@
    restart evidence and read its tail. Evaluate
    benchmark results when present; for performance
    symptoms without them, recommend a `--benchmark`
-   bundle.
+   bundle. Read the trace files of a bundle from
+   `0001` (the slowest) and report the spans that
+   took the time. For a slowness without usable
+   traces, recommend an `--include-traces` bundle.
 
 3. **Correlation (correlate-)** -- HIGH. Group raw
    signals by timestamp and causal chain into

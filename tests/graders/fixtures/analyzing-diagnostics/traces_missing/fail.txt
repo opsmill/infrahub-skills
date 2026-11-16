@@ -1,0 +1,7 @@
+## Report
+
+The manifest (bundle_information.json) lists logs, metrics and benchmark.
+
+The logs show two slow GraphQL queries (27.41 s and 22.08 s) and no error. The benchmark is healthy.
+Collect a new bundle with infrahub-collecting-diagnostics and `--include-queries` to see the
+database queries.

@@ -1,0 +1,10 @@
+## Report
+
+The manifest (bundle_information.json) lists logs, metrics and benchmark, and no traces.
+
+The logs show two slow GraphQL queries and no error. Collect a new bundle with
+infrahub-collecting-diagnostics:
+
+```bash
+infrahub-collect create --include-traces --traces-since 2h
+```

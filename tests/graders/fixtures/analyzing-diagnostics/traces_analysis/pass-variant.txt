@@ -1,0 +1,18 @@
+## Report
+
+Manifest first (bundle_information.json): the traces collector succeeded with 35 traces, sampling
+ratio 0.1.
+
+| Trace file | Root operation | Service | Duration | Self time |
+| --- | --- | --- | --- | --- |
+| 0001-6c26f0d2e9c893ed614173cb81d8d534.json | Sync Git Repositories | infrahub-task-worker | 10741 ms | 10720 ms |
+
+The children (one database query, one POST on infrahub-server) take about 21 ms. The durations come
+from this script, run on the bundle files:
+
+```bash
+jq -r '.resourceSpans[] | (.resource.attributes[] | select(.key == "service.name") | .value.stringValue) as $svc
+  | .scopeSpans[].spans[]
+  | [$svc, .name, ((.endTimeUnixNano | tonumber) - (.startTimeUnixNano | tonumber)) / 1e6] | @tsv' \
+  bundle/traces/0001-6c26f0d2e9c893ed614173cb81d8d534.json | sort -t$'\t' -k3 -nr | head
+```

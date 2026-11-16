@@ -1,0 +1,23 @@
+# Findings report
+
+## Deployment context
+
+`bundle/bundle_information.json`: Infrahub 1.12.1 on Docker Compose (`infrahub-prod`). The
+collectors are logs, metrics and benchmark. There is no `traces` entry: the bundle was collected
+without `--include-traces`.
+
+## Incident 1: slow GraphQL queries from 14:00 to 15:30 UTC (HIGH)
+
+`bundle/logs/server/infrahub-server-1.log`: `query=DeviceList duration=27.41s` at 14:12:03 and
+`query=InterfaceList duration=22.08s` at 14:40:51, both at INFO level. The benchmark is healthy
+(single-CPU score 1850, 9500 IOPS), so the host is not the cause. The bundle cannot show which
+component took the time.
+
+## Recommendations
+
+Collect a new bundle with the traces of the slowness, through infrahub-collecting-diagnostics:
+
+```bash
+infrahub-collect create --include-traces \
+  --traces-start 2026-11-15T14:00:00Z --traces-end 2026-11-15T15:30:00Z
+```

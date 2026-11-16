@@ -428,7 +428,95 @@ def check_cross_link_reporting_issues(text: str, **_: object) -> CheckResult:
     return False, "missing infrahub-reporting-issues cross-link"
 
 
+# --- Traces of a bundle (rules/triage-traces.md) --- #
+#
+# The report must read the trace files and name where the time went: the slow
+# operation, its service and its duration, together in one paragraph or one
+# table row of the prose. Shell blocks do not count, so a span name that only
+# appears in a `jq` filter is not a finding. The skill reads the bundle files
+# only: a command that starts, queries or posts to a Tempo or Grafana fails,
+# even a local one.
+
+_FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})[^\n]*\n(.*?)^[ \t]*\1[ \t]*$", re.MULTILINE | re.DOTALL)
+
+
+_TRACE_API_RE = re.compile(r"/v1/traces|/api/(v2/)?traces\b|/api/search\b|/api/datasources/")
+_TRACE_IMAGE_RE = re.compile(r"\b(grafana/tempo|grafana/grafana|jaegertracing/)", re.IGNORECASE)
+
+
+def _trace_service_calls(text: str) -> list[str]:
+    """Commands that start, query or post to a trace service, local or remote."""
+    calls: list[str] = []
+    for m in _FENCE_RE.finditer(text):
+        for line in m.group(2).splitlines():
+            code = line.split("#", 1)[0]
+            if _TRACE_API_RE.search(code) and re.search(r"\b(curl|wget|http|xh)\b", code):
+                calls.append(line.strip())
+            elif _TRACE_IMAGE_RE.search(code) and re.search(r"\bdocker\b", code):
+                calls.append(line.strip())
+    return calls
+
+
+def _prose_units(text: str) -> list[str]:
+    """Paragraphs of the prose, and each table row on its own."""
+    units: list[str] = []
+    for para in re.split(r"\n\s*\n", _FENCE_RE.sub("\n\n", text)):
+        rows = [line for line in para.splitlines() if line.lstrip().startswith("|")]
+        units.extend(rows or [para])
+    return units
+
+
+def check_traces_slow_span(
+    text: str, *, span: str = "", service: str = "", duration: str = "", **_: object
+) -> CheckResult:
+    """Name the operation that took the time, its service and its duration.
+
+    `span` and `service` are the names of the slow span of the task's trace,
+    `duration` a regex for its duration. They must appear together in one
+    paragraph or one table row of the prose.
+    """
+    if not (span and service and duration):
+        return False, "check_traces_slow_span requires span, service and duration kwargs"
+    calls = _trace_service_calls(text)
+    if calls:
+        return False, f"uses a trace service instead of the bundle files: {calls[0]!r}"
+    dur_re = re.compile(duration, re.IGNORECASE)
+    for unit in _prose_units(text):
+        low = unit.lower()
+        if span.lower() in low and service.lower() in low and dur_re.search(unit):
+            return True, f"names {span!r} on {service} with its duration"
+    return False, f"no paragraph or table row names {span!r}, {service} and its duration together"
+
+
+_INCLUDE_TRACES_RE = re.compile(r"--include-traces\b")
+_WINDOW_OPTIONS = {"since": ("--traces-since",), "absolute": ("--traces-start", "--traces-end")}
+# "no need for --include-traces" and "skip --include-traces" negate too.
+_TRACES_NEGATION_RE = re.compile(_NEGATION_WORDS + r"|\bno\b|\bskip\b", re.IGNORECASE)
+
+
+def check_recommends_traces(text: str, *, window: str = "any", **_: object) -> CheckResult:
+    """For a slowness without traces: ask for a next bundle with --include-traces and a window.
+
+    `window` is "absolute" for a slowness that has ended (both
+    `--traces-start` and `--traces-end` in the same paragraph or code block),
+    "any" when either form fits. A negated mention ("no need for
+    --include-traces") does not count.
+    """
+    wanted = [_WINDOW_OPTIONS["absolute"]] if window == "absolute" else list(_WINDOW_OPTIONS.values())
+    units = [m.group(2) for m in _FENCE_RE.finditer(text)] + _prose_units(text)
+    for unit in units:
+        for m in _INCLUDE_TRACES_RE.finditer(unit):
+            sentence_start = max(unit.rfind(". ", 0, m.start()), unit.rfind("\n", 0, m.start())) + 1
+            if _TRACES_NEGATION_RE.search(unit[sentence_start : m.start()]):
+                continue
+            if any(all(opt in unit for opt in opts) for opts in wanted):
+                return True, "recommends a next bundle with --include-traces and a window"
+    return False, "does not recommend a next bundle with --include-traces and a window that fits"
+
+
 CHECKS: dict[str, CheckFn] = {
+    "recommends-traces": check_recommends_traces,
+    "traces-slow-span": check_traces_slow_span,
     "asks-bundle-location": check_asks_bundle_location,
     "no-location-scan": check_no_location_scan,
     "mentions-manifest": check_mentions_manifest,

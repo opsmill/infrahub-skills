@@ -1,0 +1,22 @@
+# Findings report
+
+## Deployment context
+
+`bundle/bundle_information.json`: Infrahub 1.12.1 on Docker Compose (`infrahub-prod`).
+
+## Traces
+
+The manifest has a `traces` entry with status `success`: 35 traces written, 0 left out, window
+08:45-08:55 UTC. The sampling ratio in force is 0.1, so only about one request in ten has a trace.
+
+## Incident 1: a Git sync task took 10.7 s (MEDIUM)
+
+`bundle/traces/0001-6c26f0d2e9c893ed614173cb81d8d534.json`: the root span "Sync Git Repositories"
+on infrahub-task-worker lasted 10.74 s. Its direct children take about 21 ms: a `Query.execute`
+with the database query `node_get_list` (1.1 ms) and a POST to infrahub-server (19.7 ms). The self
+time is 10.72 s, so the time went into the Git sync work itself, which has no span. The API and the
+database are not the cause.
+
+## Open questions
+
+- Do traces 0002 to 0035 show the same task? Read them before concluding.

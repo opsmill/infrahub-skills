@@ -3821,6 +3821,378 @@ tasks:
       - name: recommendation-not-executed
         check: Remediation appears as a recommendation the analysis did not execute
 
+  - name: analyzing-diagnostics-traces-analysis
+    trials: 3
+    timeout: 600
+    instruction: |
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: A customer says Infrahub was slow this morning between 08:45 and 08:55
+      UTC. They sent the bundle below, collected with
+      `infrahub-collect create --include-traces`. The logs show no error. Write
+      the findings report: which service and which operation took the time. Do
+      NOT actually run any commands; read the excerpts below.
+
+      bundle/bundle_information.json:
+      {"infrahub_version": "1.12.1", "environment": {"type": "docker-compose", "project": "infrahub-prod"},
+       "collectors": [
+         {"name": "logs", "status": "success"},
+         {"name": "traces", "status": "success",
+          "details": {"backend": "http://tempo.monitoring.acme.internal:3200",
+                      "window": {"start": "2026-11-13T08:45:00Z", "end": "2026-11-13T08:55:00Z"},
+                      "min_duration_used": "1s", "traces_found": 35, "traces_written": 35,
+                      "traces_left_out": 0,
+                      "sample_ratio": {"enabled": true, "ratio_in_force": 0.1}}}]}
+
+      ls bundle/traces/:
+      0001-6c26f0d2e9c893ed614173cb81d8d534.json
+      0002-b8847743a1b1d7c6dd8b89a68eb5831f.json
+      0003-580f6b6e0dd0abbc2d4a0196ae50e47e.json
+      ... (35 files)
+
+      bundle/traces/0001-6c26f0d2e9c893ed614173cb81d8d534.json:
+      {
+        "resourceSpans": [
+          {
+            "resource": {
+              "attributes": [
+                {"key": "service.version", "value": {"stringValue": "1.12.1"}},
+                {"key": "worker.id", "value": {"stringValue": "d658d474-7b95-46ad-842b-bbf1442f9d29"}},
+                {"key": "service.name", "value": {"stringValue": "infrahub-task-worker"}}
+              ]
+            },
+            "scopeSpans": [
+              {
+                "spans": [
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "efda365e6270c931",
+                    "parentSpanId": "78418f92c539a263",
+                    "name": "execute_db_query_with_metadata",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680603084088",
+                    "endTimeUnixNano": "1794559680604076213",
+                    "attributes": [
+                      {"key": "query_name", "value": {"stringValue": "node_get_list"}},
+                      {"key": "rows", "value": {"intValue": "0"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "78418f92c539a263",
+                    "parentSpanId": "d2446c829af3e673",
+                    "name": "Query.execute",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680603003796",
+                    "endTimeUnixNano": "1794559680604094546"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "d2446c829af3e673",
+                    "name": "Sync Git Repositories",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559670263219125",
+                    "endTimeUnixNano": "1794559681004458713",
+                    "status": {"code": "STATUS_CODE_OK"}
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "resource": {
+              "attributes": [
+                {"key": "service.version", "value": {"stringValue": "1.12.1"}},
+                {"key": "worker.id", "value": {"stringValue": "0517a5cb-be40-47cf-9778-d59634c79f87"}},
+                {"key": "service.name", "value": {"stringValue": "infrahub-server"}}
+              ]
+            },
+            "scopeSpans": [
+              {
+                "spans": [
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "a3377cc930641988",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "POST http receive",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680597116588",
+                    "endTimeUnixNano": "1794559680597128463"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "efa211464beeba52",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "POST http send",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680602160838",
+                    "endTimeUnixNano": "1794559680602179005"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "22a7094e0d02b3f6",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "POST http send",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680602330380",
+                    "endTimeUnixNano": "1794559680602335088"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "d55584d9305328cf",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "POST http send",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680602412796",
+                    "endTimeUnixNano": "1794559680602417421"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "8e8b06e183895371",
+                    "parentSpanId": "d2446c829af3e673",
+                    "name": "POST",
+                    "kind": "SPAN_KIND_SERVER",
+                    "startTimeUnixNano": "1794559680582710046",
+                    "endTimeUnixNano": "1794559680602427421",
+                    "attributes": [
+                      {"key": "http.method", "value": {"stringValue": "POST"}},
+                      {"key": "http.status_code", "value": {"intValue": "200"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "267f23122d486c43",
+                    "parentSpanId": "13e0ef95dca6f06e",
+                    "name": "execute_db_query_with_metadata",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680583523630",
+                    "endTimeUnixNano": "1794559680593139421",
+                    "attributes": [
+                      {"key": "query_name", "value": {"stringValue": "account_token_validate"}},
+                      {"key": "rows", "value": {"intValue": "1"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "2bf7b8116609deca",
+                    "parentSpanId": "6c79d3f3a3cef9bb",
+                    "name": "execute_db_query_with_metadata",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680593322838",
+                    "endTimeUnixNano": "1794559680594667130",
+                    "attributes": [
+                      {"key": "query_name", "value": {"stringValue": "node_list_get_info"}},
+                      {"key": "rows", "value": {"intValue": "1"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "e2a9ad59840eef9b",
+                    "parentSpanId": "3327b07366801fcc",
+                    "name": "execute_db_query_with_metadata",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680594902963",
+                    "endTimeUnixNano": "1794559680596539963",
+                    "attributes": [
+                      {"key": "query_name", "value": {"stringValue": "node_list_get_attribute"}},
+                      {"key": "rows", "value": {"intValue": "8"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "db2df8db242595de",
+                    "parentSpanId": "b362dd4f701d8cfe",
+                    "name": "execute_db_query_with_metadata",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680597486338",
+                    "endTimeUnixNano": "1794559680598925546",
+                    "attributes": [
+                      {"key": "query_name", "value": {"stringValue": "account_global_permissions"}},
+                      {"key": "rows", "value": {"intValue": "1"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "ccc8a725a043a58c",
+                    "parentSpanId": "0ac35d00845ead99",
+                    "name": "execute_db_query_with_metadata",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680599083671",
+                    "endTimeUnixNano": "1794559680600361421",
+                    "attributes": [
+                      {"key": "query_name", "value": {"stringValue": "account_object_permissions"}},
+                      {"key": "rows", "value": {"intValue": "0"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "ffd430e152a43329",
+                    "parentSpanId": "dadeff9046b43296",
+                    "name": "execute_db_query_with_metadata",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680600750338",
+                    "endTimeUnixNano": "1794559680601681338",
+                    "attributes": [
+                      {"key": "query_name", "value": {"stringValue": "standard_node_list"}},
+                      {"key": "rows", "value": {"intValue": "1"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "13e0ef95dca6f06e",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "Query.execute",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680583443921",
+                    "endTimeUnixNano": "1794559680593168171"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "6c79d3f3a3cef9bb",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "Query.execute",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680593259963",
+                    "endTimeUnixNano": "1794559680594694463"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "3327b07366801fcc",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "Query.execute",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680594838338",
+                    "endTimeUnixNano": "1794559680596629338"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "b362dd4f701d8cfe",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "Query.execute",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680597426005",
+                    "endTimeUnixNano": "1794559680598950213"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "0ac35d00845ead99",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "Query.execute",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680599030671",
+                    "endTimeUnixNano": "1794559680600376588"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "dadeff9046b43296",
+                    "parentSpanId": "21971a3eacbea7f8",
+                    "name": "Query.execute",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680600707046",
+                    "endTimeUnixNano": "1794559680601697921"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "21971a3eacbea7f8",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "execute_graphql",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680600534213",
+                    "endTimeUnixNano": "1794559680601963130",
+                    "attributes": [
+                      {"key": "type", "value": {"stringValue": "query"}},
+                      {"key": "branch", "value": {"stringValue": "main"}},
+                      {"key": "operation", "value": {"stringValue": "GetAllBranch"}},
+                      {"key": "name", "value": {"stringValue": "Branch"}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_traces_analysis.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that reads the `traces` entry of bundle_information.json
+      first (35 written, none left out, sampling ratio 0.1), then reads trace 0001
+      and names where the time went: the root span "Sync Git Repositories" on
+      infrahub-task-worker took 10.74 s, while its children (one database query
+      and one POST to infrahub-server) took about 21 ms, so the time is in the
+      Git sync work itself, which has no span. It reads the files only and starts
+      or queries no Tempo or Grafana.
+    expectations:
+      - Reads bundle_information.json and the traces entry before the trace file
+      - Names "Sync Git Repositories" on infrahub-task-worker and its 10.74 s duration
+      - Says that the children take about 21 ms, so the time is in the span's own work
+      - Reads the files only, with no Tempo, Grafana or other service
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: traces-slow-span
+        check: >-
+          One paragraph or table row names "Sync Git Repositories",
+          infrahub-task-worker and its duration of about 10.7 s, and no command
+          starts, queries or posts to a Tempo or Grafana
+
+  - name: analyzing-diagnostics-traces-missing
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: A customer says Infrahub was very slow yesterday from 14:00 to 15:30
+      UTC: every page took 20 to 30 seconds. It is fast again now. They run the
+      observability stack. They sent the bundle below. Write the findings report.
+      Do NOT actually run any commands.
+
+      bundle/bundle_information.json:
+      {"infrahub_version": "1.12.1", "environment": {"type": "docker-compose", "project": "infrahub-prod"},
+       "collectors": [
+         {"name": "logs", "status": "success"},
+         {"name": "metrics", "status": "success"},
+         {"name": "benchmark", "status": "success"}]}
+
+      bundle/logs/server/infrahub-server-1.log (excerpt):
+      2026-11-15 14:12:03 INFO infrahub.graphql query=DeviceList duration=27.41s
+      2026-11-15 14:40:51 INFO infrahub.graphql query=InterfaceList duration=22.08s
+
+      bundle/metrics/benchmark.txt:
+      single-CPU score 1850 (healthy); database volume 9500 random IOPS at 0.4 ms (healthy)
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_traces_missing.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that reads bundle_information.json first, notes that the
+      bundle has no traces entry, says the logs and the healthy benchmark cannot
+      show which component took the time, and recommends a next bundle collected
+      with `infrahub-collect create --include-traces --traces-start
+      2026-11-15T14:00:00Z --traces-end 2026-11-15T15:30:00Z`, handed off to
+      infrahub-collecting-diagnostics.
+    expectations:
+      - Reads bundle_information.json and notes that it has no traces entry
+      - Recommends a next bundle with `--include-traces` and the window of the slowness
+      - Uses `--traces-start` and `--traces-end`, because the slowness has ended
+      - Hands the collection back to infrahub-collecting-diagnostics
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: recommends-traces
+        check: >-
+          Report recommends a next bundle with `--include-traces`,
+          `--traces-start` and `--traces-end`, not negated
+      - name: cross-link-collecting-diagnostics
+        check: Report hands collection off to infrahub-collecting-diagnostics
+
   # --- Generator Creator --- #
   - name: from-graphql-hydration-refactor
     trials: 3
