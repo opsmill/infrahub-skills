@@ -4125,13 +4125,13 @@ tasks:
       and names where the time went: the root span "Sync Git Repositories" on
       infrahub-task-worker took 10.74 s, while its children (one database query
       and one POST to infrahub-server) took about 21 ms, so the time is in the
-      Git sync work itself, which has no span. It does not post the traces to the
-      customer's Tempo.
+      Git sync work itself, which has no span. It reads the files only and starts
+      or queries no Tempo or Grafana.
     expectations:
       - Reads bundle_information.json and the traces entry before the trace file
       - Names "Sync Git Repositories" on infrahub-task-worker and its 10.74 s duration
       - Says that the children take about 21 ms, so the time is in the span's own work
-      - Does not post the traces to the customer's Tempo
+      - Reads the files only, with no Tempo, Grafana or other service
     assertions:
       - name: mentions-manifest
         check: Report references bundle_information.json / the manifest
@@ -4139,7 +4139,59 @@ tasks:
         check: >-
           One paragraph or table row names "Sync Git Repositories",
           infrahub-task-worker and its duration of about 10.7 s, and no command
-          posts the traces to a Tempo that is not local
+          starts, queries or posts to a Tempo or Grafana
+
+  - name: analyzing-diagnostics-traces-missing
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: A customer says Infrahub was very slow yesterday from 14:00 to 15:30
+      UTC: every page took 20 to 30 seconds. It is fast again now. They run the
+      observability stack. They sent the bundle below. Write the findings report.
+      Do NOT actually run any commands.
+
+      bundle/bundle_information.json:
+      {"infrahub_version": "1.12.1", "environment": {"type": "docker-compose", "project": "infrahub-prod"},
+       "collectors": [
+         {"name": "logs", "status": "success"},
+         {"name": "metrics", "status": "success"},
+         {"name": "benchmark", "status": "success"}]}
+
+      bundle/logs/server/infrahub-server-1.log (excerpt):
+      2026-11-15 14:12:03 INFO infrahub.graphql query=DeviceList duration=27.41s
+      2026-11-15 14:40:51 INFO infrahub.graphql query=InterfaceList duration=22.08s
+
+      bundle/metrics/benchmark.txt:
+      single-CPU score 1850 (healthy); database volume 9500 random IOPS at 0.4 ms (healthy)
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_traces_missing.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that reads bundle_information.json first, notes that the
+      bundle has no traces entry, says the logs and the healthy benchmark cannot
+      show which component took the time, and recommends a next bundle collected
+      with `infrahub-collect create --include-traces --traces-start
+      2026-11-15T14:00:00Z --traces-end 2026-11-15T15:30:00Z`, handed off to
+      infrahub-collecting-diagnostics.
+    expectations:
+      - Reads bundle_information.json and notes that it has no traces entry
+      - Recommends a next bundle with `--include-traces` and the window of the slowness
+      - Uses `--traces-start` and `--traces-end`, because the slowness has ended
+      - Hands the collection back to infrahub-collecting-diagnostics
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: recommends-traces
+        check: >-
+          Report recommends a next bundle with `--include-traces`,
+          `--traces-start` and `--traces-end`, not negated
+      - name: cross-link-collecting-diagnostics
+        check: Report hands collection off to infrahub-collecting-diagnostics
 
   # --- Generator Creator --- #
   - name: from-graphql-hydration-refactor

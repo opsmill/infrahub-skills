@@ -17,7 +17,8 @@
    symptoms without them, recommend a `--benchmark`
    bundle. Read the trace files of a bundle from
    `0001` (the slowest) and report the spans that
-   took the time.
+   took the time. For a slowness without usable
+   traces, recommend an `--include-traces` bundle.
 
 3. **Correlation (correlate-)** -- HIGH. Group raw
    signals by timestamp and causal chain into

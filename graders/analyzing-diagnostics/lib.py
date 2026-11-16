@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import re
-import shlex
 from pathlib import Path
 from typing import Callable
 
@@ -434,63 +433,28 @@ def check_cross_link_reporting_issues(text: str, **_: object) -> CheckResult:
 # The report must read the trace files and name where the time went: the slow
 # operation, its service and its duration, together in one paragraph or one
 # table row of the prose. Shell blocks do not count, so a span name that only
-# appears in a `jq` filter is not a finding. A command that posts the traces to
-# a Tempo that is not local fails: the traces are customer data.
+# appears in a `jq` filter is not a finding. The skill reads the bundle files
+# only: a command that starts, queries or posts to a Tempo or Grafana fails,
+# even a local one.
 
 _FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})[^\n]*\n(.*?)^[ \t]*\1[ \t]*$", re.MULTILINE | re.DOTALL)
-_URL_HOST_RE = re.compile(r"https?://(?:[^@/\s\"']*@)?(\[[^\]]+\]|[^/:\s\"']+)")
-_LOCAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "[::1]", "host.docker.internal"}
-_DATA_OPTIONS = ("-d", "--data", "--data-binary", "--data-raw", "--json")
 
 
-def _curl_commands(text: str) -> list[list[str]]:
-    """Every curl command in the fenced blocks, as shlex tokens without comments."""
-    commands: list[list[str]] = []
+_TRACE_API_RE = re.compile(r"/v1/traces|/api/(v2/)?traces\b|/api/search\b|/api/datasources/")
+_TRACE_IMAGE_RE = re.compile(r"\b(grafana/tempo|grafana/grafana|jaegertracing/)", re.IGNORECASE)
+
+
+def _trace_service_calls(text: str) -> list[str]:
+    """Commands that start, query or post to a trace service, local or remote."""
+    calls: list[str] = []
     for m in _FENCE_RE.finditer(text):
-        block = re.sub(r"\\\n", " ", re.sub(r"(?m)^([ \t]*)\$[ \t]+", r"\1", m.group(2)))
-        for line in block.splitlines():
-            try:
-                tokens = shlex.split(line, comments=True)
-            except ValueError:
-                continue
-            current: list[str] = []
-            for tok in tokens + [";"]:
-                if tok in ("&&", "||", ";", "|", "do", "done", "then", "fi"):
-                    if current and current[0].endswith("curl"):
-                        commands.append(current)
-                    current = []
-                else:
-                    current.append(tok)
-    return commands
-
-
-def _posts_trace_file(cmd: list[str]) -> bool:
-    """The curl command posts a file of traces/ (or a loop variable) to /v1/traces."""
-    if not any("/v1/traces" in tok for tok in cmd):
-        return False
-    for i, tok in enumerate(cmd):
-        value = ""
-        if tok in _DATA_OPTIONS and i + 1 < len(cmd):
-            value = cmd[i + 1]
-        elif tok.startswith(tuple(f"{o}=" for o in _DATA_OPTIONS if o.startswith("--"))):
-            value = tok.split("=", 1)[1]
-        if value.startswith("@") and ("traces/" in value or value[1:].startswith("$")):
-            return True
-    return False
-
-
-def _remote_trace_posts(text: str) -> list[str]:
-    """Hosts that are not local and receive a file of traces/."""
-    hosts: list[str] = []
-    for cmd in _curl_commands(text):
-        if not _posts_trace_file(cmd):
-            continue
-        for tok in cmd:
-            m = _URL_HOST_RE.search(tok) if "/v1/traces" in tok else None
-            host = m.group(1).lower() if m else ""
-            if host and host not in _LOCAL_HOSTS and not host.startswith(("<", "$")):
-                hosts.append(host)
-    return hosts
+        for line in m.group(2).splitlines():
+            code = line.split("#", 1)[0]
+            if _TRACE_API_RE.search(code) and re.search(r"\b(curl|wget|http|xh)\b", code):
+                calls.append(line.strip())
+            elif _TRACE_IMAGE_RE.search(code) and re.search(r"\bdocker\b", code):
+                calls.append(line.strip())
+    return calls
 
 
 def _prose_units(text: str) -> list[str]:
@@ -513,9 +477,9 @@ def check_traces_slow_span(
     """
     if not (span and service and duration):
         return False, "check_traces_slow_span requires span, service and duration kwargs"
-    remote = _remote_trace_posts(text)
-    if remote:
-        return False, f"posts the traces to {remote[0]}, not to a local Tempo"
+    calls = _trace_service_calls(text)
+    if calls:
+        return False, f"uses a trace service instead of the bundle files: {calls[0]!r}"
     dur_re = re.compile(duration, re.IGNORECASE)
     for unit in _prose_units(text):
         low = unit.lower()
@@ -524,7 +488,34 @@ def check_traces_slow_span(
     return False, f"no paragraph or table row names {span!r}, {service} and its duration together"
 
 
+_INCLUDE_TRACES_RE = re.compile(r"--include-traces\b")
+_WINDOW_OPTIONS = {"since": ("--traces-since",), "absolute": ("--traces-start", "--traces-end")}
+# "no need for --include-traces" and "skip --include-traces" negate too.
+_TRACES_NEGATION_RE = re.compile(_NEGATION_WORDS + r"|\bno\b|\bskip\b", re.IGNORECASE)
+
+
+def check_recommends_traces(text: str, *, window: str = "any", **_: object) -> CheckResult:
+    """For a slowness without traces: ask for a next bundle with --include-traces and a window.
+
+    `window` is "absolute" for a slowness that has ended (both
+    `--traces-start` and `--traces-end` in the same paragraph or code block),
+    "any" when either form fits. A negated mention ("no need for
+    --include-traces") does not count.
+    """
+    wanted = [_WINDOW_OPTIONS["absolute"]] if window == "absolute" else list(_WINDOW_OPTIONS.values())
+    units = [m.group(2) for m in _FENCE_RE.finditer(text)] + _prose_units(text)
+    for unit in units:
+        for m in _INCLUDE_TRACES_RE.finditer(unit):
+            sentence_start = max(unit.rfind(". ", 0, m.start()), unit.rfind("\n", 0, m.start())) + 1
+            if _TRACES_NEGATION_RE.search(unit[sentence_start : m.start()]):
+                continue
+            if any(all(opt in unit for opt in opts) for opts in wanted):
+                return True, "recommends a next bundle with --include-traces and a window"
+    return False, "does not recommend a next bundle with --include-traces and a window that fits"
+
+
 CHECKS: dict[str, CheckFn] = {
+    "recommends-traces": check_recommends_traces,
     "traces-slow-span": check_traces_slow_span,
     "asks-bundle-location": check_asks_bundle_location,
     "no-location-scan": check_no_location_scan,

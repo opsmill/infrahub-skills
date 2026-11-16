@@ -7,10 +7,12 @@ ratio 0.1.
 | --- | --- | --- | --- | --- |
 | 0001-6c26f0d2e9c893ed614173cb81d8d534.json | Sync Git Repositories | infrahub-task-worker | 10741 ms | 10720 ms |
 
-The children (one database query, one POST on infrahub-server) take about 21 ms. To view the
-trace as a timeline, post it to a local Tempo:
+The children (one database query, one POST on infrahub-server) take about 21 ms. The durations come
+from this script, run on the bundle files:
 
 ```bash
-curl -X POST http://localhost:4318/v1/traces -H 'Content-Type: application/json' \
-  --data-binary @bundle/traces/0001-6c26f0d2e9c893ed614173cb81d8d534.json
+jq -r '.resourceSpans[] | (.resource.attributes[] | select(.key == "service.name") | .value.stringValue) as $svc
+  | .scopeSpans[].spans[]
+  | [$svc, .name, ((.endTimeUnixNano | tonumber) - (.startTimeUnixNano | tonumber)) / 1e6] | @tsv' \
+  bundle/traces/0001-6c26f0d2e9c893ed614173cb81d8d534.json | sort -t$'\t' -k3 -nr | head
 ```

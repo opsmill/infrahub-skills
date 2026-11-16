@@ -80,14 +80,43 @@ analysis.
    the spans that took the time, with service,
    operation and duration. Then the service that
    takes most of the time across the traces.
+5. Stay on the bundle files. Do not start, query or
+   post to a Tempo, Grafana, Prometheus or the
+   Infrahub API, not even a local one: the answer
+   must come from the files, and the traces are
+   customer data. The only external call of this
+   skill is the GitHub issue search (see
+   [scope-read-only-analysis.md](scope-read-only-analysis.md)).
 
-To view a trace as a timeline, a person can post the
-files to a local Tempo with `POST /v1/traces` and
-open each trace in Grafana by the trace ID in its
-file name; a search does not find traces with old
-timestamps. Never post the files to the customer's
-Tempo or to a shared instance: the traces are
-customer data.
+### Ask for a richer next bundle
+
+When the traces cannot answer the question, say in
+the report's recommendations what the next bundle
+needs, and hand the collection back to
+`infrahub-collecting-diagnostics`. The analysis
+applies none of these itself.
+
+- The symptom is a slowness and the manifest has no
+  `traces` entry, or it is `skipped` with the reason
+  `not requested`: collect again with
+  `--include-traces` and a window that covers the
+  slowness (`--traces-since` for a slowness still
+  going on, `--traces-start` and `--traces-end` for
+  one that ended).
+- The `traces` entry is `skipped` for another
+  reason, such as Tempo not found or a missing
+  Kubernetes permission: quote the reason, and name
+  what fixes it (the observability stack,
+  `--traces-tempo-url`, or the permission).
+- Few traces and a low sampling ratio, and the
+  slowness can be reproduced: a user with the
+  `super_admin` permission raises the ratio for a
+  limited time, the user reproduces the slowness,
+  collects again, and then removes the raised ratio.
+- `traces_left_out` is above 0: collect again with a
+  larger `--traces-max-size`.
+- The slowness happened outside `details.window`:
+  collect again with a window that covers it.
 
 ### Compliant
 
@@ -115,8 +144,9 @@ load the folder, and search for traces longer than
 ```
 
 The report does not say which service or operation
-took the time, and it sends the analysis to a tool
-instead of reading the files.
+took the time, and it sends the analysis to a
+service outside the bundle instead of reading the
+files.
 
 ### Common mistakes
 
@@ -132,7 +162,12 @@ instead of reading the files.
 - Ignoring `traces_left_out` and the sampling ratio:
   the slowest traces are in the bundle, but not
   every slow request.
-- Posting the files to the customer's own Tempo, or
-  to a shared OpsMill instance, to view them.
+- Loading the files into a Tempo or Grafana to view
+  them, or reading the customer's Tempo for more
+  traces. Read the files; ask for a richer next
+  bundle instead.
+- Recommending `--include-traces` for a problem that
+  is not a slowness, such as a crash with a clear
+  traceback.
 
 Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)

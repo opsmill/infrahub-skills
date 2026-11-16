@@ -135,7 +135,12 @@ of `bundle/traces/` before you conclude on a
 slowness, from `0001` (the slowest). For each trace,
 find the spans that took the time from their
 durations and self times, and report the service and
-the operation. No trace viewer is needed. See
+the operation. Read the files only: never start or
+query a Tempo or Grafana, not even a local one. When
+the symptom is a slowness and the bundle has no
+usable traces, recommend a next bundle with
+`--include-traces` and a window that covers the
+slowness. See
 [rules/triage-traces.md](rules/triage-traces.md).
 
 ### 4. Correlate into incidents
@@ -262,6 +267,12 @@ full index.
   names, UUIDs, hostnames, and timestamps make
   searches return nothing. Strip them; search the
   stable parts.
+- **Reaching outside the bundle for more data.** No
+  Tempo, Grafana, Prometheus or Infrahub API queries,
+  not even against a local instance. The only
+  external call is the GitHub issue search; what the
+  bundle lacks goes into the recommendations as a
+  richer next bundle.
 - **Fixing instead of analyzing.** No restarts, no
   `docker`/`kubectl` mutations, no config edits.
   Recommendations go in the report; actions go to
