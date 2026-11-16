@@ -27,7 +27,7 @@ description: Upgrade planning one minor version at a time, device-type export fr
 
 ## Release summary
 
-After upgrading, you can plan an Infrahub upgrade before you run it, with every release on the way checked for breaking changes that affect your repository and instance. You can also convert device types straight from a running NetBox instance, where before you had to export them manually first. When Infrahub is slow, you can also add the traces of the slow requests to the support bundle. Guidance for generators, schemas, menus, and generated protocol files that described Infrahub behavior inaccurately has been corrected.
+After upgrading, you can plan an Infrahub upgrade before you run it, with every release on the way checked for breaking changes that affect your repository and instance. You can also convert device types straight from a running NetBox instance, where before you had to export them manually first. When Infrahub is slow, you can also add the traces of the slow requests to the support bundle, and the analysis reports which service took the time. Guidance for generators, schemas, menus, and generated protocol files that described Infrahub behavior inaccurately has been corrected.
 
 :::note What to expect after upgrading
 
@@ -70,6 +70,16 @@ What changed:
 * Add traces only after you agree. The skill asks whether to include them, for which window (`--traces-since` for a slowness that is still going on, `--traces-start` and `--traces-end` for one that ended), and which minimum duration of trace to keep (`--traces-min-duration`, default `1s`).
 * Get more traces of a slowness you can reproduce. The skill explains how a user with the `super_admin` permission raises the trace sampling ratio for a limited time and removes it after the bundle is created. You run these calls; the skill does not.
 * Keep the API token out of the conversation. The skill says how `INFRAHUB_TRACES_API_TOKEN` reaches the command, and never asks for the token value.
+
+### Find the slow service in the traces of a bundle
+
+When a bundle has traces, the [analyzing-diagnostics](../skills-reference/analyzing-diagnostics.mdx) skill reads the trace files and reports which service and which operation took the time ([#243](https://github.com/opsmill/infrahub-skills/pull/243)).
+
+What changed:
+
+* Get the slow operation from the bundle files. The skill reads the `traces` entry of `bundle_information.json`, then each file of `bundle/traces/`, from the slowest. For each span, it computes the duration and the self time: the duration minus the durations of the direct children of the span. A large self time points to work that has no span, such as a Git operation.
+* Keep the analysis on the bundle. The skill does not start or query a Tempo, Grafana, Prometheus or the Infrahub API, not even a local one. Outside the bundle, it reads only the `opsmill/infrahub` issues and docs.infrahub.app.
+* Know what to collect next. When the traces cannot answer the question, the report says what the next bundle needs: for example `--include-traces` with a window that covers the slowness, or a larger `--traces-max-size` when traces were left out.
 
 ## Bug fixes
 
@@ -135,6 +145,7 @@ Notes: the skills no longer list `allowed-tools`. While a skill is active, Bash,
 * infrahub-planning-upgrades skill plans an upgrade one minor version at a time and checks every release's breaking changes against the repository and instance ([#159](https://github.com/opsmill/infrahub-skills/pull/159)).
 * managing-checks states which repository commit a proposed change's checks run ([#194](https://github.com/opsmill/infrahub-skills/issues/194)).
 * collecting-diagnostics offers `infrahub-collect create --include-traces` for a slow instance, after you agree, with a time window. Needs `infrahub-collect` 2.5.0 or later ([#234](https://github.com/opsmill/infrahub-skills/pull/234)).
+* analyzing-diagnostics reads the trace files of a bundle and reports the service and the operation that took the time; for a slowness without usable traces, it asks for a next bundle with `--include-traces` ([#243](https://github.com/opsmill/infrahub-skills/pull/243)).
 
 ### Changed
 
