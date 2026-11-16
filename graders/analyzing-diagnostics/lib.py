@@ -431,18 +431,16 @@ def check_cross_link_reporting_issues(text: str, **_: object) -> CheckResult:
 
 # --- Traces of a bundle (rules/triage-traces.md) --- #
 #
-# The report must replay the files of bundle/traces/ into a local Tempo with
-# POST /v1/traces, and open each trace by its trace ID. The commands are read
-# from the fenced blocks with shlex; a command inside a shell `for` loop counts.
+# The report must read the trace files and name where the time went: the slow
+# operation, its service and its duration, together in one paragraph or one
+# table row of the prose. Shell blocks do not count, so a span name that only
+# appears in a `jq` filter is not a finding. A command that posts the traces to
+# a Tempo that is not local fails: the traces are customer data.
 
 _FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})[^\n]*\n(.*?)^[ \t]*\1[ \t]*$", re.MULTILINE | re.DOTALL)
 _URL_HOST_RE = re.compile(r"https?://(?:[^@/\s\"']*@)?(\[[^\]]+\]|[^/:\s\"']+)")
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "[::1]", "host.docker.internal"}
 _DATA_OPTIONS = ("-d", "--data", "--data-binary", "--data-raw", "--json")
-_OPEN_BY_ID_RE = re.compile(
-    r"\btrace[ -]?id\b|\bby\s+(its|their|the)\s+(trace\s+)?id\b|/api/(v2/)?traces/", re.IGNORECASE
-)
-_SEARCH_ONLY_RE = re.compile(r"\bsearch\b", re.IGNORECASE)
 
 
 def _curl_commands(text: str) -> list[list[str]]:
@@ -481,39 +479,53 @@ def _posts_trace_file(cmd: list[str]) -> bool:
     return False
 
 
-def check_traces_replayed_by_id(text: str, *, customer_host: str = "", **_: object) -> CheckResult:
-    """Replay bundle/traces/ into a local Tempo, then open each trace by its ID.
-
-    `customer_host` is the host of the customer's Tempo from the manifest of
-    the task. A replay to that host, or to any host that is not local, fails:
-    the traces are customer data and go only to the analyst's own Tempo.
-    """
-    posts = [c for c in _curl_commands(text) if _posts_trace_file(c)]
-    if not posts:
-        return False, "no curl command posts the files of bundle/traces/ to /v1/traces"
-    for cmd in posts:
+def _remote_trace_posts(text: str) -> list[str]:
+    """Hosts that are not local and receive a file of traces/."""
+    hosts: list[str] = []
+    for cmd in _curl_commands(text):
+        if not _posts_trace_file(cmd):
+            continue
         for tok in cmd:
-            if "/v1/traces" not in tok:
-                continue
-            m = _URL_HOST_RE.search(tok)
+            m = _URL_HOST_RE.search(tok) if "/v1/traces" in tok else None
             host = m.group(1).lower() if m else ""
-            if customer_host and host == customer_host.lower():
-                return False, f"posts the traces to the customer's Tempo ({host})"
             if host and host not in _LOCAL_HOSTS and not host.startswith(("<", "$")):
-                return False, f"posts the traces to {host}, not to a local Tempo"
-    prose = _FENCE_RE.sub("\n", text)
-    by_id = [
-        s for s in re.split(r"(?<=[.!?])\s+|\n\s*\n", prose)
-        if _OPEN_BY_ID_RE.search(s) and not re.search(_NEGATION_WORDS, s[: _OPEN_BY_ID_RE.search(s).start()], re.IGNORECASE)
-    ]
-    in_commands = any("/api/v2/traces/" in tok or "/api/traces/" in tok for c in _curl_commands(text) for tok in c)
-    if not (by_id or in_commands):
-        return False, "does not open the replayed traces by trace ID"
-    return True, "replays bundle/traces/ into a local Tempo and opens the traces by ID"
+                hosts.append(host)
+    return hosts
+
+
+def _prose_units(text: str) -> list[str]:
+    """Paragraphs of the prose, and each table row on its own."""
+    units: list[str] = []
+    for para in re.split(r"\n\s*\n", _FENCE_RE.sub("\n\n", text)):
+        rows = [line for line in para.splitlines() if line.lstrip().startswith("|")]
+        units.extend(rows or [para])
+    return units
+
+
+def check_traces_slow_span(
+    text: str, *, span: str = "", service: str = "", duration: str = "", **_: object
+) -> CheckResult:
+    """Name the operation that took the time, its service and its duration.
+
+    `span` and `service` are the names of the slow span of the task's trace,
+    `duration` a regex for its duration. They must appear together in one
+    paragraph or one table row of the prose.
+    """
+    if not (span and service and duration):
+        return False, "check_traces_slow_span requires span, service and duration kwargs"
+    remote = _remote_trace_posts(text)
+    if remote:
+        return False, f"posts the traces to {remote[0]}, not to a local Tempo"
+    dur_re = re.compile(duration, re.IGNORECASE)
+    for unit in _prose_units(text):
+        low = unit.lower()
+        if span.lower() in low and service.lower() in low and dur_re.search(unit):
+            return True, f"names {span!r} on {service} with its duration"
+    return False, f"no paragraph or table row names {span!r}, {service} and its duration together"
 
 
 CHECKS: dict[str, CheckFn] = {
-    "traces-replayed-by-id": check_traces_replayed_by_id,
+    "traces-slow-span": check_traces_slow_span,
     "asks-bundle-location": check_asks_bundle_location,
     "no-location-scan": check_no_location_scan,
     "mentions-manifest": check_mentions_manifest,

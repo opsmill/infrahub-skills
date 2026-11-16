@@ -1,0 +1,16 @@
+## Report
+
+Manifest first (bundle_information.json): the traces collector succeeded with 35 traces, sampling
+ratio 0.1.
+
+| Trace file | Root operation | Service | Duration | Self time |
+| --- | --- | --- | --- | --- |
+| 0001-6c26f0d2e9c893ed614173cb81d8d534.json | Sync Git Repositories | infrahub-task-worker | 10741 ms | 10720 ms |
+
+The children (one database query, one POST on infrahub-server) take about 21 ms. To view the
+trace as a timeline, post it to a local Tempo:
+
+```bash
+curl -X POST http://localhost:4318/v1/traces -H 'Content-Type: application/json' \
+  --data-binary @bundle/traces/0001-6c26f0d2e9c893ed614173cb81d8d534.json
+```

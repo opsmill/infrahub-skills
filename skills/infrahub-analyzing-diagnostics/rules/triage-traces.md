@@ -1,37 +1,35 @@
 ---
-title: Open the traces of a bundle by trace ID in a local Tempo
+title: Read the trace files of a bundle and find where the time went
 impact: HIGH
-tags: triage, traces, tempo, grafana, performance, slowness
+tags: triage, traces, spans, performance, slowness
 ---
 
-## Open the traces of a bundle by trace ID in a local Tempo
+## Read the trace files of a bundle and find where the time went
 
 Impact: HIGH
 
 When the manifest has a `traces` entry with traces
-written, read its `details`, then open the traces:
-post every file of `bundle/traces/` to a local
-Tempo, and open each trace in Grafana by the trace
-ID in its file name, starting with `0001`. Report
-which service and which operation took the time.
+written, read its `details`, then read the files of
+`bundle/traces/` directly, from `0001` (the
+slowest). For each trace, find the spans that took
+the time, and report the service, the operation and
+the duration, with the file name as evidence. No
+trace viewer is needed.
 
 ### Why it matters
 
 A bundle collected with `infrahub-collect create
---include-traces` holds one file per slow request,
-in OpenTelemetry (OTLP) JSON. A trace shows where
-the time of one request went: each service, each
-GraphQL resolver, each database query. It is the
-most direct evidence of a slowness. But the files
-cannot be read one by one: a trace has many spans,
-and only a trace viewer shows them in parent-child
-order with their durations.
+--include-traces` holds one file per slow request.
+A trace shows where the time of one request went:
+each service, each GraphQL query, each database
+query. It is the most direct evidence of a slowness,
+and the logs often show no error at all.
 
-The files are sorted slowest first: `0001` is the
-slowest trace. A Tempo search does not return
-replayed traces whose timestamps are hours or days
-old, but Tempo finds each of them at once by its
-trace ID (tested with Tempo 2.10.3).
+The files are small JSON documents, sorted slowest
+first, so they can be read like any other bundle
+file. Starting a trace viewer only to look at them
+needs Docker and time, and adds nothing to the
+analysis.
 
 ### What to do
 
@@ -49,34 +47,47 @@ trace ID (tested with Tempo 2.10.3).
    - `details.sample_ratio`: the share of requests
      that has a trace. With a low ratio, a missing
      trace does not prove that a request was fast.
-2. Start a local Tempo and Grafana on the analyst's
-   machine, for example the observability stack of
-   the Infrahub development environment. Never post
-   the files to the customer's Tempo or to any
-   shared instance: the traces are customer data.
-3. Post each file to the OTLP HTTP receiver of that
-   local Tempo:
+2. Read each file `NNNN-<trace ID>.json`, from
+   `0001`. The format is OpenTelemetry (OTLP) JSON:
+   - `resourceSpans[].resource.attributes`: the
+     `service.name` of the spans below it, such as
+     `infrahub-server` or `infrahub-task-worker`.
+   - `resourceSpans[].scopeSpans[].spans[]`: each
+     span, with `name` (the operation), `spanId`,
+     `parentSpanId`, `startTimeUnixNano` and
+     `endTimeUnixNano`, and `attributes` such as
+     `query_name` for a database query or `operation`
+     for a GraphQL request.
+   - The duration of a span is `endTimeUnixNano`
+     minus `startTimeUnixNano`, in nanoseconds.
+3. Find where the time went:
+   - The root span (no `parentSpanId`) is the whole
+     request or task.
+   - The self time of a span is its duration minus
+     the durations of its direct children. A large
+     self time means the time went into work that is
+     not traced, such as a Git operation or a call to
+     an external system. A large child means the time
+     went into that child, such as a database query.
+   - Across all traces, add up the self time per
+     service, to say which service takes most of the
+     time.
+   - For a large file or many traces, read the files
+     with a short script (`jq` or Python) rather than
+     by eye, and say that the numbers come from it.
+4. Report, for each trace that matters: the file
+   name, the root operation and its duration, and
+   the spans that took the time, with service,
+   operation and duration. Then the service that
+   takes most of the time across the traces.
 
-   ```bash
-   for f in bundle/traces/*.json; do
-     curl -sf -X POST "http://localhost:4318/v1/traces" \
-       -H "Content-Type: application/json" \
-       --data-binary @"$f" || echo "rejected: $f"
-   done
-   ```
-
-4. Open each trace in Grafana by the trace ID in its
-   file name: `0001-<trace ID>.json`. In Explore,
-   choose the Tempo data source, select TraceQL, and
-   enter the trace ID. Or call the Tempo API:
-   `curl -H "Accept: application/json"
-   "http://localhost:3200/api/v2/traces/<trace ID>"`.
-   Do not use a search to find them.
-5. For each trace, report the slowest spans: the
-   service (`service.name`), the operation (the span
-   name, such as a GraphQL query name or a task
-   name), and the duration. Cite the file name as
-   evidence, like a log line.
+To view a trace as a timeline, a person can post the
+files to a local Tempo with `POST /v1/traces` and
+open each trace in Grafana by the trace ID in its
+file name; a search does not find traces with old
+timestamps. Never post the files to the customer's
+Tempo or to a shared instance: the traces are
+customer data.
 
 ### Compliant
 
@@ -85,41 +96,43 @@ Traces (bundle_information.json: traces, success;
 35 written, 0 left out; window 08:45-08:55 UTC;
 sampling ratio 1.0, raised for the test).
 
-Replayed into a local Tempo with POST /v1/traces,
-then opened by ID in Grafana.
-
 bundle/traces/0001-6c26f0d2e9c893ed614173cb81d8d534.json:
-10.74 s in infrahub-task-worker, span "Sync Git
-Repositories". The GraphQL request that started it
-took 19.7 ms on infrahub-server. The time is in the
-Git sync task, not in the API or the database.
+root span "Sync Git Repositories" on
+infrahub-task-worker, 10.74 s. Its children take
+about 21 ms: one database query (node_get_list,
+1 ms) and one API call (POST on infrahub-server,
+19.7 ms). The self time is 10.72 s, so the time is
+in the Git sync work itself, which has no span, not
+in the API or the database.
 ```
 
 ### Non-compliant
 
 ```text
-The bundle has a traces/ folder. I read
-0001-6c26f0d2e9c893ed614173cb81d8d534.json: it has
-many spans with startTimeUnixNano values. Load the
-folder into Grafana and search for slow traces.
+The bundle has 35 traces. Start Tempo and Grafana,
+load the folder, and search for traces longer than
+1s to see what was slow.
 ```
 
 The report does not say which service or operation
-took the time, and a Grafana search does not find
-replayed traces that are older than a few minutes.
+took the time, and it sends the analysis to a tool
+instead of reading the files.
 
 ### Common mistakes
 
-- Searching for the replayed traces instead of
-  opening them by ID. The search returns nothing,
-  and the analyst concludes that the bundle has no
-  slow trace.
-- Posting the files to the customer's own Tempo, or
-  to a shared OpsMill instance.
-- Reading the JSON files by hand and quoting raw
-  timestamps instead of span durations.
+- Naming the slowest span without its self time. A
+  10 s request whose 10 s child is a database query
+  points at the database; a 10 s span whose children
+  take 20 ms points at untraced work in that span.
+- Reading only `0001`. The slowest trace can be an
+  outlier; the other traces show whether the same
+  service is slow every time.
+- Quoting raw `startTimeUnixNano` values instead of
+  durations.
 - Ignoring `traces_left_out` and the sampling ratio:
   the slowest traces are in the bundle, but not
   every slow request.
+- Posting the files to the customer's own Tempo, or
+  to a shared OpsMill instance, to view them.
 
 Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)
