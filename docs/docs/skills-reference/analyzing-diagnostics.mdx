@@ -42,7 +42,7 @@ A findings report based on bundle evidence:
 - **Stable search keys**: a key is built from the exception class, the normalized message, and the innermost Infrahub frame, with branch names, UUIDs, and hostnames stripped, so a known issue actually matches
 - **Both halves of the tracker**: the issue search covers open and closed issues, because a closed match is the one that tells you which version includes the fix
 - **Evidence per finding**: every claim cites a bundle path and a quoted excerpt, and what the bundle cannot answer is stated as an open question rather than left out
-- **Read-only**: the analysis reads an already-collected bundle and runs issue searches, its only external call; it never touches the running instance, restarts nothing, edits no configuration, and creates no issue
+- **Read-only**: the analysis reads an already-collected bundle and reads only two sources outside it, the `opsmill/infrahub` issues and the Infrahub documentation; it never touches the running instance, restarts nothing, edits no configuration, and creates no issue
 
 ## Common mistakes it catches
 

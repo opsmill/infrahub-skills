@@ -269,10 +269,10 @@ full index.
   stable parts.
 - **Reaching outside the bundle for more data.** No
   Tempo, Grafana, Prometheus or Infrahub API queries,
-  not even against a local instance. The only
-  external call is the GitHub issue search; what the
-  bundle lacks goes into the recommendations as a
-  richer next bundle.
+  not even against a local instance. Outside the
+  bundle, read only the `opsmill/infrahub` issues and
+  `docs.infrahub.app`; what the bundle lacks goes
+  into the recommendations as a richer next bundle.
 - **Fixing instead of analyzing.** No restarts, no
   `docker`/`kubectl` mutations, no config edits.
   Recommendations go in the report; actions go to

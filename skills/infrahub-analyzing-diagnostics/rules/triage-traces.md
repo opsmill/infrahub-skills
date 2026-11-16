@@ -84,8 +84,9 @@ analysis.
    post to a Tempo, Grafana, Prometheus or the
    Infrahub API, not even a local one: the answer
    must come from the files, and the traces are
-   customer data. The only external call of this
-   skill is the GitHub issue search (see
+   customer data. Outside the bundle, the skill
+   reads only the `opsmill/infrahub` issues and
+   `docs.infrahub.app` (see
    [scope-read-only-analysis.md](scope-read-only-analysis.md)).
 
 ### Ask for a richer next bundle
