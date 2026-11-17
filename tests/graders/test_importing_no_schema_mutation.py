@@ -14,10 +14,10 @@ from pathlib import Path
 
 import pytest
 
-GRADER = (
-    Path(__file__).resolve().parent.parent.parent
-    / "graders" / "importing-data" / "check_no_schema_mutation.py"
-)
+GRADERS_DIR = Path(__file__).resolve().parent.parent.parent / "graders" / "importing-data"
+GRADER = GRADERS_DIR / "check_no_schema_mutation.py"
+# The csv-import-fail-closed task grader runs the same `fail-closed` check.
+FAIL_CLOSED_GRADER = GRADERS_DIR / "check_fail_closed.py"
 
 OBJECT_ROWS = """---
 apiVersion: infrahub.app/v1
@@ -53,14 +53,14 @@ extensions:
 REPORT = "gpu_count has no schema home on DcimDevice. Checked: DcimDevice.\n"
 
 
-def _score(tmp_path: Path, files: dict[str, str]) -> float:
+def _score(tmp_path: Path, files: dict[str, str], grader: Path = GRADER) -> float:
     out = tmp_path / "output_dir"
     out.mkdir()
     for rel, content in files.items():
         (out / rel).parent.mkdir(parents=True, exist_ok=True)
         (out / rel).write_text(content)
     proc = subprocess.run(
-        [sys.executable, str(GRADER), str(out)],
+        [sys.executable, str(grader), str(out)],
         capture_output=True, text=True, check=True,
     )
     return json.loads(proc.stdout)["score"]
@@ -77,8 +77,7 @@ def _score(tmp_path: Path, files: dict[str, str]) -> float:
             "  data: []\n",
         )}, 1.0),
         # Compliant: the structured report as YAML. It lists the unmapped
-        # columns as mappings and has no `kind`, `spec` or `data` (review of
-        # #247).
+        # columns as mappings, outside `spec` and `data` (review of #247).
         ({"report.yml": (
             "result: failed_closed\n"
             "unmapped_columns:\n"
@@ -155,3 +154,51 @@ def test_fail_closed_answer_passes(tmp_path: Path, files: dict, expected: float)
 )
 def test_schema_change_or_partial_write_fails(tmp_path: Path, files: dict) -> None:
     assert _score(tmp_path, files) < 1.0
+
+
+# A structured YAML report that names the kind it checked. Its top-level
+# list of mappings describes the unmapped columns; it is not object rows
+# (review of #247).
+KIND_REPORT = (
+    "kind: DcimDevice\n"
+    "status: failed\n"
+    "unmapped_columns:\n"
+    "  - column: license_tier\n"
+    "    reason: no attribute, relationship or dropdown on DcimDevice\n"
+)
+
+
+@pytest.mark.parametrize("grader", [GRADER, FAIL_CLOSED_GRADER], ids=["no-schema-mutation", "fail-closed"])
+@pytest.mark.parametrize(
+    "files",
+    [
+        # Compliant: a YAML report that names the kind it checked.
+        {"report.yml": KIND_REPORT},
+        # Compliant: a YAML file that holds only a comment, so no document.
+        {"report.yml": "# Import aborted: license_tier has no schema home\n"},
+        # Compliant: an empty YAML file.
+        {"report.yml": ""},
+    ],
+    ids=["kind-report", "comment-only", "empty-file"],
+)
+def test_report_without_rows_passes(tmp_path: Path, files: dict, grader: Path) -> None:
+    assert _score(tmp_path, files, grader) == 1.0
+
+
+@pytest.mark.parametrize("grader", [GRADER, FAIL_CLOSED_GRADER], ids=["no-schema-mutation", "fail-closed"])
+@pytest.mark.parametrize(
+    "files",
+    [
+        # Near-miss: the same report, with the rows under a top-level `data:`.
+        {"report.yml": KIND_REPORT + "data:\n  - name: spine-01\n    license_tier: gold\n"},
+        # Near-miss: the rows under `data` nested in a report section.
+        {"report.yml": KIND_REPORT + "result:\n  data:\n    - name: spine-01\n"},
+        # Near-miss: the report as a top-level list. A report is a mapping.
+        {"report.yml": "- column: license_tier\n  kind: DcimDevice\n"},
+        # Near-miss: a comment line, then a file that does not parse as YAML.
+        {"report.yml": "# Import aborted\nkey: [unclosed\n"},
+    ],
+    ids=["kind-report-with-data", "nested-data", "list-report", "unparseable"],
+)
+def test_report_with_rows_or_unreadable_fails(tmp_path: Path, files: dict, grader: Path) -> None:
+    assert _score(tmp_path, files, grader) < 1.0

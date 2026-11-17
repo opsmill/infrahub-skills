@@ -932,44 +932,35 @@ def check_provenance_comment(
 def _row_lists(doc: dict) -> list[tuple[str, int]]:
     """(key path, row count) for each list of rows a document holds.
 
-    Rows are a non-empty list of mappings, or any non-empty list under a
-    ``data`` key. A list of scalars under another key (``tags: [a, b]``) is
-    not a list of rows. The check looks:
+    Rows are:
 
-    - under ``spec``, at any depth (``spec.data``, ``spec.payload.data``);
-    - at the top level of a document that has ``kind`` or ``spec``;
-    - under a top-level ``data`` key in any document.
+    - any non-empty list under a key named ``data``, at any depth of the
+      document (``data``, ``spec.data``, ``spec.payload.data``,
+      ``result.data``), a list of scalars included;
+    - any non-empty list of mappings under the top-level ``spec``, in any
+      key and at any depth (``spec.rows``).
 
-    A document with no ``kind``, no ``spec`` and no ``data`` is not object
-    data: a YAML report that lists the unmapped columns as mappings is the
-    structured report the skill asks for.
+    Any other list is not rows. A top-level list of mappings such as
+    ``unmapped_columns`` is the structured report the skill asks for, even
+    when the document also names the ``kind`` it checked.
     """
     found: list[tuple[str, int]] = []
 
-    def rows_of(key: str, value: Any) -> int:
-        if not isinstance(value, list) or not value:
-            return 0
-        rows = sum(1 for item in value if isinstance(item, dict))
-        return rows or (len(value) if key == "data" else 0)
-
-    def walk(prefix: str, holder: dict) -> None:
+    def walk(prefix: str, holder: dict, under_spec: bool) -> None:
         for key, value in holder.items():
-            rows = rows_of(key, value)
-            if rows:
-                found.append((f"{prefix}{key}", rows))
-            elif isinstance(value, dict):
-                walk(f"{prefix}{key}.", value)
-
-    object_like = "kind" in doc or "spec" in doc
-    for key, value in doc.items():
-        if key == "spec":
+            path = f"{prefix}{key}"
             if isinstance(value, dict):
-                walk("spec.", value)
-            continue
-        if object_like or key == "data":
-            rows = rows_of(key, value)
-            if rows:
-                found.append((key, rows))
+                walk(f"{path}.", value, under_spec or (not prefix and key == "spec"))
+                continue
+            if not isinstance(value, list) or not value:
+                continue
+            mappings = sum(1 for item in value if isinstance(item, dict))
+            if key == "data":
+                found.append((path, mappings or len(value)))
+            elif under_spec and mappings:
+                found.append((path, mappings))
+
+    walk("", doc, False)
     return found
 
 
@@ -984,29 +975,31 @@ def check_fail_closed(
     When an input column has no schema home, the skill must stop and write
     nothing — never a partial emission that silently drops the column. The
     grader asserts the invariant that survives in the output directory: no
-    YAML document carries rows, whatever its ``kind``. Rows are a non-empty
-    list of mappings under ``spec``, under a top-level ``data:``, or at the
-    top level of a document that has ``kind`` or ``spec`` (see
-    ``_row_lists``). A YAML report with no ``kind``, ``spec`` or ``data``
-    that lists the unmapped columns passes. A YAML file that parses to no
-    mapping document (a top-level list of rows, or a file that does not
-    parse) is a write the check cannot read, so it fails too. A plain-text
-    report explaining the unmapped column is fine (it isn't YAML), and an
-    empty / absent output dir also passes.
+    YAML document carries rows, whatever its ``kind``. Rows are any
+    non-empty list under a ``data`` key at any depth, or any non-empty list
+    of mappings under ``spec`` (see ``_row_lists``). A YAML report that
+    lists the unmapped columns as mappings passes, with or without a
+    ``kind``. A YAML file with no document at all (empty, or only comments)
+    passes. A file that does not parse, a top-level YAML list, or a file
+    whose only documents are not mappings is a write the check cannot read
+    as a report, so it fails. A plain-text report explaining the unmapped
+    column is fine (it isn't YAML), and an empty / absent output dir also
+    passes.
     """
     offending: list[str] = []
     for file_path, docs in parsed_files.items():
-        if not docs:
-            offending.append(f"{file_path.name}: YAML file with no mapping document")
-            continue
         # The parsed docs keep only mappings, so a list of rows next to a
         # mapping document in the same stream would go unseen. Re-read it.
         try:
             raw_docs = list(yaml.safe_load_all(file_path.read_text(encoding="utf-8", errors="replace")))
         except (OSError, yaml.YAMLError):
-            raw_docs = []
+            offending.append(f"{file_path.name}: YAML file that does not parse")
+            continue
+        raw_docs = [d for d in raw_docs if d is not None]
         if any(isinstance(d, list) and d for d in raw_docs):
             offending.append(f"{file_path.name}: YAML list document of rows")
+        elif raw_docs and not docs:
+            offending.append(f"{file_path.name}: YAML file with no mapping document")
         for idx, doc in enumerate(docs):
             for key, rows in _row_lists(doc):
                 offending.append(
