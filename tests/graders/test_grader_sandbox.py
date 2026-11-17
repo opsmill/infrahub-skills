@@ -147,6 +147,8 @@ def test_grader_reads_skill_files_in_trial_layout(
         if any(marker in m for marker in _CRASH_MARKERS)
         or "not found at" in m
         or "could not read" in m
+        # The fetch script found no caps under the definition names it knows.
+        or "no maxLength cap" in m
     ]
     assert not missing, f"{script}: skill file unreachable in trial layout: {missing}"
 

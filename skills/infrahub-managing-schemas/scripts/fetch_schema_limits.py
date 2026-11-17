@@ -23,16 +23,18 @@ Modes
 
 The JSON output is keyed by schema name (``NodeSchema``,
 ``GenericSchema``, ``AttributeSchema``, ``RelationshipSchema``).
-Schemas without ``-Input`` / ``-Output`` variants in the OpenAPI
-spec are normalised to the JSON Schema names so the output structure
-is identical regardless of source.
+Both sources name their definitions differently across Infrahub
+versions (``NodeSchemaWrite``, ``GenericAttributeWrite``,
+``AttributeSchema-Input``). The script normalises them to these four
+names so the output structure is identical regardless of source.
 
 Exit codes
 ----------
 Without ``--check``:
   0  Constraints printed to stdout.
-  1  Source unreachable or returned invalid JSON. A human-readable
-     diagnostic is printed to stderr.
+  1  Source unreachable, returned invalid JSON, or has no ``maxLength``
+     cap for one of the four schema names. A human-readable diagnostic
+     is printed to stderr.
 
 With ``--check``:
   0  All files within caps, OR source unreachable (warned to
@@ -41,6 +43,9 @@ With ``--check``:
      visibly inconclusive rather than wrong.
   1  At least one over-cap field found; issues printed to stdout.
   2  ``--check`` was passed but PyYAML is not installed.
+  3  The source was read but has no ``maxLength`` cap for one of the
+     four schema names, so no file was validated. The definition
+     names in the source have probably changed.
 """
 from __future__ import annotations
 
@@ -57,14 +62,22 @@ PUBLIC_SCHEMA_URL = "https://schema.infrahub.app/infrahub/schema/latest.json"
 SCHEMA_NAMES = ("NodeSchema", "GenericSchema",
                 "AttributeSchema", "RelationshipSchema")
 
-# Map of OpenAPI -> normalised name. The OpenAPI export uses
-# `AttributeSchema-Input` for the request body variant; the JSON
-# Schema export uses `AttributeSchema`. Normalise to the latter.
-OPENAPI_NAME_MAP = {
-    "NodeSchema": "NodeSchema",
-    "GenericSchema": "GenericSchema",
-    "AttributeSchema-Input": "AttributeSchema",
-    "RelationshipSchema": "RelationshipSchema",
+# Definition names to try, in order, for each normalised name. Both the
+# public JSON Schema export and `/api/openapi.json` name the definitions
+# `NodeSchemaWrite` and so on, and have no attribute definition of their own:
+# every attribute kind maps to `GenericAttributeWrite` or a variant with the
+# same caps. The names without `Write` and `AttributeSchema-Input` are the
+# ones that older Infrahub versions use.
+DEFINITION_NAMES = {
+    "NodeSchema": ("NodeSchemaWrite", "NodeSchema"),
+    "GenericSchema": ("GenericSchemaWrite", "GenericSchema"),
+    "AttributeSchema": (
+        "GenericAttributeWrite",
+        "AttributeSchemaWrite",
+        "AttributeSchema-Input",
+        "AttributeSchema",
+    ),
+    "RelationshipSchema": ("RelationshipSchemaWrite", "RelationshipSchema"),
 }
 
 
@@ -110,35 +123,35 @@ def _extract_properties(props: dict) -> dict[str, dict]:
     return out
 
 
-# Definition names to try, in order, for each normalised name. The public
-# JSON Schema export names its definitions `NodeSchemaWrite` and so on, and
-# has no attribute definition of its own: every attribute kind maps to
-# `GenericAttributeWrite` or a variant with the same caps.
-JSON_SCHEMA_NAMES = {
-    "NodeSchema": ("NodeSchema", "NodeSchemaWrite"),
-    "GenericSchema": ("GenericSchema", "GenericSchemaWrite"),
-    "AttributeSchema": ("AttributeSchema", "AttributeSchemaWrite", "GenericAttributeWrite"),
-    "RelationshipSchema": ("RelationshipSchema", "RelationshipSchemaWrite"),
-}
-
-
-def caps_from_json_schema(doc: dict) -> dict[str, dict[str, dict]]:
-    defs = doc.get("$defs", {})
+def _caps_from_definitions(defs: dict) -> dict[str, dict[str, dict]]:
+    """The constraints of the first definition found for each schema name."""
     out: dict[str, dict[str, dict]] = {}
     for name in SCHEMA_NAMES:
-        found = next((defs[c] for c in JSON_SCHEMA_NAMES[name] if c in defs), {})
+        found = next((defs[c] for c in DEFINITION_NAMES[name] if c in defs), {})
         out[name] = _extract_properties(found.get("properties", {}))
     return out
 
 
+def caps_from_json_schema(doc: dict) -> dict[str, dict[str, dict]]:
+    return _caps_from_definitions(doc.get("$defs", {}))
+
+
 def caps_from_openapi(doc: dict) -> dict[str, dict[str, dict]]:
-    schemas = doc.get("components", {}).get("schemas", {})
-    out: dict[str, dict[str, dict]] = {name: {} for name in SCHEMA_NAMES}
-    for openapi_name, normalised in OPENAPI_NAME_MAP.items():
-        out[normalised] = _extract_properties(
-            schemas.get(openapi_name, {}).get("properties", {})
-        )
-    return out
+    return _caps_from_definitions(doc.get("components", {}).get("schemas", {}))
+
+
+def names_without_caps(caps: dict[str, dict[str, dict]]) -> list[str]:
+    """The schema names for which the source gave no ``maxLength`` cap.
+
+    Infrahub caps the name of every node, generic, attribute and
+    relationship. A name with no cap means the script did not find its
+    definition in the source, not that the field has no limit.
+    """
+    return [
+        name
+        for name in SCHEMA_NAMES
+        if not any("maxLength" in info for info in caps.get(name, {}).values())
+    ]
 
 
 def check_files(paths: list[str], caps: dict[str, dict[str, dict]]) -> int:
@@ -229,7 +242,8 @@ def main(argv: list[str] | None = None) -> int:
             "maxLength caps. Composes with --openapi. Exits 1 if any "
             "field is over cap; exits 0 (with stderr warning) if the "
             "source is unreachable so CI tolerates transient network "
-            "failures."
+            "failures; exits 3 if the source has no caps for a schema "
+            "name, because no file was validated."
         ),
     )
     args = parser.parse_args(argv)
@@ -258,6 +272,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     caps = caps_from_openapi(doc) if from_openapi else caps_from_json_schema(doc)
+
+    missing = names_without_caps(caps)
+    if missing:
+        print(
+            f"ERROR: {url} has no maxLength cap for {', '.join(missing)}. "
+            "The definition names in the source have probably changed. "
+            "String-length validation cannot be performed.",
+            file=sys.stderr,
+        )
+        return 3 if args.check else 1
 
     if args.check:
         n_issues = check_files(args.check, caps)
