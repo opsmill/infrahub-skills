@@ -12,6 +12,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 LIB_PATH = REPO_ROOT / "graders" / "teaching-concepts" / "lib.py"
 
@@ -604,6 +606,41 @@ def test_own_artifacts_short_name_without_backticks_passes(tmp_path):
         "Cardinality controls", "Each zone can hold many sensors. Cardinality controls"
     )
     ws = make_ws(tmp_path, lesson=prose)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert ok, msg
+
+
+@pytest.mark.parametrize(
+    "reference",
+    ["to your **Zone** node", "to your Zone node", "to the node named `Zone`", "to the Zone kind"],
+    ids=["bold", "plain", "node-named", "kind"],
+)
+def test_own_artifacts_short_name_as_node_name_fails(tmp_path, reference):
+    """A short name next to node or kind, with or without backticks (review of #247)."""
+    mixed = COMPLIANT_LESSON.replace("to `TestbedZone`", reference)
+    assert mixed != COMPLIANT_LESSON
+    ws = make_ws(tmp_path, lesson=mixed)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert not ok and "Zone" in msg and "short name" in msg
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        # The contrast form that grounding-own-artifacts.md writes itself.
+        "Always write `TestbedZone`, not `Zone`.",
+        # An attributes lesson that explains `name` and `namespace`.
+        "Its kind joins the `namespace` (`Testbed`) and the `name` (`Sensor`).",
+        # The full kind and the short name of the same node in one sentence.
+        "The `TestbedZone` kind is the `Zone` node in the `Testbed` namespace.",
+    ],
+    ids=["contrast", "name-and-namespace", "full-kind-in-sentence"],
+)
+def test_own_artifacts_short_name_not_as_node_name_passes(tmp_path, sentence):
+    """Near-miss: the short name appears, but not as the name of a node (review of #247)."""
+    lesson = COMPLIANT_LESSON.replace("Cardinality controls", f"{sentence} Cardinality controls")
+    assert lesson != COMPLIANT_LESSON
+    ws = make_ws(tmp_path, lesson=lesson)
     ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
     assert ok, msg
 

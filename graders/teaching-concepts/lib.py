@@ -501,6 +501,42 @@ def _learner_nodes(ws: Path) -> set[tuple[str, str]]:
 _NOT_LEARNER_DIRS = ("graders", ".claude", ".agents")
 
 
+def _short_name_uses(explain: str, nodes: set[tuple[str, str]]) -> list[str]:
+    """The learner nodes that Explain names by their short name.
+
+    The rule names each node by its full kind (`TestbedSensor`, not
+    `Sensor`). A short name counts when it is used as a node name: next to
+    "node", "kind", "object" or "generic", in backticks, in bold or plain
+    ("your `Zone` node", "your **Zone** node", "the Zone kind"). A sentence
+    that also names the full kind of that node is skipped, so the contrast
+    the rule itself writes ("`TestbedZone`, not `Zone`") passes. A short name
+    that is not used as a node name passes too ("the `name` (`Sensor`)",
+    "each zone holds many sensors").
+    """
+    kinds = {f"{namespace}{name}" for namespace, name in nodes}
+    full_kinds: dict[str, set[str]] = {}
+    for namespace, name in nodes:
+        if name not in kinds:
+            full_kinds.setdefault(name, set()).add(f"{namespace}{name}")
+    mark = r"[`*_]*"
+    word = r"(?i:node|kind|object|generic)s?"
+    used: set[str] = set()
+    # A sentence ends at a sentence ender followed by whitespace, or at a
+    # blank line. It may wrap across lines.
+    for sentence in re.split(r"(?<=[.!?])\s+|\n\s*\n", explain):
+        for name, fulls in full_kinds.items():
+            if any(full in sentence for full in fulls):
+                continue
+            short = re.escape(name)
+            if re.search(
+                rf"(?<![A-Za-z0-9]){mark}{short}{mark}\s+{word}\b"
+                rf"|\b{word}\s+(?:(?i:called|named)\s+)?{mark}{short}{mark}(?![A-Za-z0-9])",
+                sentence,
+            ):
+                used.add(name)
+    return sorted(used)
+
+
 def check_own_artifacts(ws: Path) -> tuple[bool, str]:
     """Every lesson's Explain is anchored to a kind the learner owns.
 
@@ -518,9 +554,7 @@ def check_own_artifacts(ws: Path) -> tuple[bool, str]:
             "no learner schema file in the workspace; grounding cannot be "
             "graded without the artifacts it is supposed to ground in"
         )
-    # The rule names each node by its full kind (`TestbedSensor`, not
-    # `Sensor`): a short name in backticks is a node named the wrong way.
-    short_names = {name for _, name in _learner_nodes(ws)} - kinds
+    nodes = _learner_nodes(ws)
     for lesson in found:
         explain = sections(lesson.read_text()).get("Explain", "")
         if not any(k in explain for k in kinds):
@@ -528,7 +562,7 @@ def check_own_artifacts(ws: Path) -> tuple[bool, str]:
                 f"{lesson.name}: Explain names none of the learner's kinds "
                 f"{sorted(kinds)}; it teaches through an invented example"
             )
-        short = sorted(n for n in short_names if f"`{n}`" in explain)
+        short = _short_name_uses(explain, nodes)
         if short:
             return False, (
                 f"{lesson.name}: Explain names learner nodes by their short "
