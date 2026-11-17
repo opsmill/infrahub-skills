@@ -16,8 +16,8 @@ In the customer's sync configuration, the `identifiers`
 of each `schema_mapping` entry are the fields of the
 destination kind's `human_friendly_id`: one identifier
 per HFID element, named after the element's first
-segment (`location__name__value` gives `location`), in
-the same order. When the node declares no
+segment (`location__name__value` gives `location`). The
+order does not matter. When the node declares no
 `human_friendly_id`, use the one it inherits from a
 generic listed in `inherit_from`.
 
@@ -47,7 +47,7 @@ and Infrahub holds one node.
    `human_friendly_id`, take it from the first generic
    in its `inherit_from` that declares one.
 2. **Set `identifiers`** to the first segment of each HFID
-   element, in order. The fields of those names must be
+   element. The fields of those names must be
    in the entry's `fields`.
 3. **Keep the source's stable ID as an ordinary field**
    (`object_id`, `webex_id`) when the schema has an
@@ -131,16 +131,24 @@ problem at once, not the first one:
 from collections import Counter
 
 
-def precheck(records: list[dict], identifiers: list[str], parent_field: str | None, known_parents: set) -> dict:
-    """records: one dict per source record, with the mapped field values the sync will send."""
+def precheck(
+    records: list[dict], identifiers: list[str], parent_field: str | None, known_parents: set, roots_allowed: bool
+) -> dict:
+    """records: one dict per source record, with the mapped field values the sync will send.
+
+    roots_allowed: True when a record may have no parent (a top-level site in a site tree),
+    False when the parent is required (a room always belongs to a site).
+    """
     keys = [tuple(record.get(field) for field in identifiers) for record in records]
-    # An empty parent marks a root record, such as a top-level site: it is not a missing parent.
-    parents = {record.get(parent_field) for record in records} if parent_field else set()
+    parents = [record.get(parent_field) for record in records] if parent_field else []
     return {
         "duplicate_identifiers": [key for key, count in Counter(keys).items() if count > 1],
         "empty_identifiers": [key for key in keys if any(value in (None, "") for value in key)],
+        "empty_parents": []
+        if roots_allowed
+        else [key for key, parent in zip(keys, parents) if parent in (None, "")],
         "missing_parents": sorted(
-            (parent for parent in parents if parent not in (None, "") and parent not in known_parents), key=str
+            {parent for parent in parents if parent not in (None, "") and parent not in known_parents}, key=str
         ),
     }
 ```

@@ -188,7 +188,9 @@ Work in the customer's repository.
       and unique only when the source always fills it,
       because an optional unique attribute fails as soon
       as two nodes leave it empty. Never map a computed
-      attribute.
+      attribute. **Approval point 3:** wait for the
+      user's approval of the schema change before loading
+      it.
    3. If no node exists, hand off to
       `infrahub-managing-schemas`. **Approval point 3:**
       wait for the user's approval of the new schema.
@@ -213,8 +215,10 @@ Work in the customer's repository.
 4. **Approval point 4:** run `infrahub-sync sync` to the
    branch only after the user approves.
 5. Run `infrahub-sync diff` again. It must report no
-   changes; any change means the adapter or the mapping
-   does not round-trip.
+   creates or updates; any one means the adapter or the
+   mapping does not round-trip. Deletions of existing
+   nodes the source does not hold are expected, because
+   the Infrahub adapter does not delete.
 
 The commands are in
 [reference.md](./reference.md#phase-5-live-validation-commands).

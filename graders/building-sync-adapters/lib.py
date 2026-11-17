@@ -281,20 +281,25 @@ def check_behavior_field_quirks(ctx: dict) -> tuple[bool, str]:
 
 def run_fake_probe(output_dir: Path) -> dict:
     """Run ``_fake_probe.py`` against the model's fake; return its JSON report."""
-    proc = subprocess.run(
-        [
-            sys.executable,
-            "-I",
-            str(_HERE / "_fake_probe.py"),
-            str(output_dir.resolve()),
-            str(DATA),
-        ],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        cwd=str(output_dir.resolve()),
-        check=False,
-    )
+    if not output_dir.is_dir():
+        return {"error": f"no {output_dir}/ directory: the fake was not written there"}
+    try:
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-I",
+                str(_HERE / "_fake_probe.py"),
+                str(output_dir.resolve()),
+                str(DATA),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            cwd=str(output_dir.resolve()),
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return {"error": "probe timed out after 60 s"}
     try:
         return json.loads(proc.stdout.strip().splitlines()[-1])
     except (IndexError, json.JSONDecodeError):
@@ -704,6 +709,27 @@ def _reraises(handler: ast.ExceptHandler) -> bool:
     )
 
 
+_HTTP_RECEIVERS = ("session", "client", "http", "requests", "httpx")
+
+
+def _calls_http(stmts: list[ast.stmt]) -> bool:
+    """The statements call an HTTP session or client (``self.session.get(...)``, ``requests.get(...)``)."""
+    for stmt in stmts:
+        for n in ast.walk(stmt):
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute):
+                receiver = n.func.value
+                name = (
+                    receiver.id
+                    if isinstance(receiver, ast.Name)
+                    else receiver.attr
+                    if isinstance(receiver, ast.Attribute)
+                    else ""
+                )
+                if any(word in name.lower() for word in _HTTP_RECEIVERS):
+                    return True
+    return False
+
+
 def check_no_tls_retry(ctx: dict) -> tuple[bool, str]:
     """A handler that retries connection errors handles SSLError first, so TLS errors are not retried."""
     tree = ctx["py"]
@@ -711,7 +737,9 @@ def check_no_tls_retry(ctx: dict) -> tuple[bool, str]:
         return False, f"no-tls-retry: {ctx['py_err']}"
     broad_seen = False
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Try):
+        # Only the try around the HTTP call retries; an unrelated
+        # ``except OSError`` (a reset-time parse, a file read) does not.
+        if not isinstance(node, ast.Try) or not _calls_http(node.body):
             continue
         ssl_handled = False
         for handler in node.handlers:
@@ -813,13 +841,20 @@ _ALLOWED = (
     re.compile(r"^changelog/"),
     re.compile(r"^(dev/)?specs/"),
     re.compile(r"^[^/]+\.md$"),  # issue drafts or notes at the top level
+    re.compile(r"^\.vale/styles/spelling-exceptions\.txt$"),
 )
+# Left by running the tests or the linters; not part of the change.
+_CACHE_PARTS = {"__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache"}
 
 
 def check_diff_stays_in_adapter(ctx: dict) -> tuple[bool, str]:
     """Every changed file is the adapter module or a test, example, doc, changelog or spec file."""
     root = ctx["output_dir"]
-    files = [p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()]
+    files = [
+        p.relative_to(root).as_posix()
+        for p in root.rglob("*")
+        if p.is_file() and not _CACHE_PARTS & set(p.relative_to(root).parts)
+    ]
     if not any(f == "infrahub_sync/adapters/servicenow.py" for f in files):
         return (
             False,
@@ -891,7 +926,7 @@ def run_checks(check_names: list[str], workdir: Path = Path()) -> dict:
         try:
             ok, msg = CHECKS[name](ctx)
         except Exception as exc:  # noqa: BLE001 - a crashing check fails, it does not abort the run
-            ok, msg = False, f"{name}: error running check: {exc!r}"
+            ok, msg = False, f"{name}: Error running check: {exc!r}"
         passed += ok
         entries.append({"name": name, "passed": ok, "message": msg})
     total = len(check_names)

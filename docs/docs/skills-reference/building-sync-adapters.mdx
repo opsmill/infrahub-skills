@@ -15,12 +15,13 @@ The Sync Adapter Builder guides you through adding a source adapter to [infrahub
 
 ## What it produces
 
-- Raw API responses captured from the live system, with customer values replaced by invented ones
+- Raw API responses captured from the live system, kept out of every repository
+- Redacted copies of those responses, with customer values replaced by invented ones, as test fixtures under `tests/fixtures/<name>/`
 - `api-behavior.yml`, one entry per endpoint: pagination, the parameters the next-page link repeats, field selection, rate limiting, and how field values are shaped
 - A spec that cites the behavior file
 - The adapter module, with unit tests whose fakes serve the captured responses
 - A sync config whose `identifiers` match each destination kind's human-friendly ID
-- A live validation run: `generate`, `diff`, `sync` to an Infrahub branch, then a second `diff` that shows no changes
+- A live validation run: `generate`, `diff`, `sync` to an Infrahub branch, then a second `diff` that shows no creates or updates
 - A pull request description that lists every repository check with its result
 - Drafted issues for any infrahub-sync core change the work needs, instead of the change itself
 
@@ -35,7 +36,7 @@ The Sync Adapter Builder guides you through adding a source adapter to [infrahub
 
 - **Probe before the spec**: the live API is queried first, and the spec cites the behavior file built from what the responses show, not from vendor documentation
 - **Fakes built from captures**: unit-test fakes serve the captured bodies and headers and behave like the real API, neither looser nor stricter
-- **Default retry policy**: 429, 502, 503 and 504 and dropped connections are retried, `Retry-After` is honored up to 300 seconds, backoff is capped at 60 seconds with jitter, and TLS errors are never retried
+- **Default retry policy**: 429, 502, 503 and 504 and dropped connections are retried, `Retry-After` is honored in full and a wait above 300 seconds stops the run with an error, backoff is capped at 60 seconds with jitter, and TLS errors are never retried
 - **Identifiers match the human-friendly ID**: the sync `identifiers` equal the destination kind's `human_friendly_id`, including one inherited from a generic, because the Infrahub upsert matches on it
 - **Adapter files only**: the change touches the adapter module, its tests, example, docs, changelog fragment and spec, and nothing else in infrahub-sync
 - **Every check before the pull request**: format, lint, type check, tests, Markdown lint, docs build, the example's `generate` and `diff`, the news fragment, and the docs sidebar

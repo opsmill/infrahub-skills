@@ -83,6 +83,8 @@ import json
 from pathlib import Path
 from urllib.parse import parse_qsl, urlsplit
 
+import requests
+
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "netinventory"
 LIST_KEY = "items"  # where the rows sit in the captured body
 SELECT_PARAM = "fields"  # api-behavior.yml: field_selection
@@ -96,6 +98,11 @@ class FakeResponse:
 
     def json(self) -> object:
         return self._body
+
+    def raise_for_status(self) -> None:
+        """As a real response does, so the retry client runs unchanged against the fake."""
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"HTTP {self.status_code}", response=self)
 
 
 def _query(url: str, params: dict | None) -> tuple[str, dict[str, str]]:

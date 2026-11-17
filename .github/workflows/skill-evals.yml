@@ -165,7 +165,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pyyaml
+          pip install pyyaml requests
           npm i -g skillgrade @anthropic-ai/claude-code
 
       - name: Run skillgrade (${{ matrix.skill }})

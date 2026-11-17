@@ -18,7 +18,9 @@ infrahub-sync checkout:
 - `infrahub_sync/adapters/<name>.py`;
 - its tests and fixtures under `tests/`;
 - its example under `examples/`;
-- its docs page and the adapter lists under `docs/`;
+- its docs page and the adapter lists under `docs/`, and
+  the product names it adds to
+  `.vale/styles/spelling-exceptions.txt`;
 - its news fragment under `changelog/`;
 - its spec under `dev/specs/` (or `specs/`).
 
@@ -85,7 +87,7 @@ def _next_link(link_header: str | None) -> str | None:
     """The rel="next" URL of a Link header, selected exactly (never prev or last), whatever the parameter order."""
     for url, params in _LINK.findall(link_header or ""):
         rel = _REL.search(params)
-        if rel and "next" in rel.group(1).split():
+        if rel and "next" in rel.group(1).lower().split():
             return url
     return None
 ```

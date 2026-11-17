@@ -32,7 +32,7 @@ CASES = [
     (task, fixture)
     for task in TASKS
     for fixture in ("pass", "pass-variant", "fail", "fail-nearmiss")
-] + [("strict-fake", "pass-dataclass")]
+] + [("strict-fake", "pass-dataclass"), ("retry-policy", "pass-reset-guard")]
 
 
 def _score(task: str, fixture: str) -> dict:
@@ -166,3 +166,29 @@ def test_no_tls_retry_requires_the_ssl_handler_to_reraise(
     tree = ast.parse(_TLS_CLIENT.format(ssl_body=ssl_body))
     ok, details = lib.check_no_tls_retry({"py": tree, "py_err": None})
     assert ok is expected, details
+
+
+def test_fake_probe_without_output_dir_reports_an_error(tmp_path: Path) -> None:
+    """A trial with no output/ fails the strict-fake checks with a message, not an exception."""
+    report = lib.run_fake_probe(tmp_path / "output")
+    assert "no " in report["error"]
+
+
+def test_scope_ignores_caches_and_allows_vale_exceptions(tmp_path: Path) -> None:
+    root = tmp_path / "output"
+    for rel in (
+        "infrahub_sync/adapters/servicenow.py",
+        "infrahub_sync/adapters/__pycache__/servicenow.cpython-313.pyc",
+        ".pytest_cache/v/cache/lastfailed",
+        ".vale/styles/spelling-exceptions.txt",
+    ):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text("")
+    ok, details = lib.check_diff_stays_in_adapter({"output_dir": root})
+    assert ok, details
+
+    (root / ".github" / "workflows").mkdir(parents=True)
+    (root / ".github" / "workflows" / "ci.yml").write_text("")
+    ok, details = lib.check_diff_stays_in_adapter({"output_dir": root})
+    assert not ok
+    assert ".github/workflows/ci.yml" in details

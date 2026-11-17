@@ -236,12 +236,14 @@ infrahubctl info
   reads as "every record was removed" in the diff.
 
 Reference adapters on `main`: `netbox.py` for the
-contract shape, `aci.py` for a `requests.Session` client
-with retries, `peeringmanager.py` for a thin subclass of
-the generic REST adapter. The Webex adapter in
-[opsmill/infrahub-sync#401](https://github.com/opsmill/infrahub-sync/pull/401)
-is the only example that follows `Link` headers and
-honors `Retry-After`; it is not merged.
+contract shape, `msgraphsync.py` for a client with the
+default retry policy (`RETRY_STATUSES`, `Retry-After`
+honored in full, a stop above 300 s, backoff capped at
+60 s), `webex.py` for following `Link` headers, and
+`peeringmanager.py` for a thin subclass of the generic
+REST adapter. Do not copy the retry setup of `aci.py`:
+it retries 500 and has neither the 300 s stop nor the
+capped jitter.
 
 ## Phase 2: spec details
 
@@ -278,17 +280,17 @@ infrahubctl branch create "<test-branch>"
 infrahubctl schema load schemas --branch "<test-branch>"
 
 uv run --project "<infrahub-sync-checkout>" infrahub-sync list --directory sync
-uv run --project "<infrahub-sync-checkout>" infrahub-sync generate --name "<project>" --directory sync
+uv run --project "<infrahub-sync-checkout>" infrahub-sync generate --name "<project>" --directory sync --branch "<test-branch>"
 uv run --project "<infrahub-sync-checkout>" infrahub-sync diff --name "<project>" --directory sync --branch "<test-branch>"
 
 # Approval point 4. Only after the user approves:
 uv run --project "<infrahub-sync-checkout>" infrahub-sync sync --name "<project>" --directory sync --branch "<test-branch>"
 
-# Expect no changes.
+# Expect no creates or updates. Deletions of nodes the source does not hold are expected.
 uv run --project "<infrahub-sync-checkout>" infrahub-sync diff --name "<project>" --directory sync --branch "<test-branch>"
 ```
 
-`diff` and `sync` take `--branch` on infrahub-sync
+`generate`, `diff` and `sync` take `--branch` on infrahub-sync
 `main`. Pass it on the command line rather than
 setting a branch in the destination settings, so no
 test branch ends up in the committed configuration.
