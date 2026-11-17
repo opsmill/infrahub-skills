@@ -112,6 +112,10 @@ _SEEDED_OUTPUT = {
     "graders/importing-data/check_self_check_rules.py": {
         "output_dir/answer.md": "Checked against format-structure.md.\n",
     },
+    # Reaches fetch_schema_limits.py, which the grader runs from the skill.
+    "graders/managing-schemas/check_string_limits.py": {
+        "output.yml": 'version: "1.0"\nnodes:\n  - name: Device\n    namespace: Dcim\n',
+    },
 }
 
 

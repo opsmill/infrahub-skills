@@ -110,12 +110,25 @@ def _extract_properties(props: dict) -> dict[str, dict]:
     return out
 
 
+# Definition names to try, in order, for each normalised name. The public
+# JSON Schema export names its definitions `NodeSchemaWrite` and so on, and
+# has no attribute definition of its own: every attribute kind maps to
+# `GenericAttributeWrite` or a variant with the same caps.
+JSON_SCHEMA_NAMES = {
+    "NodeSchema": ("NodeSchema", "NodeSchemaWrite"),
+    "GenericSchema": ("GenericSchema", "GenericSchemaWrite"),
+    "AttributeSchema": ("AttributeSchema", "AttributeSchemaWrite", "GenericAttributeWrite"),
+    "RelationshipSchema": ("RelationshipSchema", "RelationshipSchemaWrite"),
+}
+
+
 def caps_from_json_schema(doc: dict) -> dict[str, dict[str, dict]]:
     defs = doc.get("$defs", {})
-    return {
-        name: _extract_properties(defs.get(name, {}).get("properties", {}))
-        for name in SCHEMA_NAMES
-    }
+    out: dict[str, dict[str, dict]] = {}
+    for name in SCHEMA_NAMES:
+        found = next((defs[c] for c in JSON_SCHEMA_NAMES[name] if c in defs), {})
+        out[name] = _extract_properties(found.get("properties", {}))
+    return out
 
 
 def caps_from_openapi(doc: dict) -> dict[str, dict[str, dict]]:
