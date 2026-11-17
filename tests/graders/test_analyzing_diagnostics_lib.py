@@ -185,9 +185,40 @@ bundle/message-queue/rabbitmq.log
 """
 
 
+# The evidence on its own sibling item, as report-evidence-per-finding.md
+# writes it (review of #247).
+EVIDENCE_ITEM = """## Incident 1: broker memory alarm (CRITICAL)
+
+- Root: memory resource limit alarm on rabbit@mq-1 (10:11:52)
+- Evidence: bundle/logs/message-queue/message-queue-1.log
+- Cascade: downstream connection errors in bundle/logs/server/server.log
+- Recommendation: raise the memory limit of the broker
+"""
+
+# The same report with indented headings.
+INDENTED_HEADINGS = TEMPLATE_REPORT.replace("## Incident 1", "  ## Incident 1")
+
+
 @pytest.mark.parametrize(
-    "report", [TEMPLATE_REPORT, HEADING_ROOT, BLANK_LINE_ROOT, LIKELY_ROOT_HEADING, PARAGRAPH_ROOT],
-    ids=["template", "heading", "blank-line", "likely-root-heading", "paragraph"],
+    "report",
+    [
+        TEMPLATE_REPORT,
+        HEADING_ROOT,
+        BLANK_LINE_ROOT,
+        LIKELY_ROOT_HEADING,
+        PARAGRAPH_ROOT,
+        EVIDENCE_ITEM,
+        INDENTED_HEADINGS,
+    ],
+    ids=[
+        "template",
+        "heading",
+        "blank-line",
+        "likely-root-heading",
+        "paragraph",
+        "evidence-item",
+        "indented-headings",
+    ],
 )
 def test_root_attributed(report: str) -> None:
     assert check_root_service(report, service="message-queue")[0]
@@ -240,6 +271,17 @@ The message-queue is healthy and logs downstream errors only.
 """
 
 
+# Near-miss: the broker is named on a labelled sibling item that is not
+# evidence, after the Evidence item of the root.
+LABELLED_SIBLING = """## Incident 1: server crash (CRITICAL)
+
+- Root: server crashed (10:11:52)
+- Evidence: bundle/logs/server/server.log
+- Recommendation: check the message-queue credentials of the server
+- Cascade: task-workers lost their connection
+"""
+
+
 @pytest.mark.parametrize(
     "report",
     [
@@ -249,6 +291,7 @@ The message-queue is healthy and logs downstream errors only.
         ROOT_HEADING_OVER_LABELS,
         ROOT_HEADING_CASCADE_ITEM,
         PROSE_AFTER_ROOT_ITEM,
+        LABELLED_SIBLING,
     ],
     ids=[
         "template",
@@ -257,6 +300,7 @@ The message-queue is healthy and logs downstream errors only.
         "root-heading-over-labels",
         "root-heading-cascade-item",
         "prose-after-root-item",
+        "labelled-sibling",
     ],
 )
 def test_wrong_root_fails(report: str) -> None:
@@ -419,6 +463,12 @@ def test_not_provided_wordings_pass(wording: str) -> None:
 
 def test_scope_statement_before_analysis_passes() -> None:
     assert _mod.check_analyzes_pasted_excerpt(STATES_SCOPE)[0]
+
+
+def test_negated_request_before_analysis_passes() -> None:
+    """Near-miss: a polite sentence that asks for nothing."""
+    report = "Please do not provide the full bundle yet.\n\n" + EXCERPT_REPORT
+    assert _mod.check_analyzes_pasted_excerpt(report)[0]
 
 
 def _run(tmp_path: Path, report: str) -> dict:

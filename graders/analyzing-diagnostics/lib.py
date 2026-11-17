@@ -129,12 +129,25 @@ def _cascade_lines(lines: list[str]) -> list[bool]:
     return mask
 
 
+# A list item that opens with a label (`- Recommendation: ...`).
+_ITEM_LABEL = re.compile(rf"^\s*{_LIST_MARKER}[*_`]*([A-Za-z][A-Za-z -]{{0,30}}?)[*_`]*\s*:")
+# Labels of items that carry the evidence of the item above them, as
+# rules/report-evidence-per-finding.md writes it (`Evidence: bundle/...`).
+_EVIDENCE_LABELS = {
+    "evidence", "excerpt", "log", "logs", "path", "file", "source", "quote",
+    "timestamp", "time", "when", "where", "service",
+}
+
+
 def _label_window(lines: list[str], i: int, start: int, cascade: list[bool]) -> str:
     """The `- Root:` line from `start`, plus the lines that belong to it.
 
     A list item owns the more-indented lines under it (the quoted excerpt, a
-    path after a blank line). A `Root:` paragraph owns the next non-blank
-    line. The window never enters a heading or a Cascade line.
+    path after a blank line) and the sibling items after it, up to the next
+    labelled item (`- Cascade:`, `- Recommendation:`). An `- Evidence:` item
+    is evidence of the root, so it does not end the window. A `Root:`
+    paragraph owns the next non-blank line. The window never enters a
+    heading, a Cascade line, or a paragraph at the indentation of the item.
     """
     own = lines[i]
     is_item = bool(re.match(rf"\s*{_LIST_MARKER}", own))
@@ -146,7 +159,11 @@ def _label_window(lines: list[str], i: int, start: int, cascade: list[bool]) -> 
         if not line.strip():
             continue
         if is_item and _indent(line) <= _indent(own):
-            break
+            if not re.match(rf"\s*{_LIST_MARKER}", line):
+                break
+            label = _ITEM_LABEL.match(line)
+            if label and label.group(1).strip().lower() not in _EVIDENCE_LABELS:
+                break
         window.append(line)
         if not is_item:
             break
@@ -225,7 +242,8 @@ def _incident_sections(text: str) -> list[tuple[str, str]]:
     """
     matches = list(
         re.finditer(
-            r"(?im)^#{1,6}\s*incident(?:\s*#?\d+|\s*:|\s+[-\u2013\u2014]\s)[^\n]*", text
+            r"(?im)^[ ]{0,3}#{1,6}\s*incident(?:\s*#?\d+|\s*:|\s+[-\u2013\u2014]\s)[^\n]*",
+            text,
         )
     )
     sections: list[tuple[str, str]] = []
@@ -313,8 +331,10 @@ def check_no_location_scan(text: str, **_: object) -> CheckResult:
 
 _BUNDLE_OR_MANIFEST = re.compile(r"(?i)\bbundle\b|\bmanifest\b|bundle_information\.json")
 # A request without a question mark: "Please send me the path to the bundle."
+# Each alternative is the action asked for, so a negation right before it
+# ("Please do not provide the full bundle") can be read.
 _REQUEST_RE = re.compile(
-    r"(?i)\b(?:please|send|share|upload|attach|provide|paste|give\s+me|point\s+me"
+    r"(?i)\b(?:send|share|upload|attach|provide|paste|give\s+me|point\s+me"
     r"|i(?:'ll|\s+will|\s+would|\s+first)?\s+need|need\s+(?:the|your|a|to\s+see)"
     r"|where\s+is|path\s+to|location\s+of)\b"
 )
@@ -345,11 +365,10 @@ def check_analyzes_pasted_excerpt(text: str, **_: object) -> CheckResult:
             continue
         if sentence.rstrip().endswith("?"):
             return False, "asks for the bundle before analyzing the pasted excerpt"
-        request = _REQUEST_RE.search(sentence)
-        if request and not re.search(
-            _NEGATION_WORDS, sentence[max(0, request.start() - 15) : request.start()], re.IGNORECASE
-        ):
-            return False, "requests the bundle before analyzing the pasted excerpt"
+        for request in _REQUEST_RE.finditer(sentence):
+            before = sentence[max(0, request.start() - 15) : request.start()]
+            if not re.search(_NEGATION_WORDS, before, re.IGNORECASE):
+                return False, "requests the bundle before analyzing the pasted excerpt"
     return True, "analyzes the pasted excerpt first"
 
 
