@@ -88,9 +88,17 @@ python "$SKILL/scripts/fetch_schema_limits.py" \
   --openapi "$BASE_URL"
 ```
 
-The script normalises the OpenAPI naming difference
-(`AttributeSchema-Input` → `AttributeSchema`), so the
+Both sources name their definitions `NodeSchemaWrite`,
+`GenericSchemaWrite`, `GenericAttributeWrite` and
+`RelationshipSchemaWrite`. Older Infrahub versions use
+`NodeSchema` and `AttributeSchema-Input`. The script
+maps all of them to the four keys above, so the
 output structure is identical regardless of source.
+
+If the source has no cap for one of the four keys,
+the script prints an error and exits 1 (exits 3 with
+`--check`). Treat that like an unreachable source:
+the lengths were not validated.
 
 If both tiers fail, **do not fall back to hardcoded
 numbers**. Warn the user that string-length
@@ -179,6 +187,8 @@ unreachable (warning on stderr — skip-on-unreachable
 keeps CI green during transient blips). Exit 1 if any
 field is over its cap; each violation is printed as
 `{path}:{Kind}.{field}: <len> chars (max <cap>)`.
+Exit 3 if the source has no cap for one of the four
+keys: no file was validated.
 Compose with `--openapi $BASE_URL` for the Tier 2
 case.
 

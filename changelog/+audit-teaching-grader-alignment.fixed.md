@@ -1,0 +1,1 @@
+The auditing-repo skill now lists only live reference sites in a finding's `sites`, and counts a kind with a different choice list or peer toward a duplicate shape, recording the difference as a feasibility blocker. The teaching-concepts skill names each node by its full kind, such as `CampusSwitch`.
