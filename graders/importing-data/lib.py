@@ -940,15 +940,19 @@ def check_fail_closed(
     When an input column has no schema home, the skill must stop and write
     nothing — never a partial emission that silently drops the column. The
     grader asserts the invariant that survives in the output directory: no
-    Object-envelope document carries any ``spec.data`` rows. A plain-text
-    report explaining the unmapped column is fine (it isn't a YAML Object),
-    and an empty / absent output dir also passes.
+    YAML document carries any ``spec.data`` rows, whatever its ``kind`` (a
+    document without ``kind: Object`` is still a partial write), and no YAML
+    file parses to no mapping document (a top-level list of rows, or a file
+    that does not parse, is a write the check cannot read). A plain-text
+    report explaining the unmapped column is fine (it isn't YAML), and an
+    empty / absent output dir also passes.
     """
     offending: list[str] = []
     for file_path, docs in parsed_files.items():
+        if not docs:
+            offending.append(f"{file_path.name}: YAML file with no mapping document")
+            continue
         for idx, doc in enumerate(docs):
-            if doc.get("kind") != "Object":
-                continue
             spec = doc.get("spec")
             data = spec.get("data") if isinstance(spec, dict) else None
             if isinstance(data, list) and len(data) > 0:

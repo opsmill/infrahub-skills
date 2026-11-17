@@ -96,8 +96,20 @@ def test_fail_closed_answer_passes(tmp_path: Path, files: dict, expected: float)
         # Near-miss: no schema document anywhere, so no-schema-mutation is
         # satisfied, but the partial write the rule forbids is there.
         {"01_dcim_devices.yml": OBJECT_ROWS, "report.txt": REPORT},
+        # Near-miss: the same rows in a document without `kind: Object`.
+        {"01_dcim_devices.yml": OBJECT_ROWS.replace("kind: Object\n", ""), "report.txt": REPORT},
+        # Near-miss: the rows as a top-level YAML list, which parses to no
+        # mapping document.
+        {"01_dcim_devices.yml": "- name: spine-01\n  role: spine\n  status: active\n", "report.txt": REPORT},
     ],
-    ids=["schema-document", "extension-document", "float-version", "partial-object-write"],
+    ids=[
+        "schema-document",
+        "extension-document",
+        "float-version",
+        "partial-object-write",
+        "partial-write-without-kind",
+        "partial-write-as-list",
+    ],
 )
 def test_schema_change_or_partial_write_fails(tmp_path: Path, files: dict) -> None:
     assert _score(tmp_path, files) < 1.0
