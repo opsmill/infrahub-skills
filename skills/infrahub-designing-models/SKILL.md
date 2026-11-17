@@ -13,7 +13,7 @@ description: >-
   wants to learn concepts (use infrahub-teaching-concepts).
 argument-hint: "[idea, problem or existing brief]"
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 
