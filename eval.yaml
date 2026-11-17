@@ -4429,7 +4429,7 @@ tasks:
     assertions:
       - name: fail-closed
         check: >-
-          No Object document in the output dir carries spec.data rows
+          No YAML document in the output dir carries rows, under spec.data or anywhere else
       - name: no-schema-mutation
         check: >-
           Output dir contains no schema document and no schemas/ sub-path
@@ -4825,15 +4825,15 @@ tasks:
       column and the kind it checked, pointing the user at
       infrahub-managing-schemas. No partial file that silently drops the column.
     expectations:
-      - No Object-envelope file in ./output_dir/ carries any spec.data rows
+      - No YAML file in ./output_dir/ carries any rows, with or without the Object envelope
       - A report names the unmapped license_tier column and the kind checked
       - The user is routed to infrahub-managing-schemas for the schema decision
       - No partial emission that drops the unmapped column
     assertions:
       - name: fail-closed
         check: >-
-          No Object document in the output dir emits spec.data rows for an
-          input that has an unmapped column
+          No YAML document in the output dir emits rows, under spec.data or
+          anywhere else, for an input that has an unmapped column
 
   - name: csv-import-folder-coverage
     trials: 3
@@ -8982,7 +8982,8 @@ tasks:
       - name: own-artifacts
         check: >-
           Explain is anchored to at least one node kind from the learner's
-          own schema file, and names no learner node by its short name
+          own schema file, and uses no short name as the name of a learner
+          node, unless the same sentence names the full kind
       - name: structured-lessons
         check: lesson uses the four-section shape
 

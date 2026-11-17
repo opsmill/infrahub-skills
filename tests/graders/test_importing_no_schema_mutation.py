@@ -110,6 +110,17 @@ def test_fail_closed_answer_passes(tmp_path: Path, files: dict, expected: float)
             ) + "---\n- name: spine-01\n  role: spine\n",
             "report.txt": REPORT,
         },
+        # Near-miss: the rows under a top-level `data:` key, outside
+        # `spec.data` (review of #247).
+        {
+            "01_dcim_devices.yml": "kind: DcimDevice\ndata:\n  - name: spine-01\n    role: spine\n",
+            "report.txt": REPORT,
+        },
+        # Near-miss: the rows under `spec`, in a key other than `data`.
+        {
+            "01_dcim_devices.yml": OBJECT_ROWS.replace("  data:\n", "  rows:\n"),
+            "report.txt": REPORT,
+        },
     ],
     ids=[
         "schema-document",
@@ -119,6 +130,8 @@ def test_fail_closed_answer_passes(tmp_path: Path, files: dict, expected: float)
         "partial-write-without-kind",
         "partial-write-as-list",
         "partial-write-as-list-after-mapping",
+        "partial-write-top-level-data",
+        "partial-write-other-spec-key",
     ],
 )
 def test_schema_change_or_partial_write_fails(tmp_path: Path, files: dict) -> None:

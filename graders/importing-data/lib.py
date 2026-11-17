@@ -929,6 +929,25 @@ def check_provenance_comment(
     return True, f"All {len(parsed_files)} files carry the provenance comment"
 
 
+def _row_lists(doc: dict) -> list[tuple[str, int]]:
+    """(key path, row count) for each list of row mappings a document holds.
+
+    Looks at the top level of the document and under ``spec``. A list of
+    scalars (``tags: [a, b]``) is not a list of rows.
+    """
+    found: list[tuple[str, int]] = []
+    spec = doc.get("spec")
+    for prefix, holder in (("", doc), ("spec.", spec)):
+        if not isinstance(holder, dict):
+            continue
+        for key, value in holder.items():
+            if isinstance(value, list):
+                rows = sum(1 for item in value if isinstance(item, dict))
+                if rows:
+                    found.append((f"{prefix}{key}", rows))
+    return found
+
+
 def check_fail_closed(
     parsed_files: dict[Path, list[dict]],
     *,
@@ -940,10 +959,12 @@ def check_fail_closed(
     When an input column has no schema home, the skill must stop and write
     nothing — never a partial emission that silently drops the column. The
     grader asserts the invariant that survives in the output directory: no
-    YAML document carries any ``spec.data`` rows, whatever its ``kind`` (a
-    document without ``kind: Object`` is still a partial write), and no YAML
-    file parses to no mapping document (a top-level list of rows, or a file
-    that does not parse, is a write the check cannot read). A plain-text
+    YAML document carries rows, whatever its ``kind`` and wherever the rows
+    are. Rows are a non-empty list of mappings, at the top level of the
+    document or under ``spec`` (``spec.data``, or a top-level ``data:`` in a
+    document without the Object envelope). A YAML file that parses to no
+    mapping document (a top-level list of rows, or a file that does not
+    parse) is a write the check cannot read, so it fails too. A plain-text
     report explaining the unmapped column is fine (it isn't YAML), and an
     empty / absent output dir also passes.
     """
@@ -961,11 +982,9 @@ def check_fail_closed(
         if any(isinstance(d, list) and d for d in raw_docs):
             offending.append(f"{file_path.name}: YAML list document of rows")
         for idx, doc in enumerate(docs):
-            spec = doc.get("spec")
-            data = spec.get("data") if isinstance(spec, dict) else None
-            if isinstance(data, list) and len(data) > 0:
+            for key, rows in _row_lists(doc):
                 offending.append(
-                    f"{file_path.name}[doc {idx}]: emitted {len(data)} object row(s)"
+                    f"{file_path.name}[doc {idx}]: emitted {rows} object row(s) under `{key}`"
                 )
 
     if offending:
