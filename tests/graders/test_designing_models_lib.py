@@ -1165,6 +1165,12 @@ CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
         ),
         pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "Providers are a separate node kind", "A separate provider kind",
+            )),
+            None, id="compliant-variant-subject-between-separate-and-kind",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
                 "Bandwidth is entered by the requester", "The requester enters speed and bandwidth",
             )),
             None, id="compliant-variant-subject-listed-in-its-own-decision",

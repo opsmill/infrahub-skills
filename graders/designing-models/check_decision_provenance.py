@@ -28,7 +28,9 @@ def _p(pattern: str) -> re.Pattern:
 # "The transport team owns providers") is not read as that decision.
 SUBJECTS = {
     "circuit identity": (_p(r"circuit[ _-]?id"), "stated"),
-    "providers": (_p(r"provider.*\b(?:own|separate)\b.*\bkind|\b(?:own|separate)\b.*\bkinds?\b.*provider"), "stated"),
+    # The three words in any order: "providers are their own kind",
+    # "separate node kinds for providers", "a separate provider kind".
+    "providers": (_p(r"^(?=.*provider)(?=.*\b(?:own|separate)\b)(?=.*\bkinds?\b)"), "stated"),
     "bandwidth": (_p(r"bandwidth.*\brequest|\brequest.*bandwidth"), "stated"),
     "the endpoint generic": (_p(r"(?:endpoint|terminat|\bsites?\b|\bpops?\b).*\bgeneric|\bgeneric.*(?:endpoint|terminat|\bsites?\b|\bpops?\b)"), "recommended"),
     "contract end dates": (_p(r"end[ _-]?date.*(?:\bimport|carriers\.xlsx)|(?:\bimport|carriers\.xlsx).*end[ _-]?date"), "recommended"),
