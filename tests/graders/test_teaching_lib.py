@@ -608,6 +608,14 @@ def test_own_artifacts_short_name_without_backticks_passes(tmp_path):
     assert ok, msg
 
 
+def test_own_artifacts_malformed_schema_does_not_crash(tmp_path):
+    """A node whose name is a list is skipped, not a crash."""
+    broken = FIXTURE_SCHEMA.replace("  - name: Zone\n", "  - name: [Zone]\n")
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, schema=broken)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert ok, msg
+
+
 OTHER_SCHEMA = """version: "1.0"
 nodes:
   - name: Switch

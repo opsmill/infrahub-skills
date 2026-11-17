@@ -3316,7 +3316,7 @@ tasks:
       writes `Manifest: not provided` instead of a collector count.
     expectations:
       - Analyzes the pasted log before asking for anything else
-      - Writes `Manifest: not provided` and no collector count
+      - "Writes `Manifest: not provided` and no collector count"
       - Cites bundle/logs/task-worker/... as evidence for the traceback
       - Searches opsmill/infrahub issues with `gh search issues`
       - Search keys keep InitializationError but strip the internal broker hostname

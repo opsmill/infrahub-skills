@@ -952,6 +952,14 @@ def check_fail_closed(
         if not docs:
             offending.append(f"{file_path.name}: YAML file with no mapping document")
             continue
+        # The parsed docs keep only mappings, so a list of rows next to a
+        # mapping document in the same stream would go unseen. Re-read it.
+        try:
+            raw_docs = list(yaml.safe_load_all(file_path.read_text(encoding="utf-8", errors="replace")))
+        except (OSError, yaml.YAMLError):
+            raw_docs = []
+        if any(isinstance(d, list) and d for d in raw_docs):
+            offending.append(f"{file_path.name}: YAML list document of rows")
         for idx, doc in enumerate(docs):
             spec = doc.get("spec")
             data = spec.get("data") if isinstance(spec, dict) else None

@@ -213,7 +213,11 @@ def check_analyzes_pasted_excerpt(text: str, **_: object) -> CheckResult:
     first = analysis.search(text)
     if not first:
         return False, "no analysis of the pasted excerpt"
-    for m in re.finditer(r"[^.!?]*\?", text[: first.start()]):
+    # Read up to the end of the sentence that holds the first marker, so a
+    # question that names a bundle path ("Is it in bundle/?") is a question.
+    end = re.search(r"[.!?]", text[first.end() :])
+    head = text[: first.end() + end.end()] if end else text
+    for m in re.finditer(r"[^.!?]*\?", head):
         sentence = m.group(0)
         if re.search(r"where|path|location|director|folder|send|share|upload", sentence, re.I) and re.search(
             r"bundle", sentence, re.I
@@ -224,7 +228,7 @@ def check_analyzes_pasted_excerpt(text: str, **_: object) -> CheckResult:
 
 # A collector count, such as "8/8 collectors ok" or "1 of 1 collectors".
 _COLLECTOR_COUNT_RE = re.compile(
-    r"(?i)\b\d+\s*/\s*\d+\s*(?:collectors?\b|ok\b|succeeded\b|success\b)"
+    r"(?i)\b\d+\s*/\s*\d+\s*(?:[a-z-]+\s+)?(?:collectors?\b|ok\b|succeeded\b|success\b)"
     r"|\b\d+\s+of\s+\d+\s+collectors?\b"
 )
 _MANIFEST_NOT_PROVIDED_RE = re.compile(

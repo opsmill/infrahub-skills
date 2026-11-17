@@ -168,9 +168,10 @@ to a fraction.
   constraint the schema is currently enforcing.
 - Nodes that share attribute *names* but differ in attribute kind
   (one's `id` is `Text`, another's is `Number`). They aren't the same
-  shape. A different choice list on a Dropdown or a different peer on
-  a relationship is not a reason to skip the finding: it still counts
-  toward check 1, and is recorded as a feasibility blocker.
+  shape. A different choice list on a Dropdown, or a different peer on
+  a relationship that is not the pairing above, is not a reason to
+  skip the finding: it still counts toward check 1, and is recorded as
+  a feasibility blocker (`blocked-differing-peers` for a peer).
 - Nodes already inheriting from `opsmill/schema-library` generics
   where the shared attributes come from the library — that's reuse,
   not duplication.

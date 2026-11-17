@@ -101,6 +101,15 @@ def test_fail_closed_answer_passes(tmp_path: Path, files: dict, expected: float)
         # Near-miss: the rows as a top-level YAML list, which parses to no
         # mapping document.
         {"01_dcim_devices.yml": "- name: spine-01\n  role: spine\n  status: active\n", "report.txt": REPORT},
+        # Near-miss: an empty Object document, then the rows as a list
+        # document in the same stream.
+        {
+            "01_dcim_devices.yml": OBJECT_ROWS.replace(
+                "  data:\n    - name: spine-01\n      role: spine\n      status: active\n",
+                "  data: []\n",
+            ) + "---\n- name: spine-01\n  role: spine\n",
+            "report.txt": REPORT,
+        },
     ],
     ids=[
         "schema-document",
@@ -109,6 +118,7 @@ def test_fail_closed_answer_passes(tmp_path: Path, files: dict, expected: float)
         "partial-object-write",
         "partial-write-without-kind",
         "partial-write-as-list",
+        "partial-write-as-list-after-mapping",
     ],
 )
 def test_schema_change_or_partial_write_fails(tmp_path: Path, files: dict) -> None:

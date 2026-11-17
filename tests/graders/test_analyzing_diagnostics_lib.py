@@ -296,5 +296,21 @@ def test_excerpt_rule_violation_fails_on_its_check(tmp_path: Path, report: str, 
     assert failed == [check], result["details"]
 
 
+# Near-miss: the count with a collector type between ratio and "collectors".
+TYPED_COUNT = EXCERPT_REPORT.replace(
+    "Manifest: not provided (one pasted log).", "Manifest: 3/4 log collectors succeeded."
+)
+
+
+def test_typed_collector_count_fails() -> None:
+    assert not _mod.check_manifest_not_provided(TYPED_COUNT)[0]
+
+
+def test_question_naming_a_bundle_path_is_a_question() -> None:
+    """Near-miss: the first analysis marker sits inside the question."""
+    report = "Is the bundle in bundle/ under your home folder?\n\n" + EXCERPT_REPORT
+    assert not _mod.check_analyzes_pasted_excerpt(report)[0]
+
+
 def test_question_only_has_no_analysis() -> None:
     assert not _mod.check_analyzes_pasted_excerpt("Where is the bundle directory?\n")[0]

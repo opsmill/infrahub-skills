@@ -493,7 +493,7 @@ def _learner_nodes(ws: Path) -> set[tuple[str, str]]:
                 if not isinstance(node, dict):
                     continue
                 name, namespace = node.get("name"), node.get("namespace")
-                if name and namespace:
+                if isinstance(name, str) and isinstance(namespace, str) and name and namespace:
                     nodes.add((namespace, name))
     return nodes
 
