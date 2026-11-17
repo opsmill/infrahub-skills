@@ -129,13 +129,13 @@
     {
       "id": 7,
       "prompt": "I have `devices.csv` with an extra `gpu_count` column the schema\ndoes not declare:\n\n    name,role,status,gpu_count\n    spine-01,spine,active,0\n    gpu-rig-01,gpu,active,8\n    gpu-rig-02,gpu,active,8\n\nThe DcimDevice schema declares `name`, `role`, and `status` only \u2014 no\n`gpu_count` attribute. The schema is fixed and I have not approved any\nschema change.\n\nEmit whatever correct Infrahub object YAML you can to `./output_dir/`. Do\nNOT propose or write any schema changes; the skill fails closed on\nunmapped columns. Write your report to `./import-report.md`.",
-      "expected_output": "No schema document anywhere in the workspace, inside or outside ./output_dir/ (no file with top-level `version: \"1.0\"` plus `nodes:` / `generics:` / `extensions:`), and nothing under a `schemas/` sub-path of the output dir. The skill fails closed on the unmapped `gpu_count`: it writes no object rows, and its report in ./import-report.md names the column and the DcimDevice kind it checked and points at infrahub-managing-schemas. It never writes a schema mutation.",
+      "expected_output": "No schema document written by the run anywhere in the workspace, inside or outside ./output_dir/ (no file with top-level `version: \"1.0\"` plus `nodes:` / `generics:` / `extensions:`), and nothing under a `schemas/` sub-path of the output dir. The skill fails closed on the unmapped `gpu_count`: it writes no object rows, and its report in ./import-report.md names the column and the DcimDevice kind it checked and points at infrahub-managing-schemas. It never writes a schema mutation.",
       "files": [],
       "expectations": [
         "No file the run writes, in ./output_dir/ or elsewhere in the workspace, is a schema document (version 1.0 + nodes / generics / extensions)",
         "No file lives under a schemas/ sub-path of ./output_dir/",
         "No object rows are emitted for an input with an unmapped column",
-        "./import-report.md names the unmapped gpu_count column and the DcimDevice kind checked"
+        "./import-report.md names the unmapped gpu_count column and the DcimDevice kind checked, and points at infrahub-managing-schemas"
       ],
       "assertions": [
         {
@@ -148,7 +148,7 @@
         },
         {
           "name": "reports-unmapped-column",
-          "check": "./import-report.md names the unmapped gpu_count column and the DcimDevice kind checked"
+          "check": "./import-report.md names the unmapped gpu_count column, the DcimDevice kind checked, and infrahub-managing-schemas"
         }
       ]
     },

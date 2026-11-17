@@ -354,7 +354,7 @@ _BUNDLE_OR_MANIFEST = re.compile(r"(?i)\bbundle\b|\bmanifest\b|bundle_informatio
 # list item ("- Open questions: ...", "**Open questions:**").
 _OPEN_QUESTIONS_HEADING = re.compile(
     r"(?im)^[ ]{0,3}(#{1,6})\s*[*_]*(?:(?:open|outstanding|remaining|unanswered)\s+)?"
-    r"questions?\b"
+    r"questions?\b(?!\s+(?:answered|closed|resolved|settled)\b)"
 )
 _OPEN_QUESTIONS_LABEL = re.compile(
     r"(?im)^([ \t]*)([-*+]\s+|\d+[.)]\s+)?[*_]*"

@@ -468,11 +468,16 @@ def _workspace_root(output_dir: Path | None) -> Path:
     return base.resolve().parent
 
 
-def _workspace_yaml(root: Path) -> dict[Path, list[dict]]:
-    """Parse every YAML file in the workspace outside ``_NON_AGENT_DIRS``."""
+def _workspace_yaml(root: Path) -> tuple[dict[Path, list[dict]], list[Path]]:
+    """Parse every YAML file in the workspace outside ``_NON_AGENT_DIRS``.
+
+    Returns the parsed files and the YAML files that could not be read. An
+    unreadable file may be a schema change, so the caller fails on it.
+    """
     parsed: dict[Path, list[dict]] = {}
+    unreadable: list[Path] = []
     if not root.is_dir():
-        return parsed
+        return parsed, unreadable
     for dirpath, dirnames, filenames in os.walk(root):
         if Path(dirpath) == root:
             dirnames[:] = [d for d in dirnames if d not in _NON_AGENT_DIRS]
@@ -484,9 +489,10 @@ def _workspace_yaml(root: Path) -> dict[Path, list[dict]]:
             try:
                 raw = file_path.read_text(encoding="utf-8", errors="replace")
             except OSError:
+                unreadable.append(file_path)
                 continue
             parsed[file_path] = _docs_from_file(raw)
-    return parsed
+    return parsed, unreadable
 
 
 def _is_schema_document(doc: dict) -> bool:
@@ -514,7 +520,8 @@ def check_no_schema_mutation(
     the output dir empty and writes ``schemas/dcim.yml`` beside it has still
     changed the schema. The directories the run did not write
     (``_NON_AGENT_DIRS``) are skipped. Inside the output dir, any file under a
-    ``schemas/`` sub-path also fails.
+    ``schemas/`` sub-path also fails, and so does a YAML file the check cannot
+    read, because it may be a schema document.
 
     A workspace with no schema document passes, including one where the run
     wrote no YAML at all: writing no object file is what the fail-closed rule
@@ -522,10 +529,14 @@ def check_no_schema_mutation(
     rows, and ``reports-unmapped-column`` rejects a run that reports nothing.
     """
     base = Path(output_dir).resolve() if output_dir is not None else None
-    files = dict(_workspace_yaml(_workspace_root(output_dir)))
+    workspace_files, unreadable = _workspace_yaml(_workspace_root(output_dir))
+    files = dict(workspace_files)
     files.update(parsed_files)
 
-    violations: list[str] = []
+    violations: list[str] = [
+        f"{file_path}: YAML file that cannot be read, so it may be a schema document"
+        for file_path in unreadable
+    ]
     for file_path, docs in files.items():
         if base is not None:
             try:
@@ -556,9 +567,14 @@ def check_reports_unmapped_column(
     output_dir: Path | None = None,
     column: str = "gpu_count",
     kind: str = "DcimDevice",
+    handoff: str = "infrahub-managing-schemas",
     **_: Any,
 ) -> tuple[bool, str]:
-    """The fail-closed report names the unmapped column and the kind checked.
+    """The fail-closed report names the unmapped column, the kind checked, and the hand-off.
+
+    rules/workflow-fail-closed-on-unmapped-columns.md: the report lists the
+    offending column and the kinds checked, and points the user at
+    ``infrahub-managing-schemas``.
 
     skillgrade keeps only the model's final text, so a grader reads the
     report from the file the task names, ``./import-report.md`` at the
@@ -576,16 +592,19 @@ def check_reports_unmapped_column(
     text = report.read_text(encoding="utf-8", errors="replace")
     missing = [
         label
-        for label, ident in (("column", column), ("kind", kind))
+        for label, ident in (("column", column), ("kind", kind), ("hand-off to", handoff))
         if not re.search(rf"(?<![A-Za-z0-9_]){re.escape(ident)}(?![A-Za-z0-9_])", text)
     ]
     if missing:
-        named = {"column": column, "kind": kind}
+        named = {"column": column, "kind": kind, "hand-off to": handoff}
         return False, (
-            f"./{IMPORT_REPORT_NAME} does not name the unmapped "
-            + " or the ".join(f"{m} {named[m]}" for m in missing)
+            f"./{IMPORT_REPORT_NAME} does not name the "
+            + ", the ".join(f"{m} {named[m]}" for m in missing)
         )
-    return True, f"./{IMPORT_REPORT_NAME} names the unmapped column {column} and the kind {kind}"
+    return True, (
+        f"./{IMPORT_REPORT_NAME} names the unmapped column {column}, the kind {kind} "
+        f"and the hand-off to {handoff}"
+    )
 
 
 # ---------------------------------------------------------------------------

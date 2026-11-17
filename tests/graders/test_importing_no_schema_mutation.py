@@ -283,6 +283,11 @@ def test_workspace_without_schema_change_passes(
         ({}, {"import-report.md": "Cannot import: a column has no home on DcimDevice.\n"}),
         # Near-miss: an empty report file.
         ({}, {"import-report.md": ""}),
+        # Near-miss: the column and the kind, but no hand-off to
+        # infrahub-managing-schemas (cubic review of #247).
+        ({}, {"import-report.md": IMPORT_REPORT.replace(
+            "To unblock this import, add the attribute through infrahub-managing-schemas.\n", ""
+        )}),
     ],
     ids=[
         "extension-at-workspace-root",
@@ -292,9 +297,29 @@ def test_workspace_without_schema_change_passes(
         "report-without-kind",
         "report-without-column",
         "empty-report",
+        "report-without-schema-handoff",
     ],
 )
 def test_schema_change_outside_output_dir_or_missing_report_fails(
     tmp_path: Path, files: dict, workspace: dict
 ) -> None:
     assert _score(tmp_path, files, workspace=workspace) < 1.0
+
+
+def test_unreadable_yaml_in_workspace_fails(tmp_path: Path) -> None:
+    """A YAML file the grader cannot read may be a schema change, so it fails.
+
+    A dangling symlink is unreadable whatever the user's permissions
+    (cubic review of #247).
+    """
+    out = tmp_path / "output_dir"
+    out.mkdir()
+    (tmp_path / "import-report.md").write_text(IMPORT_REPORT)
+    (tmp_path / "dcim.yml").symlink_to(tmp_path / "missing.yml")
+    proc = subprocess.run(
+        [sys.executable, str(GRADER), str(out)],
+        capture_output=True, text=True, check=True, cwd=GRADERS_DIR,
+    )
+    result = json.loads(proc.stdout)
+    failed = [c["name"] for c in result["checks"] if not c["passed"]]
+    assert failed == ["no-schema-mutation"], result["details"]

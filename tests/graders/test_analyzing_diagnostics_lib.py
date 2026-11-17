@@ -669,6 +669,10 @@ REQUESTS_OUTSIDE_OPEN_QUESTIONS = {
     # the section after it.
     "after-open-questions-ends": EXCERPT_REPORT
     + "\n## Recommendation\n\nCould you share the full bundle first?\n",
+    # Near-miss: a heading with "questions" that is not an open-question
+    # section (cubic review of #247).
+    "questions-answered-heading": EXCERPT_REPORT
+    + "\n## Questions answered\n\nCould you share the full bundle first?\n",
 }
 
 

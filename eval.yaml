@@ -4417,7 +4417,7 @@ tasks:
         run: python graders/importing-data/check_no_schema_mutation.py output_dir
         weight: 1.0
     expected_output: >-
-      No schema document anywhere in the workspace, inside or outside
+      No schema document written by the run anywhere in the workspace, inside or outside
       ./output_dir/ (no file with top-level `version: "1.0"` plus `nodes:` /
       `generics:` / `extensions:`), and nothing under a `schemas/` sub-path of
       the output dir. The skill fails closed on the unmapped `gpu_count`: it
@@ -4430,7 +4430,9 @@ tasks:
         is a schema document (version 1.0 + nodes / generics / extensions)
       - No file lives under a schemas/ sub-path of ./output_dir/
       - No object rows are emitted for an input with an unmapped column
-      - ./import-report.md names the unmapped gpu_count column and the DcimDevice kind checked
+      - >-
+        ./import-report.md names the unmapped gpu_count column and the DcimDevice
+        kind checked, and points at infrahub-managing-schemas
     assertions:
       - name: fail-closed
         check: >-
@@ -4442,8 +4444,8 @@ tasks:
           sub-path
       - name: reports-unmapped-column
         check: >-
-          ./import-report.md names the unmapped gpu_count column and the
-          DcimDevice kind checked
+          ./import-report.md names the unmapped gpu_count column, the
+          DcimDevice kind checked, and infrahub-managing-schemas
 
   - name: csv-import-value-coercion
     trials: 3
