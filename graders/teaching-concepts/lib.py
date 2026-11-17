@@ -501,37 +501,56 @@ def _learner_nodes(ws: Path) -> set[tuple[str, str]]:
 _NOT_LEARNER_DIRS = ("graders", ".claude", ".agents")
 
 
+_MARKER_WORDS = ("node", "kind", "object", "generic")
+
+
 def _short_name_uses(explain: str, nodes: set[tuple[str, str]]) -> list[str]:
     """The learner nodes that Explain names by their short name.
 
     The rule names each node by its full kind (`TestbedSensor`, not
-    `Sensor`). A short name counts when it is used as a node name: next to
-    "node", "kind", "object" or "generic", in backticks, in bold or plain
-    ("your `Zone` node", "your **Zone** node", "the Zone kind"). A sentence
-    that also names the full kind of that node is skipped, so the contrast
-    the rule itself writes ("`TestbedZone`, not `Zone`") passes. A short name
-    that is not used as a node name passes too ("the `name` (`Sensor`)",
-    "each zone holds many sensors").
+    `Sensor`). A short name counts when it is in backticks or in bold
+    ("each `Sensor` sits in one `Zone`", "your **Zone**"), or plain next to
+    "node", "kind", "object" or "generic" ("your Zone node", "kind: Zone").
+
+    Two uses do not count:
+
+    - A sentence that also names the full kind of that node, so the contrast
+      the rule itself writes ("`TestbedZone`, not `Zone`") passes.
+    - A short name given as the value of `name` ("the `name` (`Sensor`)",
+      "`name: Sensor`"), which an attributes lesson needs.
+
+    A short name that is itself one of the marker words (`Generic` in
+    `LocationGeneric`) is skipped: "**Generic nodes**" is not a node name.
     """
     kinds = {f"{namespace}{name}" for namespace, name in nodes}
     full_kinds: dict[str, set[str]] = {}
     for namespace, name in nodes:
-        if name not in kinds:
+        if name not in kinds and name.lower() not in _MARKER_WORDS:
             full_kinds.setdefault(name, set()).add(f"{namespace}{name}")
     mark = r"[`*_]*"
-    word = r"(?i:node|kind|object|generic)s?"
+    word = rf"(?i:{'|'.join(_MARKER_WORDS)})s?"
     used: set[str] = set()
     # A sentence ends at a sentence ender followed by whitespace, or at a
     # blank line. It may wrap across lines.
     for sentence in re.split(r"(?<=[.!?])\s+|\n\s*\n", explain):
         for name, fulls in full_kinds.items():
-            if any(full in sentence for full in fulls):
+            if any(
+                re.search(rf"(?<![A-Za-z0-9_]){re.escape(full)}(?![A-Za-z0-9_])", sentence)
+                for full in fulls
+            ):
                 continue
             short = re.escape(name)
-            if re.search(
-                rf"(?<![A-Za-z0-9]){mark}{short}{mark}\s+{word}\b"
-                rf"|\b{word}\s+(?:(?i:called|named)\s+)?{mark}{short}{mark}(?![A-Za-z0-9])",
+            # Drop the short name where it is the value of `name`.
+            rest = re.sub(
+                rf"\bname[`*_]*\s*(?:[:=]|\bis\b|\bof\b|\bas\b)?\s*[(\"'`*_]*{short}(?![A-Za-z0-9])",
+                "name",
                 sentence,
+            )
+            if re.search(
+                rf"`{short}`|\*\*{short}\*\*|__{short}__"
+                rf"|(?<![A-Za-z0-9]){mark}{short}{mark}\s+{word}\b"
+                rf"|\b{word}(?:\s+|\s*:\s*)(?:(?i:called|named)\s+)?{mark}{short}{mark}(?![A-Za-z0-9])",
+                rest,
             ):
                 used.add(name)
     return sorted(used)

@@ -612,8 +612,17 @@ def test_own_artifacts_short_name_without_backticks_passes(tmp_path):
 
 @pytest.mark.parametrize(
     "reference",
-    ["to your **Zone** node", "to your Zone node", "to the node named `Zone`", "to the Zone kind"],
-    ids=["bold", "plain", "node-named", "kind"],
+    [
+        "to your **Zone** node",
+        "to your Zone node",
+        "to the node named `Zone`",
+        "to the Zone kind",
+        # No marker word next to the name: the most common short-name use.
+        "to exactly one `Zone`",
+        "to one **Zone**",
+        "to the kind: Zone",
+    ],
+    ids=["bold", "plain", "node-named", "kind", "backticks-only", "bold-only", "kind-colon"],
 )
 def test_own_artifacts_short_name_as_node_name_fails(tmp_path, reference):
     """A short name next to node or kind, with or without backticks (review of #247)."""
@@ -633,8 +642,10 @@ def test_own_artifacts_short_name_as_node_name_fails(tmp_path, reference):
         "Its kind joins the `namespace` (`Testbed`) and the `name` (`Sensor`).",
         # The full kind and the short name of the same node in one sentence.
         "The `TestbedZone` kind is the `Zone` node in the `Testbed` namespace.",
+        # The short name as the value of `name`, in the YAML form.
+        "The schema file sets `name: Zone` under the `Testbed` namespace.",
     ],
-    ids=["contrast", "name-and-namespace", "full-kind-in-sentence"],
+    ids=["contrast", "name-and-namespace", "full-kind-in-sentence", "name-value"],
 )
 def test_own_artifacts_short_name_not_as_node_name_passes(tmp_path, sentence):
     """Near-miss: the short name appears, but not as the name of a node (review of #247)."""
@@ -643,6 +654,22 @@ def test_own_artifacts_short_name_not_as_node_name_passes(tmp_path, sentence):
     ws = make_ws(tmp_path, lesson=lesson)
     ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
     assert ok, msg
+
+
+def test_own_artifacts_longer_kind_does_not_hide_short_name():
+    """Near-miss: `TestbedZoneExtra` is not the full kind of `Zone`."""
+    nodes = {("Testbed", "Zone"), ("Testbed", "ZoneExtra")}
+    assert teaching_lib._short_name_uses("Each `TestbedZoneExtra` sits in one `Zone`.", nodes) == ["Zone"]
+    assert teaching_lib._short_name_uses("Each `TestbedZoneExtra` sits in one `TestbedZone`.", nodes) == []
+
+
+def test_own_artifacts_marker_word_short_name_is_skipped():
+    """A generic named `LocationGeneric`: "Generic nodes" is not a node name."""
+    nodes = {("Location", "Generic"), ("Testbed", "Zone")}
+    assert teaching_lib._short_name_uses("**Generic nodes** share attributes.", nodes) == []
+    assert teaching_lib._short_name_uses("**Generic** kinds share attributes.", nodes) == []
+    # Near-miss: the other node of the same schema is still checked.
+    assert teaching_lib._short_name_uses("**Generic nodes** such as `Zone`.", nodes) == ["Zone"]
 
 
 def test_own_artifacts_malformed_schema_does_not_crash(tmp_path):
