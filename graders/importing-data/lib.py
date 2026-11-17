@@ -930,21 +930,46 @@ def check_provenance_comment(
 
 
 def _row_lists(doc: dict) -> list[tuple[str, int]]:
-    """(key path, row count) for each list of row mappings a document holds.
+    """(key path, row count) for each list of rows a document holds.
 
-    Looks at the top level of the document and under ``spec``. A list of
-    scalars (``tags: [a, b]``) is not a list of rows.
+    Rows are a non-empty list of mappings, or any non-empty list under a
+    ``data`` key. A list of scalars under another key (``tags: [a, b]``) is
+    not a list of rows. The check looks:
+
+    - under ``spec``, at any depth (``spec.data``, ``spec.payload.data``);
+    - at the top level of a document that has ``kind`` or ``spec``;
+    - under a top-level ``data`` key in any document.
+
+    A document with no ``kind``, no ``spec`` and no ``data`` is not object
+    data: a YAML report that lists the unmapped columns as mappings is the
+    structured report the skill asks for.
     """
     found: list[tuple[str, int]] = []
-    spec = doc.get("spec")
-    for prefix, holder in (("", doc), ("spec.", spec)):
-        if not isinstance(holder, dict):
-            continue
+
+    def rows_of(key: str, value: Any) -> int:
+        if not isinstance(value, list) or not value:
+            return 0
+        rows = sum(1 for item in value if isinstance(item, dict))
+        return rows or (len(value) if key == "data" else 0)
+
+    def walk(prefix: str, holder: dict) -> None:
         for key, value in holder.items():
-            if isinstance(value, list):
-                rows = sum(1 for item in value if isinstance(item, dict))
-                if rows:
-                    found.append((f"{prefix}{key}", rows))
+            rows = rows_of(key, value)
+            if rows:
+                found.append((f"{prefix}{key}", rows))
+            elif isinstance(value, dict):
+                walk(f"{prefix}{key}.", value)
+
+    object_like = "kind" in doc or "spec" in doc
+    for key, value in doc.items():
+        if key == "spec":
+            if isinstance(value, dict):
+                walk("spec.", value)
+            continue
+        if object_like or key == "data":
+            rows = rows_of(key, value)
+            if rows:
+                found.append((key, rows))
     return found
 
 
@@ -959,10 +984,11 @@ def check_fail_closed(
     When an input column has no schema home, the skill must stop and write
     nothing — never a partial emission that silently drops the column. The
     grader asserts the invariant that survives in the output directory: no
-    YAML document carries rows, whatever its ``kind`` and wherever the rows
-    are. Rows are a non-empty list of mappings, at the top level of the
-    document or under ``spec`` (``spec.data``, or a top-level ``data:`` in a
-    document without the Object envelope). A YAML file that parses to no
+    YAML document carries rows, whatever its ``kind``. Rows are a non-empty
+    list of mappings under ``spec``, under a top-level ``data:``, or at the
+    top level of a document that has ``kind`` or ``spec`` (see
+    ``_row_lists``). A YAML report with no ``kind``, ``spec`` or ``data``
+    that lists the unmapped columns passes. A YAML file that parses to no
     mapping document (a top-level list of rows, or a file that does not
     parse) is a write the check cannot read, so it fails too. A plain-text
     report explaining the unmapped column is fine (it isn't YAML), and an

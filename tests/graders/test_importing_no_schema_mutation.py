@@ -76,8 +76,18 @@ def _score(tmp_path: Path, files: dict[str, str]) -> float:
             "  data:\n    - name: spine-01\n      role: spine\n      status: active\n",
             "  data: []\n",
         )}, 1.0),
+        # Compliant: the structured report as YAML. It lists the unmapped
+        # columns as mappings and has no `kind`, `spec` or `data` (review of
+        # #247).
+        ({"report.yml": (
+            "result: failed_closed\n"
+            "unmapped_columns:\n"
+            "  - file: devices.csv\n"
+            "    column: gpu_count\n"
+            "    kinds_checked: [DcimDevice]\n"
+        )}, 1.0),
     ],
-    ids=["report-only", "object-without-rows"],
+    ids=["report-only", "object-without-rows", "yaml-report"],
 )
 def test_fail_closed_answer_passes(tmp_path: Path, files: dict, expected: float) -> None:
     assert _score(tmp_path, files) == expected
@@ -121,6 +131,13 @@ def test_fail_closed_answer_passes(tmp_path: Path, files: dict, expected: float)
             "01_dcim_devices.yml": OBJECT_ROWS.replace("  data:\n", "  rows:\n"),
             "report.txt": REPORT,
         },
+        # Near-miss: the rows one level below `spec`.
+        {
+            "01_dcim_devices.yml": "kind: Object\nspec:\n  payload:\n    data:\n      - name: spine-01\n",
+            "report.txt": REPORT,
+        },
+        # Near-miss: a `data` list of scalars, in a document with no `kind`.
+        {"01_dcim_devices.yml": "data:\n  - spine-01\n  - spine-02\n", "report.txt": REPORT},
     ],
     ids=[
         "schema-document",
@@ -132,6 +149,8 @@ def test_fail_closed_answer_passes(tmp_path: Path, files: dict, expected: float)
         "partial-write-as-list-after-mapping",
         "partial-write-top-level-data",
         "partial-write-other-spec-key",
+        "partial-write-nested-under-spec",
+        "partial-write-scalar-data",
     ],
 )
 def test_schema_change_or_partial_write_fails(tmp_path: Path, files: dict) -> None:
