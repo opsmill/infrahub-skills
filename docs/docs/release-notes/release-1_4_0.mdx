@@ -16,7 +16,7 @@ description: Upgrade planning one minor version at a time, device-type export fr
     </tr>
     <tr>
       <th>Release Date</th>
-      <td>November 16th, 2026</td>
+      <td>November 17th, 2026</td>
     </tr>
     <tr>
       <th>Tag</th>
@@ -92,6 +92,7 @@ What changed:
 * Audit findings from the auditing-repo skill list only live reference sites in `sites`: a file that nothing registers, includes, or imports is reported as dead code instead. A kind whose Dropdown has a different choice list, or whose relationship has a different peer, now counts toward a duplicate shape, and the difference is recorded as a feasibility blocker.
 * Analyze a pasted log excerpt with the analyzing-diagnostics skill without first being asked where the bundle is; what the excerpt lacks is listed under Open questions. Every report now states the bundle manifest, including when every collector succeeded, and writes the exact `gh search issues` line for each query, including queries that could not be run.
 * Lessons from the teaching-concepts skill name each node by its full kind, such as `CampusSwitch`, as the schema and the API do.
+* `fetch_schema_limits.py` in the managing-schemas skill reads the string-length limits from the public Infrahub schema again, such as 128 characters for a `description`. The public schema and `/api/openapi.json` name their definitions `NodeSchemaWrite` and so on, so the script returned no limits, and `--check` reported no over-limit field. The script now exits with an error when a source has no limits.
 * The managing-checks skill now states which repository commit a proposed change's checks run, and how to get a check fix merged to `main` into an open proposed change on a branch synced with Git ([#194](https://github.com/opsmill/infrahub-skills/issues/194)).
 * The output rule of the converting-netbox-device-types skill lists all five files the converter writes, including `04_module_types.yml` and `05_module_templates.yml`. Before, it listed three, so module types converted with the skill were not loaded ([#135](https://github.com/opsmill/infrahub-skills/issues/135)).
 
@@ -161,6 +162,7 @@ Notes: the skills no longer list `allowed-tools`. While a skill is active, Bash,
 * auditing-repo lists only live reference sites and counts differing kinds toward a duplicate shape.
 * analyzing-diagnostics analyzes a pasted excerpt, always states the manifest, and always writes the `gh search issues` line.
 * teaching-concepts names nodes by their full kind.
+* `fetch_schema_limits.py` in managing-schemas reads the `*Write` definitions of the public Infrahub schema and of `/api/openapi.json`, so `--check` finds over-limit fields again. It exits with an error when a source has no limits, instead of reporting no over-limit field.
 
 ### Housekeeping
 

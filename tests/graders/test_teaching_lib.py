@@ -12,6 +12,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 LIB_PATH = REPO_ROOT / "graders" / "teaching-concepts" / "lib.py"
 
@@ -588,6 +590,101 @@ def test_own_artifacts_generic_example_instead(tmp_path):
     ws = make_ws(tmp_path, lesson=generic)
     ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
     assert not ok
+
+
+def test_own_artifacts_short_name_fails(tmp_path):
+    """One full kind, then the other node by its short name (review of #226)."""
+    mixed = COMPLIANT_LESSON.replace("to `TestbedZone`", "to your `Zone` node")
+    ws = make_ws(tmp_path, lesson=mixed)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert not ok and "Zone" in msg and "short name" in msg
+
+
+def test_own_artifacts_short_name_without_backticks_passes(tmp_path):
+    """Near-miss: the word in plain prose is not a node reference."""
+    prose = COMPLIANT_LESSON.replace(
+        "Cardinality controls", "Each zone can hold many sensors. Cardinality controls"
+    )
+    ws = make_ws(tmp_path, lesson=prose)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert ok, msg
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        "to your **Zone** node",
+        "to your Zone node",
+        "to the node named `Zone`",
+        "to the Zone kind",
+        # No marker word next to the name: the most common short-name use.
+        "to exactly one `Zone`",
+        "to one **Zone**",
+        "to the kind: Zone",
+    ],
+    ids=["bold", "plain", "node-named", "kind", "backticks-only", "bold-only", "kind-colon"],
+)
+def test_own_artifacts_short_name_as_node_name_fails(tmp_path, reference):
+    """A short name next to node or kind, with or without backticks (review of #247)."""
+    mixed = COMPLIANT_LESSON.replace("to `TestbedZone`", reference)
+    assert mixed != COMPLIANT_LESSON
+    ws = make_ws(tmp_path, lesson=mixed)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert not ok and "Zone" in msg and "short name" in msg
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        # The contrast form that grounding-own-artifacts.md writes itself.
+        "Always write `TestbedZone`, not `Zone`.",
+        # An attributes lesson that explains `name` and `namespace`.
+        "Its kind joins the `namespace` (`Testbed`) and the `name` (`Sensor`).",
+        # The full kind and the short name of the same node in one sentence.
+        "The `TestbedZone` kind is the `Zone` node in the `Testbed` namespace.",
+        # The short name as the value of `name`, in the YAML form.
+        "The schema file sets `name: Zone` under the `Testbed` namespace.",
+    ],
+    ids=["contrast", "name-and-namespace", "full-kind-in-sentence", "name-value"],
+)
+def test_own_artifacts_short_name_not_as_node_name_passes(tmp_path, sentence):
+    """Near-miss: the short name appears, but not as the name of a node (review of #247)."""
+    lesson = COMPLIANT_LESSON.replace("Cardinality controls", f"{sentence} Cardinality controls")
+    assert lesson != COMPLIANT_LESSON
+    ws = make_ws(tmp_path, lesson=lesson)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert ok, msg
+
+
+def test_own_artifacts_longer_kind_does_not_hide_short_name():
+    """Near-miss: `TestbedZoneExtra` is not the full kind of `Zone`."""
+    nodes = {("Testbed", "Zone"), ("Testbed", "ZoneExtra")}
+    assert teaching_lib._short_name_uses("Each `TestbedZoneExtra` sits in one `Zone`.", nodes) == ["Zone"]
+    assert teaching_lib._short_name_uses("Each `TestbedZoneExtra` sits in one `TestbedZone`.", nodes) == []
+
+
+def test_own_artifacts_name_of_is_not_a_name_value():
+    """Near-miss: "name of" does not make the short name a `name` value."""
+    nodes = {("Testbed", "Zone")}
+    assert teaching_lib._short_name_uses("The name of `Zone` is short.", nodes) == ["Zone"]
+    assert teaching_lib._short_name_uses("The name is `Zone` here.", nodes) == []
+
+
+def test_own_artifacts_marker_word_short_name_is_skipped():
+    """A generic named `LocationGeneric`: "Generic nodes" is not a node name."""
+    nodes = {("Location", "Generic"), ("Testbed", "Zone")}
+    assert teaching_lib._short_name_uses("**Generic nodes** share attributes.", nodes) == []
+    assert teaching_lib._short_name_uses("**Generic** kinds share attributes.", nodes) == []
+    # Near-miss: the other node of the same schema is still checked.
+    assert teaching_lib._short_name_uses("**Generic nodes** such as `Zone`.", nodes) == ["Zone"]
+
+
+def test_own_artifacts_malformed_schema_does_not_crash(tmp_path):
+    """A node whose name is a list is skipped, not a crash."""
+    broken = FIXTURE_SCHEMA.replace("  - name: Zone\n", "  - name: [Zone]\n")
+    ws = make_ws(tmp_path, lesson=COMPLIANT_LESSON, schema=broken)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert ok, msg
 
 
 OTHER_SCHEMA = """version: "1.0"

@@ -719,6 +719,12 @@ def _load_schema_limits() -> tuple[dict[str, dict[str, int]] | None, str | None]
             for field, info in full.get(name, {}).items()
             if "maxLength" in info
         }
+    # An empty table means the script read the wrong definition name, not
+    # that Infrahub has no caps: report the check as not verified.
+    empty = sorted(name for name, table in limits.items() if not table)
+    if empty:
+        _SCHEMA_LIMITS_ERROR = f"fetch script returned no maxLength caps for {', '.join(empty)}"
+        return None, _SCHEMA_LIMITS_ERROR
     _SCHEMA_LIMITS_CACHE = limits
     return limits, None
 

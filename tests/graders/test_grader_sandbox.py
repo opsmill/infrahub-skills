@@ -112,6 +112,10 @@ _SEEDED_OUTPUT = {
     "graders/importing-data/check_self_check_rules.py": {
         "output_dir/answer.md": "Checked against format-structure.md.\n",
     },
+    # Reaches fetch_schema_limits.py, which the grader runs from the skill.
+    "graders/managing-schemas/check_string_limits.py": {
+        "output.yml": 'version: "1.0"\nnodes:\n  - name: Device\n    namespace: Dcim\n',
+    },
 }
 
 
@@ -143,6 +147,8 @@ def test_grader_reads_skill_files_in_trial_layout(
         if any(marker in m for marker in _CRASH_MARKERS)
         or "not found at" in m
         or "could not read" in m
+        # The fetch script found no caps under the definition names it knows.
+        or "no maxLength cap" in m
     ]
     assert not missing, f"{script}: skill file unreachable in trial layout: {missing}"
 

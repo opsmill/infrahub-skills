@@ -72,43 +72,198 @@ def _gh_search_commands(text: str) -> list[str]:
     return commands
 
 
-_HEADING = re.compile(r"(?m)^#{1,6}\s")
+_HEADING = re.compile(r"^\s{0,3}#{1,6}\s")
+_LIST_MARKER = r"(?:[-*+]|\d+[.)])\s+"
+# A `- Root:` label line, as rules/correlate-into-incidents.md writes it. The
+# label may be bold and may read "Root cause".
+_ROOT_LABEL = re.compile(
+    rf"(?i)^\s*(?:{_LIST_MARKER})?[*_`]*root(?:[ -]cause)?[*_`]*\s*[:–—-]"
+)
+# A `- Cascade:` list item or a `### Cascade` heading.
+_CASCADE_LABEL = re.compile(
+    rf"(?i)^\s*(?:#{{1,6}}\s+|{_LIST_MARKER})[*_`]*(?:cascad\w*|downstream)\b"
+)
+# A `Cascade:` or `**Cascade:**` paragraph label. It needs the colon, and
+# `_cascade_lines` reads it only at the start of a paragraph, so a wrapped
+# line that merely starts with the word ("cascade below, bundle/...") is not
+# one.
+_CASCADE_PARAGRAPH_LABEL = re.compile(
+    r"(?i)^\s*[*_`]*(?:cascad\w*|downstream)(?:\s+\w+){0,2}[*_`]*\s*:"
+)
+_ROOT_MENTION = re.compile(r"(?i)\broot(?:[ -]cause)?\b|caused by")
+_INCIDENT_HEADING = re.compile(
+    r"(?i)^#{1,6}\s*incident(?:\s*#?\d+|\s*:|\s+[-–—]\s)"
+)
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip())
+
+
+def _cascade_lines(lines: list[str]) -> list[bool]:
+    """Which lines belong to a Cascade item or a Cascade section.
+
+    A `- Cascade:` item owns its own line and the more-indented lines under
+    it. A `### Cascade` heading owns its section, up to the next heading. A
+    `Cascade:` paragraph owns its lines up to the next blank line.
+
+    A paragraph label counts only at the start of a paragraph: the first
+    line, or a line after a blank line or a heading. A line wrapped inside a
+    `- Root:` item that starts with "cascade" or "downstream" is part of
+    that item, not a Cascade label.
+    """
+    mask = [False] * len(lines)
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        starts_paragraph = i == 0 or not lines[i - 1].strip() or bool(_HEADING.match(lines[i - 1]))
+        if not (
+            _CASCADE_LABEL.match(line)
+            or (starts_paragraph and _CASCADE_PARAGRAPH_LABEL.match(line))
+        ):
+            i += 1
+            continue
+        mask[i] = True
+        is_heading = bool(_HEADING.match(line))
+        is_item = bool(re.match(rf"\s*{_LIST_MARKER}", line))
+        j = i + 1
+        while j < len(lines):
+            nxt = lines[j]
+            if is_heading:
+                if _HEADING.match(nxt):
+                    break
+            elif _HEADING.match(nxt):
+                break
+            elif is_item:
+                if nxt.strip() and _indent(nxt) <= _indent(line):
+                    break
+            elif not nxt.strip():
+                break
+            mask[j] = True
+            j += 1
+        i = j
+    return mask
+
+
+# A list item that opens with a label (`- Recommendation: ...`).
+_ITEM_LABEL = re.compile(rf"^\s*{_LIST_MARKER}[*_`]*([A-Za-z][A-Za-z -]{{0,30}}?)[*_`]*\s*:")
+# Labels of items that carry the evidence of the item above them, as
+# rules/report-evidence-per-finding.md writes it (`Evidence: bundle/...`).
+_EVIDENCE_LABELS = {
+    "evidence", "excerpt", "log", "logs", "path", "file", "source", "quote",
+    "timestamp", "time", "when", "where", "service",
+}
+
+
+def _label_window(lines: list[str], i: int, start: int, cascade: list[bool]) -> str:
+    """The `- Root:` line from `start`, plus the lines that belong to it.
+
+    A list item owns the more-indented lines under it (the quoted excerpt, a
+    path after a blank line) and the sibling items after it, up to the next
+    labelled item (`- Cascade:`, `- Recommendation:`). An `- Evidence:` item
+    is evidence of the root, so it does not end the window. A `Root:`
+    paragraph owns the next non-blank line. The window never enters a
+    heading, a Cascade line, or a paragraph at the indentation of the item.
+    """
+    own = lines[i]
+    is_item = bool(re.match(rf"\s*{_LIST_MARKER}", own))
+    window = [own[start:]]
+    for j in range(i + 1, len(lines)):
+        line = lines[j]
+        if cascade[j] or _HEADING.match(line):
+            break
+        if not line.strip():
+            continue
+        if is_item and _indent(line) <= _indent(own):
+            # A sibling is at the indentation of the Root item. A less
+            # indented item belongs to an outer list.
+            if _indent(line) < _indent(own) or not re.match(rf"\s*{_LIST_MARKER}", line):
+                break
+            label = _ITEM_LABEL.match(line)
+            if label and label.group(1).strip().lower() not in _EVIDENCE_LABELS:
+                break
+        window.append(line)
+        if not is_item:
+            break
+    return "\n".join(window)
 
 
 def _root_windows(text: str) -> list[str]:
-    """The evidence window after each root mention.
+    """The evidence window of each root the report names.
 
-    The report template anchors the root to its evidence on the `- Root:` line
-    (path) and the next non-blank line (quoted excerpt); a wider window would
-    credit unrelated paths mentioned further down the section. A root named
-    by a heading (`### Root Cause`) owns that heading's section instead, up to
-    the next heading.
+    Each incident section is read on its own (the whole report when it has
+    no incident section):
+
+    - When the section has a `- Root:` label line, as
+      rules/correlate-into-incidents.md prescribes, the root is read from
+      those lines only: the label line and the lines that belong to it. What
+      a heading says does not matter.
+    - Otherwise a heading that mentions the root (`### Root Cause`,
+      `### Likely root cause`) owns its section up to the next heading, and
+      a prose mention owns the rest of its line and the next non-blank line.
+      An incident heading that mentions the root is read as prose.
+
+    In both cases a `- Cascade:` item or a `### Cascade` section is never
+    part of a root window.
     """
+    sections = _incident_sections(text)
+    if sections:
+        first = text.find(sections[0][0])
+        chunks = [text[: max(first, 0)]] + [head + body for head, body in sections]
+    else:
+        chunks = [text]
     windows: list[str] = []
-    for m in re.finditer(r"(?i)\broot(?:[ -]cause)?\b|caused by", text):
-        line_start = text.rfind("\n", 0, m.start()) + 1
-        if _HEADING.match(text, line_start):
-            nxt = _HEADING.search(text, m.end())
-            windows.append(text[m.end() : nxt.start() if nxt else len(text)])
+    for chunk in chunks:
+        lines = chunk.split("\n")
+        cascade = _cascade_lines(lines)
+        labels = [
+            (i, m.end())
+            for i, line in enumerate(lines)
+            if not cascade[i] and (m := _ROOT_LABEL.match(line))
+        ]
+        if labels:
+            windows.extend(_label_window(lines, i, start, cascade) for i, start in labels)
             continue
-        line_end = text.find("\n", m.end())
-        if line_end == -1:
-            windows.append(text[m.end() :])
-            continue
-        following = re.search(r"\n[ \t]*\S[^\n]*", text[line_end:])
-        end = line_end + following.end() if following else len(text)
-        windows.append(text[m.end() : end])
+        for i, line in enumerate(lines):
+            if cascade[i]:
+                continue
+            for m in _ROOT_MENTION.finditer(line):
+                if _HEADING.match(line) and not _INCIDENT_HEADING.match(line.lstrip()):
+                    section: list[str] = []
+                    for j in range(i + 1, len(lines)):
+                        if _HEADING.match(lines[j]):
+                            break
+                        if not cascade[j]:
+                            section.append(lines[j])
+                    windows.append("\n".join(section))
+                    break
+                window = [line[m.end() :]]
+                for j in range(i + 1, len(lines)):
+                    if cascade[j] or _HEADING.match(lines[j]):
+                        break
+                    if lines[j].strip():
+                        window.append(lines[j])
+                        break
+                windows.append("\n".join(window))
     return windows
 
 
 def _incident_sections(text: str) -> list[tuple[str, str]]:
     """(heading line, body) for each `## Incident <n>` section in the report.
 
-    Only a numbered or colon-led heading opens an incident, as the template
-    writes it (`## Incident 1: ...`). `### Incident Correlation` or
-    `## Incident Summary` are report sections about incidents, not incidents.
+    Only a numbered, colon-led or dash-led heading opens an incident, as the
+    template writes it (`## Incident 1: ...`, `## Incident - database OOM`).
+    The dash needs a space on each side, so a hyphenated word
+    (`## Incident-free services`) does not open one. `### Incident
+    Correlation` or `## Incident Summary` are report sections about
+    incidents, not incidents.
     """
-    matches = list(re.finditer(r"(?im)^#{1,6}\s*incident\s*(?:#?\d+|:)[^\n]*", text))
+    matches = list(
+        re.finditer(
+            r"(?im)^[ ]{0,3}#{1,6}\s*incident(?:\s*#?\d+|\s*:|\s+[-\u2013\u2014]\s)[^\n]*",
+            text,
+        )
+    )
     sections: list[tuple[str, str]] = []
     for i, m in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
@@ -190,6 +345,180 @@ def check_no_location_scan(text: str, **_: object) -> CheckResult:
             continue
         return False, "uses the default bundle directory instead of asking"
     return True, "no location scanning or assumed default"
+
+
+_BUNDLE_OR_MANIFEST = re.compile(r"(?i)\bbundle\b|\bmanifest\b|bundle_information\.json")
+
+# The section the rule allows a request in: a heading ("## Open questions",
+# "### Questions") or a label at the start of a line, plain, bold, or as a
+# list item ("- Open questions: ...", "**Open questions:**").
+_OPEN_QUESTIONS_HEADING = re.compile(
+    r"(?im)^[ ]{0,3}(#{1,6})\s*[*_]*(?:(?:open|outstanding|remaining|unanswered)\s+)?"
+    r"questions?\b(?!\s+(?:answered|closed|resolved|settled)\b)"
+)
+_OPEN_QUESTIONS_LABEL = re.compile(
+    r"(?im)^([ \t]*)([-*+]\s+|\d+[.)]\s+)?[*_]*"
+    r"(?:(?:open|outstanding|remaining|unanswered)\s+)?questions?[*_]*\s*:"
+)
+_LEVEL_HEADING = re.compile(r"(?m)^[ ]{0,3}(#{1,6})\s")
+
+# What makes a sentence a request to the reader rather than a statement about
+# the bundle: it addresses the reader ("could you", "you will need to"), states
+# what the writer wants ("I would like", "I need"), or asks politely or for
+# something back ("please", "tell me", "let me know"). These are grammatical
+# shapes, not a list of what the bundle can be asked for with. A question
+# mark is the other shape and is read separately.
+_REQUEST_SHAPE_RE = re.compile(
+    r"(?i)\b(?:can|could|would|will)\s+you\b"
+    r"|\byou(?:'ll|\s+will)?\s+(?:should|must|need\s+to|have\s+to)\b"
+    r"|\b(?:i|we)(?:'d|'ll|\s+would|\s+will)?(?:\s+(?:also|first|still|really))?"
+    r"\s+(?:need|want|like|require)\b"
+    r"|\bplease(?!\s+(?:do\s+not|don'?t|never|avoid|note|see)\b)"
+    r"|\blet\s+(?:me|us)\s+know\b"
+    # A verb + "me" in imperative position only: at the start of the sentence
+    # or a clause, or after "and"/"then" ("Run X and tell me ..."). "The
+    # manifest tells us ..." is a statement.
+    r"|(?:^[\s>*_+\-\d.)]*|[,;:]\s*|\b(?:and|then)\s+)(?!let\b)[a-z]+\s+(?:me|us)\b"
+)
+_NEGATION_AFTER = re.compile(r"(?i)^\s*(?:not|never|no\s+longer)\b")
+
+
+def _open_question_spans(text: str) -> list[tuple[int, int]]:
+    """(start, end) of each Open questions section or labelled item.
+
+    A heading runs to the next heading of the same or a higher level. A list
+    item label runs to the next line at the same or a lower indent that
+    starts a list item, follows a blank line, or is a heading. A paragraph
+    label runs to the next heading.
+    """
+    spans: list[tuple[int, int]] = []
+    headings = list(_LEVEL_HEADING.finditer(text))
+    for m in _OPEN_QUESTIONS_HEADING.finditer(text):
+        level = len(m.group(1))
+        end = next(
+            (h.start() for h in headings if h.start() > m.start() and len(h.group(1)) <= level),
+            len(text),
+        )
+        spans.append((m.start(), end))
+    for m in _OPEN_QUESTIONS_LABEL.finditer(text):
+        indent = len(m.group(1).expandtabs())
+        end = next((h.start() for h in headings if h.start() > m.start()), len(text))
+        if m.group(2):
+            pos = text.find("\n", m.end())
+            blank = False
+            while pos != -1 and pos + 1 < end:
+                line_end = text.find("\n", pos + 1)
+                line = text[pos + 1 : line_end if line_end != -1 else len(text)]
+                if not line.strip():
+                    blank = True
+                elif len(line) - len(line.lstrip()) <= indent and (
+                    blank or re.match(r"\s*(?:[-*+]|\d+[.)])\s", line)
+                ):
+                    end = pos + 1
+                    break
+                pos = line_end
+        spans.append((m.start(), end))
+    return spans
+
+
+def _sentences(text: str) -> list[str]:
+    """Sentences, which may wrap across lines.
+
+    A sentence ends at a sentence ender followed by whitespace, at a blank
+    line, or where a line starts a list item, a heading, or a quote.
+    """
+    return re.split(
+        r"(?<=[.!?])\s+|\n\s*\n|\n(?=[ \t]*(?:[-*+>]|\d+[.)]|#{1,6})\s)", text
+    )
+
+
+def _requests_bundle(sentence: str) -> bool:
+    """Whether a sentence asks for the bundle or the manifest.
+
+    Ranked: a sentence that does not name the bundle or the manifest asks for
+    nothing here. A question about either asks for it. Otherwise only a
+    request shape the sentence does not negate does: a statement that the
+    manifest is absent or not needed ("Manifest: not provided", "there is no
+    need to send the full bundle"), or a cited evidence path
+    ("Evidence: bundle/logs/database/db.log"), carries none.
+    """
+    if not _BUNDLE_OR_MANIFEST.search(sentence):
+        return False
+    if sentence.rstrip().rstrip("*_`)\"'").endswith("?"):
+        return True
+    for shape in _REQUEST_SHAPE_RE.finditer(sentence):
+        # The negation must sit in the same clause as the request: "Manifest:
+        # not provided; please send it" still asks.
+        before = re.split(r"[;,:\u2013\u2014]", sentence[max(0, shape.start() - 15) : shape.start()])[-1]
+        if re.search(_NEGATION_WORDS, before, re.IGNORECASE):
+            continue
+        if _NEGATION_AFTER.match(sentence[shape.end() :]):
+            continue
+        return True
+    return False
+
+
+def check_analyzes_pasted_excerpt(text: str, **_: object) -> CheckResult:
+    """For a pasted excerpt, the report analyzes it and asks only under Open questions.
+
+    rules/workflow-ask-bundle-location.md: a pasted excerpt settles the bundle
+    question, even a single log. The report analyzes what was pasted and lists
+    what it lacks (the manifest, the other services) under Open questions. A
+    question or a request for the bundle or the manifest is allowed only in an
+    Open questions section or item; anywhere else in the report it fails,
+    before or after the analysis. Saying the manifest is absent or the bundle
+    is not needed, or citing a bundle/ path as evidence, is not a request. The
+    report also fails when it has no analysis outside Open questions.
+    """
+    spans = _open_question_spans(text)
+    outside = list(text)
+    for start, end in spans:
+        outside[start:end] = " " * (end - start)
+    rest = "".join(outside)
+    findings_with_body = re.search(
+        r"(?im)^[ ]{0,3}#{1,6}\s*findings?\b[^\n]*\n(?:\s*\n)*[ \t]*[^\s#]", rest
+    )
+    analysis = re.search(r"(?im)^[ ]{0,3}#{1,6}\s*incident\b|bundle/\w|root[ -]cause", rest)
+    if not (analysis or findings_with_body):
+        return False, "no analysis of the pasted excerpt"
+    for sentence in _sentences(rest):
+        if _requests_bundle(sentence):
+            return False, "asks for the bundle outside Open questions"
+    return True, "analyzes the pasted excerpt first"
+
+
+# A collector count: a ratio ("8/8 collectors ok", "3/4 ok") or any number
+# before "collector(s)", with at most one word between ("8 collectors",
+# "3 of 4 log collectors").
+_COLLECTOR_COUNT_RE = re.compile(
+    r"(?i)\b\d+\s*/\s*\d+\s*(?:[a-z-]+\s+)?(?:collectors?\b|ok\b|succeeded\b|success\b)"
+    r"|\b\d+\s+(?:of\s+(?:the\s+)?\d+\s+)?(?:[a-z-]+\s+)?collectors?\b"
+)
+# "not provided" or a synonym, as the value of the Manifest line
+# ("Manifest: not provided", "the manifest was not included"), or "no
+# manifest". A word elsewhere on the line ("none failed") does not count.
+_MANIFEST_NOT_PROVIDED_RE = re.compile(
+    r"(?i)(?:manifest|bundle_information\.json)[*_`]*\s*(?:\([^)\n]*\)\s*)?"
+    r"(?:[:=–—-]|\b(?:is|was)\b)\s*[*_`]*\s*"
+    r"(?:not\s+(?:provided|available|included|present|pasted|supplied|shared|given)"
+    r"|unavailable|missing|absent)\b"
+    r"|\bno\s+(?:manifest|bundle_information\.json)\b"
+)
+
+
+def check_manifest_not_provided(text: str, **_: object) -> CheckResult:
+    """For a pasted excerpt, the report says the manifest is not provided.
+
+    rules/workflow-manifest-first.md: write `Manifest: not provided` and never
+    infer a collector count from a single pasted log. Any collector count
+    fails, also next to "not provided".
+    """
+    count = _COLLECTOR_COUNT_RE.search(text)
+    if count:
+        return False, f"infers a collector count with no manifest: {count.group(0)!r}"
+    if _MANIFEST_NOT_PROVIDED_RE.search(text):
+        return True, "states that the manifest is not provided"
+    return False, "does not say that the manifest is not provided"
 
 
 def check_mentions_manifest(text: str, **_: object) -> CheckResult:
@@ -464,6 +793,8 @@ CHECKS: dict[str, CheckFn] = {
     "asks-bundle-location": check_asks_bundle_location,
     "no-location-scan": check_no_location_scan,
     "mentions-manifest": check_mentions_manifest,
+    "analyzes-pasted-excerpt": check_analyzes_pasted_excerpt,
+    "manifest-not-provided": check_manifest_not_provided,
     "mentions-version": check_mentions_version,
     "cites-bundle-evidence": check_cites_bundle_evidence,
     "restart-evidence": check_restart_evidence,

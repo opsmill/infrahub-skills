@@ -92,9 +92,11 @@
     {
       "id": 3,
       "prompt": "Our task-workers will not start after an upgrade. In the diagnostic\nbundle I collected, every worker log ends with the traceback below. Is this\nalready a known Infrahub issue, and what should I do next? Do NOT actually\nrun any commands; write the exact commands and steps as a short report.\n\nbundle/logs/task-worker/task-worker-1.log:\nTraceback (most recent call last):\n  File \"/usr/local/lib/python3.12/site-packages/infrahub/workers/infrahub_async.py\", line 67, in setup\ninfrahub.exceptions.InitializationError: Unable to connect to the message broker at rabbitmq-7f9c4d.acme.net:5672",
-      "expected_output": "A report that cites the bundle path for the traceback, builds the GitHub search from stable keys (InitializationError + message-broker wording, the internal hostname stripped), searches opsmill/infrahub with `gh search issues` (open and closed by default), does not file anything itself, and hands any filing or commenting off to infrahub-reporting-issues.",
+      "expected_output": "A report that cites the bundle path for the traceback, builds the GitHub search from stable keys (InitializationError + message-broker wording, the internal hostname stripped), searches opsmill/infrahub with `gh search issues` (open and closed by default), does not file anything itself, and hands any filing or commenting off to infrahub-reporting-issues. The prompt pastes one log and no manifest, so the report analyzes it, asks for the bundle or the manifest only under Open questions, and writes `Manifest: not provided` instead of a collector count.",
       "files": [],
       "expectations": [
+        "Analyzes the pasted log and asks for the bundle or manifest only under Open questions",
+        "Writes `Manifest: not provided` and no collector count",
         "Cites bundle/logs/task-worker/... as evidence for the traceback",
         "Searches opsmill/infrahub issues with `gh search issues`",
         "Search keys keep InitializationError but strip the internal broker hostname",
@@ -102,6 +104,14 @@
         "Cross-links infrahub-reporting-issues for filing or commenting"
       ],
       "assertions": [
+        {
+          "name": "analyzes-pasted-excerpt",
+          "check": "Report analyzes the pasted log and asks for the bundle or manifest only under Open questions"
+        },
+        {
+          "name": "manifest-not-provided",
+          "check": "Report says the manifest is not provided and states no collector count"
+        },
         {
           "name": "cites-bundle-evidence",
           "check": "Report cites bundle/<service>/ file paths as evidence"

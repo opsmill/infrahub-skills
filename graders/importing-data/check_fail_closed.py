@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Grader for the csv-import-fail-closed eval task.
 
-Asserts the skill fails closed on an unmapped column: no Object-envelope
-document in the output directory carries any ``spec.data`` rows (i.e. no
-partial write that silently drops the column).
+Asserts the skill fails closed on an unmapped column: no YAML document in
+the output directory carries any rows, with or without the Object envelope
+(i.e. no partial write that silently drops the column).
 
 Only the ``fail-closed`` check runs here. The usual ``envelope`` baseline is
 intentionally omitted — a correct fail-closed run emits no object YAML, so an

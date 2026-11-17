@@ -1,0 +1,1 @@
+`fetch_schema_limits.py` in managing-schemas reads the `*Write` definitions of the public Infrahub schema and of `/api/openapi.json`, so `--check` finds over-limit fields again. It exits with an error when a source has no limits, instead of reporting no over-limit field.

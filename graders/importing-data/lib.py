@@ -24,6 +24,7 @@ Usage (in a per-task grader script)::
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -448,52 +449,162 @@ def check_range_expansion(
     return True, f"All {matched} bracket-range blocks set parameters.expand_range: true"
 
 
+# Directories of a trial workspace that the run did not write. skillgrade
+# copies graders/ in and installs every skill under .claude/skills/ and
+# .agents/skills/; skills/ is where the repository keeps them. Their YAML
+# holds schema documents of its own (examples, fixtures), so it is skipped.
+_NON_AGENT_DIRS: frozenset[str] = frozenset(
+    {"graders", "skills", ".claude", ".agents", ".git"}
+)
+
+
+def _workspace_root(output_dir: Path | None) -> Path:
+    """The trial workspace: the directory that holds ``output_dir``.
+
+    The task's ``run:`` line passes ``output_dir`` relative to the trial
+    directory, so its parent is the workspace whatever the grader's cwd is.
+    """
+    base = Path(output_dir) if output_dir is not None else Path("output_dir")
+    return base.resolve().parent
+
+
+def _workspace_yaml(root: Path) -> tuple[dict[Path, list[dict]], list[Path]]:
+    """Parse every YAML file in the workspace outside ``_NON_AGENT_DIRS``.
+
+    Returns the parsed files and the YAML files that could not be read. An
+    unreadable file may be a schema change, so the caller fails on it.
+    """
+    parsed: dict[Path, list[dict]] = {}
+    unreadable: list[Path] = []
+    if not root.is_dir():
+        return parsed, unreadable
+    for dirpath, dirnames, filenames in os.walk(root):
+        if Path(dirpath) == root:
+            dirnames[:] = [d for d in dirnames if d not in _NON_AGENT_DIRS]
+        dirnames.sort()
+        for name in sorted(filenames):
+            file_path = Path(dirpath) / name
+            if file_path.suffix.lower() not in {".yml", ".yaml"}:
+                continue
+            try:
+                raw = file_path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                unreadable.append(file_path)
+                continue
+            parsed[file_path] = _docs_from_file(raw)
+    return parsed, unreadable
+
+
+def _is_schema_document(doc: dict) -> bool:
+    """``version: "1.0"`` plus ``nodes:``, ``generics:`` or ``extensions:``."""
+    # An unquoted `version: 1.0` loads as a float, so compare as text.
+    has_schema_keys = "nodes" in doc or "generics" in doc or "extensions" in doc
+    return str(doc.get("version")) == "1.0" and has_schema_keys
+
+
 def check_no_schema_mutation(
     parsed_files: dict[Path, list[dict]],
     *,
     output_dir: Path | None = None,
     **_: Any,
 ) -> tuple[bool, str]:
-    """Within the emitted output dir, no file is a schema document.
+    """No file the run wrote is a schema document, inside or outside the output dir.
 
     A schema document is identifiable by top-level ``version: "1.0"`` (quoted
     or not) plus ``nodes:``, ``generics:`` or ``extensions:`` keys. An
     ``extensions:`` document adds attributes to an existing node, so it is a
-    schema change too. Also fails if any file lives under a ``schemas/``
-    sub-path inside the emission directory.
+    schema change too.
 
-    An output dir with no YAML passes: it holds no schema document, and
-    writing nothing is what the fail-closed rule requires when a column has
-    no schema home. ``fail-closed`` is the check that rejects object rows.
+    The check scans every YAML file in the trial workspace (the directory
+    that holds the output dir), not only the output dir: a run that leaves
+    the output dir empty and writes ``schemas/dcim.yml`` beside it has still
+    changed the schema. The directories the run did not write
+    (``_NON_AGENT_DIRS``) are skipped. Inside the output dir, any file under a
+    ``schemas/`` sub-path also fails, and so does a YAML file the check cannot
+    read, because it may be a schema document.
+
+    A workspace with no schema document passes, including one where the run
+    wrote no YAML at all: writing no object file is what the fail-closed rule
+    requires when a column has no schema home. ``fail-closed`` rejects object
+    rows, and ``reports-unmapped-column`` rejects a run that reports nothing.
     """
-    if not parsed_files:
-        return True, "No YAML emitted, so no schema mutation in the output dir"
+    base = Path(output_dir).resolve() if output_dir is not None else None
+    workspace_files, unreadable = _workspace_yaml(_workspace_root(output_dir))
+    files = dict(workspace_files)
+    files.update(parsed_files)
 
-    base = output_dir.resolve() if output_dir else None
-    violations: list[str] = []
-    for file_path, docs in parsed_files.items():
-        # Check sub-path
+    violations: list[str] = [
+        f"{file_path}: YAML file that cannot be read, so it may be a schema document"
+        for file_path in unreadable
+    ]
+    for file_path, docs in files.items():
         if base is not None:
             try:
                 rel = file_path.resolve().relative_to(base)
                 if "schemas" in rel.parts:
-                    violations.append(f"{file_path} lives under a schemas/ sub-path")
+                    violations.append(f"{file_path} lives under a schemas/ sub-path of the output dir")
+                    continue
             except ValueError:
                 pass
-        for doc in docs:
-            # An unquoted `version: 1.0` loads as a float, so compare as text.
-            version = str(doc.get("version"))
-            has_schema_keys = "nodes" in doc or "generics" in doc or "extensions" in doc
-            if version == "1.0" and has_schema_keys:
-                violations.append(
-                    f"{file_path.name}: schema document "
-                    "(version 1.0 + nodes/generics/extensions)"
-                )
-                break
+        if any(_is_schema_document(doc) for doc in docs):
+            violations.append(
+                f"{file_path}: schema document (version 1.0 + nodes/generics/extensions)"
+            )
 
     if violations:
-        return False, "; ".join(violations[:5])
-    return True, "No schema mutation in emitted output dir"
+        return False, "Schema mutation written: " + "; ".join(violations[:5])
+    return True, "No schema document written in the workspace"
+
+
+# The report the csv-import-no-schema-mutation task asks the run to write,
+# relative to the trial workspace. Keep in sync with the task prompt.
+IMPORT_REPORT_NAME = "import-report.md"
+
+
+def check_reports_unmapped_column(
+    parsed_files: dict[Path, list[dict]],
+    *,
+    output_dir: Path | None = None,
+    column: str = "gpu_count",
+    kind: str = "DcimDevice",
+    handoff: str = "infrahub-managing-schemas",
+    **_: Any,
+) -> tuple[bool, str]:
+    """The fail-closed report names the unmapped column, the kind checked, and the hand-off.
+
+    rules/workflow-fail-closed-on-unmapped-columns.md: the report lists the
+    offending column and the kinds checked, and points the user at
+    ``infrahub-managing-schemas``.
+
+    skillgrade keeps only the model's final text, so a grader reads the
+    report from the file the task names, ``./import-report.md`` at the
+    workspace root. It sits outside the output dir because the rule's report
+    ends "No files have been written", and it is Markdown, so ``fail-closed``
+    and ``no-schema-mutation`` never read it as YAML.
+
+    The column and the kind are matched as whole identifiers in that one
+    file, not anywhere in the workspace: an empty output dir with no report
+    is the silent failure the rule exists to prevent.
+    """
+    report = _workspace_root(output_dir) / IMPORT_REPORT_NAME
+    if not report.is_file():
+        return False, f"No report at ./{IMPORT_REPORT_NAME} naming the unmapped column"
+    text = report.read_text(encoding="utf-8", errors="replace")
+    missing = [
+        label
+        for label, ident in (("column", column), ("kind", kind), ("hand-off to", handoff))
+        if not re.search(rf"(?<![A-Za-z0-9_]){re.escape(ident)}(?![A-Za-z0-9_])", text)
+    ]
+    if missing:
+        named = {"column": column, "kind": kind, "hand-off to": handoff}
+        return False, (
+            f"./{IMPORT_REPORT_NAME} does not name the "
+            + ", the ".join(f"{m} {named[m]}" for m in missing)
+        )
+    return True, (
+        f"./{IMPORT_REPORT_NAME} names the unmapped column {column}, the kind {kind} "
+        f"and the hand-off to {handoff}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -929,6 +1040,41 @@ def check_provenance_comment(
     return True, f"All {len(parsed_files)} files carry the provenance comment"
 
 
+def _row_lists(doc: dict) -> list[tuple[str, int]]:
+    """(key path, row count) for each list of rows a document holds.
+
+    Rows are:
+
+    - any non-empty list under a key named ``data``, at any depth of the
+      document (``data``, ``spec.data``, ``spec.payload.data``,
+      ``result.data``), a list of scalars included;
+    - any non-empty list of mappings under the top-level ``spec``, in any
+      key and at any depth (``spec.rows``).
+
+    Any other list is not rows. A top-level list of mappings such as
+    ``unmapped_columns`` is the structured report the skill asks for, even
+    when the document also names the ``kind`` it checked.
+    """
+    found: list[tuple[str, int]] = []
+
+    def walk(prefix: str, holder: dict, under_spec: bool) -> None:
+        for key, value in holder.items():
+            path = f"{prefix}{key}"
+            if isinstance(value, dict):
+                walk(f"{path}.", value, under_spec or (not prefix and key == "spec"))
+                continue
+            if not isinstance(value, list) or not value:
+                continue
+            mappings = sum(1 for item in value if isinstance(item, dict))
+            if key == "data":
+                found.append((path, mappings or len(value)))
+            elif under_spec and mappings:
+                found.append((path, mappings))
+
+    walk("", doc, False)
+    return found
+
+
 def check_fail_closed(
     parsed_files: dict[Path, list[dict]],
     *,
@@ -940,20 +1086,35 @@ def check_fail_closed(
     When an input column has no schema home, the skill must stop and write
     nothing — never a partial emission that silently drops the column. The
     grader asserts the invariant that survives in the output directory: no
-    Object-envelope document carries any ``spec.data`` rows. A plain-text
-    report explaining the unmapped column is fine (it isn't a YAML Object),
-    and an empty / absent output dir also passes.
+    YAML document carries rows, whatever its ``kind``. Rows are any
+    non-empty list under a ``data`` key at any depth, or any non-empty list
+    of mappings under ``spec`` (see ``_row_lists``). A YAML report that
+    lists the unmapped columns as mappings passes, with or without a
+    ``kind``. A YAML file with no document at all (empty, or only comments)
+    passes. A file that does not parse, a top-level YAML list, or a file
+    whose only documents are not mappings is a write the check cannot read
+    as a report, so it fails. A plain-text report explaining the unmapped
+    column is fine (it isn't YAML), and an empty / absent output dir also
+    passes.
     """
     offending: list[str] = []
     for file_path, docs in parsed_files.items():
+        # The parsed docs keep only mappings, so a list of rows next to a
+        # mapping document in the same stream would go unseen. Re-read it.
+        try:
+            raw_docs = list(yaml.safe_load_all(file_path.read_text(encoding="utf-8", errors="replace")))
+        except (OSError, yaml.YAMLError):
+            offending.append(f"{file_path.name}: YAML file that does not parse")
+            continue
+        raw_docs = [d for d in raw_docs if d is not None]
+        if any(isinstance(d, list) and d for d in raw_docs):
+            offending.append(f"{file_path.name}: YAML list document of rows")
+        elif raw_docs and not docs:
+            offending.append(f"{file_path.name}: YAML file with no mapping document")
         for idx, doc in enumerate(docs):
-            if doc.get("kind") != "Object":
-                continue
-            spec = doc.get("spec")
-            data = spec.get("data") if isinstance(spec, dict) else None
-            if isinstance(data, list) and len(data) > 0:
+            for key, rows in _row_lists(doc):
                 offending.append(
-                    f"{file_path.name}[doc {idx}]: emitted {len(data)} object row(s)"
+                    f"{file_path.name}[doc {idx}]: emitted {rows} object row(s) under `{key}`"
                 )
 
     if offending:
@@ -1455,6 +1616,7 @@ CHECKS: dict[str, Any] = {
     "component-children-shape": check_component_children_shape,
     "range-expansion": check_range_expansion,
     "no-schema-mutation": check_no_schema_mutation,
+    "reports-unmapped-column": check_reports_unmapped_column,
     "value-coercion": check_value_coercion,
     "empty-and-null": check_empty_and_null,
     "csv-dialect": check_csv_dialect,
