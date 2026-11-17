@@ -167,7 +167,9 @@ to a fraction.
   the pairing is the point. Hoisting it to a generic would erase a
   constraint the schema is currently enforcing.
 - Nodes that share attribute *names* but differ in attribute kind
-  (one's `id` is `Text`, another's is `Number`). They aren't the same
+  (one's `id` is `Text`, another's is `Number`) or in constraints
+  other than a Dropdown choice list (`unique`, `optional`,
+  `max_length`, `regex`, a default value). They aren't the same
   shape. A different choice list on a Dropdown, or a different peer on
   a relationship that is not the pairing above, is not a reason to
   skip the finding: it still counts toward check 1, and is recorded as
