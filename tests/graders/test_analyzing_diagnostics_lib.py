@@ -307,6 +307,71 @@ def test_wrong_root_fails(report: str) -> None:
     assert not check_root_service(report, service="message-queue")[0]
 
 
+# A Root item wrapped across lines, where the continuation line starts with
+# "cascade" or "downstream". The continuation is part of the Root item, not a
+# Cascade label, so the root window runs to the path on it (review of #247).
+WRAPPED_ROOT_CASCADE = """## Incident 1: database OOM (CRITICAL)
+
+- Root: database OOM, which set off the
+  cascade below, bundle/logs/database/db.log
+- Cascade: the server lost its connection to the database
+"""
+
+WRAPPED_ROOT_DOWNSTREAM = """## Incident 1: database OOM (CRITICAL)
+
+- Root: database OOM, which stopped the services
+  downstream of it, bundle/logs/database/db.log
+- Cascade: the server lost its connection to the database
+"""
+
+
+@pytest.mark.parametrize(
+    "report", [WRAPPED_ROOT_CASCADE, WRAPPED_ROOT_DOWNSTREAM], ids=["cascade", "downstream"]
+)
+def test_wrapped_root_line_is_read_to_its_end(report: str) -> None:
+    assert check_incident_grouping(report, max_incidents=1)[0]
+    assert check_root_service(report, service="database")[0]
+
+
+# Near-miss: the only bundle path sits on a real `- Cascade:` item, and the
+# Root item, wrapped the same way, has none.
+CASCADE_ITEM_HOLDS_PATH = """## Incident 1: database OOM (CRITICAL)
+
+- Root: database OOM, which set off the
+  cascade below
+- Cascade: the server lost its connection, bundle/logs/server/server.log
+"""
+
+DOWNSTREAM_ITEM_HOLDS_PATH = """## Incident 1: database OOM (CRITICAL)
+
+- Root: database OOM, which stopped the services
+  downstream of it
+- Downstream: the server lost its connection, bundle/logs/server/server.log
+"""
+
+# Near-miss: the wrapped Root item names the server; the database appears only
+# on the Cascade item.
+WRAPPED_ROOT_WRONG_SERVICE = """## Incident 1: server crash (CRITICAL)
+
+- Root: server crashed, which set off the
+  cascade below, bundle/logs/server/server.log
+- Cascade: database connections dropped (bundle/logs/database/db.log)
+"""
+
+
+@pytest.mark.parametrize(
+    "report",
+    [CASCADE_ITEM_HOLDS_PATH, DOWNSTREAM_ITEM_HOLDS_PATH],
+    ids=["cascade", "downstream"],
+)
+def test_path_only_on_cascade_item_fails(report: str) -> None:
+    assert not check_incident_grouping(report, max_incidents=1)[0]
+
+
+def test_wrapped_root_wrong_service_fails() -> None:
+    assert not check_root_service(WRAPPED_ROOT_WRONG_SERVICE, service="database")[0]
+
+
 # --- gh search commands ------------------------------------------------------
 
 ONE_LINE = 'Query: `gh search issues --repo opsmill/infrahub "InitializationError message broker"`\n'

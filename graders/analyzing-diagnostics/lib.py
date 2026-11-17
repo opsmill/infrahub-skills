@@ -79,9 +79,16 @@ _LIST_MARKER = r"(?:[-*+]|\d+[.)])\s+"
 _ROOT_LABEL = re.compile(
     rf"(?i)^\s*(?:{_LIST_MARKER})?[*_`]*root(?:[ -]cause)?[*_`]*\s*[:–—-]"
 )
-# A `- Cascade:` label line or a `### Cascade` heading.
+# A `- Cascade:` list item or a `### Cascade` heading.
 _CASCADE_LABEL = re.compile(
-    rf"(?i)^\s*(?:#{{1,6}}\s+|{_LIST_MARKER})?[*_`]*(?:cascad\w*|downstream)\b"
+    rf"(?i)^\s*(?:#{{1,6}}\s+|{_LIST_MARKER})[*_`]*(?:cascad\w*|downstream)\b"
+)
+# A `Cascade:` or `**Cascade:**` paragraph label. It needs the colon, and
+# `_cascade_lines` reads it only at the start of a paragraph, so a wrapped
+# line that merely starts with the word ("cascade below, bundle/...") is not
+# one.
+_CASCADE_PARAGRAPH_LABEL = re.compile(
+    r"(?i)^\s*[*_`]*(?:cascad\w*|downstream)(?:\s+\w+){0,2}[*_`]*\s*:"
 )
 _ROOT_MENTION = re.compile(r"(?i)\broot(?:[ -]cause)?\b|caused by")
 _INCIDENT_HEADING = re.compile(
@@ -99,12 +106,21 @@ def _cascade_lines(lines: list[str]) -> list[bool]:
     A `- Cascade:` item owns its own line and the more-indented lines under
     it. A `### Cascade` heading owns its section, up to the next heading. A
     `Cascade:` paragraph owns its lines up to the next blank line.
+
+    A paragraph label counts only at the start of a paragraph: the first
+    line, or a line after a blank line or a heading. A line wrapped inside a
+    `- Root:` item that starts with "cascade" or "downstream" is part of
+    that item, not a Cascade label.
     """
     mask = [False] * len(lines)
     i = 0
     while i < len(lines):
         line = lines[i]
-        if not _CASCADE_LABEL.match(line):
+        starts_paragraph = i == 0 or not lines[i - 1].strip() or bool(_HEADING.match(lines[i - 1]))
+        if not (
+            _CASCADE_LABEL.match(line)
+            or (starts_paragraph and _CASCADE_PARAGRAPH_LABEL.match(line))
+        ):
             i += 1
             continue
         mask[i] = True
