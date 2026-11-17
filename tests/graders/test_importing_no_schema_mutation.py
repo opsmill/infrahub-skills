@@ -4,6 +4,11 @@ The task feeds a CSV with a column the schema does not declare, so the
 fail-closed rule requires an output dir with no object rows and no schema
 document. The grader used to bundle ``envelope``, which fails an empty
 output dir, so the correct answer scored 0.0 on every trial.
+
+The grader then looked only inside the output dir, so a run that wrote its
+schema change next to it, or wrote nothing at all, scored 1.0 (review of
+#247). It now scans the whole trial workspace for schema documents and reads
+the report the task asks for at ``./import-report.md``.
 """
 from __future__ import annotations
 
@@ -52,16 +57,44 @@ extensions:
 
 REPORT = "gpu_count has no schema home on DcimDevice. Checked: DcimDevice.\n"
 
+# The report the task asks for, at the trial workspace root next to output_dir.
+IMPORT_REPORT = """Cannot import: 1 column has no schema home.
 
-def _score(tmp_path: Path, files: dict[str, str], grader: Path = GRADER) -> float:
+Unmapped columns:
+  - devices.csv: gpu_count (checked DcimDevice, no matching attribute)
+
+Schemas checked: DcimDevice.
+
+To unblock this import, add the attribute through infrahub-managing-schemas.
+
+No files have been written.
+"""
+
+DEFAULT_WORKSPACE = {"import-report.md": IMPORT_REPORT}
+
+
+def _score(
+    tmp_path: Path,
+    files: dict[str, str],
+    grader: Path = GRADER,
+    workspace: dict[str, str] | None = None,
+) -> float:
+    """Score a trial: ``files`` go under output_dir, ``workspace`` at its root.
+
+    The grader runs from an unrelated cwd, so it has to find the workspace
+    from the output_dir argument, as it does in a trial.
+    """
     out = tmp_path / "output_dir"
     out.mkdir()
     for rel, content in files.items():
         (out / rel).parent.mkdir(parents=True, exist_ok=True)
         (out / rel).write_text(content)
+    for rel, content in (DEFAULT_WORKSPACE if workspace is None else workspace).items():
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text(content)
     proc = subprocess.run(
         [sys.executable, str(grader), str(out)],
-        capture_output=True, text=True, check=True,
+        capture_output=True, text=True, check=True, cwd=GRADERS_DIR,
     )
     return json.loads(proc.stdout)["score"]
 
@@ -202,3 +235,66 @@ def test_report_without_rows_passes(tmp_path: Path, files: dict, grader: Path) -
 )
 def test_report_with_rows_or_unreadable_fails(tmp_path: Path, files: dict, grader: Path) -> None:
     assert _score(tmp_path, files, grader) < 1.0
+
+
+# A copy of the skills and graders the way skillgrade lays them out. Their
+# YAML includes schema documents, which are not the run's own writes.
+SKILL_SCHEMA_COPIES = {
+    ".claude/skills/infrahub-managing-schemas/examples/dcim.yml": SCHEMA_DOC,
+    ".agents/skills/infrahub-managing-schemas/examples/dcim.yml": SCHEMA_DOC,
+    "skills/infrahub-managing-schemas/examples/dcim.yml": SCHEMA_DOC,
+    "graders/importing-data/fixtures/schema.yml": SCHEMA_DOC,
+}
+
+
+@pytest.mark.parametrize(
+    ("files", "workspace"),
+    [
+        # Compliant: the report at the workspace root, an empty output dir,
+        # and an unrelated YAML file that is not a schema document.
+        ({}, {**DEFAULT_WORKSPACE, "config/settings.yml": "branch: csv-import\nserver: http://localhost:8000\n"}),
+        # Compliant: schema documents inside the copies skillgrade lays out,
+        # which the run did not write.
+        ({}, {**DEFAULT_WORKSPACE, **SKILL_SCHEMA_COPIES}),
+    ],
+    ids=["report-and-unrelated-yaml", "skill-and-grader-copies"],
+)
+def test_workspace_without_schema_change_passes(
+    tmp_path: Path, files: dict, workspace: dict
+) -> None:
+    assert _score(tmp_path, files, workspace=workspace) == 1.0
+
+
+@pytest.mark.parametrize(
+    ("files", "workspace"),
+    [
+        # Violating (review of #247): an empty output dir, a correct report,
+        # and the schema extension written at the workspace root.
+        ({}, {**DEFAULT_WORKSPACE, "schemas/dcim.yml": EXTENSION_DOC}),
+        # Violating: the same change as a node document beside the output dir.
+        ({}, {**DEFAULT_WORKSPACE, "dcim.yaml": SCHEMA_DOC}),
+        # Violating (review of #247): nothing written at all.
+        ({}, {}),
+        # Violating: the report is in the output dir, not where the task asks.
+        ({"report.txt": REPORT}, {}),
+        # Near-miss: the report names the column but not the kind it checked.
+        ({}, {"import-report.md": "Cannot import: gpu_count has no schema home.\n"}),
+        # Near-miss: the report names the kind but not the column.
+        ({}, {"import-report.md": "Cannot import: a column has no home on DcimDevice.\n"}),
+        # Near-miss: an empty report file.
+        ({}, {"import-report.md": ""}),
+    ],
+    ids=[
+        "extension-at-workspace-root",
+        "node-document-beside-output-dir",
+        "nothing-written",
+        "report-in-output-dir-only",
+        "report-without-kind",
+        "report-without-column",
+        "empty-report",
+    ],
+)
+def test_schema_change_outside_output_dir_or_missing_report_fails(
+    tmp_path: Path, files: dict, workspace: dict
+) -> None:
+    assert _score(tmp_path, files, workspace=workspace) < 1.0

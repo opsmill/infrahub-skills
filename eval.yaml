@@ -4411,29 +4411,39 @@ tasks:
 
       Emit whatever correct Infrahub object YAML you can to `./output_dir/`. Do
       NOT propose or write any schema changes; the skill fails closed on
-      unmapped columns.
+      unmapped columns. Write your report to `./import-report.md`.
     graders:
       - type: deterministic
         run: python graders/importing-data/check_no_schema_mutation.py output_dir
         weight: 1.0
     expected_output: >-
-      A directory ./output_dir/ that contains no schema documents (no file with
-      top-level `version: "1.0"` plus `nodes:` / `generics:` / `extensions:`), and nothing under
-      a `schemas/` sub-path of the output dir. The skill fails closed on the
-      unmapped `gpu_count`: it writes no object rows, names the column and the
-      kinds it checked, and points at infrahub-managing-schemas. It never
-      writes a schema mutation.
+      No schema document anywhere in the workspace, inside or outside
+      ./output_dir/ (no file with top-level `version: "1.0"` plus `nodes:` /
+      `generics:` / `extensions:`), and nothing under a `schemas/` sub-path of
+      the output dir. The skill fails closed on the unmapped `gpu_count`: it
+      writes no object rows, and its report in ./import-report.md names the
+      column and the DcimDevice kind it checked and points at
+      infrahub-managing-schemas. It never writes a schema mutation.
     expectations:
-      - No file in ./output_dir/ is a schema document (version 1.0 + nodes / generics / extensions)
+      - >-
+        No file the run writes, in ./output_dir/ or elsewhere in the workspace,
+        is a schema document (version 1.0 + nodes / generics / extensions)
       - No file lives under a schemas/ sub-path of ./output_dir/
       - No object rows are emitted for an input with an unmapped column
+      - ./import-report.md names the unmapped gpu_count column and the DcimDevice kind checked
     assertions:
       - name: fail-closed
         check: >-
           No YAML document in the output dir carries rows, under spec.data or anywhere else
       - name: no-schema-mutation
         check: >-
-          Output dir contains no schema document and no schemas/ sub-path
+          No YAML file in the workspace, outside the copied graders and
+          skills, is a schema document, and the output dir has no schemas/
+          sub-path
+      - name: reports-unmapped-column
+        check: >-
+          ./import-report.md names the unmapped gpu_count column and the
+          DcimDevice kind checked
 
   - name: csv-import-value-coercion
     trials: 3

@@ -24,6 +24,7 @@ Usage (in a per-task grader script)::
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -448,52 +449,143 @@ def check_range_expansion(
     return True, f"All {matched} bracket-range blocks set parameters.expand_range: true"
 
 
+# Directories of a trial workspace that the run did not write. skillgrade
+# copies graders/ in and installs every skill under .claude/skills/ and
+# .agents/skills/; skills/ is where the repository keeps them. Their YAML
+# holds schema documents of its own (examples, fixtures), so it is skipped.
+_NON_AGENT_DIRS: frozenset[str] = frozenset(
+    {"graders", "skills", ".claude", ".agents", ".git"}
+)
+
+
+def _workspace_root(output_dir: Path | None) -> Path:
+    """The trial workspace: the directory that holds ``output_dir``.
+
+    The task's ``run:`` line passes ``output_dir`` relative to the trial
+    directory, so its parent is the workspace whatever the grader's cwd is.
+    """
+    base = Path(output_dir) if output_dir is not None else Path("output_dir")
+    return base.resolve().parent
+
+
+def _workspace_yaml(root: Path) -> dict[Path, list[dict]]:
+    """Parse every YAML file in the workspace outside ``_NON_AGENT_DIRS``."""
+    parsed: dict[Path, list[dict]] = {}
+    if not root.is_dir():
+        return parsed
+    for dirpath, dirnames, filenames in os.walk(root):
+        if Path(dirpath) == root:
+            dirnames[:] = [d for d in dirnames if d not in _NON_AGENT_DIRS]
+        dirnames.sort()
+        for name in sorted(filenames):
+            file_path = Path(dirpath) / name
+            if file_path.suffix.lower() not in {".yml", ".yaml"}:
+                continue
+            try:
+                raw = file_path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            parsed[file_path] = _docs_from_file(raw)
+    return parsed
+
+
+def _is_schema_document(doc: dict) -> bool:
+    """``version: "1.0"`` plus ``nodes:``, ``generics:`` or ``extensions:``."""
+    # An unquoted `version: 1.0` loads as a float, so compare as text.
+    has_schema_keys = "nodes" in doc or "generics" in doc or "extensions" in doc
+    return str(doc.get("version")) == "1.0" and has_schema_keys
+
+
 def check_no_schema_mutation(
     parsed_files: dict[Path, list[dict]],
     *,
     output_dir: Path | None = None,
     **_: Any,
 ) -> tuple[bool, str]:
-    """Within the emitted output dir, no file is a schema document.
+    """No file the run wrote is a schema document, inside or outside the output dir.
 
     A schema document is identifiable by top-level ``version: "1.0"`` (quoted
     or not) plus ``nodes:``, ``generics:`` or ``extensions:`` keys. An
     ``extensions:`` document adds attributes to an existing node, so it is a
-    schema change too. Also fails if any file lives under a ``schemas/``
-    sub-path inside the emission directory.
+    schema change too.
 
-    An output dir with no YAML passes: it holds no schema document, and
-    writing nothing is what the fail-closed rule requires when a column has
-    no schema home. ``fail-closed`` is the check that rejects object rows.
+    The check scans every YAML file in the trial workspace (the directory
+    that holds the output dir), not only the output dir: a run that leaves
+    the output dir empty and writes ``schemas/dcim.yml`` beside it has still
+    changed the schema. The directories the run did not write
+    (``_NON_AGENT_DIRS``) are skipped. Inside the output dir, any file under a
+    ``schemas/`` sub-path also fails.
+
+    A workspace with no schema document passes, including one where the run
+    wrote no YAML at all: writing no object file is what the fail-closed rule
+    requires when a column has no schema home. ``fail-closed`` rejects object
+    rows, and ``reports-unmapped-column`` rejects a run that reports nothing.
     """
-    if not parsed_files:
-        return True, "No YAML emitted, so no schema mutation in the output dir"
+    base = Path(output_dir).resolve() if output_dir is not None else None
+    files = dict(_workspace_yaml(_workspace_root(output_dir)))
+    files.update(parsed_files)
 
-    base = output_dir.resolve() if output_dir else None
     violations: list[str] = []
-    for file_path, docs in parsed_files.items():
-        # Check sub-path
+    for file_path, docs in files.items():
         if base is not None:
             try:
                 rel = file_path.resolve().relative_to(base)
                 if "schemas" in rel.parts:
-                    violations.append(f"{file_path} lives under a schemas/ sub-path")
+                    violations.append(f"{file_path} lives under a schemas/ sub-path of the output dir")
+                    continue
             except ValueError:
                 pass
-        for doc in docs:
-            # An unquoted `version: 1.0` loads as a float, so compare as text.
-            version = str(doc.get("version"))
-            has_schema_keys = "nodes" in doc or "generics" in doc or "extensions" in doc
-            if version == "1.0" and has_schema_keys:
-                violations.append(
-                    f"{file_path.name}: schema document "
-                    "(version 1.0 + nodes/generics/extensions)"
-                )
-                break
+        if any(_is_schema_document(doc) for doc in docs):
+            violations.append(
+                f"{file_path}: schema document (version 1.0 + nodes/generics/extensions)"
+            )
 
     if violations:
-        return False, "; ".join(violations[:5])
-    return True, "No schema mutation in emitted output dir"
+        return False, "Schema mutation written: " + "; ".join(violations[:5])
+    return True, "No schema document written in the workspace"
+
+
+# The report the csv-import-no-schema-mutation task asks the run to write,
+# relative to the trial workspace. Keep in sync with the task prompt.
+IMPORT_REPORT_NAME = "import-report.md"
+
+
+def check_reports_unmapped_column(
+    parsed_files: dict[Path, list[dict]],
+    *,
+    output_dir: Path | None = None,
+    column: str = "gpu_count",
+    kind: str = "DcimDevice",
+    **_: Any,
+) -> tuple[bool, str]:
+    """The fail-closed report names the unmapped column and the kind checked.
+
+    skillgrade keeps only the model's final text, so a grader reads the
+    report from the file the task names, ``./import-report.md`` at the
+    workspace root. It sits outside the output dir because the rule's report
+    ends "No files have been written", and it is Markdown, so ``fail-closed``
+    and ``no-schema-mutation`` never read it as YAML.
+
+    The column and the kind are matched as whole identifiers in that one
+    file, not anywhere in the workspace: an empty output dir with no report
+    is the silent failure the rule exists to prevent.
+    """
+    report = _workspace_root(output_dir) / IMPORT_REPORT_NAME
+    if not report.is_file():
+        return False, f"No report at ./{IMPORT_REPORT_NAME} naming the unmapped column"
+    text = report.read_text(encoding="utf-8", errors="replace")
+    missing = [
+        label
+        for label, ident in (("column", column), ("kind", kind))
+        if not re.search(rf"(?<![A-Za-z0-9_]){re.escape(ident)}(?![A-Za-z0-9_])", text)
+    ]
+    if missing:
+        named = {"column": column, "kind": kind}
+        return False, (
+            f"./{IMPORT_REPORT_NAME} does not name the unmapped "
+            + " or the ".join(f"{m} {named[m]}" for m in missing)
+        )
+    return True, f"./{IMPORT_REPORT_NAME} names the unmapped column {column} and the kind {kind}"
 
 
 # ---------------------------------------------------------------------------
@@ -1505,6 +1597,7 @@ CHECKS: dict[str, Any] = {
     "component-children-shape": check_component_children_shape,
     "range-expansion": check_range_expansion,
     "no-schema-mutation": check_no_schema_mutation,
+    "reports-unmapped-column": check_reports_unmapped_column,
     "value-coercion": check_value_coercion,
     "empty-and-null": check_empty_and_null,
     "csv-dialect": check_csv_dialect,
