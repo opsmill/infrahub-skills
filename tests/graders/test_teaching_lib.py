@@ -590,6 +590,24 @@ def test_own_artifacts_generic_example_instead(tmp_path):
     assert not ok
 
 
+def test_own_artifacts_short_name_fails(tmp_path):
+    """One full kind, then the other node by its short name (review of #226)."""
+    mixed = COMPLIANT_LESSON.replace("to `TestbedZone`", "to your `Zone` node")
+    ws = make_ws(tmp_path, lesson=mixed)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert not ok and "Zone" in msg and "short name" in msg
+
+
+def test_own_artifacts_short_name_without_backticks_passes(tmp_path):
+    """Near-miss: the word in plain prose is not a node reference."""
+    prose = COMPLIANT_LESSON.replace(
+        "Cardinality controls", "Each zone can hold many sensors. Cardinality controls"
+    )
+    ws = make_ws(tmp_path, lesson=prose)
+    ok, msg = teaching_lib.CHECKS["own-artifacts"](ws)
+    assert ok, msg
+
+
 OTHER_SCHEMA = """version: "1.0"
 nodes:
   - name: Switch

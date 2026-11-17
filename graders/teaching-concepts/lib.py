@@ -462,7 +462,12 @@ def check_sandbox_safety(ws: Path) -> tuple[bool, str]:
 
 
 def learner_kinds(ws: Path) -> set[str]:
-    """The node kinds declared in the learner's own schema files.
+    """The node kinds declared in the learner's own schema files."""
+    return {f"{namespace}{name}" for namespace, name in _learner_nodes(ws)}
+
+
+def _learner_nodes(ws: Path) -> set[tuple[str, str]]:
+    """(namespace, name) of each node and generic in the learner's schema files.
 
     The rule is "teach through the learner's artifacts", so the kinds
     come from those artifacts. A literal tuple here would be a second
@@ -470,7 +475,7 @@ def learner_kinds(ws: Path) -> set[str]:
     the check would grade names the learner no longer has. Same
     discipline as known_slugs().
     """
-    kinds: set[str] = set()
+    nodes: set[tuple[str, str]] = set()
     for path in sorted(ws.rglob("*.y*ml")):
         # A trial directory also holds the graders and the installed skills,
         # whose fixtures declare kinds the learner never wrote; counting them
@@ -489,8 +494,8 @@ def learner_kinds(ws: Path) -> set[str]:
                     continue
                 name, namespace = node.get("name"), node.get("namespace")
                 if name and namespace:
-                    kinds.add(f"{namespace}{name}")
-    return kinds
+                    nodes.add((namespace, name))
+    return nodes
 
 
 _NOT_LEARNER_DIRS = ("graders", ".claude", ".agents")
@@ -513,12 +518,21 @@ def check_own_artifacts(ws: Path) -> tuple[bool, str]:
             "no learner schema file in the workspace; grounding cannot be "
             "graded without the artifacts it is supposed to ground in"
         )
+    # The rule names each node by its full kind (`TestbedSensor`, not
+    # `Sensor`): a short name in backticks is a node named the wrong way.
+    short_names = {name for _, name in _learner_nodes(ws)} - kinds
     for lesson in found:
         explain = sections(lesson.read_text()).get("Explain", "")
         if not any(k in explain for k in kinds):
             return False, (
                 f"{lesson.name}: Explain names none of the learner's kinds "
                 f"{sorted(kinds)}; it teaches through an invented example"
+            )
+        short = sorted(n for n in short_names if f"`{n}`" in explain)
+        if short:
+            return False, (
+                f"{lesson.name}: Explain names learner nodes by their short "
+                f"name {short}, not by their full kind"
             )
     return True, f"every Explain anchored to the learner's own kinds: {sorted(kinds)}"
 

@@ -8982,7 +8982,7 @@ tasks:
       - name: own-artifacts
         check: >-
           Explain is anchored to at least one node kind from the learner's
-          own schema file
+          own schema file, and names no learner node by its short name
       - name: structured-lessons
         check: lesson uses the four-section shape
 
