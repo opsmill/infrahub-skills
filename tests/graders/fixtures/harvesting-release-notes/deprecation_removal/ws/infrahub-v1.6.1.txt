@@ -1,0 +1,14 @@
+# Infrahub - v1.6.1
+
+## Release highlights
+
+This patch release fixes two bugs.
+
+## Breaking changes and required actions
+
+None in this release.
+
+## Full changelog
+
+- Fixed a timeout when rebasing a branch with more than 10,000 changes.
+- Fixed the label of the proposed change status badge.

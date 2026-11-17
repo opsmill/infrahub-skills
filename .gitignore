@@ -58,6 +58,9 @@ htmlcov/
 # Skill-change pipeline handoff files (local working-tree artifacts)
 .skill-change-*.md
 
+# harvesting-release-notes reports (local working-tree artifacts)
+.release-harvest-*.md
+
 # Direnv files (https://direnv.net/)
 .direnv/
 .envrc
