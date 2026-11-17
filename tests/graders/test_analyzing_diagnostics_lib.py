@@ -76,7 +76,16 @@ UNCITED_COLON = TEMPLATE_REPORT + """
 """
 
 
-@pytest.mark.parametrize("report", [TEMPLATE_REPORT, WITH_SUMMARY], ids=["template", "with-summary"])
+# A dash after "Incident" opens an incident too (review of #226).
+DASH_HEADING = TEMPLATE_REPORT.replace(
+    "## Incident 1: message queue down, server cascades (CRITICAL)",
+    "## Incident - message queue down, server cascades (CRITICAL)",
+)
+
+
+@pytest.mark.parametrize(
+    "report", [TEMPLATE_REPORT, WITH_SUMMARY, DASH_HEADING], ids=["template", "with-summary", "dash"]
+)
 def test_incident_sections_pass(report: str) -> None:
     assert check_cites_bundle_evidence(report)[0]
     assert check_severity_labels(report)[0]
@@ -142,7 +151,23 @@ def test_root_attributed(report: str) -> None:
     assert check_root_service(report, service="message-queue")[0]
 
 
-@pytest.mark.parametrize("report", [WRONG_ROOT, HEADING_ROOT_WRONG], ids=["template", "heading"])
+# Near-miss: the incident heading says "root cause" and the root is the
+# server; the broker appears only on the Cascade line. A heading that only
+# mentions the root must not make its whole section a root window (review of
+# #226).
+ROOT_IN_INCIDENT_HEADING = """## Incident 1: server crash is the root cause (CRITICAL)
+
+- Root: server crashed — bundle/logs/server/server.log
+  > Worker exited with code 137
+- Cascade: message-queue connections dropped (bundle/message-queue/rabbitmq.log)
+"""
+
+
+@pytest.mark.parametrize(
+    "report",
+    [WRONG_ROOT, HEADING_ROOT_WRONG, ROOT_IN_INCIDENT_HEADING],
+    ids=["template", "heading", "root-in-incident-heading"],
+)
 def test_wrong_root_fails(report: str) -> None:
     assert not check_root_service(report, service="message-queue")[0]
 

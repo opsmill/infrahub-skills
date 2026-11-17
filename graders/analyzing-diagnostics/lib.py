@@ -73,6 +73,9 @@ def _gh_search_commands(text: str) -> list[str]:
 
 
 _HEADING = re.compile(r"(?m)^#{1,6}\s")
+# A heading about the root: its text starts with "Root", after an optional
+# number and emphasis (`### Root Cause`, `### 2. **Root cause**`).
+_ROOT_HEADING = re.compile(r"(?i)#{1,6}\s+(?:\d+[.)]?\s*)?[*_]*root\b")
 
 
 def _root_windows(text: str) -> list[str]:
@@ -80,14 +83,17 @@ def _root_windows(text: str) -> list[str]:
 
     The report template anchors the root to its evidence on the `- Root:` line
     (path) and the next non-blank line (quoted excerpt); a wider window would
-    credit unrelated paths mentioned further down the section. A root named
-    by a heading (`### Root Cause`) owns that heading's section instead, up to
-    the next heading.
+    credit unrelated paths mentioned further down the section. A heading
+    about the root (`### Root Cause`) owns that heading's section instead, up
+    to the next heading. A heading that only mentions the root
+    (`## Incident 1: server crash is the root cause`) is read like any other
+    line, so its section, with the `- Cascade:` line, is not a root window.
     """
     windows: list[str] = []
     for m in re.finditer(r"(?i)\broot(?:[ -]cause)?\b|caused by", text):
         line_start = text.rfind("\n", 0, m.start()) + 1
-        if _HEADING.match(text, line_start):
+        heading = _ROOT_HEADING.match(text, line_start)
+        if heading and heading.end() >= m.start():
             nxt = _HEADING.search(text, m.end())
             windows.append(text[m.end() : nxt.start() if nxt else len(text)])
             continue
@@ -104,11 +110,14 @@ def _root_windows(text: str) -> list[str]:
 def _incident_sections(text: str) -> list[tuple[str, str]]:
     """(heading line, body) for each `## Incident <n>` section in the report.
 
-    Only a numbered or colon-led heading opens an incident, as the template
-    writes it (`## Incident 1: ...`). `### Incident Correlation` or
-    `## Incident Summary` are report sections about incidents, not incidents.
+    Only a numbered, colon-led or dash-led heading opens an incident, as the
+    template writes it (`## Incident 1: ...`, `## Incident - database OOM`).
+    `### Incident Correlation` or `## Incident Summary` are report sections
+    about incidents, not incidents.
     """
-    matches = list(re.finditer(r"(?im)^#{1,6}\s*incident\s*(?:#?\d+|:)[^\n]*", text))
+    matches = list(
+        re.finditer(r"(?im)^#{1,6}\s*incident\s*(?:#?\d+|[:\-\u2013\u2014])[^\n]*", text)
+    )
     sections: list[tuple[str, str]] = []
     for i, m in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
