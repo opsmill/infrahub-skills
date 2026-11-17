@@ -332,49 +332,142 @@ def check_no_location_scan(text: str, **_: object) -> CheckResult:
 
 
 _BUNDLE_OR_MANIFEST = re.compile(r"(?i)\bbundle\b|\bmanifest\b|bundle_information\.json")
-# A request without a question mark: "Please send me the path to the bundle."
-# "please" opens a request whatever the verb is ("Please run
-# `infrahub-collect create` and let me know the bundle directory"), unless a
-# negation or a remark comes right after it ("please do not", "please note").
-# The other alternatives are the action asked for, so a negation right before
-# one ("do not provide the full bundle") can be read.
-_REQUEST_RE = re.compile(
-    r"(?i)\b(?:please(?!\s+(?:do\s+not|don'?t|never|avoid|note|see)\b)|let\s+me\s+know"
-    r"|send|share|upload|attach|provide|paste|give\s+me|point\s+me"
-    r"|i(?:'ll|\s+will|\s+would|\s+first)?\s+need|need\s+(?:the|your|a|to\s+see)"
-    r"|where\s+is|path\s+to|location\s+of)\b"
+
+# The section the rule allows a request in: a heading ("## Open questions",
+# "### Questions") or a label at the start of a line, plain, bold, or as a
+# list item ("- Open questions: ...", "**Open questions:**").
+_OPEN_QUESTIONS_HEADING = re.compile(
+    r"(?im)^[ ]{0,3}(#{1,6})\s*[*_]*(?:(?:open|outstanding|remaining|unanswered)\s+)?"
+    r"questions?\b"
 )
+_OPEN_QUESTIONS_LABEL = re.compile(
+    r"(?im)^([ \t]*)([-*+]\s+|\d+[.)]\s+)?[*_]*"
+    r"(?:(?:open|outstanding|remaining|unanswered)\s+)?questions?[*_]*\s*:"
+)
+_LEVEL_HEADING = re.compile(r"(?m)^[ ]{0,3}(#{1,6})\s")
+
+# What makes a sentence a request to the reader rather than a statement about
+# the bundle: it addresses the reader ("could you", "you will need to"), states
+# what the writer wants ("I would like", "I need"), or asks politely or for
+# something back ("please", "tell me", "let me know"). These are grammatical
+# shapes, not a list of what the bundle can be asked for with. A question
+# mark is the other shape and is read separately.
+_REQUEST_SHAPE_RE = re.compile(
+    r"(?i)\b(?:can|could|would|will)\s+you\b"
+    r"|\byou(?:'ll|\s+will)?\s+(?:should|must|need\s+to|have\s+to)\b"
+    r"|\b(?:i|we)(?:'d|'ll|\s+would|\s+will)?(?:\s+(?:also|first|still|really))?"
+    r"\s+(?:need|want|like|require)\b"
+    r"|\bplease(?!\s+(?:do\s+not|don'?t|never|avoid|note|see)\b)"
+    r"|\blet\s+(?:me|us)\s+know\b"
+    # A verb + "me" in imperative position only: at the start of the sentence
+    # or a clause, or after "and"/"then" ("Run X and tell me ..."). "The
+    # manifest tells us ..." is a statement.
+    r"|(?:^[\s>*_+\-\d.)]*|[,;:]\s*|\b(?:and|then)\s+)(?!let\b)[a-z]+\s+(?:me|us)\b"
+)
+_NEGATION_AFTER = re.compile(r"(?i)^\s*(?:not|never|no\s+longer)\b")
+
+
+def _open_question_spans(text: str) -> list[tuple[int, int]]:
+    """(start, end) of each Open questions section or labelled item.
+
+    A heading runs to the next heading of the same or a higher level. A list
+    item label runs to the next line at the same or a lower indent that
+    starts a list item, follows a blank line, or is a heading. A paragraph
+    label runs to the next heading.
+    """
+    spans: list[tuple[int, int]] = []
+    headings = list(_LEVEL_HEADING.finditer(text))
+    for m in _OPEN_QUESTIONS_HEADING.finditer(text):
+        level = len(m.group(1))
+        end = next(
+            (h.start() for h in headings if h.start() > m.start() and len(h.group(1)) <= level),
+            len(text),
+        )
+        spans.append((m.start(), end))
+    for m in _OPEN_QUESTIONS_LABEL.finditer(text):
+        indent = len(m.group(1).expandtabs())
+        end = next((h.start() for h in headings if h.start() > m.start()), len(text))
+        if m.group(2):
+            pos = text.find("\n", m.end())
+            blank = False
+            while pos != -1 and pos + 1 < end:
+                line_end = text.find("\n", pos + 1)
+                line = text[pos + 1 : line_end if line_end != -1 else len(text)]
+                if not line.strip():
+                    blank = True
+                elif len(line) - len(line.lstrip()) <= indent and (
+                    blank or re.match(r"\s*(?:[-*+]|\d+[.)])\s", line)
+                ):
+                    end = pos + 1
+                    break
+                pos = line_end
+        spans.append((m.start(), end))
+    return spans
+
+
+def _sentences(text: str) -> list[str]:
+    """Sentences, which may wrap across lines.
+
+    A sentence ends at a sentence ender followed by whitespace, at a blank
+    line, or where a line starts a list item, a heading, or a quote.
+    """
+    return re.split(
+        r"(?<=[.!?])\s+|\n\s*\n|\n(?=[ \t]*(?:[-*+>]|\d+[.)]|#{1,6})\s)", text
+    )
+
+
+def _requests_bundle(sentence: str) -> bool:
+    """Whether a sentence asks for the bundle or the manifest.
+
+    Ranked: a sentence that does not name the bundle or the manifest asks for
+    nothing here. A question about either asks for it. Otherwise only a
+    request shape the sentence does not negate does: a statement that the
+    manifest is absent or not needed ("Manifest: not provided", "there is no
+    need to send the full bundle"), or a cited evidence path
+    ("Evidence: bundle/logs/database/db.log"), carries none.
+    """
+    if not _BUNDLE_OR_MANIFEST.search(sentence):
+        return False
+    if sentence.rstrip().rstrip("*_`)\"'").endswith("?"):
+        return True
+    for shape in _REQUEST_SHAPE_RE.finditer(sentence):
+        # The negation must sit in the same clause as the request: "Manifest:
+        # not provided; please send it" still asks.
+        before = re.split(r"[;,:\u2013\u2014]", sentence[max(0, shape.start() - 15) : shape.start()])[-1]
+        if re.search(_NEGATION_WORDS, before, re.IGNORECASE):
+            continue
+        if _NEGATION_AFTER.match(sentence[shape.end() :]):
+            continue
+        return True
+    return False
 
 
 def check_analyzes_pasted_excerpt(text: str, **_: object) -> CheckResult:
-    """For a pasted excerpt, the report analyzes it before asking for more.
+    """For a pasted excerpt, the report analyzes it and asks only under Open questions.
 
     rules/workflow-ask-bundle-location.md: a pasted excerpt settles the bundle
-    question, even a single log. Asking for the bundle or the manifest is fine
-    under Open questions, after the analysis. It fails when it comes before
-    any analysis content, as a question ("Can you provide the full bundle?")
-    or as a request ("Please send me the path to the full bundle."), or when
-    the report has no analysis.
+    question, even a single log. The report analyzes what was pasted and lists
+    what it lacks (the manifest, the other services) under Open questions. A
+    question or a request for the bundle or the manifest is allowed only in an
+    Open questions section or item; anywhere else in the report it fails,
+    before or after the analysis. Saying the manifest is absent or the bundle
+    is not needed, or citing a bundle/ path as evidence, is not a request. The
+    report also fails when it has no analysis outside Open questions.
     """
-    analysis = re.compile(r"(?im)^#{1,6}\s*(incident|finding)\b|bundle/\w|root[ -]cause")
-    first = analysis.search(text)
-    if not first:
+    spans = _open_question_spans(text)
+    outside = list(text)
+    for start, end in spans:
+        outside[start:end] = " " * (end - start)
+    rest = "".join(outside)
+    findings_with_body = re.search(
+        r"(?im)^[ ]{0,3}#{1,6}\s*findings?\b[^\n]*\n(?:\s*\n)*[ \t]*[^\s#]", rest
+    )
+    analysis = re.search(r"(?im)^[ ]{0,3}#{1,6}\s*incident\b|bundle/\w|root[ -]cause", rest)
+    if not (analysis or findings_with_body):
         return False, "no analysis of the pasted excerpt"
-    # Read up to the end of the sentence that holds the first marker, so a
-    # question that names a bundle path ("Is it in bundle/?") is a question.
-    end = re.search(r"[.!?]", text[first.end() :])
-    head = text[: first.end() + end.end()] if end else text
-    # A sentence ends at a sentence ender followed by whitespace, or at a
-    # blank line. It may wrap across lines.
-    for sentence in re.split(r"(?<=[.!?])\s+|\n\s*\n", head):
-        if not _BUNDLE_OR_MANIFEST.search(sentence):
-            continue
-        if sentence.rstrip().endswith("?"):
-            return False, "asks for the bundle before analyzing the pasted excerpt"
-        for request in _REQUEST_RE.finditer(sentence):
-            before = sentence[max(0, request.start() - 15) : request.start()]
-            if not re.search(_NEGATION_WORDS, before, re.IGNORECASE):
-                return False, "requests the bundle before analyzing the pasted excerpt"
+    for sentence in _sentences(rest):
+        if _requests_bundle(sentence):
+            return False, "asks for the bundle outside Open questions"
     return True, "analyzes the pasted excerpt first"
 
 

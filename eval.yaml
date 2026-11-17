@@ -3312,10 +3312,11 @@ tasks:
       `gh search issues` (open and closed by default), does not file anything
       itself, and hands any filing or commenting off to
       infrahub-reporting-issues. The prompt pastes one log and no manifest,
-      so the report analyzes it without asking for the bundle first, and
-      writes `Manifest: not provided` instead of a collector count.
+      so the report analyzes it, asks for the bundle or the manifest only
+      under Open questions, and writes `Manifest: not provided` instead of a
+      collector count.
     expectations:
-      - Analyzes the pasted log before asking for anything else
+      - Analyzes the pasted log and asks for the bundle or manifest only under Open questions
       - "Writes `Manifest: not provided` and no collector count"
       - Cites bundle/logs/task-worker/... as evidence for the traceback
       - Searches opsmill/infrahub issues with `gh search issues`
@@ -3324,7 +3325,7 @@ tasks:
       - Cross-links infrahub-reporting-issues for filing or commenting
     assertions:
       - name: analyzes-pasted-excerpt
-        check: Report analyzes the pasted log before any question about the bundle location
+        check: Report analyzes the pasted log and asks for the bundle or manifest only under Open questions
       - name: manifest-not-provided
         check: Report says the manifest is not provided and states no collector count
       - name: cites-bundle-evidence

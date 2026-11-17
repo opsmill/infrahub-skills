@@ -562,3 +562,143 @@ def test_question_naming_a_bundle_path_is_a_question() -> None:
 
 def test_question_only_has_no_analysis() -> None:
     assert not _mod.check_analyzes_pasted_excerpt("Where is the bundle directory?\n")[0]
+
+
+# --- a bundle request anywhere outside Open questions (review of #247) ------
+#
+# rules/workflow-ask-bundle-location.md draws the line at Open questions: a
+# pasted excerpt is analyzed, and what it lacks is asked for under Open
+# questions. A request for the bundle or the manifest anywhere else fails,
+# whatever its wording and wherever it sits in the report.
+
+
+def _before_incident(sentence: str) -> str:
+    return _NO_OPEN_QUESTION.replace(
+        "## Incident 1", sentence + "\n\n## Incident 1", 1
+    )
+
+
+REQUESTS_OUTSIDE_OPEN_QUESTIONS = {
+    "run-and-tell-me": _before_incident(
+        "Run `infrahub-collect create` and tell me the bundle directory."
+    ),
+    "i-would-like": _before_incident(
+        "Before I analyze, I would like the full bundle and its manifest."
+    ),
+    "could-you-no-question-mark": _before_incident(
+        "Could you also include the bundle manifest."
+    ),
+    # The manifest line cites a bundle/ path; the request after it still counts.
+    "manifest-line-then-request": EXCERPT_REPORT.replace(
+        "Manifest: not provided (one pasted log).",
+        "Manifest (bundle/bundle_information.json): not provided.\n\n"
+        "Can you share the rest of the bundle?",
+    ),
+    # After the analysis, but outside Open questions.
+    "after-analysis-in-known-issues": EXCERPT_REPORT.replace(
+        "To file or comment on an issue, use infrahub-reporting-issues.",
+        "To file or comment on an issue, use infrahub-reporting-issues. "
+        "Please send me the full bundle so I can check the broker logs.",
+    ),
+    # Near-miss: an Open questions section exists, but the request sits in
+    # the section after it.
+    "after-open-questions-ends": EXCERPT_REPORT
+    + "\n## Recommendation\n\nCould you share the full bundle first?\n",
+}
+
+
+@pytest.mark.parametrize(
+    "report",
+    list(REQUESTS_OUTSIDE_OPEN_QUESTIONS.values()),
+    ids=list(REQUESTS_OUTSIDE_OPEN_QUESTIONS),
+)
+def test_bundle_request_outside_open_questions_fails(tmp_path: Path, report: str) -> None:
+    result = _run(tmp_path, report)
+    failed = [c["name"] for c in result["checks"] if not c["passed"]]
+    assert failed == ["analyzes-pasted-excerpt"], result["details"]
+
+
+FINDINGS_REPORT = """# Report
+
+Deployment: Infrahub version unknown. Manifest: not provided.
+
+## Findings
+
+- The task-workers fail at startup with InitializationError: they cannot
+  connect to the message broker, so no worker comes up.
+
+## Open questions
+
+- Where is the full bundle? The manifest would show whether the
+  message-queue collector also failed.
+"""
+
+ANALYSIS_NAMES_BUNDLE = EXCERPT_REPORT.replace(
+    "## Known issues",
+    "The pasted excerpt is from bundle/logs/task-worker/task-worker-1.log. "
+    "Without the bundle manifest, collector status is unknown.\n\n"
+    "Evidence: bundle/logs/task-worker/task-worker-1.log\n\n"
+    "Recommendation: hand the bundle and this report to OpsMill support.\n\n"
+    "## Known issues",
+)
+
+# Open questions as a list label inside the incident, the way
+# reference.md's report shape writes it, wrapped across lines.
+OPEN_QUESTIONS_LABEL = _NO_OPEN_QUESTION.replace(
+    "  > infrahub.exceptions.InitializationError: Unable to connect to the message broker\n",
+    "  > infrahub.exceptions.InitializationError: Unable to connect to the message broker\n"
+    "- Open questions: the manifest is not in the excerpt. Could you share\n"
+    "  the full bundle?\n"
+    "- Recommendation: check the broker before restarting the workers.\n",
+)
+
+# Open questions as a bold paragraph label, its questions in a list below.
+OPEN_QUESTIONS_BOLD = (
+    _NO_OPEN_QUESTION
+    + "\n**Open questions:**\n\n- Can you share the bundle manifest?\n"
+    "- Please send me the other service logs from the bundle.\n"
+)
+
+
+@pytest.mark.parametrize(
+    "report",
+    [
+        _before_incident("There is no need to send the full bundle."),
+        FINDINGS_REPORT,
+        ANALYSIS_NAMES_BUNDLE,
+        OPEN_QUESTIONS_LABEL,
+        OPEN_QUESTIONS_BOLD,
+    ],
+    ids=["no-need", "findings-plural", "analysis-names-bundle", "label", "bold-label"],
+)
+def test_bundle_named_outside_a_request_passes(report: str) -> None:
+    assert _mod.check_analyzes_pasted_excerpt(report) == (
+        True,
+        "analyzes the pasted excerpt first",
+    )
+
+
+def test_open_questions_only_has_no_analysis() -> None:
+    """Near-miss: a title and an Open questions section, but no analysis."""
+    report = "# Findings\n\n## Open questions\n\n- Where is the full bundle?\n"
+    assert _mod.check_analyzes_pasted_excerpt(report) == (
+        False,
+        "no analysis of the pasted excerpt",
+    )
+
+
+@pytest.mark.parametrize(
+    ("sentence", "asks"),
+    [
+        ("The manifest tells us which collectors failed.", False),
+        ("Let me start with the pasted log; the full bundle can follow.", False),
+        ("Manifest: not provided; please send it.", True),
+        ("Tell me where the bundle is.", True),
+    ],
+    ids=["statement-tells-us", "let-me-start", "negation-in-other-clause", "imperative-tell-me"],
+)
+def test_request_shape_reads_the_clause(sentence: str, asks: bool) -> None:
+    """A verb + "me" asks only in imperative position, and a negation in
+    another clause does not cancel a request."""
+    report = _before_incident(sentence)
+    assert _mod.check_analyzes_pasted_excerpt(report)[0] is not asks
