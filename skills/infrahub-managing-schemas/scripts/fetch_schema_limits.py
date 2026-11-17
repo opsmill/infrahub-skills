@@ -141,16 +141,17 @@ def caps_from_openapi(doc: dict) -> dict[str, dict[str, dict]]:
 
 
 def names_without_caps(caps: dict[str, dict[str, dict]]) -> list[str]:
-    """The schema names for which the source gave no ``maxLength`` cap.
+    """The schema names for which the source gave no ``maxLength`` cap on ``name``.
 
-    Infrahub caps the name of every node, generic, attribute and
-    relationship. A name with no cap means the script did not find its
-    definition in the source, not that the field has no limit.
+    Infrahub caps the ``name`` of every node, generic, attribute and
+    relationship. A schema name with no cap on ``name`` means the script did
+    not find its definition in the source, or found a partial one, not that
+    the field has no limit.
     """
     return [
         name
         for name in SCHEMA_NAMES
-        if not any("maxLength" in info for info in caps.get(name, {}).values())
+        if "maxLength" not in caps.get(name, {}).get("name", {})
     ]
 
 

@@ -93,6 +93,13 @@ def test_definition_without_max_length_is_reported() -> None:
     assert fsl.names_without_caps(caps) == ["RelationshipSchema"]
 
 
+def test_definition_without_cap_on_name_is_reported() -> None:
+    """Near-miss: a partial definition, with a cap on another field only."""
+    defs = dict(WRITE_DEFS, NodeSchemaWrite={"properties": {"description": _nullable(128)}})
+    caps = fsl.caps_from_json_schema({"$defs": defs})
+    assert fsl.names_without_caps(caps) == ["NodeSchema"]
+
+
 OVER_CAP = 'version: "1.0"\nnodes:\n  - name: Device\n    namespace: Dcim\n    description: "' + "x" * 400 + '"\n'
 WITHIN_CAP = 'version: "1.0"\nnodes:\n  - name: Device\n    namespace: Dcim\n    description: "A device"\n'
 
