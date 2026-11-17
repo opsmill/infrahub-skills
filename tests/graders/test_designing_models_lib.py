@@ -1104,7 +1104,7 @@ CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
         ),
         pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS
-                  + "| 7 | Providers come from the demo's provider kind | recommended | The demo has one (strong) |\n"),
+                  + "| 7 | Providers are their own node kind, as in the demo | recommended | The demo has one (strong) |\n"),
             "tagged 'recommended'; the transcript makes it 'stated'", id="near-miss-one-subject-with-contradicting-tags",
         ),
         pytest.param(
@@ -1141,7 +1141,7 @@ CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
         ),
         pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS
-                  + "| 7 | Circuits come from the carrier export, providers come from the demo's kind | recommended | The demo has one (strong) |\n"),
+                  + "| 7 | Circuits come from the carrier export, providers are their own kind as in the demo | recommended | The demo has one (strong) |\n"),
             "tagged 'recommended'; the transcript makes it 'stated'", id="near-miss-subject-after-a-clause-comma",
         ),
         pytest.param(
@@ -1152,8 +1152,47 @@ CIRCUIT_DECISIONS_SWAPPED = CIRCUIT_DECISIONS.replace(
             "no decision about providers", id="near-miss-subject-only-listed",
         ),
         pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "Providers are a separate node kind", "Separate node kinds for circuits and providers",
+            )),
+            None, id="compliant-variant-decision-names-the-subject-last",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "Providers are a separate node kind", "OrganizationProvider is its own node kind, not a circuit attribute",
+            )),
+            None, id="compliant-variant-decision-names-the-node-kind",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "Bandwidth is entered by the requester", "The requester enters speed and bandwidth",
+            )),
+            None, id="compliant-variant-subject-listed-in-its-own-decision",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "Circuit endpoints use a generic for sites and PoPs", "Sites and PoPs share a generic, so either can terminate a circuit",
+            ).replace("Contract end dates are imported, not typed", "Contract end dates come from carriers.xlsx")),
+            None, id="compliant-variant-decisions-in-other-words",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "| 4 | Circuit endpoints use a generic for sites and PoPs | recommended | Both endpoint kinds share address and code (medium) |",
+                "| 4 | Marketplace schemas are searched for generics first | recommended | Reuse saves work (strong) |",
+            )),
+            "no decision about the endpoint generic", id="near-miss-generic-named-without-the-decision",
+        ),
+        pytest.param(
+            brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS.replace(
+                "| 2 | Providers are a separate node kind | stated | |",
+                "| 2 | Separate node kinds for circuits and providers | recommended | Providers recur (medium) |\n"
+                "| 7 | The transport team owns providers | stated | |",
+            )),
+            "tagged 'recommended'; the transcript makes it 'stated'", id="near-miss-decision-mistagged-next-to-a-stated-mention",
+        ),
+        pytest.param(
             brief(sketch_rows=CIRCUIT_ROWS, decisions=CIRCUIT_DECISIONS
-                  + "| 7 | Circuits and providers: providers come from the demo's provider kind | recommended | The demo has one (strong) |\n"),
+                  + "| 7 | Circuits and providers: providers are their own kind, as in the demo | recommended | The demo has one (strong) |\n"),
             "tagged 'recommended'; the transcript makes it 'stated'", id="near-miss-listed-once-then-decided-again",
         ),
         pytest.param(

@@ -22,7 +22,11 @@ log`, tagged with where it came from:
   listed in Open items.
 
 No other tags. A recommendation the user has not
-accepted is `open`, not `recommended`.
+accepted is `open`, not `recommended`. The one
+exception is an outcome of this skill's own rules, such
+as not splitting the scope: it is `recommended`, with
+the rule as its Basis, even when the user has not
+accepted it.
 
 ## Why it matters
 
