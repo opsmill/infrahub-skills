@@ -163,6 +163,16 @@ TOKEN_LEAKS = [
         "Run `cat <<< 'echo $INFRAHUB_API_TOKEN' | sh`.",
         id="here-string-through-cat-into-a-shell",
     ),
+    # Commands that print their input, with no print word at all.
+    pytest.param('Run `cat <<< "$INFRAHUB_API_TOKEN"`.', id="cat-here-string"),
+    pytest.param(
+        'Run `head -c 8 <<< "$INFRAHUB_API_TOKEN"; echo`.', id="head-here-string"
+    ),
+    # curl prints its request headers, the token included, in verbose mode.
+    pytest.param(
+        'Run `curl -v -H "X-INFRAHUB-KEY: $INFRAHUB_API_TOKEN" "$INFRAHUB_ADDRESS"`.',
+        id="curl-header-in-verbose-mode",
+    ),
 ]
 
 
@@ -191,37 +201,40 @@ TOKEN_SAFE = [
         "Don't echo it; it's secret: [ -n \"${INFRAHUB_API_TOKEN:-}\" ] is enough.",
         id="prose-apostrophes-around-a-separator",
     ),
-    # Single quotes stop expansion, so this prints the name, not the value.
+    # The allowed forms in other spellings: `test`, `[[`, `-z`, and a curl
+    # header on a `\` continuation line.
     pytest.param(
-        "Run `echo 'a; $INFRAHUB_API_TOKEN'`.", id="single-quoted-name-does-not-expand"
-    ),
-    # Naming a shell inside the quotes does not run one.
-    pytest.param(
-        "Run `echo 'ssh: $INFRAHUB_API_TOKEN'`.", id="shell-name-inside-the-quotes"
+        'Run `test -z "${INFRAHUB_API_TOKEN:-}" && echo "not set"`.',
+        id="test-z-operand",
     ),
     pytest.param(
-        "Run `echo 'su infrahub -c $INFRAHUB_API_TOKEN'`.", id="su-c-inside-the-quotes"
+        "Run `[[ -n $INFRAHUB_API_TOKEN ]] && echo set`.", id="double-bracket-operand"
     ),
     pytest.param(
-        "Run `echo 'bash -o pipefail -c $INFRAHUB_API_TOKEN'`.",
-        id="bash-c-inside-the-quotes",
+        '```bash\ncurl -s -X POST \\\n  -H "X-INFRAHUB-KEY: $INFRAHUB_API_TOKEN" \\\n'
+        '  "$INFRAHUB_ADDRESS/graphql" -d @q.json | jq .\n```',
+        id="curl-header-on-a-continuation-line",
     ),
-    # Outside the quotes but an argument to echo, so still only printed.
     pytest.param(
-        "Run `echo sh -c 'x $INFRAHUB_API_TOKEN'`.", id="shell-words-as-echo-arguments"
+        'Run `curl -H "Authorization: Bearer $INFRAHUB_API_TOKEN" "$(printf %s https://x)"`.',
+        id="token-header-beside-a-substitution",
+    ),
+    # A code span holding only the reference names the variable.
+    pytest.param(
+        "Confirm `$INFRAHUB_API_TOKEN` is exported in your shell.",
+        id="reference-alone-in-a-code-span",
     ),
     pytest.param(
         "Run `$(command -v infrahubctl) info`.",
         id="substitution-in-command-position-without-the-token",
     ),
-    # Near-miss for the pipe leaks: `||` runs the next command only on
-    # failure and feeds it nothing, so it is not a pipe.
+    # `||` after a presence test feeds the next command nothing.
     pytest.param(
         'Run `[ -n "${INFRAHUB_API_TOKEN:-}" ] || echo "not set"`.',
         id="or-operator-is-not-a-pipe",
     ),
-    # A pipe keeps only single-quoted text live. A token in double quotes,
-    # sent in a header or tested for presence, on a piped line prints nothing.
+    # A token sent in a header, or tested for presence, on a piped line
+    # prints nothing.
     pytest.param(
         'Run `curl -s -H "X-INFRAHUB-KEY: $INFRAHUB_API_TOKEN" "$INFRAHUB_ADDRESS/graphql" -d @q.json | jq .`.',
         id="token-in-a-header-piped-to-jq",
@@ -239,33 +252,52 @@ def test_presence_tests_that_cannot_leak_pass(text):
     assert ok, msg
 
 
-# These print nothing secret, and fail on purpose. A command holding the
-# token beside a substitution, or single-quoted on a line with a pipe or
-# a here-string, fails closed, because reading what the next
-# program runs kept missing leaks. This list protects that choice: do not move these back to
-# TOKEN_SAFE without a reader that is exact.
+# These print nothing secret, and fail on purpose. Every expansion of the
+# token outside the allowed forms fails, single-quoted text included,
+# because listing the commands that print it kept missing leaks. This list
+# protects that choice: do not move these back to TOKEN_SAFE by widening
+# the allowed forms without a review.
 TOKEN_FAILS_CLOSED = [
     pytest.param(
-        "Run `echo 'literal $INFRAHUB_API_TOKEN' | grep x`.",
-        id="single-quoted-piped-into-a-non-shell",
+        "Run `echo 'a; $INFRAHUB_API_TOKEN'`.", id="single-quoted-name-does-not-expand"
+    ),
+    pytest.param(
+        "Run `echo 'su infrahub -c $INFRAHUB_API_TOKEN'`.", id="su-c-inside-the-quotes"
+    ),
+    pytest.param(
+        "Run `echo 'ssh: $INFRAHUB_API_TOKEN'`.", id="shell-name-inside-the-quotes"
+    ),
+    pytest.param(
+        "Run `echo 'bash -o pipefail -c $INFRAHUB_API_TOKEN'`.",
+        id="bash-c-inside-the-quotes",
+    ),
+    pytest.param(
+        "Run `echo sh -c 'x $INFRAHUB_API_TOKEN'`.", id="shell-words-as-echo-arguments"
     ),
     pytest.param(
         "Run `echo 'literal $INFRAHUB_API_TOKEN' \"$(printf fixed)\"`.",
         id="single-quoted-literal-beside-a-substitution",
     ),
     pytest.param(
-        'Run `curl -H "Authorization: Bearer $INFRAHUB_API_TOKEN" "$(printf %s https://x)"`.',
-        id="token-header-beside-a-substitution",
+        "Run `echo 'literal $INFRAHUB_API_TOKEN' | grep x`.",
+        id="single-quoted-piped-into-a-non-shell",
     ),
     pytest.param(
         """Run `echo "$(printf '%s' 'literal $INFRAHUB_API_TOKEN')"`.""",
         id="single-quoted-literal-inside-a-printed-substitution",
     ),
+    # The variable named with a `$` in prose, outside a code span.
+    pytest.param("Make sure $INFRAHUB_API_TOKEN is exported.", id="reference-in-prose"),
+    # docker compose interpolation is not a shell, but is not on the list.
+    pytest.param(
+        "```yaml\nenvironment:\n  - INFRAHUB_API_TOKEN=${INFRAHUB_API_TOKEN}\n```",
+        id="compose-interpolation",
+    ),
 ]
 
 
 @pytest.mark.parametrize("text", TOKEN_FAILS_CLOSED)
-def test_token_beside_a_substitution_or_pipe_fails_closed(text):
+def test_expansions_outside_the_allowed_forms_fail_closed(text):
     assert not check_token_not_printed(text)[0]
 
 

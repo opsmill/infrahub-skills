@@ -42,7 +42,7 @@
         },
         {
           "name": "token-not-printed",
-          "check": "The token presence test cannot expand to the token's value: no bare `echo $INFRAHUB_API_TOKEN` and no `${INFRAHUB_API_TOKEN:-...}` fallback"
+          "check": "The token presence test cannot expand to the token's value: INFRAHUB_API_TOKEN is expanded only as a `[ -n ... ]` or `test -n` operand, a curl request header, or `${INFRAHUB_API_TOKEN:+...}` / `${INFRAHUB_API_TOKEN:?...}`"
         },
         {
           "name": "cli-commands-exist",

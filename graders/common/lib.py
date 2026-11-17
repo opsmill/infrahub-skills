@@ -171,156 +171,45 @@ _TOKEN_VAR = "INFRAHUB_API_TOKEN"
 # print it, so it fails wherever it appears.
 _TOKEN_FALLBACK = re.compile(rf"\$\{{{_TOKEN_VAR}:?-[^}}]+\}}")
 
-# Forms that expand to the value: bare, braced, or an empty fallback. Safe
-# as a test operand (`[ -n "${TOKEN:-}" ]`), unsafe as an argument to
-# something that writes to stdout.
+# Forms that expand to the value: bare, braced, or an empty fallback. Each
+# one fails unless `_safe_use` finds it in an allowed position.
 _TOKEN_VALUE = re.compile(rf"\$\{{?{_TOKEN_VAR}(?::?-)?\}}?(?![\w:?+])")
 
-# `${TOKEN:+word}` and `${TOKEN:?word}` are the safe forms: the first can
-# only ever expand to the word, the second writes to stderr and aborts.
-_PRINTS_TO_STDOUT = re.compile(r"\b(?:echo|printf|print)\b")
-# A backtick is a command boundary too. Without it an English sentence
-# containing the word "echo" counted as one command, so a safe
-# `${TOKEN:-}` test operand quoted later in the same sentence was reported
-# as a leak — the very presence test the rule recommends.
-_LINE_BREAK = re.compile(r"\n|`")
-_COMMAND_BREAK = re.compile(r";|\|\||&&|\||\bthen\b|\bdo\b|\bfi\b|\bdone\b")
+# The safe uses of an expansion, read backwards from where it starts. The
+# list is short and fixed on purpose: commands that can print the value are
+# not (`echo`, `cat <<<`, `head -c 8 <<<`, `envsubst`, `| bash`), and
+# listing them one review at a time never ended. `${TOKEN:+word}` and
+# `${TOKEN:?word}` are safe too, and `_TOKEN_VALUE` never matches them.
+_SAFE_BEFORE = [
+    # A `[ -n ... ]`, `[[ -z ... ]]` or `test -n ...` operand.
+    re.compile(r"(?:\[\[?|\btest)\s+(?:!\s+)?-[nz]\s+\"?\Z"),
+    # A curl request header, which goes to the server, not the terminal.
+    re.compile(r"(?:^|[`;&|(])\s*curl\b[^`;&|]*?\s(?:-H|--header)\s*=?\s*\"[^\"]*\Z"),
+]
+# curl prints its request headers in these modes, the token included.
+_CURL_VERBOSE = re.compile(r"\s(?:-v|--verbose|--trace\S*)(?=\s|$)")
 
 
-def _quoted_spans(segment: str) -> list[tuple[int, int, str]] | None:
-    """Return the quoted spans of a shell segment, or None if quotes don't balance.
+def _safe_use(text: str, start: int, end: int) -> bool:
+    """Whether the expansion at ``start`` is one of the allowed forms.
 
-    An apostrophe between two letters is a contraction ("don't", "it's"), not
-    a quote. Quotes that still do not balance mean prose; the caller then
-    splits on every separator as before.
+    Read within its line. A code span holding only the reference names the
+    variable rather than running anything.
     """
-    spans: list[tuple[int, int, str]] = []
-    quote = None
-    start = 0
-    for i, ch in enumerate(segment):
-        if ch == "'" and 0 < i < len(segment) - 1 and segment[i - 1].isalpha() and segment[i + 1].isalpha():
-            continue
-        if quote is None and ch in "'\"":
-            quote, start = ch, i
-        elif ch == quote and not (quote == '"' and _escaped(segment, i)):
-            spans.append((start, i, quote))
-            quote = None
-    return None if quote else spans
-
-
-def _escaped(segment: str, i: int) -> bool:
-    """Whether the character at ``i`` follows an odd run of backslashes."""
-    run = len(segment[:i]) - len(segment[:i].rstrip("\\"))
-    return run % 2 == 1
-
-
-# Programs that run a quoted argument as shell code, which expands what the
-# single quotes protected here.
-_SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "su"}
-_SHELL_RUN_OPTION = re.compile(r"-[A-Za-z]*c")
-_PRINT_COMMANDS = {"echo", "printf", "print"}
-
-
-def _runs_inner_shell(piece: str) -> bool:
-    """Whether the piece runs code the single quotes do not protect.
-
-    Read from shell tokens, after quote removal, so `bash '-c' '...'` counts
-    and `echo 'su x -c ...'` does not. A shell word printed by `echo` or
-    `printf` is an argument, not a command. Fails closed: a piece that does
-    not tokenize keeps its quoted text. A piece with a substitution never
-    gets here: the caller fails it closed.
-    """
-    try:
-        tokens = shlex.split(piece)
-    except ValueError:
+    if text[start - 1 : start] == "`" and text[end : end + 1] == "`":
         return True
-    if not tokens or tokens[0] in _PRINT_COMMANDS:
-        return False
-    for i, token in enumerate(tokens):
-        name = token.rsplit("/", 1)[-1]
-        if name == "eval" or (name == "ssh" and i + 1 < len(tokens)):
-            return True
-        if name in _SHELLS and any(
-            _SHELL_RUN_OPTION.fullmatch(t) for t in tokens[i + 1 :]
-        ):
-            return True
-    return False
-
-
-# A substitution's output is unknown when the check runs: it can be the
-# command itself, a value the command prints, or code a shell runs.
-_SUBSTITUTION = re.compile(r"[$<>]\(")
-
-# A pipe (`|` or `|&`, not `||`) or a here-string feeds text to another
-# program, which can expand or run it: `| bash`, `| sudo -E bash`,
-# `| env bash`, `bash <<< '...'`, `envsubst <<< '...'`. Which programs do
-# that is not listed.
-_FEEDS_INPUT = re.compile(r"(?<!\|)\|(?!\|)|<<<")
-
-
-def _single_quoted(piece: str) -> str:
-    """The single-quoted text of the piece, or all of it if quotes do not balance."""
-    spans = _quoted_spans(piece)
-    if spans is None:
-        return piece
-    return " ".join(piece[a + 1 : b] for a, b, q in spans if q == "'")
-
-
-def _blank_spans(piece: str, quotes: str) -> str:
-    """Blank out the text inside quotes of the given kinds."""
-    for start, end, quote in _quoted_spans(piece) or []:
-        if quote in quotes:
-            piece = piece[:start] + " " * (end - start + 1) + piece[end + 1 :]
-    return piece
-
-
-def _unquote_single(piece: str) -> str:
-    """Blank out single-quoted text, which the shell never expands.
-
-    Unless the piece runs that text in an inner shell (`sh -c '...'`,
-    `eval`, `ssh host '...'`), which does expand it.
-    """
-    if _runs_inner_shell(piece):
-        return piece
-    return _blank_spans(piece, "'")
-
-
-def _segments(text: str) -> list[tuple[int, int]]:
-    """The line and backtick segments of the text, as (start, end) offsets."""
-    bounds = [m.start() for m in _LINE_BREAK.finditer(text)] + [len(text)]
-    return [(0 if i == 0 else bounds[i - 1] + 1, end) for i, end in enumerate(bounds)]
-
-
-def _feeds_input(segment: str) -> bool:
-    """Whether the segment has a pipe or a here-string outside quotes.
-
-    Quotes that do not balance count every one, so the check fails closed.
-    """
-    spans = _quoted_spans(segment) or []
-    return any(
-        not any(a < m.start() < b for a, b, _ in spans)
-        for m in _FEEDS_INPUT.finditer(segment)
-    )
-
-
-def _command_pieces(text: str) -> list[tuple[int, str]]:
-    """Split into command-sized pieces, keeping each piece's offset.
-
-    A separator inside quotes is data: `printf '%s; ' "$TOKEN"` is one
-    command, and splitting on its `;` cut the value away from the printf.
-    """
-    pieces: list[tuple[int, str]] = []
-    for seg_start, seg_end in _segments(text):
-        segment = text[seg_start:seg_end]
-        spans = _quoted_spans(segment) or []
-        pos = 0
-        for match in _COMMAND_BREAK.finditer(segment):
-            if any(a < match.start() < b for a, b, _ in spans):
-                continue
-            pieces.append((seg_start + pos, segment[pos : match.start()]))
-            pos = match.end()
-        pieces.append((seg_start + pos, segment[pos:]))
-    return pieces
+    # The logical line: a `\` continuation joins the next physical line.
+    line_start = text.rfind("\n", 0, start) + 1
+    while line_start > 1 and text[line_start - 2] == "\\":
+        line_start = text.rfind("\n", 0, line_start - 1) + 1
+    line_end = text.find("\n", end)
+    while line_end > 0 and text[line_end - 1] == "\\":
+        line_end = text.find("\n", line_end + 1)
+    line = text[line_start : len(text) if line_end < 0 else line_end]
+    before = text[line_start:start].replace("\\\n", " ")
+    if _SAFE_BEFORE[0].search(before):
+        return True
+    return bool(_SAFE_BEFORE[1].search(before)) and not _CURL_VERBOSE.search(line)
 
 
 def _is_negated(text: str, start: int) -> bool:
@@ -335,12 +224,15 @@ def _is_negated(text: str, start: int) -> bool:
 def check_token_not_printed(text: str) -> tuple[bool, str]:
     """A presence test for the token must not be able to print its value.
 
-    The distinction is the expansion, not the intent: `${TOKEN:-is NOT set}`
-    reads as a presence test and substitutes the word only when the variable
-    is unset, so on every run where the token exists it prints the token —
-    into the terminal, the shell history and the retained CI log. Forms that
-    cannot reach stdout with the value pass: an explicit `[ -n ... ]`
-    conditional, `${TOKEN:+set}`, or `: "${TOKEN:?not set}"`.
+    Every expansion of the token fails unless it is one of the safe forms:
+    a `[ -n ... ]` or `test -n` operand, a curl request header, or
+    `${TOKEN:+set}` / `: "${TOKEN:?not set}"`, which never expand to the
+    value. `${TOKEN:-is NOT set}` reads as a presence test and prints the
+    token on every run where it exists, into the terminal, the shell
+    history and the retained CI log, so it fails wherever it appears.
+
+    Single-quoted text counts too. Deciding when quotes protect it (`| bash`,
+    `sh -c`, `envsubst <<<`) is the same open list as the printing commands.
 
     A leaking form quoted in order to warn against it is not a leak. The
     rule teaches this trap by name, so the best answer names it too — and
@@ -353,36 +245,15 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
         for m in _TOKEN_FALLBACK.finditer(text)
         if not _is_negated(text, m.start())
     }
-    # Fails closed where reading the shell exactly has kept missing shapes.
-    # A command holding the token beside a substitution is a leak. On a line
-    # with a pipe or a here-string, the next program may expand or run
-    # single-quoted text (`| bash`, `envsubst <<< '...'`), so a token there
-    # counts in any command, printing or not.
-    fed = [
-        (start, end)
-        for start, end in _segments(text)
-        if _feeds_input(text[start:end])
-    ]
-    for start, piece in _command_pieces(text):
-        if _is_negated(text, start):
-            continue
-        values = {m.group(0) for m in _TOKEN_VALUE.finditer(piece)}
-        if not values:
-            continue
-        if _SUBSTITUTION.search(piece):
-            offenders |= values
-            continue
-        if any(a <= start < b for a, b in fed):
-            offenders.update(
-                m.group(0) for m in _TOKEN_VALUE.finditer(_single_quoted(piece))
-            )
-        if _PRINTS_TO_STDOUT.search(piece):
-            offenders.update(
-                m.group(0) for m in _TOKEN_VALUE.finditer(_unquote_single(piece))
-            )
+    offenders.update(
+        m.group(0)
+        for m in _TOKEN_VALUE.finditer(text)
+        if not _is_negated(text, m.start())
+        and not _safe_use(text, m.start(), m.end())
+    )
     if offenders:
         return False, (
-            f"expansion(s) that print the token's value: {sorted(offenders)}; "
+            f"expansion(s) that can print the token's value: {sorted(offenders)}; "
             "use a presence test that can only print a fixed string"
         )
     return True, "no expansion that can print the token's value"
