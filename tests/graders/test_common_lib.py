@@ -173,6 +173,30 @@ TOKEN_LEAKS = [
         'Run `curl -v -H "X-INFRAHUB-KEY: $INFRAHUB_API_TOKEN" "$INFRAHUB_ADDRESS"`.',
         id="curl-header-in-verbose-mode",
     ),
+    pytest.param(
+        'Run `curl -H "X-INFRAHUB-KEY: $INFRAHUB_API_TOKEN" https://x --verbose`.',
+        id="curl-verbose-before-the-closing-backtick",
+    ),
+    pytest.param(
+        'Run `curl -sv -H "X-INFRAHUB-KEY: $INFRAHUB_API_TOKEN" https://x`.',
+        id="curl-verbose-in-combined-flags",
+    ),
+    # An allowed form counts only as the command itself, not as text that
+    # another command prints.
+    pytest.param(
+        'Run `printf "%s\\n" "test -n $INFRAHUB_API_TOKEN"`.',
+        id="test-operand-inside-a-printed-argument",
+    ),
+    pytest.param(
+        "Run `echo test -n $INFRAHUB_API_TOKEN`.", id="test-operand-as-an-echo-argument"
+    ),
+    pytest.param(
+        'Run `echo "x; test -n $INFRAHUB_API_TOKEN"`.',
+        id="separator-inside-quotes-before-test",
+    ),
+    pytest.param(
+        'Run `echo curl -H "X: $INFRAHUB_API_TOKEN"`.', id="curl-header-as-an-echo-argument"
+    ),
 ]
 
 
@@ -214,6 +238,15 @@ TOKEN_SAFE = [
         '```bash\ncurl -s -X POST \\\n  -H "X-INFRAHUB-KEY: $INFRAHUB_API_TOKEN" \\\n'
         '  "$INFRAHUB_ADDRESS/graphql" -d @q.json | jq .\n```',
         id="curl-header-on-a-continuation-line",
+    ),
+    # Near-misses for the verbose check: `-S` is not `-v`, and `!` before a
+    # test keeps it a command.
+    pytest.param(
+        'Run `curl -sS -H "X-INFRAHUB-KEY: $INFRAHUB_API_TOKEN" https://x`.',
+        id="curl-combined-flags-without-verbose",
+    ),
+    pytest.param(
+        'Run `! [ -z "$INFRAHUB_API_TOKEN" ] && echo set`.', id="negated-test-command"
     ),
     pytest.param(
         'Run `curl -H "Authorization: Bearer $INFRAHUB_API_TOKEN" "$(printf %s https://x)"`.',

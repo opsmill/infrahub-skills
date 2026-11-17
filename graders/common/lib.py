@@ -180,21 +180,50 @@ _TOKEN_VALUE = re.compile(rf"\$\{{?{_TOKEN_VAR}(?::?-)?\}}?(?![\w:?+])")
 # not (`echo`, `cat <<<`, `head -c 8 <<<`, `envsubst`, `| bash`), and
 # listing them one review at a time never ended. `${TOKEN:+word}` and
 # `${TOKEN:?word}` are safe too, and `_TOKEN_VALUE` never matches them.
+# Where a command starts: line start, a code-span backtick, or a shell
+# separator, then any `if`/`then`/`!`-style keywords. An allowed form counts
+# only when its command stands here, so `echo test -n $TOKEN` and
+# `printf "%s" "test -n $TOKEN"` print the value and fail.
+_COMMAND_START = r"(?:^|[`;&|({])\s*(?:(?:if|then|elif|else|while|until|do|!)\s+)*"
 _SAFE_BEFORE = [
     # A `[ -n ... ]`, `[[ -z ... ]]` or `test -n ...` operand.
-    re.compile(r"(?:\[\[?|\btest)\s+(?:!\s+)?-[nz]\s+\"?\Z"),
+    re.compile(_COMMAND_START + r"(?P<cmd>\[\[?|test)\s+(?:!\s+)?-[nz]\s+\"?\Z"),
     # A curl request header, which goes to the server, not the terminal.
-    re.compile(r"(?:^|[`;&|(])\s*curl\b[^`;&|]*?\s(?:-H|--header)\s*=?\s*\"[^\"]*\Z"),
+    re.compile(
+        _COMMAND_START
+        + r"(?P<cmd>curl)\b[^`;&|]*?\s(?:-H|--header)\s*=?\s*\"[^\"]*\Z"
+    ),
 ]
-# curl prints its request headers in these modes, the token included.
-_CURL_VERBOSE = re.compile(r"\s(?:-v|--verbose|--trace\S*)(?=\s|$)")
+# curl prints its request headers in these modes, the token included:
+# `-v` alone or among combined short flags (`-sv`), `--verbose`, `--trace*`.
+_CURL_VERBOSE = re.compile(
+    r"\s(?:-[a-zA-Z]*v[a-zA-Z]*|--verbose|--trace\S*)(?=[\s`;&|)]|$)"
+)
+
+
+def _inside_quotes(text: str) -> bool:
+    """Whether the end of ``text`` is inside a quoted string.
+
+    An apostrophe between two letters is a contraction, not a quote.
+    """
+    quote = None
+    for i, ch in enumerate(text):
+        escaped = (len(text[:i]) - len(text[:i].rstrip("\\"))) % 2 == 1
+        if quote is None:
+            if ch == "'" and 0 < i < len(text) - 1 and text[i - 1].isalpha() and text[i + 1].isalpha():
+                continue
+            if ch in "'\"" and not escaped:
+                quote = ch
+        elif ch == quote and not (quote == '"' and escaped):
+            quote = None
+    return quote is not None
 
 
 def _safe_use(text: str, start: int, end: int) -> bool:
     """Whether the expansion at ``start`` is one of the allowed forms.
 
-    Read within its line. A code span holding only the reference names the
-    variable rather than running anything.
+    Read within its logical line. A code span holding only the reference
+    names the variable rather than running anything.
     """
     if text[start - 1 : start] == "`" and text[end : end + 1] == "`":
         return True
@@ -207,9 +236,13 @@ def _safe_use(text: str, start: int, end: int) -> bool:
         line_end = text.find("\n", line_end + 1)
     line = text[line_start : len(text) if line_end < 0 else line_end]
     before = text[line_start:start].replace("\\\n", " ")
-    if _SAFE_BEFORE[0].search(before):
-        return True
-    return bool(_SAFE_BEFORE[1].search(before)) and not _CURL_VERBOSE.search(line)
+    for i, pattern in enumerate(_SAFE_BEFORE):
+        match = pattern.search(before)
+        if not match or _inside_quotes(before[: match.start("cmd")]):
+            continue
+        if i == 0 or not _CURL_VERBOSE.search(line):
+            return True
+    return False
 
 
 def _is_negated(text: str, start: int) -> bool:
