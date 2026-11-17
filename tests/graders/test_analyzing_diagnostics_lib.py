@@ -92,6 +92,22 @@ def test_incident_sections_pass(report: str) -> None:
     assert check_incident_grouping(report, max_incidents=1)[0]
 
 
+# Near-miss: a hyphenated word is not a dash heading, so this section is not
+# an incident and needs no bundle path or severity (review of #247).
+HYPHENATED_HEADING = TEMPLATE_REPORT + """
+## Incident-free services
+
+The database and the cache show no errors.
+"""
+
+
+def test_hyphenated_heading_is_not_an_incident() -> None:
+    assert len(_mod._incident_sections(HYPHENATED_HEADING)) == 1
+    assert check_cites_bundle_evidence(HYPHENATED_HEADING)[0]
+    assert check_severity_labels(HYPHENATED_HEADING)[0]
+    assert check_incident_grouping(HYPHENATED_HEADING, max_incidents=1)[0]
+
+
 @pytest.mark.parametrize("report", [UNCITED, UNCITED_COLON], ids=["numbered", "colon"])
 def test_uncited_incident_fails(report: str) -> None:
     assert not check_cites_bundle_evidence(report)[0]
@@ -143,12 +159,39 @@ The message-queue restarts afterwards (bundle/message-queue/rabbitmq.log).
 """
 
 
+# A heading that mentions the root without starting with it, and the
+# evidence path three lines down (review of #247).
+LIKELY_ROOT_HEADING = """## Incident 1: broker outage (CRITICAL)
+
+### Likely root cause
+
+The broker stopped first.
+
+Evidence: bundle/message-queue/rabbitmq.log
+> Stopping RabbitMQ
+
+### Cascade
+
+Downstream errors in bundle/logs/server/server.log.
+"""
+
+# A `Root:` paragraph, not a list item: it owns the next non-blank line.
+PARAGRAPH_ROOT = """## Incident 1: broker outage (CRITICAL)
+
+**Root cause:** broker stopped
+bundle/message-queue/rabbitmq.log
+
+**Cascade:** downstream errors in bundle/logs/server/server.log
+"""
+
+
 @pytest.mark.parametrize(
-    "report", [TEMPLATE_REPORT, HEADING_ROOT, BLANK_LINE_ROOT],
-    ids=["template", "heading", "blank-line"],
+    "report", [TEMPLATE_REPORT, HEADING_ROOT, BLANK_LINE_ROOT, LIKELY_ROOT_HEADING, PARAGRAPH_ROOT],
+    ids=["template", "heading", "blank-line", "likely-root-heading", "paragraph"],
 )
 def test_root_attributed(report: str) -> None:
     assert check_root_service(report, service="message-queue")[0]
+    assert check_incident_grouping(report, max_incidents=1)[0]
 
 
 # Near-miss: the incident heading says "root cause" and the root is the
@@ -163,10 +206,58 @@ ROOT_IN_INCIDENT_HEADING = """## Incident 1: server crash is the root cause (CRI
 """
 
 
+# Near-miss: a root heading above the template lines. The root is read from
+# the `- Root:` line, never from the `- Cascade:` line, whatever the heading
+# says (review of #247).
+ROOT_HEADING_OVER_LABELS = """## Incident 1: server crash (CRITICAL)
+
+### Root cause analysis
+
+- Root: server crashed
+- Cascade: message-queue connections dropped (bundle/message-queue/rabbitmq.log)
+"""
+
+# Near-miss: a root heading with no `- Root:` line. The Cascade item under it
+# is still not the root.
+ROOT_HEADING_CASCADE_ITEM = """## Incident 1: server crash (CRITICAL)
+
+### Root cause analysis
+
+The server crashed first (bundle/logs/server/server.log).
+
+- Cascade: message-queue connections dropped
+  (bundle/message-queue/rabbitmq.log)
+"""
+
+# Near-miss: the broker is named in prose after the Root item, at the same
+# indentation, so it is not part of the item.
+PROSE_AFTER_ROOT_ITEM = """## Incident 1: server crash (CRITICAL)
+
+- Root: server crashed — bundle/logs/server/server.log
+  > Worker exited with code 137
+
+The message-queue is healthy and logs downstream errors only.
+"""
+
+
 @pytest.mark.parametrize(
     "report",
-    [WRONG_ROOT, HEADING_ROOT_WRONG, ROOT_IN_INCIDENT_HEADING],
-    ids=["template", "heading", "root-in-incident-heading"],
+    [
+        WRONG_ROOT,
+        HEADING_ROOT_WRONG,
+        ROOT_IN_INCIDENT_HEADING,
+        ROOT_HEADING_OVER_LABELS,
+        ROOT_HEADING_CASCADE_ITEM,
+        PROSE_AFTER_ROOT_ITEM,
+    ],
+    ids=[
+        "template",
+        "heading",
+        "root-in-incident-heading",
+        "root-heading-over-labels",
+        "root-heading-cascade-item",
+        "prose-after-root-item",
+    ],
 )
 def test_wrong_root_fails(report: str) -> None:
     assert not check_root_service(report, service="message-queue")[0]
@@ -269,6 +360,67 @@ MANIFEST_NAMED_ONLY = EXCERPT_REPORT.replace(
 )
 
 
+# A count next to "not provided", with a collector type in the "of" form
+# (review of #247).
+NOT_PROVIDED_TYPED_OF = EXCERPT_REPORT.replace(
+    "Manifest: not provided (one pasted log).",
+    "Manifest: not provided; 3 of 4 log collectors succeeded.",
+)
+
+# A bare count, and "none" on the Manifest line that is not its value
+# (review of #247).
+BARE_COUNT_NONE_FAILED = EXCERPT_REPORT.replace(
+    "Manifest: not provided (one pasted log).",
+    "Manifest: all 8 collectors succeeded, none failed.",
+)
+
+# Near-miss: no count, and "none"/"missing" near "Manifest" without being its
+# value.
+NONE_NEAR_MANIFEST = EXCERPT_REPORT.replace(
+    "Manifest: not provided (one pasted log).",
+    "Manifest: read, none of the entries are missing.",
+)
+
+_NO_OPEN_QUESTION = EXCERPT_REPORT.replace(
+    "\n## Open questions\n\n- The manifest and the other services are not in the excerpt. "
+    "Where is the full bundle?\n",
+    "",
+)
+
+# Near-miss: a question for the bundle with no location word (review of #247).
+ASKS_TO_PROVIDE = "Before I start, can you provide the full bundle?\n\n" + _NO_OPEN_QUESTION
+
+# Near-miss: a request for the bundle with no question mark (review of #247).
+REQUESTS_PATH = "Please send me the path to the full bundle.\n\n" + _NO_OPEN_QUESTION
+
+# Near-miss: a request for the manifest, not the bundle.
+REQUESTS_MANIFEST = "I need the bundle_information.json file first.\n\n" + _NO_OPEN_QUESTION
+
+# Compliant: names the bundle before the analysis without asking for it.
+STATES_SCOPE = (
+    "You pasted one log, so I do not need the full bundle to start.\n\n" + EXCERPT_REPORT
+)
+
+# Compliant: other wordings of "not provided".
+NOT_PROVIDED_WORDINGS = [
+    "**Manifest:** not provided.",
+    "**Manifest**: not included in the excerpt.",
+    "The manifest was not pasted.",
+    "No manifest in the excerpt.",
+    "Manifest (bundle_information.json): missing.",
+]
+
+
+@pytest.mark.parametrize("wording", NOT_PROVIDED_WORDINGS)
+def test_not_provided_wordings_pass(wording: str) -> None:
+    report = EXCERPT_REPORT.replace("Manifest: not provided (one pasted log).", wording)
+    assert _mod.check_manifest_not_provided(report)[0]
+
+
+def test_scope_statement_before_analysis_passes() -> None:
+    assert _mod.check_analyzes_pasted_excerpt(STATES_SCOPE)[0]
+
+
 def _run(tmp_path: Path, report: str) -> dict:
     out = tmp_path / "output.md"
     out.write_text(report)
@@ -287,8 +439,25 @@ def test_excerpt_report_passes(tmp_path: Path) -> None:
         (INFERRED_COUNT, "manifest-not-provided"),
         (NOT_PROVIDED_AND_COUNT, "manifest-not-provided"),
         (MANIFEST_NAMED_ONLY, "manifest-not-provided"),
+        (NOT_PROVIDED_TYPED_OF, "manifest-not-provided"),
+        (BARE_COUNT_NONE_FAILED, "manifest-not-provided"),
+        (NONE_NEAR_MANIFEST, "manifest-not-provided"),
+        (ASKS_TO_PROVIDE, "analyzes-pasted-excerpt"),
+        (REQUESTS_PATH, "analyzes-pasted-excerpt"),
+        (REQUESTS_MANIFEST, "analyzes-pasted-excerpt"),
     ],
-    ids=["asks-first", "inferred-count", "not-provided-and-count", "manifest-named-only"],
+    ids=[
+        "asks-first",
+        "inferred-count",
+        "not-provided-and-count",
+        "manifest-named-only",
+        "not-provided-typed-of",
+        "bare-count-none-failed",
+        "none-near-manifest",
+        "asks-to-provide",
+        "requests-path",
+        "requests-manifest",
+    ],
 )
 def test_excerpt_rule_violation_fails_on_its_check(tmp_path: Path, report: str, check: str) -> None:
     result = _run(tmp_path, report)
