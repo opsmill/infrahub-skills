@@ -542,7 +542,7 @@ def _short_name_uses(explain: str, nodes: set[tuple[str, str]]) -> list[str]:
             short = re.escape(name)
             # Drop the short name where it is the value of `name`.
             rest = re.sub(
-                rf"\bname[`*_]*\s*(?:[:=]|\bis\b|\bof\b|\bas\b)?\s*[(\"'`*_]*{short}(?![A-Za-z0-9])",
+                rf"\bname[`*_]*\s*(?:[:=]|\bis\b)?\s*[(\"'`*_]*{short}(?![A-Za-z0-9])",
                 "name",
                 sentence,
             )

@@ -159,7 +159,9 @@ def _label_window(lines: list[str], i: int, start: int, cascade: list[bool]) -> 
         if not line.strip():
             continue
         if is_item and _indent(line) <= _indent(own):
-            if not re.match(rf"\s*{_LIST_MARKER}", line):
+            # A sibling is at the indentation of the Root item. A less
+            # indented item belongs to an outer list.
+            if _indent(line) < _indent(own) or not re.match(rf"\s*{_LIST_MARKER}", line):
                 break
             label = _ITEM_LABEL.match(line)
             if label and label.group(1).strip().lower() not in _EVIDENCE_LABELS:
@@ -331,10 +333,14 @@ def check_no_location_scan(text: str, **_: object) -> CheckResult:
 
 _BUNDLE_OR_MANIFEST = re.compile(r"(?i)\bbundle\b|\bmanifest\b|bundle_information\.json")
 # A request without a question mark: "Please send me the path to the bundle."
-# Each alternative is the action asked for, so a negation right before it
-# ("Please do not provide the full bundle") can be read.
+# "please" opens a request whatever the verb is ("Please run
+# `infrahub-collect create` and let me know the bundle directory"), unless a
+# negation or a remark comes right after it ("please do not", "please note").
+# The other alternatives are the action asked for, so a negation right before
+# one ("do not provide the full bundle") can be read.
 _REQUEST_RE = re.compile(
-    r"(?i)\b(?:send|share|upload|attach|provide|paste|give\s+me|point\s+me"
+    r"(?i)\b(?:please(?!\s+(?:do\s+not|don'?t|never|avoid|note|see)\b)|let\s+me\s+know"
+    r"|send|share|upload|attach|provide|paste|give\s+me|point\s+me"
     r"|i(?:'ll|\s+will|\s+would|\s+first)?\s+need|need\s+(?:the|your|a|to\s+see)"
     r"|where\s+is|path\s+to|location\s+of)\b"
 )

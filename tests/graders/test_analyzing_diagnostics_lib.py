@@ -440,6 +440,13 @@ REQUESTS_PATH = "Please send me the path to the full bundle.\n\n" + _NO_OPEN_QUE
 # Near-miss: a request for the manifest, not the bundle.
 REQUESTS_MANIFEST = "I need the bundle_information.json file first.\n\n" + _NO_OPEN_QUESTION
 
+# Near-miss: a request whose verb is not about sending the bundle (review of
+# #247).
+REQUESTS_COLLECTION = (
+    "Please run `infrahub-collect create` and let me know the bundle directory.\n\n"
+    + _NO_OPEN_QUESTION
+)
+
 # Compliant: names the bundle before the analysis without asking for it.
 STATES_SCOPE = (
     "You pasted one log, so I do not need the full bundle to start.\n\n" + EXCERPT_REPORT
@@ -465,10 +472,30 @@ def test_scope_statement_before_analysis_passes() -> None:
     assert _mod.check_analyzes_pasted_excerpt(STATES_SCOPE)[0]
 
 
-def test_negated_request_before_analysis_passes() -> None:
+@pytest.mark.parametrize(
+    "opening",
+    [
+        "Please do not provide the full bundle yet.",
+        "Please note that the manifest is not in the excerpt.",
+    ],
+    ids=["please-do-not", "please-note"],
+)
+def test_negated_request_before_analysis_passes(opening: str) -> None:
     """Near-miss: a polite sentence that asks for nothing."""
-    report = "Please do not provide the full bundle yet.\n\n" + EXCERPT_REPORT
+    report = opening + "\n\n" + EXCERPT_REPORT
     assert _mod.check_analyzes_pasted_excerpt(report)[0]
+
+
+def test_nested_root_does_not_take_outer_evidence() -> None:
+    """Near-miss: an Evidence item of the outer list is not the root's."""
+    report = """## Incident 1: server crash (CRITICAL)
+
+- Summary: the server crashed
+  - Root: server crashed (bundle/logs/server/server.log)
+- Evidence: bundle/message-queue/rabbitmq.log
+- Cascade: task-workers lost their connection
+"""
+    assert not check_root_service(report, service="message-queue")[0]
 
 
 def _run(tmp_path: Path, report: str) -> dict:
@@ -495,6 +522,7 @@ def test_excerpt_report_passes(tmp_path: Path) -> None:
         (ASKS_TO_PROVIDE, "analyzes-pasted-excerpt"),
         (REQUESTS_PATH, "analyzes-pasted-excerpt"),
         (REQUESTS_MANIFEST, "analyzes-pasted-excerpt"),
+        (REQUESTS_COLLECTION, "analyzes-pasted-excerpt"),
     ],
     ids=[
         "asks-first",
@@ -507,6 +535,7 @@ def test_excerpt_report_passes(tmp_path: Path) -> None:
         "asks-to-provide",
         "requests-path",
         "requests-manifest",
+        "requests-collection",
     ],
 )
 def test_excerpt_rule_violation_fails_on_its_check(tmp_path: Path, report: str, check: str) -> None:

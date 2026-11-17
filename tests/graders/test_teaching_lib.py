@@ -663,6 +663,13 @@ def test_own_artifacts_longer_kind_does_not_hide_short_name():
     assert teaching_lib._short_name_uses("Each `TestbedZoneExtra` sits in one `TestbedZone`.", nodes) == []
 
 
+def test_own_artifacts_name_of_is_not_a_name_value():
+    """Near-miss: "name of" does not make the short name a `name` value."""
+    nodes = {("Testbed", "Zone")}
+    assert teaching_lib._short_name_uses("The name of `Zone` is short.", nodes) == ["Zone"]
+    assert teaching_lib._short_name_uses("The name is `Zone` here.", nodes) == []
+
+
 def test_own_artifacts_marker_word_short_name_is_skipped():
     """A generic named `LocationGeneric`: "Generic nodes" is not a node name."""
     nodes = {("Location", "Generic"), ("Testbed", "Zone")}
