@@ -3311,14 +3311,22 @@ tasks:
       the internal hostname stripped), searches opsmill/infrahub with
       `gh search issues` (open and closed by default), does not file anything
       itself, and hands any filing or commenting off to
-      infrahub-reporting-issues.
+      infrahub-reporting-issues. The prompt pastes one log and no manifest,
+      so the report analyzes it without asking for the bundle first, and
+      writes `Manifest: not provided` instead of a collector count.
     expectations:
+      - Analyzes the pasted log before asking for anything else
+      - Writes `Manifest: not provided` and no collector count
       - Cites bundle/logs/task-worker/... as evidence for the traceback
       - Searches opsmill/infrahub issues with `gh search issues`
       - Search keys keep InitializationError but strip the internal broker hostname
       - Does not run `gh issue create`
       - Cross-links infrahub-reporting-issues for filing or commenting
     assertions:
+      - name: analyzes-pasted-excerpt
+        check: Report analyzes the pasted log before any question about the bundle location
+      - name: manifest-not-provided
+        check: Report says the manifest is not provided and states no collector count
       - name: cites-bundle-evidence
         check: Report cites bundle/<service>/ file paths as evidence
       - name: github-search

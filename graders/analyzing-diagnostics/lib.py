@@ -201,6 +201,53 @@ def check_no_location_scan(text: str, **_: object) -> CheckResult:
     return True, "no location scanning or assumed default"
 
 
+def check_analyzes_pasted_excerpt(text: str, **_: object) -> CheckResult:
+    """For a pasted excerpt, the report analyzes it before asking for more.
+
+    rules/workflow-ask-bundle-location.md: a pasted excerpt settles the bundle
+    question, even a single log. A question about the bundle location is fine
+    under Open questions, after the analysis; it fails only when it comes
+    before any analysis content, or when the report has no analysis.
+    """
+    analysis = re.compile(r"(?im)^#{1,6}\s*(incident|finding)\b|bundle/\w|root[ -]cause")
+    first = analysis.search(text)
+    if not first:
+        return False, "no analysis of the pasted excerpt"
+    for m in re.finditer(r"[^.!?]*\?", text[: first.start()]):
+        sentence = m.group(0)
+        if re.search(r"where|path|location|director|folder|send|share|upload", sentence, re.I) and re.search(
+            r"bundle", sentence, re.I
+        ):
+            return False, "asks for the bundle before analyzing the pasted excerpt"
+    return True, "analyzes the pasted excerpt first"
+
+
+# A collector count, such as "8/8 collectors ok" or "1 of 1 collectors".
+_COLLECTOR_COUNT_RE = re.compile(
+    r"(?i)\b\d+\s*/\s*\d+\s*(?:collectors?\b|ok\b|succeeded\b|success\b)"
+    r"|\b\d+\s+of\s+\d+\s+collectors?\b"
+)
+_MANIFEST_NOT_PROVIDED_RE = re.compile(
+    r"(?i)(manifest|bundle_information\.json)\W{0,3}[^\n]{0,40}?"
+    r"\b(not (provided|available|included|present|pasted)|missing|unavailable|none)\b"
+    r"|\bno\s+(manifest|bundle_information\.json)\b"
+)
+
+
+def check_manifest_not_provided(text: str, **_: object) -> CheckResult:
+    """For a pasted excerpt, the report says the manifest is not provided.
+
+    rules/workflow-manifest-first.md: write `Manifest: not provided` and never
+    infer a collector count from a single pasted log.
+    """
+    count = _COLLECTOR_COUNT_RE.search(text)
+    if count:
+        return False, f"infers a collector count with no manifest: {count.group(0)!r}"
+    if _MANIFEST_NOT_PROVIDED_RE.search(text):
+        return True, "states that the manifest is not provided"
+    return False, "does not say that the manifest is not provided"
+
+
 def check_mentions_manifest(text: str, **_: object) -> CheckResult:
     """Report reads/references the bundle manifest."""
     if re.search(r"bundle_information\.json|manifest", text, re.IGNORECASE):
@@ -473,6 +520,8 @@ CHECKS: dict[str, CheckFn] = {
     "asks-bundle-location": check_asks_bundle_location,
     "no-location-scan": check_no_location_scan,
     "mentions-manifest": check_mentions_manifest,
+    "analyzes-pasted-excerpt": check_analyzes_pasted_excerpt,
+    "manifest-not-provided": check_manifest_not_provided,
     "mentions-version": check_mentions_version,
     "cites-bundle-evidence": check_cites_bundle_evidence,
     "restart-evidence": check_restart_evidence,

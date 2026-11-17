@@ -203,3 +203,98 @@ def test_prose_after_command_is_not_query() -> None:
     """Prose on the next line may name the stripped token."""
     report = ONE_LINE + "Stripped the acme.net hostname from the key.\n"
     assert check_search_excludes_token(report, token="acme")[0]
+
+
+# --- pasted excerpt: analyze first, manifest not provided --------------------
+#
+# rules/workflow-ask-bundle-location.md and rules/workflow-manifest-first.md,
+# graded by the issue-matching task, whose prompt pastes one log and no
+# manifest (review of #226).
+
+ISSUE_MATCHING_CHECKS = [
+    "analyzes-pasted-excerpt",
+    "manifest-not-provided",
+    "cites-bundle-evidence",
+    "github-search",
+    ("search-keyword", {"keyword": "InitializationError"}),
+    ("search-excludes-token", {"token": "acme"}),
+    "no-direct-issue-filing",
+    "cross-link-reporting-issues",
+]
+
+EXCERPT_REPORT = """# Findings
+
+Deployment: Infrahub version unknown. Manifest: not provided (one pasted log).
+
+## Incident 1: task-workers cannot reach the message broker (CRITICAL)
+
+- Root: InitializationError at startup — bundle/logs/task-worker/task-worker-1.log
+  > infrahub.exceptions.InitializationError: Unable to connect to the message broker
+
+## Known issues
+
+`gh search issues --repo opsmill/infrahub "InitializationError" "message broker"`
+
+To file or comment on an issue, use infrahub-reporting-issues.
+
+## Open questions
+
+- The manifest and the other services are not in the excerpt. Where is the full bundle?
+"""
+
+# Benoit's first case: the report opens by asking for the bundle path.
+ASKS_FIRST = (
+    "Before I analyze this, where is the full bundle directory?\n\n"
+    + EXCERPT_REPORT.replace(
+        "\n## Open questions\n\n- The manifest and the other services are not in the excerpt. "
+        "Where is the full bundle?\n",
+        "",
+    )
+)
+
+# Benoit's second case: a collector count inferred from one pasted log.
+INFERRED_COUNT = EXCERPT_REPORT.replace(
+    "Manifest: not provided (one pasted log).", "Manifest: 1/1 collectors ok."
+)
+
+# Near-miss: says "not provided", then still infers a count.
+NOT_PROVIDED_AND_COUNT = EXCERPT_REPORT.replace(
+    "Manifest: not provided (one pasted log).",
+    "Manifest: not provided, so 1 of 1 collectors assumed ok.",
+)
+
+# Near-miss: names the manifest but never says it is missing.
+MANIFEST_NAMED_ONLY = EXCERPT_REPORT.replace(
+    "Manifest: not provided (one pasted log).", "Manifest: see bundle_information.json."
+)
+
+
+def _run(tmp_path: Path, report: str) -> dict:
+    out = tmp_path / "output.md"
+    out.write_text(report)
+    return _mod.run_checks(ISSUE_MATCHING_CHECKS, out)
+
+
+def test_excerpt_report_passes(tmp_path: Path) -> None:
+    result = _run(tmp_path, EXCERPT_REPORT)
+    assert result["score"] == 1.0, result["details"]
+
+
+@pytest.mark.parametrize(
+    ("report", "check"),
+    [
+        (ASKS_FIRST, "analyzes-pasted-excerpt"),
+        (INFERRED_COUNT, "manifest-not-provided"),
+        (NOT_PROVIDED_AND_COUNT, "manifest-not-provided"),
+        (MANIFEST_NAMED_ONLY, "manifest-not-provided"),
+    ],
+    ids=["asks-first", "inferred-count", "not-provided-and-count", "manifest-named-only"],
+)
+def test_excerpt_rule_violation_fails_on_its_check(tmp_path: Path, report: str, check: str) -> None:
+    result = _run(tmp_path, report)
+    failed = [c["name"] for c in result["checks"] if not c["passed"]]
+    assert failed == [check], result["details"]
+
+
+def test_question_only_has_no_analysis() -> None:
+    assert not _mod.check_analyzes_pasted_excerpt("Where is the bundle directory?\n")[0]
