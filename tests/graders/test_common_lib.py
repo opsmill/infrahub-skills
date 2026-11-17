@@ -197,6 +197,11 @@ TOKEN_LEAKS = [
     pytest.param(
         'Run `echo curl -H "X: $INFRAHUB_API_TOKEN"`.', id="curl-header-as-an-echo-argument"
     ),
+    # A substring of the token is still enough to identify it.
+    pytest.param(
+        'Run `echo "token starts with ${INFRAHUB_API_TOKEN:0:8}"`.',
+        id="substring-expansion",
+    ),
 ]
 
 
@@ -213,6 +218,9 @@ TOKEN_SAFE = [
     pytest.param(
         'Run `echo "INFRAHUB_API_TOKEN ${INFRAHUB_API_TOKEN:+is set}"`.',
         id="colon-plus-can-only-print-the-word",
+    ),
+    pytest.param(
+        'Run `echo "${INFRAHUB_API_TOKEN+set}"`.', id="plus-without-colon-prints-the-word"
     ),
     pytest.param(
         'Run `: "${INFRAHUB_API_TOKEN:?not set}"` — it prints nothing.',

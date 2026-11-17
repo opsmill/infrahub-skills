@@ -171,15 +171,16 @@ _TOKEN_VAR = "INFRAHUB_API_TOKEN"
 # print it, so it fails wherever it appears.
 _TOKEN_FALLBACK = re.compile(rf"\$\{{{_TOKEN_VAR}:?-[^}}]+\}}")
 
-# Forms that expand to the value: bare, braced, or an empty fallback. Each
-# one fails unless `_safe_use` finds it in an allowed position.
-_TOKEN_VALUE = re.compile(rf"\$\{{?{_TOKEN_VAR}(?::?-)?\}}?(?![\w:?+])")
+# Every expansion: bare, or braced with any operator (`${TOKEN:0:8}`,
+# `${TOKEN:-}`, `${TOKEN/x/y}`) except `+`/`:+` and `?`/`:?`. Each one fails
+# unless `_safe_use` finds it in an allowed position.
+_TOKEN_VALUE = re.compile(rf"\$(?:{_TOKEN_VAR}(?!\w)|\{{{_TOKEN_VAR}(?!:?[+?])[^}}]*\}})")
 
 # The safe uses of an expansion, read backwards from where it starts. The
 # list is short and fixed on purpose: commands that can print the value are
 # not (`echo`, `cat <<<`, `head -c 8 <<<`, `envsubst`, `| bash`), and
-# listing them one review at a time never ended. `${TOKEN:+word}` and
-# `${TOKEN:?word}` are safe too, and `_TOKEN_VALUE` never matches them.
+# listing them one review at a time never ended. `_TOKEN_VALUE` does not
+# match `${TOKEN:+word}` or `${TOKEN:?word}`.
 # Where a command starts: line start, a code-span backtick, or a shell
 # separator, then any `if`/`then`/`!`-style keywords. An allowed form counts
 # only when its command stands here, so `echo test -n $TOKEN` and
@@ -258,14 +259,28 @@ def check_token_not_printed(text: str) -> tuple[bool, str]:
     """A presence test for the token must not be able to print its value.
 
     Every expansion of the token fails unless it is one of the safe forms:
-    a `[ -n ... ]` or `test -n` operand, a curl request header, or
-    `${TOKEN:+set}` / `: "${TOKEN:?not set}"`, which never expand to the
-    value. `${TOKEN:-is NOT set}` reads as a presence test and prints the
-    token on every run where it exists, into the terminal, the shell
-    history and the retained CI log, so it fails wherever it appears.
+    a `[ -n ... ]` or `test -n` operand, a curl request header without
+    verbose flags, `${TOKEN:+set}`, or `: "${TOKEN:?not set}"`.
+    `${TOKEN:-is NOT set}` reads as a presence test and prints the token on
+    every run where it exists, into the terminal, the shell history and the
+    retained CI log, so it fails wherever it appears.
 
     Single-quoted text counts too. Deciding when quotes protect it (`| bash`,
     `sh -c`, `envsubst <<<`) is the same open list as the printing commands.
+
+    Scope: this grades the `common-preflight-before-write` task, and catches
+    the presence tests a model writes for it. It cannot prove a snippet
+    safe, since shell is a full language. These print the token and pass,
+    and are out of scope because they are not plausible answers to the task:
+
+    - an allowed form inside an unquoted heredoc body that `cat` prints;
+    - `set -x` before an allowed form, which traces the expanded line;
+    - a curl header sent to a server that echoes request headers back;
+    - `${TOKEN:?word}` printed rather than passed to `:`, since it expands
+      to the value when the token is set.
+
+    Change this check only for a finding that is a plausible answer to that
+    task, or that an eval run shows.
 
     A leaking form quoted in order to warn against it is not a leak. The
     rule teaches this trap by name, so the best answer names it too — and
