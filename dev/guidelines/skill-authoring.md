@@ -34,8 +34,8 @@ extending what already exists too, and the lead-in
 sentence saying so does not count: an agent matches
 against the triggers. Otherwise day-two work does not
 merely fall outside the triggers, it reads as a positive
-signal that the skill does not apply. Issue #78 paid for
-that gap: a session asked to investigate an existing
+signal that the skill does not apply. One session asked
+to investigate an existing
 generator never invoked the skill, and deleted a live
 interface the generator did not own, while the skill's
 own front page warned about that failure twice.
@@ -60,6 +60,23 @@ one most easily skipped", and the section carrying its
 top-priority rule, so that rule never fired at all. Name
 the action and the triggers; put the ordered steps in
 the body.
+
+Widening a TRIGGER clause has two more costs. The
+body's `## When to Use` list must cover every request
+the triggers now claim, or the skill fires and then
+reads as out of scope. And it can tie with a neighbour:
+read the neighbours' DO NOT TRIGGER clauses, and break a
+tie on the artifact (a menu file, a schema node) rather
+than on the verb.
+
+A skill with `context: fork` runs without the parent
+conversation. Its description must tell the caller to
+pass the user's request verbatim as args, or the fork
+never sees the pasted file, the version, or the
+constraint its workflow branches on. Eval prompts inline
+that context, so they cannot catch the loss.
+`tests/test_skill_frontmatter.py` fails a forked skill
+whose description does not say it.
 
 ## Body
 
@@ -98,7 +115,10 @@ memberships and nobody can tell which is current.
 
 Write the claim you tested, at the strength you tested
 it. "Verified against Infrahub 1.11.0" means the check
-ran on 1.11.0. An unverified provenance claim is worse
+ran on 1.11.0. Strength includes scope: name the call
+path, flag, or kind the test ran on
+(`save(allow_upsert=True)`, not `save()`), and a rule
+repeating the claim repeats the condition. An unverified provenance claim is worse
 than no claim, because the next author trusts it instead
 of re-checking. Before encoding a customer or PoC lesson
 as a rule, verify it against current stable Infrahub —
@@ -106,7 +126,8 @@ a lesson that upstream already fixed rots the skill.
 
 ## Release-gate a command you teach
 
-A command is only teachable once it is released. Name
+A command, or a newer argument form of an older one, is
+only teachable once it is released. Name
 the minimum version and give an observable fallback, so
 a reader on an older install has somewhere to go:
 
@@ -137,8 +158,11 @@ most of `dev/`, against the tree pinned in
 authority; `README.md` and `dev/specs/` are outside
 it. Beyond `infrahubctl` it checks only the
 `--state` value on `gh search issues|prs`, so any other
-`gh` flag, a `curl`, or a REST path is only as good as
-the author who ran it. Run it, and say which version you ran
+`gh` flag, an `infrahub` server command, a `curl`, or a
+REST path is only as good as the author who ran it. Nor
+does it check the name a leaf command takes:
+`infrahubctl generator <name>` passes with any name, so
+match it against where the skill registers it. Run it, and say which version you ran
 it on.
 
 ## Verifying an edit
@@ -154,7 +178,16 @@ See AGENTS.md § "Using the Skills From This Repo".
 An example is copied, not read. Each names only kinds,
 attributes, fields, and packages that exist in what it
 shows. Load or execute a snippet against the artifact it
-sits next to before shipping it.
+sits next to before shipping it, starting from the state
+a reader starts in: show the call that produces any
+fetched or loaded object, because a fixture copied from
+the example inherits whatever it left out.
+
+A green eval is not that check. It shows the model
+followed the rule, never that the rule is right. Check
+what the reader would observe (the section renders, the
+reference resolves), not only that the file loads, and
+say in the pull request what you could not run.
 
 After editing either half, read the lead sentence and
 the example together and check the example would fail
@@ -162,6 +195,29 @@ for the reason the lead gives. The commonest defect in a
 corrected rule is an example demonstrating the inverse
 of the sentence introducing it, because the lead was
 rewritten and the example was not.
+
+## Bundled scripts
+
+An installed skill lives under `~/.claude/plugins/cache/`,
+and a reinstall wipes it. A path like `skills/<skill>/`
+exists only in this repository. Name a bundled script
+through the skill's own directory, and keep every input
+and output, including a copied config or mapping file,
+in the user's working directory:
+
+```bash
+SKILL=/path/to/<skill>   # this skill's own directory, wherever it is installed
+python "$SKILL/scripts/convert.py" ./input/ --output-dir ./generated
+```
+
+```bash
+python skills/<skill>/scripts/convert.py ./input/   # this repository only
+```
+
+A script that does the work implies a rule saying to use
+it, since a hand-rolled answer looks just as successful.
+Grade that rule on properties only the script's output
+has, not on which command ran.
 
 ## Linting
 

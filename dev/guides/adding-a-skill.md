@@ -201,7 +201,7 @@ tasks:
   - name: basic-scenario
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-my-skill/SKILL.md
+      Read the skill at skills/infrahub-my-skill/SKILL.md
       and follow its workflow and rules.
 
       A realistic user request with specific names,
@@ -218,7 +218,7 @@ tasks:
   - name: advanced-scenario
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-my-skill/SKILL.md
+      Read the skill at skills/infrahub-my-skill/SKILL.md
       and follow its workflow and rules.
 
       A more complex request covering relationships
