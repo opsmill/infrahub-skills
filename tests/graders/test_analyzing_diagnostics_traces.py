@@ -210,6 +210,11 @@ _SELF_KWARGS = {
         ("| Span | Self time |\n| --- | --- |\n| Sync Git Repositories | 10.72 s |", True),
         # A qualifier or a unit in the header still counts.
         ("| Span | Self time (s) |\n| --- | --- |\n| Sync Git Repositories | ~10.72 s |", True),
+        # A bare number takes the unit from the header.
+        ("| Span | Self time (s) |\n| --- | --- |\n| Sync Git Repositories | 10.72 |", True),
+        ("| Span | Self time (ms) |\n| --- | --- |\n| Sync Git Repositories | 10720 |", True),
+        ("| Span | Self time (ms) |\n| --- | --- |\n| Sync Git Repositories | 10.72 |", False),
+        ("| Span | Self time |\n| --- | --- |\n| Sync Git Repositories | 10.72 |", False),
         # A table of several spans passes on the slow span's row.
         (
             "| Span | Self time |\n| --- | --- |\n| Sync Git Repositories | 10.72 s |\n"

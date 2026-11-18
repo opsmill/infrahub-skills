@@ -852,13 +852,16 @@ def check_traces_slow_span(
 _SELF_TIME_RE = re.compile(r"self[- ]time", re.IGNORECASE)
 _DURATION_RE = re.compile(r"\d+(?:[.,]\d+)?\s*(?:ms|sec|seconds|s)\b", re.IGNORECASE)
 _CHILD_RE = re.compile(r"\bchild(?:ren)?\b", re.IGNORECASE)
+_HEADER_UNIT_RE = re.compile(r"\(\s*(ms|s|sec|seconds)\s*\)", re.IGNORECASE)
+_BARE_NUMBER_RE = re.compile(r"[~≈]?\s*\d+(?:[.,]\d+)?")
 
 
 def _stated_self_times(prose: str, span: str) -> list[str]:
     """Every duration the prose states as the self time of `span`.
 
     In a table, the cells of a column whose header says "self time", in rows
-    that name the span. In a paragraph that names the span, the first duration
+    that name the span. A bare number takes the unit the header gives, as in
+    "Self time (s)". In a paragraph that names the span, the first duration
     within 60 characters after the words "self time".
     """
     values: list[str] = []
@@ -871,9 +874,13 @@ def _stated_self_times(prose: str, span: str) -> list[str]:
         if header is None:
             header = cells
         elif span in line.lower() and not all(set(c) <= set("-: ") for c in cells):
-            values.extend(
-                cell for name, cell in zip(header, cells) if _SELF_TIME_RE.search(name)
-            )
+            for name, cell in zip(header, cells):
+                if not _SELF_TIME_RE.search(name):
+                    continue
+                unit = _HEADER_UNIT_RE.search(name)
+                if unit and _BARE_NUMBER_RE.fullmatch(cell):
+                    cell = f"{cell} {unit.group(1)}"
+                values.append(cell)
     for unit in re.split(r"\n\s*\n", prose):
         if unit.lstrip().startswith("|") or span not in unit.lower():
             continue
