@@ -286,7 +286,8 @@ uv run --project "<infrahub-sync-checkout>" infrahub-sync diff --name "<project>
 # Approval point 4. Only after the user approves:
 uv run --project "<infrahub-sync-checkout>" infrahub-sync sync --name "<project>" --directory sync --branch "<test-branch>"
 
-# Expect no creates or updates. Deletions of nodes the source does not hold are expected.
+# Expect no creates or updates, except for records changed in the source since the sync.
+# Deletions of nodes the source does not hold are expected.
 uv run --project "<infrahub-sync-checkout>" infrahub-sync diff --name "<project>" --directory sync --branch "<test-branch>"
 ```
 

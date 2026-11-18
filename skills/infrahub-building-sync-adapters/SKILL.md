@@ -214,8 +214,11 @@ Work in the customer's repository.
    diff` against that branch, and show the user the diff.
 4. **Approval point 4:** run `infrahub-sync sync` to the
    branch only after the user approves.
-5. Run `infrahub-sync diff` again. It must report no
-   creates or updates; any one means the adapter or the
+5. Run `infrahub-sync diff` again. `diff` reads the
+   live source again, so a record created or changed in
+   the source since the sync shows as a create or
+   update; check those against the source first. Any
+   other create or update means the adapter or the
    mapping does not round-trip. Deletions of existing
    nodes the source does not hold are expected, because
    the Infrahub adapter does not delete.

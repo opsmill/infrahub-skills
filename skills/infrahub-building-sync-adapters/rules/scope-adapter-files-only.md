@@ -3,7 +3,8 @@ title: Change Only the Adapter Files, and Draft Core Issues Instead
 impact: HIGH
 description: >-
   An adapter change touches only infrahub_sync/adapters/<name>.py plus its
-  tests, example, docs, changelog fragment and spec. Never edit other
+  tests, example, docs, changelog fragment and spec, and the product names it
+  adds to .vale/styles/spelling-exceptions.txt. Never edit other
   infrahub_sync files such as rest_api_client.py, utils.py, the core models or
   the loader: write a private helper in the adapter module and draft a core
   issue. Check with git diff --stat after each commit.
