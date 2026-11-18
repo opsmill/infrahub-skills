@@ -14,7 +14,7 @@ description: >-
   (use infrahub-reporting-issues), or querying live data
   (use infrahub-analyzing-data).
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 

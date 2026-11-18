@@ -1,7 +1,7 @@
 ---
 title: Release 1.4.0
 sidebar_position: 1
-description: Upgrade planning one minor version at a time, device-type export from a live NetBox instance, traces for a slow instance in the support bundle, and corrected generator, schema, menu, and protocol-generation guidance.
+description: A design interview that writes a design brief before any schema, upgrade planning one minor version at a time, device-type export from a live NetBox instance, traces for a slow instance in the support bundle, and corrected generator, schema, menu, and protocol-generation guidance.
 ---
 
 <table>
@@ -27,7 +27,7 @@ description: Upgrade planning one minor version at a time, device-type export fr
 
 ## Release summary
 
-After upgrading, you can plan an Infrahub upgrade before you run it, with every release on the way checked for breaking changes that affect your repository and instance. You can also convert device types straight from a running NetBox instance, where before you had to export them manually first. When Infrahub is slow, you can also add the traces of the slow requests to the support bundle, and the analysis reports which service took the time. Guidance for generators, schemas, menus, and generated protocol files that described Infrahub behavior inaccurately has been corrected.
+After upgrading, you can work out what to model before you write a schema: an interview about the business, the service and the data produces a design brief that the managing skills build from. You can also plan an Infrahub upgrade before you run it, with every release on the way checked for breaking changes that affect your repository and instance. You can also convert device types straight from a running NetBox instance, where before you had to export them manually first. When Infrahub is slow, you can also add the traces of the slow requests to the support bundle, and the analysis reports which service took the time. Guidance for generators, schemas, menus, and generated protocol files that described Infrahub behavior inaccurately has been corrected.
 
 :::note What to expect after upgrading
 
@@ -39,6 +39,18 @@ Nothing about how you invoke the skills has changed. Two items are worth a revie
 See [Upgrade notes](#upgrade-notes) for full details.
 
 :::
+
+### Design a model before you write a schema
+
+Work out which node kinds you need, and in which order to build them, with the [designing-models](../skills-reference/designing-models.mdx) skill. It interviews you one question at a time and writes a design brief to `docs/designs/<design-slug>/design-brief.md`. It writes no schema YAML ([#183](https://github.com/opsmill/infrahub-skills/pull/183)).
+
+What changed:
+
+* Answer questions about the business first, then the service, then the data. Each question comes with a recommended answer and the reason for it.
+* Pick which outcomes the design serves first, from five value drivers. The skill ranks them, and the first one decides which feature is built first. It never asks for hours or costs.
+* Choose from two or three design directions, such as following an OpsMill reference design, building on Marketplace schemas, or a custom model, or combine them.
+* Split a large scope into ordered features. Only the first feature is modelled in depth, and each feature carries a handoff for the skill that builds it.
+* Track every decision as stated by you, accepted from a recommendation, or open.
 
 ### Plan an Infrahub upgrade before you run it
 
@@ -95,6 +107,9 @@ What changed:
 * `fetch_schema_limits.py` in the managing-schemas skill reads the string-length limits from the public Infrahub schema again, such as 128 characters for a `description`. The public schema and `/api/openapi.json` name their definitions `NodeSchemaWrite` and so on, so the script returned no limits, and `--check` reported no over-limit field. The script now exits with an error when a source has no limits.
 * The managing-checks skill now states which repository commit a proposed change's checks run, and how to get a check fix merged to `main` into an open proposed change on a branch synced with Git ([#194](https://github.com/opsmill/infrahub-skills/issues/194)).
 * The output rule of the converting-netbox-device-types skill lists all five files the converter writes, including `04_module_types.yml` and `05_module_templates.yml`. Before, it listed three, so module types converted with the skill were not loaded ([#135](https://github.com/opsmill/infrahub-skills/issues/135)).
+* The auditing-repo skill asks Claude to pass your request word for word, with any scope, path or focus you named. The skill runs in a separate context and cannot view the conversation ([#178](https://github.com/opsmill/infrahub-skills/pull/178)).
+* The managing-schemas skill runs `fetch_schema_limits.py` from the skill's own directory, where before it used a path that exists only in the infrahub-skills repository. To check string limits in CI, which has no plugin installed, copy the script into your repository once ([#178](https://github.com/opsmill/infrahub-skills/pull/178)).
+* The managing-generators skill lists changing and debugging an existing generator under When to Use, as its triggers already did ([#178](https://github.com/opsmill/infrahub-skills/pull/178)).
 
 ## Minor changes
 
@@ -113,6 +128,7 @@ What changed:
 * `scripts/check-skill-registration.py` fails a user-invocable skill that is missing from any registration surface, or whose reference page lacks the standard sections ([#160](https://github.com/opsmill/infrahub-skills/issues/160)).
 * The skill-change pipeline searches other branches for a pull request that already covers a change before analysis or design starts ([#181](https://github.com/opsmill/infrahub-skills/pull/181)).
 * An evaluation trial whose output shows the agent read the grader is void and is run again ([#184](https://github.com/opsmill/infrahub-skills/issues/184)).
+* Review lessons from pull requests #142 to #177 are part of the contributor guidance. New tests fail when an evaluation task points at a missing skill, a task grader is not run by any task, a forked skill does not ask for its request as args, or a bash snippet in a shipped skill does not parse ([#178](https://github.com/opsmill/infrahub-skills/pull/178)).
 
 **Reliability**
 
@@ -142,6 +158,7 @@ Notes: the skills no longer list `allowed-tools`. While a skill is active, Bash,
 
 ### Added
 
+* infrahub-designing-models skill interviews you about the business, the service and the data, and writes a design brief with a model sketch and ordered features ([#183](https://github.com/opsmill/infrahub-skills/pull/183)).
 * `netbox_export_device_types.py` in converting-netbox-device-types exports device types, module types, and component templates from a live NetBox instance ([#129](https://github.com/opsmill/infrahub-skills/issues/129)).
 * infrahub-planning-upgrades skill plans an upgrade one minor version at a time and checks every release's breaking changes against the repository and instance ([#159](https://github.com/opsmill/infrahub-skills/pull/159)).
 * managing-checks states which repository commit a proposed change's checks run ([#194](https://github.com/opsmill/infrahub-skills/issues/194)).
@@ -163,6 +180,7 @@ Notes: the skills no longer list `allowed-tools`. While a skill is active, Bash,
 * analyzing-diagnostics analyzes a pasted excerpt, always states the manifest, and always writes the `gh search issues` line.
 * teaching-concepts names nodes by their full kind.
 * `fetch_schema_limits.py` in managing-schemas reads the `*Write` definitions of the public Infrahub schema and of `/api/openapi.json`, so `--check` finds over-limit fields again. It exits with an error when a source has no limits, instead of reporting no over-limit field.
+* auditing-repo asks for the request word for word, managing-schemas runs `fetch_schema_limits.py` from the skill directory, and managing-generators lists changing and debugging under When to Use ([#178](https://github.com/opsmill/infrahub-skills/pull/178)).
 
 ### Housekeeping
 
@@ -174,6 +192,7 @@ Notes: the skills no longer list `allowed-tools`. While a skill is active, Bash,
 * Documentation site restructured around the Infrahub lifecycle ([#149](https://github.com/opsmill/infrahub-skills/pull/149)).
 * Release bump labels standardized and enforced ([#165](https://github.com/opsmill/infrahub-skills/pull/165)).
 * Skill-change pipeline checks other branches for existing pull requests ([#181](https://github.com/opsmill/infrahub-skills/pull/181)).
+* Review lessons from #142 to #177 harvested into the contributor guidance, with tests for evaluation wiring and shipped bash snippets ([#178](https://github.com/opsmill/infrahub-skills/pull/178)).
 * Watch grader checks match whole path segments and identity tokens ([#164](https://github.com/opsmill/infrahub-skills/pull/164)).
 * Evaluation graders and tasks that scored correct answers 0.0 on the release evaluation gate fixed, and evaluation trials run one at a time.
 * Claude plugin directory validation findings cleared, and a `plugin` branch built with only the shipped files ([#215](https://github.com/opsmill/infrahub-skills/pull/215)).
@@ -199,3 +218,4 @@ Notes: the skills no longer list `allowed-tools`. While a skill is active, Bash,
 * infrahub-teaching-concepts
 * infrahub-converting-netbox-device-types
 * infrahub-planning-upgrades
+* infrahub-designing-models

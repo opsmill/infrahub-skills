@@ -7,7 +7,7 @@ description: >-
   DO NOT TRIGGER when: running `infrahubctl load` against an LDJSON dump (different format and tool), designing or modifying schemas (this skill is read-only against the schema and fails closed on unmapped columns), exporting data from Infrahub (use `infrahubctl object get -o csv` for single-kind export), or ingesting JSON/XLSX (v1 is CSV+TSV only).
 argument-hint: "[csv-file-or-folder] [more-paths...]"
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 
