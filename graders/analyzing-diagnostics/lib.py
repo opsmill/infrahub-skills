@@ -849,6 +849,63 @@ def check_traces_slow_span(
     return False, f"no paragraph or table row names {span!r}, {service} and its duration together"
 
 
+_SELF_TIME_RE = re.compile(r"self[- ]time", re.IGNORECASE)
+_DURATION_RE = re.compile(r"\d+(?:[.,]\d+)?\s*(?:ms|sec|seconds|s)\b", re.IGNORECASE)
+_CHILD_RE = re.compile(r"\bchild(?:ren)?\b", re.IGNORECASE)
+
+
+def _stated_self_times(prose: str) -> list[str]:
+    """Every duration the prose states as a self time.
+
+    In a table, the cells of a column headed "Self time". In other prose, the
+    first duration within 60 characters after the words "self time".
+    """
+    values: list[str] = []
+    header: list[str] | None = None
+    for line in prose.splitlines():
+        if not line.lstrip().startswith("|"):
+            header = None
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if header is None:
+            header = cells
+        elif not all(set(c) <= set("-: ") for c in cells):
+            values.extend(
+                cell for name, cell in zip(header, cells) if _SELF_TIME_RE.fullmatch(name.strip())
+            )
+    for unit in re.split(r"\n\s*\n", prose):
+        if unit.lstrip().startswith("|"):
+            continue
+        for m in _SELF_TIME_RE.finditer(unit):
+            if d := _DURATION_RE.search(unit, m.end(), m.end() + 60):
+                values.append(d.group(0))
+    return values
+
+
+def check_traces_self_time(
+    text: str, *, self_time: str = "", children: str = "", **_: object
+) -> CheckResult:
+    """Say how much of the slow span is its own work: its self time.
+
+    `self_time` is a regex for the self time of the task's slow span, and
+    `children` one for the time its direct children take. A stated self time
+    decides: the right value passes and any other fails. With none stated, a
+    prose sentence must give the children's time and call them children.
+    """
+    if not (self_time and children):
+        return False, "check_traces_self_time requires self_time and children kwargs"
+    prose = _FENCE_RE.sub("\n\n", text)
+    stated = _stated_self_times(prose)
+    if stated:
+        if any(re.search(self_time, v, re.IGNORECASE) for v in stated):
+            return True, "states the self time of the slow span"
+        return False, f"states a self time of {stated[0]!r}, not the slow span's"
+    for sentence in re.split(r"(?<=[.!?])\s+", prose):
+        if _CHILD_RE.search(sentence) and re.search(children, sentence, re.IGNORECASE):
+            return True, "gives the time the slow span's children take"
+    return False, "gives neither the self time of the slow span nor the time its children take"
+
+
 _INCLUDE_TRACES_RE = re.compile(r"--include-traces\b")
 _WINDOW_OPTIONS = {"since": ("--traces-since",), "absolute": ("--traces-start", "--traces-end")}
 # "no need for --include-traces" and "skip --include-traces" negate too.
@@ -878,6 +935,7 @@ def check_recommends_traces(text: str, *, window: str = "any", **_: object) -> C
 CHECKS: dict[str, CheckFn] = {
     "recommends-traces": check_recommends_traces,
     "traces-slow-span": check_traces_slow_span,
+    "traces-self-time": check_traces_self_time,
     "asks-bundle-location": check_asks_bundle_location,
     "no-location-scan": check_no_location_scan,
     "mentions-manifest": check_mentions_manifest,

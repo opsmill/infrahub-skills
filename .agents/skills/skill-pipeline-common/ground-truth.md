@@ -64,6 +64,8 @@ truncating.
 If the guidance was correct for an older release and Infrahub has since
 changed, the fix is a version scoped rule, not a correction. Compare the
 claim against the pinned version and against the latest tag when they differ.
+When `develop` changes the behavior and no tag has the change yet, scope the
+claim to the latest tag and earlier, and say nothing about the next release.
 
 ## When a doc page contradicts the source
 

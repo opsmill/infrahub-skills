@@ -64,7 +64,9 @@ analysis.
    - The root span (no `parentSpanId`) is the whole
      request or task.
    - The self time of a span is its duration minus
-     the durations of its direct children. A large
+     the time its direct children cover. Count time
+     where children overlap once, since children can
+     run in parallel. A large
      self time means the time went into work that is
      not traced, such as a Git operation or a call to
      an external system. A large child means the time

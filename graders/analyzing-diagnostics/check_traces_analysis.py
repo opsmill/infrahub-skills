@@ -20,6 +20,14 @@ CHECKS: list[str | tuple[str, dict]] = [
             "duration": r"10[.,]7\d*\s*(s|sec|seconds)\b|107\d\d(\.\d+)?\s*ms\b",
         },
     ),
+    # Its self time: 10.72 s, since the children take about 21 ms.
+    (
+        "traces-self-time",
+        {
+            "self_time": r"^10[.,]7(?:[0-3]\d*)?\s*(s|sec|seconds)$|^107[0-3]\d(\.\d+)?\s*ms$",
+            "children": r"\b(?:19|2[0-3])(?:[.,]\d+)?\s*ms\b",
+        },
+    ),
 ]
 
 if __name__ == "__main__":

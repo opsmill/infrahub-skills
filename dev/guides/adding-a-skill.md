@@ -323,10 +323,19 @@ Confirm the skill works before submitting for review.
    `infrahubctl schema check` (for schema skills) or
    equivalent tooling
 
-**Run evaluations** (see [Step 6](#6-write-evaluations)):
+**Check the skill against itself.** For each term,
+tag, path, and step order the skill defines, grep
+`skills/infrahub-my-skill/` and read every hit. A
+workflow step, a rule, and a reference that restate the
+same fact are three homes, and a review fix to one
+leaves the others saying the old thing. Keep each fact
+in one file and link to it from the others.
+
+**Run evaluations** (see [Step 6](#6-write-evaluations)),
+one task at a time:
 
 ```bash
-skillgrade --smoke
+skillgrade --eval=<task-name> --trials=1
 ```
 
 Review results with `skillgrade preview`.
