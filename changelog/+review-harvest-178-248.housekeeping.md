@@ -1,0 +1,1 @@
+Turned review feedback from #178 to #248 into contributor guidance. The guidance covers changing an existing grader check, gating a task on its core check, fail-closed scripts, and sweeps for absolute claims. Added a `traces-self-time` check to the trace analysis task, and `string-limits` now fails when it cannot read Infrahub's caps.

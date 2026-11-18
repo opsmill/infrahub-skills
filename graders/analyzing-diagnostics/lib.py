@@ -849,6 +849,77 @@ def check_traces_slow_span(
     return False, f"no paragraph or table row names {span!r}, {service} and its duration together"
 
 
+_SELF_TIME_RE = re.compile(r"self[- ]time", re.IGNORECASE)
+_DURATION_RE = re.compile(r"\d+(?:[.,]\d+)?\s*(?:ms|sec|seconds|s)\b", re.IGNORECASE)
+_CHILD_RE = re.compile(r"\bchild(?:ren)?\b", re.IGNORECASE)
+_HEADER_UNIT_RE = re.compile(r"\(\s*(ms|s|sec|seconds)\s*\)", re.IGNORECASE)
+_BARE_NUMBER_RE = re.compile(r"[~≈]?\s*\d+(?:[.,]\d+)?")
+
+
+def _stated_self_times(prose: str, span: str) -> list[str]:
+    """Every duration the prose states as the self time of `span`.
+
+    In a table, the cells of a column whose header says "self time", in rows
+    that name the span. A bare number takes the unit the header gives, as in
+    "Self time (s)". In a paragraph that names the span, the first duration
+    within 60 characters after the words "self time".
+    """
+    values: list[str] = []
+    header: list[str] | None = None
+    for line in prose.splitlines():
+        if not line.lstrip().startswith("|"):
+            header = None
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if header is None:
+            header = cells
+        elif span in line.lower() and not all(set(c) <= set("-: ") for c in cells):
+            for name, cell in zip(header, cells):
+                if not _SELF_TIME_RE.search(name):
+                    continue
+                unit = _HEADER_UNIT_RE.search(name)
+                if unit and _BARE_NUMBER_RE.fullmatch(cell):
+                    cell = f"{cell} {unit.group(1)}"
+                values.append(cell)
+    for unit in re.split(r"\n\s*\n", prose):
+        if unit.lstrip().startswith("|") or span not in unit.lower():
+            continue
+        for m in _SELF_TIME_RE.finditer(unit):
+            if d := _DURATION_RE.search(unit, m.end(), m.end() + 60):
+                values.append(d.group(0))
+    return values
+
+
+def check_traces_self_time(
+    text: str, *, span: str = "", self_time: str = "", children: str = "", **_: object
+) -> CheckResult:
+    """Say how much of the slow span is its own work: its self time.
+
+    `span` is the name of the task's slow span, `self_time` a regex for its
+    self time, and `children` one for the time its direct children take. Only
+    a table row or paragraph that names the span counts, so a self time of
+    another span does not. A self time stated there decides: one right value
+    passes (a table can list several spans), and only wrong values fail. With
+    none stated, a sentence in a paragraph naming the span must give the
+    children's time and call them children.
+    """
+    if not (span and self_time and children):
+        return False, "check_traces_self_time requires span, self_time and children kwargs"
+    prose = _FENCE_RE.sub("\n\n", text)
+    stated = _stated_self_times(prose, span.lower())
+    if stated:
+        if any(re.search(self_time, v, re.IGNORECASE) for v in stated):
+            return True, f"states the self time of {span!r}"
+        return False, f"states a self time of {stated[0]!r} for {span!r}, not its self time"
+    for para in re.split(r"\n\s*\n", prose):
+        if span.lower() not in para.lower():
+            continue
+        for sentence in re.split(r"(?<=[.!?])\s+", para):
+            if _CHILD_RE.search(sentence) and re.search(children, sentence, re.IGNORECASE):
+                return True, f"gives the time the children of {span!r} take"
+    return False, f"gives neither the self time of {span!r} nor the time its children take"
+
+
 _INCLUDE_TRACES_RE = re.compile(r"--include-traces\b")
 _WINDOW_OPTIONS = {"since": ("--traces-since",), "absolute": ("--traces-start", "--traces-end")}
 # "no need for --include-traces" and "skip --include-traces" negate too.
@@ -878,6 +949,7 @@ def check_recommends_traces(text: str, *, window: str = "any", **_: object) -> C
 CHECKS: dict[str, CheckFn] = {
     "recommends-traces": check_recommends_traces,
     "traces-slow-span": check_traces_slow_span,
+    "traces-self-time": check_traces_self_time,
     "asks-bundle-location": check_asks_bundle_location,
     "no-location-scan": check_no_location_scan,
     "mentions-manifest": check_mentions_manifest,

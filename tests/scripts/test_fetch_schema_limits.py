@@ -203,5 +203,6 @@ def test_grader_reports_missing_caps_as_not_verified(tmp_path: Path, body: str) 
     limits, error = mod._load_schema_limits()
     assert limits is None
     assert "AttributeSchema" in error
-    _, msg = mod.check_string_limits(_SCHEMA)
+    ok, msg = mod.check_string_limits(_SCHEMA)
+    assert not ok
     assert "AttributeSchema" in msg
