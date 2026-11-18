@@ -854,11 +854,12 @@ _DURATION_RE = re.compile(r"\d+(?:[.,]\d+)?\s*(?:ms|sec|seconds|s)\b", re.IGNORE
 _CHILD_RE = re.compile(r"\bchild(?:ren)?\b", re.IGNORECASE)
 
 
-def _stated_self_times(prose: str) -> list[str]:
-    """Every duration the prose states as a self time.
+def _stated_self_times(prose: str, span: str) -> list[str]:
+    """Every duration the prose states as the self time of `span`.
 
-    In a table, the cells of a column headed "Self time". In other prose, the
-    first duration within 60 characters after the words "self time".
+    In a table, the cells of a column whose header says "self time", in rows
+    that name the span. In a paragraph that names the span, the first duration
+    within 60 characters after the words "self time".
     """
     values: list[str] = []
     header: list[str] | None = None
@@ -869,12 +870,12 @@ def _stated_self_times(prose: str) -> list[str]:
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         if header is None:
             header = cells
-        elif not all(set(c) <= set("-: ") for c in cells):
+        elif span in line.lower() and not all(set(c) <= set("-: ") for c in cells):
             values.extend(
-                cell for name, cell in zip(header, cells) if _SELF_TIME_RE.fullmatch(name.strip())
+                cell for name, cell in zip(header, cells) if _SELF_TIME_RE.search(name)
             )
     for unit in re.split(r"\n\s*\n", prose):
-        if unit.lstrip().startswith("|"):
+        if unit.lstrip().startswith("|") or span not in unit.lower():
             continue
         for m in _SELF_TIME_RE.finditer(unit):
             if d := _DURATION_RE.search(unit, m.end(), m.end() + 60):
@@ -883,27 +884,33 @@ def _stated_self_times(prose: str) -> list[str]:
 
 
 def check_traces_self_time(
-    text: str, *, self_time: str = "", children: str = "", **_: object
+    text: str, *, span: str = "", self_time: str = "", children: str = "", **_: object
 ) -> CheckResult:
     """Say how much of the slow span is its own work: its self time.
 
-    `self_time` is a regex for the self time of the task's slow span, and
-    `children` one for the time its direct children take. A stated self time
-    decides: the right value passes and any other fails. With none stated, a
-    prose sentence must give the children's time and call them children.
+    `span` is the name of the task's slow span, `self_time` a regex for its
+    self time, and `children` one for the time its direct children take. Only
+    a table row or paragraph that names the span counts, so a self time of
+    another span does not. A self time stated there decides: one right value
+    passes (a table can list several spans), and only wrong values fail. With
+    none stated, a sentence in a paragraph naming the span must give the
+    children's time and call them children.
     """
-    if not (self_time and children):
-        return False, "check_traces_self_time requires self_time and children kwargs"
+    if not (span and self_time and children):
+        return False, "check_traces_self_time requires span, self_time and children kwargs"
     prose = _FENCE_RE.sub("\n\n", text)
-    stated = _stated_self_times(prose)
+    stated = _stated_self_times(prose, span.lower())
     if stated:
         if any(re.search(self_time, v, re.IGNORECASE) for v in stated):
-            return True, "states the self time of the slow span"
-        return False, f"states a self time of {stated[0]!r}, not the slow span's"
-    for sentence in re.split(r"(?<=[.!?])\s+", prose):
-        if _CHILD_RE.search(sentence) and re.search(children, sentence, re.IGNORECASE):
-            return True, "gives the time the slow span's children take"
-    return False, "gives neither the self time of the slow span nor the time its children take"
+            return True, f"states the self time of {span!r}"
+        return False, f"states a self time of {stated[0]!r} for {span!r}, not its self time"
+    for para in re.split(r"\n\s*\n", prose):
+        if span.lower() not in para.lower():
+            continue
+        for sentence in re.split(r"(?<=[.!?])\s+", para):
+            if _CHILD_RE.search(sentence) and re.search(children, sentence, re.IGNORECASE):
+                return True, f"gives the time the children of {span!r} take"
+    return False, f"gives neither the self time of {span!r} nor the time its children take"
 
 
 _INCLUDE_TRACES_RE = re.compile(r"--include-traces\b")

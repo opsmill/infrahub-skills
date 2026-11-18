@@ -236,11 +236,7 @@ the model can still find and read it. skillgrade also
 copies the top-level directory of each grader's `run:`
 path, so all of `graders/` sits in the sandbox while
 the model works, and `tests/test.sh` holds the grader
-command. The sandbox is a copy of this repository, so its
-conventions steer the model: a skill that says "use the
-repo's existing location" puts the answer in `dev/specs/`.
-Pin output paths in the skill, or have the grader search
-every place the skill allows. Run the task without the line:
+command. Run the task without the line:
 
 ```bash
 skillgrade --eval=<task-name> --trials=1

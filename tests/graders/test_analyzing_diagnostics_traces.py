@@ -195,7 +195,8 @@ def test_recommends_traces(report: str, window: str, expected: bool) -> None:
 
 
 _SELF_KWARGS = {
-    "self_time": r"^10[.,]7(?:[0-3]\d*)?\s*(s|sec|seconds)$|^107[0-3]\d(\.\d+)?\s*ms$",
+    "span": "Sync Git Repositories",
+    "self_time": r"(?<![\d.,])10[.,]7(?:[0-3]\d*)?\s*(?:s|sec|seconds)\b|(?<![\d.,])107[0-3]\d(?:\.\d+)?\s*ms\b",
     "children": r"\b(?:19|2[0-3])(?:[.,]\d+)?\s*ms\b",
 }
 
@@ -203,18 +204,29 @@ _SELF_KWARGS = {
 @pytest.mark.parametrize(
     ("report", "expected"),
     [
-        ("The self time is 10.72 s.", True),
-        ("Self time: 10720 ms.", True),
-        ("Its direct children take about 21 ms.", True),
+        ("Sync Git Repositories: the self time is 10.72 s.", True),
+        ("Sync Git Repositories. Self time: 10720 ms.", True),
+        ("Sync Git Repositories took 10.74 s. Its direct children take about 21 ms.", True),
         ("| Span | Self time |\n| --- | --- |\n| Sync Git Repositories | 10.72 s |", True),
+        # A qualifier or a unit in the header still counts.
+        ("| Span | Self time (s) |\n| --- | --- |\n| Sync Git Repositories | ~10.72 s |", True),
+        # A table of several spans passes on the slow span's row.
+        (
+            "| Span | Self time |\n| --- | --- |\n| Sync Git Repositories | 10.72 s |\n"
+            "| POST /graphql | 19 ms |",
+            True,
+        ),
         # A stated self time decides, even next to the children's time.
-        ("Its self time is 21 ms; its children take the rest.", False),
+        ("Sync Git Repositories: its self time is 21 ms; its children take the rest.", False),
         # 10.74 s is the duration, not the self time.
-        ("The self time is 10.74 s.", False),
+        ("Sync Git Repositories: the self time is 10.74 s.", False),
         # The children's time must sit in a sentence about children.
-        ("It has two children. Another request took 21 ms.", False),
+        ("Sync Git Repositories has two children. Another request took 21 ms.", False),
+        # The right value for another span does not count.
+        ("Sync Git Repositories took 10.74 s.\n\nThe POST span has a self time of 10.72 s.", False),
+        ("| Span | Self time |\n| --- | --- |\n| POST /graphql | 10.72 s |", False),
         # A self time only in a code block does not count.
-        ("```text\nself time 10.72 s\n```", False),
+        ("Sync Git Repositories\n\n```text\nself time 10.72 s\n```", False),
     ],
 )
 def test_self_time_reads_the_value(report: str, expected: bool) -> None:

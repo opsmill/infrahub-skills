@@ -257,10 +257,10 @@ objectively deterministic. Use descriptive file names
 that explain what's being tested at a glance (e.g.,
 `check_dropdown_for_status.py` not `check_1.py`).
 
-Run evals with skillgrade to iterate on quality:
+Run each new task with skillgrade to iterate on quality:
 
 ```bash
-skillgrade --smoke
+skillgrade --eval=<task-name> --trials=1
 ```
 
 After editing `eval.yaml`, regenerate the JSON

@@ -24,7 +24,8 @@ CHECKS: list[str | tuple[str, dict]] = [
     (
         "traces-self-time",
         {
-            "self_time": r"^10[.,]7(?:[0-3]\d*)?\s*(s|sec|seconds)$|^107[0-3]\d(\.\d+)?\s*ms$",
+            "span": "Sync Git Repositories",
+            "self_time": r"(?<![\d.,])10[.,]7(?:[0-3]\d*)?\s*(?:s|sec|seconds)\b|(?<![\d.,])107[0-3]\d(?:\.\d+)?\s*ms\b",
             "children": r"\b(?:19|2[0-3])(?:[.,]\d+)?\s*ms\b",
         },
     ),

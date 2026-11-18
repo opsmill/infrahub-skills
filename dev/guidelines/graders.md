@@ -126,8 +126,10 @@ compliance. Instead:
 - Fail on zero inputs: an empty output directory, a YAML
   file that parses to nothing, an unreadable file, an
   empty table, a listing cut at its `--limit`, a pipeline
-  whose middle stage failed. A script must exit non-zero
-  on any of these, not print an empty result.
+  whose middle stage failed. A task grader returns a
+  failing verdict for these and still exits 0, since the
+  sandbox reads a non-zero exit as a crash. A standalone
+  gate or a bundled script exits non-zero.
 - Exempt by a named list with a reason, never by a
   filter that decides what gets checked.
 
@@ -222,8 +224,10 @@ this rule loads when you open it: its registry is
 `<check>[:<arg>...]` names resolved through `_dispatch`,
 and its check functions take `(findings, ...)` rather
 than a parsed artifact. Read that file's own docstring
-before adding to it; the shape above describes every
-other grader.
+before adding to it. Every other grader has a `CHECKS`
+registry, but what a check receives (a parsed dict or the
+answer's text) depends on the library: read its
+`run_checks` first.
 
 ## Verify both directions
 
@@ -316,11 +320,11 @@ to the source.
 `run_checks` library. The score is the share of checks
 passed, against a 0.8 threshold. With five or more
 checks, the rule's own check can fail and the task still
-passes. Gate the task on its core check, so its failure
-zeroes the score, and let neighbouring rules lower the
-score by their share: `neighbours=` in
-`graders/designing-models/lib.py`, `gate_checks=` in
-`graders/auditing-repo/lib.py`.
+passes. Keep a new task at four checks or fewer, or gate
+it on its core check so its failure zeroes the score.
+Only two libraries support a gate today: `neighbours=`
+in `graders/designing-models/lib.py` and `gate_checks=`
+in `graders/auditing-repo/lib.py`.
 
 For `infrahub-auditing-repo` `yagni-*` rules, wire the
 shared parameterized grader from `eval.yaml`

@@ -218,9 +218,10 @@ if __name__ == "__main__":
 ```
 
 Baseline checks catch regressions in neighbouring
-rules, but with five or more checks the proportional
-score lets the new assertion fail and the task still
-pass. Gate the task on it; the mechanism is in
+rules, but the score is the share of checks passed, so
+with five or more checks the new assertion can fail and
+the task still pass. Keep the task at four checks or
+fewer, or gate it where the library supports a gate; see
 [graders.md](../guidelines/graders.md#task-grader-scripts).
 
 For `infrahub-auditing-repo` yagni-* rules, don't add a
