@@ -192,3 +192,94 @@ def test_scope_ignores_caches_and_allows_vale_exceptions(tmp_path: Path) -> None
     ok, details = lib.check_diff_stays_in_adapter({"output_dir": root})
     assert not ok
     assert ".github/workflows/ci.yml" in details
+
+
+_RETRY_PASS = (_FIXTURES / "retry-policy" / "pass" / "servicenow_client.py").read_text()
+
+
+def _retry_checks(source: str) -> dict[str, bool]:
+    ctx = {"py": ast.parse(source), "py_err": None}
+    return {
+        name: fn(ctx)[0]
+        for name, fn in (
+            ("retry-status-set", lib.check_retry_status_set),
+            ("retry-after-honored", lib.check_retry_after_honored),
+            ("retry-after-cap", lib.check_retry_after_cap),
+            ("backoff-capped-jitter", lib.check_backoff_capped_jitter),
+        )
+    }
+
+
+# Each mutation of the compliant client keeps the token the old check looked for
+# (the status set, the header read, a comparison with 300, min(..., 60) and an
+# import of random) but cuts it off from the value the client acts on.
+_RETRY_MUTATIONS = {
+    "status set defined, only 429 retried": (
+        "if resp.status_code not in RETRY_STATUSES:",
+        "if resp.status_code != 429:",
+        "retry-status-set",
+    ),
+    "Retry-After read, fixed sleep": (
+        "            time.sleep(wait)\n",
+        "            time.sleep(5)\n",
+        "retry-after-honored",
+    ),
+    "300 compared with the attempt count, not the wait": (
+        "if wait > MAX_RETRY_AFTER:",
+        "if attempt > MAX_RETRY_AFTER:",
+        "retry-after-cap",
+    ),
+    "unrelated min(60) and a random call that does not reach the sleep": (
+        "return min(BACKOFF_CAP, 2 ** attempt) * random.uniform(0.5, 1.0)",
+        "limit = min(BACKOFF_CAP, self.max_retries)\n"
+        "        random.seed(limit)\n"
+        "        return 2 ** attempt",
+        "backoff-capped-jitter",
+    ),
+    "jitter without a cap": (
+        "return min(BACKOFF_CAP, 2 ** attempt) * random.uniform(0.5, 1.0)",
+        "return 2 ** attempt * random.uniform(0.5, 1.0)",
+        "backoff-capped-jitter",
+    ),
+    "cap without jitter": (
+        "return min(BACKOFF_CAP, 2 ** attempt) * random.uniform(0.5, 1.0)",
+        "return min(BACKOFF_CAP, 2 ** attempt)",
+        "backoff-capped-jitter",
+    ),
+}
+
+
+def test_retry_checks_pass_the_compliant_client() -> None:
+    assert all(_retry_checks(_RETRY_PASS).values())
+
+
+@pytest.mark.parametrize("case", list(_RETRY_MUTATIONS))
+def test_retry_check_fails_when_the_value_does_not_drive_the_retry(case: str) -> None:
+    old, new, failing = _RETRY_MUTATIONS[case]
+    assert _RETRY_PASS.count(old) == 1, f"the mutation for {case!r} no longer applies"
+    results = _retry_checks(_RETRY_PASS.replace(old, new))
+    assert results == {name: name != failing for name in results}, results
+
+
+def _selected(rows: list[dict]) -> dict:
+    return {"probe": {"selected": {"status": 200, "rows": rows, "next": None}}}
+
+
+def test_fake_serves_captures_compares_every_row() -> None:
+    captured = list(lib._captured_rows("cmdb_ci_netgear").values())
+    rows = [{f: r[f] for f in ("sys_id", "name")} for r in captured]
+    ok, details = lib.check_fake_serves_captures(_selected(rows))
+    assert ok, details
+
+    made_up = [rows[0], {"sys_id": "0" * 32, "name": "made-up"}]
+    ok, details = lib.check_fake_serves_captures(_selected(made_up))
+    assert not ok
+    assert "not in the captures" in details
+
+    renamed = [{**rows[0], "name": "renamed"}, *rows[1:]]
+    ok, details = lib.check_fake_serves_captures(_selected(renamed))
+    assert not ok
+    assert "captured" in details
+
+    ok, details = lib.check_fake_serves_captures(_selected([]))
+    assert not ok

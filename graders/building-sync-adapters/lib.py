@@ -322,30 +322,49 @@ def _scenario(ctx: dict, name: str) -> tuple[dict | None, str]:
     return sc, ""
 
 
-def _captured_sys_ids() -> set[str]:
-    ids = set()
+def _captured_rows(table: str) -> dict[str, dict]:
+    """The rows captured from one table, keyed by sys_id."""
+    rows: dict[str, dict] = {}
     for cap in load_captures():
+        if endpoint_path(cap["request"]["path"]).rsplit("/", 1)[-1] != table:
+            continue
         if isinstance(cap["body"], dict):
-            ids |= {
-                r.get("sys_id")
-                for r in cap["body"].get("result", [])
-                if isinstance(r, dict)
-            }
-    return ids - {None}
+            for r in cap["body"].get("result", []):
+                if isinstance(r, dict) and r.get("sys_id"):
+                    rows[r["sys_id"]] = r
+    return rows
+
+
+# The "selected" scenario of _fake_probe.py asks cmdb_ci_netgear for these fields.
+_SELECTED_FIELDS = ("sys_id", "name")
 
 
 def check_fake_serves_captures(ctx: dict) -> tuple[bool, str]:
-    """The fake's rows are the captured rows, not hand-written ones."""
+    """Every row the fake returns is a captured row, with the captured values."""
     sc, err = _scenario(ctx, "selected")
     if sc is None:
         return False, f"fake-serves-captures: {err}"
-    ids = {r.get("sys_id") for r in sc["rows"]}
-    if not ids & _captured_sys_ids():
+    if not sc["rows"]:
+        return False, "fake-serves-captures: the fake returned no rows"
+    captured = _captured_rows("cmdb_ci_netgear")
+    problems = []
+    for row in sc["rows"]:
+        source = captured.get(row.get("sys_id"))
+        if source is None:
+            problems.append(f"sys_id {row.get('sys_id')!r} is not in the captures")
+            continue
+        for field in _SELECTED_FIELDS:
+            if field in row and row[field] != source.get(field):
+                problems.append(
+                    f"{row['sys_id']}: {field}={row[field]!r}, captured {source.get(field)!r}"
+                )
+    if problems:
         return (
             False,
-            "fake-serves-captures: no row carries a captured sys_id; the data is not taken from the captures",
+            "fake-serves-captures: rows differ from the captures: "
+            + "; ".join(problems[:4]),
         )
-    return True, "fake-serves-captures: rows come from the captures"
+    return True, "fake-serves-captures: every row matches a captured row"
 
 
 def check_fake_field_selection(ctx: dict) -> tuple[bool, str]:
@@ -354,7 +373,7 @@ def check_fake_field_selection(ctx: dict) -> tuple[bool, str]:
     if sc is None:
         return False, f"fake-field-selection: {err}"
     extra = (
-        set().union(*(set(r) for r in sc["rows"])) - {"sys_id", "name"}
+        set().union(*(set(r) for r in sc["rows"])) - set(_SELECTED_FIELDS)
         if sc["rows"]
         else set()
     )
@@ -573,114 +592,328 @@ def _num(node: ast.AST, names: dict[str, float]) -> float | None:
     return None
 
 
-def _int_collections(tree: ast.Module, names: dict[str, float]) -> list[set]:
-    out = []
+def _collection_ints(node: ast.AST, names: dict[str, float]) -> set[int] | None:
+    """The integers of a literal collection, or of ``frozenset({...})`` / ``set([...])``."""
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in ("frozenset", "set", "tuple", "list")
+        and len(node.args) == 1
+    ):
+        node = node.args[0]
+    if isinstance(node, (ast.Set, ast.List, ast.Tuple)) and node.elts:
+        vals = [_num(e, names) for e in node.elts]
+        if all(v is not None for v in vals):
+            return {int(v) for v in vals}
+    return None
+
+
+def _named_collections(
+    tree: ast.Module, names: dict[str, float]
+) -> dict[str, set[int]]:
+    """Names (module constants, attributes) bound to a collection of integers."""
+    out: dict[str, set[int]] = {}
     for node in ast.walk(tree):
-        if isinstance(node, (ast.Set, ast.List, ast.Tuple)) and node.elts:
-            vals = [_num(e, names) for e in node.elts]
-            if all(v is not None for v in vals):
-                out.append({int(v) for v in vals})
+        if isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
+            ints = _collection_ints(node.value, names)
+            if ints is None:
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for t in targets:
+                if isinstance(t, ast.Name):
+                    out[t.id] = ints
+                elif isinstance(t, ast.Attribute):
+                    out[t.attr] = ints
     return out
 
 
+def _mentions_status(node: ast.AST) -> bool:
+    return any(
+        (isinstance(n, ast.Name) and "status" in n.id.lower())
+        or (isinstance(n, ast.Attribute) and "status" in n.attr.lower())
+        for n in ast.walk(node)
+    )
+
+
 def check_retry_status_set(ctx: dict) -> tuple[bool, str]:
-    """The retried status codes are exactly 429, 502, 503, 504."""
+    """The response status is tested for membership in exactly {429, 502, 503, 504}."""
     tree = ctx["py"]
     if tree is None:
         return False, f"retry-status-set: {ctx['py_err']}"
     names = _numeric_names(tree)
-    if RETRY_STATUSES in _int_collections(tree, names):
-        return True, "retry-status-set: retries 429, 502, 503, 504"
-    seen = [sorted(s) for s in _int_collections(tree, names) if 429 in s]
+    named = _named_collections(tree, names)
+    tested: list[list[int]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Compare) or not _mentions_status(node.left):
+            continue
+        for op, comp in zip(node.ops, node.comparators):
+            if not isinstance(op, (ast.In, ast.NotIn)):
+                continue
+            ints = _collection_ints(comp, names)
+            if ints is None and isinstance(comp, (ast.Name, ast.Attribute)):
+                ints = named.get(comp.id if isinstance(comp, ast.Name) else comp.attr)
+            if ints is None:
+                continue
+            if ints == RETRY_STATUSES:
+                return (
+                    True,
+                    "retry-status-set: the response status is tested against 429, 502, 503, 504",
+                )
+            tested.append(sorted(ints))
     return (
         False,
-        f"retry-status-set: no collection equal to {sorted(RETRY_STATUSES)} (collections holding 429: {seen})",
+        "retry-status-set: no test of the response status against "
+        f"{sorted(RETRY_STATUSES)} (statuses tested: {tested})",
     )
 
 
-def _reads_retry_after(tree: ast.Module) -> bool:
+# Data flow inside the client module. Each expression carries labels:
+#   retry_after: derived from the Retry-After header
+#   jitter:      derived from a random draw
+#   capped:      bounded at 60 s, by min(..., 60) or by `if x > 60: x = 60`
+# Labels pass through assignments, through any call that takes a labelled
+# argument, and through functions whose return value is labelled. The analysis
+# ignores statement order inside a function, which is enough for a client of
+# this size and errs toward passing a value that is labelled on any branch.
+
+_RANDOM_MODULES = ("random", "secrets")
+
+
+def _is_retry_after_read(node: ast.AST) -> bool:
+    key = None
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "get"
+        and node.args
+    ):
+        key = node.args[0]
+    elif isinstance(node, ast.Subscript):
+        key = node.slice
+    return (
+        isinstance(key, ast.Constant)
+        and isinstance(key.value, str)
+        and key.value.lower() == "retry-after"
+    )
+
+
+def _random_names(tree: ast.Module) -> set[str]:
+    """Names imported from random or secrets (``from random import uniform``)."""
+    return {
+        alias.asname or alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module in _RANDOM_MODULES
+        for alias in node.names
+    }
+
+
+def _call_name(func: ast.AST) -> str | None:
+    if isinstance(func, ast.Name):
+        return func.id
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return None
+
+
+def _scopes(tree: ast.Module) -> list[tuple[str, list[ast.stmt]]]:
+    """The module's top-level statements, and each function body, as separate scopes."""
+    scopes: list[tuple[str, list[ast.stmt]]] = [
+        (
+            "<module>",
+            [
+                s
+                for s in tree.body
+                if not isinstance(
+                    s, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+                )
+            ],
+        )
+    ]
     for node in ast.walk(tree):
-        key = None
-        if (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "get"
-            and node.args
-        ):
-            key = node.args[0]
-        elif isinstance(node, ast.Subscript):
-            key = node.slice
-        if (
-            isinstance(key, ast.Constant)
-            and isinstance(key.value, str)
-            and key.value.lower() == "retry-after"
-        ):
-            return True
-    return False
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            scopes.append((f"{node.name}@{node.lineno}", node.body))
+    return scopes
+
+
+def _target_names(target: ast.AST) -> list[str]:
+    return [n.id for n in ast.walk(target) if isinstance(n, ast.Name)]
+
+
+class _Flow:
+    """Labels on local names and on function return values, solved to a fixed point."""
+
+    def __init__(self, tree: ast.Module) -> None:
+        self.names = _numeric_names(tree)
+        self.random_names = _random_names(tree)
+        self.scopes = _scopes(tree)
+        self.var: dict[tuple[str, str], set[str]] = {}
+        self.ret: dict[str, set[str]] = {}
+        for _ in range(20):
+            if not self._step():
+                break
+
+    def labels(self, expr: ast.AST, scope: str) -> set[str]:
+        out: set[str] = set()
+        for n in ast.walk(expr):
+            if isinstance(n, ast.Name):
+                out |= self.var.get((scope, n.id), set())
+            if _is_retry_after_read(n):
+                out.add("retry_after")
+            if isinstance(n, ast.Call):
+                name = _call_name(n.func)
+                if (
+                    isinstance(n.func, ast.Attribute)
+                    and isinstance(n.func.value, ast.Name)
+                    and n.func.value.id in _RANDOM_MODULES
+                ) or (isinstance(n.func, ast.Name) and n.func.id in self.random_names):
+                    out.add("jitter")
+                if name == "min" and any(_num(a, self.names) == 60 for a in n.args):
+                    out.add("capped")
+                if name:
+                    out |= self.ret.get(name, set())
+        return out
+
+    def _add(self, store: dict, key, labels: set[str]) -> bool:
+        current = store.setdefault(key, set())
+        if labels <= current:
+            return False
+        current |= labels
+        return True
+
+    def _step(self) -> bool:
+        changed = False
+        for scope, body in self.scopes:
+            fname = scope.split("@", 1)[0]
+            for stmt in body:
+                for n in ast.walk(stmt):
+                    if (
+                        isinstance(n, (ast.Assign, ast.AnnAssign, ast.AugAssign))
+                        and n.value is not None
+                    ):
+                        targets = n.targets if isinstance(n, ast.Assign) else [n.target]
+                        labels = self.labels(n.value, scope)
+                        for t in targets:
+                            for name in _target_names(t):
+                                changed |= self._add(self.var, (scope, name), labels)
+                    elif isinstance(n, ast.NamedExpr):
+                        changed |= self._add(
+                            self.var, (scope, n.target.id), self.labels(n.value, scope)
+                        )
+                    elif isinstance(n, ast.If):
+                        # `if delay > 60: delay = 60` caps `delay`
+                        for name in self._capped_by_if(n):
+                            changed |= self._add(self.var, (scope, name), {"capped"})
+                    elif (
+                        isinstance(n, ast.Return)
+                        and n.value is not None
+                        and scope != "<module>"
+                    ):
+                        changed |= self._add(
+                            self.ret, fname, self.labels(n.value, scope)
+                        )
+        return changed
+
+    def _capped_by_if(self, node: ast.If) -> list[str]:
+        compared = [
+            x.id
+            for cmp in ast.walk(node.test)
+            if isinstance(cmp, ast.Compare)
+            and any(_num(y, self.names) == 60 for y in [cmp.left, *cmp.comparators])
+            for x in [cmp.left, *cmp.comparators]
+            if isinstance(x, ast.Name)
+        ]
+        assigned = {
+            name
+            for stmt in node.body
+            for n in ast.walk(stmt)
+            if isinstance(n, ast.Assign)
+            for t in n.targets
+            for name in _target_names(t)
+        }
+        return [c for c in compared if c in assigned]
+
+    def sleeps(self) -> list[set[str]]:
+        """The labels of the argument of every ``sleep(...)`` call."""
+        out = []
+        for scope, body in self.scopes:
+            for stmt in body:
+                for n in ast.walk(stmt):
+                    if (
+                        isinstance(n, ast.Call)
+                        and _call_name(n.func) == "sleep"
+                        and n.args
+                    ):
+                        out.append(self.labels(n.args[0], scope))
+        return out
+
+
+def _flow(ctx: dict) -> _Flow:
+    if "flow" not in ctx:
+        ctx["flow"] = _Flow(ctx["py"])
+    return ctx["flow"]
 
 
 def check_retry_after_honored(ctx: dict) -> tuple[bool, str]:
-    """The Retry-After header is read from the response."""
+    """The Retry-After value reaches the wait the client sleeps on."""
     tree = ctx["py"]
     if tree is None:
         return False, f"retry-after-honored: {ctx['py_err']}"
-    if _reads_retry_after(tree):
-        return True, "retry-after-honored: Retry-After is read"
-    return False, "retry-after-honored: the code never reads the Retry-After header"
-
-
-def _ifs_comparing(
-    tree: ast.Module, value: float, names: dict[str, float]
-) -> list[ast.If]:
-    hits = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.If):
-            for cmp in ast.walk(node.test):
-                if isinstance(cmp, ast.Compare) and any(
-                    _num(x, names) == value for x in [cmp.left, *cmp.comparators]
-                ):
-                    hits.append(node)
-                    break
-    return hits
+    if not any(_is_retry_after_read(n) for n in ast.walk(tree)):
+        return False, "retry-after-honored: the code never reads the Retry-After header"
+    if any("retry_after" in labels for labels in _flow(ctx).sleeps()):
+        return True, "retry-after-honored: the Retry-After value sets the sleep"
+    return (
+        False,
+        "retry-after-honored: Retry-After is read but no sleep() waits on its value",
+    )
 
 
 def check_retry_after_cap(ctx: dict) -> tuple[bool, str]:
-    """A wait longer than 300 s raises instead of sleeping."""
+    """A Retry-After wait longer than 300 s raises instead of sleeping."""
     tree = ctx["py"]
     if tree is None:
         return False, f"retry-after-cap: {ctx['py_err']}"
-    names = _numeric_names(tree)
-    for node in _ifs_comparing(tree, 300, names):
-        if any(isinstance(n, ast.Raise) for stmt in node.body for n in ast.walk(stmt)):
-            return True, "retry-after-cap: waits over 300 s raise"
-    return False, "retry-after-cap: no branch comparing against 300 s that raises"
+    flow = _flow(ctx)
+    for scope, body in flow.scopes:
+        for stmt in body:
+            for node in ast.walk(stmt):
+                if not isinstance(node, ast.If) or not any(
+                    isinstance(n, ast.Raise) for s in node.body for n in ast.walk(s)
+                ):
+                    continue
+                for cmp in ast.walk(node.test):
+                    if not isinstance(cmp, ast.Compare):
+                        continue
+                    operands = [cmp.left, *cmp.comparators]
+                    if any(_num(x, flow.names) == 300 for x in operands) and any(
+                        "retry_after" in flow.labels(x, scope) for x in operands
+                    ):
+                        return (
+                            True,
+                            "retry-after-cap: a Retry-After wait over 300 s raises",
+                        )
+    return (
+        False,
+        "retry-after-cap: no branch that compares the Retry-After wait with 300 s and raises",
+    )
 
 
 def check_backoff_capped_jitter(ctx: dict) -> tuple[bool, str]:
-    """Backoff is capped at 60 s and uses random jitter."""
+    """A slept backoff is capped at 60 s and drawn with random jitter."""
     tree = ctx["py"]
     if tree is None:
         return False, f"backoff-capped-jitter: {ctx['py_err']}"
-    names = _numeric_names(tree)
-    capped = any(
-        isinstance(n, ast.Call)
-        and isinstance(n.func, ast.Name)
-        and n.func.id == "min"
-        and any(_num(a, names) == 60 for a in n.args)
-        for n in ast.walk(tree)
-    ) or bool(_ifs_comparing(tree, 60, names))
-    jitter = any(
-        isinstance(n, ast.Attribute)
-        and isinstance(n.value, ast.Name)
-        and n.value.id in ("random", "secrets")
-        for n in ast.walk(tree)
-    ) or any(
-        isinstance(n, ast.ImportFrom) and n.module in ("random", "secrets")
-        for n in ast.walk(tree)
+    sleeps = _flow(ctx).sleeps()
+    if any({"capped", "jitter"} <= labels for labels in sleeps):
+        return (
+            True,
+            "backoff-capped-jitter: the slept backoff is capped at 60 s with jitter",
+        )
+    seen = sorted({tuple(sorted(lbl & {"capped", "jitter"})) for lbl in sleeps})
+    return (
+        False,
+        f"backoff-capped-jitter: no sleep() waits on a value both capped at 60 s and jittered (sleeps carry {seen})",
     )
-    if capped and jitter:
-        return True, "backoff-capped-jitter: capped at 60 s with jitter"
-    return False, f"backoff-capped-jitter: cap at 60 s={capped}, random jitter={jitter}"
 
 
 _BROAD = {

@@ -50,7 +50,7 @@
       "assertions": [
         {
           "name": "fake-serves-captures",
-          "check": "The fake's rows carry captured sys_id values"
+          "check": "Every row the fake returns is a captured row with the captured values"
         },
         {
           "name": "fake-field-selection",
@@ -104,19 +104,19 @@
       "assertions": [
         {
           "name": "retry-status-set",
-          "check": "A collection equal to {429, 502, 503, 504} drives the retry"
+          "check": "The response status is tested for membership in {429, 502, 503, 504}"
         },
         {
           "name": "retry-after-honored",
-          "check": "The Retry-After header is read"
+          "check": "The Retry-After value reaches the sleep() wait"
         },
         {
           "name": "retry-after-cap",
-          "check": "A branch comparing against 300 raises"
+          "check": "A branch comparing the Retry-After wait with 300 raises"
         },
         {
           "name": "backoff-capped-jitter",
-          "check": "Backoff uses min(..., 60) or a 60 s comparison, plus random jitter"
+          "check": "A slept backoff is capped at 60 s and drawn with random jitter"
         },
         {
           "name": "no-tls-retry",
