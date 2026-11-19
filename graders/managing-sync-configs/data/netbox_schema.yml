@@ -1,5 +1,5 @@
 ---
-# Customer schema for the identifiers task (task 5). The prompt shows the same nodes.
+# Customer schema for the identifiers task. The prompt shows the same nodes.
 # The device's human_friendly_id lives on the generic it inherits from.
 version: "1.0"
 generics:
@@ -21,12 +21,11 @@ nodes:
     human_friendly_id: [name__value]
     attributes:
       - {name: name, kind: Text, unique: true}
-      - {name: city, kind: Text, optional: true}
-      - {name: servicenow_sys_id, kind: Text, optional: true}
+      - {name: description, kind: Text, optional: true}
+      - {name: netbox_id, kind: Number, optional: true}
   - name: Device
     namespace: Network
     inherit_from: [DcimGenericDevice, DcimGenericEndpoint]
     attributes:
-      - {name: ip_address, kind: Text, optional: true}
       - {name: serial_number, kind: Text, optional: true}
-      - {name: servicenow_sys_id, kind: Text, optional: true}
+      - {name: netbox_id, kind: Number, optional: true}

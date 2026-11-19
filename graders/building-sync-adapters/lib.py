@@ -1010,59 +1010,6 @@ def check_no_tls_retry(ctx: dict) -> tuple[bool, str]:
 
 
 # --------------------------------------------------------------------------
-# Task 5: identifiers match the human-friendly ID
-# --------------------------------------------------------------------------
-
-
-def schema_hfids(schema: dict) -> dict[str, list[str]]:
-    """Map each node kind to the fields of its human_friendly_id, inherited from a generic when the node has none."""
-    generics = {
-        f"{g.get('namespace', '')}{g.get('name', '')}": g.get("human_friendly_id")
-        for g in schema.get("generics", []) or []
-    }
-    out = {}
-    for node in schema.get("nodes", []) or []:
-        kind = f"{node.get('namespace', '')}{node.get('name', '')}"
-        hfid = node.get("human_friendly_id") or next(
-            (
-                generics[g]
-                for g in node.get("inherit_from", []) or []
-                if generics.get(g)
-            ),
-            None,
-        )
-        if hfid:
-            out[kind] = [str(h).split("__")[0] for h in hfid]
-    return out
-
-
-def check_identifiers_match_hfid(ctx: dict) -> tuple[bool, str]:
-    """Each mapping's identifiers are the fields of the destination kind's human_friendly_id."""
-    config = ctx["config"]
-    if not isinstance(config, dict) or not isinstance(
-        config.get("schema_mapping"), list
-    ):
-        return False, "identifiers-match-hfid: no schema_mapping list in config.yml"
-    hfids = schema_hfids(ctx["schema"])
-    problems = []
-    for mapping in config["schema_mapping"]:
-        if not isinstance(mapping, dict) or mapping.get("name") not in hfids:
-            continue
-        want = hfids[mapping["name"]]
-        got = mapping.get("identifiers") or []
-        if not isinstance(got, list) or set(map(str, got)) != set(want):
-            problems.append(
-                f"{mapping['name']}: identifiers {got} vs human_friendly_id fields {want}"
-            )
-    mapped = {m.get("name") for m in config["schema_mapping"] if isinstance(m, dict)}
-    if set(hfids) - mapped:
-        problems.append(f"no mapping for {sorted(set(hfids) - mapped)}")
-    if problems:
-        return False, "identifiers-match-hfid: " + "; ".join(problems)
-    return True, "identifiers-match-hfid: identifiers match every human_friendly_id"
-
-
-# --------------------------------------------------------------------------
 # Task 6: changes stay in adapter files
 # --------------------------------------------------------------------------
 
@@ -1126,7 +1073,6 @@ CHECKS: dict[str, Callable[[dict], tuple[bool, str]]] = {
     "retry-after-cap": check_retry_after_cap,
     "backoff-capped-jitter": check_backoff_capped_jitter,
     "no-tls-retry": check_no_tls_retry,
-    "identifiers-match-hfid": check_identifiers_match_hfid,
     "diff-stays-in-adapter": check_diff_stays_in_adapter,
 }
 
@@ -1137,17 +1083,13 @@ def build_context(workdir: Path) -> dict:
     py, py_err = load_python(workdir / "servicenow_client.py")
     if py is not None:
         py = _strip_docstrings(py)
-    config, _ = load_yaml_file(workdir / "config.yml")
     pr = workdir / "PR_DESCRIPTION.md"
-    schema = yaml.safe_load((DATA.parent / "task5_schema.yml").read_text())
     return {
         "workdir": workdir,
         "output_dir": workdir / "output",
         "behavior": behavior,
         "py": py,
         "py_err": py_err,
-        "config": config,
-        "schema": schema,
         "pr_text": pr.read_text() if pr.exists() else None,
     }
 

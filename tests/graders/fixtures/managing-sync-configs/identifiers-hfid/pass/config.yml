@@ -1,9 +1,9 @@
 ---
-name: from-servicenow
+name: from-netbox
 source:
-  name: servicenow
+  name: netbox
   settings:
-    url: https://example.service-now.com
+    url: https://netbox.example.com
 destination:
   name: infrahub
   settings:
@@ -13,27 +13,30 @@ order:
   - NetworkDevice
 schema_mapping:
   - name: LocationSite
-    mapping: cmn_location
+    mapping: dcim.sites
     identifiers:
       - name
     fields:
       - name: name
         mapping: name
-      - name: city
-        mapping: city
-      - name: servicenow_sys_id
-        mapping: sys_id
+      - name: description
+        mapping: description
+      - name: netbox_id
+        mapping: id
   - name: NetworkDevice
-    mapping: cmdb_ci_netgear
+    mapping: dcim.devices
+    identifiers:
+      - name
+      - location
     fields:
       - name: name
         mapping: name
-      - name: ip_address
-        mapping: ip_address
       - name: serial_number
-        mapping: serial_number
-      - name: servicenow_sys_id
-        mapping: sys_id
+        mapping: serial
+      - name: address
+        mapping: primary_ip.address
+      - name: netbox_id
+        mapping: id
       - name: location
-        mapping: location_name
+        mapping: site
         reference: LocationSite

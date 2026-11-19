@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Grader for the building-sync-adapters-identifiers-hfid eval: sync identifiers match the destination human-friendly ID."""
+"""Grader for the managing-sync-configs-identifiers-hfid eval: sync identifiers match the destination human-friendly ID."""
 
 from __future__ import annotations
 

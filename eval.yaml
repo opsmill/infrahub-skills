@@ -10659,98 +10659,6 @@ tasks:
         check: >-
           Handlers that retry connection errors handle SSLError first
 
-  - name: building-sync-adapters-identifiers-hfid
-    trials: 3
-    instruction: |
-      Read the skill at skills/infrahub-building-sync-adapters/SKILL.md and follow its workflow and rules.
-
-      Task: Finish the infrahub-sync config that syncs the customer's ServiceNow network
-      gear into their Infrahub. Their schema is fixed and already loaded:
-
-      ```yaml
-      version: "1.0"
-      generics:
-        - name: GenericDevice
-          namespace: Dcim
-          human_friendly_id: [name__value, location__name__value]
-          attributes:
-            - {name: name, kind: Text}
-            - {name: description, kind: Text, optional: true}
-          relationships:
-            - {name: location, peer: LocationSite, cardinality: one, optional: false}
-        - name: GenericEndpoint
-          namespace: Dcim
-          attributes:
-            - {name: address, kind: IPHost, optional: true}
-      nodes:
-        - name: Site
-          namespace: Location
-          human_friendly_id: [name__value]
-          attributes:
-            - {name: name, kind: Text, unique: true}
-            - {name: city, kind: Text, optional: true}
-            - {name: servicenow_sys_id, kind: Text, optional: true}
-        - name: Device
-          namespace: Network
-          inherit_from: [DcimGenericDevice, DcimGenericEndpoint]
-          attributes:
-            - {name: ip_address, kind: Text, optional: true}
-            - {name: serial_number, kind: Text, optional: true}
-            - {name: servicenow_sys_id, kind: Text, optional: true}
-      ```
-
-      My draft config:
-
-      ```yaml
-      name: from-servicenow
-      source:
-        name: servicenow
-        settings:
-          url: "https://example.service-now.com"
-      destination:
-        name: infrahub
-        settings:
-          url: "http://localhost:8000"
-      order: [LocationSite, NetworkDevice]
-      schema_mapping:
-        - name: LocationSite
-          mapping: cmn_location
-          identifiers: [name]
-          fields:
-            - {name: name, mapping: name}
-            - {name: city, mapping: city}
-        - name: NetworkDevice
-          mapping: cmdb_ci_netgear
-          identifiers: [servicenow_sys_id]
-          fields:
-            - {name: servicenow_sys_id, mapping: sys_id}
-            - {name: name, mapping: name}
-            - {name: location, mapping: location_name, reference: LocationSite}
-      ```
-
-      We key devices on the ServiceNow `sys_id` because the network team renames
-      devices regularly and the `sys_id` never changes. The device mapping still
-      needs `ip_address` and `serial_number`, and the sites should carry their
-      `sys_id` too.
-
-      Save the complete config to: config.yml
-    graders:
-      - type: deterministic
-        run: python graders/building-sync-adapters/check_identifiers_hfid.py
-        weight: 1.0
-    expected_output: >-
-      A config whose NetworkDevice identifiers are name and location, matching
-      the human_friendly_id [name__value, location__name__value], so the
-      Infrahub upsert cannot merge two devices that share a name.
-    expectations:
-      - NetworkDevice identifiers are name and location
-      - LocationSite identifiers are name
-    assertions:
-      - name: identifiers-match-hfid
-        check: >-
-          Each mapping's identifiers equal the fields of the destination kind's
-          human_friendly_id
-
   - name: building-sync-adapters-scope-core-files
     trials: 3
     timeout: 600
@@ -10804,3 +10712,97 @@ tasks:
         check: >-
           Every changed file is the adapter module or a test, example, doc,
           changelog, spec or top-level note
+
+  # --- infrahub-sync Config Manager --- #
+  - name: managing-sync-configs-identifiers-hfid
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-managing-sync-configs/SKILL.md and follow its workflow and rules.
+
+      Task: Finish the infrahub-sync config that syncs our NetBox sites and devices into
+      Infrahub. We use the netbox adapter that ships with infrahub-sync. Our schema is
+      fixed and already loaded:
+
+      ```yaml
+      version: "1.0"
+      generics:
+        - name: GenericDevice
+          namespace: Dcim
+          human_friendly_id: [name__value, location__name__value]
+          attributes:
+            - {name: name, kind: Text}
+            - {name: description, kind: Text, optional: true}
+          relationships:
+            - {name: location, peer: LocationSite, cardinality: one, optional: false}
+        - name: GenericEndpoint
+          namespace: Dcim
+          attributes:
+            - {name: address, kind: IPHost, optional: true}
+      nodes:
+        - name: Site
+          namespace: Location
+          human_friendly_id: [name__value]
+          attributes:
+            - {name: name, kind: Text, unique: true}
+            - {name: description, kind: Text, optional: true}
+            - {name: netbox_id, kind: Number, optional: true}
+        - name: Device
+          namespace: Network
+          inherit_from: [DcimGenericDevice, DcimGenericEndpoint]
+          attributes:
+            - {name: serial_number, kind: Text, optional: true}
+            - {name: netbox_id, kind: Number, optional: true}
+      ```
+
+      My draft config:
+
+      ```yaml
+      name: from-netbox
+      source:
+        name: netbox
+        settings:
+          url: "https://netbox.example.com"
+      destination:
+        name: infrahub
+        settings:
+          url: "http://localhost:8000"
+      schema_mapping:
+        - name: LocationSite
+          mapping: dcim.sites
+          identifiers: [name]
+          fields:
+            - {name: name, mapping: name}
+            - {name: description, mapping: description}
+        - name: NetworkDevice
+          mapping: dcim.devices
+          identifiers: [netbox_id]
+          fields:
+            - {name: netbox_id, mapping: id}
+            - {name: name, mapping: name}
+            - {name: location, mapping: site, reference: LocationSite}
+      ```
+
+      We key devices on the NetBox `id` because the network team renames devices
+      regularly and the NetBox id never changes. The device mapping still needs the
+      serial number and the primary IP address, and the sites should carry their
+      NetBox id too.
+
+      Save the complete config to: config.yml
+    graders:
+      - type: deterministic
+        run: python graders/managing-sync-configs/check_identifiers_hfid.py
+        weight: 1.0
+    expected_output: >-
+      A config whose NetworkDevice identifiers are name and location, matching
+      the human_friendly_id [name__value, location__name__value] inherited from
+      DcimGenericDevice, so the Infrahub upsert cannot merge two devices that
+      share a name and a site. netbox_id stays an ordinary field.
+    expectations:
+      - NetworkDevice identifiers are name and location
+      - LocationSite identifiers are name
+      - netbox_id is mapped as a field, not used as an identifier
+    assertions:
+      - name: identifiers-match-hfid
+        check: >-
+          Each mapping's identifiers equal the fields of the destination kind's
+          human_friendly_id

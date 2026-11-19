@@ -25,7 +25,6 @@ TASKS = {
     "strict-fake": "check_strict_fake.py",
     "pr-check-list": "check_pr_check_list.py",
     "retry-policy": "check_retry_policy.py",
-    "identifiers-hfid": "check_identifiers_hfid.py",
     "scope-core-files": "check_scope_core_files.py",
 }
 CASES = [
@@ -115,32 +114,6 @@ def test_pr_checks_require_every_docs_item(dropped: str, item: str) -> None:
     ok, details = lib.check_pr_checks_complete({"pr_text": text.replace(dropped, "")})
     assert not ok
     assert item in details
-
-
-def test_identifiers_duplicate_mapping_does_not_hide_a_missing_kind() -> None:
-    schema = {
-        "nodes": [
-            {
-                "namespace": "Location",
-                "name": "Site",
-                "human_friendly_id": ["name__value"],
-            },
-            {
-                "namespace": "Network",
-                "name": "Device",
-                "human_friendly_id": ["name__value"],
-            },
-        ]
-    }
-    config = {
-        "schema_mapping": [
-            {"name": "LocationSite", "identifiers": ["name"]},
-            {"name": "LocationSite", "identifiers": ["name"]},
-        ]
-    }
-    ok, details = lib.check_identifiers_match_hfid({"config": config, "schema": schema})
-    assert not ok
-    assert "NetworkDevice" in details
 
 
 _TLS_CLIENT = """

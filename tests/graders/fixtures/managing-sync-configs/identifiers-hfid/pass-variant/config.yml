@@ -1,0 +1,25 @@
+---
+# order is left out: infrahub-sync main computes it from the references.
+name: from-netbox
+source:
+  name: netbox
+  settings: {url: "https://netbox.example.com"}
+destination:
+  name: infrahub
+  settings: {url: "http://localhost:8000"}
+schema_mapping:
+  - name: NetworkDevice
+    mapping: dcim.devices
+    identifiers: ["location", "name"]
+    fields:
+      - {name: netbox_id, mapping: id}
+      - {name: location, mapping: site, reference: LocationSite}
+      - {name: name, mapping: name}
+      - {name: serial_number, mapping: serial}
+      - {name: address, mapping: primary_ip.address}
+  - name: LocationSite
+    mapping: dcim.sites
+    identifiers: ["name"]
+    fields:
+      - {name: name, mapping: name}
+      - {name: netbox_id, mapping: id}
