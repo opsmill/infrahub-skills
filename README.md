@@ -51,7 +51,8 @@ For targeted changes, skip the ceremony. Describe what you want and the agent ha
 - *"Import this `inventory.csv` into Infrahub"* — the agent uses **importing-data**, introspects the live schema, batches every ambiguity into one interview, and loads the result on a fresh branch.
 - *"Turn the NetBox device types for Arista into object templates"* — the agent uses **converting-netbox-device-types**, runs the bundled converter against a mapping profile built from your schema, and tells you which components the schema could not hold.
 - *"We want our L3VPN service in Infrahub, where do we start?"*: the agent uses **designing-models**, reads any diagrams or exports you have, asks one question at a time with a recommended answer, and writes a design brief that the managing skills build from: **managing-schemas** first, then the skill for each other artifact the brief lists (objects, generators, checks, transforms, menus).
-- *"Build an infrahub-sync adapter for our ServiceNow CMDB"*: the agent uses **building-sync-adapters**, captures real API responses before writing the spec, keeps the change inside the adapter module, and runs `diff` and `sync` against the live system before the pull request.
+- *"Build an infrahub-sync adapter for our ServiceNow CMDB"*: the agent uses **building-sync-adapters**, captures real API responses before writing the spec, keeps the change inside the adapter module, and hands the live `diff` and `sync` to **managing-sync-configs** before the pull request.
+- *"Our NetBox sync merges devices that share a name"*: the agent uses **managing-sync-configs**, matches the `identifiers` to each destination kind's human-friendly ID, checks the source data for duplicate and empty keys, and runs `diff` before any `sync` to an Infrahub branch.
 - *"Plan our upgrade from 1.9.2 to 1.10.0"*: the agent uses **planning-upgrades**, reads the notes of every release in between, checks each breaking change against your repository, and writes `UPGRADE_PLAN.md` without running the upgrade.
 
 This is the fastest path for well-scoped work: adding attributes, writing a check, populating objects, creating a transform. No planning step needed. It's also how most people start — install the skills, describe what you need, and iterate from there.
@@ -120,7 +121,8 @@ A team already running Infrahub who needs to continue extending it — adding sc
 | **converting-netbox-device-types** | Convert NetBox device-type definitions (devicetype-library / NDX) into Infrahub object templates with a bundled converter, and report what the target schema could not hold |
 | **planning-upgrades** | Plan an Infrahub upgrade one minor version at a time, checking every release's breaking changes against your repository and instance, without running the upgrade |
 | **designing-models** | Work out what to model before any schema exists: an interview about the business, the service and the data, with a recommended answer per question, that writes a design brief and splits a large scope into ordered features |
-| **building-sync-adapters** | Build an infrahub-sync source adapter: probe the live API, build tests from captured responses, map to the existing schema, and validate the sync against the real system before the pull request |
+| **building-sync-adapters** | Build an infrahub-sync source adapter: probe the live API, build tests from captured responses, and keep the change inside the adapter files; the customer config and live validation go to managing-sync-configs |
+| **managing-sync-configs** | Write, change and debug an infrahub-sync `config.yml` for an adapter that exists: identifiers that match the human-friendly ID, schema mapping, and a validated sync to an Infrahub branch |
 
 Each skill lives in `skills/infrahub-<name>/` with a `SKILL.md` entry point, reference docs, examples, and modular rules. Shared references (GraphQL patterns, `.infrahub.yml` format, git integration) are in `skills/infrahub-common/`. Skills use gerund-form names following the [Agent Skills best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
 
@@ -233,7 +235,8 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 │   ├── infrahub-converting-netbox-device-types/ # NetBox device types → object templates
 │   ├── infrahub-planning-upgrades/ # Version-by-version upgrade plans
 │   ├── infrahub-designing-models/ # Design interview → design brief
-│   └── infrahub-building-sync-adapters/ # infrahub-sync source adapters
+│   ├── infrahub-building-sync-adapters/ # infrahub-sync source adapters
+│   └── infrahub-managing-sync-configs/ # infrahub-sync configs and live runs
 ├── README.md
 └── LICENSE                      # Apache 2.0
 ```

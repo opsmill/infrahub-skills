@@ -1,12 +1,12 @@
 ---
 name: infrahub-building-sync-adapters
 description: >-
-  Builds an infrahub-sync source adapter and validates it against the customer's live system through a sync config in the customer's repository.
-  TRIGGER when: writing a new infrahub-sync adapter, adding a source system (REST API, SaaS tool, CMDB, directory) to infrahub-sync, probing a source API before an adapter spec, writing test fakes for an adapter's HTTP client, adding pagination, retries or rate-limit handling to an adapter, writing the sync config and identifiers for a new adapter, preparing an adapter pull request, modifying, debugging or extending an existing source adapter.
-  DO NOT TRIGGER when: writing a destination adapter, source-side incremental reads, the infrahub-sync feature/v3-develop branch, changing infrahub-sync core, designing the destination schema (use infrahub-managing-schemas), a one-off CSV import (use infrahub-importing-data), converting NetBox device types (use infrahub-converting-netbox-device-types).
+  Builds an infrahub-sync source adapter from API responses captured on the live system; the customer's sync config and live run go to infrahub-managing-sync-configs.
+  TRIGGER when: writing a new infrahub-sync adapter, adding a source system (REST API, SaaS tool, CMDB, directory) to infrahub-sync, probing a source API before an adapter spec, writing test fakes for an adapter's HTTP client, adding pagination, retries or rate-limit handling to an adapter, preparing an adapter pull request, modifying, debugging or extending an existing source adapter.
+  DO NOT TRIGGER when: writing or debugging a customer's sync config.yml, or running generate, diff or sync on it (use infrahub-managing-sync-configs), destination adapters, source-side incremental reads, the infrahub-sync feature/v3-develop branch, changing infrahub-sync core, designing the destination schema (use infrahub-managing-schemas), a one-off CSV import (use infrahub-importing-data), converting NetBox device types (use infrahub-converting-netbox-device-types).
 argument-hint: "[source-system]"
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 
@@ -17,11 +17,13 @@ metadata:
 Guides the work of adding a source system to
 [infrahub-sync](https://github.com/opsmill/infrahub-sync):
 the adapter, its tests, example, docs and pull request in
-the infrahub-sync repository, and a sync configuration in
-the customer's repository that validates the adapter
-against the customer's live system.
+the infrahub-sync repository. The customer's sync
+configuration and the live run that validates the
+adapter against the customer's system belong to
+`infrahub-managing-sync-configs`, which this skill hands
+off to in phase 4.
 
-The work spans two repositories on purpose. The bugs in
+The live run is part of the work on purpose. The bugs in
 the adapters this skill comes from (Microsoft Graph for
 Entra ID, and Webex) were found because the team could
 query and sync against the customer's real system. Unit
@@ -39,10 +41,6 @@ contract.
 Adapters in this checkout, if this is infrahub-sync:
 !`ls infrahub_sync/adapters/ 2>/dev/null | head -20`
 
-Sync projects in this repository, if this is a customer
-repository:
-!`find . -maxdepth 3 -name "config.yml" -path "*sync*" 2>/dev/null | head -10`
-
 If invoked with an argument (for example
 `/infrahub:building-sync-adapters netinventory`), treat
 it as the source system the adapter reads.
@@ -54,15 +52,18 @@ it as the source system the adapter reads.
   read per resource is not enough.
 - An existing source adapter needs pagination, retries,
   rate-limit handling, a new endpoint or a bug fix.
-- An adapter exists and the customer's sync
-  configuration, its `identifiers` or its first live run
-  needs to be written or debugged.
+- A live run with `infrahub-managing-sync-configs` shows
+  an adapter bug.
 - An adapter pull request is about to be opened.
 
 ## When NOT to Use
 
 These are out of scope:
 
+- **The customer's sync configuration** for an adapter
+  that exists: its `config.yml`, `identifiers`, schema
+  mapping and live runs. Use
+  `infrahub-managing-sync-configs`.
 - **Destination adapters.** Only the Infrahub adapter
   writes on `main`.
 - **Source-side incremental reads.** The adapter keeps
@@ -80,15 +81,16 @@ These are out of scope:
 ## Approval Points
 
 Stop and wait for the user's explicit approval at these
-five points, and at no others unless something fails:
+three points, and at no others unless something fails.
+The schema change and the first write to Infrahub are
+approved in `infrahub-managing-sync-configs` during
+phase 4.
 
 | # | When | What the user approves |
 | - | ---- | ---------------------- |
 | 1 | End of phase 1 | `api-behavior.yml` |
 | 2 | End of phase 2 | The spec |
-| 3 | Phase 4, only when the sync needs a new or changed schema | The schema change |
-| 4 | Phase 5, before the first `infrahub-sync sync` | Writing to the Infrahub branch, after the user has seen the `diff` |
-| 5 | Phase 6, before push and pull request | The pull request description and the commits |
+| 3 | Phase 6, before push and pull request | The pull request description and the commits |
 
 ## Rule Categories
 
@@ -97,7 +99,6 @@ five points, and at no others unless something fails:
 | CRITICAL | Probe | `probe-` | Capture the live API and record its behavior before the spec |
 | CRITICAL | Test | `test-` | Test fakes built from the captures, enforcing the behavior file |
 | HIGH | Retry | `retry-` | Default retry and rate-limit policy |
-| CRITICAL | Mapping | `mapping-` | Sync identifiers against the destination human-friendly ID, data check |
 | HIGH | Scope | `scope-` | Adapter files only; core problems become drafted issues |
 | HIGH | Gate | `gate-` | Full check list in the pull request |
 
@@ -166,70 +167,34 @@ table that the final audit in phase 6 uses. Details in
    [rules/test-fakes-from-captures.md](./rules/test-fakes-from-captures.md)
    describes, before writing the tests that use them.
 5. Write the example under `examples/`, the docs page and
-   the news fragment.
+   the news fragment. The docs page says that a record
+   removed from the source stays in Infrahub, because
+   `InfrahubModel` has no delete.
 6. After each commit, run the scope check in
    [rules/scope-adapter-files-only.md](./rules/scope-adapter-files-only.md).
    A helper the adapter needs is a private function in
    the adapter module; a change core needs is a drafted
    issue.
 
-### Phase 4: Target schema and customer sync config
+### Phase 4: Customer config and live validation
 
-Work in the customer's repository.
+Hand off to `infrahub-managing-sync-configs` in the
+customer's repository. Give it the adapter name, the
+path of the infrahub-sync checkout that holds the
+adapter, and the source resources the spec covers. That
+skill maps the resources onto the customer's schema,
+writes the sync config, and runs the live validation on
+an Infrahub branch. Do not write the sync config here.
 
-1. **Schema step.** This is guidance, not a rule:
-   1. For each source resource, look for an existing node
-      in the repository's `schemas/` and in the schema
-      loaded on the running Infrahub.
-   2. If a node exists, map to it. When it has no
-      attribute for the source's stable ID (the Entra
-      adapter needed `object_id`, the Webex one
-      `webex_location_id`), add one. Make it optional,
-      and unique only when the source always fills it,
-      because an optional unique attribute fails as soon
-      as two nodes leave it empty. Never map a computed
-      attribute. **Approval point 3:** wait for the
-      user's approval of the schema change before loading
-      it.
-   3. If no node exists, hand off to
-      `infrahub-managing-schemas`. **Approval point 3:**
-      wait for the user's approval of the new schema.
-2. **Sync config.** Write `sync/<project>/config.yml`.
-   Read
-   [rules/mapping-identifiers-match-hfid.md](./rules/mapping-identifiers-match-hfid.md)
-   before setting `identifiers`, and run its data check
-   before the first run.
-3. **Core limits.** Warn the user about the known
-   infrahub-sync core limits in
-   [reference.md](./reference.md#known-infrahub-sync-core-limits)
-   that apply to this sync.
+### Phase 5: Fix what the live run finds
 
-### Phase 5: Live validation
-
-1. Add `.infrahub-sync-cache/` to the customer
-   repository's `.gitignore` before the first run: the
-   cache holds snapshots of source data.
-2. Create an Infrahub branch and load the schema on it.
-3. Run `infrahub-sync generate`, then `infrahub-sync
-   diff` against that branch, and show the user the diff.
-4. **Approval point 4:** run `infrahub-sync sync` to the
-   branch only after the user approves.
-5. Run `infrahub-sync diff` again. `diff` reads the
-   live source again, so a record created or changed in
-   the source since the sync shows as a create or
-   update; check those against the source first. Any
-   other create or update means the adapter or the
-   mapping does not round-trip. Deletions of existing
-   nodes the source does not hold are expected, because
-   the Infrahub adapter does not delete.
-
-The commands are in
-[reference.md](./reference.md#phase-5-live-validation-commands).
-
-A bug the live run finds goes back to phase 3: capture
-the response that shows it, make the fake serve it, write
-the failing test, then fix the adapter. A bug in
-infrahub-sync core becomes a drafted issue, not a fix.
+An adapter bug the live run finds comes back to phase 3:
+capture the response that shows it, make the fake serve
+it, write the failing test, then fix the adapter. Then
+run the live validation in
+`infrahub-managing-sync-configs` again. A mapping
+problem stays with that skill. A bug in infrahub-sync
+core becomes a drafted issue, not a fix.
 
 ### Phase 6: Checks and pull request
 
@@ -239,7 +204,7 @@ including the news fragment, the docs pages and the spec
 documents re-read against the code. Mark every numbered
 requirement of the spec met, partly met or not met.
 
-**Approval point 5:** show the user the pull request
+**Approval point 3:** show the user the pull request
 description, with its checks section, and the commits.
 Push and open the pull request only after the user
 approves.
@@ -249,18 +214,13 @@ approves.
 - **[reference.md](./reference.md)**: the
   `api-behavior.yml` format, the capture format and
   redaction, preflight commands, the adapter contract on
-  `main`, spec details, live validation commands, and
-  the known core limits.
+  `main`, and spec details.
 - **[rules/_sections.md](./rules/_sections.md)**: the
   rule categories.
-- **[../infrahub-managing-schemas/SKILL.md](../infrahub-managing-schemas/SKILL.md)**:
-  new destination nodes, and changes to a node's
-  `human_friendly_id`.
-- **[../infrahub-analyzing-data/SKILL.md](../infrahub-analyzing-data/SKILL.md)**:
-  checking the nodes already in Infrahub, such as the
-  parents a sync references.
+- **[../infrahub-managing-sync-configs/SKILL.md](../infrahub-managing-sync-configs/SKILL.md)**:
+  the customer's sync config, the destination schema
+  mapping, the live validation commands, and the known
+  infrahub-sync core limits.
 - **[../infrahub-common/rules/connectivity-server-check.md](../infrahub-common/rules/connectivity-server-check.md)**:
   checking the Infrahub server before any command that
   needs it.
-- **[../infrahub-common/rules/workflow-branch-for-crud.md](../infrahub-common/rules/workflow-branch-for-crud.md)**:
-  why every write goes to a branch first.

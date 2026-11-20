@@ -1,1 +1,1 @@
-Added the infrahub-building-sync-adapters skill, which builds an infrahub-sync source adapter from API responses captured on the live system, keeps the change inside the adapter files, and validates the sync against that system before the pull request.
+Added the infrahub-building-sync-adapters skill, which builds an infrahub-sync source adapter from API responses captured on the live system and keeps the change inside the adapter files. It hands the customer's sync config and the live validation to infrahub-managing-sync-configs.

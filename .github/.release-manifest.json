@@ -18,6 +18,7 @@
     "infrahub-converting-netbox-device-types",
     "infrahub-planning-upgrades",
     "infrahub-designing-models",
-    "infrahub-building-sync-adapters"
+    "infrahub-building-sync-adapters",
+    "infrahub-managing-sync-configs"
   ]
 }

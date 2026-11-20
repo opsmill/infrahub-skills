@@ -78,6 +78,7 @@ const sidebars: SidebarsConfig = {
         'skills-reference/importing-data',
         'skills-reference/converting-netbox-device-types',
         'skills-reference/building-sync-adapters',
+        'skills-reference/managing-sync-configs',
       ],
     },
     {
