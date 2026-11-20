@@ -1,0 +1,60 @@
+---
+title: Sync Config Manager
+---
+
+Skill: `infrahub-managing-sync-configs`
+
+The Sync Config Manager helps you write, change and debug the [infrahub-sync](https://github.com/opsmill/infrahub-sync) configuration that keeps your Infrahub in sync with a source system that already has an adapter, such as NetBox, Nautobot, Microsoft Graph or Webex. It maps the source onto the schema you already have, keys every record on the destination node's human-friendly ID, and runs the sync on an Infrahub branch only after you have viewed the diff.
+
+## When to use
+
+- Syncing a system infrahub-sync already has an adapter for into your Infrahub
+- Adding a mapping, a field, a reference, a filter or a transform to an existing sync config
+- A sync that merges records, creates duplicates, or stops on one bad record
+- Running the live validation for an adapter that was just built with the [Sync Adapter Builder](./building-sync-adapters.mdx)
+
+## What it produces
+
+- `sync/<project>/config.yml`, with `identifiers` that match each destination kind's human-friendly ID
+- An optional attribute for the source system's stable ID on the destination node, when the schema has none, after you approve the schema change
+- A data check before the first run that lists every duplicate key, empty key and missing parent at once
+- A live validation run: `generate`, `diff`, `sync` to an Infrahub branch, then a second `diff` that shows no creates or updates while the source data is unchanged
+- `.infrahub-sync-cache/` added to your `.gitignore` before the first run, because the cache holds source data
+
+## Example prompts
+
+- "Write an infrahub-sync config that syncs our NetBox sites and devices into Infrahub"
+- "Our Nautobot sync merges two devices that have the same name; work out why"
+- "Add the serial number and the primary IP address to the device mapping"
+- "The new adapter is merged; write the customer's sync config and run it against a test branch"
+
+## Key rules enforced
+
+- **Identifiers match the human-friendly ID**: the sync `identifiers` equal the destination kind's `human_friendly_id`, including one inherited from a generic, because the Infrahub upsert matches on it. A stable source ID stays an ordinary field unless you approve a schema change that makes it the human-friendly ID.
+- **Data check before the first run**: one bad record stops the whole sync, so duplicate keys, empty keys and missing parents are found before the first `diff`.
+- **Branch first, diff before sync**: every write goes to an Infrahub branch, and `sync` runs only after you have viewed the `diff`.
+
+## Common mistakes it catches
+
+| Mistake | What the skill does instead |
+| --- | --- |
+| Keying a sync on a stable source ID while the schema identifies nodes by name | Aligns `identifiers` with the human-friendly ID, or proposes a schema change for approval |
+| Reading the human-friendly ID from the node only | Takes it from the first generic in `inherit_from` that declares one |
+| Finding bad records one failed run at a time | Checks every record before the first run and reports all problems at once |
+| Running `sync` straight to `main` | Syncs to a branch, after you have viewed the `diff` |
+| Committing the sync cache | Adds `.infrahub-sync-cache/` to `.gitignore` before the first run |
+
+## Approval points
+
+The skill stops for your approval at two points:
+
+1. Before a new or changed schema, when the sync needs one
+2. Before the first `sync` that writes to Infrahub
+
+:::note
+The skill covers sync configs on the infrahub-sync `main` branch. A source with no adapter, or a bug in an adapter, goes to the [Sync Adapter Builder](./building-sync-adapters.mdx). The `feature/v3-develop` configuration format is out of scope.
+:::
+
+## Not sure this is the right skill?
+
+See [Sync Adapter Builder, Sync Config Manager](../choosing-a-skill.mdx#sync-adapter-builder-sync-config-manager).

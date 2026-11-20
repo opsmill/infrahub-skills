@@ -161,6 +161,8 @@ the skill fires at all.
 | `infrahub-converting-netbox-device-types` | `skills/infrahub-converting-netbox-device-types/` | Convert NetBox device-type definitions into Infrahub object templates via a bundled, mapping-profile-driven Python converter |
 | `infrahub-planning-upgrades` | `skills/infrahub-planning-upgrades/` | Plan a version-by-version upgrade path, checking each release's breaking changes against the repo and instance (read-only) |
 | `infrahub-designing-models` | `skills/infrahub-designing-models/` | Interview from idea to a design brief: business, service, then data; recommended answer per question; scope split into ordered features; no schema YAML |
+| `infrahub-building-sync-adapters` | `skills/infrahub-building-sync-adapters/` | Build an infrahub-sync source adapter from captured API responses; hands the customer config and live validation to `infrahub-managing-sync-configs` |
+| `infrahub-managing-sync-configs` | `skills/infrahub-managing-sync-configs/` | infrahub-sync `config.yml` for an existing adapter (create, modify, debug): identifiers against the HFID, schema mapping, live validation on a branch |
 
 ### Rule = Test (Required)
 
