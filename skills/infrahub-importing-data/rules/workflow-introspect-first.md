@@ -75,10 +75,18 @@ all the kinds you need.
    different server than the configured one):
 
    ```bash
-   curl -s -o schema.json \
-     "$INFRAHUB_ADDRESS/api/schema?branch=<name>"
-   jq '.nodes[] | select(.name == "<Kind>")' schema.json
+   (
+     schema_response=$(mktemp) || exit 1
+     trap 'rm -f "$schema_response"' EXIT
+     curl -fsS -o "$schema_response" \
+       "$INFRAHUB_ADDRESS/api/schema?branch=<name>" &&
+       jq '.nodes[] | select(.name == "<Kind>")' "$schema_response"
+   )
    ```
+
+   The subshell removes the temporary response on exit,
+   including when fetching or filtering fails, without
+   overwriting project files.
 
 4. **Local `schemas/*.yml`** in the repo. Read every
    schema YAML in the working tree. Resolve
