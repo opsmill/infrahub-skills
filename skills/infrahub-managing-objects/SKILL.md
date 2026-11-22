@@ -2,7 +2,7 @@
 name: infrahub-managing-objects
 description: >-
   Creates, modifies and manages Infrahub object data YAML files for populating infrastructure instances — devices, locations, organizations, and modules.
-  TRIGGER when: creating device instances, populating data files, defining locations or organizations, adding infrastructure objects, modifying or extending an existing data file, updating attribute values or relationship links on objects already defined in a data file, debugging why an object fails to load.
+  TRIGGER when: creating device instances, populating data files, defining locations or organizations, adding infrastructure objects, modifying or extending an existing data file, updating attribute values or relationship links on objects already defined in a data file, debugging why an object fails to load, editing a YAML file under `objects/` or `data/`, or any file with `apiVersion: infrahub.app/v1` and `kind: Object`.
   DO NOT TRIGGER when: designing or modifying schemas, including changing an attribute or relationship definition on a node kind (use infrahub-managing-schemas), writing Python checks/generators, querying live data.
 argument-hint: "[kind] [object-details...]"
 metadata:
@@ -21,11 +21,13 @@ modules, and more.
 
 ## Project Context
 
-Existing schema files:
-!`find . -name "*.yml" -path "*/schemas/*" -o -name "*schema*" -name "*.yml" 2>/dev/null | head -10`
+Before writing object files, look at the project with
+read-only tools:
 
-Existing object files:
-!`find . -name "*.yml" -path "*/objects/*" 2>/dev/null | head -20`
+- Find the existing schema files: `.yml` files under a
+  `schemas/` directory, or with `schema` in the name.
+- Find the existing object files: `.yml` files under an
+  `objects/` directory.
 
 If invoked with arguments (e.g., `/infrahub:managing-objects DcimDevice spine-01`),
 use the first argument as the kind and remaining arguments as object details.
@@ -40,6 +42,8 @@ use the first argument as the kind and remaining arguments as object details.
 - Organizing object files for correct load order
 - Updating attribute values or relationship links in an existing data file
 - Debugging why an object fails to load or resolves the wrong reference
+- Editing a YAML file under `objects/` or `data/`, or any file with
+  `apiVersion: infrahub.app/v1` and `kind: Object`
 
 ## Rule Categories
 

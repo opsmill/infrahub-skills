@@ -2,7 +2,7 @@
 name: infrahub-managing-transforms
 description: >-
   Creates, modifies and debugs Infrahub transforms that convert data into JSON, text, CSV, or device configs using Python or Jinja2 templates, with YAML-driven tests.
-  TRIGGER when: building config generation, data export, format conversion, Jinja2 templates, artifact pipelines, writing or running tests for a transform, modifying or extending an existing transform or template, debugging why a transform renders the wrong output or an artifact fails to generate.
+  TRIGGER when: building config generation, data export, format conversion, Jinja2 templates, artifact pipelines, writing or running tests for a transform, modifying or extending an existing transform or template, debugging why a transform renders the wrong output or an artifact fails to generate, editing a file under `transforms/`, a `.j2` file under `templates/`, or a `.gql` file under `queries/` in an Infrahub repository.
   DO NOT TRIGGER when: designing schemas, writing validation checks, creating generators, querying live data.
 argument-hint: "[transform-name] [format]"
 metadata:
@@ -21,11 +21,13 @@ output -- using Python classes or Jinja2 templates.
 
 ## Project Context
 
-Infrahub config:
-!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
+Before writing a transform, look at the project with
+read-only tools:
 
-Existing transforms:
-!`find . -name "*.py" -path "*/transforms/*" -o -name "*.j2" -path "*/templates/*" 2>/dev/null | head -20`
+- Read `.infrahub.yml` if it exists.
+- Find the existing transforms: `.py` files under a
+  `transforms/` directory and `.j2` files under a
+  `templates/` directory.
 
 ## When to Use
 
@@ -37,6 +39,9 @@ Existing transforms:
 - Connecting transforms to artifacts for automated output
 - Changing what an existing transform or template renders
 - Debugging wrong output, or an artifact that fails to generate
+- Editing a file under `transforms/`, a `.j2` file under `templates/`, or a
+  `.gql` file under `queries/`, even when the request does not mention
+  transforms
 
 ## Rule Categories
 

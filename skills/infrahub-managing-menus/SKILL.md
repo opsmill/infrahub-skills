@@ -2,7 +2,7 @@
 name: infrahub-managing-menus
 description: >-
   Creates, modifies and debugs Infrahub custom navigation menus for the web UI sidebar, organizing node types into logical groups.
-  TRIGGER when: designing sidebar menus, grouping node types in UI, customizing Infrahub web interface navigation, modifying or extending an existing menu, changing the order, nesting, or icons inside a menu file, debugging why a menu item does not appear or lands in the wrong group.
+  TRIGGER when: designing sidebar menus, grouping node types in UI, customizing Infrahub web interface navigation, modifying or extending an existing menu, changing the order, nesting, or icons inside a menu file, debugging why a menu item does not appear or lands in the wrong group, editing a YAML file under `menus/` or any file with `kind: Menu`.
   DO NOT TRIGGER when: designing or modifying schemas, including setting menu_placement, icon, or order_weight on a schema node (use infrahub-managing-schemas), writing checks or transforms, populating data objects.
 argument-hint: "[menu-structure-description]"
 metadata:
@@ -21,11 +21,14 @@ hierarchy.
 
 ## Project Context
 
-Existing menu files:
-!`find . -name "*.yml" -path "*/menus/*" 2>/dev/null | head -10`
+Before writing a menu, look at the project with
+read-only tools:
 
-Schema files (to identify available node types):
-!`find . -name "*.yml" -path "*/schemas/*" -o -name "*schema*" -name "*.yml" 2>/dev/null | head -10`
+- Find the existing menu files: `.yml` files under a
+  `menus/` directory.
+- Find the schema files, to learn which node kinds are
+  available: `.yml` files under a `schemas/` directory,
+  or with `schema` in the name.
 
 ## When to Use
 
@@ -41,6 +44,8 @@ Schema files (to identify available node types):
   menu file
 - Debugging why a menu item does not appear, or
   lands in the wrong group
+- Editing a YAML file under `menus/`, or any file
+  with `kind: Menu`
 
 ## Rule Categories
 

@@ -2,7 +2,7 @@
 name: infrahub-managing-generators
 description: >-
   Creates, modifies and debugs Infrahub Generators — design-driven automation that builds infrastructure objects from templates and topology definitions.
-  TRIGGER when: building design-to-implementation workflows, auto-creating objects from templates, topology-driven generation, modifying or extending an existing generator, debugging why a generator produced or deleted the wrong objects or left a field empty or wrong, changing what a generator produces.
+  TRIGGER when: building design-to-implementation workflows, auto-creating objects from templates, topology-driven generation, modifying or extending an existing generator, debugging why a generator produced or deleted the wrong objects or left a field empty or wrong, changing what a generator produces, editing a `.py` or `.gql` file under `generators/` in an Infrahub repository.
   DO NOT TRIGGER when: designing schemas, writing data transforms, querying live data, populating static data files.
 argument-hint: "[generator-name] [description...]"
 metadata:
@@ -22,11 +22,12 @@ downstream infrastructure.
 
 ## Project Context
 
-Infrahub config:
-!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
+Before writing a generator, look at the project with
+read-only tools:
 
-Existing generators:
-!`find . -name "*.py" -path "*/generators/*" 2>/dev/null | head -20`
+- Read `.infrahub.yml` if it exists.
+- Find the existing generators: `.py` files under a
+  `generators/` directory.
 
 ## When to Use
 
@@ -37,6 +38,8 @@ Existing generators:
 - Understanding the generator tracking system
 - Changing or extending what an existing generator produces
 - Debugging a generator that created, deleted, or left wrong objects or fields
+- Editing any `.py` or `.gql` file under `generators/`, even when the
+  request does not mention generators
 
 ## Rule Categories
 

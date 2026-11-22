@@ -75,8 +75,9 @@ all the kinds you need.
    different server than the configured one):
 
    ```bash
-   curl -s "$INFRAHUB_ADDRESS/api/schema?branch=<name>" \
-     | jq '.nodes[] | select(.name == "<Kind>")'
+   curl -s -o schema.json \
+     "$INFRAHUB_ADDRESS/api/schema?branch=<name>"
+   jq '.nodes[] | select(.name == "<Kind>")' schema.json
    ```
 
 4. **Local `schemas/*.yml`** in the repo. Read every

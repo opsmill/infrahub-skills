@@ -10,8 +10,7 @@ raised a hold or a warning. None of them is part of the plugin.
 
 This script builds a commit holding only `SHIPPED_PATHS`, taken from a
 source commit, and points the plugin branch at it. The directory tracks that
-branch instead of `main`. The plugin stays at the root of the branch, which
-matters: a plugin in a subfolder has its hook scripts held for a reviewer.
+branch instead of `main`, so its Branch or tag field must say `plugin`.
 
 Each build is committed on top of the branch's previous build, so the branch
 history is linear and every commit names the `main` commit it came from. A
@@ -38,8 +37,6 @@ import tempfile
 SHIPPED_PATHS = (
     ".claude-plugin",
     "skills",
-    "hooks",
-    "hooks-handlers",
     "README.md",
     "LICENSE",
 )

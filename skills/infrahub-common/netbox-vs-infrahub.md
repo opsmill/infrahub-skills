@@ -19,8 +19,9 @@ schema, not any documentation. Use:
 # Dump the running schema (one YAML file per namespace)
 infrahubctl schema export --branch main ./schema-export
 
-# Or query the REST endpoint directly
-curl -s "$INFRAHUB_ADDRESS/api/schema?branch=main" | jq '.nodes[] | select(.name == "Interface")'
+# Or save the REST endpoint's response, then filter it
+curl -s -o schema.json "$INFRAHUB_ADDRESS/api/schema?branch=main"
+jq '.nodes[] | select(.name == "Interface")' schema.json
 ```
 
 GraphQL introspection on `/graphql` also works.

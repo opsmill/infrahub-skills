@@ -29,8 +29,8 @@ It rejects the whole `.infrahub.yml` file. Check your target version before addi
 
 | AI Tool | Installation Method | Auto-detection | Direct Skill Invocation |
 | --------- | ------------------- | ---------------- | ------------------------ |
-| Claude Code (plugin) | `/plugin install infrahub@opsmill` | Yes (session hook) | Yes (`/infrahub:managing-schemas`, etc.) |
-| Claude Code (npx) | `npx skills add` | No | Yes |
+| Claude Code (plugin) | `/plugin install infrahub@opsmill` | Yes (skill descriptions) | Yes (`/infrahub:managing-schemas`, etc.) |
+| Claude Code (npx) | `npx skills add` | Yes (skill descriptions) | Yes |
 | GitHub Copilot | `npx skills add` | No | No, passive only |
 | Cursor | `npx skills add` | No | No, passive only |
 | Windsurf | `npx skills add` | No | No, passive only |
@@ -135,7 +135,36 @@ Each skill's SKILL.md file describes when and how to use it.
 
 ### Claude Code (plugin)
 
-No additional configuration required after plugin install. The session hook fires on project open and provides context about available skills automatically.
+No additional configuration required after plugin install. Claude Code chooses a skill from its description when your request matches it.
+
+A request such as "fix the failing test in `generators/create_dc.py`" names a file, not a task, so the matching skill may not load. To make Claude Code read the right skill before it edits a file, add this section to the `CLAUDE.md` at the root of your Infrahub repository:
+
+```markdown
+## Infrahub skills
+
+Before editing a file in these paths, read the matching skill from the
+infrahub plugin, and the rules named here:
+
+- `generators/**/*.py` or `generators/**/*.gql`: `infrahub-managing-generators`,
+  including `rules/python-relationship-references.md` and
+  `rules/python-multi-peer-add.md`
+- `transforms/**/*.py`, `templates/**/*.j2` or `queries/**/*.gql`:
+  `infrahub-managing-transforms`, including `rules/queries-union-fragments.md`
+  before editing a `.gql` file, and `rules/artifacts-async-regen-polling.md`
+  before writing code that calls `/api/artifact/generate`
+- `checks/**/*.py`: `infrahub-managing-checks`
+- `objects/**/*.yml`, `data/**/*.yml`, or any file with
+  `apiVersion: infrahub.app/v1` and `kind: Object`: `infrahub-managing-objects`
+- `menus/**/*.yml`, or any file with `kind: Menu`: `infrahub-managing-menus`
+- Any `.gql` file: also `infrahub-common`'s
+  `rules/deployment-gql-dry-run.md`
+
+Before running any `infrahubctl` command, detect the project's Python
+environment as `infrahub-common`'s `rules/connectivity-python-environment.md`
+describes.
+```
+
+These path rules matter most for generators and transforms. Code written from the patterns already in a repository can pass its unit tests and still fail against a live Infrahub server, and the skills hold the rules that prevent that.
 
 ## MCP server setup (Data Analyzer skill)
 

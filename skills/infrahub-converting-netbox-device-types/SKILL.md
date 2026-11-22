@@ -41,11 +41,13 @@ at the right schema and reading what it tells you.
 
 ## Project Context
 
-Target schema files:
-!`find . -name "*.yml" -path "*schema*" 2>/dev/null | head -10`
+Before converting, look at the project with read-only
+tools:
 
-Existing mapping profiles:
-!`find . -name "*.yml" -path "*mappings*" 2>/dev/null | head -10`
+- Find the target schema files: `.yml` files with
+  `schema` in their path.
+- Find any existing mapping profiles: `.yml` files with
+  `mappings` in their path.
 
 ## When to Use
 
@@ -218,10 +220,14 @@ own instance is usually what they actually want to
 import, and it is not the same set as the published
 library. `scripts/netbox_export_device_types.py` reads
 a live instance over its REST API and writes the
-library file format:
+library file format. It needs
+[pynetbox](https://pynetbox.readthedocs.io/) 7.0 or
+later, NetBox's Python client, and
+[PyYAML](https://pyyaml.org/wiki/PyYAMLDocumentation)
+in the Python environment that runs it. Install both
+the way that environment's package manager documents.
 
 ```bash
-pip install 'pynetbox>=7.0' pyyaml   # NetBox's client, and the file writer
 # SKILL is this skill's own directory, wherever it is installed
 SKILL=/path/to/infrahub-converting-netbox-device-types
 export NETBOX_TOKEN=...

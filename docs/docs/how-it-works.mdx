@@ -57,15 +57,9 @@ Agents with plugin support let you invoke a skill by name:
 
 Where an agent has no plugin mechanism, activation is passive: the AI finds skill files through its normal file context and applies them when the request is relevant. No explicit invocation is needed.
 
-## Auto-detection (plugin installs)
+## How a skill is chosen (plugin installs)
 
-When installed as a plugin, a `SessionStart` hook runs on project open. The hook checks for Infrahub project markers:
-
-- `.infrahub.yml`
-- `infrahub.toml`
-- Schema files containing `version: "1.0"` with `nodes:` or `generics:` keys
-
-If markers are found, the hook outputs context that tells the AI which skills are available and how to use them, before you type anything.
+Claude Code reads each skill's description and loads the skill whose description matches your request. You do not need to name the skill, and nothing runs when you open a project.
 
 With other AI tools (npx or manual copy), discovery happens because the skill files are present in the project directory. The AI finds them through its normal file context when the user's request is relevant.
 

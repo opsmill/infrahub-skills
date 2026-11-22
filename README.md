@@ -208,10 +208,6 @@ See [Cursor Rules docs](https://cursor.com/docs/rules).
 .
 ├── .claude-plugin/
 │   └── plugin.json              # Plugin manifest
-├── hooks/
-│   └── hooks.json               # Hook definitions
-├── hooks-handlers/
-│   └── session-start.sh         # Infrahub project detection
 ├── skills/
 │   ├── infrahub-common/          # Shared references and rules
 │   ├── infrahub-managing-schemas/  # Schema design

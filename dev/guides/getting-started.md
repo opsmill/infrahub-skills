@@ -106,19 +106,16 @@ entry point and supporting files (rules, examples,
 references). The AI assistant reads these files to
 produce correct, best-practice Infrahub artifacts.
 
-### Automatic Detection (Claude Code only)
+### How a skill is chosen (Claude Code)
 
-When installed as a plugin, the SessionStart hook
-automatically detects Infrahub projects by looking
-for:
+Claude Code picks a skill from its `description`: the
+TRIGGER and DO NOT TRIGGER clauses decide which request
+loads which skill. The plugin has no hook, because the
+Claude plugin directory accepts command hooks only under
+strict rules that a project-detection script cannot meet.
 
-- `.infrahub.yml` or `infrahub.toml` configuration
-  files
-- Schema files containing `version: "1.0"` with
-  `nodes:` or `generics:` keys
-
-When detected, Claude is guided to use the appropriate
-skill for each task.
+When a request matches, Claude loads that skill and
+follows its rules.
 
 ### Manual Invocation
 
@@ -202,15 +199,10 @@ Confirm skills are installed and discoverable:
    and produce a YAML schema starting with
    `version: "1.0"` containing a `nodes:` list.
 
-3. For Claude Code plugin installs, verify detection:
-
-   ```bash
-   # In a directory with .infrahub.yml
-   claude
-   ```
-
-   The SessionStart hook should report that Infrahub
-   skills are available.
+3. For Claude Code plugin installs, verify the skills
+   are registered: run `/skills` in a Claude Code
+   session and check that the `infrahub-*` skills are
+   listed.
 
 ## Related Resources
 

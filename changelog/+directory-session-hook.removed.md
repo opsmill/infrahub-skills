@@ -1,0 +1,1 @@
+Removed the `SessionStart` hook that detected Infrahub projects. The Claude plugin directory holds or refuses a command hook whose script uses variables, wildcards, command substitution or a here-document, and the detection script needed all of them. Claude Code still picks each skill from its description, so you do not need to name a skill to use it.

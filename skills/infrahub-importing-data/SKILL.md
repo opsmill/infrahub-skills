@@ -33,17 +33,17 @@ default branch.
 
 ## Project Context
 
-Existing schema files:
-!`find . -name "*.yml" -path "*/schemas/*" -o -name "*schema*" -name "*.yml" 2>/dev/null | head -10`
+Before converting anything, look at the project with
+read-only tools:
 
-Existing object files:
-!`find . -name "*.yml" -path "*/objects/*" 2>/dev/null | head -10`
-
-`.infrahub.yml` if present:
-!`find . -maxdepth 2 -name ".infrahub.yml" 2>/dev/null | head -1`
-
-Candidate CSV/TSV inputs in the working tree:
-!`find . -maxdepth 3 \( -name "*.csv" -o -name "*.tsv" \) 2>/dev/null | head -10`
+- Find the existing schema files: `.yml` files under a
+  `schemas/` directory, or with `schema` in the name.
+- Find the existing object files: `.yml` files under an
+  `objects/` directory.
+- Check for `.infrahub.yml` up to two directory levels
+  deep.
+- Find candidate `.csv` and `.tsv` inputs up to three
+  directory levels deep.
 
 If invoked with arguments (e.g.,
 `/infrahub:importing-data inventory.csv`), treat the

@@ -40,11 +40,13 @@ for read-only inspection, not for changing state;
 
 ## Project Context
 
-Project structure:
-!`find . -maxdepth 2 -type f \( -name "*.yml" -o -name "*.yaml" -o -name "*.py" -o -name "*.gql" -o -name "*.j2" \) 2>/dev/null | head -40`
+Before auditing, look at the project with read-only
+tools:
 
-Infrahub config:
-!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
+- List the `.yml`, `.yaml`, `.py`, `.gql`, and `.j2`
+  files up to two directory levels deep.
+- Read `.infrahub.yml` if it exists. If it does not,
+  note that in the report.
 
 ## When to Use
 
