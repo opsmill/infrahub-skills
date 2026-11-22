@@ -136,5 +136,3 @@ be re-rendered against current data. Without one
 of these, "I pushed a fix and the artifact still
 shows the old config" is the canonical user
 complaint.
-
-Reference: [Infrahub CLI Docs](https://docs.infrahub.app)

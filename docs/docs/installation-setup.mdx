@@ -38,9 +38,8 @@ It rejects the whole `.infrahub.yml` file. Check your target version before addi
 | Cline | `npx skills add` | No | No, passive only |
 | Codex | `npx skills add` | No | No, passive only |
 
-**Auto-detection** means the tool recognizes an Infrahub project and
-activates skills without you asking. It is a plugin feature, via the
-session start hook.
+**Auto-detection** means the tool loads a skill without you naming it,
+because your request matches the skill's description.
 
 **Direct skill invocation** means calling a skill by name, for example
 `/infrahub:managing-schemas`. Available where the agent supports
@@ -71,7 +70,7 @@ Install from the Claude Code plugin marketplace for a global installation that w
 /plugin install infrahub@opsmill
 ```
 
-The plugin auto-detects Infrahub projects on session start by looking for `.infrahub.yml`, `infrahub.toml`, or schema file markers in the project directory.
+Claude Code chooses a skill from its description when your request matches it. See [Claude Code (plugin)](#claude-code-plugin) for a `CLAUDE.md` section that makes it read the right skill before editing a file by path.
 
 </TabItem>
 <TabItem value="manual" label="Manual Copy">

@@ -177,4 +177,5 @@ created again for a slowness that already ended.
 - Asking the operator to paste a token in the
   conversation.
 
-Reference: [Collect a diagnostic bundle](https://docs.infrahub.app/backup/collect/create)
+Reference: "Collect a diagnostic bundle", linked from
+[reference.md](../reference.md).

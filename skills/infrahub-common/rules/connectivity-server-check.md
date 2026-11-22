@@ -225,8 +225,8 @@ export INFRAHUB_API_TOKEN="your-api-token"
    `INFRAHUB_ADDRESS` matches the actual server URL
 3. **Is the token valid?** Regenerate the API token
    from the Infrahub UI if needed
-4. **Is the network reachable?** Test with
-   `curl -s $INFRAHUB_ADDRESS/api/health`
+4. **Is the network reachable?** Run `infrahubctl info`
+   again and read `Connection Status` (Step 1)
 
 ### Prevention
 
@@ -271,6 +271,3 @@ export INFRAHUB_API_TOKEN="your-api-token"
 - Wrap state-changing commands in a task runner that
   supplies credentials explicitly rather than relying
   on ambient configuration.
-
-Reference:
-[Infrahub CLI Docs](https://docs.infrahub.app)

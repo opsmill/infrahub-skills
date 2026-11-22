@@ -269,21 +269,16 @@ Continuous replication is
 separate product.
 
 **From the published library.** For seeding vendor
-models nobody has yet, clone the upstream repo — but
-sparsely. A plain `--depth 1` clone pulls 1.6 GB,
-almost all of it rack elevation images the converter
-never reads. Restricting to the definitions gets all
-11,500+ device types and 2,000+ module types in about
-60 MB:
-
-```bash
-git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/netbox-community/devicetype-library.git
-git -C devicetype-library sparse-checkout set device-types module-types
-```
-
-Drop `module-types` from that list if you only want
-devices.
+models nobody has yet, use the upstream
+[netbox-community/devicetype-library](https://github.com/netbox-community/devicetype-library)
+repository, and fetch only its `device-types/` and
+`module-types/` directories, for example with a
+[sparse checkout](https://git-scm.com/docs/git-sparse-checkout).
+A full copy is 1.6 GB, almost all of it rack elevation
+images the converter never reads. The two definition
+directories hold all 11,500+ device types and 2,000+
+module types in about 60 MB. Leave out `module-types/`
+if you only want devices.
 
 The converter accepts files, directories (walked
 recursively), and globs.

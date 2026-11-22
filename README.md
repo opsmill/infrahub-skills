@@ -154,7 +154,7 @@ If you use Claude Code, you can also install as a plugin via the OpsMill marketp
 /plugin install infrahub@opsmill
 ```
 
-The plugin auto-detects Infrahub projects on session start by looking for `.infrahub.yml`, `infrahub.toml`, or schema files with `version: "1.0"` and `nodes:`/`generics:` keys.
+Claude Code chooses a skill from its description when your request matches it. To make it read the right skill before editing a file by path, add the `CLAUDE.md` section in the [installation guide](docs/docs/installation-setup.mdx#claude-code-plugin).
 
 ### Manual Copy
 
