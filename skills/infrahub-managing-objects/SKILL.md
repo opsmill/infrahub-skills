@@ -24,10 +24,14 @@ modules, and more.
 Before writing object files, look at the project with
 read-only tools:
 
-- Find the existing schema files: `.yml` files under a
+- Find the existing schema files: `.yml` or `.yaml` files under a
   `schemas/` directory, or with `schema` in the name.
 - Find the existing object files: `.yml` or `.yaml` files
   under an `objects/` or `data/` directory.
+
+These steps contact the Infrahub server, so they come
+after the read-only look at the project:
+
 - Before running any `infrahubctl` command, detect the
   project's Python environment as
   [../infrahub-common/rules/connectivity-python-environment.md](../infrahub-common/rules/connectivity-python-environment.md)

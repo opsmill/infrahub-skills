@@ -27,8 +27,13 @@ read-only tools:
 - Find the existing menu files: `.yml` or `.yaml` files
   under a `menus/` directory.
 - Find the schema files, to learn which node kinds are
-  available: `.yml` files under a `schemas/` directory,
+  available: `.yml` or `.yaml` files under a `schemas/`
+  directory,
   or with `schema` in the name.
+
+These steps contact the Infrahub server, so they come
+after the read-only look at the project:
+
 - Before running any `infrahubctl` command, detect the
   project's Python environment as
   [../infrahub-common/rules/connectivity-python-environment.md](../infrahub-common/rules/connectivity-python-environment.md)

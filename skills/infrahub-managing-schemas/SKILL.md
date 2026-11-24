@@ -24,9 +24,13 @@ relationships, and extensions.
 Before changing a schema, look at the project with
 read-only tools:
 
-- Find the existing schema files: `.yml` files under a
+- Find the existing schema files: `.yml` or `.yaml` files under a
   `schemas/` directory, or with `schema` in the name.
 - Read `.infrahub.yml` if it exists.
+
+These steps contact the Infrahub server, so they come
+after the read-only look at the project:
+
 - Before running any `infrahubctl` command, detect the
   project's Python environment as
   [../infrahub-common/rules/connectivity-python-environment.md](../infrahub-common/rules/connectivity-python-environment.md)

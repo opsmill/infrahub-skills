@@ -278,7 +278,8 @@ directory with the `--depth 1`, `--filter=blob:none` and
 to `device-types` and `module-types`. Later steps and
 `examples.md` use `devicetype-library/` as a relative
 path. A sparse checkout alone still downloads every
-file: the two options are what keep the download small.
+file: all three options are needed to keep the download
+small.
 A full copy is 1.6 GB, almost all of it rack elevation
 images the converter never reads. The two definition
 directories hold all 11,500+ device types and 2,000+

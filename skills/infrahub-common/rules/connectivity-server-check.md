@@ -225,11 +225,14 @@ export INFRAHUB_API_TOKEN="your-api-token"
    `INFRAHUB_ADDRESS` matches the actual server URL
 3. **Is the token valid?** Regenerate the API token
    from the Infrahub UI if needed
-4. **Is the network reachable?** Open
-   `$INFRAHUB_ADDRESS/api/health` in a browser on the
-   same machine. If the page loads but `infrahubctl info`
-   fails, the fault is in the SDK configuration or the
-   Python environment, not the network
+4. **Is the network reachable?** In a browser on the
+   same machine, open the server address that
+   `INFRAHUB_ADDRESS` holds, followed by `/api/health`,
+   for example `http://localhost:8000/api/health`. If the
+   page loads but `infrahubctl info` fails, check the SDK
+   configuration, the Python environment, and any proxy,
+   DNS or TLS settings that apply to the command line but
+   not to the browser
 
 ### Prevention
 

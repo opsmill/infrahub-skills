@@ -30,12 +30,17 @@ read-only tools:
   `generators/` directory.
 - Find the existing generator queries: `.gql` files
   under a `generators/` directory.
+
+These steps contact the Infrahub server, so they come
+after the read-only look at the project:
+
 - Before running any `infrahubctl` command, detect the
   project's Python environment as
   [../infrahub-common/rules/connectivity-python-environment.md](../infrahub-common/rules/connectivity-python-environment.md)
   describes.
-- Before merging a changed `.gql` file, dry-run it
-  against the live schema as
+- Before opening a pull request that changes a `.gql`
+  file, dry-run the query against the live schema on a
+  branch as
   [../infrahub-common/rules/deployment-gql-dry-run.md](../infrahub-common/rules/deployment-gql-dry-run.md)
   describes.
 

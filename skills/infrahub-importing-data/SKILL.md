@@ -37,7 +37,7 @@ Before converting anything, look at the project with
 read-only tools. List at most 10 matches per search, so a
 large tree does not fill the context:
 
-- Find the existing schema files: `.yml` files under a
+- Find the existing schema files: `.yml` or `.yaml` files under a
   `schemas/` directory, or with `schema` in the name.
 - Find the existing object files: `.yml` files under an
   `objects/` directory.

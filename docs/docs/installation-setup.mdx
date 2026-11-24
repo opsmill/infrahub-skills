@@ -153,9 +153,11 @@ of that skill, next to its `SKILL.md`:
   including `rules/artifacts-async-regen-polling.md` before writing code
   that calls `/api/artifact/generate`
 - `checks/**/*.py`: `infrahub-managing-checks`
-- `queries/**/*.gql`: look up in `.infrahub.yml` which transform or check
-  uses the query, then read `infrahub-managing-transforms`, including
-  `rules/queries-union-fragments.md`, or `infrahub-managing-checks`
+- `queries/**/*.gql`: find which transform, check or generator uses the
+  query, from its `.infrahub.yml` entry or the `query` attribute of its
+  Python class, then read `infrahub-managing-transforms` (including
+  `rules/queries-union-fragments.md`), `infrahub-managing-checks` or
+  `infrahub-managing-generators`
 - Any YAML file with `apiVersion: infrahub.app/v1` and `kind: Object`,
   usually under `objects/` or `data/`: `infrahub-managing-objects`
 - `menus/**/*.{yml,yaml}`, or any file with `kind: Menu`: `infrahub-managing-menus`
