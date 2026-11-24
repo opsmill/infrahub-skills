@@ -26,8 +26,13 @@ class FakeSession:
 
     def get(self, url, params=None, headers=None, timeout=None):
         query = {**dict(parse_qsl(urlsplit(url).query)), **(params or {})}
-        if query == dict(parse_qsl(urlsplit(self.page["request"]["path"]).query)):
+        captured = dict(parse_qsl(urlsplit(self.page["request"]["path"]).query))
+        if query == captured:
             return FakeResponse(self.page["status"], self.page["headers"], self.page["body"])
+        if {k: v for k, v in query.items() if k != "sysparm_fields"} != {
+            k: v for k, v in captured.items() if k != "sysparm_fields"
+        }:
+            return FakeResponse(404, {}, {"error": {"message": "no capture for this page"}})
         wanted = {f for f in query.get("sysparm_fields", "").split(",") if f}
         rows = [{k: v for k, v in r.items() if not wanted or k in wanted} for r in self.page["body"]["result"]]
         return FakeResponse(200, {}, {"result": rows})

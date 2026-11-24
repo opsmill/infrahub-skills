@@ -17,13 +17,21 @@ An adapter change touches only these files in the
 infrahub-sync checkout:
 
 - `infrahub_sync/adapters/<name>.py`;
-- its tests and fixtures under `tests/`;
-- its example under `examples/`;
-- its docs page and the adapter lists under `docs/`, and
-  the product names it adds to
+- its tests, `tests/adapters/test_<name>*.py`, and its
+  fixtures under `tests/fixtures/<name>/`;
+- its example under `examples/<name>*/`;
+- its docs page `docs/docs/adapters/<name>.mdx`, and one
+  line each in the adapter lists:
+  `docs/docs/adapters/choosing-an-adapter.mdx`,
+  `docs/docs/readme.mdx`, `docs/sidebars.ts`,
+  `README.md` and `AGENTS.md`;
+- the product names it adds to
   `.vale/styles/spelling-exceptions.txt`;
 - its news fragment under `changelog/`;
-- its spec under `dev/specs/` (or `specs/`).
+- its spec under `dev/specs/<number>-<name>-adapter/`.
+
+The merged Webex adapter (opsmill/infrahub-sync#401)
+touched exactly these files.
 
 Every other file under `infrahub_sync/` stays as it is:
 `rest_api_client.py`, `utils.py`, the core models, the
@@ -59,17 +67,22 @@ was reverted file by file.
   - the adapters that would use it;
   - the workaround in this adapter (the private helper's
     name).
-- **After each commit, run the scope check.** It must
+- **After each commit, run the scope check.** It lists
+  every changed file outside the list above, and must
   print nothing:
 
 ```bash
-git diff --stat "<base>" -- infrahub_sync ':!infrahub_sync/adapters/<name>.py'
+NAME="<name>"   # the adapter name
+git diff --name-only "<base>" | grep -vE "^(infrahub_sync/adapters/$NAME\.py|tests/adapters/test_$NAME[^/]*\.py|tests/fixtures/$NAME/.+|examples/$NAME[^/]*/.+|docs/docs/adapters/($NAME|choosing-an-adapter)\.mdx|docs/docs/readme\.mdx|docs/sidebars\.ts|README\.md|AGENTS\.md|\.vale/styles/spelling-exceptions\.txt|changelog/[^/]+\.md|dev/specs/[^/]*-$NAME-[^/]*/.+)$"
 ```
 
 `<base>` is the commit the adapter branch started from,
 for example the output of
-`git merge-base HEAD origin/main`. Any line in the output
-is a core file to revert before going on.
+`git merge-base HEAD origin/main`. A line under
+`infrahub_sync/` is a core file to revert; any other line
+is a file of another adapter or of the repository, to
+revert or to explain to the user. A drafted core issue
+stays untracked, so it does not show here.
 
 ### Correct
 
@@ -80,16 +93,17 @@ core issue proposes the shared version:
 # infrahub_sync/adapters/netinventory.py
 import re
 
-_LINK = re.compile(r"<([^>]*)>([^,<]*)")
-_REL = re.compile(r'(?:^|;)\s*rel="?([^";]+)"?', re.IGNORECASE)
+# One link value: <url> then its parameters, where a quoted string may hold "," or ";".
+_LINK = re.compile(r'<([^>]*)>((?:[^,"<]|"[^"]*")*)')
+_PARAM = re.compile(r';\s*([^=;\s]+)\s*=\s*("[^"]*"|[^;]*)')
 
 
 def _next_link(link_header: str | None) -> str | None:
     """The rel="next" URL of a Link header, selected exactly (never prev or last), whatever the parameter order."""
     for url, params in _LINK.findall(link_header or ""):
-        rel = _REL.search(params)
-        if rel and "next" in rel.group(1).lower().split():
-            return url
+        for name, value in _PARAM.findall(params):
+            if name.lower() == "rel" and "next" in value.strip().strip('"').lower().split():
+                return url
     return None
 ```
 

@@ -12,6 +12,7 @@ from lib import run_checks  # noqa: E402
 
 CHECKS = [
     "identifiers-match-hfid",
+    "stable-id-is-a-field",
 ]
 
 if __name__ == "__main__":

@@ -7,7 +7,8 @@ The fake lives at <output_dir>/tests/fakes/servicenow.py and exposes
 timeout=None)`` returning an object with ``status_code``, ``headers`` and
 ``json()``. Network access is blocked before the module is imported, so a fake
 that calls the real API fails instead of passing. The last stdout line is a
-JSON report keyed by scenario.
+JSON report keyed by scenario. ``_sandbox.confine`` limits the fake before it
+is imported: no subprocess, no network, no write outside <output_dir>.
 """
 
 from __future__ import annotations
@@ -26,6 +27,15 @@ HEADERS = {"Accept": "application/json"}
 
 def _blocked(*_a, **_k):
     raise OSError("network access is blocked in the grader")
+
+
+def _confine(out_dir: Path) -> None:
+    spec = importlib.util.spec_from_file_location(
+        "_sandbox", Path(__file__).with_name("_sandbox.py")
+    )
+    sandbox = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sandbox)
+    sandbox.confine(out_dir)
 
 
 def _link_next(headers) -> str | None:
@@ -55,6 +65,8 @@ def main() -> None:
     out_dir, captures_dir = Path(sys.argv[1]), Path(sys.argv[2])
     socket.socket.connect = _blocked  # type: ignore[method-assign]
     socket.create_connection = _blocked  # type: ignore[assignment]
+    captured = json.loads((captures_dir / "cmdb_ci_netgear_page1.json").read_text())
+    _confine(out_dir)
     report: dict = {}
     fake_path = out_dir / "tests" / "fakes" / "servicenow.py"
     if not fake_path.exists():
@@ -75,7 +87,6 @@ def main() -> None:
         print(json.dumps({"error": f"cannot build the fake: {exc!r}"}))
         return
 
-    captured = json.loads((captures_dir / "cmdb_ci_netgear_page1.json").read_text())
     captured_url = "https://example.service-now.com" + captured["request"]["path"]
     expected_next = dict(
         (rel, url)
@@ -100,6 +111,16 @@ def main() -> None:
             report[name] = {"error": f"{name}: the fake raised {exc!r}"}
     if "error" not in report["captured_page"]:
         report["captured_page"]["expected_next"] = expected_next
+    # The next page was not captured: a strict fake answers 404 or raises, and
+    # must not serve the first page again for it.
+    try:
+        report["next_page"] = (
+            _call(session, expected_next)
+            if expected_next
+            else {"error": "no next link"}
+        )
+    except Exception as exc:  # noqa: BLE001
+        report["next_page"] = {"error": f"next_page: the fake raised {exc!r}"}
     print(json.dumps(report, default=str))
 
 

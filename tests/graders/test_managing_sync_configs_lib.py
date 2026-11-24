@@ -95,3 +95,52 @@ def test_identifiers_hfid_inherited_from_first_generic_that_declares_one() -> No
         lib.yaml.safe_load((_GRADERS / "data" / "netbox_schema.yml").read_text())
     )
     assert hfids == {"LocationSite": ["name"], "NetworkDevice": ["name", "location"]}
+
+
+_PASS = _FIXTURES / "identifiers-hfid" / "pass" / "config.yml"
+_SCHEMA = lib.yaml.safe_load((_GRADERS / "data" / "netbox_schema.yml").read_text())
+
+
+def _checks(config: dict) -> dict[str, bool]:
+    ctx = {"config": config, "schema": _SCHEMA}
+    return {name: fn(ctx)[0] for name, fn in lib.CHECKS.items()}
+
+
+def _device(config: dict) -> dict:
+    return next(m for m in config["schema_mapping"] if m["name"] == "NetworkDevice")
+
+
+def test_nearmiss_fails_only_on_the_unmapped_identifier() -> None:
+    config, _ = lib.load_yaml_file(
+        _FIXTURES / "identifiers-hfid" / "fail-nearmiss" / "config.yml"
+    )
+    assert _checks(config) == {
+        "identifiers-match-hfid": False,
+        "stable-id-is-a-field": True,
+    }
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        pytest.param(lambda d: d.pop("fields"), id="no fields at all"),
+        pytest.param(
+            lambda d: d["identifiers"].append("name"), id="duplicate identifier"
+        ),
+    ],
+)
+def test_identifiers_must_be_unique_and_mapped(mutate) -> None:
+    config, _ = lib.load_yaml_file(_PASS)
+    mutate(_device(config))
+    assert _checks(config)["identifiers-match-hfid"] is False
+
+
+def test_stable_id_check_fails_when_netbox_id_is_dropped_or_used_as_key() -> None:
+    config, _ = lib.load_yaml_file(_PASS)
+    site = next(m for m in config["schema_mapping"] if m["name"] == "LocationSite")
+    site["fields"] = [f for f in site["fields"] if f["name"] != "netbox_id"]
+    assert _checks(config)["stable-id-is-a-field"] is False
+
+    config, _ = lib.load_yaml_file(_PASS)
+    _device(config)["identifiers"].append("netbox_id")
+    assert _checks(config)["stable-id-is-a-field"] is False

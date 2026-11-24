@@ -7,7 +7,6 @@ as skillgrade runs them, from the fixture directory, so the test covers the
 script and the library together.
 """
 
-import ast
 import importlib.util
 import json
 import subprocess
@@ -100,7 +99,10 @@ _PASS_PR = _FIXTURES / "pr-check-list" / "pass" / "PR_DESCRIPTION.md"
 @pytest.mark.parametrize(
     ("dropped", "item"),
     [
-        ("- `infrahub-sync list --directory examples/`\n", "infrahub-sync list"),
+        (
+            "- `infrahub-sync list --directory examples/`: lists from-servicenow\n",
+            "infrahub-sync list",
+        ),
         ("Docs page `docs/docs/adapters/servicenow.mdx`, ", "docs page"),
         (
             ", row in `docs/docs/adapters/choosing-an-adapter.mdx`",
@@ -116,29 +118,25 @@ def test_pr_checks_require_every_docs_item(dropped: str, item: str) -> None:
     assert item in details
 
 
-_TLS_CLIENT = """
-import requests
-
-def get(session, url):
-    while True:
-        try:
-            return session.get(url)
-        except requests.exceptions.SSLError:
-            {ssl_body}
-        except requests.exceptions.ConnectionError:
-            continue
-"""
+def test_pr_checks_require_a_result_after_each_command() -> None:
+    """Only the code spans, with no result after them, is a list of checks not run."""
+    text = _PASS_PR.read_text()
+    bare = "\n".join(
+        line.split(": ", 1)[0] if line.startswith("- `") else line
+        for line in text.splitlines()
+    )
+    ok, details = lib.check_pr_checks_complete({"pr_text": bare})
+    assert not ok
+    assert "no result written after" in details
 
 
-@pytest.mark.parametrize(
-    ("ssl_body", "expected"), [("raise", True), ("continue", False), ("pass", False)]
-)
-def test_no_tls_retry_requires_the_ssl_handler_to_reraise(
-    ssl_body: str, expected: bool
-) -> None:
-    tree = ast.parse(_TLS_CLIENT.format(ssl_body=ssl_body))
-    ok, details = lib.check_no_tls_retry({"py": tree, "py_err": None})
-    assert ok is expected, details
+def test_pr_checks_ignore_commands_that_are_only_printed() -> None:
+    text = _PASS_PR.read_text().replace(
+        "`uv run ty check .`: passed", "`echo uv run ty check .`: printed"
+    )
+    ok, details = lib.check_pr_checks_complete({"pr_text": text})
+    assert not ok
+    assert "type check" in details
 
 
 def test_fake_probe_without_output_dir_reports_an_error(tmp_path: Path) -> None:
@@ -168,33 +166,45 @@ def test_scope_ignores_caches_and_allows_vale_exceptions(tmp_path: Path) -> None
 
 
 _RETRY_PASS = (_FIXTURES / "retry-policy" / "pass" / "servicenow_client.py").read_text()
+_RETRY_CHECKS = (
+    "retry-status-set",
+    "retry-after-honored",
+    "retry-after-cap",
+    "backoff-capped-jitter",
+    "no-tls-retry",
+    "shared-retry-budget",
+)
 
 
-def _retry_checks(source: str) -> dict[str, bool]:
-    ctx = {"py": ast.parse(source), "py_err": None}
-    return {
-        name: fn(ctx)[0]
-        for name, fn in (
-            ("retry-status-set", lib.check_retry_status_set),
-            ("retry-after-honored", lib.check_retry_after_honored),
-            ("retry-after-cap", lib.check_retry_after_cap),
-            ("backoff-capped-jitter", lib.check_backoff_capped_jitter),
-        )
-    }
+def _retry_checks(tmp_path: Path, source: str) -> dict[str, bool]:
+    (tmp_path / "servicenow_client.py").write_text(source)
+    ctx = lib.build_context(tmp_path)
+    return {name: lib.CHECKS[name](ctx)[0] for name in _RETRY_CHECKS}
 
 
-# Each mutation of the compliant client keeps the token the old check looked for
-# (the status set, the header read, a comparison with 300, min(..., 60) and an
-# import of random) but cuts it off from the value the client acts on.
+# Each mutation of the compliant client keeps the rule's vocabulary (the status
+# set, the header read, the comparison with 300, min(..., 60), random, SSLError)
+# but changes what the client does. The review of #236 found each of these
+# passing the earlier, AST-only checks.
 _RETRY_MUTATIONS = {
     "status set defined, only 429 retried": (
         "if resp.status_code not in RETRY_STATUSES:",
         "if resp.status_code != 429:",
         "retry-status-set",
     ),
+    "membership test reversed": (
+        "if resp.status_code not in RETRY_STATUSES:",
+        "if resp.status_code in RETRY_STATUSES:",
+        "retry-status-set",
+    ),
     "Retry-After read, fixed sleep": (
         "            time.sleep(wait)\n",
         "            time.sleep(5)\n",
+        "retry-after-honored",
+    ),
+    "parsed wait overwritten": (
+        "                wait = float(retry_after)\n",
+        "                wait = float(retry_after)\n                wait = 5\n",
         "retry-after-honored",
     ),
     "300 compared with the attempt count, not the wait": (
@@ -209,6 +219,11 @@ _RETRY_MUTATIONS = {
         "        return 2 ** attempt",
         "backoff-capped-jitter",
     ),
+    "jitter added after the cap": (
+        "return min(BACKOFF_CAP, 2 ** attempt) * random.uniform(0.5, 1.0)",
+        "return min(BACKOFF_CAP, 2 ** attempt) + random.uniform(0, 5)",
+        "backoff-capped-jitter",
+    ),
     "jitter without a cap": (
         "return min(BACKOFF_CAP, 2 ** attempt) * random.uniform(0.5, 1.0)",
         "return 2 ** attempt * random.uniform(0.5, 1.0)",
@@ -219,19 +234,63 @@ _RETRY_MUTATIONS = {
         "return min(BACKOFF_CAP, 2 ** attempt)",
         "backoff-capped-jitter",
     ),
+    "TLS errors retried": (
+        "            except requests.exceptions.SSLError:\n                raise\n",
+        "",
+        "no-tls-retry",
+    ),
+    "timeouts not retried": (
+        "except (requests.ConnectionError, requests.Timeout):",
+        "except requests.ConnectionError:",
+        "no-tls-retry",
+    ),
+    "a second budget for connection errors": (
+        "            except (requests.ConnectionError, requests.Timeout):\n                attempt += 1\n"
+        "                if attempt > self.max_retries:",
+        "            except (requests.ConnectionError, requests.Timeout):\n                errors = getattr(self, 'errors', 0) + 1\n"
+        "                self.errors = errors\n                if errors > self.max_retries:",
+        "shared-retry-budget",
+    ),
 }
 
 
-def test_retry_checks_pass_the_compliant_client() -> None:
-    assert all(_retry_checks(_RETRY_PASS).values())
+def test_retry_checks_pass_the_compliant_client(tmp_path: Path) -> None:
+    assert all(_retry_checks(tmp_path, _RETRY_PASS).values())
 
 
 @pytest.mark.parametrize("case", list(_RETRY_MUTATIONS))
-def test_retry_check_fails_when_the_value_does_not_drive_the_retry(case: str) -> None:
+def test_retry_check_fails_when_the_behavior_breaks(tmp_path: Path, case: str) -> None:
     old, new, failing = _RETRY_MUTATIONS[case]
     assert _RETRY_PASS.count(old) == 1, f"the mutation for {case!r} no longer applies"
-    results = _retry_checks(_RETRY_PASS.replace(old, new))
-    assert results == {name: name != failing for name in results}, results
+    results = _retry_checks(tmp_path, _RETRY_PASS.replace(old, new))
+    assert results[failing] is False, results
+
+
+def test_retry_probe_cannot_read_the_environment_or_spawn(tmp_path: Path) -> None:
+    """Answer code runs with an empty environment and cannot start a process."""
+    source = _RETRY_PASS + (
+        "\nimport os, subprocess\n"
+        "LEAK = os.environ.get('ANTHROPIC_API_KEY')\n"
+        "assert LEAK is None, 'the environment reached the answer code'\n"
+        "subprocess.run(['true'])\n"
+    )
+    (tmp_path / "servicenow_client.py").write_text(source)
+    report = lib.run_probe("_retry_probe.py", tmp_path)
+    assert "PermissionError" in report.get("error", ""), report
+
+
+def test_retry_probe_refuses_writes_outside_the_answer_directory(
+    tmp_path: Path,
+) -> None:
+    work = tmp_path / "work"
+    work.mkdir()
+    target = tmp_path / "outside.txt"
+    (work / "servicenow_client.py").write_text(
+        _RETRY_PASS + f"\nopen({str(target)!r}, 'w').write('x')\n"
+    )
+    report = lib.run_probe("_retry_probe.py", work)
+    assert "PermissionError" in report.get("error", ""), report
+    assert not target.exists()
 
 
 def _selected(rows: list[dict]) -> dict:
@@ -239,20 +298,156 @@ def _selected(rows: list[dict]) -> dict:
 
 
 def test_fake_serves_captures_compares_every_row() -> None:
-    captured = list(lib._captured_rows("cmdb_ci_netgear").values())
-    rows = [{f: r[f] for f in ("sys_id", "name")} for r in captured]
+    page = lib._captured_page()
+    rows = [{f: r[f] for f in ("sys_id", "name")} for r in page]
     ok, details = lib.check_fake_serves_captures(_selected(rows))
     assert ok, details
 
-    made_up = [rows[0], {"sys_id": "0" * 32, "name": "made-up"}]
-    ok, details = lib.check_fake_serves_captures(_selected(made_up))
-    assert not ok
-    assert "not in the captures" in details
+    for wrong in (
+        [rows[0], {"sys_id": "0" * 32, "name": "made-up"}],  # a made-up row
+        [{**rows[0], "name": "renamed"}, rows[1]],  # a changed value
+        [rows[0]],  # a row missing
+        [{"sys_id": r["sys_id"]} for r in rows],  # a selected field dropped
+        list(reversed(rows)),  # another order
+        [],
+    ):
+        ok, details = lib.check_fake_serves_captures(_selected(wrong))
+        assert not ok, wrong
 
-    renamed = [{**rows[0], "name": "renamed"}, *rows[1:]]
-    ok, details = lib.check_fake_serves_captures(_selected(renamed))
-    assert not ok
-    assert "captured" in details
 
-    ok, details = lib.check_fake_serves_captures(_selected([]))
+def test_fake_next_link_fails_when_the_next_page_is_page_one() -> None:
+    page = lib._captured_page()
+    probe = {
+        "captured_page": {
+            "status": 200,
+            "rows": page,
+            "next": "n",
+            "expected_next": "n",
+        },
+        "next_page": {"status": 200, "rows": page, "next": "n"},
+    }
+    ok, details = lib.check_fake_next_link({"probe": probe})
     assert not ok
+    assert "first page again" in details
+    probe["next_page"] = {"status": 404, "rows": [], "next": None}
+    ok, details = lib.check_fake_next_link({"probe": probe})
+    assert ok, details
+
+
+@pytest.mark.parametrize(
+    "other",
+    [
+        "docs/unrelated.mdx",
+        "examples/netbox_to_infrahub/config.yml",
+        "tests/adapters/test_netbox.py",
+        ".github/workflows/ci.yml",
+    ],
+)
+def test_scope_rejects_files_of_other_adapters_or_the_repository(
+    tmp_path: Path, other: str
+) -> None:
+    root = tmp_path / "output"
+    for rel in (
+        "infrahub_sync/adapters/servicenow.py",
+        "tests/adapters/test_servicenow.py",
+        "docs/docs/adapters/servicenow.mdx",
+        other,
+    ):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text("")
+    ok, details = lib.check_diff_stays_in_adapter({"output_dir": root})
+    assert not ok
+    assert other in details
+
+
+# Each near-miss carries the rule's vocabulary and breaks one thing, so exactly
+# the checks named here fail. A near-miss that fails everything proves nothing.
+NEARMISS_FAILS = {
+    "probe-behavior-file": {"behavior-next-link"},
+    "strict-fake": {"fake-next-link"},
+    "retry-policy": {"no-tls-retry"},
+}
+
+
+@pytest.mark.parametrize("task", list(NEARMISS_FAILS))
+def test_nearmiss_fails_only_the_check_it_targets(task: str) -> None:
+    result = _score(task, "fail-nearmiss")
+    failed = {c["name"] for c in result["checks"] if not c["passed"]}
+    assert failed == NEARMISS_FAILS[task], result["details"]
+
+
+_BEHAVIOR_PASS = _FIXTURES / "probe-behavior-file" / "pass" / "api-behavior.yml"
+
+
+def _behavior_checks(doc: dict) -> dict[str, bool]:
+    ctx = {"behavior": doc}
+    return {
+        name: lib.CHECKS[name](ctx)[0]
+        for name in (
+            "behavior-keys",
+            "behavior-covers-endpoints",
+            "behavior-next-link",
+            "behavior-rate-limit",
+            "behavior-field-quirks",
+        )
+    }
+
+
+def _netgear(doc: dict) -> dict:
+    return next(e for e in doc["endpoints"] if e["path"].endswith("cmdb_ci_netgear"))
+
+
+def _location(doc: dict) -> dict:
+    return next(e for e in doc["endpoints"] if e["path"].endswith("cmn_location"))
+
+
+# Each case is a wrong behavior file the review of #236 found passing.
+_BEHAVIOR_MUTATIONS = {
+    "POST instead of the captured GET": (
+        lambda d: _netgear(d).update(method="POST"),
+        "behavior-keys",
+    ),
+    "a scalar entry": (
+        lambda d: d["endpoints"].append("cmdb_ci_netgear"),
+        "behavior-keys",
+    ),
+    "a duplicate entry": (
+        lambda d: d["endpoints"].append(dict(_netgear(d))),
+        "behavior-covers-endpoints",
+    ),
+    "an endpoint matched by suffix": (
+        lambda d: _netgear(d).update(path="/api/now/v2/table/cmdb_ci_netgear"),
+        "behavior-covers-endpoints",
+    ),
+    "pagination type none despite the Link header": (
+        lambda d: _netgear(d)["pagination"].update(type="none"),
+        "behavior-next-link",
+    ),
+    "an extra next-link parameter": (
+        lambda d: _netgear(d)["pagination"]["next_link_carries"].append("sysparm_view"),
+        "behavior-next-link",
+    ),
+    "a 429 no capture shows": (
+        lambda d: _location(d).update(
+            rate_limit={"status": 429, "retry_after_header": True}
+        ),
+        "behavior-rate-limit",
+    ),
+    "the empty parent of the second location capture": (
+        lambda d: _location(d)["field_quirks"].pop("reference_empty"),
+        "behavior-field-quirks",
+    ),
+}
+
+
+def test_behavior_checks_pass_the_compliant_file() -> None:
+    doc = lib.yaml.safe_load(_BEHAVIOR_PASS.read_text())
+    assert all(_behavior_checks(doc).values())
+
+
+@pytest.mark.parametrize("case", list(_BEHAVIOR_MUTATIONS))
+def test_behavior_check_fails_on_a_wrong_file(case: str) -> None:
+    doc = lib.yaml.safe_load(_BEHAVIOR_PASS.read_text())
+    mutate, failing = _BEHAVIOR_MUTATIONS[case]
+    mutate(doc)
+    assert _behavior_checks(doc)[failing] is False

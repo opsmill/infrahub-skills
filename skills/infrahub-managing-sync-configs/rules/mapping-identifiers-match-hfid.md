@@ -24,11 +24,12 @@ generic listed in `inherit_from`.
 ### Why it matters
 
 The sync keys records on `identifiers`, but the
-infrahub-sync Infrahub adapter saves each node with
-`allow_upsert=True`, and Infrahub matches an upsert on
-the human-friendly ID, not on the sync key. When the two
-differ, two source records that share an HFID become one
-node:
+infrahub-sync Infrahub adapter creates each new node with
+`allow_upsert=True`. For a kind with a
+`human_friendly_id`, Infrahub turns a create whose HFID
+already exists into an update of that node. When the sync
+key and the HFID differ, two source records that share an
+HFID become one node:
 
 - **Microsoft Graph.** The sync keyed users on the Graph
   object ID while the HFID was `username`. Two accounts
@@ -38,6 +39,13 @@ node:
 
 Nothing reports the merge. The diff shows two creates,
 and Infrahub holds one node.
+
+A kind with no `human_friendly_id` is matched on its
+`default_filter` when it has one, and otherwise each
+create makes a new node. For such a kind, set
+`identifiers` to its `default_filter` attribute, or
+propose adding a `human_friendly_id` through
+`infrahub-managing-schemas`.
 
 ### How to apply
 
@@ -55,10 +63,10 @@ and Infrahub holds one node.
 4. **When the user wants the stable source ID as the
    key**, for example because records are renamed often,
    explain the trade-off:
-   - Keyed on the HFID, a renamed record looks like one
-     deletion and one creation. The infrahub-sync
-     Infrahub adapter does not delete, so the old node
-     stays (see
+   - Keyed on the HFID, a renamed record is a new key:
+     the sync creates a node under the new name and
+     leaves the node under the old one, because the
+     infrahub-sync Infrahub adapter never deletes (see
      [../reference.md](../reference.md#known-infrahub-sync-core-limits)).
    - Keyed on the source ID, the HFID has to become that
      ID, which is a schema change.
@@ -111,9 +119,11 @@ schema_mapping:
 ### Data check before the first run
 
 Matching keys are not enough when the data breaks them.
-In infrahub-sync, one bad record stops the whole run,
-and `--continue-on-error` does not help. On the Webex
-sync:
+In infrahub-sync, one bad record stops the whole run.
+`--continue-on-error` skips only some of these problems
+and does not skip a failed write (see
+[../reference.md](../reference.md#known-infrahub-sync-core-limits)).
+On the Webex sync:
 
 - two locations with the same site code raised
   `ObjectAlreadyExists`;
@@ -131,6 +141,10 @@ problem at once, not the first one:
 from collections import Counter
 
 
+def _empty(value) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
 def precheck(
     records: list[dict], identifiers: list[str], parent_field: str | None, known_parents: set, roots_allowed: bool
 ) -> dict:
@@ -140,21 +154,33 @@ def precheck(
     False when the parent is required (a room always belongs to a site).
     """
     keys = [tuple(record.get(field) for field in identifiers) for record in records]
+    # DiffSync joins the identifier values with "__" into one key, so ("a__b", "c")
+    # and ("a", "b__c") collide although the tuples differ.
+    joined = ["__".join(str(value) for value in key) for key in keys]
     parents = [record.get(parent_field) for record in records] if parent_field else []
     return {
-        "duplicate_identifiers": [key for key, count in Counter(keys).items() if count > 1],
-        "empty_identifiers": [key for key in keys if any(value in (None, "") for value in key)],
+        "duplicate_identifiers": [key for key, count in Counter(joined).items() if count > 1],
+        "empty_identifiers": [key for key in keys if any(_empty(value) for value in key)],
         "empty_parents": []
         if roots_allowed
-        else [key for key, parent in zip(keys, parents) if parent in (None, "")],
+        else [key for key, parent in zip(keys, parents) if _empty(parent)],
         "missing_parents": sorted(
-            {parent for parent in parents if parent not in (None, "") and parent not in known_parents}, key=str
+            {parent for parent in parents if not _empty(parent) and parent not in known_parents}, key=str
         ),
     }
 ```
 
-`known_parents` holds the parent keys loaded earlier in
-the same sync and the parents already in Infrahub. Show
+An empty value is `None` or a string of only spaces,
+which the Webex adapter rejects. Run the check on the
+values after the entry's filters and transforms, as the
+adapter maps them.
+
+`known_parents` holds the parent keys the source adapter
+loads earlier in the same sync. Most adapters resolve a
+`reference` among the records they loaded, so a parent
+that exists only in Infrahub does not count unless the
+adapter's reference code shows otherwise (see
+[../reference.md](../reference.md#config-keys-on-main)). Show
 the counts and examples to the user, who decides: clean
 the source data, or exclude the records with a filter for
 the test only. Temporary filters do not stay in the

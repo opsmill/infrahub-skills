@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import random
 import time
 from datetime import datetime, timezone
@@ -30,13 +31,17 @@ def _retry_after_seconds(value: str | None) -> float | None:
     if not value:
         return None
     try:
-        return max(0.0, float(value))
+        seconds = float(value)
     except ValueError:
         pass
+    else:
+        return max(0.0, seconds) if math.isfinite(seconds) else None  # NaN or inf: use the backoff
     try:
         when = parsedate_to_datetime(value)
     except (TypeError, ValueError):
         return None
+    if when.tzinfo is None:  # "-0000" means UTC with no zone information
+        when = when.replace(tzinfo=timezone.utc)
     return max(0.0, (when - datetime.now(timezone.utc)).total_seconds())
 
 
@@ -72,7 +77,7 @@ class NetinventoryClient:
                     try:
                         resets_at = datetime.fromtimestamp(int(reset), tz=timezone.utc).isoformat() if reset else None
                     except (ValueError, OverflowError, OSError):
-                        resets_at = None  # milliseconds, a date string or out of range: report without it
+                        resets_at = reset  # not epoch seconds (a date, milliseconds): report the raw value
                     msg = (
                         f"{url}: HTTP {response.status_code}, the API asks to wait {retry_after:.0f} s, "
                         f"more than the {MAX_RETRY_AFTER} s limit"

@@ -42,8 +42,7 @@ endpoints:
     filters_supported:
       - sysparm_query
     rate_limit:
-      status: 429
-      retry_after_header: true
+      observed: false
     empty_result_is_valid: true
     captures:
       - cmn_location_page1.json

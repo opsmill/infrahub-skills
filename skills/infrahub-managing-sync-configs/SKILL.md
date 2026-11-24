@@ -78,7 +78,7 @@ two points, and at no others unless something fails:
 | # | When | What the user approves |
 | - | ---- | ---------------------- |
 | 1 | Phase 2, only when the sync needs a new or changed schema | The schema change |
-| 2 | Phase 4, before the first `infrahub-sync sync` | Writing to the Infrahub branch, after the user has seen the `diff` |
+| 2 | Phase 4, before the first `infrahub-sync sync` | Writing the current source data to the Infrahub branch, after the user has seen the `diff` and the effective target |
 
 ## Rule Categories
 
@@ -99,8 +99,12 @@ Check, and stop with a message at the first failure:
    `BUILTIN_ADAPTER_CAPABILITIES`, it is on
    `feature/v3-develop`: stop and tell the user this
    skill covers `main` only.
-2. **The source system has an adapter.** If it has none,
-   or the user reports an adapter bug, hand off to
+2. **The source system has an adapter.** When
+   `infrahub-building-sync-adapters` handed over an
+   infrahub-sync checkout, look for the adapter in that
+   checkout, not in the installed package, which may not
+   have it yet. If there is no adapter, or the user
+   reports an adapter bug, hand off to
    `infrahub-building-sync-adapters`.
 3. **Infrahub is reachable** (`infrahubctl info`) and its
    token is in the `INFRAHUB_API_TOKEN` environment
@@ -110,8 +114,6 @@ The commands are in
 [reference.md](./reference.md#preflight-commands).
 
 ### Phase 2: Destination schema
-
-This is guidance, not a rule:
 
 1. For each source resource, look for an existing node in
    the repository's `schemas/` and in the schema loaded
@@ -148,18 +150,30 @@ This is guidance, not a rule:
    repository's `.gitignore` before the first run: the
    cache holds snapshots of source data.
 2. Create an Infrahub branch and load the schema on it.
-3. Run `infrahub-sync generate`, then `infrahub-sync
-   diff` against that branch, and show the user the diff.
-4. **Approval point 2:** run `infrahub-sync sync` to the
-   branch only after the user approves.
-5. Run `infrahub-sync diff` again. `diff` reads the
-   live source again, so a record created or changed in
-   the source since the sync shows as a create or
-   update; check those against the source first. Any
-   other create or update means the adapter or the
-   mapping does not round-trip. Deletions of existing
-   nodes the source does not hold are expected, because
-   the Infrahub adapter does not delete.
+3. Write the run config: a copy of `config.yml`, kept
+   out of Git, that sets the Infrahub `url` and the test
+   `branch`. A `branch` in the destination settings
+   overrides `--branch`, and `generate` reads the Infrahub
+   address and token from the settings while `diff` and
+   `sync` read them from the environment first. Show the
+   user the effective Infrahub address and branch, and
+   stop when the commands would not use the same ones.
+4. Run `infrahub-sync generate`, then `infrahub-sync
+   diff`, with the run config, and show the user the diff.
+5. **Approval point 2:** run `infrahub-sync sync` to the
+   branch only after the user approves. Tell the user
+   first that `sync` reads the source again: it also
+   writes any record created or changed after the diff
+   they saw.
+6. Run `infrahub-sync diff` again. `diff` reads the live
+   source again, so a record created or changed in the
+   source since the sync shows as a create or update;
+   check those against the source first. Any other create
+   or update means the adapter or the mapping does not
+   round-trip. With the default `diffsync_flags`, nodes
+   that only Infrahub holds do not show in the diff, and
+   `sync` never deletes them.
+7. Delete the run config: it may hold the Infrahub token.
 
 The commands are in
 [reference.md](./reference.md#live-validation-commands).

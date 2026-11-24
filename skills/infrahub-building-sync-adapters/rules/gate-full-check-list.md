@@ -39,9 +39,12 @@ ran.
 
 ### The check list
 
-Run from the infrahub-sync checkout:
+Run from the infrahub-sync checkout. Invoke, ruff, ty,
+pytest, rumdl and towncrier are in the `dev` extra, as in
+the repository's CI, so install it first:
 
 ```bash
+uv sync --extra dev
 uv run invoke format
 uv run invoke lint
 uv run ty check .
@@ -52,7 +55,7 @@ uv run invoke docs.docusaurus
 uv run infrahub-sync list --directory examples/
 uv run infrahub-sync generate --name <example-name> --directory examples/<example-dir>/
 uv run infrahub-sync diff --name <example-name> --directory examples/<example-dir>/
-uv run --extra dev towncrier create -c "Add a <System> source adapter." <PR>.added.md
+uv run towncrier create -c "Add a <System> source adapter." <PR>.added.md
 ```
 
 - **`uv run invoke lint`** runs pylint, which already

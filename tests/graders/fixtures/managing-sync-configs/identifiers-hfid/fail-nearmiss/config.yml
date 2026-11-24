@@ -1,6 +1,6 @@
 ---
-# Device names are unique in NetBox, so identifiers match the
-# human_friendly_id [name, location] without being listed.
+# The identifiers are the HFID fields, but the site reference is mapped under
+# another name, so no field supplies the location identifier.
 name: from-netbox
 source:
   name: netbox
@@ -10,9 +10,6 @@ destination:
   name: infrahub
   settings:
     url: http://localhost:8000
-order:
-  - LocationSite
-  - NetworkDevice
 schema_mapping:
   - name: LocationSite
     mapping: dcim.sites
@@ -25,6 +22,9 @@ schema_mapping:
         mapping: id
   - name: NetworkDevice
     mapping: dcim.devices
+    identifiers:
+      - name
+      - location
     fields:
       - name: name
         mapping: name
@@ -34,6 +34,6 @@ schema_mapping:
         mapping: primary_ip.address
       - name: netbox_id
         mapping: id
-      - name: location
+      - name: site
         mapping: site
         reference: LocationSite

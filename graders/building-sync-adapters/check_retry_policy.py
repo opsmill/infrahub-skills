@@ -16,6 +16,7 @@ CHECKS = [
     "retry-after-cap",
     "backoff-capped-jitter",
     "no-tls-retry",
+    "shared-retry-budget",
 ]
 
 if __name__ == "__main__":

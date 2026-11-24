@@ -88,6 +88,7 @@ import requests
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "netinventory"
 LIST_KEY = "items"  # where the rows sit in the captured body
 SELECT_PARAM = "fields"  # api-behavior.yml: field_selection
+REQUIRED_HEADERS = {"Accept": "application/json"}  # api-behavior.yml: required_headers
 
 
 class FakeResponse:
@@ -118,36 +119,56 @@ def _page_key(path: str, params: dict[str, str]) -> tuple:
     return path, tuple(sorted((k, v) for k, v in params.items() if k != SELECT_PARAM))
 
 
+def _selection(params: dict[str, str]) -> set[str] | None:
+    """The selected field names, or None when the request selects none and gets every field."""
+    return {name for name in params.get(SELECT_PARAM, "").split(",") if name} or None
+
+
 class FakeSession:
     def __init__(self, captures: list[dict]) -> None:
         self.requests: list[tuple[str, dict[str, str]]] = []
         self.queued: list[dict] = []  # error captures a test serves next: queued.append(errors[429])
         self.errors: dict[int, dict] = {}  # the captured error responses (429, 503), by status
-        self._pages: dict[tuple, dict] = {}
+        self._pages: dict[tuple, list[tuple[set[str] | None, dict]]] = {}
         for capture in captures:
             if capture["status"] != 200:
                 self.errors[capture["status"]] = capture
                 continue
             path, params = _query(capture["request"]["path"], None)
-            key = _page_key(path, params)
-            # Two captures of one page: keep the one without field selection, it has every field.
-            if key not in self._pages or SELECT_PARAM not in params:
-                self._pages[key] = capture
+            self._pages.setdefault(_page_key(path, params), []).append((_selection(params), capture))
+
+    def _capture_for(self, key: tuple, wanted: set[str] | None) -> dict | None:
+        """A capture of the page that holds every field the request can get back."""
+        captures = self._pages.get(key, [])
+        for selection, capture in captures:
+            if selection is None:  # captured without selection: every field is there
+                return capture
+        if wanted is None:
+            return None  # every field asked for, and no capture has them all
+        # A name no captured row of the page has does not exist: the file says it is dropped.
+        known = {name for _, capture in captures for row in capture["body"][LIST_KEY] for name in row}
+        for selection, capture in captures:
+            if wanted & known <= selection:
+                return capture
+        return None
 
     def get(self, url: str, params: dict | None = None, headers: dict | None = None, timeout: float | None = None):
+        sent = {key.lower(): value for key, value in (headers or {}).items()}
+        for name, value in REQUIRED_HEADERS.items():
+            assert sent.get(name.lower()) == value, f"the adapter did not send {name}: {value}"
         path, merged = _query(url, params)
         self.requests.append((path, merged))
         if self.queued:
             capture = self.queued.pop(0)
             return FakeResponse(capture["status"], dict(capture["headers"]), capture["body"])
-        capture = self._pages.get(_page_key(path, merged))
+        selected = _selection(merged)
+        capture = self._capture_for(_page_key(path, merged), selected)
         if capture is None:
             return FakeResponse(404, {}, {"error": f"no capture for {path} {merged}"})
         body = capture["body"]
-        selected = [name for name in merged.get(SELECT_PARAM, "").split(",") if name]
         if selected:
             # unknown_selected_field: dropped_silently -> a name the row lacks is left out, still HTTP 200.
-            rows = [{name: row[name] for name in selected if name in row} for row in body[LIST_KEY]]
+            rows = [{name: row[name] for name in row if name in selected} for row in body[LIST_KEY]]
             body = {**body, LIST_KEY: rows}
         # Headers, the Link header included, go back exactly as captured.
         return FakeResponse(capture["status"], dict(capture["headers"]), body)
@@ -161,7 +182,9 @@ def make_fake_session() -> FakeSession:
 If the adapter reads headers in a different case than
 the capture stores them, wrap them in
 `requests.structures.CaseInsensitiveDict`, as a real
-response does.
+response does. A missing required header fails the test
+with an assertion, because no capture shows what the API
+answers then.
 
 ### Incorrect
 

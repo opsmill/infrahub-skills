@@ -19,9 +19,10 @@ failure:
 - Retry HTTP 429, 502, 503 and 504, and dropped or
   timed-out connections, from **one shared retry
   budget**.
-- Honor `Retry-After` in full. When it asks for more
-  than **300 s**, raise an error instead of waiting, and
-  name the reset time when the API sends one.
+- Honor `Retry-After` in full, as a number of seconds or
+  an HTTP date. When it asks for more than **300 s**,
+  raise an error instead of waiting, and include the
+  value of the reset header when the API sends one.
 - Without `Retry-After`, back off exponentially with
   random jitter, **capped at 60 s**.
 - Never retry TLS errors: certificate failures and TLS
@@ -29,10 +30,13 @@ failure:
 
 Values recorded in `api-behavior.yml` override the
 defaults: `rate_limit.max_retry_after` replaces the
-300 s limit (only after the user approves a longer
-wait), `rate_limit.retry_statuses` replaces the status
-set, and `rate_limit.reset_header` names the reset
-header.
+300 s limit, `rate_limit.retry_statuses` replaces the
+status set, and `rate_limit.reset_header` names the reset
+header. A longer wait than 300 s needs the user's
+approval: propose it in `api-behavior.yml` (approval
+point 1) or in the spec (approval point 2). One found
+later, during the live run, is a failure: stop and ask
+before changing the limit.
 
 ### Why it matters
 
@@ -61,6 +65,7 @@ header.
 from __future__ import annotations
 
 import logging
+import math
 import random
 import time
 from datetime import datetime, timezone
@@ -88,13 +93,17 @@ def _retry_after_seconds(value: str | None) -> float | None:
     if not value:
         return None
     try:
-        return max(0.0, float(value))
+        seconds = float(value)
     except ValueError:
         pass
+    else:
+        return max(0.0, seconds) if math.isfinite(seconds) else None  # NaN or inf: use the backoff
     try:
         when = parsedate_to_datetime(value)
     except (TypeError, ValueError):
         return None
+    if when.tzinfo is None:  # "-0000" means UTC with no zone information
+        when = when.replace(tzinfo=timezone.utc)
     return max(0.0, (when - datetime.now(timezone.utc)).total_seconds())
 
 
@@ -130,7 +139,7 @@ class NetinventoryClient:
                     try:
                         resets_at = datetime.fromtimestamp(int(reset), tz=timezone.utc).isoformat() if reset else None
                     except (ValueError, OverflowError, OSError):
-                        resets_at = None  # milliseconds, a date string or out of range: report without it
+                        resets_at = reset  # not epoch seconds (a date, milliseconds): report the raw value
                     msg = (
                         f"{url}: HTTP {response.status_code}, the API asks to wait {retry_after:.0f} s, "
                         f"more than the {MAX_RETRY_AFTER} s limit"

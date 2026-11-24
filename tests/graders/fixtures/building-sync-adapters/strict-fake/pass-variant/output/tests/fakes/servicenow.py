@@ -26,6 +26,11 @@ def make_fake_session():
         query = {**dict(parse_qsl(urlsplit(url).query)), **(params or {})}
         if query == page_query:
             return _respond(page["status"], page["headers"], page["body"])
+        same_page = {k: v for k, v in query.items() if k != "sysparm_fields"} == {
+            k: v for k, v in page_query.items() if k != "sysparm_fields"
+        }
+        if not same_page:
+            return _respond(404, {}, {"error": {"message": "no capture for this page"}})
         wanted = set(filter(None, query.get("sysparm_fields", "").split(",")))
         rows = [_select(r, wanted) for r in page["body"]["result"]]
         return _respond(200, {"X-Total-Count": str(len(rows))}, {"result": rows})

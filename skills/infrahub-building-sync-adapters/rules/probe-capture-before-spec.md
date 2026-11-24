@@ -51,7 +51,10 @@ any code depends on them.
    - the first page, with the field selection and
      filters the adapter will send;
    - the next page, by following the next link exactly
-     as it came back;
+     as it came back, once its scheme and host match the
+     base URL you queried. A link to another host is a
+     finding to record and show the user, not a request
+     to send with the integration account's credentials;
    - one request without field selection, to see the
      default fields;
    - one request whose field selection names a field

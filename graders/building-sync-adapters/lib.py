@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -67,13 +68,17 @@ def captured_endpoints() -> dict[str, dict]:
         entry = facts.setdefault(
             path,
             {
+                "methods": set(),
                 "next_params": set(),
                 "rate_limited": False,
                 "reference_set": False,
                 "reference_empty": False,
                 "dropped_fields": set(),
+                "object_fields": set(),
+                "empty_fields": set(),
             },
         )
+        entry["methods"].add(cap["request"].get("method", "GET"))
         if cap["status"] == 429:
             entry["rate_limited"] = True
             continue
@@ -90,13 +95,16 @@ def captured_endpoints() -> dict[str, dict]:
         if requested and rows:
             entry["dropped_fields"] |= {f for f in requested.split(",") if f} - returned
         for row in rows:
-            for value in row.values():
+            for key, value in row.items():
                 if isinstance(value, dict) and {"link", "value"} <= value.keys():
                     entry["reference_set"] = True
-        # an empty reference is "" for a field that is an object in another row
-        ref_fields = {k for r in rows for k, v in r.items() if isinstance(v, dict)}
-        if any(r.get(k) == "" for r in rows for k in ref_fields):
-            entry["reference_empty"] = True
+                    entry["object_fields"].add(key)
+                elif value == "":
+                    entry["empty_fields"].add(key)
+    # An empty reference is "" for a field that is an object in another row,
+    # possibly in another capture of the same endpoint.
+    for entry in facts.values():
+        entry["reference_empty"] = bool(entry["object_fields"] & entry["empty_fields"])
     return facts
 
 
@@ -162,42 +170,71 @@ def _behavior_entries(doc: Any) -> list[dict]:
 
 
 def _entry_for(entries: list[dict], path: str) -> dict | None:
+    """The entry whose path is exactly this endpoint (a query string is ignored)."""
     for entry in entries:
-        if isinstance(entry.get("path"), str) and endpoint_path(entry["path"]).endswith(
-            path
-        ):
+        if isinstance(entry.get("path"), str) and endpoint_path(entry["path"]) == path:
             return entry
     return None
 
 
 def check_behavior_keys(ctx: dict) -> tuple[bool, str]:
-    """Every endpoint entry carries the fixed key set."""
-    entries = _behavior_entries(ctx["behavior"])
+    """Every endpoint entry is a mapping with the fixed key set and the captured method."""
+    doc = ctx["behavior"]
+    entries = _behavior_entries(doc)
     if not entries:
         return False, "behavior-keys: no `endpoints` list in api-behavior.yml"
+    problems = []
+    scalars = [e for e in doc["endpoints"] if not isinstance(e, dict)]
+    if scalars:
+        problems.append(f"entries that are not mappings: {scalars}")
     gaps = {
         e.get("path", "?"): [k for k in BEHAVIOR_KEYS if k not in e] for e in entries
     }
     gaps = {p: ks for p, ks in gaps.items() if ks}
     if gaps:
-        return False, f"behavior-keys: entries missing keys: {gaps}"
-    return True, "behavior-keys: every entry has the fixed key set"
+        problems.append(f"entries missing keys: {gaps}")
+    for path, facts in captured_endpoints().items():
+        entry = _entry_for(entries, path)
+        if (
+            entry is not None
+            and str(entry.get("method", "")).upper() not in facts["methods"]
+        ):
+            problems.append(
+                f"{path}: method {entry.get('method')!r}, captured {sorted(facts['methods'])}"
+            )
+    if problems:
+        return False, "behavior-keys: " + "; ".join(problems)
+    return (
+        True,
+        "behavior-keys: every entry has the fixed key set and the captured method",
+    )
 
 
 def check_behavior_covers_endpoints(ctx: dict) -> tuple[bool, str]:
-    """Every captured endpoint has an entry."""
+    """One entry per captured endpoint, and no entry for an endpoint never captured."""
     entries = _behavior_entries(ctx["behavior"])
-    missing = [p for p in captured_endpoints() if _entry_for(entries, p) is None]
+    captured = set(captured_endpoints())
+    paths = [
+        endpoint_path(e["path"]) for e in entries if isinstance(e.get("path"), str)
+    ]
+    problems = []
+    missing = sorted(captured - set(paths))
     if missing:
-        return (
-            False,
-            f"behavior-covers-endpoints: no entry for captured endpoints {missing}",
-        )
-    return True, "behavior-covers-endpoints: every captured endpoint has an entry"
+        problems.append(f"no entry for captured endpoints {missing}")
+    duplicates = sorted({p for p in paths if paths.count(p) > 1})
+    if duplicates:
+        problems.append(f"more than one entry for {duplicates}")
+    extra = sorted(set(paths) - captured)
+    if extra:
+        problems.append(f"entries for endpoints never captured {extra}")
+    if problems:
+        return False, "behavior-covers-endpoints: " + "; ".join(problems)
+    return True, "behavior-covers-endpoints: one entry per captured endpoint"
 
 
 def check_behavior_next_link(ctx: dict) -> tuple[bool, str]:
-    """`pagination.next_link_carries` lists the parameters the captured next link repeats."""
+    """A captured next link means `pagination.type: link_header`, and
+    `next_link_carries` lists exactly the parameters that link repeats."""
     entries = _behavior_entries(ctx["behavior"])
     problems = []
     for path, facts in captured_endpoints().items():
@@ -207,40 +244,52 @@ def check_behavior_next_link(ctx: dict) -> tuple[bool, str]:
         pag = (
             entry.get("pagination") if isinstance(entry.get("pagination"), dict) else {}
         )
+        if pag.get("type") != "link_header":
+            problems.append(
+                f"{path} type is {pag.get('type')!r}, the capture has a Link header"
+            )
         carries = pag.get("next_link_carries") or []
         carries = {str(c) for c in carries} if isinstance(carries, list) else set()
-        lacking = facts["next_params"] - carries
-        if lacking:
-            problems.append(f"{path} lacks {sorted(lacking)}")
+        # The parameter that moves the page is left out of the comparison: listing it is harmless.
+        carries -= {"sysparm_offset", str(pag.get("cursor_param"))}
+        if carries != facts["next_params"]:
+            problems.append(
+                f"{path} carries {sorted(carries)}, the captured link repeats {sorted(facts['next_params'])}"
+            )
     if problems:
         return (
             False,
-            "behavior-next-link: next_link_carries does not match the captured next link: "
+            "behavior-next-link: pagination does not match the captured next link: "
             + "; ".join(problems),
         )
-    return True, "behavior-next-link: next_link_carries matches the captured next links"
+    return True, "behavior-next-link: pagination matches the captured next links"
 
 
 def check_behavior_rate_limit(ctx: dict) -> tuple[bool, str]:
-    """Endpoints with a captured 429 record status 429 and a Retry-After header."""
+    """A captured 429 is recorded with status 429 and a Retry-After header; an
+    endpoint with no captured 429 does not claim one."""
     entries = _behavior_entries(ctx["behavior"])
     problems = []
     for path, facts in captured_endpoints().items():
-        if not facts["rate_limited"]:
-            continue
         rl = (_entry_for(entries, path) or {}).get("rate_limit")
-        if (
-            not isinstance(rl, dict)
-            or rl.get("status") != 429
-            or rl.get("retry_after_header") is not True
+        if facts["rate_limited"]:
+            if (
+                not isinstance(rl, dict)
+                or rl.get("status") != 429
+                or rl.get("retry_after_header") is not True
+            ):
+                problems.append(
+                    f"{path}: the captured 429 with Retry-After is not recorded"
+                )
+        elif isinstance(rl, dict) and (
+            rl.get("status") == 429 or rl.get("observed") is True
         ):
-            problems.append(path)
+            problems.append(
+                f"{path}: records a 429 no capture shows (use observed: false)"
+            )
     if problems:
-        return (
-            False,
-            f"behavior-rate-limit: rate_limit does not record the captured 429 with Retry-After for {problems}",
-        )
-    return True, "behavior-rate-limit: captured 429 recorded"
+        return False, "behavior-rate-limit: " + "; ".join(problems)
+    return True, "behavior-rate-limit: rate limits recorded as captured"
 
 
 def check_behavior_field_quirks(ctx: dict) -> tuple[bool, str]:
@@ -279,23 +328,21 @@ def check_behavior_field_quirks(ctx: dict) -> tuple[bool, str]:
 # --------------------------------------------------------------------------
 
 
-def run_fake_probe(output_dir: Path) -> dict:
-    """Run ``_fake_probe.py`` against the model's fake; return its JSON report."""
-    if not output_dir.is_dir():
-        return {"error": f"no {output_dir}/ directory: the fake was not written there"}
+def run_probe(script: str, workdir: Path, *args: str) -> dict:
+    """Run one probe script against answer code in ``workdir``; return its JSON report.
+
+    The probe imports model-written code, so it runs in a child process with an
+    empty environment (no API key or token in reach), from inside ``workdir``,
+    and confines itself with ``_sandbox.confine`` before the import.
+    """
     try:
         proc = subprocess.run(
-            [
-                sys.executable,
-                "-I",
-                str(_HERE / "_fake_probe.py"),
-                str(output_dir.resolve()),
-                str(DATA),
-            ],
+            [sys.executable, "-I", str(_HERE / script), str(workdir.resolve()), *args],
             capture_output=True,
             text=True,
             timeout=60,
-            cwd=str(output_dir.resolve()),
+            cwd=str(workdir.resolve()),
+            env={"PATH": os.defpath, "HOME": str(workdir.resolve()), "LANG": "C.UTF-8"},
             check=False,
         )
     except subprocess.TimeoutExpired:
@@ -304,6 +351,13 @@ def run_fake_probe(output_dir: Path) -> dict:
         return json.loads(proc.stdout.strip().splitlines()[-1])
     except (IndexError, json.JSONDecodeError):
         return {"error": f"probe crashed: {proc.stderr.strip()[-400:]}"}
+
+
+def run_fake_probe(output_dir: Path) -> dict:
+    """Run ``_fake_probe.py`` against the model's fake; return its JSON report."""
+    if not output_dir.is_dir():
+        return {"error": f"no {output_dir}/ directory: the fake was not written there"}
+    return run_probe("_fake_probe.py", output_dir, str(DATA))
 
 
 def _probe(ctx: dict) -> dict:
@@ -322,17 +376,10 @@ def _scenario(ctx: dict, name: str) -> tuple[dict | None, str]:
     return sc, ""
 
 
-def _captured_rows(table: str) -> dict[str, dict]:
-    """The rows captured from one table, keyed by sys_id."""
-    rows: dict[str, dict] = {}
-    for cap in load_captures():
-        if endpoint_path(cap["request"]["path"]).rsplit("/", 1)[-1] != table:
-            continue
-        if isinstance(cap["body"], dict):
-            for r in cap["body"].get("result", []):
-                if isinstance(r, dict) and r.get("sys_id"):
-                    rows[r["sys_id"]] = r
-    return rows
+def _captured_page() -> list[dict]:
+    """The rows of the captured cmdb_ci_netgear page, in order, as the probe's requests target it."""
+    cap = json.loads((DATA / "cmdb_ci_netgear_page1.json").read_text())
+    return [r for r in cap["body"]["result"] if isinstance(r, dict)]
 
 
 # The "selected" scenario of _fake_probe.py asks cmdb_ci_netgear for these fields.
@@ -340,31 +387,24 @@ _SELECTED_FIELDS = ("sys_id", "name")
 
 
 def check_fake_serves_captures(ctx: dict) -> tuple[bool, str]:
-    """Every row the fake returns is a captured row, with the captured values."""
+    """The fake returns the captured page: every row, in order, with the captured values."""
     sc, err = _scenario(ctx, "selected")
     if sc is None:
         return False, f"fake-serves-captures: {err}"
-    if not sc["rows"]:
-        return False, "fake-serves-captures: the fake returned no rows"
-    captured = _captured_rows("cmdb_ci_netgear")
-    problems = []
-    for row in sc["rows"]:
-        source = captured.get(row.get("sys_id"))
-        if source is None:
-            problems.append(f"sys_id {row.get('sys_id')!r} is not in the captures")
-            continue
-        for field in _SELECTED_FIELDS:
-            if field in row and row[field] != source.get(field):
-                problems.append(
-                    f"{row['sys_id']}: {field}={row[field]!r}, captured {source.get(field)!r}"
-                )
-    if problems:
+    expected = [
+        {k: v for k, v in row.items() if k in _SELECTED_FIELDS}
+        for row in _captured_page()
+    ]
+    if sc["rows"] != expected:
         return (
             False,
-            "fake-serves-captures: rows differ from the captures: "
-            + "; ".join(problems[:4]),
+            f"fake-serves-captures: asked for sys_id,name and got {sc['rows'][:3]}, "
+            f"the capture gives {expected}",
         )
-    return True, "fake-serves-captures: every row matches a captured row"
+    return (
+        True,
+        "fake-serves-captures: the captured rows, in order, with the captured values",
+    )
 
 
 def check_fake_field_selection(ctx: dict) -> tuple[bool, str]:
@@ -405,23 +445,29 @@ def check_fake_drops_unknown(ctx: dict) -> tuple[bool, str]:
 
 
 def check_fake_reference_shapes(ctx: dict) -> tuple[bool, str]:
-    """References come back as {link, value} when set and "" when empty."""
+    """The captured request gets the captured rows back unchanged, references included:
+    {link, value} when set and "" when empty."""
     sc, err = _scenario(ctx, "references")
     if sc is None:
         return False, f"fake-reference-shapes: {err}"
-    values = [r.get("location") for r in sc["rows"]]
-    has_obj = any(isinstance(v, dict) and {"link", "value"} <= v.keys() for v in values)
-    has_empty = any(v == "" for v in values)
-    if not (has_obj and has_empty):
+    expected = _captured_page()
+    if sc["rows"] != expected:
+        got = [r.get("location") for r in sc["rows"]]
+        want = [r.get("location") for r in expected]
         return (
             False,
-            f"fake-reference-shapes: location values {values[:4]} lack an object or an empty string",
+            f"fake-reference-shapes: the captured request returns rows that differ from the capture "
+            f"(location values {got[:4]}, captured {want})",
         )
-    return True, "fake-reference-shapes: object when set, empty string when empty"
+    return (
+        True,
+        "fake-reference-shapes: object when set, empty string when empty, as captured",
+    )
 
 
 def check_fake_next_link(ctx: dict) -> tuple[bool, str]:
-    """The captured page's next link is served exactly as captured."""
+    """The captured page's next link is served exactly as captured, and following
+    it does not serve the first page again."""
     sc, err = _scenario(ctx, "captured_page")
     if sc is None:
         return False, f"fake-next-link: {err}"
@@ -430,7 +476,21 @@ def check_fake_next_link(ctx: dict) -> tuple[bool, str]:
             False,
             f"fake-next-link: next link {sc.get('next')!r} differs from the captured {sc.get('expected_next')!r}",
         )
-    return True, "fake-next-link: next link served as captured"
+    nxt = _probe(ctx).get("next_page") or {}
+    first_ids = [r.get("sys_id") for r in _captured_page()]
+    if (
+        nxt.get("status") == 200
+        and [r.get("sys_id") for r in nxt.get("rows", [])] == first_ids
+    ):
+        return (
+            False,
+            "fake-next-link: following the next link serves the first page again; "
+            "the fake ignores the query string of the link",
+        )
+    return (
+        True,
+        "fake-next-link: next link served as captured, and not answered with page 1",
+    )
 
 
 # --------------------------------------------------------------------------
@@ -439,7 +499,6 @@ def check_fake_next_link(ctx: dict) -> tuple[bool, str]:
 
 _HEADING = re.compile(r"^(#{1,4})\s+(.*)$")
 _SECTION_WORDS = re.compile(r"check|test|verif|validat|gate", re.IGNORECASE)
-_CODE = re.compile(r"```[^\n]*\n(.*?)```|`([^`\n]+)`", re.DOTALL)
 
 
 def _checks_section(text: str) -> str | None:
@@ -458,17 +517,48 @@ def _checks_section(text: str) -> str | None:
     return None
 
 
-def _command_tokens(section: str) -> list[list[str]]:
+_INLINE = re.compile(r"`([^`\n]+)`")
+_FENCE_BLOCK = re.compile(r"```[^\n]*\n.*?```", re.DOTALL)
+_PRINTERS = {"echo", "printf"}
+
+
+def _entries(section: str) -> list[str]:
+    """List items (with their indented continuation lines) and table rows, fences removed."""
+    entries: list[str] = []
+    for line in _FENCE_BLOCK.sub("", section).splitlines():
+        if not line.strip():
+            continue
+        if (
+            line.startswith((" ", "\t"))
+            and entries
+            and not line.lstrip().startswith(("-", "*", "|"))
+        ):
+            entries[-1] += " " + line.strip()
+        else:
+            entries.append(line.strip())
+    return entries
+
+
+def _tokens(span: str) -> list[str]:
+    span = span.strip().lstrip("$ ").strip()
+    try:
+        tokens = shlex.split(span)
+    except ValueError:
+        tokens = span.split()
+    return [] if tokens and tokens[0] in _PRINTERS else tokens
+
+
+def _pr_entries(section: str) -> list[tuple[list[list[str]], bool]]:
+    """For each entry: the token lists of its code spans, and whether text after the
+    first code span reports a result."""
     out = []
-    for fenced, inline in _CODE.findall(section):
-        for line in (fenced or inline).splitlines():
-            line = line.strip().lstrip("$ ").strip()
-            if not line or line.startswith("#"):
-                continue
-            try:
-                out.append(shlex.split(line))
-            except ValueError:
-                out.append(line.split())
+    for entry in _entries(section):
+        spans = _INLINE.findall(entry)
+        if not spans:
+            continue
+        after = entry.split("`" + spans[0] + "`", 1)[1]
+        result = re.search(r"[A-Za-z0-9]", _INLINE.sub("", after)) is not None
+        out.append(([_tokens(span) for span in spans], result))
     return out
 
 
@@ -476,7 +566,12 @@ def _has_seq(tokens: list[str], seq: list[str]) -> bool:
     return any(tokens[i : i + len(seq)] == seq for i in range(len(tokens)))
 
 
-PR_ITEMS: dict[str, Callable[[list[str]], bool]] = {
+def _names_adapter(tokens: list[str]) -> bool:
+    return any("servicenow" in t.lower() for t in tokens)
+
+
+# Commands need a result written after them; a changed path is its own evidence.
+PR_COMMANDS: dict[str, Callable[[list[str]], bool]] = {
     "format": lambda t: _has_seq(t, ["invoke", "format"]),
     "lint": lambda t: _has_seq(t, ["invoke", "lint"]),
     "type check": lambda t: _has_seq(t, ["ty", "check"]),
@@ -492,26 +587,30 @@ PR_ITEMS: dict[str, Callable[[list[str]], bool]] = {
         or _has_seq(t, ["npm", "run", "build"])
     ),
     "infrahub-sync list": lambda t: _has_seq(t, ["infrahub-sync", "list"]),
-    "infrahub-sync generate": lambda t: _has_seq(t, ["infrahub-sync", "generate"]),
-    "infrahub-sync diff": lambda t: _has_seq(t, ["infrahub-sync", "diff"]),
+    "infrahub-sync generate": lambda t: (
+        _has_seq(t, ["infrahub-sync", "generate"]) and _names_adapter(t)
+    ),
+    "infrahub-sync diff": lambda t: (
+        _has_seq(t, ["infrahub-sync", "diff"]) and _names_adapter(t)
+    ),
+}
+PR_PATHS: dict[str, Callable[[list[str]], bool]] = {
     "news fragment": lambda t: (
         "towncrier" in t or any(re.match(r"^changelog/.+\.md$", x) for x in t)
     ),
-    "docs page": lambda t: any(
-        re.match(r"^docs/docs/adapters/[^/]+\.mdx$", x)
-        and not x.endswith("choosing-an-adapter.mdx")
-        for x in t
-    ),
+    "docs page": lambda t: "docs/docs/adapters/servicenow.mdx" in t,
     "docs sidebar": lambda t: any(x.endswith("sidebars.ts") for x in t),
     "choosing-an-adapter row": lambda t: any(
         x.endswith("choosing-an-adapter.mdx") for x in t
     ),
-    "spec documents": lambda t: any("specs/" in x for x in t),
+    "spec documents": lambda t: any("specs/" in x and "servicenow" in x for x in t),
 }
+PR_ITEMS = {**PR_COMMANDS, **PR_PATHS}
 
 
 def check_pr_checks_complete(ctx: dict) -> tuple[bool, str]:
-    """The PR's checks section names every required check."""
+    """The PR's checks section names every required check: each command with its
+    result, each changed path, all for the ServiceNow adapter."""
     text = ctx["pr_text"]
     if text is None:
         return False, "pr-checks-complete: PR_DESCRIPTION.md not found"
@@ -521,20 +620,148 @@ def check_pr_checks_complete(ctx: dict) -> tuple[bool, str]:
             False,
             "pr-checks-complete: no checks section (a heading naming checks, tests, verification or validation)",
         )
-    commands = _command_tokens(section)
-    missing = [
-        name for name, hit in PR_ITEMS.items() if not any(hit(t) for t in commands)
-    ]
+    entries = _pr_entries(section)
+    missing, no_result = [], []
+    for name, hit in PR_ITEMS.items():
+        found = [result for spans, result in entries for t in spans if hit(t)]
+        if not found:
+            missing.append(name)
+        elif name in PR_COMMANDS and not any(found):
+            no_result.append(name)
+    problems = []
     if missing:
-        return False, f"pr-checks-complete: the checks section omits {missing}"
-    return True, "pr-checks-complete: every required check is listed"
+        problems.append(f"the checks section omits {missing}")
+    if no_result:
+        problems.append(f"no result written after {no_result}")
+    if problems:
+        return False, "pr-checks-complete: " + "; ".join(problems)
+    return True, "pr-checks-complete: every required check is listed with its result"
 
 
 # --------------------------------------------------------------------------
-# Task 4: retry policy (AST)
+# Task 4: retry policy (run against scripted responses, plus the AST for the cap)
 # --------------------------------------------------------------------------
 
 RETRY_STATUSES = {429, 502, 503, 504}
+NOT_RETRIED = {"ok": 200, "s500": 500, "s404": 404}
+
+
+def _retry_report(ctx: dict) -> dict:
+    if "retry_probe" not in ctx:
+        path = ctx["workdir"] / "servicenow_client.py"
+        ctx["retry_probe"] = (
+            run_probe("_retry_probe.py", ctx["workdir"])
+            if path.exists()
+            else {"error": "servicenow_client.py not found"}
+        )
+    return ctx["retry_probe"]
+
+
+def _scenarios(ctx: dict, check: str) -> tuple[dict | None, str]:
+    report = _retry_report(ctx)
+    if report.get("error"):
+        return None, f"{check}: {report['error']}"
+    return report, ""
+
+
+def _retried_once_then_ok(entry: dict) -> bool:
+    return entry.get("calls") == 2 and entry.get("status") == 200
+
+
+def check_retry_status_set(ctx: dict) -> tuple[bool, str]:
+    """429, 502, 503 and 504 are retried; 200, 404 and 500 are not."""
+    report, err = _scenarios(ctx, "retry-status-set")
+    if report is None:
+        return False, err
+    wrong = [
+        f"HTTP {status} not retried ({report[f's{status}']})"
+        for status in sorted(RETRY_STATUSES)
+        if not _retried_once_then_ok(report[f"s{status}"])
+    ] + [
+        f"HTTP {status} retried ({report[name]})"
+        for name, status in NOT_RETRIED.items()
+        if report[name].get("calls") != 1
+    ]
+    if wrong:
+        return False, "retry-status-set: " + "; ".join(wrong)
+    return True, "retry-status-set: retries 429, 502, 503 and 504 only"
+
+
+def check_retry_after_honored(ctx: dict) -> tuple[bool, str]:
+    """The client waits exactly the Retry-After seconds, up to 300 s included."""
+    report, err = _scenarios(ctx, "retry-after-honored")
+    if report is None:
+        return False, err
+    wrong = []
+    for name, seconds in (("retry_after_30", 30.0), ("retry_after_300", 300.0)):
+        entry = report[name]
+        if entry.get("status") != 200 or entry.get("waits", [None])[:1] != [seconds]:
+            wrong.append(f"Retry-After {seconds:.0f}: {entry}")
+    if wrong:
+        return (
+            False,
+            "retry-after-honored: the wait is not the Retry-After value: "
+            + "; ".join(wrong),
+        )
+    return True, "retry-after-honored: the client waits the Retry-After seconds"
+
+
+def check_retry_after_cap(ctx: dict) -> tuple[bool, str]:
+    """A Retry-After above 300 s raises at once, without waiting."""
+    report, err = _scenarios(ctx, "retry-after-cap")
+    if report is None:
+        return False, err
+    wrong = [
+        f"Retry-After {name.rsplit('_', 1)[1]}: {report[name]}"
+        for name in ("retry_after_301", "retry_after_1422")
+        if report[name].get("ended") != "raised"
+        or report[name].get("calls") != 1
+        or report[name].get("waits")
+    ]
+    if wrong:
+        return (
+            False,
+            "retry-after-cap: a wait over 300 s does not stop the run: "
+            + "; ".join(wrong),
+        )
+    return True, "retry-after-cap: a Retry-After over 300 s raises without waiting"
+
+
+def check_no_tls_retry(ctx: dict) -> tuple[bool, str]:
+    """Dropped and timed-out connections are retried; a TLS error is raised at once."""
+    report, err = _scenarios(ctx, "no-tls-retry")
+    if report is None:
+        return False, err
+    wrong = [
+        f"{name} not retried ({report[name]})"
+        for name in ("connection_error", "timeout")
+        if not _retried_once_then_ok(report[name])
+    ]
+    ssl = report["ssl_error"]
+    if ssl.get("ended") != "raised" or ssl.get("calls") != 1:
+        wrong.append(f"SSLError retried ({ssl})")
+    if wrong:
+        return False, "no-tls-retry: " + "; ".join(wrong)
+    return True, "no-tls-retry: connection errors retried, TLS errors raised"
+
+
+def check_shared_retry_budget(ctx: dict) -> tuple[bool, str]:
+    """Retries end, and status and connection retries draw on one budget."""
+    report, err = _scenarios(ctx, "shared-retry-budget")
+    if report is None:
+        return False, err
+    runs = {n: report[n] for n in ("always_503", "always_connection_error", "mixed")}
+    unbounded = [n for n, e in runs.items() if e.get("ended") == "unbounded"]
+    if unbounded:
+        return False, f"shared-retry-budget: retries never stop for {unbounded}"
+    single = max(runs["always_503"]["calls"], runs["always_connection_error"]["calls"])
+    if runs["mixed"]["calls"] > single:
+        return (
+            False,
+            f"shared-retry-budget: alternating failures made {runs['mixed']['calls']} requests, "
+            f"more than the {single} one kind allows: two separate budgets",
+        )
+    return True, "shared-retry-budget: one budget for status and connection retries"
 
 
 def _strip_docstrings(tree: ast.Module) -> ast.Module:
@@ -592,109 +819,16 @@ def _num(node: ast.AST, names: dict[str, float]) -> float | None:
     return None
 
 
-def _collection_ints(node: ast.AST, names: dict[str, float]) -> set[int] | None:
-    """The integers of a literal collection, or of ``frozenset({...})`` / ``set([...])``."""
-    if (
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id in ("frozenset", "set", "tuple", "list")
-        and len(node.args) == 1
-    ):
-        node = node.args[0]
-    if isinstance(node, (ast.Set, ast.List, ast.Tuple)) and node.elts:
-        vals = [_num(e, names) for e in node.elts]
-        if all(v is not None for v in vals):
-            return {int(v) for v in vals}
-    return None
-
-
-def _named_collections(
-    tree: ast.Module, names: dict[str, float]
-) -> dict[str, set[int]]:
-    """Names (module constants, attributes) bound to a collection of integers."""
-    out: dict[str, set[int]] = {}
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Assign, ast.AnnAssign)) and node.value is not None:
-            ints = _collection_ints(node.value, names)
-            if ints is None:
-                continue
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            for t in targets:
-                if isinstance(t, ast.Name):
-                    out[t.id] = ints
-                elif isinstance(t, ast.Attribute):
-                    out[t.attr] = ints
-    return out
-
-
-def _mentions_status(node: ast.AST) -> bool:
-    return any(
-        (isinstance(n, ast.Name) and "status" in n.id.lower())
-        or (isinstance(n, ast.Attribute) and "status" in n.attr.lower())
-        for n in ast.walk(node)
-    )
-
-
-def check_retry_status_set(ctx: dict) -> tuple[bool, str]:
-    """The response status is tested for membership in exactly {429, 502, 503, 504}."""
-    tree = ctx["py"]
-    if tree is None:
-        return False, f"retry-status-set: {ctx['py_err']}"
-    names = _numeric_names(tree)
-    named = _named_collections(tree, names)
-    tested: list[list[int]] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Compare) or not _mentions_status(node.left):
-            continue
-        for op, comp in zip(node.ops, node.comparators):
-            if not isinstance(op, (ast.In, ast.NotIn)):
-                continue
-            ints = _collection_ints(comp, names)
-            if ints is None and isinstance(comp, (ast.Name, ast.Attribute)):
-                ints = named.get(comp.id if isinstance(comp, ast.Name) else comp.attr)
-            if ints is None:
-                continue
-            if ints == RETRY_STATUSES:
-                return (
-                    True,
-                    "retry-status-set: the response status is tested against 429, 502, 503, 504",
-                )
-            tested.append(sorted(ints))
-    return (
-        False,
-        "retry-status-set: no test of the response status against "
-        f"{sorted(RETRY_STATUSES)} (statuses tested: {tested})",
-    )
-
-
-# Data flow inside the client module. Each expression carries labels:
-#   retry_after: derived from the Retry-After header
-#   jitter:      derived from a random draw
-#   capped:      bounded at 60 s, by min(..., 60) or by `if x > 60: x = 60`
-# Labels pass through assignments, through any call that takes a labelled
-# argument, and through functions whose return value is labelled. The analysis
-# ignores statement order inside a function, which is enough for a client of
-# this size and errs toward passing a value that is labelled on any branch.
+# The 60 s cap is read from the code: with a budget of five retries, 2**5 = 32 s
+# never reaches it, so the scripted run cannot show it. Each expression carries
+# labels: jitter (derived from a random draw) and capped (bounded at 60 s by
+# min(..., 60) or by `if x > 60: x = 60`). Labels pass through assignments,
+# through a call that takes a labelled argument, and through functions whose
+# return value is labelled. Adding or subtracting keeps `capped` only when both
+# sides are capped, so min(60, x) + uniform(0, 5) is not capped. The analysis
+# ignores statement order inside a function.
 
 _RANDOM_MODULES = ("random", "secrets")
-
-
-def _is_retry_after_read(node: ast.AST) -> bool:
-    key = None
-    if (
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "get"
-        and node.args
-    ):
-        key = node.args[0]
-    elif isinstance(node, ast.Subscript):
-        key = node.slice
-    return (
-        isinstance(key, ast.Constant)
-        and isinstance(key.value, str)
-        and key.value.lower() == "retry-after"
-    )
 
 
 def _random_names(tree: ast.Module) -> set[str]:
@@ -753,24 +887,41 @@ class _Flow:
                 break
 
     def labels(self, expr: ast.AST, scope: str) -> set[str]:
+        if isinstance(expr, ast.Name):
+            return set(self.var.get((scope, expr.id), set()))
+        if isinstance(expr, ast.BinOp) and isinstance(expr.op, (ast.Add, ast.Sub)):
+            left, right = self.labels(expr.left, scope), self.labels(expr.right, scope)
+            out = (left | right) - {"capped"}
+            if "capped" in left and "capped" in right:
+                out.add("capped")
+            return out
+        if isinstance(expr, ast.IfExp):
+            body, orelse = (
+                self.labels(expr.body, scope),
+                self.labels(expr.orelse, scope),
+            )
+            out = (body | orelse) - {"capped"}
+            if "capped" in body and "capped" in orelse:
+                out.add("capped")
+            return out
         out: set[str] = set()
-        for n in ast.walk(expr):
-            if isinstance(n, ast.Name):
-                out |= self.var.get((scope, n.id), set())
-            if _is_retry_after_read(n):
-                out.add("retry_after")
-            if isinstance(n, ast.Call):
-                name = _call_name(n.func)
-                if (
-                    isinstance(n.func, ast.Attribute)
-                    and isinstance(n.func.value, ast.Name)
-                    and n.func.value.id in _RANDOM_MODULES
-                ) or (isinstance(n.func, ast.Name) and n.func.id in self.random_names):
-                    out.add("jitter")
-                if name == "min" and any(_num(a, self.names) == 60 for a in n.args):
-                    out.add("capped")
-                if name:
-                    out |= self.ret.get(name, set())
+        if isinstance(expr, ast.Call):
+            name = _call_name(expr.func)
+            if (
+                isinstance(expr.func, ast.Attribute)
+                and isinstance(expr.func.value, ast.Name)
+                and expr.func.value.id in _RANDOM_MODULES
+            ) or (
+                isinstance(expr.func, ast.Name) and expr.func.id in self.random_names
+            ):
+                out.add("jitter")
+            if name == "min" and any(_num(a, self.names) == 60 for a in expr.args):
+                out.add("capped")
+            if name:
+                out |= self.ret.get(name, set())
+        for child in ast.iter_child_nodes(expr):
+            if isinstance(child, ast.expr):
+                out |= self.labels(child, scope)
         return out
 
     def _add(self, store: dict, key, labels: set[str]) -> bool:
@@ -795,10 +946,6 @@ class _Flow:
                         for t in targets:
                             for name in _target_names(t):
                                 changed |= self._add(self.var, (scope, name), labels)
-                    elif isinstance(n, ast.NamedExpr):
-                        changed |= self._add(
-                            self.var, (scope, n.target.id), self.labels(n.value, scope)
-                        )
                     elif isinstance(n, ast.If):
                         # `if delay > 60: delay = 60` caps `delay`
                         for name in self._capped_by_if(n):
@@ -847,180 +994,50 @@ class _Flow:
         return out
 
 
-def _flow(ctx: dict) -> _Flow:
-    if "flow" not in ctx:
-        ctx["flow"] = _Flow(ctx["py"])
-    return ctx["flow"]
-
-
-def check_retry_after_honored(ctx: dict) -> tuple[bool, str]:
-    """The Retry-After value reaches the wait the client sleeps on."""
-    tree = ctx["py"]
-    if tree is None:
-        return False, f"retry-after-honored: {ctx['py_err']}"
-    if not any(_is_retry_after_read(n) for n in ast.walk(tree)):
-        return False, "retry-after-honored: the code never reads the Retry-After header"
-    if any("retry_after" in labels for labels in _flow(ctx).sleeps()):
-        return True, "retry-after-honored: the Retry-After value sets the sleep"
-    return (
-        False,
-        "retry-after-honored: Retry-After is read but no sleep() waits on its value",
-    )
-
-
-def check_retry_after_cap(ctx: dict) -> tuple[bool, str]:
-    """A Retry-After wait longer than 300 s raises instead of sleeping."""
-    tree = ctx["py"]
-    if tree is None:
-        return False, f"retry-after-cap: {ctx['py_err']}"
-    flow = _flow(ctx)
-    for scope, body in flow.scopes:
-        for stmt in body:
-            for node in ast.walk(stmt):
-                if not isinstance(node, ast.If) or not any(
-                    isinstance(n, ast.Raise) for s in node.body for n in ast.walk(s)
-                ):
-                    continue
-                for cmp in ast.walk(node.test):
-                    if not isinstance(cmp, ast.Compare):
-                        continue
-                    operands = [cmp.left, *cmp.comparators]
-                    if any(_num(x, flow.names) == 300 for x in operands) and any(
-                        "retry_after" in flow.labels(x, scope) for x in operands
-                    ):
-                        return (
-                            True,
-                            "retry-after-cap: a Retry-After wait over 300 s raises",
-                        )
-    return (
-        False,
-        "retry-after-cap: no branch that compares the Retry-After wait with 300 s and raises",
-    )
-
-
 def check_backoff_capped_jitter(ctx: dict) -> tuple[bool, str]:
-    """A slept backoff is capped at 60 s and drawn with random jitter."""
-    tree = ctx["py"]
-    if tree is None:
-        return False, f"backoff-capped-jitter: {ctx['py_err']}"
-    sleeps = _flow(ctx).sleeps()
-    if any({"capped", "jitter"} <= labels for labels in sleeps):
-        return (
-            True,
-            "backoff-capped-jitter: the slept backoff is capped at 60 s with jitter",
+    """Backoff waits (repeated dropped connections) vary between runs and stay at or
+    below 60 s, and the slept backoff is capped at 60 s in the code."""
+    report, err = _scenarios(ctx, "backoff-capped-jitter")
+    if report is None:
+        return False, err
+    first = report["always_connection_error"]["waits"]
+    second = report["always_connection_error_seed2"]["waits"]
+    problems = []
+    if len(first) < 2:
+        problems.append(
+            f"fewer than two backoff waits on repeated connection errors ({first})"
         )
-    seen = sorted({tuple(sorted(lbl & {"capped", "jitter"})) for lbl in sleeps})
-    return (
-        False,
-        f"backoff-capped-jitter: no sleep() waits on a value both capped at 60 s and jittered (sleeps carry {seen})",
-    )
-
-
-_BROAD = {
-    "ConnectionError",
-    "RequestException",
-    "OSError",
-    "Exception",
-    "BaseException",
-}
-
-
-def _handler_names(handler: ast.ExceptHandler) -> set[str]:
-    t = handler.type
-    elts = t.elts if isinstance(t, ast.Tuple) else [t] if t is not None else []
-    return {
-        e.id if isinstance(e, ast.Name) else e.attr
-        for e in elts
-        if isinstance(e, (ast.Name, ast.Attribute))
-    }
-
-
-def _reraises(handler: ast.ExceptHandler) -> bool:
-    nodes = [n for stmt in handler.body for n in ast.walk(stmt)]
-    return any(isinstance(n, ast.Raise) for n in nodes) and not any(
-        isinstance(n, ast.Continue) for n in nodes
-    )
-
-
-_HTTP_RECEIVERS = ("session", "client", "http", "requests", "httpx")
-
-
-def _calls_http(stmts: list[ast.stmt]) -> bool:
-    """The statements call an HTTP session or client (``self.session.get(...)``, ``requests.get(...)``)."""
-    for stmt in stmts:
-        for n in ast.walk(stmt):
-            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute):
-                receiver = n.func.value
-                name = (
-                    receiver.id
-                    if isinstance(receiver, ast.Name)
-                    else receiver.attr
-                    if isinstance(receiver, ast.Attribute)
-                    else ""
-                )
-                if any(word in name.lower() for word in _HTTP_RECEIVERS):
-                    return True
-    return False
-
-
-def check_no_tls_retry(ctx: dict) -> tuple[bool, str]:
-    """A handler that retries connection errors handles SSLError first, so TLS errors are not retried."""
+    if any(w > 60 for w in first + second):
+        problems.append(f"a wait above 60 s ({max(first + second)})")
+    if first == second:
+        problems.append(f"the same waits with two random seeds, so no jitter ({first})")
     tree = ctx["py"]
-    if tree is None:
-        return False, f"no-tls-retry: {ctx['py_err']}"
-    broad_seen = False
-    for node in ast.walk(tree):
-        # Only the try around the HTTP call retries; an unrelated
-        # ``except OSError`` (a reset-time parse, a file read) does not.
-        if not isinstance(node, ast.Try) or not _calls_http(node.body):
-            continue
-        ssl_handled = False
-        for handler in node.handlers:
-            names = _handler_names(handler)
-            if "SSLError" in names:
-                # Only a handler that re-raises excludes TLS errors; one that
-                # continues or swallows the error still retries them.
-                ssl_handled = _reraises(handler)
-                continue
-            if names & _BROAD:
-                broad_seen = True
-                isinstance_guard = any(
-                    isinstance(n, ast.Call)
-                    and isinstance(n.func, ast.Name)
-                    and n.func.id == "isinstance"
-                    and any(
-                        isinstance(x, (ast.Name, ast.Attribute))
-                        and getattr(x, "id", getattr(x, "attr", "")) == "SSLError"
-                        for x in ast.walk(n)
-                    )
-                    for stmt in handler.body
-                    for n in ast.walk(stmt)
-                )
-                if not (ssl_handled or isinstance_guard):
-                    return (
-                        False,
-                        "no-tls-retry: a handler catching connection errors retries SSLError, which subclasses ConnectionError",
-                    )
-    if not broad_seen:
-        return (
-            False,
-            "no-tls-retry: no handler retries dropped or timed-out connections",
-        )
-    return True, "no-tls-retry: connection errors retried, TLS errors excluded"
+    if tree is None or not any(
+        {"capped", "jitter"} <= lbl for lbl in _Flow(tree).sleeps()
+    ):
+        problems.append("no sleep() waits on a value both capped at 60 s and jittered")
+    if problems:
+        return False, "backoff-capped-jitter: " + "; ".join(problems)
+    return True, "backoff-capped-jitter: jittered backoff capped at 60 s"
 
 
 # --------------------------------------------------------------------------
 # Task 6: changes stay in adapter files
 # --------------------------------------------------------------------------
 
+# The adapter's own files, as rules/scope-adapter-files-only.md lists them for <name>=servicenow.
 _ALLOWED = (
     re.compile(r"^infrahub_sync/adapters/servicenow\.py$"),
-    re.compile(r"^tests/"),
-    re.compile(r"^examples/"),
-    re.compile(r"^docs/"),
-    re.compile(r"^changelog/"),
-    re.compile(r"^(dev/)?specs/"),
-    re.compile(r"^[^/]+\.md$"),  # issue drafts or notes at the top level
+    # its tests, fixtures and fakes, wherever the test layout puts them
+    re.compile(r"^tests/(.+/)?[^/]*servicenow[^/]*(/.+)?$"),
+    re.compile(r"^examples/servicenow[^/]*/.+"),
+    re.compile(r"^docs/docs/adapters/(servicenow|choosing-an-adapter)\.mdx$"),
+    re.compile(r"^docs/docs/readme\.mdx$"),
+    re.compile(r"^docs/sidebars\.ts$"),
+    re.compile(r"^changelog/[^/]+\.md$"),
+    re.compile(r"^(dev/)?specs/[^/]*servicenow[^/]*/.+"),
+    # README.md and AGENTS.md (the adapter lists), and drafted issues or notes
+    re.compile(r"^[^/]+\.md$"),
     re.compile(r"^\.vale/styles/spelling-exceptions\.txt$"),
 )
 # Left by running the tests or the linters; not part of the change.
@@ -1073,6 +1090,7 @@ CHECKS: dict[str, Callable[[dict], tuple[bool, str]]] = {
     "retry-after-cap": check_retry_after_cap,
     "backoff-capped-jitter": check_backoff_capped_jitter,
     "no-tls-retry": check_no_tls_retry,
+    "shared-retry-budget": check_shared_retry_budget,
     "diff-stays-in-adapter": check_diff_stays_in_adapter,
 }
 

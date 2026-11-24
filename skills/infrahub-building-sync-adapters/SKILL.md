@@ -84,7 +84,9 @@ Stop and wait for the user's explicit approval at these
 three points, and at no others unless something fails.
 The schema change and the first write to Infrahub are
 approved in `infrahub-managing-sync-configs` during
-phase 4.
+phase 4. A retry limit longer than the 300 s default is
+approved with `api-behavior.yml` or the spec; one needed
+later counts as a failure, so stop and ask.
 
 | # | When | What the user approves |
 | - | ---- | ---------------------- |
@@ -116,14 +118,11 @@ Check, and stop with a message at the first failure:
    under `infrahub_sync/`, the checkout is on
    `feature/v3-develop`: stop and tell the user this
    skill covers `main` only.
-2. **Infrahub is reachable** (`infrahubctl info`) and its
-   token is in the `INFRAHUB_API_TOKEN` environment
-   variable.
-3. **API login works with the integration account**, the
+2. **API login works with the integration account**, the
    account the sync will run as. Some systems refuse
    Basic authentication for interactive or admin
    accounts.
-4. **The adapter name** is one lowercase word with no `-`
+3. **The adapter name** is one lowercase word with no `-`
    and no `_`, with a `sync` suffix when it equals the
    vendor SDK's import name.
 
@@ -184,7 +183,8 @@ path of the infrahub-sync checkout that holds the
 adapter, and the source resources the spec covers. That
 skill maps the resources onto the customer's schema,
 writes the sync config, and runs the live validation on
-an Infrahub branch. Do not write the sync config here.
+an Infrahub branch, after its own preflight checks that
+Infrahub is reachable. Do not write the sync config here.
 
 ### Phase 5: Fix what the live run finds
 

@@ -10359,21 +10359,24 @@ tasks:
     assertions:
       - name: behavior-keys
         check: >-
-          Every endpoint entry carries the fixed key set
+          Every endpoint entry is a mapping with the fixed key set and the
+          captured method
       - name: behavior-covers-endpoints
         check: >-
-          Every captured endpoint has an entry
+          Exactly one entry per captured endpoint, and none for an endpoint
+          never captured
       - name: behavior-next-link
         check: >-
-          next_link_carries holds every parameter the captured next link repeats
+          pagination.type is link_header, and next_link_carries lists exactly the
+          parameters the captured next link repeats
       - name: behavior-rate-limit
         check: >-
-          Endpoints with a captured 429 record status 429 and retry_after_header
-          true
+          The captured 429 is recorded with status 429 and retry_after_header
+          true; an endpoint with no captured 429 does not claim one
       - name: behavior-field-quirks
         check: >-
           field_quirks records the reference shapes and the silently dropped
-          field the captures show
+          field the captures show, across every capture of an endpoint
 
   - name: building-sync-adapters-strict-fake
     trials: 3
@@ -10424,7 +10427,7 @@ tasks:
           default_fields: all
           field_selection: sysparm_fields
           filters_supported: [sysparm_query]
-          rate_limit: {status: 429, retry_after_header: true}
+          rate_limit: {observed: false}
           empty_result_is_valid: true
           captures: [cmn_location_page1.json, cmn_location_noparent.json]
           field_quirks: {reference_set: object, reference_empty: empty_string, unknown_selected_field: dropped_silently}
@@ -10529,7 +10532,8 @@ tasks:
     assertions:
       - name: fake-serves-captures
         check: >-
-          Every row the fake returns is a captured row with the captured values
+          Asked for sys_id,name, the fake returns every captured row, in order,
+          with the captured values
       - name: fake-field-selection
         check: >-
           A request with sysparm_fields=sys_id,name gets only those fields
@@ -10568,7 +10572,8 @@ tasks:
         weight: 1.0
     expected_output: >-
       A PR description with a checks section naming every repository check for
-      an adapter PR: format, lint, ty, unit tests, rumdl, the docs build,
+      an adapter PR, each command followed by its result: format, lint, ty, unit
+      tests, rumdl, the docs build,
       infrahub-sync list, generate and diff on the example, the news fragment,
       the docs page, its sidebar entry and its choosing-an-adapter row, and the
       spec documents matched to the code.
@@ -10581,7 +10586,8 @@ tasks:
     assertions:
       - name: pr-checks-complete
         check: >-
-          The checks section names every required check as a command or path
+          The checks section names every required check as a command followed by
+          its result, or as a changed path, for the ServiceNow adapter and example
 
   - name: building-sync-adapters-retry-policy
     trials: 3
@@ -10638,6 +10644,7 @@ tasks:
       60 s, and never retries TLS errors.
     expectations:
       - The retried statuses are exactly 429, 502, 503 and 504
+      - Status and connection retries share one budget
       - Retry-After is read from the response
       - A Retry-After above 300 s raises an error instead of sleeping
       - Backoff is capped at 60 s with random jitter
@@ -10645,19 +10652,26 @@ tasks:
     assertions:
       - name: retry-status-set
         check: >-
-          The response status is tested for membership in {429, 502, 503, 504}
+          Run against scripted responses, the client retries 429, 502, 503 and
+          504 and does not retry 200, 404 or 500
       - name: retry-after-honored
         check: >-
-          The Retry-After value reaches the sleep() wait
+          The client waits exactly the Retry-After seconds, 30 and 300 included
       - name: retry-after-cap
         check: >-
-          A branch comparing the Retry-After wait with 300 raises
+          A Retry-After of 301 or 1422 raises at once, without waiting
       - name: backoff-capped-jitter
         check: >-
-          A slept backoff is capped at 60 s and drawn with random jitter
+          Backoff waits vary between two random seeds, stay at or below 60 s,
+          and the slept value is capped at 60 s in the code
       - name: no-tls-retry
         check: >-
-          Handlers that retry connection errors handle SSLError first
+          A dropped or timed-out connection is retried; an SSLError is raised
+          after one request
+      - name: shared-retry-budget
+        check: >-
+          Retries end, and alternating connection errors and 503s make no more
+          requests than one kind alone
 
   - name: building-sync-adapters-scope-core-files
     trials: 3
@@ -10795,14 +10809,20 @@ tasks:
     expected_output: >-
       A config whose NetworkDevice identifiers are name and location, matching
       the human_friendly_id [name__value, location__name__value] inherited from
-      DcimGenericDevice, so the Infrahub upsert cannot merge two devices that
-      share a name and a site. netbox_id stays an ordinary field.
+      DcimGenericDevice, so two devices with the same name at different sites
+      stay two nodes, and the Infrahub upsert does not merge them. Two devices
+      with the same name at the same site share one key, which is a data problem
+      to fix before the sync. netbox_id stays an ordinary field on both kinds.
     expectations:
-      - NetworkDevice identifiers are name and location
+      - NetworkDevice identifiers are name and location, each mapped as a field
       - LocationSite identifiers are name
-      - netbox_id is mapped as a field, not used as an identifier
+      - netbox_id is mapped as a field on both kinds, not used as an identifier
     assertions:
       - name: identifiers-match-hfid
         check: >-
           Each mapping's identifiers equal the fields of the destination kind's
-          human_friendly_id
+          human_friendly_id, listed once each and mapped in the same entry
+      - name: stable-id-is-a-field
+        check: >-
+          netbox_id is mapped as a field on NetworkDevice and LocationSite and is
+          not an identifier

@@ -2,7 +2,7 @@
 
 Commands and config keys that `SKILL.md` points at. They
 were read on the infrahub-sync `main` branch at commit
-`bdf58f98`.
+`e509abbb`.
 
 ## Preflight commands
 
@@ -61,38 +61,85 @@ schema_mapping:
         reference: BuiltinTag     # a relationship: the peer's kind
 ```
 
-- Credentials come from environment variables, not
-  from the file. The adapter's example lists the ones it
-  reads.
+- Source credentials come from environment variables,
+  not from the file. The adapter's example lists the ones
+  it reads.
+- The Infrahub address, token and branch are read in two
+  places that do not agree:
+  - `generate` takes `url`, `token` and `branch` from
+    `destination.settings` only. It ignores
+    `INFRAHUB_API_TOKEN`, so without a `token` in the
+    settings it reads the schema anonymously.
+  - `diff` and `sync` use `INFRAHUB_ADDRESS` (or
+    `INFRAHUB_URL`) and `INFRAHUB_API_TOKEN` first, and
+    the settings only when those are unset.
+  - A `branch` in `destination.settings` overrides
+    `--branch` on all three commands.
+
+  The live validation below runs from a run config that
+  sets all three, so every command reads the same
+  Infrahub branch.
 - `order` is optional on `main`. infrahub-sync computes
   the write order from the `reference` of each field.
   Set `order` only to override it.
-- Every kind named in `reference` needs its own
-  `schema_mapping` entry, or nodes already in Infrahub
-  for it.
+- A `reference` is resolved twice. The source adapter
+  looks the peer up among the records it loaded for the
+  referenced kind, so that kind needs its own
+  `schema_mapping` entry: the NetBox adapter, for
+  example, raises `Unable to locate the node ...` when the
+  peer was not loaded, even if Infrahub already holds it.
+  Infrahub then needs the peer node on the branch. Read
+  how the adapter's `obj_to_diffsync` (or its equivalent)
+  resolves a reference before relying on nodes that are
+  only in Infrahub.
 
 ## Live validation commands
 
-Run from the customer repository. `generate` reads the
-schema from Infrahub, so point it at the branch where the
-schema is loaded.
+Run from the customer repository. The commands use a run
+config, `sync/<project>/config.run.yml`: a copy of
+`config.yml` that stays out of Git and sets the Infrahub
+`url`, the test `branch` and, when `generate` needs it,
+the `token` (see
+[the config keys](#config-keys-on-main)). Generated files
+land in `sync/<project>/`, next to the run config, as
+they would with `--name`.
 
 ```bash
 grep -qxF ".infrahub-sync-cache/" .gitignore || echo ".infrahub-sync-cache/" >> .gitignore
+grep -qxF "config.run.yml" .gitignore || echo "config.run.yml" >> .gitignore
 
 infrahubctl branch create "<test-branch>"
 infrahubctl schema load schemas --branch "<test-branch>"
 
-infrahub-sync list --directory sync
-infrahub-sync generate --name "<project>" --directory sync --branch "<test-branch>"
-infrahub-sync diff --name "<project>" --directory sync --branch "<test-branch>"
+RUN="sync/<project>/config.run.yml"
+cp sync/<project>/config.yml "$RUN"
+# Edit $RUN: under destination.settings set url to the Infrahub address
+# and branch to <test-branch>. Add token only if generate fails to authenticate.
+
+# Show the effective target, and stop when the commands would not agree.
+python - "$RUN" <<'EOF'
+import os, sys, yaml
+settings = yaml.safe_load(open(sys.argv[1]))["destination"].get("settings") or {}
+url, branch = str(settings.get("url") or ""), settings.get("branch")
+env = os.environ.get("INFRAHUB_ADDRESS") or os.environ.get("INFRAHUB_URL") or ""
+print(f"generate reads the schema from {url} on branch {branch}")
+print(f"diff and sync use {env or url} on branch {branch}")
+if not branch:
+    sys.exit("no destination branch in the run config: stop")
+if env and env.rstrip("/") != url.rstrip("/"):
+    sys.exit("INFRAHUB_ADDRESS and destination.settings.url differ: stop")
+EOF
+
+infrahub-sync generate --config-file "$RUN"
+infrahub-sync diff --config-file "$RUN"
 
 # Approval point 2. Only after the user approves:
-infrahub-sync sync --name "<project>" --directory sync --branch "<test-branch>"
+infrahub-sync sync --config-file "$RUN"
 
 # Expect no creates or updates, except for records changed in the source since the sync.
-# Deletions of nodes the source does not hold are expected.
-infrahub-sync diff --name "<project>" --directory sync --branch "<test-branch>"
+infrahub-sync diff --config-file "$RUN"
+
+rm "$RUN"   # it may hold the Infrahub token
 ```
 
 When the adapter comes from an infrahub-sync checkout
@@ -103,10 +150,16 @@ that is not released yet, for example one handed over by
 the checkout without changing the customer repository's
 dependencies.
 
-`generate`, `diff` and `sync` take `--branch` on
-infrahub-sync `main`. Pass it on the command line rather
-than setting a branch in the destination settings, so no
-test branch ends up in the committed configuration.
+`generate`, `diff` and `sync` also take `--branch` on
+infrahub-sync `main`, but a `branch` in
+`destination.settings` overrides it. That is why the
+branch goes in the run config, and why the committed
+`config.yml` carries no test branch.
+
+`sync` reads the source again and computes its own diff
+before writing. It writes the current source data, which
+includes any record created or changed after the `diff`
+the user approved.
 
 The cache holds snapshots of source data, which is why
 `.infrahub-sync-cache/` goes into `.gitignore` before the
@@ -118,14 +171,22 @@ Warn the user about these, and draft an issue with
 `infrahub-reporting-issues` instead of working around
 them in infrahub-sync core:
 
-- One bad record stops the whole run, and
-  `--continue-on-error` does not help. The data
-  pre-check in
+- One bad record stops the whole run. With
+  `--continue-on-error`, the Infrahub adapter skips a
+  peer relationship whose peer has empty identifier
+  values and a node it cannot build into a model, and
+  logs a warning for each. The flag does not skip a
+  failed write to Infrahub, a duplicate key, or a source
+  adapter error. The data pre-check in
   [rules/mapping-identifiers-match-hfid.md](./rules/mapping-identifiers-match-hfid.md)
   finds those records before the first run.
-- `InfrahubModel` has no delete. A record removed from
-  the source shows as a deletion in the diff but stays in
-  Infrahub.
+- A record removed from the source stays in Infrahub.
+  With no `diffsync_flags` in the config, infrahub-sync
+  uses `SKIP_UNMATCHED_DST`, so the diff shows no row for
+  a node that only Infrahub holds. With flags that let
+  the diff show a deletion, `sync` still leaves the node,
+  because `InfrahubModel` implements `create` and
+  `update` only.
 - Transforms render with Jinja's native types, so a
   number-like string (`"1411"`) becomes a number. Add
   `| tojson` to a transform whose result must stay a

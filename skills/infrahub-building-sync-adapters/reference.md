@@ -46,6 +46,12 @@ Select the next link by its relation exactly. Some APIs
 send `first`, `prev`, `next` and `last` together, and a
 `prev` link can carry a negative offset.
 
+Before following a next link, check that its scheme and
+host are those of the configured base URL, and raise
+otherwise, as `_url` in infrahub-sync's
+`webex_client.py` does. Test it with a fake that returns
+a next link to another host.
+
 ### `rate_limit`
 
 | Key | Value |
@@ -162,18 +168,17 @@ repository:
 
 ## Phase 0: preflight details
 
-Run these in the infrahub-sync checkout and in the
-customer repository. Stop at the first failure and tell
-the user what failed.
+Run this in the infrahub-sync checkout. Stop at the
+first failure and tell the user what failed. Infrahub is
+not needed until phase 4, where
+`infrahub-managing-sync-configs` checks it.
 
 ```bash
-# The checkout follows the main contract. A match means the
-# feature/v3-develop contract: stop and tell the user.
+# The checkout follows the main contract. grep exits 1 when nothing matches,
+# which is the expected result here. A match means the feature/v3-develop
+# contract: stop and tell the user. A missing infrahub_sync/ directory
+# (exit 2) means this is not an infrahub-sync checkout: stop.
 grep -rn "BUILTIN_ADAPTER_CAPABILITIES" infrahub_sync/
-
-# Infrahub is reachable and the token is in the environment.
-test -n "$INFRAHUB_API_TOKEN" && echo "INFRAHUB_API_TOKEN is set"
-infrahubctl info
 ```
 
 - **Contract.** Create the adapter branch from
@@ -235,15 +240,27 @@ infrahubctl info
   row list instead of returning zero rows. Zero rows
   reads as "every record was removed" in the diff.
 
-Reference adapters on `main`: `netbox.py` for the
-contract shape, `msgraphsync.py` for a client with the
-default retry policy (`RETRY_STATUSES`, `Retry-After`
-honored in full, a stop above 300 s, backoff capped at
-60 s), `webex.py` for following `Link` headers, and
-`peeringmanager.py` for a thin subclass of the generic
-REST adapter. Do not copy the retry setup of `aci.py`:
-it retries 500 and has neither the 300 s stop nor the
-capped jitter.
+Reference adapters on `main`, each for one part only.
+The policy itself is the one in
+[rules/retry-default-policy.md](./rules/retry-default-policy.md),
+not any adapter's:
+
+- `netbox.py` for the contract shape.
+- `msgraphsync.py` for the retry status set, the shared
+  budget, the stop above 300 s and the capped jitter. Its
+  `Retry-After` parser reads seconds only, and its TLS
+  exclusion covers certificate errors only.
+- `webex.py` and `webex_client.py` for following `Link`
+  headers, including the check that the next link stays
+  on the configured host. Not for retries: they retry
+  every 5xx, back off without jitter, and catch
+  `requests.ConnectionError` without excluding TLS
+  errors.
+- `peeringmanager.py` for a thin subclass of the generic
+  REST adapter.
+
+Do not copy the retry setup of `aci.py`: it retries 500
+and has neither the 300 s stop nor jitter.
 
 ## Phase 2: spec details
 
@@ -263,4 +280,5 @@ Write the spec in the infrahub-sync checkout under
 | ID | Requirement | Source | Test |
 | -- | ----------- | ------ | ---- |
 | FR-001 | Follow the `rel="next"` link until it is absent, sending it as captured | `api-behavior.yml`, `/api/v2/devices`, `pagination` | `test_pagination_follows_captured_next_link` |
+| FR-001a | Refuse a next link whose scheme or host differs from the base URL | `pagination` | `test_next_link_to_another_host_is_refused` |
 | FR-002 | Stop with an error when `Retry-After` asks for more than 300 s | Default retry policy | `test_long_retry_after_stops_the_run` |

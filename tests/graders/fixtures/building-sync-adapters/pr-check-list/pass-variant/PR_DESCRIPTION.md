@@ -15,7 +15,7 @@ New source adapter for the ServiceNow Table API.
 | Markdown | `uv run rumdl check .` | clean |
 | Docs build | `cd docs && npm run build` | built |
 | Examples load | `infrahub-sync list --directory examples/` | lists from-servicenow |
-| Example | `infrahub-sync generate --name from-servicenow --directory examples/` then `infrahub-sync diff --name from-servicenow --directory examples/` | 9 creates |
+| Example | `infrahub-sync generate --name from-servicenow --directory examples/servicenow_to_infrahub/` then `infrahub-sync diff --name from-servicenow --directory examples/servicenow_to_infrahub/` | 9 creates |
 | Changelog | `changelog/412.added.md` | added |
 | Docs page | `docs/docs/adapters/servicenow.mdx` | added |
 | Sidebar | `docs/sidebars.ts` | entry added |

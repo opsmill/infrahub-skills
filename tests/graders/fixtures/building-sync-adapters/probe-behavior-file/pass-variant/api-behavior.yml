@@ -47,6 +47,8 @@ endpoints:
     empty_result_is_valid: true
     captures:
       - cmn_location_page1.json
+      - cmn_location_noparent.json
     field_quirks:
       reference_set: object
+      reference_empty: empty_string
     subclass_rows: none

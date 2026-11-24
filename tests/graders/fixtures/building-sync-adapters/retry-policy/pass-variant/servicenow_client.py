@@ -21,11 +21,11 @@ class Policy:
         return delay
 
 
-def fetch(session, url, policy=None):
+def fetch(session, url, params=None, policy=None):
     policy = policy or Policy()
     for attempt in range(policy.attempts):
         try:
-            resp = session.get(url, timeout=60)
+            resp = session.get(url, params=params, timeout=60)
         except requests.RequestException as exc:
             if isinstance(exc, requests.exceptions.SSLError):
                 raise
@@ -39,3 +39,12 @@ def fetch(session, url, policy=None):
             raise RuntimeError(f"rate limited for {wait} s; giving up")
         sleep(wait)
     raise RuntimeError("retries exhausted")
+
+
+class ServiceNowClient:
+    def __init__(self, session, policy=None):
+        self.session = session
+        self.policy = policy
+
+    def get(self, url, params=None):
+        return fetch(self.session, url, params=params, policy=self.policy)
