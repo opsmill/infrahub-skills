@@ -24,11 +24,15 @@ hierarchy.
 Before writing a menu, look at the project with
 read-only tools:
 
-- Find the existing menu files: `.yml` files under a
-  `menus/` directory.
+- Find the existing menu files: `.yml` or `.yaml` files
+  under a `menus/` directory.
 - Find the schema files, to learn which node kinds are
   available: `.yml` files under a `schemas/` directory,
   or with `schema` in the name.
+- Before running any `infrahubctl` command, detect the
+  project's Python environment as
+  [../infrahub-common/rules/connectivity-python-environment.md](../infrahub-common/rules/connectivity-python-environment.md)
+  describes.
 
 ## When to Use
 

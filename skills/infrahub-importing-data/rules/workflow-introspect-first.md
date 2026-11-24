@@ -79,14 +79,16 @@ all the kinds you need.
      schema_response=$(mktemp) || exit 1
      trap 'rm -f "$schema_response"' EXIT
      curl -fsS -o "$schema_response" \
+       -H "X-INFRAHUB-KEY: $INFRAHUB_API_TOKEN" \
        "$INFRAHUB_ADDRESS/api/schema?branch=<name>" &&
        jq '.nodes[] | select(.name == "<Kind>")' "$schema_response"
    )
    ```
 
-   The subshell removes the temporary response on exit,
-   including when fetching or filtering fails, without
-   overwriting project files.
+   Writing the response to a temporary file avoids
+   piping `curl` into another command. The subshell
+   removes the file on exit, including when fetching or
+   filtering fails.
 
 4. **Local `schemas/*.yml`** in the repo. Read every
    schema YAML in the working tree. Resolve

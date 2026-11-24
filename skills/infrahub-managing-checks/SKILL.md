@@ -2,7 +2,7 @@
 name: infrahub-managing-checks
 description: >-
   Creates, modifies and debugs Infrahub check definitions — Python validation logic, GraphQL queries, and YAML-driven tests for proposed change pipelines.
-  TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes, writing or running tests for a check, modifying or extending an existing check, debugging why a check fails, passes when it should not, or flags the wrong nodes, editing a `.py` file under `checks/` in an Infrahub repository.
+  TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes, writing or running tests for a check, modifying or extending an existing check, debugging why a check fails, passes when it should not, or flags the wrong nodes, editing a `.py` file under `checks/` or a `.gql` file under `queries/` that a check in `.infrahub.yml` uses, in an Infrahub repository.
   DO NOT TRIGGER when: designing schemas, querying live data, building transforms or generators.
 argument-hint: "[check-name] [description...]"
 metadata:
@@ -29,6 +29,14 @@ read-only tools:
   `checks/` directory.
 - Find the existing queries: `.gql` files under a
   `queries/` directory.
+- Before running any `infrahubctl` command, detect the
+  project's Python environment as
+  [../infrahub-common/rules/connectivity-python-environment.md](../infrahub-common/rules/connectivity-python-environment.md)
+  describes.
+- Before merging a changed `.gql` file, dry-run it
+  against the live schema as
+  [../infrahub-common/rules/deployment-gql-dry-run.md](../infrahub-common/rules/deployment-gql-dry-run.md)
+  describes.
 
 ## When to Use
 
@@ -40,8 +48,9 @@ read-only tools:
   objects
 - Debugging check failures or understanding the check
   lifecycle
-- Editing any `.py` file under `checks/`, even when the
-  request does not mention checks
+- Editing any `.py` file under `checks/`, or a `.gql` file
+  under `queries/` that a check in `.infrahub.yml` uses,
+  even when the request does not mention checks
 
 ## Rule Categories
 

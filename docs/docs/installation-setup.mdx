@@ -31,15 +31,16 @@ It rejects the whole `.infrahub.yml` file. Check your target version before addi
 | --------- | ------------------- | ---------------- | ------------------------ |
 | Claude Code (plugin) | `/plugin install infrahub@opsmill` | Yes (skill descriptions) | Yes (`/infrahub:managing-schemas`, etc.) |
 | Claude Code (npx) | `npx skills add` | Yes (skill descriptions) | Yes |
-| GitHub Copilot | `npx skills add` | No | No, passive only |
-| Cursor | `npx skills add` | No | No, passive only |
-| Windsurf | `npx skills add` | No | No, passive only |
-| Amp | `npx skills add` | No | No, passive only |
-| Cline | `npx skills add` | No | No, passive only |
-| Codex | `npx skills add` | No | No, passive only |
+| GitHub Copilot | `npx skills add` | No, passive only | No, passive only |
+| Cursor | `npx skills add` | No, passive only | No, passive only |
+| Windsurf | `npx skills add` | No, passive only | No, passive only |
+| Amp | `npx skills add` | No, passive only | No, passive only |
+| Cline | `npx skills add` | No, passive only | No, passive only |
+| Codex | `npx skills add` | No, passive only | No, passive only |
 
-**Auto-detection** means the tool loads a skill without you naming it,
-because your request matches the skill's description.
+**Auto-detection** means Claude Code reads each skill's description and
+loads the skill whose description matches your request, without you
+naming it. This works for both the plugin and the npx install.
 
 **Direct skill invocation** means calling a skill by name, for example
 `/infrahub:managing-schemas`. Available where the agent supports
@@ -134,7 +135,7 @@ Each skill's SKILL.md file describes when and how to use it.
 
 ### Claude Code (plugin)
 
-No additional configuration required after plugin install. Claude Code chooses a skill from its description when your request matches it.
+Skills load without configuration: Claude Code chooses a skill from its description when your request matches it.
 
 A request such as "fix the failing test in `generators/create_dc.py`" names a file, not a task, so the matching skill may not load. To make Claude Code read the right skill before it edits a file, add this section to the `CLAUDE.md` at the root of your Infrahub repository:
 
@@ -142,25 +143,28 @@ A request such as "fix the failing test in `generators/create_dc.py`" names a fi
 ## Infrahub skills
 
 Before editing a file in these paths, read the matching skill from the
-infrahub plugin, and the rules named here:
+infrahub plugin. Each rule named here is a file in the `rules/` directory
+of that skill, next to its `SKILL.md`:
 
 - `generators/**/*.py` or `generators/**/*.gql`: `infrahub-managing-generators`,
   including `rules/python-relationship-references.md` and
   `rules/python-multi-peer-add.md`
-- `transforms/**/*.py`, `templates/**/*.j2` or `queries/**/*.gql`:
-  `infrahub-managing-transforms`, including `rules/queries-union-fragments.md`
-  before editing a `.gql` file, and `rules/artifacts-async-regen-polling.md`
-  before writing code that calls `/api/artifact/generate`
+- `transforms/**/*.py` or `templates/**/*.j2`: `infrahub-managing-transforms`,
+  including `rules/artifacts-async-regen-polling.md` before writing code
+  that calls `/api/artifact/generate`
 - `checks/**/*.py`: `infrahub-managing-checks`
-- `objects/**/*.yml`, `data/**/*.yml`, or any file with
-  `apiVersion: infrahub.app/v1` and `kind: Object`: `infrahub-managing-objects`
-- `menus/**/*.yml`, or any file with `kind: Menu`: `infrahub-managing-menus`
-- Any `.gql` file: also `infrahub-common`'s
-  `rules/deployment-gql-dry-run.md`
+- `queries/**/*.gql`: look up in `.infrahub.yml` which transform or check
+  uses the query, then read `infrahub-managing-transforms`, including
+  `rules/queries-union-fragments.md`, or `infrahub-managing-checks`
+- Any YAML file with `apiVersion: infrahub.app/v1` and `kind: Object`,
+  usually under `objects/` or `data/`: `infrahub-managing-objects`
+- `menus/**/*.{yml,yaml}`, or any file with `kind: Menu`: `infrahub-managing-menus`
+- Any `.gql` file: also `rules/deployment-gql-dry-run.md` in the
+  `infrahub-common` skill
 
 Before running any `infrahubctl` command, detect the project's Python
-environment as `infrahub-common`'s `rules/connectivity-python-environment.md`
-describes.
+environment as `rules/connectivity-python-environment.md` in the
+`infrahub-common` skill describes.
 ```
 
 These path rules matter most for generators and transforms. Code written from the patterns already in a repository can pass its unit tests and still fail against a live Infrahub server, and the skills hold the rules that prevent that.

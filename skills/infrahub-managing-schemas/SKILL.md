@@ -27,6 +27,10 @@ read-only tools:
 - Find the existing schema files: `.yml` files under a
   `schemas/` directory, or with `schema` in the name.
 - Read `.infrahub.yml` if it exists.
+- Before running any `infrahubctl` command, detect the
+  project's Python environment as
+  [../infrahub-common/rules/connectivity-python-environment.md](../infrahub-common/rules/connectivity-python-environment.md)
+  describes.
 
 If invoked with arguments (e.g., `/infrahub:managing-schemas Ipam Vlan VlanGroup`),
 use the first argument as the namespace and remaining arguments as node names.

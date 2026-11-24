@@ -23,7 +23,8 @@ infrahubctl schema export --branch main ./schema-export
 (
   schema_response=$(mktemp) || exit 1
   trap 'rm -f "$schema_response"' EXIT
-  curl -fsS -o "$schema_response" "$INFRAHUB_ADDRESS/api/schema?branch=main" &&
+  curl -fsS -o "$schema_response" -H "X-INFRAHUB-KEY: $INFRAHUB_API_TOKEN" \
+    "$INFRAHUB_ADDRESS/api/schema?branch=main" &&
     jq '.nodes[] | select(.name == "Interface")' "$schema_response"
 )
 ```

@@ -45,7 +45,7 @@ skills/infrahub-managing-schemas/
 
 ## How skills are triggered
 
-The AI infers whether a skill is relevant by matching the user's request against each skill's description. When a user asks "create a schema for VLAN management," the AI recognizes this matches the Schema Manager skill, activates it, and reads its `SKILL.md` to understand how to proceed.
+Claude Code, installed as a plugin or with npx, reads each skill's description and loads the skill whose description matches your request. You do not need to name the skill, and nothing runs when you open a project. When a user asks "create a schema for VLAN management," the AI recognizes this matches the Schema Manager skill, activates it, and reads its `SKILL.md` to understand how to proceed.
 
 Agents with plugin support let you invoke a skill by name:
 
@@ -56,12 +56,6 @@ Agents with plugin support let you invoke a skill by name:
 ```
 
 Where an agent has no plugin mechanism, activation is passive: the AI finds skill files through its normal file context and applies them when the request is relevant. No explicit invocation is needed.
-
-## How a skill is chosen (plugin installs)
-
-Claude Code reads each skill's description and loads the skill whose description matches your request. You do not need to name the skill, and nothing runs when you open a project.
-
-With other AI tools (npx or manual copy), discovery happens because the skill files are present in the project directory. The AI finds them through its normal file context when the user's request is relevant.
 
 ## The infrahub-common library
 

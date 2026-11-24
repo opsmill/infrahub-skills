@@ -2,7 +2,7 @@
 name: infrahub-managing-transforms
 description: >-
   Creates, modifies and debugs Infrahub transforms that convert data into JSON, text, CSV, or device configs using Python or Jinja2 templates, with YAML-driven tests.
-  TRIGGER when: building config generation, data export, format conversion, Jinja2 templates, artifact pipelines, writing or running tests for a transform, modifying or extending an existing transform or template, debugging why a transform renders the wrong output or an artifact fails to generate, editing a file under `transforms/`, a `.j2` file under `templates/`, or a `.gql` file under `queries/` in an Infrahub repository.
+  TRIGGER when: building config generation, data export, format conversion, Jinja2 templates, artifact pipelines, writing or running tests for a transform, modifying or extending an existing transform or template, debugging why a transform renders the wrong output or an artifact fails to generate, editing a `.py` file under `transforms/`, a `.j2` file under `templates/`, or a `.gql` file under `queries/` that a transform in `.infrahub.yml` uses, in an Infrahub repository.
   DO NOT TRIGGER when: designing schemas, writing validation checks, creating generators, querying live data.
 argument-hint: "[transform-name] [format]"
 metadata:
@@ -28,6 +28,14 @@ read-only tools:
 - Find the existing transforms: `.py` files under a
   `transforms/` directory and `.j2` files under a
   `templates/` directory.
+- Before running any `infrahubctl` command, detect the
+  project's Python environment as
+  [../infrahub-common/rules/connectivity-python-environment.md](../infrahub-common/rules/connectivity-python-environment.md)
+  describes.
+- Before merging a changed `.gql` file, dry-run it
+  against the live schema as
+  [../infrahub-common/rules/deployment-gql-dry-run.md](../infrahub-common/rules/deployment-gql-dry-run.md)
+  describes.
 
 ## When to Use
 
@@ -39,9 +47,9 @@ read-only tools:
 - Connecting transforms to artifacts for automated output
 - Changing what an existing transform or template renders
 - Debugging wrong output, or an artifact that fails to generate
-- Editing a file under `transforms/`, a `.j2` file under `templates/`, or a
-  `.gql` file under `queries/`, even when the request does not mention
-  transforms
+- Editing a `.py` file under `transforms/`, a `.j2` file under `templates/`,
+  or a `.gql` file under `queries/` that a transform in `.infrahub.yml` uses,
+  even when the request does not mention transforms
 
 ## Rule Categories
 

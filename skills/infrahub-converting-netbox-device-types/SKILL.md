@@ -271,9 +271,14 @@ separate product.
 **From the published library.** For seeding vendor
 models nobody has yet, use the upstream
 [netbox-community/devicetype-library](https://github.com/netbox-community/devicetype-library)
-repository, and fetch only its `device-types/` and
-`module-types/` directories, for example with a
-[sparse checkout](https://git-scm.com/docs/git-sparse-checkout).
+repository. Clone it into a `devicetype-library/`
+directory with the `--depth 1`, `--filter=blob:none` and
+`--sparse` options, then set the
+[sparse checkout](https://git-scm.com/docs/git-sparse-checkout)
+to `device-types` and `module-types`. Later steps and
+`examples.md` use `devicetype-library/` as a relative
+path. A sparse checkout alone still downloads every
+file: the two options are what keep the download small.
 A full copy is 1.6 GB, almost all of it rack elevation
 images the converter never reads. The two definition
 directories hold all 11,500+ device types and 2,000+

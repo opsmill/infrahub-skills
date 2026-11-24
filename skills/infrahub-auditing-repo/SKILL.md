@@ -44,7 +44,8 @@ Before auditing, look at the project with read-only
 tools:
 
 - List the `.yml`, `.yaml`, `.py`, `.gql`, and `.j2`
-  files up to two directory levels deep.
+  files in the project root and the directories directly
+  below it, at most 40 paths.
 - Read `.infrahub.yml` if it exists. If it does not,
   note that in the report.
 

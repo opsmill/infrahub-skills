@@ -83,6 +83,8 @@ def _build_tree(source: str) -> str:
     for repo_path, branch_path in RENAMED_PATHS.items():
         # ls-tree prints "<mode> <type> <sha>\t<path>"; keep the blob, swap the path.
         blob = _git("ls-tree", "--full-tree", source, "--", repo_path).split("\t")[0]
+        if blob.split()[1] != "blob":
+            raise SystemExit(f"RENAMED_PATHS entry {repo_path} must be a file")
         entries.append(f"{blob}\t{branch_path}")
     listing = "\n".join(entries)
     with tempfile.TemporaryDirectory() as tmp:

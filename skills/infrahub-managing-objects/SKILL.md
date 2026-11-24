@@ -2,7 +2,7 @@
 name: infrahub-managing-objects
 description: >-
   Creates, modifies and manages Infrahub object data YAML files for populating infrastructure instances — devices, locations, organizations, and modules.
-  TRIGGER when: creating device instances, populating data files, defining locations or organizations, adding infrastructure objects, modifying or extending an existing data file, updating attribute values or relationship links on objects already defined in a data file, debugging why an object fails to load, editing a YAML file under `objects/` or `data/`, or any file with `apiVersion: infrahub.app/v1` and `kind: Object`.
+  TRIGGER when: creating device instances, populating data files, defining locations or organizations, adding infrastructure objects, modifying or extending an existing data file, updating attribute values or relationship links on objects already defined in a data file, debugging why an object fails to load, editing a YAML file that has `apiVersion: infrahub.app/v1` and `kind: Object`, such as a file under `objects/` or `data/`.
   DO NOT TRIGGER when: designing or modifying schemas, including changing an attribute or relationship definition on a node kind (use infrahub-managing-schemas), writing Python checks/generators, querying live data.
 argument-hint: "[kind] [object-details...]"
 metadata:
@@ -26,8 +26,12 @@ read-only tools:
 
 - Find the existing schema files: `.yml` files under a
   `schemas/` directory, or with `schema` in the name.
-- Find the existing object files: `.yml` files under an
-  `objects/` directory.
+- Find the existing object files: `.yml` or `.yaml` files
+  under an `objects/` or `data/` directory.
+- Before running any `infrahubctl` command, detect the
+  project's Python environment as
+  [../infrahub-common/rules/connectivity-python-environment.md](../infrahub-common/rules/connectivity-python-environment.md)
+  describes.
 
 If invoked with arguments (e.g., `/infrahub:managing-objects DcimDevice spine-01`),
 use the first argument as the kind and remaining arguments as object details.
@@ -42,8 +46,8 @@ use the first argument as the kind and remaining arguments as object details.
 - Organizing object files for correct load order
 - Updating attribute values or relationship links in an existing data file
 - Debugging why an object fails to load or resolves the wrong reference
-- Editing a YAML file under `objects/` or `data/`, or any file with
-  `apiVersion: infrahub.app/v1` and `kind: Object`
+- Editing a YAML file that has `apiVersion: infrahub.app/v1` and
+  `kind: Object`, such as a file under `objects/` or `data/`
 
 ## Rule Categories
 
