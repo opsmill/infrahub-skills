@@ -15,6 +15,7 @@ The Sync Config Manager helps you write, change and debug the [infrahub-sync](ht
 
 ## What it produces
 
+- `sync/<project>/README.md`, a scope note: which records and attributes the sync covers, who owns each attribute, what happens to records deleted in the source, and who runs the sync
 - `sync/<project>/config.yml`, with `identifiers` that match each destination kind's human-friendly ID
 - An optional attribute for the source system's stable ID on the destination node, when the schema has none, after you approve the schema change
 - A data check before the first run that lists every duplicate key, empty key and missing parent at once
@@ -30,6 +31,7 @@ The Sync Config Manager helps you write, change and debug the [infrahub-sync](ht
 
 ## Key rules enforced
 
+- **Scope agreed before mapping**: for a new sync, or a change to what a sync covers, you agree which records and attributes it covers, who owns each attribute, and what happens to records deleted in the source. On every run, `sync` writes the source value over a mapped attribute that differs in Infrahub, and it never deletes a node.
 - **Identifiers match the human-friendly ID**: the sync `identifiers` equal the destination kind's `human_friendly_id`, including one inherited from a generic, because Infrahub turns a create whose human-friendly ID already exists into an update of that node. A stable source ID stays an ordinary field unless you approve a schema change that makes it the human-friendly ID.
 - **Data check before the first run**: one bad record stops the whole sync, so duplicate keys, empty keys and missing parents are found before the first `diff`.
 - **Branch first, diff before sync**: every write goes to an Infrahub branch, and `sync` runs only after you have viewed the `diff` and the Infrahub address and branch every command will use. A `branch` in the config's destination settings overrides `--branch`, so the live run uses a run config, kept out of Git, that sets the test branch.
@@ -41,16 +43,18 @@ The Sync Config Manager helps you write, change and debug the [infrahub-sync](ht
 | Keying a sync on a stable source ID while the schema identifies nodes by name | Aligns `identifiers` with the human-friendly ID, or proposes a schema change for approval |
 | Reading the human-friendly ID from the node only | Takes it from the first generic in `inherit_from` that declares one |
 | Finding bad records one failed run at a time | Checks every record before the first run and reports all problems at once |
+| Mapping an attribute that people also edit in Infrahub | Asks who owns each attribute before mapping it, because `sync` overwrites edits made in Infrahub |
 | Running `sync` straight to `main` | Syncs to a branch, after you have viewed the `diff` |
 | `generate` reading a different Infrahub than `diff` and `sync` | Sets the address in the run config and stops when it differs from `INFRAHUB_ADDRESS` |
 | Committing the sync cache | Adds `.infrahub-sync-cache/` to `.gitignore` before the first run |
 
 ## Approval points
 
-The skill stops for your approval at two points:
+The skill stops for your approval at three points:
 
-1. Before a new or changed schema, when the sync needs one
-2. Before the first `sync` that writes to Infrahub. `sync` reads the source again, so it also writes records that changed after the `diff` you viewed.
+1. The scope note, when the skill proposed any of its answers
+2. Before a new or changed schema, when the sync needs one
+3. Before the first `sync` that writes to Infrahub. `sync` reads the source again, so it also writes records that changed after the `diff` you viewed.
 
 :::note
 The skill covers sync configs on the infrahub-sync `main` branch. A source with no adapter, or a bug in an adapter, goes to the [Sync Adapter Builder](./building-sync-adapters.mdx). The `feature/v3-develop` configuration format is out of scope.

@@ -79,6 +79,30 @@ schema_mapping:
   The live validation below runs from a run config that
   sets all three, so every command reads the same
   Infrahub branch.
+- `filters` and `transforms` on a `schema_mapping` entry
+  work on the source record, before the diff. `filters`
+  keeps only the records that pass every entry; the
+  operations are `==`, `!=`, `>`, `<`, `>=`, `<=`, `in`,
+  `not in`, `contains`, `not contains`, `is_empty`,
+  `is_not_empty`, `regex` and `is_ip_within`.
+  `transforms` sets a source field from a Jinja
+  expression, which `fields` can then map. Read the
+  examples in
+  [`examples/netbox_to_infrahub/config.yml`](https://github.com/opsmill/infrahub-sync/blob/main/examples/netbox_to_infrahub/config.yml)
+  and
+  [`examples/aci_to_infrahub/config.yml`](https://github.com/opsmill/infrahub-sync/blob/main/examples/aci_to_infrahub/config.yml):
+
+  ```yaml
+      filters:                      # from the dcim.devices entry
+        - field: parent_device
+          operation: "is_empty"
+        - field: name               # NetBox allows an empty device name
+          operation: "is_not_empty"
+      transforms:                   # from the dcim.device-types entry
+        - field: integer_height
+          expression: "{{ u_height|float|round(0, 'ceil') }}"
+  ```
+
 - `order` is optional on `main`. infrahub-sync computes
   the write order from the `reference` of each field.
   Set `order` only to override it.
@@ -133,7 +157,7 @@ EOF
 infrahub-sync generate --config-file "$RUN"
 infrahub-sync diff --config-file "$RUN"
 
-# Approval point 2. Only after the user approves:
+# Approval point 3. Only after the user approves:
 infrahub-sync sync --config-file "$RUN"
 
 # Expect no creates or updates, except for records changed in the source since the sync.
