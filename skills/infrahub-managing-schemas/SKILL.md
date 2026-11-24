@@ -21,11 +21,20 @@ relationships, and extensions.
 
 ## Project Context
 
-Existing schemas in this project:
-!`find . -name "*.yml" -path "*/schemas/*" -o -name "*schema*" -name "*.yml" 2>/dev/null | head -20`
+Before changing a schema, look at the project with
+read-only tools:
 
-Infrahub config (if present):
-!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
+- Find the existing schema files: `.yml` or `.yaml` files under a
+  `schemas/` directory, or with `schema` in the name.
+- Read `.infrahub.yml` if it exists.
+
+These steps contact the Infrahub server, so they come
+after the read-only look at the project:
+
+- Before running any `infrahubctl` command, detect the
+  project's Python environment as
+  [../infrahub-common/rules/connectivity-python-environment.md](../infrahub-common/rules/connectivity-python-environment.md)
+  describes.
 
 If invoked with arguments (e.g., `/infrahub:managing-schemas Ipam Vlan VlanGroup`),
 use the first argument as the namespace and remaining arguments as node names.
