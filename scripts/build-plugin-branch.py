@@ -8,10 +8,10 @@ example GitHub token for a redaction eval, which blocked submission, and the
 file count, the oversized files, `favicon.ico` and the routing symlinks each
 raised a hold or a warning. None of them is part of the plugin.
 
-This script builds a commit holding only `SHIPPED_PATHS`, taken from a
-source commit, and points the plugin branch at it. The directory tracks that
-branch instead of `main`. The plugin stays at the root of the branch, which
-matters: a plugin in a subfolder has its hook scripts held for a reviewer.
+This script builds a commit holding only `SHIPPED_PATHS`, plus each file in
+`RENAMED_PATHS` at its branch path, taken from a source commit, and points
+the plugin branch at it. The directory tracks that
+branch instead of `main`, so its Branch or tag field must say `plugin`.
 
 Each build is committed on top of the branch's previous build, so the branch
 history is linear and every commit names the `main` commit it came from. A
@@ -38,11 +38,17 @@ import tempfile
 SHIPPED_PATHS = (
     ".claude-plugin",
     "skills",
-    "hooks",
-    "hooks-handlers",
-    "README.md",
     "LICENSE",
 )
+
+# Files shipped under another path: path in this repository -> path on the
+# branch. The root README.md teaches `npx skills add` and `git clone` for the
+# tools that are not Claude Code, and the directory holds a download-and-run
+# command for review even in documentation. The plugin branch gets a README
+# written for plugin users instead.
+RENAMED_PATHS = {
+    "plugin-branch/README.md": "README.md",
+}
 
 
 def _git(
@@ -66,15 +72,21 @@ def _remote_head(remote: str, branch: str) -> str | None:
 
 
 def _build_tree(source: str) -> str:
-    """Write a tree holding only SHIPPED_PATHS from the source commit."""
-    missing = [
-        path for path in SHIPPED_PATHS if not _git("ls-tree", source, "--", path)
-    ]
+    """Write a tree holding SHIPPED_PATHS and RENAMED_PATHS from the source commit."""
+    sources = (*SHIPPED_PATHS, *RENAMED_PATHS)
+    missing = [path for path in sources if not _git("ls-tree", source, "--", path)]
     if missing:
         raise SystemExit(
             f"Source commit {source} lacks shipped paths: {', '.join(missing)}"
         )
-    listing = _git("ls-tree", "-r", "--full-tree", source, "--", *SHIPPED_PATHS)
+    entries = [_git("ls-tree", "-r", "--full-tree", source, "--", *SHIPPED_PATHS)]
+    for repo_path, branch_path in RENAMED_PATHS.items():
+        # ls-tree prints "<mode> <type> <sha>\t<path>"; keep the blob, swap the path.
+        blob = _git("ls-tree", "--full-tree", source, "--", repo_path).split("\t")[0]
+        if blob.split()[1] != "blob":
+            raise SystemExit(f"RENAMED_PATHS entry {repo_path} must be a file")
+        entries.append(f"{blob}\t{branch_path}")
+    listing = "\n".join(entries)
     with tempfile.TemporaryDirectory() as tmp:
         env = {**os.environ, "GIT_INDEX_FILE": os.path.join(tmp, "index")}
         _git("update-index", "--index-info", env=env, stdin=listing + "\n")
@@ -100,7 +112,8 @@ def main() -> int:
         print(f"{args.branch} already matches {source[:12]}; nothing to commit.")
         return 0
 
-    message = f"Build plugin from {source}\n\nShipped paths: {', '.join(SHIPPED_PATHS)}"
+    shipped = [*SHIPPED_PATHS, *(f"{a} as {b}" for a, b in RENAMED_PATHS.items())]
+    message = f"Build plugin from {source}\n\nShipped paths: {', '.join(shipped)}"
     parent_args = ["-p", parent] if parent is not None else []
     commit = _git("commit-tree", tree, *parent_args, "-m", message)
 
