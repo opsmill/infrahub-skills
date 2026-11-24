@@ -27,8 +27,8 @@ Load every numbered file that exists, in number order.
 
 ### Why it matters
 
-Each file references a file loaded before it by
-`human_friendly_id`. A device type names its
+Each file after the manufacturers file references a
+file loaded before it by `human_friendly_id`. A device type names its
 manufacturer; a template names its device type. A
 module type names its manufacturer; a module template
 names its module type. The loader resolves references

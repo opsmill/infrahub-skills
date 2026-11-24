@@ -1,0 +1,1 @@
+Fixed three skill errors: `infrahub-analyzing-diagnostics` now counts overlapping child spans once when it computes a span's self time, `infrahub-managing-menus` links to the current menu docs page, and `infrahub-converting-netbox-device-types` no longer says the manufacturers file references an earlier file.

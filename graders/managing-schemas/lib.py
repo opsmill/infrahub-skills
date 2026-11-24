@@ -734,16 +734,15 @@ def check_string_limits(schema: dict, **_: Any) -> tuple[bool, str]:
 
     Delegates to ``skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py``
     so the source-of-truth URL and extraction logic live in exactly one
-    place across the repo. If the script can't reach the live schema,
-    the check returns ``True`` with an explicit "unverified" reason so
-    transient network failures don't fail CI — the result is visibly
-    inconclusive.
+    place across the repo. If the script cannot read the caps (no network,
+    a script error, an empty table), the check fails: a schema it could not
+    measure is not a schema within limits.
     """
     limits, error = _load_schema_limits()
     if limits is None:
-        return True, (
+        return False, (
             f"String-length caps not verified — fetch_schema_limits.py failed "
-            f"({error}). Check skipped for this run."
+            f"({error}), so the schema could not be measured against them."
         )
 
     def _check(ref: str, obj: dict, table: dict[str, int], issues: list[str]) -> None:

@@ -114,4 +114,7 @@ Each release also gets a curated page under
 `docs/docs/release-notes/`. The new page takes
 `sidebar_position: 1` and **every older page shifts down
 by one**. Write it before the release pull request
-merges, since merging is what tags and publishes.
+merges, since merging is what tags and publishes. Run
+every example on the page against the option tables it
+cites: the snippet rule in `skill-authoring.md` does not
+load for `docs/`.
