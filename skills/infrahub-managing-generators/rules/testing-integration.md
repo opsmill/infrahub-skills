@@ -30,6 +30,7 @@ After the generator is implemented and unit-tested:
    definition registered. ``--list`` is a flag; there is no
    ``generator list`` subcommand, and a bare word there is read
    as the name of a generator to run.
+
 2. ``infrahubctl generator <name> <param>=<target-id> --branch <branch>``
    — execute the generator against a real branch. The name is a
    positional argument, not a ``run`` subcommand. ``--branch`` is
@@ -47,8 +48,10 @@ After the generator is implemented and unit-tested:
    member of the definition's target group. A mistyped target is a
    mass write, not a no-op. Verified against SDK 1.23.1
    (``ctl/utils.py`` ``parse_cli_vars``, ``ctl/generator.py``).
+
 3. Verify the created objects exist via the UI or a GraphQL
    query. Confirm relationships resolve.
+
 4. If anything fails, fix and re-run before moving on.
 
 ### When this matters most

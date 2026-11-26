@@ -175,6 +175,7 @@ deliberately:
 1. **A test asserting every restated list still matches
    the generic's.** This is the only guard that permits
    the per-kind-default pattern. Recommended.
+
 2. **`allow_override: none` on the generic's attribute.**
    The server then rejects any override outright:
 

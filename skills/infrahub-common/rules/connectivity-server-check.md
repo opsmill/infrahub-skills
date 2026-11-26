@@ -244,6 +244,7 @@ export INFRAHUB_API_TOKEN="your-api-token"
   `info` with a valid one, so before anything that
   writes, run the branch create/delete probe from
   Step 2 as well
+
 - For offline work (no server available), limit to
   local validation:
   - YAML linting and structure checks
@@ -252,6 +253,7 @@ export INFRAHUB_API_TOKEN="your-api-token"
     `.infrahub.yml`
   - Schema YAML format checks (correct keys, naming
     conventions)
+
 - Set `INFRAHUB_ADDRESS` and `INFRAHUB_API_TOKEN` in
   your shell profile for consistent config, and
   confirm both are actually exported before a write:
@@ -274,6 +276,7 @@ export INFRAHUB_API_TOKEN="your-api-token"
   reason a project has a working address and a missing
   token: the compose stack reads the file, your shell
   does not.
+
 - Wrap state-changing commands in a task runner that
   supplies credentials explicitly rather than relying
   on ambient configuration.

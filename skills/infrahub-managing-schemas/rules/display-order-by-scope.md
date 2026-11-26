@@ -110,10 +110,12 @@ Supported metadata fields: created_at, updated_at.
 
 - A direction suffix: `name__value__asc`,
   `name__value__desc`. Ascending is the default.
+
 - An attribute reached through a **cardinality-one
   relationship the same schema declares**:
   `device__name__value`. The relationship may be
   optional here, unlike in `uniqueness_constraints`.
+
 - Each target at most once. Listing one target twice,
   even with opposite directions, is rejected:
 
