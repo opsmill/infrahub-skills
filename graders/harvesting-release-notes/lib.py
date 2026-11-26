@@ -50,12 +50,15 @@ _FIELD_RE = re.compile(
 _VERSION_RE = re.compile(
     r"(?<![\w.])(?:infrahub-)?v?(?P<major>\d+)\.(?P<minor>\d+)(?:\.(?P<patch>\d+))?(?P<pre>(?:a|b|rc)\d+)?(?![\w])"
 )
-# A commit pins evidence only in the `<commit>:<path>` form, so a file name
-# made of hex letters is not mistaken for one.
-_SHA_RE = re.compile(r"(?<![\w./-])[0-9a-f]{7,40}:")
-# A path: zero or more directories and a file extension that starts with a
-# letter, so a version such as `infrahub-v1.7.0` is not read as a path.
-_PATH_RE = re.compile(r"[\w.-]+(?:/[\w.-]+)*\.[A-Za-z]\w*")
+# Pinned evidence: `<tag-or-commit>:<path>`, read as one token so the pin and
+# the path come from the same place. A dotted word elsewhere in the field
+# ("e.g.", "README.md") is not a path, and a version elsewhere does not pin
+# it. The path has a file extension that starts with a letter; a commit is 7
+# to 40 hex characters, so a file name made of hex letters is not one.
+_PINNED_RE = re.compile(
+    r"(?<![\w./-])(?:(?P<sha>[0-9a-f]{7,40})|(?P<tag>(?:infrahub-)?v?\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?))"
+    r":(?P<path>[\w.-]+(?:/[\w.-]+)*\.[A-Za-z]\w*)"
+)
 _AFFECTED_RE = re.compile(r"(?P<path>[\w./-]+\.\w+):(?P<line>\d+)(?:-(?P<end>\d+))?")
 # A note in brackets, such as "(shipped with infrahub-v1.12.0)", names the
 # release that carried the change, not a boundary.
@@ -260,12 +263,19 @@ def check_evidence_pinned(text: str, start: str, end: str, **_) -> tuple[bool, s
                 return False, f"Finding {i} is UNVERIFIED but still recommends a gate"
             continue
         value = _clean(finding.get("verified in", ""))
-        if not _PATH_RE.search(value):
-            return False, f"Finding {i} 'Verified in' names no source path: '{value}'"
-        pinned = bool(_SHA_RE.search(value))
-        for v in _versions(value):
-            if v[2] is not None and lo <= (v[0], v[1], v[2]) <= hi:
+        tokens = list(_PINNED_RE.finditer(value))
+        if not tokens:
+            return False, (
+                f"Finding {i} 'Verified in' names no source path in the "
+                f"<tag-or-commit>:<path> form: '{value}'"
+            )
+        pinned = False
+        for token in tokens:
+            if token.group("sha"):
                 pinned = True
+            for v in _versions(token.group("tag") or ""):
+                if v[2] is not None and lo <= (v[0], v[1], v[2]) <= hi:
+                    pinned = True
         if not pinned:
             return False, (
                 f"Finding {i} 'Verified in' is not pinned to a release in {start}..{end} "

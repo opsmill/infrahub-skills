@@ -418,6 +418,15 @@ def test_gate_boundaries_ignore_the_release_named_in_brackets():
         ("backend/infrahub/deadbeef1.py", False),
         # A version alone is not a path.
         ("infrahub-v1.7.0", False),
+        # A dotted word is not a path, and a version elsewhere does not pin it.
+        ("the 1.7.0 notes, e.g. Unknown argument", False),
+        ("the infrahub-v1.7.0 notes, see README.md", False),
+        ("infrahub-v1.7.0: backend/infrahub/graphql/filters.py", False),
+        # The pin has to be the path's own: an in-range version next to an
+        # out-of-range pinned path does not count.
+        ("infrahub-v1.8.0:backend/infrahub/graphql/filters.py, per the 1.7.0 notes", False),
+        # The SDK form SKILL.md step 7 shows.
+        ("v1.7.0:infrahub_sdk/operation.py, `branch_name` (`infrahubctl generator`)", True),
     ],
 )
 def test_evidence_pinned_reads_the_commit_and_the_path_apart(verified, ok):
