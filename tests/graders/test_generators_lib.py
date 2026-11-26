@@ -1862,6 +1862,10 @@ def test_generator_run_names_branch_is_registered():
         ("violating_never_comment.md", False, "does not select an Infrahub branch"),
         # `uv run echo infrahubctl ...` runs echo; the real run has no branch.
         ("violating_echo_wrapper.md", False, "does not select an Infrahub branch"),
+        # WRONG and RIGHT in one fence: the RIGHT half is still read.
+        ("compliant_mixed_fence.md", True, "selects its Infrahub branch"),
+        # A fence headed "# Never omit --branch" is advice, not a WRONG label.
+        ("compliant_never_heading.md", True, "selects its Infrahub branch"),
     ],
 )
 def test_generator_run_names_branch_fixtures(fixture, expected, reason):

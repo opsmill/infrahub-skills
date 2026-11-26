@@ -2429,13 +2429,11 @@ def _saves_on(
 
 
 def _answer_tree_without_negatives(output: dict) -> ast.Module | None:
-    """Like ``_answer_tree``, without the fences labelled as the wrong form."""
+    """Like ``_answer_tree``, without the parts labelled as the wrong form."""
     raw = output.get("raw", "")
     if not raw:
         return _answer_tree(output)
-    blocks = [
-        m.group(1) for m in _PY_FENCE.finditer(raw) if not _negative_fence(m.group(1))
-    ]
+    blocks = [_without_negative_examples(m.group(1)) for m in _PY_FENCE.finditer(raw)]
     parseable = [b for b in blocks if _parse_python(b) is not None]
     return _parse_python("\n\n".join(parseable))
 
@@ -2622,12 +2620,12 @@ def check_generator_run_names_branch(output: dict, **_: Any) -> tuple[bool, str]
     the old prose. See dev/guidelines/rule-equals-test.md § "When no task
     can score the rule".
     """
-    # Skip a fence labelled as the wrong form, which is how the rules lay
-    # out a contrast.
+    # Drop what a fence labels as the wrong form, which is how the rules
+    # lay out a contrast.
     blocks = [
-        m.group(2)
+        _without_negative_examples(m.group(2))
         for m in _ANY_FENCE.finditer(output.get("raw", ""))
-        if m.group(1).lower() in _SHELL_TAGS and not _negative_fence(m.group(2))
+        if m.group(1).lower() in _SHELL_TAGS
     ]
     runs = 0
     for block in blocks:
@@ -2942,21 +2940,29 @@ def _strip_negative_examples(text: str) -> str:
     return "\n".join(kept)
 
 
-def _negative_fence(body: str) -> bool:
-    """True if a fenced block opens with a comment labelling it the wrong form.
+# Only these open a contrast fence. Words such as NEVER, FAIL or DO NOT
+# also start ordinary advice ("# Never omit --branch"), so they do not.
+_CONTRAST_LABEL = re.compile(
+    r"(?:#|//)\s*\**\s*(?:WRONG|INCORRECT|BAD|BROKEN|ANTI-?PATTERN)\b", re.IGNORECASE
+)
 
-    The rules lay a contrast out as two fences, the first opening with
-    ``# WRONG.``. Only the opening line counts: a comment such as ``# Fail
-    rather than return`` inside a real answer does not label the code
-    around it, so stripping from any labelled line drops code the answer
-    runs.
+
+def _without_negative_examples(body: str) -> str:
+    """A fenced block's body without the part it labels as the wrong form.
+
+    A fence that opens with a contrast label (``# WRONG``) is stripped line
+    by line, so a ``# RIGHT`` half later in the same fence is kept. Any other
+    fence is kept whole: a comment inside real code, such as ``# Fail rather
+    than return``, labels nothing.
     """
     for line in body.splitlines():
         text = line.strip()
         if not text:
             continue
-        return text.startswith(("#", "//")) and bool(_NEGATIVE_LABEL.match(text))
-    return False
+        if _CONTRAST_LABEL.match(text):
+            return _strip_negative_examples(body)
+        return body
+    return body
 
 
 def check_group_membership_from_member_side(
