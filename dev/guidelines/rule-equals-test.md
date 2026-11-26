@@ -392,12 +392,10 @@ three were neither used nor shown sound. No task runs
 them, since neither the #240 nor the #241 task could tell
 the old prose from the new. Each of three review rounds
 found new ways a correct answer failed or a wrong one
-passed, and the last before/after run found one more: the
-
-## 240 check missed a removal by a local alias. A future
-
-task for these rules would need a check written for its
-own prompt.
+passed, and the last before/after run found one more:
+the check for issue 240 missed a removal by a local
+alias. A future task for these rules would need a check
+written for its own prompt.
 
 The reference-drift remedy was taken once, for
 `skills/infrahub-managing-schemas/rules/relationship-on-delete.md`
@@ -422,7 +420,7 @@ its own when the server changes which kind defaults to
 what; only a new kind or value in `infrahub-sdk`
 reaches it without an edit.
 
-### When the grader and the rule disagree, decide which side moves
+## When the grader and the rule disagree, decide which side moves
 
 A check that encodes a stricter contract than the rule
 it tests does not read as a conflict. It reads as a
@@ -454,7 +452,7 @@ equivalent, and the check can no longer fail on the
 distinction the rule exists to draw. Say which
 direction a pinning test protects before writing it.
 
-### New category prefixes
+## New category prefixes
 
 A new prefix must be registered everywhere the skill
 enumerates its categories, not only in `_sections.md`:
@@ -468,7 +466,7 @@ enumerates its categories, not only in `_sections.md`:
 A prefix registered in only one of those is a rule the
 skill never emits, while its eval still passes.
 
-### Severity
+## Severity
 
 `yagni-*` audit rules cap at MEDIUM. HIGH and CRITICAL
 are for real failures, not advisory cost-to-fix
