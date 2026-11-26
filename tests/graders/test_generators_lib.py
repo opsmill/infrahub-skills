@@ -1846,8 +1846,9 @@ def test_generator_run_names_branch_is_registered():
         ("violating_from_git_false.md", False, "does not select an Infrahub branch"),
         # Behind `uv run --env-file`, next to a --branch on --list.
         ("violating_env_file.md", False, "does not select an Infrahub branch"),
-        # A branchless run in an untagged fence, next to a correct run.
-        ("violating_untagged_fence.md", False, "does not select an Infrahub branch"),
+        # A branchless run in an untagged fence, next to a correct run. Kept
+        # as .txt: the markdown formatter would tag the fence.
+        ("violating_untagged_fence.txt", False, "does not select an Infrahub branch"),
     ],
 )
 def test_generator_run_names_branch_fixtures(fixture, expected, reason):
