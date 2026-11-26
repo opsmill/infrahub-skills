@@ -378,7 +378,11 @@ precondition hands the model the answer through the SDK
 source, its training, or a sibling example. The
 reference-drift pytest does not fit #238 either, for the
 reason given for #239: the repo pins infrahub-sdk 1.23.2.
-The five tasks and their grader scripts were removed. The
+The five tasks (`generator-opt-out-existing-member` twice,
+the second time with the rebuilt #240 prompt,
+`generator-agnostic-kind-branch-run`, `generator-agnostic-tag`
+and `generator-local-run-branch`) and their grader scripts
+were removed. The
 check functions `opt-out-releases-existing-member`,
 `agnostic-saves-opt-out` and `generator-run-names-branch`
 and their fixtures stay in
