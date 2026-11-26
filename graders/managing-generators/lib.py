@@ -2766,18 +2766,23 @@ def _opted_out_names(tree: ast.Module) -> set[str]:
     ``add_relationships()``, or a name bound by a ``get``, that has no
     tracked save anywhere in the answer.
     """
+    passed = _call_site_arguments(tree)
+    owner = _enclosing_function_names(tree)
+
+    def receivers(calls: list[ast.Call]) -> set[str]:
+        # A receiver that is a helper's parameter resolves to what its
+        # callers pass, so `_save(self, node)` called with the trunk
+        # records the trunk, not `node`.
+        out: set[str] = set()
+        for c in calls:
+            if isinstance(c.func, ast.Attribute):
+                out |= _node_names(c.func.value, owner.get(id(c)), passed, owner)
+        return out
+
     saves = _save_calls(tree)
-    tracked = {
-        ast.unparse(c.func.value) for c in saves
-        if isinstance(c.func, ast.Attribute) and not _save_opts_out(c)
-    }
-    names = {
-        ast.unparse(c.func.value) for c in saves
-        if isinstance(c.func, ast.Attribute) and _save_opts_out(c)
-    }
-    names |= {
-        ast.unparse(c.func.value) for c in _calls_to(tree, {"add_relationships"})
-    }
+    tracked = receivers([c for c in saves if not _save_opts_out(c)])
+    names = receivers([c for c in saves if _save_opts_out(c)])
+    names |= receivers(_calls_to(tree, {"add_relationships"}))
     for targets, value in _bindings(tree):
         if isinstance(value, ast.Await):
             value = value.value

@@ -1682,6 +1682,8 @@ def test_opt_out_releases_existing_member_is_registered():
         ("violating_wrong_node.md", False, "never removed from the generator group"),
         # Removes the trunk from a group fetched by a literal name.
         ("violating_unrelated_group.md", False, "never removed from the generator group"),
+        # The opt-out save sits in a helper that takes the node as a parameter.
+        ("compliant_helper_save.md", True, "removed from the generator group"),
     ],
 )
 def test_opt_out_releases_existing_member_fixtures(fixture, expected, reason):
