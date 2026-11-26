@@ -1,0 +1,7 @@
+## Report
+
+Manifest first (bundle_information.json): the traces collector succeeded with 35 traces.
+
+Trace 0001 belongs to a "Sync Git Repositories" task.
+
+The request spent 10.74 s on infrahub-server, so the API server is the bottleneck.

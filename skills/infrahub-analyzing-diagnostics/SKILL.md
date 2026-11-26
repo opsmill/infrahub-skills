@@ -14,7 +14,7 @@ description: >-
   (use infrahub-reporting-issues), or querying live data
   (use infrahub-analyzing-data).
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 
@@ -75,11 +75,12 @@ confident report about the wrong incident.
 Mentioning the default as a hint is fine
 (`./infrahub_bundles/` when `--output-dir` wasn't
 set), but the user names the path. Skip the question
-only when the user already gave a path or pasted the
-bundle contents. Once given, confirm it looks like
+only when the user already gave a path or pasted
+bundle contents, even a single log excerpt. When the
+user gave a path, confirm it looks like
 an `infrahub-collect` bundle — a `bundle/` directory
-containing `bundle_information.json`. If there is no
-bundle at all, stop and hand off to
+containing `bundle_information.json`. If the user has
+neither a bundle nor pasted contents, stop and hand off to
 `infrahub-collecting-diagnostics`; do not scrape
 `docker compose logs`/`kubectl logs` as a substitute.
 See
@@ -128,6 +129,20 @@ undersized host. If it's absent and the symptom is
 performance-shaped, the report must recommend a
 next bundle with `--benchmark`. See
 [rules/triage-benchmark-results.md](rules/triage-benchmark-results.md).
+
+If the manifest has a `traces` entry with traces
+written (`create --include-traces`), read the files
+of `bundle/traces/` before you conclude on a
+slowness, from `0001` (the slowest). For each trace,
+find the spans that took the time from their
+durations and self times, and report the service and
+the operation. Read the files only: never start or
+query a Tempo or Grafana, not even a local one. When
+the symptom is a slowness and the bundle has no
+usable traces, recommend a next bundle with
+`--include-traces` and a window that covers the
+slowness. See
+[rules/triage-traces.md](rules/triage-traces.md).
 
 ### 4. Correlate into incidents
 
@@ -253,6 +268,12 @@ full index.
   names, UUIDs, hostnames, and timestamps make
   searches return nothing. Strip them; search the
   stable parts.
+- **Reaching outside the bundle for more data.** No
+  Tempo, Grafana, Prometheus or Infrahub API queries,
+  not even against a local instance. Outside the
+  bundle, read only the `opsmill/infrahub` issues and
+  `docs.infrahub.app`; what the bundle lacks goes
+  into the recommendations as a richer next bundle.
 - **Fixing instead of analyzing.** No restarts, no
   `docker`/`kubectl` mutations, no config edits.
   Recommendations go in the report; actions go to

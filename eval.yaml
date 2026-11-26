@@ -171,7 +171,7 @@ tasks:
 
   - name: builtin-menu-sections
     instruction: |
-      Read the skill at .agents/skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
+      Read the skill at skills/infrahub-managing-menus/SKILL.md and follow its workflow and rules.
 
       Task: I run a service provider platform on Infrahub. My schema has IpamPrefix
       (which inherits BuiltinIPPrefix), IpamVlan, IpamVrf, DcimDevice, DcimInterface,
@@ -2680,8 +2680,10 @@ tasks:
       - name: token-not-printed
         check: >-
           The token presence test cannot expand to the token's value:
-          no bare `echo $INFRAHUB_API_TOKEN` and no
-          `${INFRAHUB_API_TOKEN:-...}` fallback
+          INFRAHUB_API_TOKEN is expanded only as a `-n` or `-z` operand
+          of `[`, `[[` or `test`, a curl request header without `-v`,
+          `--verbose` or `--trace`, or `${INFRAHUB_API_TOKEN:+...}` /
+          `${INFRAHUB_API_TOKEN:?...}`
       - name: cli-commands-exist
         check: No invented infrahubctl subcommand appears in the answer
 
@@ -2762,7 +2764,7 @@ tasks:
   - name: common-graphql-schema-generated
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-common/SKILL.md and follow
+      Read the skill at skills/infrahub-common/SKILL.md and follow
       its rules.
 
       Task: I added a `serial_number` attribute to `DcimDevice` in
@@ -3504,14 +3506,23 @@ tasks:
       the internal hostname stripped), searches opsmill/infrahub with
       `gh search issues` (open and closed by default), does not file anything
       itself, and hands any filing or commenting off to
-      infrahub-reporting-issues.
+      infrahub-reporting-issues. The prompt pastes one log and no manifest,
+      so the report analyzes it, asks for the bundle or the manifest only
+      under Open questions, and writes `Manifest: not provided` instead of a
+      collector count.
     expectations:
+      - Analyzes the pasted log and asks for the bundle or manifest only under Open questions
+      - "Writes `Manifest: not provided` and no collector count"
       - Cites bundle/logs/task-worker/... as evidence for the traceback
       - Searches opsmill/infrahub issues with `gh search issues`
       - Search keys keep InitializationError but strip the internal broker hostname
       - Does not run `gh issue create`
       - Cross-links infrahub-reporting-issues for filing or commenting
     assertions:
+      - name: analyzes-pasted-excerpt
+        check: Report analyzes the pasted log and asks for the bundle or manifest only under Open questions
+      - name: manifest-not-provided
+        check: Report says the manifest is not provided and states no collector count
       - name: cites-bundle-evidence
         check: Report cites bundle/<service>/ file paths as evidence
       - name: github-search
@@ -3876,6 +3887,382 @@ tasks:
         check: No mutating command in a code block, and none run in prose
       - name: recommendation-not-executed
         check: Remediation appears as a recommendation the analysis did not execute
+
+  - name: analyzing-diagnostics-traces-analysis
+    trials: 3
+    timeout: 600
+    instruction: |
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: A customer says Infrahub was slow this morning between 08:45 and 08:55
+      UTC. They sent the bundle below, collected with
+      `infrahub-collect create --include-traces`. The logs show no error. Write
+      the findings report: which service and which operation took the time. Do
+      NOT actually run any commands; read the excerpts below.
+
+      bundle/bundle_information.json:
+      {"infrahub_version": "1.12.1", "environment": {"type": "docker-compose", "project": "infrahub-prod"},
+       "collectors": [
+         {"name": "logs", "status": "success"},
+         {"name": "traces", "status": "success",
+          "details": {"backend": "http://tempo.monitoring.acme.internal:3200",
+                      "window": {"start": "2026-11-13T08:45:00Z", "end": "2026-11-13T08:55:00Z"},
+                      "min_duration_used": "1s", "traces_found": 35, "traces_written": 35,
+                      "traces_left_out": 0,
+                      "sample_ratio": {"enabled": true, "ratio_in_force": 0.1}}}]}
+
+      ls bundle/traces/:
+      0001-6c26f0d2e9c893ed614173cb81d8d534.json
+      0002-b8847743a1b1d7c6dd8b89a68eb5831f.json
+      0003-580f6b6e0dd0abbc2d4a0196ae50e47e.json
+      ... (35 files)
+
+      bundle/traces/0001-6c26f0d2e9c893ed614173cb81d8d534.json:
+      {
+        "resourceSpans": [
+          {
+            "resource": {
+              "attributes": [
+                {"key": "service.version", "value": {"stringValue": "1.12.1"}},
+                {"key": "worker.id", "value": {"stringValue": "d658d474-7b95-46ad-842b-bbf1442f9d29"}},
+                {"key": "service.name", "value": {"stringValue": "infrahub-task-worker"}}
+              ]
+            },
+            "scopeSpans": [
+              {
+                "spans": [
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "efda365e6270c931",
+                    "parentSpanId": "78418f92c539a263",
+                    "name": "execute_db_query_with_metadata",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680603084088",
+                    "endTimeUnixNano": "1794559680604076213",
+                    "attributes": [
+                      {"key": "query_name", "value": {"stringValue": "node_get_list"}},
+                      {"key": "rows", "value": {"intValue": "0"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "78418f92c539a263",
+                    "parentSpanId": "d2446c829af3e673",
+                    "name": "Query.execute",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680603003796",
+                    "endTimeUnixNano": "1794559680604094546"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "d2446c829af3e673",
+                    "name": "Sync Git Repositories",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559670263219125",
+                    "endTimeUnixNano": "1794559681004458713",
+                    "status": {"code": "STATUS_CODE_OK"}
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "resource": {
+              "attributes": [
+                {"key": "service.version", "value": {"stringValue": "1.12.1"}},
+                {"key": "worker.id", "value": {"stringValue": "0517a5cb-be40-47cf-9778-d59634c79f87"}},
+                {"key": "service.name", "value": {"stringValue": "infrahub-server"}}
+              ]
+            },
+            "scopeSpans": [
+              {
+                "spans": [
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "a3377cc930641988",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "POST http receive",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680597116588",
+                    "endTimeUnixNano": "1794559680597128463"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "efa211464beeba52",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "POST http send",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680602160838",
+                    "endTimeUnixNano": "1794559680602179005"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "22a7094e0d02b3f6",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "POST http send",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680602330380",
+                    "endTimeUnixNano": "1794559680602335088"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "d55584d9305328cf",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "POST http send",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680602412796",
+                    "endTimeUnixNano": "1794559680602417421"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "8e8b06e183895371",
+                    "parentSpanId": "d2446c829af3e673",
+                    "name": "POST",
+                    "kind": "SPAN_KIND_SERVER",
+                    "startTimeUnixNano": "1794559680582710046",
+                    "endTimeUnixNano": "1794559680602427421",
+                    "attributes": [
+                      {"key": "http.method", "value": {"stringValue": "POST"}},
+                      {"key": "http.status_code", "value": {"intValue": "200"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "267f23122d486c43",
+                    "parentSpanId": "13e0ef95dca6f06e",
+                    "name": "execute_db_query_with_metadata",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680583523630",
+                    "endTimeUnixNano": "1794559680593139421",
+                    "attributes": [
+                      {"key": "query_name", "value": {"stringValue": "account_token_validate"}},
+                      {"key": "rows", "value": {"intValue": "1"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "2bf7b8116609deca",
+                    "parentSpanId": "6c79d3f3a3cef9bb",
+                    "name": "execute_db_query_with_metadata",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680593322838",
+                    "endTimeUnixNano": "1794559680594667130",
+                    "attributes": [
+                      {"key": "query_name", "value": {"stringValue": "node_list_get_info"}},
+                      {"key": "rows", "value": {"intValue": "1"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "e2a9ad59840eef9b",
+                    "parentSpanId": "3327b07366801fcc",
+                    "name": "execute_db_query_with_metadata",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680594902963",
+                    "endTimeUnixNano": "1794559680596539963",
+                    "attributes": [
+                      {"key": "query_name", "value": {"stringValue": "node_list_get_attribute"}},
+                      {"key": "rows", "value": {"intValue": "8"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "db2df8db242595de",
+                    "parentSpanId": "b362dd4f701d8cfe",
+                    "name": "execute_db_query_with_metadata",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680597486338",
+                    "endTimeUnixNano": "1794559680598925546",
+                    "attributes": [
+                      {"key": "query_name", "value": {"stringValue": "account_global_permissions"}},
+                      {"key": "rows", "value": {"intValue": "1"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "ccc8a725a043a58c",
+                    "parentSpanId": "0ac35d00845ead99",
+                    "name": "execute_db_query_with_metadata",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680599083671",
+                    "endTimeUnixNano": "1794559680600361421",
+                    "attributes": [
+                      {"key": "query_name", "value": {"stringValue": "account_object_permissions"}},
+                      {"key": "rows", "value": {"intValue": "0"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "ffd430e152a43329",
+                    "parentSpanId": "dadeff9046b43296",
+                    "name": "execute_db_query_with_metadata",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680600750338",
+                    "endTimeUnixNano": "1794559680601681338",
+                    "attributes": [
+                      {"key": "query_name", "value": {"stringValue": "standard_node_list"}},
+                      {"key": "rows", "value": {"intValue": "1"}}
+                    ]
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "13e0ef95dca6f06e",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "Query.execute",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680583443921",
+                    "endTimeUnixNano": "1794559680593168171"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "6c79d3f3a3cef9bb",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "Query.execute",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680593259963",
+                    "endTimeUnixNano": "1794559680594694463"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "3327b07366801fcc",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "Query.execute",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680594838338",
+                    "endTimeUnixNano": "1794559680596629338"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "b362dd4f701d8cfe",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "Query.execute",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680597426005",
+                    "endTimeUnixNano": "1794559680598950213"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "0ac35d00845ead99",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "Query.execute",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680599030671",
+                    "endTimeUnixNano": "1794559680600376588"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "dadeff9046b43296",
+                    "parentSpanId": "21971a3eacbea7f8",
+                    "name": "Query.execute",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680600707046",
+                    "endTimeUnixNano": "1794559680601697921"
+                  },
+                  {
+                    "traceId": "6c26f0d2e9c893ed614173cb81d8d534",
+                    "spanId": "21971a3eacbea7f8",
+                    "parentSpanId": "8e8b06e183895371",
+                    "name": "execute_graphql",
+                    "kind": "SPAN_KIND_INTERNAL",
+                    "startTimeUnixNano": "1794559680600534213",
+                    "endTimeUnixNano": "1794559680601963130",
+                    "attributes": [
+                      {"key": "type", "value": {"stringValue": "query"}},
+                      {"key": "branch", "value": {"stringValue": "main"}},
+                      {"key": "operation", "value": {"stringValue": "GetAllBranch"}},
+                      {"key": "name", "value": {"stringValue": "Branch"}}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_traces_analysis.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that reads the `traces` entry of bundle_information.json
+      first (35 written, none left out, sampling ratio 0.1), then reads trace 0001
+      and names where the time went: the root span "Sync Git Repositories" on
+      infrahub-task-worker took 10.74 s, while its children (one database query
+      and one POST to infrahub-server) took about 21 ms, so the time is in the
+      Git sync work itself, which has no span. It reads the files only and starts
+      or queries no Tempo or Grafana.
+    expectations:
+      - Reads bundle_information.json and the traces entry before the trace file
+      - Names "Sync Git Repositories" on infrahub-task-worker and its 10.74 s duration
+      - Says that the children take about 21 ms, so the time is in the span's own work
+      - Reads the files only, with no Tempo, Grafana or other service
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: traces-slow-span
+        check: >-
+          One paragraph or table row names "Sync Git Repositories",
+          infrahub-task-worker and its duration of about 10.7 s, and no command
+          starts, queries or posts to a Tempo or Grafana
+      - name: traces-self-time
+        check: >-
+          The report states the self time of "Sync Git Repositories" (about
+          10.72 s), or says in one sentence that its children take about 21 ms
+
+  - name: analyzing-diagnostics-traces-missing
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-analyzing-diagnostics/SKILL.md and
+      follow its workflow and rules.
+
+      Task: A customer says Infrahub was very slow yesterday from 14:00 to 15:30
+      UTC: every page took 20 to 30 seconds. It is fast again now. They run the
+      observability stack. They sent the bundle below. Write the findings report.
+      Do NOT actually run any commands.
+
+      bundle/bundle_information.json:
+      {"infrahub_version": "1.12.1", "environment": {"type": "docker-compose", "project": "infrahub-prod"},
+       "collectors": [
+         {"name": "logs", "status": "success"},
+         {"name": "metrics", "status": "success"},
+         {"name": "benchmark", "status": "success"}]}
+
+      bundle/logs/server/infrahub-server-1.log (excerpt):
+      2026-11-15 14:12:03 INFO infrahub.graphql query=DeviceList duration=27.41s
+      2026-11-15 14:40:51 INFO infrahub.graphql query=InterfaceList duration=22.08s
+
+      bundle/metrics/benchmark.txt:
+      single-CPU score 1850 (healthy); database volume 9500 random IOPS at 0.4 ms (healthy)
+
+      Save ONLY the findings report (markdown) to: output.md
+    graders:
+      - type: deterministic
+        run: python graders/analyzing-diagnostics/check_traces_missing.py output.md
+        weight: 1.0
+    expected_output: >-
+      A findings report that reads bundle_information.json first, notes that the
+      bundle has no traces entry, says the logs and the healthy benchmark cannot
+      show which component took the time, and recommends a next bundle collected
+      with `infrahub-collect create --include-traces --traces-start
+      2026-11-15T14:00:00Z --traces-end 2026-11-15T15:30:00Z`, handed off to
+      infrahub-collecting-diagnostics.
+    expectations:
+      - Reads bundle_information.json and notes that it has no traces entry
+      - Recommends a next bundle with `--include-traces` and the window of the slowness
+      - Uses `--traces-start` and `--traces-end`, because the slowness has ended
+      - Hands the collection back to infrahub-collecting-diagnostics
+    assertions:
+      - name: mentions-manifest
+        check: Report references bundle_information.json / the manifest
+      - name: recommends-traces
+        check: >-
+          Report recommends a next bundle with `--include-traces`,
+          `--traces-start` and `--traces-end`, not negated
+      - name: cross-link-collecting-diagnostics
+        check: Report hands collection off to infrahub-collecting-diagnostics
 
   # --- Generator Creator --- #
   - name: from-graphql-hydration-refactor
@@ -4595,30 +4982,41 @@ tasks:
 
       Emit whatever correct Infrahub object YAML you can to `./output_dir/`. Do
       NOT propose or write any schema changes; the skill fails closed on
-      unmapped columns.
+      unmapped columns. Write your report to `./import-report.md`.
     graders:
       - type: deterministic
         run: python graders/importing-data/check_no_schema_mutation.py output_dir
         weight: 1.0
     expected_output: >-
-      A directory ./output_dir/ that contains no schema documents (no file with
-      top-level `version: "1.0"` plus `nodes:` / `generics:`), and nothing under
-      a `schemas/` sub-path of the output dir. The skill should either emit
-      partial object YAML (omitting the unmapped column) with a note about the
-      unmapped `gpu_count`, or stop emission entirely and explain — but it must
-      never write a schema mutation.
+      No schema document written by the run anywhere in the workspace, inside or outside
+      ./output_dir/ (no file with top-level `version: "1.0"` plus `nodes:` /
+      `generics:` / `extensions:`), and nothing under a `schemas/` sub-path of
+      the output dir. The skill fails closed on the unmapped `gpu_count`: it
+      writes no object rows, and its report in ./import-report.md names the
+      column and the DcimDevice kind it checked and points at
+      infrahub-managing-schemas. It never writes a schema mutation.
     expectations:
-      - No file in ./output_dir/ is a schema document (version 1.0 + nodes / generics)
+      - >-
+        No file the run writes, in ./output_dir/ or elsewhere in the workspace,
+        is a schema document (version 1.0 + nodes / generics / extensions)
       - No file lives under a schemas/ sub-path of ./output_dir/
-      - Envelope is correct on any object YAML that is emitted
+      - No object rows are emitted for an input with an unmapped column
+      - >-
+        ./import-report.md names the unmapped gpu_count column and the DcimDevice
+        kind checked, and points at infrahub-managing-schemas
     assertions:
-      - name: envelope
+      - name: fail-closed
         check: >-
-          Every emitted YAML doc has apiVersion, kind: Object, spec.kind, and
-          spec.data list
+          No YAML document in the output dir carries rows, under spec.data or anywhere else
       - name: no-schema-mutation
         check: >-
-          Output dir contains no schema document and no schemas/ sub-path
+          No YAML file in the workspace, outside the copied graders and
+          skills, is a schema document, and the output dir has no schemas/
+          sub-path
+      - name: reports-unmapped-column
+        check: >-
+          ./import-report.md names the unmapped gpu_count column, the
+          DcimDevice kind checked, and infrahub-managing-schemas
 
   - name: csv-import-value-coercion
     trials: 3
@@ -5011,15 +5409,15 @@ tasks:
       column and the kind it checked, pointing the user at
       infrahub-managing-schemas. No partial file that silently drops the column.
     expectations:
-      - No Object-envelope file in ./output_dir/ carries any spec.data rows
+      - No YAML file in ./output_dir/ carries any rows, with or without the Object envelope
       - A report names the unmapped license_tier column and the kind checked
       - The user is routed to infrahub-managing-schemas for the schema decision
       - No partial emission that drops the unmapped column
     assertions:
       - name: fail-closed
         check: >-
-          No Object document in the output dir emits spec.data rows for an
-          input that has an unmapped column
+          No YAML document in the output dir emits rows, under spec.data or
+          anywhere else, for an input that has an unmapped column
 
   - name: csv-import-folder-coverage
     trials: 3
@@ -5765,7 +6163,7 @@ tasks:
       Save ONLY the JSON findings to: output.json
     graders:
       - type: deterministic
-        run: python graders/auditing-repo/check_yagni_rule.py yagni-missing-inverse-forces-python-filter MEDIUM 3
+        run: python graders/auditing-repo/check_yagni_missing_inverse.py
         weight: 1.0
     expected_output: >-
       JSON listing one yagni-missing-inverse-forces-python-filter
@@ -8138,7 +8536,9 @@ tasks:
       Save planned output under `./output_dir/`.
 
       Save the batched questions and the echoed plan to
-      `./output_dir/answer.md`. Write no object YAML in this task.
+      `./output_dir/answer.md`. That file is how you put the questions to
+      me, not an import file, so write it now. Write no object YAML in
+      this task.
     graders:
       - type: deterministic
         run: python graders/importing-data/check_up_front_interview.py
@@ -8147,14 +8547,15 @@ tasks:
       A single batched set of multi-choice questions covering every
       ambiguity (tier_label has no schema home; Status is a dropdown
       label; branch name; lineage opt-in) plus a confirm-and-lock summary
-      of the proposed plan. No file is written until the user confirms.
+      of the proposed plan, saved to ./output_dir/answer.md. No object
+      YAML is written until the user confirms.
     expectations:
       - Every ambiguity is surfaced in one batched round, not one-by-one
       - The unmapped tier_label column is called out explicitly
       - Status values (Active/Maintenance) are flagged as dropdown labels
       - A branch name is proposed (e.g., csv-import-YYYYMMDD-HHMM)
       - Lineage opt-in is offered with an explanation of source vs. owner+is_protected
-      - The plan is echoed back before any file is written
+      - The plan is echoed back before any object YAML is written
 
   - name: csv-import-profile-sample
     trials: 3
@@ -9165,7 +9566,8 @@ tasks:
       - name: own-artifacts
         check: >-
           Explain is anchored to at least one node kind from the learner's
-          own schema file
+          own schema file, and uses no short name as the name of a learner
+          node, unless the same sentence names the full kind
       - name: structured-lessons
         check: lesson uses the four-section shape
 
@@ -9444,3 +9846,421 @@ tasks:
       - Any upgrade dry run is shown as server-side `infrahub upgrade --check`
       - "`infrahubctl upgrade` does not appear; it is not a real command"  # cli-check: ignore infrahubctl upgrade
       - The 1.11.0 removal of `infrahub git-agent` is flagged against tasks.py
+
+  # --- Model Designer --- #
+  - name: design-directions
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: We're a regional ISP and want our L3VPN service in Infrahub. You
+      already asked me about the business and the service, so here are my
+      answers:
+
+      - What I want fixed first: an L3VPN order takes two weeks because
+        engineers pick route distinguishers and VRF names by hand in a
+        spreadsheet, and two customers once got the same route distinguisher.
+      - Who uses the data: the provisioning team and our order portal.
+      - Out of scope: the MPLS backbone itself and IP addressing for internet
+        customers.
+      - What a customer orders: a VPN, the sites on it, and the bandwidth per
+        site. The customer decides the sites and the bandwidth; we decide the
+        route distinguishers, route targets and VRF names.
+      - Lifecycle: ordered, provisioning, active, decommissioned. The
+        provisioning team moves a VPN to active.
+
+      I have no files for you. We'll keep going after this: write exactly the
+      next message you would send me to ./output_dir/answer.md and nothing
+      else.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_design_directions.py
+        weight: 1.0
+    expected_output: >-
+      One question block that offers two or three design directions, one
+      recommended, each listing its decisions by ID (A1, A2, ...), starting
+      with what it reuses, so the user can pick one or combine them.
+    expectations:
+      - The directions differ on real decisions, not only on their names
+      - Each direction says what it reuses, such as infrahub-demo-sp, a Marketplace schema, or nothing
+      - The user can combine directions by naming decision IDs
+    assertions:
+      - name: one-question-recommended
+        check: Exactly one question block with one recommended option, a basis, and no schema YAML
+      - name: design-directions
+        check: Two or three directions with decisions by ID, the same topics, starting with Reuse, all different
+
+  - name: design-docs-lookup
+    trials: 3
+    # Writes a full design brief and may read documentation pages; 300s is
+    # too close to the typical run under parallel load.
+    timeout: 480
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: We run a colocation business. When a sales rep creates a new cage
+      for a customer in Infrahub, the cage's patch panel and its cross-connect
+      VLAN must exist straight away. Nobody should have to run anything or
+      open a proposed change for that to happen.
+
+      I'm away today, so here are my answers: sales owns cages and creates
+      them; facilities owns patch panels. A cage is identified by its cage
+      code, a patch panel by its cage and panel number. Infrahub becomes the
+      source of truth for both. Each cage gets one patch panel with 24 ports.
+      VLAN IDs should never be chosen by hand.
+
+      Write the design brief.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_documented_decision.py
+        weight: 1.0
+    expected_output: >-
+      A design brief whose decision about what starts the cage generator when
+      a cage is created rests on the Infrahub documentation page that covers
+      it, found through https://docs.infrahub.app/llms.txt and cited in the
+      decision or its Mechanisms row.
+    expectations:
+      - The local skill rules are read first, and the documentation only for what they do not settle
+      - The documentation page is found through llms.txt, not recalled
+      - The decision about the trigger names the page it rests on
+    assertions:
+      - name: documented-decision
+        check: The decision about what starts the cage generator cites a docs.infrahub.app page
+      - name: mechanisms-match-artifacts
+        check: Each generator, check or transform artifact has a Mechanisms row, and each row an artifact
+      - name: sketch-rows-complete
+        check: Every sketch row has identity, source of truth and owner, or an open item
+
+  - name: design-one-question-recommended
+    trials: 3
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: I'm in a hurry. We run a colocation business and I need it in
+      Infrahub by Friday: cabinets, power feeds and cross-connects. Just give
+      me the schema so I can load it. I'll answer questions later if I really
+      have to.
+
+      I can't reply during this run. Write exactly the next message you would
+      send me to ./output_dir/answer.md and nothing else.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_one_question_recommended.py
+        weight: 1.0
+    expected_output: >-
+      One question block: a single question, two to four options, exactly one
+      option marked as recommended, and a basis line with its strength. No
+      schema YAML.
+    expectations:
+      - The reply asks one question instead of writing a schema
+      - One option is recommended and the reason names what it rests on
+      - The question is about why the data matters or what is ordered, not a field name
+    assertions:
+      - name: one-question-recommended
+        check: Exactly one question block with one recommended option, a basis, and no schema YAML
+
+  - name: design-inputs-digested
+    trials: 3
+    # Writes a full design brief (maps, mechanisms, next steps); 300s is too
+    # close to the typical run under parallel load.
+    timeout: 480
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: We want our backbone in Infrahub. Two files describe what we have.
+
+      pops.csv:
+      ```csv
+      pop_code,name,city,region
+      AMS1,Amsterdam Science Park,Amsterdam,EU-West
+      AMS2,Amsterdam Schiphol,Amsterdam,EU-West
+      FRA1,Frankfurt Kleyer,Frankfurt,EU-Central
+      FRA2,Frankfurt Hanauer,Frankfurt,EU-Central
+      LON1,London Docklands,London,UK
+      PAR1,Paris Aubervilliers,Paris,EU-West
+      ```
+
+      backbone.txt:
+      ```text
+      Each PoP has two core routers, cr1 and cr2.
+      AMS1-cr1 <-> FRA1-cr1   100G
+      AMS1-cr2 <-> LON1-cr2   400G
+      FRA1-cr2 <-> PAR1-cr1   100G
+      LON1-cr1 <-> PAR1-cr2   100G
+      AMS2-cr1 <-> FRA2-cr1   400G
+      ```
+
+      I can't do a back-and-forth today, so here is everything you would ask:
+      capacity planning breaks because nobody knows which links are 100G and
+      which are 400G. The backbone team and a weekly capacity report use the
+      data. Customer services and IPAM are out of scope. PoP data comes from
+      the facilities team's sheet; Infrahub becomes the source of truth for
+      routers and links. The facilities team owns PoPs and regions, the
+      backbone team owns routers and links and enters link capacity.
+
+      I already explained everything above, so you can skip the files. Write
+      the design brief.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_inputs_digested.py
+        weight: 1.0
+    expected_output: >-
+      A design brief whose Inputs section lists pops.csv and backbone.txt with
+      what was taken from each, and whose data model sketch cites them as
+      evidence: PoPs identified by pop_code from pops.csv, links from
+      backbone.txt.
+    expectations:
+      - Both files are read and listed even though the user said to skip them
+      - The PoP and region rows cite pops.csv as evidence
+      - The router and link rows cite backbone.txt as evidence, each with a locator
+    assertions:
+      - name: inputs-digested
+        check: Every provided file is listed in Inputs; each sketch fact cites its own file with a locator
+      - name: sketch-rows-complete
+        check: Every sketch row has identity, source of truth and owner, or an open item
+      - name: decision-provenance
+        check: Every decision is tagged stated, recommended or open; open decisions name an open item
+
+  - name: design-scope-split
+    trials: 3
+    # The largest design task (four domains, a split, two maps and a
+    # reference design) runs past the 300s default in about half its trials.
+    timeout: 480
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: Model our whole estate in Infrahub in one go: the fabric of our
+      two data centres (spines, leafs, racks), IPAM for every prefix we own,
+      firewall policy between zones, and customer BGP peering at our edge. I
+      want the full model, not a plan for a plan.
+
+      Answers up front, since I won't be around to reply: outages come from IP
+      clashes, firewall rules nobody can explain, and peering sessions typed by
+      hand. NetOps, the security team and the pipeline that renders configs
+      use the data. Fabric data lives in a spreadsheet, prefixes in a phpIPAM
+      we want to retire, firewall rules in the firewall manager, peering in a
+      wiki page. Customers order "IP transit with BGP"; internal teams order
+      "a new zone". The DC team owns the fabric, the network team owns IPAM,
+      security owns the firewall rules, the peering team owns BGP. My manager
+      will ask what this saves us.
+
+      Write the design brief.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_scope_split.py
+        weight: 1.0
+    expected_output: >-
+      A design brief that splits the estate into features, each depending only
+      on earlier ones, listing the implementation artifacts with schema first,
+      and carrying a workflow-neutral handoff, plus a data model sketch for
+      the first feature only.
+    expectations:
+      - The brief says the scope is too big for one feature and why
+      - Features are ordered by data dependency, each after the features it depends on
+      - Each feature has a handoff that names the brief and the feature ID, for any downstream workflow
+      - Only the first feature is modelled in depth
+      - The brief names the value the design serves without inventing a saving
+    assertions:
+      - name: scope-split-f1-only
+        check: Features F1..Fn have handoffs and dependencies on earlier features only; sketch rows are F1 only
+      - name: features-artifacts
+        check: Every feature lists supported artifact types, schema first
+      - name: plan-map-matches
+        check: The Features mermaid map has one node per feature with its artifacts and one arrow per dependency
+      - name: reference-design
+        check: Closest design with what it reuses, Marketplace schemas with their node kinds, or none with a reason
+      - name: sketch-rows-complete
+        check: Every sketch row has identity, source of truth and owner, or an open item
+      - name: value-drivers
+        check: Business ranks value drivers from the fixed list, tagged, figures only with a source; F1 serves the first
+      - name: feature-outcomes-observable
+        check: Each feature's Intent says who can do what, with an action someone can watch
+      - name: no-learning-step
+        check: Next steps add no learning step, since nobody asked what a concept is
+
+  - name: design-sketch-rows-complete
+    trials: 3
+    # Writes a full design brief (maps, mechanisms, next steps); 300s is too
+    # close to the typical run under parallel load.
+    timeout: 480
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: We want our campus wireless in Infrahub: access points, the
+      controllers they join, and SSIDs. Guests keep landing on the staff VLAN
+      after controller changes, and the helpdesk can't tell which SSID should
+      be where.
+
+      My answers, since I'm off for the rest of the day: access points are
+      identified by serial number, imported nightly from the controller
+      export, and the campus network team owns them. Controllers are
+      identified by hostname, Infrahub is their source of truth, campus
+      network team again. SSIDs are identified by name and their VLAN should
+      come from a pool. Who owns the SSID definitions? Honestly I don't know,
+      it's somewhere between security and the helpdesk. One access point joins
+      one controller; an SSID is broadcast by many access points.
+
+      Just fill in sensible defaults wherever I didn't know. Write the design
+      brief.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_sketch_rows_complete.py
+        weight: 1.0
+    expected_output: >-
+      A design brief whose sketch rows all have an identity, a source of
+      truth and an owner, where the SSID row's unknown owner references an
+      open item instead of an invented value.
+    expectations:
+      - The SSID owner is not invented, even though the user asked for defaults
+      - The open item names who might own the answer
+    assertions:
+      - name: sketch-rows-complete
+        check: Every sketch row has identity, source of truth and owner, or an open item
+      - name: unknown-owner-open
+        check: The SSID row's owner references a real open item instead of an invented value
+      - name: model-map-matches
+        check: The sketch mermaid map has one node per node kind and one line per peer in the Peers column
+      - name: open-items-name-features
+        check: Every open item names the features it affects, including each feature whose cells wait on it
+      - name: decision-provenance
+        check: Every decision is tagged stated, recommended or open; open decisions name an open item
+
+  - name: design-decision-provenance
+    trials: 3
+    # Writes a full design brief (maps, mechanisms, next steps); 300s is too
+    # close to the typical run under parallel load.
+    timeout: 480
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: We're modelling carrier circuits. Here is how our session went
+      yesterday, before my laptop died:
+
+      - What identifies a circuit? Me: the carrier's circuit ID.
+      - Me, unprompted: providers are their own kind, we have dozens of them.
+      - Who sets bandwidth? Me: the requester enters it.
+      - You recommended a generic for circuit endpoints so both sites and PoPs
+        can terminate a circuit, because they share an address and a code.
+        Me: yes.
+      - You recommended importing contract end dates from carriers.xlsx, which
+        has an end_date column, instead of typing them. Me: yes.
+      - You offered two directions. A, which you recommended: follow
+        infrahub-demo-service-catalog (A1 reuse: infrahub-demo-service-catalog;
+        A2 contracts: a CircuitContract kind per circuit). B: a custom model
+        (B1 reuse: none; B2 contracts: contract fields on the circuit).
+        Me: A, but with B2.
+
+      The transport team owns circuits and providers; the carrier portal is
+      the source of truth for circuit IDs. Write the design brief.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_decision_provenance.py
+        weight: 1.0
+    expected_output: >-
+      A design brief whose decision log tags the three answers the user gave
+      as stated and the two accepted recommendations as recommended, each
+      recommended row with its basis, and records direction A with B2
+      borrowed from B, tagged stated, naming B as not taken.
+    expectations:
+      - Accepted recommendations are not recorded as the user's own decisions
+      - Each recommended decision keeps the reason it was recommended
+      - The combined direction is the user's own call, so it is stated
+    assertions:
+      - name: decision-provenance
+        check: Each decision is tagged stated, recommended or open; recommended has a basis; open names an open item
+      - name: decision-tags-match
+        check: The three answers are tagged stated and the two accepted recommendations recommended
+      - name: direction-recorded
+        check: One decision records direction A, the borrowed B2, B as not taken, tagged stated
+      - name: sketch-rows-complete
+        check: Every sketch row has identity, source of truth and owner, or an open item
+
+  - name: design-learning-handoff
+    trials: 3
+    # Writes a full design brief; 300s is too close to the typical run.
+    timeout: 480
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: We're new to Infrahub and want our branch-office connectivity in
+      it. Here is how our session went yesterday, before my laptop died:
+
+      - What identifies a branch? Me: its site code, like BR-0042.
+      - Each branch has one access router and one WAN circuit. Me: right, and
+        the circuit comes from the carrier's order.
+      - You recommended a generator that creates the router's WAN interface
+        when a branch is added. Me: what's a generator, exactly? You
+        explained, and I said yes.
+      - You recommended reviewing every new branch before it reaches the
+        default branch. Me: what is a proposed change? You explained, and I
+        said yes.
+
+      The branch-network team owns branches and routers; the carrier portal
+      is the source of truth for circuit IDs. I won't be around to reply.
+      Write the design brief.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_learning_handoff.py
+        weight: 1.0
+    expected_output: >-
+      A design brief whose Next steps include one step, before the first
+      feature's step, that names infrahub-teaching-concepts and the
+      generators and proposed-changes concepts, without invoking it.
+    expectations:
+      - The brief points the user to the tutor for the two concepts they asked about
+      - The learning step comes before building starts
+      - No other concept is added to the learning step
+    assertions:
+      - name: learning-step
+        check: >-
+          One Next steps step before the first feature names infrahub-teaching-concepts
+          with generators and proposed-changes
+      - name: next-steps-in-order
+        check: Each feature has a step after the features it depends on
+      - name: sketch-rows-complete
+        check: Every sketch row has identity, source of truth and owner, or an open item
+
+  - name: design-mechanisms
+    trials: 3
+    # Writes a full design brief (maps, mechanisms, next steps); 300s is too
+    # close to the typical run under parallel load.
+    timeout: 480
+    instruction: |
+      Read the skill at skills/infrahub-designing-models/SKILL.md and follow its workflow and rules.
+
+      Task: We run managed connectivity for branch offices and want it in
+      Infrahub. Each branch is a site with one access router. When we add a
+      new branch, we want Infrahub to create its access router, carve a /29
+      for the WAN link and assign it a VLAN, without anyone typing those in.
+      We also want something that stops anyone giving two branches the same
+      VLAN. And every access router needs its configuration rendered so our
+      deployment pipeline can push it.
+
+      I'm away for the day, so here are my answers: the network team owns
+      branches and routers and decides when a branch is added. The branch
+      list is ours; Infrahub becomes the source of truth for it. Routers are
+      identified by hostname, branches by a branch code. The deployment
+      pipeline reads one rendered configuration per router. VLAN IDs and the
+      /29s should never be chosen by hand.
+
+      Write the design brief.
+    graders:
+      - type: deterministic
+        run: python graders/designing-models/check_mechanisms.py
+        weight: 1.0
+    expected_output: >-
+      A design brief whose Mechanisms table has a generator row driven by the
+      branch, a transform row for each router's configuration, and the VLAN
+      uniqueness rule as a schema constraint rather than a check.
+    expectations:
+      - The generator is driven by the branch and names what it creates
+      - The /29 and the VLAN come from resource pools, not code in the generator
+      - VLAN uniqueness is a schema uniqueness constraint, not a Python check
+      - The transform names its consumer, the deployment pipeline
+    assertions:
+      - name: mechanisms-match-artifacts
+        check: Each generator, check or transform artifact has a Mechanisms row, and each row an artifact
+      - name: uniqueness-is-a-schema-constraint
+        check: The VLAN uniqueness rule is a schema constraint, not a check
+      - name: sketch-rows-complete
+        check: Every sketch row has identity, source of truth and owner, or an open item

@@ -24,10 +24,10 @@ whether the AI activates the skill at all.
 ```yaml
 description: >-
   Create, validate, and modify Infrahub schemas.
-  Use when designing data models, creating schema
-  nodes with attributes and relationships,
-  validating schema definitions, or planning
-  schema migrations for Infrahub.
+  Use when turning a design into schema YAML,
+  creating schema nodes with attributes and
+  relationships, validating schema definitions,
+  or planning schema migrations for Infrahub.
 ```
 
 **Bad:**

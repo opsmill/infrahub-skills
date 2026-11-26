@@ -279,7 +279,9 @@ Deployment: Infrahub <version> (<edition>),
 - Cascade: <downstream effects with paths>
 - Known issue: <matched issue URL + state; when it
   names a fix version, the comparison against the
-  running version — or "no match (queries: ...)">
+  running version — or "no match"; either way, each
+  `gh search issues --repo opsmill/infrahub "..."`
+  line tried>
 - Open questions: <what this bundle cannot answer;
   whether the symptom reproduces on demand and when
   it last did; which `infrahub-collect create` flags

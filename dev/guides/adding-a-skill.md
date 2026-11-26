@@ -201,7 +201,7 @@ tasks:
   - name: basic-scenario
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-my-skill/SKILL.md
+      Read the skill at skills/infrahub-my-skill/SKILL.md
       and follow its workflow and rules.
 
       A realistic user request with specific names,
@@ -218,7 +218,7 @@ tasks:
   - name: advanced-scenario
     trials: 3
     instruction: |
-      Read the skill at .agents/skills/infrahub-my-skill/SKILL.md
+      Read the skill at skills/infrahub-my-skill/SKILL.md
       and follow its workflow and rules.
 
       A more complex request covering relationships
@@ -257,10 +257,10 @@ objectively deterministic. Use descriptive file names
 that explain what's being tested at a glance (e.g.,
 `check_dropdown_for_status.py` not `check_1.py`).
 
-Run evals with skillgrade to iterate on quality:
+Run each new task with skillgrade to iterate on quality:
 
 ```bash
-skillgrade --smoke
+skillgrade --eval=<task-name> --trials=1
 ```
 
 After editing `eval.yaml`, regenerate the JSON
@@ -323,10 +323,19 @@ Confirm the skill works before submitting for review.
    `infrahubctl schema check` (for schema skills) or
    equivalent tooling
 
-**Run evaluations** (see [Step 6](#6-write-evaluations)):
+**Check the skill against itself.** For each term,
+tag, path, and step order the skill defines, grep
+`skills/infrahub-my-skill/` and read every hit. A
+workflow step, a rule, and a reference that restate the
+same fact are three homes, and a review fix to one
+leaves the others saying the old thing. Keep each fact
+in one file and link to it from the others.
+
+**Run evaluations** (see [Step 6](#6-write-evaluations)),
+one task at a time:
 
 ```bash
-skillgrade --smoke
+skillgrade --eval=<task-name> --trials=1
 ```
 
 Review results with `skillgrade preview`.

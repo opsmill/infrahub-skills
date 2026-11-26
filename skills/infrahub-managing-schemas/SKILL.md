@@ -1,12 +1,12 @@
 ---
 name: infrahub-managing-schemas
 description: >-
-  Creates, validates, formats, and modifies Infrahub schema YAML files — nodes, generics, attributes, relationships, and extensions. Also checks the Infrahub Marketplace for an existing published schema to reuse before modelling a domain from scratch.
-  TRIGGER when: designing data models, adding schema nodes, validating schema definitions, planning schema migrations, modifying or extending an existing schema, changing an attribute or relationship on a node kind, debugging why a schema fails to load or a migration is rejected, checking the marketplace for an off-the-shelf schema, modeling file objects / attachments / uploads (PDFs, images, certificates, documents), formatting schema files, canonicalising schema key order, or running `infrahubctl schema format` (including as a CI gate).
-  DO NOT TRIGGER when: populating or editing object data files (use infrahub-managing-objects), writing checks/generators/transforms, querying live data, planning an Infrahub version upgrade (use infrahub-planning-upgrades).
+  Creates, validates, formats, and modifies Infrahub schema YAML files: nodes, generics, attributes, relationships, and extensions. Also checks the Infrahub Marketplace for a schema to reuse.
+  TRIGGER when: turning a design into schema YAML, adding schema nodes, validating schema definitions, planning schema migrations, modifying or extending an existing schema, changing an attribute or relationship on a node kind, debugging why a schema fails to load or a migration is rejected, checking the marketplace for an off-the-shelf schema, modeling file objects / attachments / uploads (PDFs, images, certificates, documents), formatting schema files, canonicalising schema key order, or running `infrahubctl schema format` (including as a CI gate).
+  DO NOT TRIGGER when: populating or editing object data files (use infrahub-managing-objects), writing checks/generators/transforms, querying live data, planning an Infrahub version upgrade (use infrahub-planning-upgrades), no design yet (use infrahub-designing-models).
 argument-hint: "[namespace] [node-names...]"
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 
@@ -21,11 +21,20 @@ relationships, and extensions.
 
 ## Project Context
 
-Existing schemas in this project:
-!`find . -name "*.yml" -path "*/schemas/*" -o -name "*schema*" -name "*.yml" 2>/dev/null | head -20`
+Before changing a schema, look at the project with
+read-only tools:
 
-Infrahub config (if present):
-!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
+- Find the existing schema files: `.yml` or `.yaml` files under a
+  `schemas/` directory, or with `schema` in the name.
+- Read `.infrahub.yml` if it exists.
+
+These steps contact the Infrahub server, so they come
+after the read-only look at the project:
+
+- Before running any `infrahubctl` command, detect the
+  project's Python environment as
+  [../infrahub-common/rules/connectivity-python-environment.md](../infrahub-common/rules/connectivity-python-environment.md)
+  describes.
 
 If invoked with arguments (e.g., `/infrahub:managing-schemas Ipam Vlan VlanGroup`),
 use the first argument as the namespace and remaining arguments as node names.
@@ -136,6 +145,10 @@ Follow these steps when creating or modifying a schema:
 1. **Gather requirements** — Identify the node types,
    their attributes, and how they relate to each other.
    Ask about hierarchies, dropdowns, and display needs.
+   When the user cannot yet name the node kinds, or the
+   request spans several domains, run
+   `infrahub-designing-models` first and build from its
+   design brief.
 2. **Check the marketplace first** — Before modelling
    *any* domain from scratch, search the whole Infrahub
    Marketplace and reuse a published schema when one

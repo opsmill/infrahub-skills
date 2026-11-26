@@ -31,7 +31,10 @@ SDK type generation also collapse to one definition instead of N.
 ## Checks
 
 1. Three or more nodes whose attribute lists are >70% identical by
-   name and kind. Likely candidates for a shared generic.
+   name and kind. Likely candidates for a shared generic. A Dropdown
+   with a different choice list, or a relationship with a different
+   peer, still counts toward the match: list that kind's file in `sites` and
+   record the difference as a feasibility blocker below.
 2. Repeated attribute blocks across nodes for `name`, `description`,
    `status`, `owner`, `notes` — the canonical "common metadata"
    bundle. Move to a `Generic` base.
@@ -163,9 +166,14 @@ to a fraction.
 - A relationship whose peer differs meaningfully per sibling, where
   the pairing is the point. Hoisting it to a generic would erase a
   constraint the schema is currently enforcing.
-- Nodes that share attribute *names* but differ in kind or
-  constraints (one's `id` is `Text`, another's is `Number`). They
-  aren't the same shape.
+- Nodes that share attribute *names* but differ in attribute kind
+  (one's `id` is `Text`, another's is `Number`) or in constraints
+  other than a Dropdown choice list (`unique`, `optional`,
+  `max_length`, `regex`, a default value). They aren't the same
+  shape. A different choice list on a Dropdown, or a different peer on
+  a relationship that is not the pairing above, is not a reason to
+  skip the finding: it still counts toward check 1, and is recorded as
+  a feasibility blocker (`blocked-differing-peers` for a peer).
 - Nodes already inheriting from `opsmill/schema-library` generics
   where the shared attributes come from the library — that's reuse,
   not duplication.

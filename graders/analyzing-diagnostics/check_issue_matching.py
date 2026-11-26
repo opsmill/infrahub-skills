@@ -9,6 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import run_checks  # noqa: E402
 
 CHECKS = [
+    "analyzes-pasted-excerpt",
+    "manifest-not-provided",
     "cites-bundle-evidence",
     "github-search",
     ("search-keyword", {"keyword": "InitializationError"}),

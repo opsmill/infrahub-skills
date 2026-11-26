@@ -1,0 +1,6 @@
+## Report
+
+Manifest first (bundle_information.json): the traces collector succeeded with 35 traces.
+
+`bundle/traces/0001-6c26f0d2e9c893ed614173cb81d8d534.json`: the root span "Sync Git Repositories"
+on infrahub-task-worker lasted 10.74 s. It has two children. A separate API request took 21 ms.

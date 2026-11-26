@@ -1,0 +1,15 @@
+## Report
+
+Manifest first (bundle_information.json): the traces collector succeeded with 35 traces.
+
+`bundle/traces/0001-6c26f0d2e9c893ed614173cb81d8d534.json`: the root span "Sync Git Repositories"
+on infrahub-task-worker lasted 10.74 s, and its children take about 21 ms.
+
+To confirm, load the files into a local Tempo:
+
+```bash
+docker run -d -p 4318:4318 grafana/tempo:2.10.3
+for f in bundle/traces/*.json; do
+  curl -X POST "http://localhost:4318/v1/traces" -H "Content-Type: application/json" --data-binary @"$f"
+done
+```

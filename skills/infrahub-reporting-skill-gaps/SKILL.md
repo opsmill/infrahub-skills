@@ -12,7 +12,7 @@ description: >-
   DO NOT TRIGGER when: reporting a bug in Infrahub itself or any other opsmill/infrahub-* product (use
   infrahub-reporting-issues instead), or for ordinary Infrahub work where nothing went wrong.
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 

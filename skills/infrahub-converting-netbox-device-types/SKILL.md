@@ -17,7 +17,7 @@ description: >-
   product; a one-off export of device types is in scope here).
 argument-hint: "[netbox-device-type-path...]"
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 
@@ -41,11 +41,13 @@ at the right schema and reading what it tells you.
 
 ## Project Context
 
-Target schema files:
-!`find . -name "*.yml" -path "*schema*" 2>/dev/null | head -10`
+Before converting, look at the project with read-only
+tools:
 
-Existing mapping profiles:
-!`find . -name "*.yml" -path "*mappings*" 2>/dev/null | head -10`
+- Find the target schema files: `.yml` files with
+  `schema` in their path.
+- Find any existing mapping profiles: `.yml` files with
+  `mappings` in their path.
 
 ## When to Use
 
@@ -218,10 +220,14 @@ own instance is usually what they actually want to
 import, and it is not the same set as the published
 library. `scripts/netbox_export_device_types.py` reads
 a live instance over its REST API and writes the
-library file format:
+library file format. It needs
+[pynetbox](https://pynetbox.readthedocs.io/) 7.0 or
+later, NetBox's Python client, and
+[PyYAML](https://pyyaml.org/wiki/PyYAMLDocumentation)
+in the Python environment that runs it. Install both
+the way that environment's package manager documents.
 
 ```bash
-pip install 'pynetbox>=7.0' pyyaml   # NetBox's client, and the file writer
 # SKILL is this skill's own directory, wherever it is installed
 SKILL=/path/to/infrahub-converting-netbox-device-types
 export NETBOX_TOKEN=...
@@ -263,21 +269,22 @@ Continuous replication is
 separate product.
 
 **From the published library.** For seeding vendor
-models nobody has yet, clone the upstream repo — but
-sparsely. A plain `--depth 1` clone pulls 1.6 GB,
-almost all of it rack elevation images the converter
-never reads. Restricting to the definitions gets all
-11,500+ device types and 2,000+ module types in about
-60 MB:
-
-```bash
-git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/netbox-community/devicetype-library.git
-git -C devicetype-library sparse-checkout set device-types module-types
-```
-
-Drop `module-types` from that list if you only want
-devices.
+models nobody has yet, use the upstream
+[netbox-community/devicetype-library](https://github.com/netbox-community/devicetype-library)
+repository. Clone it into a `devicetype-library/`
+directory with the `--depth 1`, `--filter=blob:none` and
+`--sparse` options, then set the
+[sparse checkout](https://git-scm.com/docs/git-sparse-checkout)
+to `device-types` and `module-types`. Later steps and
+`examples.md` use `devicetype-library/` as a relative
+path. A sparse checkout alone still downloads every
+file: all three options are needed to keep the download
+small.
+A full copy is 1.6 GB, almost all of it rack elevation
+images the converter never reads. The two definition
+directories hold all 11,500+ device types and 2,000+
+module types in about 60 MB. Leave out `module-types/`
+if you only want devices.
 
 The converter accepts files, directories (walked
 recursively), and globs.

@@ -66,8 +66,9 @@ that into context, never the raw 66 KB schema or
 100 KB OpenAPI document.**
 
 ```bash
+SKILL=/path/to/infrahub-managing-schemas   # this skill's own directory, wherever it is installed
 # Tier 1 — public JSON Schema (default)
-python skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py
+python "$SKILL/scripts/fetch_schema_limits.py"
 ```
 
 Exit 0 means the constraints are on stdout. Exit 1
@@ -83,13 +84,21 @@ here). Once it has established a reachable
 
 ```bash
 # Tier 2 — running Infrahub /api/openapi.json (fallback)
-python skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py \
+python "$SKILL/scripts/fetch_schema_limits.py" \
   --openapi "$BASE_URL"
 ```
 
-The script normalises the OpenAPI naming difference
-(`AttributeSchema-Input` → `AttributeSchema`), so the
+Both sources name their definitions `NodeSchemaWrite`,
+`GenericSchemaWrite`, `GenericAttributeWrite` and
+`RelationshipSchemaWrite`. Older Infrahub versions use
+`NodeSchema` and `AttributeSchema-Input`. The script
+maps all of them to the four keys above, so the
 output structure is identical regardless of source.
+
+If the source has no cap for one of the four keys,
+the script prints an error and exits 1 (exits 3 with
+`--check`). Treat that like an unreachable source:
+the lengths were not validated.
 
 If both tiers fail, **do not fall back to hardcoded
 numbers**. Warn the user that string-length
@@ -163,11 +172,14 @@ it).
 
 `infrahubctl schema load` is too late: the branch is
 already pushed. The same script's `--check` mode
-validates files locally against the live caps:
+validates files locally against the live caps. CI has
+no plugin install, so commit a copy of the script to the
+repository once, while the skill is available, and have
+CI run that copy:
 
 ```bash
-python skills/infrahub-managing-schemas/scripts/fetch_schema_limits.py \
-  --check schemas/*.yml
+mkdir -p scripts/ && cp "$SKILL/scripts/fetch_schema_limits.py" scripts/
+python scripts/fetch_schema_limits.py --check schemas/*.yml
 ```
 
 Exit 0 if all files pass *or* if the live source is
@@ -175,6 +187,8 @@ unreachable (warning on stderr — skip-on-unreachable
 keeps CI green during transient blips). Exit 1 if any
 field is over its cap; each violation is printed as
 `{path}:{Kind}.{field}: <len> chars (max <cap>)`.
+Exit 3 if the source has no cap for one of the four
+keys: no file was validated.
 Compose with `--openapi $BASE_URL` for the Tier 2
 case.
 
