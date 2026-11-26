@@ -293,23 +293,42 @@ logs.
   an earlier run put it in, and the next run deletes it.
   `generator-opt-out-existing-member` gave a generator that
   had saved a shared container for a year and asked for no
-  run to own it. Two prompts, one valid trial. A first
-  prompt, which mentioned that a decommissioned service's
-  run could delete the container, scored 1.00. A second
-  prompt without that hint scored 0.5, but the 0.5 came
-  from the check: the model stopped writing the container
-  and removed it from the group, and the check required an
-  opt-out save. The check was fixed and the same answer
-  passes it, but a score from a grader fault is void and
-  re-grading the answer is not a re-run, so that trial
-  does not count. Both times the model read the SDK's
-  cleanup code in the sandbox, and the skill already gives
-  the formula, `previous_group.members -
-  nodes_saved_this_run`. Step-4 reading: the model read the
-  skill anyway, through that formula. That reading needs
-  the before/after score on the same prompt and grader,
-  and only the score with the old prose was recorded, so
-  step 4 is not met for #240.
+  run to own it. Three prompts.
+  - A first prompt, which mentioned that a decommissioned
+    service's run could delete the container, scored 1.00
+    on one trial.
+  - A second prompt without that hint scored 0.5, but the
+    0.5 came from the check: the model stopped writing the
+    container and removed it from the group, and the check
+    required an opt-out save. A score from a grader fault is
+    void, and re-grading the answer is not a re-run, so that
+    trial does not count. That prompt was not kept.
+  - A third prompt rebuilt the second for a before/after
+    run: the generator in a workspace file,
+    `generators/service_legs.py`, saving `shared-trunk` on
+    every service's run, and a user asking that no
+    service's run own the trunk any more, with no hint about
+    deletion. Three trials with the #240 prose removed
+    scored 1.00 three times, and three trials with it scored
+    1.00 three times, graded by
+    `opt-out-releases-existing-member`. No trial read the
+    grader. With the old prose every answer read the SDK's
+    cleanup code and applied the skill's formula,
+    `previous_group.members - nodes_saved_this_run`. With
+    the new prose none read the SDK.
+
+    A first run of the old-prose set is void: removing the
+    #240 commit left a comment that points to the new
+    section, so the old prose still told the model to
+    remove the container from the group. Its one 0.00 was
+    also a grader fault: the check does not follow a
+    removal by a local alias such as `trunk_id = trunk.id`.
+
+  Step-4 reading: the model read the skill anyway, through
+  that formula and the SDK source. The before/after score
+  on the same prompt and grader is 1.00 and 1.00, which
+  meets step 4 and shows the prose does not change the
+  score.
 - #241, cleanup deletes an object of a `branch: agnostic`
   kind on every branch. Two scenarios.
   - `generator-agnostic-kind-branch-run` showed the schema
@@ -359,7 +378,7 @@ precondition hands the model the answer through the SDK
 source, its training, or a sibling example. The
 reference-drift pytest does not fit #238 either, for the
 reason given for #239: the repo pins infrahub-sdk 1.23.2.
-The four tasks and their grader scripts were removed. The
+The five tasks and their grader scripts were removed. The
 check functions `opt-out-releases-existing-member`,
 `agnostic-saves-opt-out` and `generator-run-names-branch`
 and their fixtures stay in
