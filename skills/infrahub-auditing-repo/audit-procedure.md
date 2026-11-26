@@ -292,11 +292,9 @@ convention).
 - Must use `await self.client.create()` for object
   creation
 - Must call `save(allow_upsert=True)` on created objects
-- Should raise, or re-claim the previous run's members
-  before returning, when the collection it builds from is
-  empty. From infrahub-sdk 1.24.0 a run that saves nothing
-  deletes the previous run's output (python-classes
-  check 4)
+- Should keep the previous output on empty input when that
+  means something is wrong: see
+  [python-classes Generators check 4](./rules/python-classes.md#generators)
 
 ### 4.3 Transform classes
 
