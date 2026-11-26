@@ -2429,15 +2429,13 @@ def _saves_on(
 
 
 def _answer_tree_without_negatives(output: dict) -> ast.Module | None:
-    """Like ``_answer_tree``, with labelled WRONG lines stripped per fence.
-
-    Stripping inside each fence, not across the answer, keeps a label from
-    swallowing the closing fence of its block.
-    """
+    """Like ``_answer_tree``, without the fences labelled as the wrong form."""
     raw = output.get("raw", "")
     if not raw:
         return _answer_tree(output)
-    blocks = [_strip_negative_examples(m.group(1)) for m in _PY_FENCE.finditer(raw)]
+    blocks = [
+        m.group(1) for m in _PY_FENCE.finditer(raw) if not _negative_fence(m.group(1))
+    ]
     parseable = [b for b in blocks if _parse_python(b) is not None]
     return _parse_python("\n\n".join(parseable))
 
@@ -2589,20 +2587,19 @@ def check_generator_run_names_branch(output: dict, **_: Any) -> tuple[bool, str]
     ``INFRAHUB_DEFAULT_BRANCH_FROM_GIT`` prefix, or follows an ``export`` of
     either in the same fence. Runner wrappers and their options before
     ``infrahubctl`` (``uv run --env-file .env``) name no branch. Shell and
-    untagged fences are read; labelled WRONG examples are not.
+    untagged fences are read; a fence labelled WRONG is not.
     ``--list`` lists generators and runs nothing, so it does not count.
 
     No eval task wires this check (#238): the model answered correctly with
     the old prose. See dev/guidelines/rule-equals-test.md § "When no task
     can score the rule".
     """
-    # Strip labelled WRONG lines inside each fence, which is how the rules
-    # lay out a contrast. Stripping the whole answer would drop a closing
-    # fence with the lines it labels and pair the wrong fences up.
+    # Skip a fence labelled as the wrong form, which is how the rules lay
+    # out a contrast.
     blocks = [
-        _strip_negative_examples(m.group(2))
+        m.group(2)
         for m in _ANY_FENCE.finditer(output.get("raw", ""))
-        if m.group(1).lower() in _SHELL_TAGS
+        if m.group(1).lower() in _SHELL_TAGS and not _negative_fence(m.group(2))
     ]
     runs = 0
     for block in blocks:
@@ -2910,6 +2907,23 @@ def _strip_negative_examples(text: str) -> str:
         if not skipping:
             kept.append(line)
     return "\n".join(kept)
+
+
+def _negative_fence(body: str) -> bool:
+    """True if a fenced block opens with a comment labelling it the wrong form.
+
+    The rules lay a contrast out as two fences, the first opening with
+    ``# WRONG.``. Only the opening line counts: a comment such as ``# Fail
+    rather than return`` inside a real answer does not label the code
+    around it, so stripping from any labelled line drops code the answer
+    runs.
+    """
+    for line in body.splitlines():
+        text = line.strip()
+        if not text:
+            continue
+        return text.startswith(("#", "//")) and bool(_NEGATIVE_LABEL.match(text))
+    return False
 
 
 def check_group_membership_from_member_side(

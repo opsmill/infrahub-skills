@@ -1775,6 +1775,8 @@ def test_agnostic_saves_opt_out_is_registered():
         # Saved with the default through a helper, then attached with
         # add_relationships(); the attach does not excuse the save.
         ("violating_helper_save.md", False, "saved without update_group_context=False"),
+        # A "# Fail ..." comment inside the generator is not a WRONG label.
+        ("compliant_fail_comment.md", True, "stays out of the generator group"),
     ],
 )
 def test_agnostic_saves_opt_out_fixtures(fixture, expected, reason):
@@ -1854,6 +1856,8 @@ def test_generator_run_names_branch_is_registered():
         # A branchless run in an untagged fence, next to a correct run. Kept
         # as .txt: the markdown formatter would tag the fence.
         ("violating_untagged_fence.txt", False, "does not select an Infrahub branch"),
+        # A "# Never ..." comment above a run does not hide the run.
+        ("violating_never_comment.md", False, "does not select an Infrahub branch"),
     ],
 )
 def test_generator_run_names_branch_fixtures(fixture, expected, reason):
