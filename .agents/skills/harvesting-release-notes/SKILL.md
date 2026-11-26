@@ -105,11 +105,13 @@ never reaches it: `infrahub-v1.11.13` came out after
 since the issue that names that end was created:
 
 ```bash
-gh release list -R <owner/repo> --limit 100 --json tagName,publishedAt,isPrerelease
+gh release list -R <owner/repo> --limit 1000 --json tagName,publishedAt,isPrerelease
 ```
 
 Harvest each one whose version is below the end, as a
-single release, alongside the range.
+single release, alongside the range. Skip a release that
+a `Release harvest:` line already names: it was harvested
+as a single release by an earlier run.
 
 A range that produced no finding files no issue, so it
 leaves no record. Say so in the report.
