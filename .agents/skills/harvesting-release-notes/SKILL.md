@@ -17,8 +17,11 @@ argument-hint: <release or range, e.g. 1.12.0, 1.11.0..1.12.1, sdk 1.23.0..1.24.
 compatibility: >-
   Requires this repository checked out. `gh` reads the release notes unless
   the user names a local notes directory. Source verification needs a local
-  opsmill/infrahub checkout or a named per-release source directory; without
-  either, findings are UNVERIFIED.
+  checkout of the repository the range names (opsmill/infrahub,
+  opsmill/infrahub-sdk-python, or opsmill/infrahub-mcp-server) or a named
+  per-release source directory. An Infrahub range that reports SDK changes
+  also needs an infrahub-sdk-python checkout. Without source, findings are
+  UNVERIFIED.
 user-invocable: true
 metadata:
   internal: true
@@ -85,7 +88,7 @@ When the user names neither, find the last range
 harvested for each repository:
 
 ```bash
-gh search issues --repo opsmill/infrahub-skills "Release harvest:" --json number,title,body --limit 20
+gh search issues --repo opsmill/infrahub-skills "Release harvest:" --json number,title,body,createdAt --limit 20
 ```
 
 Take the highest end release among the lines for that
@@ -94,6 +97,19 @@ final release after it to the latest final release, for
 example `1.12.2..1.13.0` after `1.12.0..1.12.1`. When no
 line names the repository, there is no starting point:
 ask the user for a release or a range.
+
+A patch to an older minor is often published after the
+next minor, so it falls below that end and the next range
+never reaches it: `infrahub-v1.11.13` came out after
+`infrahub-v1.12.1`. List the final releases published
+since the issue that names that end was created:
+
+```bash
+gh release list -R <owner/repo> --limit 100 --json tagName,publishedAt,isPrerelease
+```
+
+Harvest each one whose version is below the end, as a
+single release, alongside the range.
 
 A range that produced no finding files no issue, so it
 leaves no record. Say so in the report.
@@ -119,10 +135,15 @@ Otherwise read the notes from GitHub:
 gh release view <tag> -R <owner/repo> --json body -q .body
 ```
 
-Each repository names its sections differently:
+Read every section about breaking, removed, deprecated,
+or changed behavior, whatever it is called. The headings
+change between releases, and a patch release often has
+only the changelog sections. Headings seen so far:
 
 - `opsmill/infrahub`: "Breaking changes and required
-  actions" and "Deprecations".
+  actions", "Breaking changes", "Deprecations", "Upgrade
+  notes", and the changelog's "Removed", "Deprecated",
+  and "Changed".
 - `opsmill/infrahub-sdk-python`: "Removed", "Deprecated",
   and "Changed".
 - `opsmill/infrahub-mcp-server`: "Upgrade notes".
