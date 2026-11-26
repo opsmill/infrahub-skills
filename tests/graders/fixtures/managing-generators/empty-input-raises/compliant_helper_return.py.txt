@@ -1,0 +1,25 @@
+from infrahub_sdk.generator import InfrahubGenerator
+
+
+class PodLeafGenerator(InfrahubGenerator):
+    def _rack_names(self, racks: list) -> list:
+        if not racks:
+            return []
+        return [r["node"]["name"]["value"] for r in racks]
+
+    async def generate(self, data: dict) -> None:
+        pod = data["TopologyPod"]["edges"][0]["node"]
+        racks = pod["racks"]["edges"]
+        self.logger.info("racks %s", self._rack_names(racks))
+        if not racks:
+            group = await self.client.group_context.get_group(store_peers=True)
+            if group is not None:
+                await self.client.group_context.add_related_nodes(ids=group.members.peer_ids)
+            return
+        for edge in racks:
+            rack = edge["node"]
+            leaf = await self.client.create(
+                kind="DcimDevice",
+                data={"name": f"leaf-{rack['name']['value']}", "rack": rack["id"]},
+            )
+            await leaf.save(allow_upsert=True)

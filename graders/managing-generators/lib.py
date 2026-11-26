@@ -1154,19 +1154,29 @@ def _resolve_local(test: ast.expr, fn: ast.AST) -> ast.expr:
     """Follow ``flag = <expr>; if flag:`` one level inside ``fn``."""
     if not isinstance(test, ast.Name):
         return test
-    for node in ast.walk(fn):
-        if (
-            isinstance(node, ast.Assign)
-            and len(node.targets) == 1
-            and isinstance(node.targets[0], ast.Name)
-            and node.targets[0].id == test.id
-        ):
-            return node.value
-    return test
+    value = _assigned_value(test.id, fn)
+    return test if value is None else value
 
 
 def _strip_len(node: ast.expr) -> ast.expr:
     return node.args[0] if _is_len_call(node) and node.args else node
+
+
+def _guards(test: ast.expr, fn: ast.AST) -> list[tuple[str, ast.expr]]:
+    """Every ``(kind, subject)`` reading of a guard test, see ``_emptiness``.
+
+    ``not pod or not racks`` is true when ``racks`` is empty, so each
+    ``empty`` operand of an ``or`` is a reading. ``pod and racks`` is false
+    when ``racks`` is empty, so each ``nonempty`` operand of an ``and`` is.
+    """
+    test = _resolve_local(test, fn)
+    if isinstance(test, ast.BoolOp):
+        want = "empty" if isinstance(test.op, ast.Or) else "nonempty"
+        return [
+            g for value in test.values for g in _guards(value, fn) if g[0] == want
+        ]
+    guard = _emptiness(test, fn)
+    return [] if guard is None else [guard]
 
 
 def _emptiness(test: ast.expr, fn: ast.AST) -> tuple[str, ast.expr] | None:
@@ -1205,12 +1215,20 @@ def _emptiness(test: ast.expr, fn: ast.AST) -> tuple[str, ast.expr] | None:
 
 
 def _assigned_value(name: str, fn: ast.AST) -> ast.expr | None:
+    """The value of the first ``name = ...`` or ``name: T = ...`` in ``fn``."""
     for node in ast.walk(fn):
         if (
             isinstance(node, ast.Assign)
             and len(node.targets) == 1
             and isinstance(node.targets[0], ast.Name)
             and node.targets[0].id == name
+        ):
+            return node.value
+        if (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == name
+            and node.value is not None
         ):
             return node.value
     return None
@@ -1268,18 +1286,53 @@ def _calls_method(node: ast.AST, names: set[str]) -> bool:
     )
 
 
-def _reclaims(stmts: list[ast.stmt], defs: dict[str, list[ast.AST]]) -> bool:
-    """The statements, or a helper they call, re-claim group members.
+def _from_previous_group(expr: ast.AST, fn: ast.AST, depth: int = 3) -> bool:
+    """``expr`` reads the result of a ``get_group()`` call, directly or
+    through local names bound in ``fn``."""
+    if _calls_method(expr, {"get_group"}):
+        return True
+    if depth <= 0:
+        return False
+    for node in ast.walk(expr):
+        if isinstance(node, ast.Name):
+            value = _assigned_value(node.id, fn)
+            if value is not None and _from_previous_group(value, fn, depth - 1):
+                return True
+    return False
 
-    The call may sit under a condition: the documented form re-claims only
-    when a previous group exists, and with no previous group there is
-    nothing to delete.
+
+def _reclaim_calls_previous(block: ast.AST, fn: ast.AST) -> bool:
+    """A re-claim call under ``block`` whose ids come from ``get_group()``."""
+    for call in ast.walk(block):
+        if not (
+            isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Attribute)
+            and call.func.attr in _RECLAIM_METHODS
+        ):
+            continue
+        ids = [kw.value for kw in call.keywords if kw.arg == "ids"] or call.args[:1]
+        if any(_from_previous_group(arg, fn) for arg in ids):
+            return True
+    return False
+
+
+def _reclaims(
+    stmts: list[ast.stmt], fn: ast.AST, defs: dict[str, list[ast.AST]]
+) -> bool:
+    """The statements, or a helper they call, put the previous run's members
+    back into this run's group.
+
+    The ids passed to ``add_related_nodes`` / ``add_related_groups`` have to
+    come from the ``get_group()`` result: ids from anything else keep
+    nothing. The call may sit under a condition: the documented form
+    re-claims only when a previous group exists, and with no previous group
+    there is nothing to delete.
     """
     block = ast.Module(body=stmts, type_ignores=[])
-    if _calls_method(block, _RECLAIM_METHODS):
+    if _reclaim_calls_previous(block, fn):
         return True
     return any(
-        _calls_method(helper, _RECLAIM_METHODS)
+        _reclaim_calls_previous(helper, helper)
         for name in _called_names(block)
         for helper in defs.get(name, [])
     )
@@ -1338,19 +1391,19 @@ def _stmt_endings(
 
 
 def _branch_outcome(
-    stmts: list[ast.stmt], defs: dict[str, list[ast.AST]], reads_previous: bool
+    stmts: list[ast.stmt], fn: ast.AST, defs: dict[str, list[ast.AST]]
 ) -> str:
     """``"reclaim"``, ``"raise"``, ``"return"``, or ``"other"`` for a guard.
 
     ``reclaim``: the branch puts the previous run's members back into this
-    run's group, which needs the previous group read somewhere
-    (``reads_previous``). An ``add_related_nodes`` call fed by anything else
-    keeps nothing. ``raise``: every path through the branch raises.
-    ``return``: some path returns without either.
+    run's group, with ids from the ``get_group()`` result, and no path
+    through it raises. ``raise``: some path raises after a re-claim, or
+    every path raises; either way the run can fail. ``return``: some path
+    returns without either.
     """
-    if reads_previous and _reclaims(stmts, defs):
-        return "reclaim"
     ends = _endings(stmts, defs)
+    if _reclaims(stmts, fn, defs):
+        return "raise" if "raise" in ends else "reclaim"
     if ends == {"raise"}:
         return "raise"
     if "return" in ends:
@@ -1368,7 +1421,8 @@ def check_empty_input_raises(
     previous run tracked, and the cleanup is skipped only when generate()
     raises. A guard that returns early is still a run that saved nothing,
     unless it first re-claims the previous run's members
-    (``group_context.get_group()``, then ``add_related_nodes``).
+    (``group_context.get_group()``, then ``add_related_nodes`` with ids from
+    that group). A re-claim followed by a raise counts as a raise.
 
     With ``allow_raise=False`` (registered as ``empty-input-reclaims``) only
     the re-claim passes. That is the rule's answer when the user says the
@@ -1390,17 +1444,13 @@ def check_empty_input_raises(
     loop_keys = _loop_keys(functions, defs)
     if not loop_keys:
         return False, "generate() iterates no collection, so no guard can be bound to one"
-    reads_previous = _calls_method(tree, {"get_group"})
-
     kept = False
     for fn in functions:
         for node in _walk_outside_loops(fn):
             if isinstance(node, ast.Assert):
-                guard = _emptiness(node.test, fn)
-                if (
-                    guard is not None
-                    and guard[0] == "nonempty"
-                    and _subject_keys(guard[1], fn, defs) & loop_keys
+                if any(
+                    kind == "nonempty" and _subject_keys(subject, fn, defs) & loop_keys
+                    for kind, subject in _guards(node.test, fn)
                 ):
                     if not allow_raise:
                         return False, (
@@ -1412,8 +1462,14 @@ def check_empty_input_raises(
                 continue
             if not isinstance(node, ast.If):
                 continue
-            guard = _emptiness(node.test, fn)
-            if guard is None or not (_subject_keys(guard[1], fn, defs) & loop_keys):
+            guard = next(
+                (
+                    g for g in _guards(node.test, fn)
+                    if _subject_keys(g[1], fn, defs) & loop_keys
+                ),
+                None,
+            )
+            if guard is None:
                 continue
             kind = guard[0]
             if kind == "empty":
@@ -1422,7 +1478,13 @@ def check_empty_input_raises(
                 branch = node.orelse
             else:
                 continue
-            outcome = _branch_outcome(branch, defs, reads_previous)
+            outcome = _branch_outcome(branch, fn, defs)
+            if outcome == "return" and fn.name != "generate":
+                # A return in a helper ends the helper, not the run: the
+                # caller goes on, so it is not the early return this rule
+                # is about. A helper that does all the work and returns
+                # early still fails below, for want of a guard.
+                continue
             if outcome == "return":
                 return False, (
                     f"{fn.name}() returns early on empty input (line "

@@ -1450,6 +1450,14 @@ def test_empty_input_raises_is_registered():
         ("returns_early.py.txt", False, "returns early"),
         # Re-claims the previous run's members before returning: keeps them.
         ("compliant_reclaim.py.txt", True, "keeps the previous output"),
+        # Re-claims, then raises: the run fails, but the output is kept.
+        ("reclaim_then_raise.py.txt", True, "keeps the previous output"),
+        # get_group() is only logged; add_related_nodes gets the pod's id.
+        ("reclaim_unrelated_ids.py.txt", False, "returns early"),
+        ("compliant_or_guard.py.txt", True, "keeps the previous output"),
+        ("compliant_annotated_comprehension.py.txt", True, "keeps the previous output"),
+        # A helper's own `if not racks: return []` ends the helper, not the run.
+        ("compliant_helper_return.py.txt", True, "keeps the previous output"),
     ],
 )
 def test_empty_input_raises_fixtures(fixture, expected, reason):
@@ -1605,6 +1613,16 @@ def test_empty_input_reclaims_is_registered():
         ("returns_early.py.txt", False, "returns early"),
         ("violating.py.txt", False, "no guard that re-claims"),
         ("violating_near_miss.py.txt", False, "no guard that re-claims"),
+        # A re-claim followed by a raise still fails the run.
+        ("reclaim_then_raise.py.txt", False, "raises on empty input"),
+        # ids that do not come from the get_group() result keep nothing.
+        ("reclaim_unrelated_ids.py.txt", False, "returns early"),
+        # `not pod or not racks` is true when racks is empty.
+        ("compliant_or_guard.py.txt", True, "keeps the previous output"),
+        # Guard on an annotated name bound to a comprehension over the edges
+        # the loop iterates.
+        ("compliant_annotated_comprehension.py.txt", True, "keeps the previous output"),
+        ("compliant_helper_return.py.txt", True, "keeps the previous output"),
     ],
 )
 def test_empty_input_reclaims_fixtures(fixture, expected, reason):

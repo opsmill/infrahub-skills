@@ -108,7 +108,7 @@
       "assertions": [
         {
           "name": "empty-input-reclaims",
-          "check": "A guard outside any loop, in generate() or a helper it calls, tests a collection the generator loops over and, when it is empty, calls add_related_nodes or add_related_groups, with the previous group read by get_group(); no such guard raises, asserts, or returns without re-claiming."
+          "check": "A guard outside any loop, in generate() or a helper it calls, tests a collection the generator loops over and, when it is empty, calls add_related_nodes or add_related_groups with ids from the group get_group() returns; no such guard raises, asserts, or returns without re-claiming, and no path through the re-claim raises."
         },
         {
           "name": "preflight-or-upsert",
