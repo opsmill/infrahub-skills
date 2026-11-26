@@ -151,6 +151,12 @@ _KEEPS_OLD = {
         "but it fails from 1.7.",
         "Infrahub 1.6.0 and later: use `name__contains`. It is required from 1.7.0, which removed "
         "`name__like`. Before 1.6.0: `name__like`.",
+        # The pass fixture's gate, wrapped inside its second sentence.
+        "`name__contains` is available from Infrahub 1.6 and required from 1.7. Before\n"
+        "  1.7: `name__like` still works.",
+        # Replace wording in one clause does not void the clause that keeps the old filter.
+        "From 1.6, replace `name__like` with `name__contains`; it is required from 1.7. "
+        "Before 1.6: `name__like` still works.",
     ],
 )
 def test_keeps_old_guidance_accepts_a_clause_reaching_the_removal(gate):
@@ -172,6 +178,14 @@ def test_keeps_old_guidance_accepts_a_clause_reaching_the_removal(gate):
         "1.7 and later: `name__like` is removed, use `name__contains` (available from 1.6).",
         # The old guidance kept with no version at all.
         "From 1.6 use `name__contains`, required from 1.7. Earlier: `name__like`.",
+        # Tells the reader to drop the old filter, which SKILL.md step 6 forbids.
+        "Replace `name__like` with `name__contains` before 1.7 (available from 1.6).",
+        "Migrate from `name__like` to `name__contains` before 1.7 (available from 1.6).",
+        "Stop using `name__like` before 1.7; `name__contains` is available from 1.6.",
+        # "and below" includes 1.7, the release that removed the old filter.
+        "`name__contains` from 1.6. Infrahub 1.7 and below: `name__like`.",
+        # Two sentences on two lines are two clauses, so 1.6 is still uncovered.
+        "From 1.7: `name__contains`\nBefore 1.6: `name__like`",
     ],
 )
 def test_keeps_old_guidance_rejects_a_clause_that_stops_short(gate):

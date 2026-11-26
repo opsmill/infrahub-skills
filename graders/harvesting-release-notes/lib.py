@@ -60,16 +60,19 @@ _AFFECTED_RE = re.compile(r"(?P<path>[\w./-]+\.\w+):(?P<line>\d+)(?:-(?P<end>\d+
 # A note in brackets, such as "(shipped with infrahub-v1.12.0)", names the
 # release that carried the change, not a boundary.
 _BRACKETS_RE = re.compile(r"\([^)]*\)")
-# Words saying the old token stopped working. Only the text before the first
-# of them counts as keeping the old guidance, so "`name__like` was removed
-# before 1.7" keeps nothing, while "Before 1.6: `name__like` works, but fails
+# Words saying the old token stopped working, or telling the reader to move
+# off it. Only the text before the first of them counts as keeping the old
+# guidance, so "`name__like` was removed before 1.7" and "Replace `name__like`
+# before 1.7" keep nothing, while "Before 1.6: `name__like` works, but fails
 # from 1.7" still does.
 _GONE_WORDS = re.compile(
-    r"\b(removed|fails?|failed|no longer|dropped|unsupported|not (?:work|supported|available))\b",
+    r"\b(removed|fails?|failed|no longer|dropped|unsupported|not (?:work|supported|available)"
+    r"|replace[ds]?|migrate[ds]?|stop using|switch(?:es)? (?:from|to))\b",
     re.IGNORECASE,
 )
 # "Before 1.7" excludes 1.7 itself: the qualifier for the removal release.
-_BEFORE_WORDS = re.compile(r"\b(before|prior to|pre|until|below)\b|<(?!=)", re.IGNORECASE)
+# "below" is not one of them: "1.7 and below" includes 1.7.
+_BEFORE_WORDS = re.compile(r"\b(before|prior to|pre|until)\b|<(?!=)", re.IGNORECASE)
 # "1.6 and earlier" includes 1.6: the qualifier for the last release where the
 # old guidance still works.
 _INCLUSIVE_WORDS = re.compile(
@@ -309,6 +312,11 @@ def check_gate_boundaries(
 
 
 def _clauses(gate: str) -> list[str]:
+    # A line break before a lowercase word, a digit or a bracket is a wrap
+    # inside a sentence ("Before\n1.7: ..."), not a clause boundary. A line
+    # that starts a new sentence stays its own clause, so "From 1.7: new" and
+    # "Before 1.6: old" on two lines are not read as one clause.
+    gate = re.sub(r"(?<![.!?;:])\n(?=[a-z0-9(])", " ", gate)
     parts = re.split(r"\n|;|(?<=[.!?])\s+(?=[A-Z(`*])", gate)
     return [p.strip() for p in parts if p.strip()]
 
