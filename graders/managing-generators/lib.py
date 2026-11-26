@@ -2409,13 +2409,37 @@ _AGNOSTIC_KIND = "OpsAssetTag"
 _AWARE_KIND = "DcimDevice"
 
 
-def _saves_on(saves: list[ast.Call], names: set[str]) -> list[ast.Call]:
+def _saves_on(
+    saves: list[ast.Call], names: set[str], tree: ast.Module
+) -> list[ast.Call]:
+    """The saves whose receiver is one of ``names``.
+
+    A receiver that is a helper's parameter resolves to what its callers
+    pass, so ``async def _save(self, node): await node.save()`` called with
+    the tag is a save of the tag.
+    """
+    passed = _call_site_arguments(tree)
+    owner = _enclosing_function_names(tree)
     return [
         c for c in saves
         if isinstance(c.func, ast.Attribute)
         and isinstance(c.func.value, (ast.Name, ast.Attribute))
-        and ast.unparse(c.func.value) in names
+        and _node_names(c.func.value, owner.get(id(c)), passed, owner) & names
     ]
+
+
+def _answer_tree_without_negatives(output: dict) -> ast.Module | None:
+    """Like ``_answer_tree``, with labelled WRONG lines stripped per fence.
+
+    Stripping inside each fence, not across the answer, keeps a label from
+    swallowing the closing fence of its block.
+    """
+    raw = output.get("raw", "")
+    if not raw:
+        return _answer_tree(output)
+    blocks = [_strip_negative_examples(m.group(1)) for m in _PY_FENCE.finditer(raw)]
+    parseable = [b for b in blocks if _parse_python(b) is not None]
+    return _parse_python("\n\n".join(parseable))
 
 
 def check_agnostic_saves_opt_out(output: dict, **_: Any) -> tuple[bool, str]:
@@ -2435,18 +2459,18 @@ def check_agnostic_saves_opt_out(output: dict, **_: Any) -> tuple[bool, str]:
     the old prose. See dev/guidelines/rule-equals-test.md § "When no task
     can score the rule".
     """
-    tree = _answer_tree(output)
+    tree = _answer_tree_without_negatives(output)
     if tree is None:
         return False, "no parseable Python block found"
     if "generate" not in _function_defs(tree):
         return False, "No generate() method found"
 
     saves = _save_calls(tree)
-    aware_saves = _saves_on(saves, _vars_bound_to_kind(tree, _AWARE_KIND))
+    aware_saves = _saves_on(saves, _vars_bound_to_kind(tree, _AWARE_KIND), tree)
 
     created = _vars_bound_to_kind(tree, _AGNOSTIC_KIND, {"create", "upsert"})
     agnostic_vars = created | _vars_bound_to_kind(tree, _AGNOSTIC_KIND, {"get"})
-    agnostic_saves = _saves_on(saves, agnostic_vars)
+    agnostic_saves = _saves_on(saves, agnostic_vars, tree)
     tracked = [c for c in agnostic_saves if not _save_opts_out(c)]
     if tracked:
         return False, (
@@ -2463,7 +2487,7 @@ def check_agnostic_saves_opt_out(output: dict, **_: Any) -> tuple[bool, str]:
             and ast.unparse(c.func.value) not in agnostic_vars
             and c not in aware_saves
         })
-        if unresolved and not _calls_to(tree, {"add_relationships"}):
+        if unresolved:
             return False, (
                 f"the generator creates the {_AGNOSTIC_KIND}, and the save "
                 f"receiver(s) {unresolved} cannot be tied back to it"

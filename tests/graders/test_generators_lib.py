@@ -1770,6 +1770,11 @@ def test_agnostic_saves_opt_out_is_registered():
         ("violating.md", False, "saved without update_group_context=False"),
         # The opt-out sits on the branch-aware leaf; the tag stays tracked.
         ("violating_near_miss.md", False, "saved without update_group_context=False"),
+        # A labelled WRONG fence before the compliant one.
+        ("compliant_contrast.md", True, "stays out of the generator group"),
+        # Saved with the default through a helper, then attached with
+        # add_relationships(); the attach does not excuse the save.
+        ("violating_helper_save.md", False, "saved without update_group_context=False"),
     ],
 )
 def test_agnostic_saves_opt_out_fixtures(fixture, expected, reason):

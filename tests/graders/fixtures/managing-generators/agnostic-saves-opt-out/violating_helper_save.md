@@ -1,0 +1,19 @@
+Saves the tag through a shared helper with the default, then attaches it.
+
+```python
+from infrahub_sdk.generator import InfrahubGenerator
+
+
+class RackLeaf(InfrahubGenerator):
+    async def _save(self, node) -> None:
+        await node.save(allow_upsert=True)
+
+    async def generate(self, data: dict) -> None:
+        rack = data["LocationRack"]["edges"][0]["node"]
+        name = f"leaf-{rack['name']['value']}"
+        leaf = await self.client.create(kind="DcimDevice", data={"name": name, "rack": rack["id"]})
+        await leaf.save(allow_upsert=True)
+        tag = await self.client.create(kind="OpsAssetTag", data={"name": f"asset-{name}"})
+        await self._save(tag)
+        await leaf.add_relationships("tags", [tag.id])
+```
