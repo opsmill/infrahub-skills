@@ -1860,6 +1860,8 @@ def test_generator_run_names_branch_is_registered():
         ("violating_untagged_fence.txt", False, "does not select an Infrahub branch"),
         # A "# Never ..." comment above a run does not hide the run.
         ("violating_never_comment.md", False, "does not select an Infrahub branch"),
+        # `uv run echo infrahubctl ...` runs echo; the real run has no branch.
+        ("violating_echo_wrapper.md", False, "does not select an Infrahub branch"),
     ],
 )
 def test_generator_run_names_branch_fixtures(fixture, expected, reason):

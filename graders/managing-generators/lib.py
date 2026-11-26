@@ -2513,6 +2513,34 @@ _RUNNERS = {"env", "uv", "run", "uvx", "poetry"}
 _TRUE_VALUES = {"1", "true", "yes", "on", "y", "t"}
 
 
+# Runner options that take the next token as their value.
+_RUNNER_VALUE_OPTIONS = {
+    "--env-file", "--with", "--python", "-p", "--project", "--directory",
+    "--group", "--extra", "--package", "--from", "-u", "--unset", "-C",
+}
+
+
+def _is_launch_prefix(tokens: list[str]) -> bool:
+    """True if ``tokens`` only set variables or wrap the next command.
+
+    Assignments, runner words, their options and the values of options that
+    take one. Anything else is a command of its own, so in ``uv run echo
+    infrahubctl ...`` the run is ``echo``, not ``infrahubctl``.
+    """
+    expect_value = False
+    for tok in tokens:
+        if expect_value:
+            expect_value = False
+            continue
+        if tok in _RUNNERS or ("=" in tok and not tok.startswith("-")):
+            continue
+        if tok.startswith("-"):
+            expect_value = tok in _RUNNER_VALUE_OPTIONS
+            continue
+        return False
+    return True
+
+
 def _selects_branch(assignment: str) -> bool:
     """True if ``VAR=value`` points the run at a branch other than the default.
 
@@ -2613,7 +2641,7 @@ def check_generator_run_names_branch(output: dict, **_: Any) -> tuple[bool, str]
             # Strip `VAR=value` assignments, runner wrappers and their
             # options (`uv run --env-file .env`) before `infrahubctl`. An
             # env file's contents are not in the answer, so it names nothing.
-            if rest and ("=" in rest[0] or rest[0] in _RUNNERS) and "infrahubctl" in rest:
+            if "infrahubctl" in rest and _is_launch_prefix(rest[: rest.index("infrahubctl")]):
                 cut = rest.index("infrahubctl")
                 prefix, rest = rest[:cut], rest[cut:]
             if len(rest) < 2 or rest[0] != "infrahubctl" or rest[1] != "generator":
