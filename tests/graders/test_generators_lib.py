@@ -1840,6 +1840,14 @@ def test_generator_run_names_branch_is_registered():
         ("violating.md", False, "does not select an Infrahub branch"),
         # --branch only on --list, and a comment saying it is not needed.
         ("violating_near_miss.md", False, "does not select an Infrahub branch"),
+        # A labelled WRONG fence next to the RIGHT one, as the rules show it.
+        ("compliant_contrast.md", True, "selects its Infrahub branch"),
+        # false is the SDK default, so the run targets main.
+        ("violating_from_git_false.md", False, "does not select an Infrahub branch"),
+        # Behind `uv run --env-file`, next to a --branch on --list.
+        ("violating_env_file.md", False, "does not select an Infrahub branch"),
+        # A branchless run in an untagged fence, next to a correct run.
+        ("violating_untagged_fence.md", False, "does not select an Infrahub branch"),
     ],
 )
 def test_generator_run_names_branch_fixtures(fixture, expected, reason):

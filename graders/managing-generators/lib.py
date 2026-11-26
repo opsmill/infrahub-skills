@@ -2479,8 +2479,31 @@ def check_agnostic_saves_opt_out(output: dict, **_: Any) -> tuple[bool, str]:
     )
 
 
-_SHELL_FENCE = re.compile(r"```(?:bash|sh|shell|console|zsh)[ \t]*\n(.*?)```", re.DOTALL)
-_BRANCH_ENV = ("INFRAHUB_DEFAULT_BRANCH=", "INFRAHUB_DEFAULT_BRANCH_FROM_GIT=")
+# Every fenced block with its language tag; an untagged fence is read as
+# shell too. Matching every fence, not only shell ones, keeps the closing
+# ``` of a python fence from being read as the opening of an untagged one.
+_ANY_FENCE = re.compile(
+    r"^[ \t]*```([\w+-]*)[ \t]*\n(.*?)^[ \t]*```", re.DOTALL | re.MULTILINE
+)
+_SHELL_TAGS = {"", "bash", "sh", "shell", "console", "zsh"}
+_RUNNERS = {"env", "uv", "run", "uvx", "poetry"}
+# Values pydantic reads as true for the SDK's default_branch_from_git.
+_TRUE_VALUES = {"1", "true", "yes", "on", "y", "t"}
+
+
+def _selects_branch(assignment: str) -> bool:
+    """True if ``VAR=value`` points the run at a branch other than the default.
+
+    ``INFRAHUB_DEFAULT_BRANCH`` with any value names one.
+    ``INFRAHUB_DEFAULT_BRANCH_FROM_GIT`` does only when true; false is the
+    SDK default from 1.24.0, and the run then targets ``main``.
+    """
+    var, _, value = assignment.partition("=")
+    if var == "INFRAHUB_DEFAULT_BRANCH":
+        return bool(value)
+    if var == "INFRAHUB_DEFAULT_BRANCH_FROM_GIT":
+        return value.strip().lower() in _TRUE_VALUES
+    return False
 
 
 def _shell_lines(block: str) -> list[list[str]]:
@@ -2538,33 +2561,40 @@ def check_generator_run_names_branch(output: dict, **_: Any) -> tuple[bool, str]
     From infrahub-sdk 1.24.0 (Infrahub 1.12.0) a run with no branch uses
     ``INFRAHUB_DEFAULT_BRANCH``, ``main`` unless set, instead of the current
     Git branch. So a run counts when it passes ``--branch``, or carries an
-    ``INFRAHUB_DEFAULT_BRANCH=`` or ``INFRAHUB_DEFAULT_BRANCH_FROM_GIT=``
-    prefix, or follows an ``export`` of either in the same fence.
+    ``INFRAHUB_DEFAULT_BRANCH=<branch>`` or a true
+    ``INFRAHUB_DEFAULT_BRANCH_FROM_GIT`` prefix, or follows an ``export`` of
+    either in the same fence. Runner wrappers and their options before
+    ``infrahubctl`` (``uv run --env-file .env``) name no branch. Shell and
+    untagged fences are read; labelled WRONG examples are not.
     ``--list`` lists generators and runs nothing, so it does not count.
 
     No eval task wires this check (#238): the model answered correctly with
     the old prose. See dev/guidelines/rule-equals-test.md § "When no task
     can score the rule".
     """
-    blocks = [m.group(1) for m in _SHELL_FENCE.finditer(output.get("raw", ""))]
+    # Strip labelled WRONG lines inside each fence, which is how the rules
+    # lay out a contrast. Stripping the whole answer would drop a closing
+    # fence with the lines it labels and pair the wrong fences up.
+    blocks = [
+        _strip_negative_examples(m.group(2))
+        for m in _ANY_FENCE.finditer(output.get("raw", ""))
+        if m.group(1).lower() in _SHELL_TAGS
+    ]
     runs = 0
     for block in blocks:
         exported = False
         for tokens in _shell_lines(block):
-            if tokens[0] == "export" and any(
-                t.startswith(_BRANCH_ENV) for t in tokens[1:]
-            ):
+            if tokens[0] == "export" and any(_selects_branch(t) for t in tokens[1:]):
                 exported = True
                 continue
             prefix: list[str] = []
             rest = tokens
-            # Strip `VAR=value` assignments and runner wrappers before argv[0].
-            while rest and (
-                ("=" in rest[0] and not rest[0].startswith("-"))
-                or rest[0] in ("env", "uv", "run", "uvx", "poetry")
-            ):
-                prefix.append(rest[0])
-                rest = rest[1:]
+            # Strip `VAR=value` assignments, runner wrappers and their
+            # options (`uv run --env-file .env`) before `infrahubctl`. An
+            # env file's contents are not in the answer, so it names nothing.
+            if rest and ("=" in rest[0] or rest[0] in _RUNNERS) and "infrahubctl" in rest:
+                cut = rest.index("infrahubctl")
+                prefix, rest = rest[:cut], rest[cut:]
             if len(rest) < 2 or rest[0] != "infrahubctl" or rest[1] != "generator":
                 continue
             args = rest[2:]
@@ -2572,7 +2602,7 @@ def check_generator_run_names_branch(output: dict, **_: Any) -> tuple[bool, str]
                 continue
             runs += 1
             named = any(a == "--branch" or a.startswith("--branch=") for a in args)
-            named = named or exported or any(p.startswith(_BRANCH_ENV) for p in prefix)
+            named = named or exported or any(_selects_branch(p) for p in prefix)
             if not named:
                 return False, (
                     f"`{' '.join(rest)}` does not select an Infrahub branch; from "
