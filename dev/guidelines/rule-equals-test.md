@@ -293,18 +293,23 @@ logs.
   an earlier run put it in, and the next run deletes it.
   `generator-opt-out-existing-member` gave a generator that
   had saved a shared container for a year and asked for no
-  run to own it. Two prompts, one valid trial each. A first
+  run to own it. Two prompts, one valid trial. A first
   prompt, which mentioned that a decommissioned service's
   run could delete the container, scored 1.00. A second
   prompt without that hint scored 0.5, but the 0.5 came
   from the check: the model stopped writing the container
   and removed it from the group, and the check required an
-  opt-out save. With the check fixed the answer passes.
-  Both times the model read the SDK's cleanup code in the
-  sandbox, and the skill already gives the formula,
-  `previous_group.members - nodes_saved_this_run`. Step-4
-  reading: the model read the skill anyway, through that
-  formula. Only the score with the old prose was recorded.
+  opt-out save. The check was fixed and the same answer
+  passes it, but a score from a grader fault is void and
+  re-grading the answer is not a re-run, so that trial
+  does not count. Both times the model read the SDK's
+  cleanup code in the sandbox, and the skill already gives
+  the formula, `previous_group.members -
+  nodes_saved_this_run`. Step-4 reading: the model read the
+  skill anyway, through that formula. That reading needs
+  the before/after score on the same prompt and grader,
+  and only the score with the old prose was recorded, so
+  step 4 is not met for #240.
 - #241, cleanup deletes an object of a `branch: agnostic`
   kind on every branch. Two scenarios.
   - `generator-agnostic-kind-branch-run` showed the schema
