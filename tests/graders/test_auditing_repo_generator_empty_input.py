@@ -59,6 +59,12 @@ def _finding(**kw) -> dict:
             ]},
             True,
         ),
+        # A range that covers the target from both sides overlaps it.
+        ("range_covers", [_finding(line="5-12")], True),
+        # path:line:col reads the line, not the column.
+        ("line_and_column", [_finding(file="generators/pod_leaf.py:8:12")], True),
+        # Overlaps the target but spans most of the file: not bound to it.
+        ("range_too_wide", [_finding(line="9-200")], False),
         ("violating", [], False),
         # Right rule, right file, wrong construct: line 16 is the save().
         ("violating_near_miss", [_finding(line=16)], False),
@@ -77,4 +83,4 @@ def test_line_check_message_names_cited_lines():
         [_finding(line="16")], "python-classes", "pod_leaf.py", 8, 10
     )
     assert not ok
-    assert "[16]" in msg
+    assert "line(s) 16," in msg

@@ -1069,11 +1069,13 @@ def check_yagni_finding_replacement_mentions(
 _LINE_NUMBER = re.compile(r"(\d+)(?:\s*[-–]\s*(\d+))?")
 
 
-def _finding_lines(finding: dict) -> list[int]:
-    """Line numbers a finding cites, from ``line`` or a ``path:line`` file.
+def _finding_lines(finding: dict) -> list[tuple[int, int]]:
+    """Line ranges a finding cites, from ``line`` or a ``path:line`` file.
 
-    ``"12"``, ``12``, ``"12-14"`` and ``"generators/x.py:12"`` all count. A
-    range contributes both ends.
+    ``"12"``, ``12``, ``"12-14"``, ``"generators/x.py:12"`` and
+    ``"generators/x.py:12:5"`` all count. A single line is the range
+    ``(12, 12)``. In a ``path:line:col`` file the first number after the
+    path is the line; the column is ignored.
     """
     cited: list[str] = []
     line = finding.get("line")
@@ -1083,27 +1085,34 @@ def _finding_lines(finding: dict) -> list[int]:
         cited.append(line)
     file_ = str(finding.get("file", ""))
     if ":" in file_:
-        cited.append(file_.rsplit(":", 1)[1])
-    out: list[int] = []
+        cited.append(file_.split(":", 1)[1])
+    out: list[tuple[int, int]] = []
     for text in cited:
         m = _LINE_NUMBER.search(text)
         if m:
-            out.append(int(m.group(1)))
-            if m.group(2):
-                out.append(int(m.group(2)))
+            start = int(m.group(1))
+            end = int(m.group(2)) if m.group(2) else start
+            out.append((min(start, end), max(start, end)))
     return out
+
+
+# How many lines wider than the target a cited range may be. A range that
+# overlaps the target but spans most of the file does not point at the
+# construct, so it cannot bind the finding to it.
+_RANGE_SLACK = 5
 
 
 def check_finding_line_in_range(
     findings: list[dict], rule: str, substring: str, lo: int, hi: int
 ) -> tuple[bool, str]:
-    """Assert a ``rule`` finding on ``substring``'s file cites a line in
-    ``[lo, hi]``.
+    """Assert a ``rule`` finding on ``substring``'s file cites lines that
+    overlap ``[lo, hi]``.
 
     A file-level match passes a finding raised on the right file for the
     wrong reason. Pinning the cited line binds the finding to the construct
     the rule is about. A finding that cites no line cannot be bound and
-    fails.
+    fails. A cited range passes when it overlaps the target and is at most
+    ``_RANGE_SLACK`` lines wider than it.
     """
     on_file = [
         f for f in _find_all(findings, rule)
@@ -1111,12 +1120,18 @@ def check_finding_line_in_range(
     ]
     if not on_file:
         return False, f"no {rule} finding on a file matching {substring!r}"
-    cited = [n for f in on_file for n in _finding_lines(f)]
-    if any(lo <= n <= hi for n in cited):
-        return True, f"{rule} on {substring} cites a line in {lo}-{hi}"
+    cited = [r for f in on_file for r in _finding_lines(f)]
     if not cited:
         return False, f"{rule} on {substring} cites no line, so it cannot be tied to lines {lo}-{hi}"
-    return False, f"{rule} on {substring} cites line(s) {sorted(set(cited))}, none in {lo}-{hi}"
+    max_width = (hi - lo) + _RANGE_SLACK
+    for a, b in cited:
+        if a <= hi and b >= lo and b - a <= max_width:
+            return True, f"{rule} on {substring} cites lines {a}-{b}, which cover {lo}-{hi}"
+    shown = ", ".join(sorted({f"{a}" if a == b else f"{a}-{b}" for a, b in set(cited)}))
+    return False, (
+        f"{rule} on {substring} cites line(s) {shown}, none overlapping "
+        f"{lo}-{hi} within {_RANGE_SLACK} lines of its width"
+    )
 
 
 def check_yagni_no_finding_on_file(
