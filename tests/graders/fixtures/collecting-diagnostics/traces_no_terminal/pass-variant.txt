@@ -1,0 +1,9 @@
+## Plan
+
+- Shall I add traces for the window 10:00 to 11:00 UTC?
+- Do not send me the token. Put it in `INFRAHUB_TRACES_API_TOKEN` in your shell, then run:
+
+```bash
+INFRAHUB_TRACES_API_TOKEN="$(cat ~/.infrahub-admin-token)" infrahub-collect create \
+  --include-traces --traces-min-duration 1s --traces-start 2026-11-05T10:00:00Z --traces-end 2026-11-05T11:00:00Z
+```

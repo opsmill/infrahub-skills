@@ -23,7 +23,7 @@ on:
         description: "Concurrent trials per skill job"
         required: false
         type: number
-        default: 2
+        default: 1
       trials:
         description: "Trials per eval; overrides the preset's count (empty = preset)"
         required: false
@@ -56,7 +56,7 @@ on:
       parallel:
         description: "Concurrent trials per skill job"
         required: false
-        default: "2"
+        default: "1"
       trials:
         description: "Trials per eval; overrides the preset's count (empty = preset)"
         required: false
@@ -73,7 +73,11 @@ permissions:
 env:
   EVAL_MODEL: ${{ inputs.model || 'haiku' }}
   GRADER_MODEL: ${{ inputs.grader_model || 'claude-haiku-4-5' }}
-  EVAL_PARALLEL: ${{ inputs.parallel || 2 }}
+  # One trial at a time per job: skillgrade writes every trial's prompt to the
+  # same /tmp/.prompt.md, so two concurrent trials can empty each other's
+  # prompt and one exits with "Input must be provided". Jobs run on separate
+  # runners, so max-parallel below is unaffected.
+  EVAL_PARALLEL: ${{ inputs.parallel || 1 }}
   EVAL_TRIALS: ${{ inputs.trials }}
   EVAL_THRESHOLD: ${{ inputs.threshold }}
 
@@ -141,7 +145,8 @@ jobs:
     needs: discover
     if: needs.discover.outputs.has-skills == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    # Sized for EVAL_PARALLEL=1: the longest smoke job ran 42 min at 2.
+    timeout-minutes: 120
     strategy:
       matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
       fail-fast: false

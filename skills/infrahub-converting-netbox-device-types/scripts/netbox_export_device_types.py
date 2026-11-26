@@ -15,7 +15,7 @@ object templates::
 
 This is **not** a sync. It is a one-way snapshot into files you can read,
 diff, and keep. Continuous replication between a live NetBox and Infrahub is
-`infrahub-sync <https://docs.infrahub.app/sync/>`_, a separate product.
+infrahub-sync, a separate product.
 
 Reading through pynetbox
 ------------------------

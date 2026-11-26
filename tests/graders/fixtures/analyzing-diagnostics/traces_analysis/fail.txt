@@ -1,0 +1,6 @@
+## Report
+
+Manifest first (bundle_information.json): the traces collector succeeded with 35 traces.
+
+Start Tempo and Grafana, load the folder `bundle/traces/`, and search for traces longer than 1s
+in the window 08:45-08:55 to see what was slow.

@@ -9,7 +9,7 @@ description: >-
   in any opsmill/infrahub-* project (SDK, Ansible, VS Code, MCP, Helm, schema-library, sync, backup, nornir, skills).
   DO NOT TRIGGER when: the user wants to fix the bug themselves locally, write a test, or debug code without filing.
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 
@@ -238,7 +238,7 @@ For features, skip this step. For bugs, collect
   component.
 
 That's it. **Do not** collect file paths, project
-structure, logs verbatim, env dumps, `docker
+structure, logs verbatim, environment variable dumps, `docker
 compose ps` output, or anything that could leak
 internal state. The
 [environment-info-sanitization rule](rules/environment-info-sanitization.md)

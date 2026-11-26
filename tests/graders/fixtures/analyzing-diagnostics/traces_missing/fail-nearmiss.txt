@@ -1,0 +1,7 @@
+## Report
+
+The manifest (bundle_information.json) lists logs, metrics and benchmark, and no traces.
+
+The logs show two slow GraphQL queries and no error. There is no need for `--include-traces`
+with `--traces-start` and `--traces-end` here: collect a new bundle with
+infrahub-collecting-diagnostics and `--include-queries` instead.

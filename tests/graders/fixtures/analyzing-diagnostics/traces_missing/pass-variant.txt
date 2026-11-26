@@ -1,0 +1,10 @@
+## Report
+
+The manifest (bundle_information.json) lists logs, metrics and benchmark, and no traces.
+
+- The logs show two slow GraphQL queries (27.41 s and 22.08 s) and no error.
+- The benchmark is healthy.
+
+Next bundle: ask the user, through the infrahub-collecting-diagnostics skill, to run
+`infrahub-collect create --include-traces --traces-start=2026-11-15T14:00:00Z --traces-end=2026-11-15T15:30:00Z`,
+so the traces show which service and which query took the time.

@@ -1,1 +1,0 @@
-The skill-change pipeline's entrance stages now search other branches for an open pull request, or a merged one missing from the local tree, that already covers the change, and record the result in a required `Duplicate check` handoff field.

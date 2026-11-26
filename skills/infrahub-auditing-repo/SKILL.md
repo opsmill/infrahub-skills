@@ -4,10 +4,11 @@ description: >-
   Audits an Infrahub repository against best practices and rules, producing a structured compliance report.
   TRIGGER when: reviewing repo for compliance, onboarding to existing project, pre-deployment validation, catching issues.
   DO NOT TRIGGER when: creating schemas, writing checks/generators, querying live data, populating objects, planning an Infrahub version upgrade (use infrahub-planning-upgrades).
+  ALWAYS pass the user's request verbatim as args, with any scope, path, or focus they named. This skill runs in a forked context and cannot see the parent conversation.
 context: fork
 argument-hint: "[focus-area]"
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: OpsMill
 ---
 
@@ -39,11 +40,14 @@ for read-only inspection, not for changing state;
 
 ## Project Context
 
-Project structure:
-!`find . -maxdepth 2 -type f \( -name "*.yml" -o -name "*.yaml" -o -name "*.py" -o -name "*.gql" -o -name "*.j2" \) 2>/dev/null | head -40`
+Before auditing, look at the project with read-only
+tools:
 
-Infrahub config:
-!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
+- List the `.yml`, `.yaml`, `.py`, `.gql`, and `.j2`
+  files in the project root and the directories directly
+  below it, at most 40 paths.
+- Read `.infrahub.yml` if it exists. If it does not,
+  note that in the report.
 
 ## When to Use
 

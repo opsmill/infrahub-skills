@@ -95,46 +95,12 @@ def check_my_assertion(schema: dict, **_) -> tuple[bool, str]:
     return True, "Concise success message"
 ```
 
-Add the function and register it in `CHECKS`. Keep
-the check **deterministic** — no LLM grading, no
-network calls. Inspect the parsed YAML structure and
-return a hard pass/fail.
-
-If the rule cuts across multiple skills (rare),
-duplicate the check function in each affected
-`graders/<skill>/lib.py` rather than hoisting to a
-shared module — the skills are deliberately
-independently owned. Rules that belong to
-`infrahub-common` itself grade from
-`graders/common/`.
-
-#### Parse the answer; never substring-match it
-
-`"x" in text` is the reflexive first draft, and it is
-the commonest way a check goes wrong: it passes an
-answer that merely mentions the trap and fails a
-correct answer that words it differently. Parse the
-artifact instead:
-
-| Artifact | Parse with |
-| -------- | ---------- |
-| Schema / object / menu YAML | `yaml.safe_load`, then walk the structure |
-| Python (checks, generators, transforms) | `ast` — see `graders/managing-generators/lib.py` |
-| Shell commands | `shlex.split`; never split on `[;\|&]`, which fabricates segments inside quotes |
-| Prose reports | locate the section, then rank evidence — see below |
-
-Three failure modes follow from matching raw text:
-
-- **Comments and docstrings count as code.** Strip
-  them before asserting, or a `# WRONG:` contrast
-  block in the answer satisfies the check meant to
-  fail it.
-- **Only the first fence gets graded.** Extract every
-  fenced block, and accept an answer whose entire
-  output is fenced.
-- **Adjacency is not structure.** A verb next to a
-  path does not mean the command ran against that
-  path.
+Add the function and register it in `CHECKS`. What
+the check may and may not do (determinism, parsing
+instead of substring matching, reading commands out of
+Markdown, failing closed) is in
+[graders.md](../guidelines/graders.md), which loads
+when you open the file.
 
 #### Why ranking evidence beats listing phrasings
 
@@ -242,8 +208,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import run_checks  # noqa: E402
 
 CHECKS = [
-    "schema-version",
     "<assertion-name-from-CHECKS>",
+    "schema-version",
     # ... other related baseline checks
 ]
 
@@ -251,10 +217,12 @@ if __name__ == "__main__":
     print(json.dumps(run_checks(CHECKS, Path("output.yml"))))
 ```
 
-Bundle the new assertion with related baseline
-assertions (schema version, naming, etc.) so the
-grader catches regressions in unrelated rules within
-the same task.
+Baseline checks catch regressions in neighbouring
+rules, but the score is the share of checks passed, so
+with five or more checks the new assertion can fail and
+the task still pass. Keep the task at four checks or
+fewer, or gate it where the library supports a gate; see
+[graders.md](../guidelines/graders.md#task-grader-scripts).
 
 For `infrahub-auditing-repo` yagni-* rules, don't add a
 new bespoke script — wire the shared parameterized
@@ -268,34 +236,11 @@ carve-out checks the parameterized grader can't express
 ### 5. Verify the Grader Both Ways
 
 A check is wrong in two directions, and the obvious
-compliant/violating pair catches neither. Hand-craft
-**four** fixtures and run the grader on each:
-
-| Fixture | Expected |
-| ------- | -------- |
-| Compliant, written the way the rule shows | 1.0 |
-| Compliant, refactored the way the check's traversal is vulnerable to | 1.0 |
-| Violating, obviously | < 1.0 |
-| Violating **near-miss** — satisfies the check's keyword while breaking the rule | < 1.0 |
-
-The last of each pair is the one that finds bugs:
-
-- **False fail.** A correct answer scores < 1.0. Vary
-  what the check actually reads, not the cosmetics. If
-  it walks the AST for call order, extract the calls
-  into a helper; if it reads a comparison in a test
-  position, hoist it into a variable; if it keys on a
-  node name, put two relationships on one node. Field
-  order and synonyms exercise nothing. Write out the
-  answer the rule's own example shows too, and watch
-  whether it passes.
-- **Laundering.** A violating answer scores 1.0
-  because it mentions the right word, imports the
-  right module, or names the right helper somewhere
-  in the file. Ask what the smallest edit is that
-  makes the violating fixture pass — if a comment or
-  a bare string is enough, the check grades
-  vocabulary, not substance.
+compliant/violating pair catches neither. The four
+fixtures, what each must vary, and where to commit
+them are in
+[graders.md](../guidelines/graders.md#verify-both-directions).
+To try them before committing:
 
 ```bash
 mkdir -p /tmp/grader-test/{pass,pass-variant,fail,fail-nearmiss}
@@ -308,24 +253,52 @@ for d in pass pass-variant fail fail-nearmiss; do
 done
 ```
 
-Check the failure message too: it has to name the
-assertion that actually broke. A check that cannot
-fail is worse than no check — it reports the rule as
-covered forever.
+A check that cannot fail is worse than no check: it
+reports the rule as covered forever.
 
 ### 6. Sweep the Layers the Rule Contradicts
 
 If the rule corrects something the repo said before,
-the prose layer is not the only place the old claim
-lives. Grep the whole tree and fix every hit in the
-same change — except `evaluations/`, which step 7
-regenerates from `eval.yaml` rather than taking
-hand edits:
+or adds a capability or exception to something the repo
+states as absolute, the prose layer is not the only
+place the old claim lives. This is the one sweep command; every other page
+and skill that sweeps points here. Fix every hit in the same
+change, except `evaluations/`, which step 7 regenerates
+from `eval.yaml`:
 
 ```bash
-grep -rn "<old claim, command, or field>" \
-  skills/ graders/ eval.yaml dev/ .agents/skills/
+grep -rn "<term>" skills/ graders/ eval.yaml tests/ \
+  scripts/ dev/ .agents/skills/ AGENTS.md README.md docs/docs/
 ```
+
+Run it once per term, and pick terms from the concept,
+not from the wording of the file you started in. A grep
+for one file's phrasing finds only the files that
+already agree with it. Use three kinds of term:
+
+- the bare concept word (`replace`, not the full
+  sentence you found);
+- the opposite wording of the claim;
+- when the fix extends a list, a member already on it,
+  since a copy of the list never names the new one;
+- when the change adds a capability or exception, the
+  absolutes it breaks (`only`, `never`, `no other`,
+  `does not need`), in the skill, its docs page, and
+  the rule's frontmatter `description`.
+
+Then read every rule the changed one links to, and every
+rule linking to it. A linked rule that now says the
+opposite contains none of your terms. Read the rest of
+the changed file too: its "What NOT to flag" list, its
+verdict table, and its examples can contradict the new
+text without sharing a word with it. When the rule adds
+a second input path (a pasted excerpt instead of a
+bundle), walk that path through every later `SKILL.md`
+step and every check of the task.
+
+Then re-run each check that grades the changed rule
+against the answers the rule now allows, per
+[rule-equals-test.md](../guidelines/rule-equals-test.md#when-the-grader-and-the-rule-disagree-decide-which-side-moves).
 
 The hits that get missed are the ones outside
 `skills/`: a grader still asserting a command the
@@ -350,24 +323,24 @@ job runs `sync-evals.py` and fails the pull request on
 any diff under `evaluations/`, so a stale JSON is a red
 build rather than silent drift.
 
-### 8. Run a Smoke Pass
+### 8. Run the Task
 
 ```bash
-skillgrade --smoke
+skillgrade --eval=<task-name> --trials=1
 ```
 
-A passing smoke run with your new rule means the AI
-follows the rule reliably under the skill's current
-prose. If smoke fails:
+A passing run means the AI follows the rule under the
+skill's current prose. `skillgrade --smoke` runs the
+whole suite and is rarely the question a single rule
+asks. If the task fails:
 
 - Re-read the rule file. If the *why* is buried, the
   AI may not internalize it.
 - Add a concrete example to the rule. Models learn
   from examples more reliably than from abstract
   imperatives.
-- Check whether the rule conflicts with another
-  rule in the same skill — sometimes a new rule
-  contradicts an example elsewhere.
+- Check whether the sweep in step 6 missed a rule
+  in the same skill that still says the opposite.
 
 ## Required Files Checklist
 
@@ -398,13 +371,12 @@ prose. If smoke fails:
   pytest under `tests/` asserting our reference
   against the upstream surface in both directions
   takes its place
-- [ ] Grader run against all four fixtures, including
-  the compliant variant and the violating
-  near-miss
-- [ ] Old claims the rule contradicts swept from
-  `skills/`, `graders/`, `eval.yaml`, `dev/` and
-  `.agents/skills/`
+- [ ] All four fixtures committed as accept and reject
+  cases in `tests/graders/test_<skill>_lib.py`
+- [ ] Old claims the rule contradicts swept with the
+  step 6 command
 - [ ] `python scripts/sync-evals.py` run and the
   regenerated `evaluations/*.json` committed
-- [ ] `skillgrade --smoke` passes (or smoke failures
-  inform a rule rewrite before merging)
+- [ ] `skillgrade --eval=<task-name> --trials=1`
+  passes (or its failure informs a rule rewrite
+  before merging)

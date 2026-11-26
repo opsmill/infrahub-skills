@@ -462,7 +462,12 @@ def check_sandbox_safety(ws: Path) -> tuple[bool, str]:
 
 
 def learner_kinds(ws: Path) -> set[str]:
-    """The node kinds declared in the learner's own schema files.
+    """The node kinds declared in the learner's own schema files."""
+    return {f"{namespace}{name}" for namespace, name in _learner_nodes(ws)}
+
+
+def _learner_nodes(ws: Path) -> set[tuple[str, str]]:
+    """(namespace, name) of each node and generic in the learner's schema files.
 
     The rule is "teach through the learner's artifacts", so the kinds
     come from those artifacts. A literal tuple here would be a second
@@ -470,9 +475,12 @@ def learner_kinds(ws: Path) -> set[str]:
     the check would grade names the learner no longer has. Same
     discipline as known_slugs().
     """
-    kinds: set[str] = set()
+    nodes: set[tuple[str, str]] = set()
     for path in sorted(ws.rglob("*.y*ml")):
-        if LEARNING_DIR in path.parts:
+        # A trial directory also holds the graders and the installed skills,
+        # whose fixtures declare kinds the learner never wrote; counting them
+        # credits a lesson that names a fixture's kind instead of the learner's.
+        if set(path.relative_to(ws).parts) & {LEARNING_DIR, *_NOT_LEARNER_DIRS}:
             continue
         try:
             parsed = yaml.safe_load(path.read_text())
@@ -485,9 +493,67 @@ def learner_kinds(ws: Path) -> set[str]:
                 if not isinstance(node, dict):
                     continue
                 name, namespace = node.get("name"), node.get("namespace")
-                if name and namespace:
-                    kinds.add(f"{namespace}{name}")
-    return kinds
+                if isinstance(name, str) and isinstance(namespace, str) and name and namespace:
+                    nodes.add((namespace, name))
+    return nodes
+
+
+_NOT_LEARNER_DIRS = ("graders", ".claude", ".agents")
+
+
+_MARKER_WORDS = ("node", "kind", "object", "generic")
+
+
+def _short_name_uses(explain: str, nodes: set[tuple[str, str]]) -> list[str]:
+    """The learner nodes that Explain names by their short name.
+
+    The rule names each node by its full kind (`TestbedSensor`, not
+    `Sensor`). A short name counts when it is in backticks or in bold
+    ("each `Sensor` sits in one `Zone`", "your **Zone**"), or plain next to
+    "node", "kind", "object" or "generic" ("your Zone node", "kind: Zone").
+
+    Two uses do not count:
+
+    - A sentence that also names the full kind of that node, so the contrast
+      the rule itself writes ("`TestbedZone`, not `Zone`") passes.
+    - A short name given as the value of `name` ("the `name` (`Sensor`)",
+      "`name: Sensor`"), which an attributes lesson needs.
+
+    A short name that is itself one of the marker words (`Generic` in
+    `LocationGeneric`) is skipped: "**Generic nodes**" is not a node name.
+    """
+    kinds = {f"{namespace}{name}" for namespace, name in nodes}
+    full_kinds: dict[str, set[str]] = {}
+    for namespace, name in nodes:
+        if name not in kinds and name.lower() not in _MARKER_WORDS:
+            full_kinds.setdefault(name, set()).add(f"{namespace}{name}")
+    mark = r"[`*_]*"
+    word = rf"(?i:{'|'.join(_MARKER_WORDS)})s?"
+    used: set[str] = set()
+    # A sentence ends at a sentence ender followed by whitespace, or at a
+    # blank line. It may wrap across lines.
+    for sentence in re.split(r"(?<=[.!?])\s+|\n\s*\n", explain):
+        for name, fulls in full_kinds.items():
+            if any(
+                re.search(rf"(?<![A-Za-z0-9_]){re.escape(full)}(?![A-Za-z0-9_])", sentence)
+                for full in fulls
+            ):
+                continue
+            short = re.escape(name)
+            # Drop the short name where it is the value of `name`.
+            rest = re.sub(
+                rf"\bname[`*_]*\s*(?:[:=]|\bis\b)?\s*[(\"'`*_]*{short}(?![A-Za-z0-9])",
+                "name",
+                sentence,
+            )
+            if re.search(
+                rf"`{short}`|\*\*{short}\*\*|__{short}__"
+                rf"|(?<![A-Za-z0-9]){mark}{short}{mark}\s+{word}\b"
+                rf"|\b{word}(?:\s+|\s*:\s*)(?:(?i:called|named)\s+)?{mark}{short}{mark}(?![A-Za-z0-9])",
+                rest,
+            ):
+                used.add(name)
+    return sorted(used)
 
 
 def check_own_artifacts(ws: Path) -> tuple[bool, str]:
@@ -507,12 +573,19 @@ def check_own_artifacts(ws: Path) -> tuple[bool, str]:
             "no learner schema file in the workspace; grounding cannot be "
             "graded without the artifacts it is supposed to ground in"
         )
+    nodes = _learner_nodes(ws)
     for lesson in found:
         explain = sections(lesson.read_text()).get("Explain", "")
         if not any(k in explain for k in kinds):
             return False, (
                 f"{lesson.name}: Explain names none of the learner's kinds "
                 f"{sorted(kinds)}; it teaches through an invented example"
+            )
+        short = _short_name_uses(explain, nodes)
+        if short:
+            return False, (
+                f"{lesson.name}: Explain names learner nodes by their short "
+                f"name {short}, not by their full kind"
             )
     return True, f"every Explain anchored to the learner's own kinds: {sorted(kinds)}"
 
@@ -553,13 +626,21 @@ def check_graduation_pointer(ws: Path) -> tuple[bool, str]:
     return True, "graduation pointer present"
 
 
-CONCEPT_MAP = (
-    Path(__file__).resolve().parents[2]
-    / "skills"
-    / "infrahub-teaching-concepts"
-    / "references"
-    / "concept-map.md"
-)
+def _skill_dir(name: str) -> Path:
+    """The copy of skill `name` this grader can read.
+
+    The repository keeps skills under skills/. A skillgrade trial has no
+    skills/ at its root: it copies them into .claude/skills/ and
+    .agents/skills/, so a path built from skills/ alone crashes every trial.
+    """
+    root = Path(__file__).resolve().parents[2]
+    for base in ("skills", ".claude/skills", ".agents/skills"):
+        if (root / base / name).is_dir():
+            return root / base / name
+    return root / "skills" / name
+
+
+CONCEPT_MAP = _skill_dir("infrahub-teaching-concepts") / "references" / "concept-map.md"
 _MAP_ROW = re.compile(r"^\|\s*\d+\s*\|\s*([a-z][a-z0-9-]*)\s*\|")
 
 

@@ -27,6 +27,8 @@ The extension registers four hooks against the core Spec Kit skills. All four fi
 | `before_implement` | Before `/speckit.implement` runs its tasks | Re-invokes the matching skill for each artifact type in `tasks.md` |
 | `after_implement` | After `/speckit.implement` finishes | Checks the finished cycle for evidence that a skill's own guidance had a gap, and offers to report it |
 
+The `before_specify` hook does not call the [Model Designer](./skills-reference/designing-models.mdx) yet. Until it does, run the Model Designer yourself before `/speckit.specify` when the design is not settled, and give `/speckit.specify` the feature's `Handoff` cell from the brief, which names the brief and the feature ID.
+
 All three `before_*` hooks halt with install guidance when the Infrahub skills are not present, and `before_specify` also halts when the instance is unreachable. The `after_implement` hook never halts: implementation is already done, so a missing skill, an error, or an ambiguous read all degrade to a no-op line rather than disrupting finished work.
 
 ## Skill-gap detection after implement

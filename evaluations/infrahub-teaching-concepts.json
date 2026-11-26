@@ -156,7 +156,7 @@
       "assertions": [
         {
           "name": "own-artifacts",
-          "check": "Explain is anchored to at least one node kind from the learner's own schema file"
+          "check": "Explain is anchored to at least one node kind from the learner's own schema file, and uses no short name as the name of a learner node, unless the same sentence names the full kind"
         },
         {
           "name": "structured-lessons",

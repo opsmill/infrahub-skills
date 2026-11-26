@@ -38,7 +38,16 @@ left to the tool allowlist.
 ### What to do
 
 - Operate on bundle files (`Read`, `Grep`, `Glob`)
-  and GitHub search; write only the report.
+  and GitHub search; write only the report. The
+  only sources outside the bundle are public
+  references: the issues of `opsmill/infrahub`
+  (`gh search issues`, `gh issue view`, or the issue
+  page when `gh` is not available) and
+  `docs.infrahub.app` on a real gap. Do not query or
+  start any service that holds deployment data, not
+  even a local one: no Tempo, Grafana, Prometheus,
+  Loki, or Infrahub API. What the bundle lacks goes
+  into the recommendations as a richer next bundle.
 - Put remediation in the report as
   *recommendations*, each grounded in a finding —
   for the user or OpsMill support to act on.

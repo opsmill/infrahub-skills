@@ -1,0 +1,13 @@
+## Report
+
+Manifest first (bundle_information.json): the traces collector succeeded with 35 traces.
+
+The slowest database query in `bundle/traces/0001-6c26f0d2e9c893ed614173cb81d8d534.json` is
+`account_token_validate` on infrahub-server (9.6 ms), and the POST on infrahub-server took
+19.7 ms. The API is the bottleneck.
+
+```bash
+jq '.resourceSpans[].scopeSpans[].spans[] | select(.name == "Sync Git Repositories")' \
+  bundle/traces/0001-6c26f0d2e9c893ed614173cb81d8d534.json
+# Sync Git Repositories, infrahub-task-worker, 10.74 s
+```

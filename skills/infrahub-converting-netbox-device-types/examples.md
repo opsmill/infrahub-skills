@@ -152,14 +152,13 @@ spec:
 
 ## 2. A whole vendor directory
 
-Clone sparsely — the elevation images make a full
-clone 1.6 GB, against about 60 MB for the definitions alone.
+Fetch only the definitions from the library, as step 3
+of [SKILL.md](SKILL.md) describes. The elevation images
+make a full copy 1.6 GB, against about 60 MB for the
+definitions alone. Then point the converter at a vendor
+directory under `devicetype-library/device-types/`:
 
 ```bash
-git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/netbox-community/devicetype-library.git
-cd devicetype-library && git sparse-checkout set device-types && cd ..
-
 python "$SKILL/scripts/netbox_to_infrahub_templates.py" \
   devicetype-library/device-types/Juniper/ \
   --mapping "$SKILL/scripts/mappings/schema-library.yml" \
