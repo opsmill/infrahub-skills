@@ -462,3 +462,42 @@ def test_affected_path_stays_inside_the_workspace(tmp_path):
     ok, msg = _mod.check_affected_paths_exist(text, root=root)
     assert not ok
     assert "outside the workspace" in msg
+
+
+@pytest.mark.parametrize(
+    "affected",
+    [
+        "graders/harvesting-release-notes/lib.py:3",
+        "graders/harvesting-release-notes/check_deprecation_removal.py:3",
+    ],
+)
+def test_affected_path_in_this_tasks_grader_fails(tmp_path, affected):
+    """skillgrade puts graders/ in the sandbox, and this task's grader names
+    the old filter. A finding that cites it read the grader."""
+    report = _workspace(tmp_path, "pass")
+    for name in ("lib.py", "check_deprecation_removal.py"):
+        target = tmp_path / "graders" / "harvesting-release-notes" / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("one\ntwo\nname__like\n")
+    text = report.read_text().replace(
+        "skills/acme-querying-inventory/rules/filters.md:9",
+        f"skills/acme-querying-inventory/rules/filters.md:9, {affected}",
+    )
+    ok, msg = _mod.check_affected_paths_exist(text, root=tmp_path)
+    assert not ok
+    assert "this task's own grader" in msg
+
+
+def test_affected_path_in_another_grader_passes(tmp_path):
+    """A grader for a shipped skill can encode the old behavior too, and
+    step 3 asks for it in Affected."""
+    report = _workspace(tmp_path, "pass")
+    target = tmp_path / "graders" / "common" / "lib.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("one\ntwo\nname__like\n")
+    text = report.read_text().replace(
+        "skills/acme-querying-inventory/rules/filters.md:9",
+        "skills/acme-querying-inventory/rules/filters.md:9, graders/common/lib.py:3",
+    )
+    ok, msg = _mod.check_affected_paths_exist(text, root=tmp_path)
+    assert ok, msg

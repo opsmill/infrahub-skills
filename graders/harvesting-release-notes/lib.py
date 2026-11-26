@@ -28,6 +28,8 @@ import re
 from pathlib import Path
 
 REPORT_FILE = "REPORT.md"
+# Where this grader sits in the repository and in the skillgrade sandbox.
+_OWN_GRADER_DIR = "graders/harvesting-release-notes"
 
 FIELDS = (
     "repository",
@@ -216,16 +218,23 @@ def check_finding_fields_present(text: str, **_) -> tuple[bool, str]:
 def check_affected_paths_exist(text: str, root: Path, **_) -> tuple[bool, str]:
     """Every passage a finding names exists in the workspace, at a line the
     file has. A change that touches no passage is not a finding, so a finding
-    for one has to name a file or a line that is not there."""
+    for one has to name a file or a line that is not there.
+
+    skillgrade copies all of graders/ into the sandbox, so a search of
+    graders/ finds this task's own grader, which names the old filter. A
+    finding that cites it read the grader, and the trial is void."""
     findings = _findings(text)
     if not findings:
         return False, "No findings to check"
     base = root.resolve()
+    own_grader = (root / _OWN_GRADER_DIR).resolve()
     for i, finding in enumerate(findings, start=1):
         for path, start, end in _affected_spans(finding.get("affected", "")):
             target = (root / path).resolve()
             if not target.is_relative_to(base):
                 return False, f"Finding {i} names {path}, which is outside the workspace"
+            if target.is_relative_to(own_grader):
+                return False, f"Finding {i} names {path}, this task's own grader; the trial is void"
             if not target.is_file():
                 return False, f"Finding {i} names {path}, which does not exist"
             if start < 1 or end < start:
