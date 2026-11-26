@@ -1623,6 +1623,10 @@ def test_empty_input_reclaims_is_registered():
         # the loop iterates.
         ("compliant_annotated_comprehension.py.txt", True, "keeps the previous output"),
         ("compliant_helper_return.py.txt", True, "keeps the previous output"),
+        # The previous group is passed into the helper that re-claims it.
+        ("compliant_helper_param.py.txt", True, "keeps the previous output"),
+        # Same helper, handed the pod instead of the previous group.
+        ("reclaim_helper_unrelated_arg.py.txt", False, "returns early"),
     ],
 )
 def test_empty_input_reclaims_fixtures(fixture, expected, reason):

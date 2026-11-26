@@ -1286,22 +1286,38 @@ def _calls_method(node: ast.AST, names: set[str]) -> bool:
     )
 
 
-def _from_previous_group(expr: ast.AST, fn: ast.AST, depth: int = 3) -> bool:
-    """``expr`` reads the result of a ``get_group()`` call, directly or
-    through local names bound in ``fn``."""
+def _from_previous_group(
+    expr: ast.AST,
+    fn: ast.AST,
+    depth: int = 3,
+    params: dict[str, tuple[ast.expr, ast.AST]] | None = None,
+) -> bool:
+    """``expr`` reads the result of a ``get_group()`` call, directly, through
+    local names bound in ``fn``, or through a parameter of ``fn`` whose
+    argument at the call site (``params``) reads it in the caller."""
     if _calls_method(expr, {"get_group"}):
         return True
     if depth <= 0:
         return False
     for node in ast.walk(expr):
         if isinstance(node, ast.Name):
+            if params and node.id in params:
+                arg, caller = params[node.id]
+                if _from_previous_group(arg, caller, depth - 1):
+                    return True
             value = _assigned_value(node.id, fn)
-            if value is not None and _from_previous_group(value, fn, depth - 1):
+            if value is not None and _from_previous_group(
+                value, fn, depth - 1, params
+            ):
                 return True
     return False
 
 
-def _reclaim_calls_previous(block: ast.AST, fn: ast.AST) -> bool:
+def _reclaim_calls_previous(
+    block: ast.AST,
+    fn: ast.AST,
+    params: dict[str, tuple[ast.expr, ast.AST]] | None = None,
+) -> bool:
     """A re-claim call under ``block`` whose ids come from ``get_group()``."""
     for call in ast.walk(block):
         if not (
@@ -1311,7 +1327,7 @@ def _reclaim_calls_previous(block: ast.AST, fn: ast.AST) -> bool:
         ):
             continue
         ids = [kw.value for kw in call.keywords if kw.arg == "ids"] or call.args[:1]
-        if any(_from_previous_group(arg, fn) for arg in ids):
+        if any(_from_previous_group(arg, fn, params=params) for arg in ids):
             return True
     return False
 
@@ -1331,11 +1347,30 @@ def _reclaims(
     block = ast.Module(body=stmts, type_ignores=[])
     if _reclaim_calls_previous(block, fn):
         return True
-    return any(
-        _reclaim_calls_previous(helper, helper)
-        for name in _called_names(block)
-        for helper in defs.get(name, [])
-    )
+    for call in ast.walk(block):
+        if not isinstance(call, ast.Call):
+            continue
+        for name in _called_names(ast.Expr(value=call))[:1]:
+            for helper in defs.get(name, []):
+                params = _call_params(call, helper, fn)
+                if _reclaim_calls_previous(helper, helper, params):
+                    return True
+    return False
+
+
+def _call_params(
+    call: ast.Call, helper: ast.AST, caller: ast.AST
+) -> dict[str, tuple[ast.expr, ast.AST]]:
+    """Map ``helper``'s parameters to the arguments ``call`` passes, so a
+    previous group handed to a helper can be traced back to ``caller``."""
+    names = [a.arg for a in helper.args.posonlyargs + helper.args.args]
+    if names and names[0] in ("self", "cls"):
+        names = names[1:]
+    bound = {n: (arg, caller) for n, arg in zip(names, call.args)}
+    for kw in call.keywords:
+        if kw.arg is not None:
+            bound[kw.arg] = (kw.value, caller)
+    return bound
 
 
 def _endings(
