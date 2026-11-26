@@ -155,9 +155,11 @@ await container.save(allow_upsert=True)   # claims it
 ```
 
 ```python
-# RIGHT. The same write, opted out of the run's tracking
-# group, so neither run claims the container and neither
-# run's cleanup can remove it.
+# RIGHT, for a container no earlier run saved. The same
+# write, opted out of the run's tracking group, so neither
+# run claims the container. If an earlier run saved it,
+# also remove it from the group: see "An object an earlier
+# run already claimed" below.
 container = await self.client.create(
     kind="NetContainer", data={"name": "shared-trunk"},
 )
@@ -166,7 +168,9 @@ await container.save(allow_upsert=True, update_group_context=False)
 
 The trade is in the second comment: nothing cleans it up
 either. [Three ways to honour it](#three-ways-to-honour-it)
-below covers the other options.
+below covers the other options, and
+[An object an earlier run already claimed](#an-object-an-earlier-run-already-claimed)
+covers a container an earlier run already saved.
 
 ### The failure is a refusal, not a changed output set
 

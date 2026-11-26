@@ -59,4 +59,4 @@ Generators run automatically when a design object in their target group changes.
 infrahubctl generator <generator-name> --branch=<branch>
 ```
 
-Pass `--branch` to choose the Infrahub branch. From Infrahub 1.12, a run without it uses `INFRAHUB_DEFAULT_BRANCH` (`main` unless set), not your current Git branch.
+Pass `--branch` to choose the Infrahub branch. From infrahub-sdk 1.24.0 (Infrahub 1.12), a run without it uses `INFRAHUB_DEFAULT_BRANCH` (`main` unless set), not your current Git branch. Set `INFRAHUB_DEFAULT_BRANCH_FROM_GIT=true` to use the Git branch again.
