@@ -2591,36 +2591,170 @@ def _positional_or_kw(call: ast.Call, index: int, name: str) -> ast.AST | None:
     return value
 
 
-def _names_bound_to_generator_group(tree: ast.Module) -> set[str]:
-    """Names assigned from ``get_group()`` or a ``CoreGeneratorGroup`` get."""
-    names: set[str] = set()
+# The SDK tracks a run in a CoreGeneratorGroup, or in a
+# CoreGeneratorAwareGroup when the definition sets execute_after_merge to
+# false (infrahub_sdk/generator.py, v1.24.0).
+_GENERATOR_GROUP_KINDS = {"CoreGeneratorGroup", "CoreGeneratorAwareGroup"}
+
+
+def _bindings(tree: ast.Module) -> Iterator[tuple[list[ast.expr], ast.expr]]:
+    """``(targets, value)`` of every assignment, ``:=`` included."""
     for stmt in ast.walk(tree):
-        if not isinstance(stmt, (ast.Assign, ast.AnnAssign)):
-            continue
-        value = stmt.value
+        if isinstance(stmt, ast.Assign):
+            yield stmt.targets, stmt.value
+        elif isinstance(stmt, ast.AnnAssign) and stmt.value is not None:
+            yield [stmt.target], stmt.value
+        elif isinstance(stmt, ast.NamedExpr):
+            yield [stmt.target], stmt.value
+
+
+def _names_bound_to_generator_group(tree: ast.Module) -> set[str]:
+    """Names bound to this run's generator group.
+
+    ``group_context.get_group()`` returns it. A ``get`` of a generator
+    group kind counts too, unless a filter is a string literal: a literal
+    name cannot follow the target, so it names some other group.
+    """
+    names: set[str] = set()
+    for targets, value in _bindings(tree):
         if isinstance(value, ast.Await):
             value = value.value
         if not (isinstance(value, ast.Call) and isinstance(value.func, ast.Attribute)):
             continue
         attr = value.func.attr
-        if attr == "get_group" or (
-            attr == "get" and _kind_of_call(value) == "CoreGeneratorGroup"
-        ):
-            targets = stmt.targets if isinstance(stmt, ast.Assign) else [stmt.target]
+        by_get = (
+            attr == "get"
+            and _kind_of_call(value) in _GENERATOR_GROUP_KINDS
+            and not any(
+                kw.arg != "kind"
+                and isinstance(kw.value, ast.Constant)
+                and isinstance(kw.value.value, str)
+                for kw in value.keywords
+            )
+        )
+        if attr == "get_group" or by_get:
             for tgt in targets:
                 names.update(_target_names(tgt))
     return names
 
 
-def _removes_group_members(call: ast.Call) -> bool:
-    """``<x>.remove_relationships("members", [<ids>])``, with ids given."""
+def _call_site_arguments(tree: ast.Module) -> dict[tuple[str, str], list[ast.expr]]:
+    """``(function, parameter)`` mapped to the arguments its callers pass.
+
+    Covers ``f(...)`` and ``self.f(...)`` calls, positional and keyword, so
+    a value handed to a helper can be traced back to the caller's name.
+    """
+    params: dict[str, list[str]] = {}
+    for name, fns in _function_defs(tree).items():
+        args = fns[0].args
+        names = [a.arg for a in args.posonlyargs + args.args]
+        if names and names[0] in ("self", "cls"):
+            names = names[1:]
+        params[name] = names
+    out: dict[tuple[str, str], list[ast.expr]] = {}
+    for call in _iter_calls(tree):
+        func = call.func
+        if isinstance(func, ast.Name):
+            fn = func.id
+        elif (
+            isinstance(func, ast.Attribute)
+            and isinstance(func.value, ast.Name)
+            and func.value.id in ("self", "cls")
+        ):
+            fn = func.attr
+        else:
+            continue
+        if fn not in params:
+            continue
+        for param, arg in zip(params[fn], call.args):
+            out.setdefault((fn, param), []).append(arg)
+        for kw in call.keywords:
+            if kw.arg in params[fn]:
+                out.setdefault((fn, kw.arg), []).append(kw.value)
+    return out
+
+
+def _enclosing_function_names(tree: ast.Module) -> dict[int, str]:
+    """``id(node)`` mapped to the name of the function that contains it."""
+    out: dict[int, str] = {}
+    for fn in ast.walk(tree):
+        if isinstance(fn, _FUNCS):
+            for sub in ast.walk(fn):
+                out[id(sub)] = fn.name
+    return out
+
+
+def _node_names(
+    expr: ast.expr,
+    fn: str | None,
+    passed: dict[tuple[str, str], list[ast.expr]],
+    owner: dict[int, str],
+    depth: int = 10,
+) -> set[str]:
+    """The names a node reference resolves to: ``x`` and ``x.id`` give ``x``.
+
+    A parameter of ``fn`` resolves to whatever its callers pass, followed
+    through each caller in turn, so a node released through a chain of
+    helpers is still tied to the variable ``generate()`` holds.
+    """
+    if isinstance(expr, ast.Attribute) and expr.attr == "id":
+        expr = expr.value
+    name = ast.unparse(expr)
+    if depth and fn is not None and isinstance(expr, ast.Name) and (fn, name) in passed:
+        out: set[str] = set()
+        for arg in passed[(fn, name)]:
+            out |= _node_names(arg, owner.get(id(arg)), passed, owner, depth - 1)
+        return out
+    return {name}
+
+
+def _opted_out_names(tree: ast.Module) -> set[str]:
+    """Names of nodes the run writes without claiming, or no longer writes.
+
+    A receiver of ``save(update_group_context=False)`` or of
+    ``add_relationships()``, or a name bound by a ``get``, that has no
+    tracked save anywhere in the answer.
+    """
+    saves = _save_calls(tree)
+    tracked = {
+        ast.unparse(c.func.value) for c in saves
+        if isinstance(c.func, ast.Attribute) and not _save_opts_out(c)
+    }
+    names = {
+        ast.unparse(c.func.value) for c in saves
+        if isinstance(c.func, ast.Attribute) and _save_opts_out(c)
+    }
+    names |= {
+        ast.unparse(c.func.value) for c in _calls_to(tree, {"add_relationships"})
+    }
+    for targets, value in _bindings(tree):
+        if isinstance(value, ast.Await):
+            value = value.value
+        if (
+            isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Attribute)
+            and value.func.attr == "get"
+            and _kind_of_call(value) not in _GENERATOR_GROUP_KINDS
+        ):
+            for tgt in targets:
+                names.update(_target_names(tgt))
+    return names - tracked
+
+
+def _removed_members(call: ast.Call) -> list[ast.expr] | None:
+    """The nodes ``<x>.remove_relationships("members", ...)`` removes.
+
+    None when the call is not a removal from ``members``.
+    """
     relation = _positional_or_kw(call, 0, "relation_to_update")
     if not (isinstance(relation, ast.Constant) and relation.value == "members"):
-        return False
+        return None
     nodes = _positional_or_kw(call, 1, "related_nodes")
     if nodes is None:
-        return False
-    return not (isinstance(nodes, (ast.List, ast.Tuple, ast.Set)) and not nodes.elts)
+        return None
+    if isinstance(nodes, (ast.List, ast.Tuple, ast.Set)):
+        return list(nodes.elts)
+    return [nodes]
 
 
 def check_opt_out_releases_existing_member(
@@ -2640,7 +2774,10 @@ def check_opt_out_releases_existing_member(
     from ``generate()``: cleanup reads the group after ``generate()``
     returns, so a removal during the run is in time. The receiver has to be
     the generator group: a name bound to ``group_context.get_group()``, or
-    to a ``get`` of kind ``CoreGeneratorGroup``.
+    to a ``get`` of kind ``CoreGeneratorGroup`` or
+    ``CoreGeneratorAwareGroup`` with no literal name filter. The removed
+    node has to be one the run opted out, directly or through a helper's
+    parameter.
 
     No eval task wires this check (#240): the model answered correctly with
     the old prose. See dev/guidelines/rule-equals-test.md § "When no task
@@ -2656,13 +2793,22 @@ def check_opt_out_releases_existing_member(
     reachable = _reachable_functions(tree, depth=sum(len(v) for v in defs.values()))
     calls = [c for fn in reachable for c in _iter_calls(fn)]
     groups = _names_bound_to_generator_group(tree)
-    removes = any(
-        isinstance(c.func, ast.Attribute)
-        and c.func.attr == "remove_relationships"
-        and ast.unparse(c.func.value) in groups
-        and _removes_group_members(c)
-        for c in calls
-    )
+    opted_out = _opted_out_names(tree)
+    passed = _call_site_arguments(tree)
+    owner = _enclosing_function_names(tree)
+    removes = False
+    for c in calls:
+        if not (
+            isinstance(c.func, ast.Attribute)
+            and c.func.attr == "remove_relationships"
+            and ast.unparse(c.func.value) in groups
+        ):
+            continue
+        removed = _removed_members(c) or []
+        fn = owner.get(id(c))
+        if any(_node_names(e, fn, passed, owner) & opted_out for e in removed):
+            removes = True
+            break
     if not removes:
         return False, (
             "the object is no longer owned by the run but never removed from "

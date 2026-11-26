@@ -1674,6 +1674,14 @@ def test_opt_out_releases_existing_member_is_registered():
         ("violating.md", False, "never removed from the generator group"),
         # remove_relationships on the container's children, not the group's members.
         ("violating_near_miss.md", False, "never removed from the generator group"),
+        # The group bound with `:=`.
+        ("compliant_walrus.md", True, "removed from the generator group"),
+        # execute_after_merge false: the run's group is a CoreGeneratorAwareGroup.
+        ("compliant_aware_group.md", True, "removed from the generator group"),
+        # Removes a node the run still tracks, not the opted-out trunk.
+        ("violating_wrong_node.md", False, "never removed from the generator group"),
+        # Removes the trunk from a group fetched by a literal name.
+        ("violating_unrelated_group.md", False, "never removed from the generator group"),
     ],
 )
 def test_opt_out_releases_existing_member_fixtures(fixture, expected, reason):
@@ -1920,7 +1928,7 @@ def test_opt_out_releases_existing_member_rejects_unrelated_group():
 def test_opt_out_releases_existing_member_accepts_generator_group_get():
     ok, msg = check_opt_out_releases_existing_member(_md(
         "await trunk.save(update_group_context=False)\n"
-        "group = await self.client.get(kind='CoreGeneratorGroup', name__value='g')\n"
+        "group = await self.client.get(kind='CoreGeneratorGroup', name__value=self.group_name)\n"
         "await group.remove_relationships('members', [trunk.id])"
     ))
     assert ok, msg
