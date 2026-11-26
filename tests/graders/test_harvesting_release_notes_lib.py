@@ -154,6 +154,11 @@ _KEEPS_OLD = {
         # The pass fixture's gate, wrapped inside its second sentence.
         "`name__contains` is available from Infrahub 1.6 and required from 1.7. Before\n"
         "  1.7: `name__like` still works.",
+        # The old filter wrapped onto the line after its qualifier.
+        "`name__contains` is available from Infrahub 1.6 and required from 1.7.\n"
+        "  Before 1.7:\n  `name__like` still works.",
+        # "Below" in front of a version excludes it, like "before".
+        "From 1.6: `name__contains`, required from 1.7. Below 1.7: `name__like`.",
         # Replace wording in one clause does not void the clause that keeps the old filter.
         "From 1.6, replace `name__like` with `name__contains`; it is required from 1.7. "
         "Before 1.6: `name__like` still works.",

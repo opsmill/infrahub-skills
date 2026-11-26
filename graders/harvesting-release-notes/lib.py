@@ -76,8 +76,11 @@ _GONE_WORDS = re.compile(
     re.IGNORECASE,
 )
 # "Before 1.7" excludes 1.7 itself: the qualifier for the removal release.
-# "below" is not one of them: "1.7 and below" includes 1.7.
-_BEFORE_WORDS = re.compile(r"\b(before|prior to|pre|until)\b|<(?!=)", re.IGNORECASE)
+# "below" counts only in front of a version: "below 1.7" excludes 1.7, while
+# "1.7 and below" includes it.
+_BEFORE_WORDS = re.compile(
+    r"\b(before|prior to|pre|until)\b|\bbelow(?=\s+(?:infrahub-)?v?\d)|<(?!=)", re.IGNORECASE
+)
 # "1.6 and earlier" includes 1.6: the qualifier for the last release where the
 # old guidance still works.
 _INCLUSIVE_WORDS = re.compile(
@@ -332,10 +335,11 @@ def check_gate_boundaries(
 
 def _clauses(gate: str) -> list[str]:
     # A line break before a lowercase word, a digit or a bracket is a wrap
-    # inside a sentence ("Before\n1.7: ..."), not a clause boundary. A line
+    # inside a sentence ("Before\n1.7: ..." or "Before 1.7:\n`name__like`",
+    # whose ticks are already stripped), not a clause boundary. A line
     # that starts a new sentence stays its own clause, so "From 1.7: new" and
     # "Before 1.6: old" on two lines are not read as one clause.
-    gate = re.sub(r"(?<![.!?;:])\n(?=[a-z0-9(])", " ", gate)
+    gate = re.sub(r"(?<![.!?;])\n(?=[a-z0-9(])", " ", gate)
     parts = re.split(r"\n|;|(?<=[.!?])\s+(?=[A-Z(`*])", gate)
     return [p.strip() for p in parts if p.strip()]
 
