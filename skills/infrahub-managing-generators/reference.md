@@ -54,7 +54,7 @@ class MyGenerator(InfrahubGenerator):
 | --------- | ---- | ------- | ----------- |
 | `query` | `str` | required | GraphQL query name from `.infrahub.yml` |
 | `client` | `InfrahubClient` | required | Tracking-enabled SDK client |
-| `branch` | `str` | `""` | Branch the run is targeting (auto-detected from git) |
+| `branch` | `str` | `""` | Branch the run is targeting. infrahub-sdk 1.24.0 and later (Infrahub 1.12 and later): the branch passed with `--branch`, otherwise `INFRAHUB_DEFAULT_BRANCH` (`main` unless set); `INFRAHUB_DEFAULT_BRANCH_FROM_GIT=true` restores the Git lookup. Before 1.24.0: the current Git branch |
 | `root_directory` | `str` | `""` | Repo root path on disk |
 | `params` | `dict` | `None` | Query parameters (resolved from `targets`/`parameters`) |
 | `convert_query_response` | `bool` | `False` | Populate `self.nodes` with `InfrahubNode` objects |
@@ -152,7 +152,7 @@ event loop until a watchdog timeout.
 | ---- | --------- | ------------ |
 | `await obj.save(allow_upsert=True)` | Yes, on every save | Without it, the second run errors out the first time it sees an object that already exists, and the rest of `generate()` never runs. |
 | `self.client` (the tagged client) | Yes | Writes via the bare client bypass the tracking group *by accident*; the cleanup pass can't see those objects on the next run, so they accumulate as orphans. Leaving the group on purpose is the next row, not this one. |
-| `update_group_context=False` on a save | Only for an object the run does not own | The deliberate opt-out, per save. Every `save()` claims the node for the run's tracking group — an upsert just as much as a create — so an object two targets can both reach gets deleted when one of them stops writing it. Opting out is the correct fix there, not a bypass. See [rules/tracking-idempotent.md](./rules/tracking-idempotent.md#the-ownership-test). |
+| `update_group_context=False` on a save | Only for an object the run does not own | The deliberate opt-out, per save. Every `save()` claims the node for the run's tracking group — an upsert just as much as a create — so an object two targets can both reach gets deleted when one of them stops writing it. Opting out is the correct fix there, not a bypass. An object an earlier run already saved stays in the group after the switch, and the next run deletes it, so remove it from the group in the same change ([details](./rules/tracking-idempotent.md#an-object-an-earlier-run-already-claimed)). See [rules/tracking-idempotent.md](./rules/tracking-idempotent.md#the-ownership-test). |
 | Stable resource identifiers | Strongly recommended | When allocating from pools (IPs, prefixes), pass a stable `identifier=` so re-runs reuse the same allocation instead of grabbing a new one each time. |
 
 Bare client (`self._init_client`) and sync wrappers
@@ -214,7 +214,7 @@ via `member_of_groups: [...]` — see
 
 ```bash
 # Run a generator against a target object
-infrahubctl generator pop_topology design=pop-par-01
+infrahubctl generator pop_topology design=pop-par-01 --branch=my-branch
 
 # Listing generators registered in .infrahub.yml
 infrahubctl generator --list
@@ -224,7 +224,11 @@ Local runs share the tracking group with pipeline
 runs, so a successful local run reconciles state the
 same way the pipeline would — including the
 delete-unused-nodes cleanup. Test on a branch first
-unless you're sure the generator won't delete data.
+unless you're sure the generator won't delete data. A
+branch run does not protect objects of a
+`branch: agnostic` kind: cleanup deletes them on every
+branch at once, including the default branch
+([tracking-idempotent.md](rules/tracking-idempotent.md#how-tracking-works)).
 
 See [rules/testing-commands.md](./rules/testing-commands.md)
 for the parameter-binding details and

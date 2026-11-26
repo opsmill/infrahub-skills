@@ -284,6 +284,124 @@ fixtures stay in
 `tests/graders/test_auditing_repo_generator_empty_input.py`,
 guarding the check.
 
+Taken three more times in one change, for three corrections
+to `skills/infrahub-managing-generators/` found in the
+Infrahub 1.12.0 release notes: #240, #241 and #238. Each
+had a task built for it, run with the skill read and the
+old prose in place. Every valid trial scored 1.00, and the
+model reached the answer by a different route each time.
+Three more trials timed out at 300 s and are void. Which
+task each of them belonged to is not known from the kept
+logs.
+
+- #240, an object opted out of tracking stays in the group
+  an earlier run put it in, and the next run deletes it.
+  `generator-opt-out-existing-member` gave a generator that
+  had saved a shared container for a year and asked for no
+  run to own it. Three prompts.
+  - A first prompt, which mentioned that a decommissioned
+    service's run could delete the container, scored 1.00
+    on one trial.
+  - A second prompt without that hint scored 0.5, but the
+    0.5 came from the check: the model stopped writing the
+    container and removed it from the group, and the check
+    required an opt-out save. A score from a grader fault is
+    void, and re-grading the answer is not a re-run, so that
+    trial does not count. That prompt was not kept.
+  - A third prompt rebuilt the second for a before/after
+    run: the generator in a workspace file,
+    `generators/service_legs.py`, saving `shared-trunk` on
+    every service's run, and a user asking that no
+    service's run own the trunk any more, with no hint about
+    deletion. Three trials with the #240 prose removed
+    scored 1.00 three times, and three trials with it scored
+    1.00 three times, graded by
+    `opt-out-releases-existing-member`. No trial read the
+    grader. With the old prose every answer read the SDK's
+    cleanup code and applied the skill's formula,
+    `previous_group.members - nodes_saved_this_run`. With
+    the new prose none read the SDK.
+
+    A first run of the old-prose set is void: removing the
+    #240 commit left a comment that points to the new
+    section, so the old prose still told the model to
+    remove the container from the group. Its one 0.00 was
+    also a grader fault: the check does not follow a
+    removal by a local alias such as `trunk_id = trunk.id`.
+
+  Step-4 reading: the model read the skill anyway, through
+  that formula and the SDK source. The before/after score
+  on the same prompt and grader is 1.00 and 1.00, which
+  meets step 4 and shows the prose does not change the
+  score.
+- #241, cleanup deletes an object of a `branch: agnostic`
+  kind on every branch. Two scenarios.
+  - `generator-agnostic-kind-branch-run` showed the schema
+    in the prompt and a user planning a branch run. One
+    valid trial, 1.00. The model opted the agnostic kind
+    out and said the skill does not mention branch-agnostic
+    nodes.
+  - That reading is "the task measures the model", so the
+    prompt was hardened: `generator-agnostic-tag` put the
+    schema in a workspace file, `schemas/dcim.yml`, with
+    `branch: agnostic` among the other fields, and named no
+    branch run. It asked for a leaf switch per rack plus an
+    asset tag that finance must not lose before the change
+    that retires the leaf is merged. That constraint is met
+    by a tracked save for a branch-aware kind, so only the
+    `branch: agnostic` line calls for the opt-out. Three
+    trials with the #241 prose removed scored 1.00 three
+    times, and three trials with it scored 1.00 three times,
+    graded by `agnostic-saves-opt-out`. No trial read the
+    grader. Every answer explained, with the old prose,
+    that a branch run deletes an agnostic tag on every
+    branch.
+
+    A first run of both sets used a check that dropped the
+    code after any comment starting with a word such as
+    "Fail", and it scored one trial with the new prose 0.00
+    on a correct answer. Those six trials are void, and the
+    check was fixed before the second run.
+
+  Step-4 reading: the task measures the model, and
+  hardening does not change that. The precondition for
+  the bug is a kind marked `branch: agnostic`, and a model
+  that sees that marking knows a delete of it is global.
+- #238, the generator's branch no longer comes from Git.
+  `generator-local-run-branch` asked for the commands to
+  run a generator on the user's branch. One valid trial,
+  1.00. The model passed `--branch`, as
+  `testing-commands.md` and `testing-integration.md`
+  already do, so the wrong rows in the two reference tables
+  lost to the skill's own examples. Step-4 reading: the
+  defect is not model behaviour. The rule corrects drift in
+  two reference tables against infrahub-sdk 1.24.0.
+
+The mechanism differs, but the result is the same: the
+prose was wrong or missing, and the task that sets up the
+precondition hands the model the answer through the SDK
+source, its training, or a sibling example. The
+reference-drift pytest does not fit #238 either, for the
+reason given for #239: the repo pins infrahub-sdk 1.23.2.
+The five tasks (`generator-opt-out-existing-member` twice,
+the second time with the rebuilt #240 prompt,
+`generator-agnostic-kind-branch-run`, `generator-agnostic-tag`
+and `generator-local-run-branch`) and their grader scripts
+were removed.
+
+The check functions `opt-out-releases-existing-member`,
+`agnostic-saves-opt-out` and `generator-run-names-branch`
+were removed too, with their fixtures and tests. This
+section keeps a check only when it is sound, and these
+three were neither used nor shown sound. No task runs
+them, since neither the #240 nor the #241 task could tell
+the old prose from the new. Each of three review rounds
+found new ways a correct answer failed or a wrong one
+passed, and the last before/after run found one more:
+the check for issue 240 missed a removal by a local
+alias. A future task for these rules would need a check
+written for its own prompt.
+
 The reference-drift remedy was taken once, for
 `skills/infrahub-managing-schemas/rules/relationship-on-delete.md`
 (#190). The rule said an omitted `on_delete` defaults to

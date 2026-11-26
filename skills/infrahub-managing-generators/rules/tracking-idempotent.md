@@ -39,7 +39,15 @@ more here than in checks or transforms.
 1. Objects created/updated during `generate()` are tracked
 2. Objects from a previous run that are NOT created/updated
    in the current run are automatically deleted
-3. This ensures idempotent behavior: re-running a generator
+3. When the deleted object's kind is `branch: agnostic`
+   ([branch-agnostic nodes](../../infrahub-managing-schemas/rules/attribute-branch-agnostic.md)),
+   the delete applies to every branch at once, including the
+   default branch, even when the generator runs on another
+   branch. A branch run does not protect it. An object of
+   such a kind that must outlive the generator producing it
+   stays out of the group, by one of the
+   [three ways to honour it](#three-ways-to-honour-it)
+4. This ensures idempotent behavior: re-running a generator
    cleans up stale objects
 
 ### A run that saves nothing deletes the previous output
@@ -147,9 +155,11 @@ await container.save(allow_upsert=True)   # claims it
 ```
 
 ```python
-# RIGHT. The same write, opted out of the run's tracking
-# group, so neither run claims the container and neither
-# run's cleanup can remove it.
+# RIGHT, for a container no earlier run saved. The same
+# write, opted out of the run's tracking group, so neither
+# run claims the container. If an earlier run saved it,
+# also remove it from the group: see "An object an earlier
+# run already claimed" below.
 container = await self.client.create(
     kind="NetContainer", data={"name": "shared-trunk"},
 )
@@ -158,7 +168,9 @@ await container.save(allow_upsert=True, update_group_context=False)
 
 The trade is in the second comment: nothing cleans it up
 either. [Three ways to honour it](#three-ways-to-honour-it)
-below covers the other options.
+below covers the other options, and
+[An object an earlier run already claimed](#an-object-an-earlier-run-already-claimed)
+covers a container an earlier run already saved.
 
 ### The failure is a refusal, not a changed output set
 
@@ -201,9 +213,9 @@ wrong. That is the quieter of the two possible failures.
    await container.save(allow_upsert=True, update_group_context=False)
    ```
 
-   The node is written and **not** added to the run's
-   group, so no run can reclaim it. Note this also means
-   nothing cleans it up: that is the trade.
+   The node is written and **not** added to this run's
+   group. Note this also means nothing cleans it up: that
+   is the trade.
 3. **Write it with `add_relationships()`**, which does not
    enter the group at all:
 
@@ -214,8 +226,8 @@ wrong. That is the quieter of the two possible failures.
    ```
 
    The method goes straight to a server-side RelationshipAdd
-   and never calls the group context, so no run claims the
-   node. It takes **no** `update_group_context` parameter:
+   and never calls the group context, so this run does not
+   claim the node. It takes **no** `update_group_context` parameter:
    passing one raises `TypeError`. Same trade as option 2,
    nothing cleans the node up. See
    [python-concurrent-relationship-writes.md](python-concurrent-relationship-writes.md).
@@ -225,6 +237,31 @@ else, so it wins over the client's tracking mode (the
 `is not False` guard). `.save()` claims the node for the
 run's tracking group after create or update;
 `add_relationships()` does not touch the group at all.
+
+### An object an earlier run already claimed
+
+All three options keep the object out of *this* run's
+members. None removes it from the group, where an earlier
+run's ordinary `save()` put it. Cleanup deletes the group's
+previous members that this run did not track, so on an
+existing generator the first run with the change deletes
+the object the change was meant to protect.
+
+Remove the object from the group in the same change, during
+the run:
+
+```python
+group = await self.client.group_context.get_group()
+if group and container.id in group.members.peer_ids:
+    await group.remove_relationships(
+        relation_to_update="members", related_nodes=[container.id]
+    )
+```
+
+Cleanup reads the group after `generate()` returns, so a
+removal during the run is in time. The group is per target,
+so each target's run removes the object from its own group.
+Once every target has run, the step does nothing.
 
 ### Audit the saves you can reach, not the ones you can see
 
@@ -266,6 +303,9 @@ Verified against infrahub-sdk 1.24.0, including a run that
 saves nothing (see
 [A run that saves nothing deletes the previous output](#a-run-that-saves-nothing-deletes-the-previous-output)).
 Before 1.24.0 a run that saved nothing skipped cleanup.
+The removal step for an object an earlier run claimed is
+verified against the SDK source only, in 1.24.0 and in the
+SDK bundled with Infrahub 1.11.12.
 
 Reference:
 [registration-config.md](registration-config.md),
