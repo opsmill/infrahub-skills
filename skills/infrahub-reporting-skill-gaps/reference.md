@@ -38,9 +38,11 @@ Instead, in this order:
 
 1. Use the current conversation. It needs no discovery
    and is the source for nearly every report.
+
 2. If the user points at a past session, ask them for
    the file or directory unless you already know where
    your own runtime writes session logs.
+
 3. If you do know, search across all of that
    directory's project folders rather than one derived
    path: a single repo spread over worktrees or clones
