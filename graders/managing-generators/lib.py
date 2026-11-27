@@ -1060,6 +1060,501 @@ def check_no_raw_create_without_handler(
 
 
 # ---------------------------------------------------------------------------
+# Empty-input guard (output.py)
+# ---------------------------------------------------------------------------
+#
+# From infrahub-sdk 1.24.0 a generator run that saves nothing deletes every
+# object the previous run with the same parameters tracked. The tracking
+# context only reconciles the group when generate() exits without an
+# exception, so the guard has to raise: returning early is a run that saved
+# nothing.
+
+_LOOPS = (ast.For, ast.AsyncFor, ast.While)
+_FUNCS = (ast.FunctionDef, ast.AsyncFunctionDef)
+
+
+def _function_defs(tree: ast.Module) -> dict[str, list[ast.AST]]:
+    """Every function or method in the module, by name."""
+    out: dict[str, list[ast.AST]] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, _FUNCS):
+            out.setdefault(node.name, []).append(node)
+    return out
+
+
+def _walk_outside_loops(fn: ast.AST) -> Iterator[ast.AST]:
+    """Walk ``fn``'s body, skipping loop bodies and nested definitions.
+
+    A guard inside a loop is a per-item check, not a check on the input as a
+    whole, so it cannot be the guard this rule asks for.
+    """
+    stack = list(getattr(fn, "body", []))
+    while stack:
+        node = stack.pop()
+        yield node
+        if isinstance(node, _LOOPS + _FUNCS + (ast.ClassDef, ast.Lambda)):
+            continue
+        stack.extend(ast.iter_child_nodes(node))
+
+
+def _called_names(node: ast.AST) -> list[str]:
+    """Names of ``f(...)`` and ``self.f(...)`` calls anywhere under ``node``."""
+    names: list[str] = []
+    for sub in ast.walk(node):
+        if not isinstance(sub, ast.Call):
+            continue
+        func = sub.func
+        if isinstance(func, ast.Name):
+            names.append(func.id)
+        elif (
+            isinstance(func, ast.Attribute)
+            and isinstance(func.value, ast.Name)
+            and func.value.id in ("self", "cls")
+        ):
+            names.append(func.attr)
+    return names
+
+
+def _reachable_functions(tree: ast.Module, depth: int = 3) -> list[ast.AST]:
+    """``generate()`` plus the module functions and methods it calls."""
+    defs = _function_defs(tree)
+    seen: list[ast.AST] = []
+    frontier = list(defs.get("generate", []))
+    for _ in range(depth + 1):
+        nxt: list[ast.AST] = []
+        for fn in frontier:
+            if any(fn is s for s in seen):
+                continue
+            seen.append(fn)
+            for name in _called_names(fn):
+                nxt.extend(defs.get(name, []))
+        frontier = nxt
+    return seen
+
+
+def _is_len_call(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "len"
+    )
+
+
+def _is_empty_literal(node: ast.AST) -> bool:
+    return isinstance(node, (ast.List, ast.Dict, ast.Tuple)) and not (
+        getattr(node, "elts", None) or getattr(node, "keys", None)
+    )
+
+
+def _is_zero(node: ast.AST) -> bool:
+    return isinstance(node, ast.Constant) and node.value == 0
+
+
+def _resolve_local(test: ast.expr, fn: ast.AST) -> ast.expr:
+    """Follow ``flag = <expr>; if flag:`` one level inside ``fn``."""
+    if not isinstance(test, ast.Name):
+        return test
+    value = _assigned_value(test.id, fn)
+    return test if value is None else value
+
+
+def _strip_len(node: ast.expr) -> ast.expr:
+    return node.args[0] if _is_len_call(node) and node.args else node
+
+
+def _guards(test: ast.expr, fn: ast.AST) -> list[tuple[str, ast.expr]]:
+    """Every ``(kind, subject)`` reading of a guard test, see ``_emptiness``.
+
+    ``not pod or not racks`` is true when ``racks`` is empty, so each
+    ``empty`` operand of an ``or`` is a reading. ``pod and racks`` is false
+    when ``racks`` is empty, so each ``nonempty`` operand of an ``and`` is.
+    """
+    test = _resolve_local(test, fn)
+    if isinstance(test, ast.BoolOp):
+        want = "empty" if isinstance(test.op, ast.Or) else "nonempty"
+        return [
+            g for value in test.values for g in _guards(value, fn) if g[0] == want
+        ]
+    guard = _emptiness(test, fn)
+    return [] if guard is None else [guard]
+
+
+def _emptiness(test: ast.expr, fn: ast.AST) -> tuple[str, ast.expr] | None:
+    """Classify a guard test and return the collection it tests.
+
+    ``("empty", subject)`` when ``test`` is true on an empty ``subject``,
+    ``("nonempty", subject)`` when it is true on a non-empty one, else
+    ``None``.
+    """
+    test = _resolve_local(test, fn)
+    if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+        return "empty", _strip_len(test.operand)
+    if isinstance(test, ast.Compare) and len(test.ops) == 1:
+        left, op, right = test.left, test.ops[0], test.comparators[0]
+        if _is_len_call(left) and _is_zero(right):
+            if isinstance(op, (ast.Eq, ast.LtE)):
+                return "empty", _strip_len(left)
+            if isinstance(op, (ast.Gt, ast.NotEq)):
+                return "nonempty", _strip_len(left)
+        if _is_len_call(left) and isinstance(right, ast.Constant) and right.value == 1:
+            if isinstance(op, ast.Lt):
+                return "empty", _strip_len(left)
+            if isinstance(op, ast.GtE):
+                return "nonempty", _strip_len(left)
+        if _is_zero(left) and _is_len_call(right) and isinstance(op, ast.Eq):
+            return "empty", _strip_len(right)
+        if _is_empty_literal(right) or _is_empty_literal(left):
+            subject = left if _is_empty_literal(right) else right
+            if isinstance(op, (ast.Eq, ast.Is)):
+                return "empty", subject
+            if isinstance(op, (ast.NotEq, ast.IsNot)):
+                return "nonempty", subject
+    if isinstance(test, (ast.Name, ast.Attribute, ast.Subscript)) or _is_len_call(test):
+        return "nonempty", _strip_len(test)
+    return None
+
+
+def _assigned_value(name: str, fn: ast.AST) -> ast.expr | None:
+    """The value of the first ``name = ...`` or ``name: T = ...`` in ``fn``."""
+    for node in ast.walk(fn):
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == name
+        ):
+            return node.value
+        if (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == name
+            and node.value is not None
+        ):
+            return node.value
+    return None
+
+
+def _subject_keys(
+    expr: ast.expr, fn: ast.AST, defs: dict[str, list[ast.AST]], depth: int = 3
+) -> set[str]:
+    """Every spelling of the collection ``expr`` names, followed through
+    local assignments, comprehensions, and helpers that return it."""
+    keys = {ast.unparse(expr)}
+    if depth <= 0:
+        return keys
+    if isinstance(expr, ast.Name):
+        value = _assigned_value(expr.id, fn)
+        if value is not None:
+            keys |= _subject_keys(value, fn, defs, depth - 1)
+    elif isinstance(expr, (ast.ListComp, ast.SetComp, ast.GeneratorExp)):
+        for gen in expr.generators:
+            keys |= _subject_keys(gen.iter, fn, defs, depth - 1)
+    elif isinstance(expr, ast.Call):
+        for name in _called_names(ast.Expr(value=expr)):
+            for helper in defs.get(name, []):
+                for node in ast.walk(helper):
+                    if isinstance(node, ast.Return) and node.value is not None:
+                        keys |= _subject_keys(node.value, helper, defs, depth - 1)
+    return keys
+
+
+def _loop_keys(
+    functions: list[ast.AST], defs: dict[str, list[ast.AST]]
+) -> set[str]:
+    """Spellings of every collection a for loop or comprehension iterates."""
+    keys: set[str] = set()
+    for fn in functions:
+        for node in ast.walk(fn):
+            if isinstance(node, (ast.For, ast.AsyncFor)):
+                keys |= _subject_keys(node.iter, fn, defs)
+            elif isinstance(node, ast.comprehension):
+                keys |= _subject_keys(node.iter, fn, defs)
+    return keys
+
+
+# Group-context calls that put the previous run's members back into this
+# run's group, so the cleanup at the end of the run finds nothing unused.
+_RECLAIM_METHODS = {"add_related_nodes", "add_related_groups"}
+
+
+def _calls_method(node: ast.AST, names: set[str]) -> bool:
+    return any(
+        isinstance(c, ast.Call)
+        and isinstance(c.func, ast.Attribute)
+        and c.func.attr in names
+        for c in ast.walk(node)
+    )
+
+
+def _from_previous_group(
+    expr: ast.AST,
+    fn: ast.AST,
+    depth: int = 3,
+    params: dict[str, tuple[ast.expr, ast.AST]] | None = None,
+) -> bool:
+    """``expr`` reads the result of a ``get_group()`` call, directly, through
+    local names bound in ``fn``, or through a parameter of ``fn`` whose
+    argument at the call site (``params``) reads it in the caller."""
+    if _calls_method(expr, {"get_group"}):
+        return True
+    if depth <= 0:
+        return False
+    for node in ast.walk(expr):
+        if isinstance(node, ast.Name):
+            if params and node.id in params:
+                arg, caller = params[node.id]
+                if _from_previous_group(arg, caller, depth - 1):
+                    return True
+            value = _assigned_value(node.id, fn)
+            if value is not None and _from_previous_group(
+                value, fn, depth - 1, params
+            ):
+                return True
+    return False
+
+
+def _reclaim_calls_previous(
+    block: ast.AST,
+    fn: ast.AST,
+    params: dict[str, tuple[ast.expr, ast.AST]] | None = None,
+) -> bool:
+    """A re-claim call under ``block`` whose ids come from ``get_group()``."""
+    for call in ast.walk(block):
+        if not (
+            isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Attribute)
+            and call.func.attr in _RECLAIM_METHODS
+        ):
+            continue
+        ids = [kw.value for kw in call.keywords if kw.arg == "ids"] or call.args[:1]
+        if any(_from_previous_group(arg, fn, params=params) for arg in ids):
+            return True
+    return False
+
+
+def _reclaims(
+    stmts: list[ast.stmt], fn: ast.AST, defs: dict[str, list[ast.AST]]
+) -> bool:
+    """The statements, or a helper they call, put the previous run's members
+    back into this run's group.
+
+    The ids passed to ``add_related_nodes`` / ``add_related_groups`` have to
+    come from the ``get_group()`` result: ids from anything else keep
+    nothing. The call may sit under a condition: the documented form
+    re-claims only when a previous group exists, and with no previous group
+    there is nothing to delete.
+    """
+    block = ast.Module(body=stmts, type_ignores=[])
+    if _reclaim_calls_previous(block, fn):
+        return True
+    for call in ast.walk(block):
+        if not isinstance(call, ast.Call):
+            continue
+        for name in _called_names(ast.Expr(value=call))[:1]:
+            for helper in defs.get(name, []):
+                params = _call_params(call, helper, fn)
+                if _reclaim_calls_previous(helper, helper, params):
+                    return True
+    return False
+
+
+def _call_params(
+    call: ast.Call, helper: ast.AST, caller: ast.AST
+) -> dict[str, tuple[ast.expr, ast.AST]]:
+    """Map ``helper``'s parameters to the arguments ``call`` passes, so a
+    previous group handed to a helper can be traced back to ``caller``."""
+    names = [a.arg for a in helper.args.posonlyargs + helper.args.args]
+    if names and names[0] in ("self", "cls"):
+        names = names[1:]
+    bound = {n: (arg, caller) for n, arg in zip(names, call.args)}
+    for kw in call.keywords:
+        if kw.arg is not None:
+            bound[kw.arg] = (kw.value, caller)
+    return bound
+
+
+def _endings(
+    stmts: list[ast.stmt], defs: dict[str, list[ast.AST]], depth: int = 3
+) -> set[str]:
+    """How a run through ``stmts`` can end: ``raise``, ``return`` or ``fall``.
+
+    A raise under a condition only ends the paths where the condition
+    holds, so ``if strict: raise`` followed by ``return`` can still return.
+    A call to a helper counts as a raise only when every path through the
+    helper raises.
+    """
+    ends: set[str] = set()
+    for stmt in stmts:
+        here = _stmt_endings(stmt, defs, depth)
+        ends |= here - {"fall"}
+        if "fall" not in here:
+            return ends
+    ends.add("fall")
+    return ends
+
+
+def _stmt_endings(
+    stmt: ast.stmt, defs: dict[str, list[ast.AST]], depth: int
+) -> set[str]:
+    if isinstance(stmt, ast.Raise):
+        return {"raise"}
+    if isinstance(stmt, ast.Return):
+        return {"return"}
+    if isinstance(stmt, ast.If):
+        return _endings(stmt.body, defs, depth) | _endings(stmt.orelse, defs, depth)
+    if isinstance(stmt, (ast.With, ast.AsyncWith)):
+        return _endings(stmt.body, defs, depth)
+    if isinstance(stmt, ast.Try):
+        body = _endings(stmt.body, defs, depth)
+        ends = body - {"fall"}
+        if "fall" in body:
+            ends |= _endings(stmt.orelse, defs, depth)
+        for handler in stmt.handlers:
+            ends |= _endings(handler.body, defs, depth)
+        return ends
+    if isinstance(stmt, _LOOPS):
+        # The body may run zero times.
+        return _endings(stmt.body, defs, depth) | {"fall"}
+    if isinstance(stmt, _FUNCS + (ast.ClassDef,)):
+        return {"fall"}
+    if depth > 0:
+        for name in _called_names(stmt):
+            for helper in defs.get(name, []):
+                if _endings(helper.body, defs, depth - 1) == {"raise"}:
+                    return {"raise"}
+    return {"fall"}
+
+
+def _branch_outcome(
+    stmts: list[ast.stmt], fn: ast.AST, defs: dict[str, list[ast.AST]]
+) -> str:
+    """``"reclaim"``, ``"raise"``, ``"return"``, or ``"other"`` for a guard.
+
+    ``reclaim``: the branch puts the previous run's members back into this
+    run's group, with ids from the ``get_group()`` result, and no path
+    through it raises. ``raise``: some path raises after a re-claim, or
+    every path raises; either way the run can fail. ``return``: some path
+    returns without either.
+    """
+    ends = _endings(stmts, defs)
+    if _reclaims(stmts, fn, defs):
+        return "raise" if "raise" in ends else "reclaim"
+    if ends == {"raise"}:
+        return "raise"
+    if "return" in ends:
+        return "return"
+    return "other"
+
+
+def check_empty_input_raises(
+    tree: ast.Module | None, *, allow_raise: bool = True, **_: Any
+) -> tuple[bool, str]:
+    """generate() keeps the previous run's output when the collection it
+    builds from is empty: it raises, or it re-claims the previous members.
+
+    From infrahub-sdk 1.24.0 a run that saves nothing deletes everything the
+    previous run tracked, and the cleanup is skipped only when generate()
+    raises. A guard that returns early is still a run that saved nothing,
+    unless it first re-claims the previous run's members
+    (``group_context.get_group()``, then ``add_related_nodes`` with ids from
+    that group). A re-claim followed by a raise counts as a raise.
+
+    With ``allow_raise=False`` (registered as ``empty-input-reclaims``) only
+    the re-claim passes. That is the rule's answer when the user says the
+    run must not fail on empty input, since a raise fails the run.
+
+    The guard has to test a collection the generator loops over. A guard on
+    something else (the query returning no design object, a missing name)
+    raises in other cases and lets an empty collection through to a run that
+    saves nothing. A generator with no loop at all has nothing to bind the
+    guard to, and fails closed.
+    """
+    if tree is None:
+        return False, "No Python source to inspect"
+    defs = _function_defs(tree)
+    if "generate" not in defs:
+        return False, "No generate() method found"
+
+    functions = _reachable_functions(tree)
+    loop_keys = _loop_keys(functions, defs)
+    if not loop_keys:
+        return False, "generate() iterates no collection, so no guard can be bound to one"
+    kept = False
+    for fn in functions:
+        for node in _walk_outside_loops(fn):
+            if isinstance(node, ast.Assert):
+                if any(
+                    kind == "nonempty" and _subject_keys(subject, fn, defs) & loop_keys
+                    for kind, subject in _guards(node.test, fn)
+                ):
+                    if not allow_raise:
+                        return False, (
+                            f"{fn.name}() asserts the input is not empty (line "
+                            f"{node.lineno}), which fails the run; re-claim the "
+                            "previous members instead"
+                        )
+                    kept = True
+                continue
+            if not isinstance(node, ast.If):
+                continue
+            guard = next(
+                (
+                    g for g in _guards(node.test, fn)
+                    if _subject_keys(g[1], fn, defs) & loop_keys
+                ),
+                None,
+            )
+            if guard is None:
+                continue
+            kind = guard[0]
+            if kind == "empty":
+                branch = node.body
+            elif kind == "nonempty" and node.orelse:
+                branch = node.orelse
+            else:
+                continue
+            outcome = _branch_outcome(branch, fn, defs)
+            if outcome == "return" and fn.name != "generate":
+                # A return in a helper ends the helper, not the run: the
+                # caller goes on, so it is not the early return this rule
+                # is about. A helper that does all the work and returns
+                # early still fails below, for want of a guard.
+                continue
+            if outcome == "return":
+                return False, (
+                    f"{fn.name}() returns early on empty input (line "
+                    f"{node.lineno}) without re-claiming the previous members; "
+                    "from infrahub-sdk 1.24.0 a run that saves nothing deletes "
+                    "the previous run's output"
+                )
+            if outcome == "raise" and not allow_raise:
+                return False, (
+                    f"{fn.name}() raises on empty input (line {node.lineno}), "
+                    "which fails the run; re-claim the previous members instead"
+                )
+            if outcome in ("raise", "reclaim"):
+                kept = True
+
+    if not kept:
+        wanted = "raises or re-claims" if allow_raise else "re-claims the previous members"
+        return False, (
+            f"generate() has no guard that {wanted} when the collection it "
+            "loops over is empty; a run that saves nothing deletes the "
+            "previous run's output from infrahub-sdk 1.24.0"
+        )
+    how = "raises, or re-claims the previous members" if allow_raise else "re-claims the previous members"
+    return True, f"generate() keeps the previous output on empty input ({how})"
+
+
+def check_empty_input_reclaims(
+    tree: ast.Module | None, **kw: Any
+) -> tuple[bool, str]:
+    """``check_empty_input_raises`` with only the re-claim accepted."""
+    kw.pop("allow_raise", None)
+    return check_empty_input_raises(tree, allow_raise=False, **kw)
+
+
+# ---------------------------------------------------------------------------
 # from_graphql hydration checks
 #
 # Each check has the signature:
@@ -3231,6 +3726,8 @@ CHECKS: dict[str, Any] = {
     "detach-precedes-peer-delete": check_detach_precedes_peer_delete,
     "detach-iterates-id-list": check_detach_iterates_id_list,
     "create-fields-exist-on-kind": check_create_fields_exist_on_kind,
+    "empty-input-raises": check_empty_input_raises,
+    "empty-input-reclaims": check_empty_input_reclaims,
     # from_graphql hydration family (output.md)
     "imports-infrahub-node": check_imports_infrahub_node,
     "uses-from-graphql": check_uses_from_graphql,

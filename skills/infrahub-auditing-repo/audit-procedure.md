@@ -292,7 +292,9 @@ convention).
 - Must use `await self.client.create()` for object
   creation
 - Must call `save(allow_upsert=True)` on created objects
-- Should handle empty/missing data gracefully
+- Should keep the previous output on empty input when that
+  means something is wrong: see
+  [python-classes Generators check 4](./rules/python-classes.md#generators)
 
 ### 4.3 Transform classes
 
