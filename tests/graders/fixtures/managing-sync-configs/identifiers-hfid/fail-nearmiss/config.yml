@@ -1,0 +1,39 @@
+---
+# The identifiers are the HFID fields, but the site reference is mapped under
+# another name, so no field supplies the location identifier.
+name: from-netbox
+source:
+  name: netbox
+  settings:
+    url: https://netbox.example.com
+destination:
+  name: infrahub
+  settings:
+    url: http://localhost:8000
+schema_mapping:
+  - name: LocationSite
+    mapping: dcim.sites
+    identifiers:
+      - name
+    fields:
+      - name: name
+        mapping: name
+      - name: netbox_id
+        mapping: id
+  - name: NetworkDevice
+    mapping: dcim.devices
+    identifiers:
+      - name
+      - location
+    fields:
+      - name: name
+        mapping: name
+      - name: serial_number
+        mapping: serial
+      - name: address
+        mapping: primary_ip.address
+      - name: netbox_id
+        mapping: id
+      - name: site
+        mapping: site
+        reference: LocationSite

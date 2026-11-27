@@ -1,0 +1,1 @@
+Added the infrahub-managing-sync-configs skill, which writes, changes and debugs an infrahub-sync config.yml for an adapter that already exists: identifiers that match the destination human-friendly ID, a data check before the first run, and a sync to an Infrahub branch after the user has viewed the diff.
