@@ -52,9 +52,11 @@ of that contract.
    multiple kinds (a denormalized sheet — see
    [decomposition-denormalized-csv.md](./decomposition-denormalized-csv.md));
    handle each kind separately.
+
 2. **Concatenate rows under one `spec.data:` list.**
    Preserve user-supplied input order: rows from
    the first input listed come first.
+
 3. **Dedupe by HFID.** If two inputs produce a row
    with the same HFID, the first occurrence wins
    and the duplicate is surfaced in the interview:

@@ -117,6 +117,7 @@ Follow these steps when creating a menu:
 1. **Gather requirements** — Ask what schema nodes
    exist, how they should be grouped, and whether
    the user wants flat or hierarchical navigation.
+
 2. **Read relevant rules** — Read `rules/format-structure.md`
    for the required YAML structure, `rules/item-properties.md`
    for item fields, and `rules/icons-reference.md`
@@ -126,9 +127,11 @@ Follow these steps when creating a menu:
    Object Management, Branches and others, and anything
    belonging in one of those attaches with `parent:`
    rather than being declared again.
+
 3. **Generate the menu YAML** — Start with the
    `$schema` comment and `apiVersion`/`kind`/`spec`
    structure. Apply rules from step 2.
+
 4. **Add registration and schema guidance** — Every
    menu file output must include:
    - A YAML comment block showing how to register

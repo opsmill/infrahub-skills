@@ -105,6 +105,7 @@ files pasted into the conversation.
 
 - `ID` is `F1`, `F2`, ... in build order. An ID never
   changes once a spec refers to it.
+
 - `Intent` says who can do what once the feature is
   built: `<who> can <action>`, such as `Field engineers
   can find the strands a cable uses by its cable ID`.
@@ -114,14 +115,17 @@ files pasted into the conversation.
   and so does a sentence whose verb is know, understand,
   track or manage.
   The people are the ones who act, never Infrahub.
+
 - `Value` names the drivers the feature serves, from the
   `Value:` line, and no figures. F1's names the first
   driver on that line.
+
 - `Artifacts` is an ordered, comma-separated list from
   exactly these values: `schema`, `objects`, `generator`,
   `check`, `transform`, `menu`. `schema` comes first
   whenever it is listed, because everything else reads
   it.
+
 - Each artifact is built by one skill:
 
   | Artifact | Skill |
@@ -137,14 +141,17 @@ files pasted into the conversation.
   a wiki page or another system nobody provided, goes to
   `infrahub-managing-objects`. Name `infrahub-importing-data`
   only for CSV or TSV files the brief lists in Inputs.
+
 - `Depends on` names the earlier features a feature
   needs, or `-` when it needs none. It is never empty,
   and never names a later or unknown ID. A later
   feature can be independent; write `-` rather than a
   dependency it does not have.
+
 - `Status` is `planned`, `specified` once a spec or
   plan exists for the feature, or `built` once its
   artifacts are loaded. It starts as `planned`.
+
 - `Handoff` states the outcome, scope, artifacts and
   dependencies, and names the brief's path and the
   feature ID, so the downstream workflow reads the

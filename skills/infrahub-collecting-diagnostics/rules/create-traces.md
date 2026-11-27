@@ -41,6 +41,7 @@ created again for a slowness that already ended.
    slowness is still going on, and which minimum
    duration of trace to keep. Propose the default,
    `1s`, and say that shorter traces are left out.
+
 2. Choose the window from the answer:
    - Still going on: `--traces-since <duration>`, a
      window that ends now (default `2h`).
@@ -51,8 +52,10 @@ created again for a slowness that already ended.
    Pass the minimum duration with
    `--traces-min-duration <duration>`, also when the
    operator keeps `1s`, so the command shows it.
+
 3. Say that only a share of requests has a trace, set
    by the trace sampling ratio of the deployment.
+
 4. When the operator can reproduce the slowness, tell
    them that a user with the `super_admin` permission
    can raise the ratio for a limited time before they
@@ -101,6 +104,7 @@ created again for a slowness that already ended.
    The sampling ratio endpoint exists in Infrahub 1.12
    and later, and needs tracing turned on
    (`INFRAHUB_TRACE_ENABLE`).
+
 5. Handle the tokens without seeing them. With
    `--include-traces`, `infrahub-collect` reads an API
    token with `super_admin` from

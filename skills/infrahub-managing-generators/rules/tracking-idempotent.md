@@ -194,6 +194,7 @@ wrong. That is the quieter of the two possible failures.
 1. **Create the shared object outside the generator** —
    in an object data file, or a separate one-off
    generator with its own single target.
+
 2. **Opt out of tracking for that save**, as in the
    RIGHT block above:
 
@@ -204,6 +205,7 @@ wrong. That is the quieter of the two possible failures.
    The node is written and **not** added to the run's
    group, so no run can reclaim it. Note this also means
    nothing cleans it up: that is the trade.
+
 3. **Write it with `add_relationships()`**, which does not
    enter the group at all:
 

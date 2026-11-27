@@ -45,12 +45,14 @@ user may paste into production.
 
    `infrahub db showmigrations` does not exist before
    1.10.0; naming it for an older hop invents a command.
+
 2. `infrahub upgrade --check` and
    `infrahub db showmigrations` are server commands.
    They run inside an Infrahub server container.
    `infrahubctl` has no upgrade command; writing one
    invents a command that looks safe and fails with
    `No such command 'upgrade'`.
+
 3. To see what a hop will do before taking it, run the
    **target** release's `infrahub upgrade --check`
    against the current database, in a one-off container
@@ -69,8 +71,10 @@ user may paste into production.
    configuration. Verified on Docker Compose against a
    1.10.8 database, with 1.11.0 and with 1.11.2: each
    reported what the hop would do and wrote nothing.
+
 4. Describe each upgrade step in prose and link the
    upgrade guide for the user's deployment.
+
 5. In prose, write "the upgrade", never the command,
    even to say you did not run it. The only form of the
    upgrade command a plan contains is the
