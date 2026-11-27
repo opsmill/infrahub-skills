@@ -28,6 +28,7 @@ guess before the window opens.
 1. Check each change against the repository inventory
    from step 3, and against the instance when one is
    reachable.
+
 2. For `yes` or `no`, put something locatable in
    `Evidence`, strongest first:
    - a file path, ideally with the element:
@@ -35,6 +36,7 @@ guess before the window opens.
    - a schema kind or `Kind.attribute`
    - a query and its result: ``query_graphql `{ BuiltinIPAddress { count } }` returned 0``
    - a probe and its output: the target's `infrahub upgrade --check` listing 2 pending migrations
+
 3. Use `unknown` when the evidence is not in hand, for
    example a schema the user did not share. Then the
    `Action` names the probe that would decide it: an
@@ -51,6 +53,7 @@ guess before the window opens.
    which is why they need the plan to say. `unknown`
    with a probe is honest; a guessed `yes` or `no` is
    not.
+
 4. A change that reaches every deployment, such as a
    data migration, still needs evidence for `yes`: the
    probe that shows it pending here, like the target
@@ -69,12 +72,15 @@ guess before the window opens.
    names what the migration touches and the repository
    shows it, otherwise `unknown` with the target's
    `upgrade --check` count line as the `Action`.
+
 5. Write the bare value. The column holds `yes`, `no`,
    or `unknown`, not a sentence.
+
 6. Make each row stand on its own. "Same as the row
    above" leaves this row with no evidence or probe of
    its own, and rows get read, sorted, and copied one
    at a time.
+
 7. A change that touches nothing in the repository or
    the instance, such as a UI URL format that only
    bookmarks and runbooks hold, either gets a runnable

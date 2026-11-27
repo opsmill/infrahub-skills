@@ -104,11 +104,13 @@ GraphQL response for each iterated edge MUST include:
 
 2. **`id`** — required for upsert mutations (identifies the
    node).
+
 3. **Every attribute the generator will MUTATE** — the
    attribute-state machinery compares current values to
    classify the save as a no-op vs. a change. A missing
    current value forces every save into the "change" path even
    when the value is identical.
+
 4. **(Recommended)** every attribute the generator READS for
    downstream branching — otherwise the typed node sees
    `value=None` for those fields.

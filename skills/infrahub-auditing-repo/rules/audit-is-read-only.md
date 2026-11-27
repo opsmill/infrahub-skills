@@ -64,6 +64,7 @@ the new verb earns a case.
    break this: `rm`, `mv`, `cp`, `touch`, `sed -i` and
    a `>` redirect into a repository path are all
    writes, and none of them are undoable either.
+
 2. **Never run a destructive git command against a
    tree being audited**, *including to undo your own
    side effect*:
@@ -103,6 +104,7 @@ the new verb earns a case.
    The "including to undo your own side effect" clause
    is the load-bearing half. A revert run in the belief
    that it is tidying up is still a delete.
+
 3. **Read another revision with a read-only command.**
    All of these read without touching the tree:
 
@@ -120,6 +122,7 @@ the new verb earns a case.
    global options sit before the verb, so
    `git -C /path/to/repo show HEAD:objects/racks.yml`
    is the same read-only command aimed elsewhere.
+
 4. **Before running any repository script for its
    output, establish whether it writes.** Read the
    script. A flag named `--check`, `--dry-run`, or
@@ -132,10 +135,12 @@ the new verb earns a case.
    `python generators/build_interfaces.py`, so the
    module form is the same run and needs the same
    check.
+
 5. **If you have already dirtied the tree, say so in
    the report and leave it.** Name the paths you
    touched. A visible mess is recoverable; a silent
    revert is not.
+
 6. **State the tree's condition in the report.** If
    the audit ran against a tree with uncommitted
    changes, record that, because it bounds what the
