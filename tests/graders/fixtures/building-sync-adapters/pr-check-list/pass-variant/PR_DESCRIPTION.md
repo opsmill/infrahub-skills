@@ -20,4 +20,5 @@ New source adapter for the ServiceNow Table API.
 | Docs page | `docs/docs/adapters/servicenow.mdx` | added |
 | Sidebar | `docs/sidebars.ts` | entry added |
 | Adapter table | `docs/docs/adapters/choosing-an-adapter.mdx` | row added |
+| Adapter lists | `docs/docs/readme.mdx`, `README.md`, `AGENTS.md` | one line each |
 | Spec | `dev/specs/017-servicenow-adapter/tasks.md` | matches the code |

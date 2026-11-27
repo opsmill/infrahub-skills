@@ -88,7 +88,7 @@ import requests
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "netinventory"
 LIST_KEY = "items"  # where the rows sit in the captured body
 SELECT_PARAM = "fields"  # api-behavior.yml: field_selection
-REQUIRED_HEADERS = {"Accept": "application/json"}  # api-behavior.yml: required_headers
+REQUIRED_HEADERS = ("Accept",)  # api-behavior.yml: required_headers (names only)
 
 
 class FakeResponse:
@@ -153,9 +153,9 @@ class FakeSession:
         return None
 
     def get(self, url: str, params: dict | None = None, headers: dict | None = None, timeout: float | None = None):
-        sent = {key.lower(): value for key, value in (headers or {}).items()}
-        for name, value in REQUIRED_HEADERS.items():
-            assert sent.get(name.lower()) == value, f"the adapter did not send {name}: {value}"
+        sent = {key.lower() for key in (headers or {})}
+        for name in REQUIRED_HEADERS:
+            assert name.lower() in sent, f"the adapter did not send the {name} header"
         path, merged = _query(url, params)
         self.requests.append((path, merged))
         if self.queued:

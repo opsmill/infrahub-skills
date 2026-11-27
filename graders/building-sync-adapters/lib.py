@@ -498,22 +498,30 @@ def check_fake_next_link(ctx: dict) -> tuple[bool, str]:
 # --------------------------------------------------------------------------
 
 _HEADING = re.compile(r"^(#{1,4})\s+(.*)$")
-_SECTION_WORDS = re.compile(r"check|test|verif|validat|gate", re.IGNORECASE)
+# Whole words only: "Latest changes" holds "test" and is not a checks section.
+_SECTION_WORDS = re.compile(
+    r"\b(checks?|tests?|testing|verification|verified|validation|gates?)\b",
+    re.IGNORECASE,
+)
 
 
 def _checks_section(text: str) -> str | None:
+    """The body of the `Checks run` section that gate-full-check-list.md
+    prescribes, or else of the first heading naming checks, tests, verification
+    or validation as a whole word."""
     lines = text.splitlines()
-    for i, line in enumerate(lines):
-        m = _HEADING.match(line)
-        if m and _SECTION_WORDS.search(m.group(2)):
-            level = len(m.group(1))
-            body = []
-            for nxt in lines[i + 1 :]:
-                n = _HEADING.match(nxt)
-                if n and len(n.group(1)) <= level:
-                    break
-                body.append(nxt)
-            return "\n".join(body)
+    headings = [(i, m) for i, line in enumerate(lines) if (m := _HEADING.match(line))]
+    exact = [h for h in headings if h[1].group(2).strip().lower() == "checks run"]
+    named = [h for h in headings if _SECTION_WORDS.search(h[1].group(2))]
+    for i, m in exact[:1] or named[:1]:
+        level = len(m.group(1))
+        body = []
+        for nxt in lines[i + 1 :]:
+            n = _HEADING.match(nxt)
+            if n and len(n.group(1)) <= level:
+                break
+            body.append(nxt)
+        return "\n".join(body)
     return None
 
 
@@ -548,17 +556,31 @@ def _tokens(span: str) -> list[str]:
     return [] if tokens and tokens[0] in _PRINTERS else tokens
 
 
-def _pr_entries(section: str) -> list[tuple[list[list[str]], bool]]:
-    """For each entry: the token lists of its code spans, and whether text after the
-    first code span reports a result."""
+# Text between code spans that only joins them: "`a`, `b` and `c`: passed".
+_CONNECTORS = re.compile(
+    r"\b(and|or|then|plus)\b|[\s,;:+&/|()\-\u2013\u2014.]", re.IGNORECASE
+)
+_RESULT = re.compile(r"[A-Za-z0-9\u2705\u2713\u2714\u274c\u2717\u2718]")
+
+
+def _pr_entries(section: str) -> list[tuple[list[str], bool]]:
+    """Each code span of the section, as tokens, with whether a result follows it.
+
+    A span's result is the text after it. When that text only joins it to the
+    next span (a comma, "and"), the span shares the next span's result, so a
+    group of commands followed by one result counts for each of them."""
     out = []
     for entry in _entries(section):
-        spans = _INLINE.findall(entry)
-        if not spans:
-            continue
-        after = entry.split("`" + spans[0] + "`", 1)[1]
-        result = re.search(r"[A-Za-z0-9]", _INLINE.sub("", after)) is not None
-        out.append(([_tokens(span) for span in spans], result))
+        parts = _INLINE.split(entry)  # text, span, text, span, ..., text
+        spans, after = parts[1::2], parts[2::2]
+        results = [False] * len(spans)
+        for i in range(len(spans) - 1, -1, -1):
+            text = _CONNECTORS.sub("", after[i])
+            if _RESULT.search(text):
+                results[i] = True
+            elif not text and i < len(spans) - 1:
+                results[i] = results[i + 1]  # joined to the next span
+        out.extend((_tokens(span), result) for span, result in zip(spans, results))
     return out
 
 
@@ -603,6 +625,10 @@ PR_PATHS: dict[str, Callable[[list[str]], bool]] = {
     "choosing-an-adapter row": lambda t: any(
         x.endswith("choosing-an-adapter.mdx") for x in t
     ),
+    # the other adapter lists, as rules/scope-adapter-files-only.md names them
+    "docs readme list": lambda t: "docs/docs/readme.mdx" in t,
+    "README.md list": lambda t: "README.md" in t,
+    "AGENTS.md list": lambda t: "AGENTS.md" in t,
     "spec documents": lambda t: any("specs/" in x and "servicenow" in x for x in t),
 }
 PR_ITEMS = {**PR_COMMANDS, **PR_PATHS}
@@ -623,7 +649,7 @@ def check_pr_checks_complete(ctx: dict) -> tuple[bool, str]:
     entries = _pr_entries(section)
     missing, no_result = [], []
     for name, hit in PR_ITEMS.items():
-        found = [result for spans, result in entries for t in spans if hit(t)]
+        found = [result for t, result in entries if hit(t)]
         if not found:
             missing.append(name)
         elif name in PR_COMMANDS and not any(found):
@@ -754,12 +780,20 @@ def check_shared_retry_budget(ctx: dict) -> tuple[bool, str]:
     unbounded = [n for n, e in runs.items() if e.get("ended") == "unbounded"]
     if unbounded:
         return False, f"shared-retry-budget: retries never stop for {unbounded}"
-    single = max(runs["always_503"]["calls"], runs["always_connection_error"]["calls"])
-    if runs["mixed"]["calls"] > single:
+    status, connection, mixed = (
+        runs[n]["calls"] for n in ("always_503", "always_connection_error", "mixed")
+    )
+    if status != connection:
         return (
             False,
-            f"shared-retry-budget: alternating failures made {runs['mixed']['calls']} requests, "
-            f"more than the {single} one kind allows: two separate budgets",
+            f"shared-retry-budget: {status} requests when every response is 503, "
+            f"{connection} when every connection drops: two budgets of different sizes",
+        )
+    if mixed > status:
+        return (
+            False,
+            f"shared-retry-budget: alternating failures made {mixed} requests, "
+            f"more than the {status} one kind allows: two separate budgets",
         )
     return True, "shared-retry-budget: one budget for status and connection retries"
 
@@ -820,21 +854,45 @@ def _num(node: ast.AST, names: dict[str, float]) -> float | None:
 
 
 # The 60 s cap is read from the code: with a budget of five retries, 2**5 = 32 s
-# never reaches it, so the scripted run cannot show it. Each expression carries
-# labels: jitter (derived from a random draw) and capped (bounded at 60 s by
-# min(..., 60) or by `if x > 60: x = 60`). Labels pass through assignments,
-# through a call that takes a labelled argument, and through functions whose
-# return value is labelled. Adding or subtracting keeps `capped` only when both
-# sides are capped, so min(60, x) + uniform(0, 5) is not capped. The analysis
-# ignores statement order inside a function.
+# never reaches it, so the scripted run cannot show it. Each value carries
+# labels: jitter (derived from a random draw) and capped (at most 60 s). The
+# analysis follows each function body in statement order, so the last
+# assignment to a name decides its labels:
+#
+# - capped comes from a number of at most 60, min() with a capped argument,
+#   max() or a bounded random draw (uniform, randint, ...) whose arguments are
+#   all capped, and the branch of `if x > 60:` that does not run;
+# - it survives multiplying by a factor of at most 1 (a number, random(), or
+#   uniform() with bounds of at most 1), dividing by a number of at least 1,
+#   subtracting, and float/int/round/abs; any other operation drops it, adding
+#   two capped values included;
+# - after an if, a loop or a try, a name has jitter when it has it on any
+#   path, and is capped when it is capped on every path that has jitter.
+#
+# Function return values are solved to a fixed point across the module.
 
 _RANDOM_MODULES = ("random", "secrets")
+# Random draws whose result lies within the bounds passed as arguments.
+_BOUNDED_DRAWS = {"uniform", "randint", "randrange", "triangular", "randbelow"}
+_KEEPS_BOUND = {"float", "int", "round", "abs"}
+CAP = 60
 
 
-def _random_names(tree: ast.Module) -> set[str]:
-    """Names imported from random or secrets (``from random import uniform``)."""
+def _random_modules(tree: ast.Module) -> set[str]:
+    """Names bound to the random or secrets module (``import random as rng``)."""
     return {
         alias.asname or alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+        if alias.name in _RANDOM_MODULES
+    }
+
+
+def _random_names(tree: ast.Module) -> dict[str, str]:
+    """Functions imported from random or secrets, by local name (``from random import uniform as u``)."""
+    return {
+        alias.asname or alias.name: alias.name
         for node in ast.walk(tree)
         if isinstance(node, ast.ImportFrom) and node.module in _RANDOM_MODULES
         for alias in node.names
@@ -849,149 +907,240 @@ def _call_name(func: ast.AST) -> str | None:
     return None
 
 
-def _scopes(tree: ast.Module) -> list[tuple[str, list[ast.stmt]]]:
-    """The module's top-level statements, and each function body, as separate scopes."""
-    scopes: list[tuple[str, list[ast.stmt]]] = [
-        (
-            "<module>",
-            [
-                s
-                for s in tree.body
-                if not isinstance(
-                    s, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-                )
-            ],
-        )
-    ]
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            scopes.append((f"{node.name}@{node.lineno}", node.body))
-    return scopes
-
-
 def _target_names(target: ast.AST) -> list[str]:
     return [n.id for n in ast.walk(target) if isinstance(n, ast.Name)]
 
 
+def _merge(*envs: dict[str, set[str]]) -> dict[str, set[str]]:
+    """Jitter on any path. Capped when every jittered path is capped: a path with
+    no random draw is not a backoff (a Retry-After wait, say), and the rule caps
+    the backoff only. With no jittered path, capped only on every path."""
+    out: dict[str, set[str]] = {}
+    for key in set().union(*envs):
+        labels = [env.get(key, set()) for env in envs]
+        merged = set().union(*labels) - {"capped"}
+        jittered = [lbl for lbl in labels if "jitter" in lbl] or labels
+        if all("capped" in lbl for lbl in jittered):
+            merged.add("capped")
+        out[key] = merged
+    return out
+
+
+def _own_exprs(stmt: ast.stmt) -> list[ast.AST]:
+    """The expressions a statement evaluates itself, not those of nested statements."""
+    out: list[ast.AST] = []
+    for _field, value in ast.iter_fields(stmt):
+        items = value if isinstance(value, list) else [value]
+        for item in items:
+            if isinstance(item, (ast.expr, ast.withitem)):
+                out.append(item)
+    return out
+
+
 class _Flow:
-    """Labels on local names and on function return values, solved to a fixed point."""
+    """Labels of the values passed to sleep(), following statements in order."""
 
     def __init__(self, tree: ast.Module) -> None:
         self.names = _numeric_names(tree)
+        self.random_modules = _random_modules(tree)
         self.random_names = _random_names(tree)
-        self.scopes = _scopes(tree)
-        self.var: dict[tuple[str, str], set[str]] = {}
+        self.functions = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        self.module_body = [
+            s
+            for s in tree.body
+            if not isinstance(s, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        ]
         self.ret: dict[str, set[str]] = {}
-        for _ in range(20):
-            if not self._step():
+        for _ in range(10):
+            before = {k: set(v) for k, v in self.ret.items()}
+            self._solve()
+            if self.ret == before:
                 break
 
-    def labels(self, expr: ast.AST, scope: str) -> set[str]:
-        if isinstance(expr, ast.Name):
-            return set(self.var.get((scope, expr.id), set()))
-        if isinstance(expr, ast.BinOp) and isinstance(expr.op, (ast.Add, ast.Sub)):
-            left, right = self.labels(expr.left, scope), self.labels(expr.right, scope)
+    def _solve(self) -> None:
+        self.sleep_labels: list[set[str]] = []
+        rets: dict[str, list[set[str]]] = {}
+        for fn in self.functions:
+            self._returns: list[set[str]] = []
+            self._run(fn.body, {})
+            if self._returns:
+                rets.setdefault(fn.name, []).extend(self._returns)
+        self._returns = []
+        self._run(self.module_body, {})
+        self.ret = {
+            name: _merge(*({"v": r} for r in rs))["v"] for name, rs in rets.items()
+        }
+
+    # -- values ----------------------------------------------------------
+
+    def _is_random_call(self, call: ast.Call) -> str | None:
+        func = call.func
+        if (
+            isinstance(func, ast.Attribute)
+            and isinstance(func.value, ast.Name)
+            and func.value.id in self.random_modules
+        ):
+            return func.attr
+        if isinstance(func, ast.Name) and func.id in self.random_names:
+            return self.random_names[func.id]
+        return None
+
+    def _at_most_one(self, node: ast.AST) -> bool:
+        number = _num(node, self.names)
+        if number is not None:
+            return 0 <= number <= 1
+        if isinstance(node, ast.Call):
+            draw = self._is_random_call(node)
+            if draw == "random" and not node.args:
+                return True
+            if draw == "uniform" and len(node.args) == 2:
+                return all(
+                    (_num(a, self.names) is not None and 0 <= _num(a, self.names) <= 1)
+                    for a in node.args
+                )
+        return False
+
+    def labels(self, expr: ast.AST, env: dict[str, set[str]]) -> set[str]:
+        number = _num(expr, self.names)
+        if isinstance(expr, ast.Name) and expr.id in env:
+            return set(env[expr.id])
+        if number is not None:
+            return {"capped"} if number <= CAP else set()
+        if isinstance(expr, ast.BinOp):
+            left, right = self.labels(expr.left, env), self.labels(expr.right, env)
             out = (left | right) - {"capped"}
-            if "capped" in left and "capped" in right:
+            op = expr.op
+            if isinstance(op, ast.Mult) and (
+                ("capped" in left and self._at_most_one(expr.right))
+                or ("capped" in right and self._at_most_one(expr.left))
+            ):
+                out.add("capped")
+            elif isinstance(op, (ast.Div, ast.FloorDiv)) and "capped" in left:
+                divisor = _num(expr.right, self.names)
+                if divisor is not None and divisor >= 1:
+                    out.add("capped")
+            elif isinstance(op, ast.Sub) and "capped" in left:
                 out.add("capped")
             return out
         if isinstance(expr, ast.IfExp):
-            body, orelse = (
-                self.labels(expr.body, scope),
-                self.labels(expr.orelse, scope),
-            )
-            out = (body | orelse) - {"capped"}
-            if "capped" in body and "capped" in orelse:
+            return _merge(
+                {"v": self.labels(expr.body, env)}, {"v": self.labels(expr.orelse, env)}
+            )["v"]
+        if isinstance(expr, ast.Call):
+            args = [self.labels(a, env) for a in expr.args]
+            out = set().union(*args) - {"capped"} if args else set()
+            name = _call_name(expr.func)
+            draw = self._is_random_call(expr)
+            if draw:
+                out.add("jitter")
+                if (draw == "random" and not expr.args) or (
+                    draw in _BOUNDED_DRAWS and args and all("capped" in a for a in args)
+                ):
+                    out.add("capped")
+            elif name == "min" and any("capped" in a for a in args):
                 out.add("capped")
+            elif (
+                name in ("max", *_KEEPS_BOUND)
+                and args
+                and all("capped" in a for a in args)
+            ):
+                out.add("capped")
+            if name and not draw:
+                out |= self.ret.get(name, set())
             return out
         out: set[str] = set()
-        if isinstance(expr, ast.Call):
-            name = _call_name(expr.func)
-            if (
-                isinstance(expr.func, ast.Attribute)
-                and isinstance(expr.func.value, ast.Name)
-                and expr.func.value.id in _RANDOM_MODULES
-            ) or (
-                isinstance(expr.func, ast.Name) and expr.func.id in self.random_names
-            ):
-                out.add("jitter")
-            if name == "min" and any(_num(a, self.names) == 60 for a in expr.args):
-                out.add("capped")
-            if name:
-                out |= self.ret.get(name, set())
         for child in ast.iter_child_nodes(expr):
             if isinstance(child, ast.expr):
-                out |= self.labels(child, scope)
+                out |= self.labels(child, env) - {"capped"}
         return out
 
-    def _add(self, store: dict, key, labels: set[str]) -> bool:
-        current = store.setdefault(key, set())
-        if labels <= current:
-            return False
-        current |= labels
-        return True
+    # -- statements --------------------------------------------------------
 
-    def _step(self) -> bool:
-        changed = False
-        for scope, body in self.scopes:
-            fname = scope.split("@", 1)[0]
-            for stmt in body:
-                for n in ast.walk(stmt):
-                    if (
-                        isinstance(n, (ast.Assign, ast.AnnAssign, ast.AugAssign))
-                        and n.value is not None
-                    ):
-                        targets = n.targets if isinstance(n, ast.Assign) else [n.target]
-                        labels = self.labels(n.value, scope)
-                        for t in targets:
-                            for name in _target_names(t):
-                                changed |= self._add(self.var, (scope, name), labels)
-                    elif isinstance(n, ast.If):
-                        # `if delay > 60: delay = 60` caps `delay`
-                        for name in self._capped_by_if(n):
-                            changed |= self._add(self.var, (scope, name), {"capped"})
-                    elif (
-                        isinstance(n, ast.Return)
-                        and n.value is not None
-                        and scope != "<module>"
-                    ):
-                        changed |= self._add(
-                            self.ret, fname, self.labels(n.value, scope)
-                        )
-        return changed
+    def _record_sleeps(self, stmt: ast.stmt, env: dict[str, set[str]]) -> None:
+        for expr in _own_exprs(stmt):
+            for n in ast.walk(expr):
+                if isinstance(n, ast.Call) and _call_name(n.func) == "sleep" and n.args:
+                    self.sleep_labels.append(self.labels(n.args[0], env))
 
-    def _capped_by_if(self, node: ast.If) -> list[str]:
-        compared = [
-            x.id
-            for cmp in ast.walk(node.test)
-            if isinstance(cmp, ast.Compare)
-            and any(_num(y, self.names) == 60 for y in [cmp.left, *cmp.comparators])
-            for x in [cmp.left, *cmp.comparators]
-            if isinstance(x, ast.Name)
-        ]
-        assigned = {
-            name
-            for stmt in node.body
-            for n in ast.walk(stmt)
-            if isinstance(n, ast.Assign)
-            for t in n.targets
-            for name in _target_names(t)
-        }
-        return [c for c in compared if c in assigned]
+    def _cap_test(self, test: ast.AST) -> tuple[str, bool] | None:
+        """(name, capped when the test is true) for `x > 60`, `x < 60`, `60 < x`."""
+        if not (isinstance(test, ast.Compare) and len(test.ops) == 1):
+            return None
+        left, op, right = test.left, test.ops[0], test.comparators[0]
+        if isinstance(right, ast.Name) and isinstance(
+            left, (ast.Constant, ast.Name, ast.Attribute)
+        ):
+            flipped = {
+                ast.Gt: ast.Lt,
+                ast.GtE: ast.LtE,
+                ast.Lt: ast.Gt,
+                ast.LtE: ast.GtE,
+            }
+            if type(op) in flipped and _num(left, self.names) is not None:
+                left, right, op = right, left, flipped[type(op)]()
+        bound = _num(right, self.names)
+        if not isinstance(left, ast.Name) or bound is None or bound > CAP:
+            return None
+        if isinstance(op, (ast.Gt, ast.GtE)):
+            return left.id, False
+        if isinstance(op, (ast.Lt, ast.LtE)):
+            return left.id, True
+        return None
+
+    def _run(
+        self, body: list[ast.stmt], env: dict[str, set[str]]
+    ) -> dict[str, set[str]]:
+        env = {k: set(v) for k, v in env.items()}
+        for stmt in body:
+            if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
+            self._record_sleeps(stmt, env)
+            if isinstance(stmt, (ast.Assign, ast.AnnAssign)) and stmt.value is not None:
+                labels = self.labels(stmt.value, env)
+                targets = (
+                    stmt.targets if isinstance(stmt, ast.Assign) else [stmt.target]
+                )
+                for t in targets:
+                    for name in _target_names(t):
+                        env[name] = set(labels)
+            elif isinstance(stmt, ast.AugAssign) and isinstance(stmt.target, ast.Name):
+                load = ast.Name(id=stmt.target.id, ctx=ast.Load())
+                env[stmt.target.id] = self.labels(
+                    ast.BinOp(left=load, op=stmt.op, right=stmt.value), env
+                )
+            elif isinstance(stmt, ast.If):
+                then_env, else_env = dict(env), dict(env)
+                cap = self._cap_test(stmt.test)
+                if cap:
+                    name, when_true = cap
+                    side = then_env if when_true else else_env
+                    side[name] = side.get(name, set()) | {"capped"}
+                env = _merge(
+                    self._run(stmt.body, then_env), self._run(stmt.orelse, else_env)
+                )
+            elif isinstance(stmt, (ast.For, ast.AsyncFor, ast.While)):
+                once = self._run(stmt.body, env)
+                twice = self._run(stmt.body, _merge(env, once))
+                env = _merge(env, twice, self._run(stmt.orelse, env))
+            elif isinstance(stmt, ast.Try):
+                tried = self._run(stmt.body, env)
+                paths = [self._run(stmt.orelse, tried)]
+                for handler in stmt.handlers:
+                    paths.append(self._run(handler.body, _merge(env, tried)))
+                env = self._run(stmt.finalbody, _merge(*paths))
+            elif isinstance(stmt, (ast.With, ast.AsyncWith)):
+                env = self._run(stmt.body, env)
+            elif isinstance(stmt, ast.Return) and stmt.value is not None:
+                self._returns.append(self.labels(stmt.value, env))
+        return env
 
     def sleeps(self) -> list[set[str]]:
         """The labels of the argument of every ``sleep(...)`` call."""
-        out = []
-        for scope, body in self.scopes:
-            for stmt in body:
-                for n in ast.walk(stmt):
-                    if (
-                        isinstance(n, ast.Call)
-                        and _call_name(n.func) == "sleep"
-                        and n.args
-                    ):
-                        out.append(self.labels(n.args[0], scope))
-        return out
+        return self.sleep_labels
 
 
 def check_backoff_capped_jitter(ctx: dict) -> tuple[bool, str]:
@@ -1027,15 +1176,16 @@ def check_backoff_capped_jitter(ctx: dict) -> tuple[bool, str]:
 
 # The adapter's own files, as rules/scope-adapter-files-only.md lists them for <name>=servicenow.
 _ALLOWED = (
-    re.compile(r"^infrahub_sync/adapters/servicenow\.py$"),
-    # its tests, fixtures and fakes, wherever the test layout puts them
-    re.compile(r"^tests/(.+/)?[^/]*servicenow[^/]*(/.+)?$"),
-    re.compile(r"^examples/servicenow[^/]*/.+"),
+    re.compile(r"^infrahub_sync/adapters/servicenow(_client)?\.py$"),
+    # its tests, fixtures and fakes, wherever the test layout puts them; the
+    # name ends at a separator, so another adapter's servicenowx files fail
+    re.compile(r"^tests/(.+/)?([^/]*_)?servicenow([_.][^/]*)?(/.+)?$"),
+    re.compile(r"^examples/servicenow[-_][^/]*/.+"),
     re.compile(r"^docs/docs/adapters/(servicenow|choosing-an-adapter)\.mdx$"),
     re.compile(r"^docs/docs/readme\.mdx$"),
     re.compile(r"^docs/sidebars\.ts$"),
     re.compile(r"^changelog/[^/]+\.md$"),
-    re.compile(r"^(dev/)?specs/[^/]*servicenow[^/]*/.+"),
+    re.compile(r"^dev/specs/[0-9]+-servicenow-adapter/.+"),
     # README.md and AGENTS.md (the adapter lists), and drafted issues or notes
     re.compile(r"^[^/]+\.md$"),
     re.compile(r"^\.vale/styles/spelling-exceptions\.txt$"),

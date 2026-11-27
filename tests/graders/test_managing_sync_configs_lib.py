@@ -144,3 +144,58 @@ def test_stable_id_check_fails_when_netbox_id_is_dropped_or_used_as_key() -> Non
     config, _ = lib.load_yaml_file(_PASS)
     _device(config)["identifiers"].append("netbox_id")
     assert _checks(config)["stable-id-is-a-field"] is False
+
+
+def _field(mapping: dict, name: str) -> dict:
+    return next(f for f in mapping["fields"] if f["name"] == name)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        pytest.param(
+            lambda f: (f.pop("mapping"), f.update(static=1)), id="static only"
+        ),
+        pytest.param(lambda f: f.update(static=1), id="static next to mapping"),
+        pytest.param(lambda f: f.update(mapping=" "), id="blank mapping"),
+    ],
+)
+def test_a_constant_is_not_a_field_mapped_from_the_source(change) -> None:
+    """A static value replaces the source value, so it keeps no NetBox id and no key."""
+    config, _ = lib.load_yaml_file(_PASS)
+    change(_field(_device(config), "netbox_id"))
+    assert _checks(config)["stable-id-is-a-field"] is False
+
+    config, _ = lib.load_yaml_file(_PASS)
+    change(_field(_device(config), "name"))
+    assert _checks(config)["identifiers-match-hfid"] is False
+
+
+@pytest.mark.parametrize(
+    ("content", "reason"),
+    [
+        pytest.param(
+            "schema_mapping: [\n  - name: x\n", "does not parse", id="invalid YAML"
+        ),
+        pytest.param(b"\xff\xfe name: x", "cannot be read", id="not UTF-8"),
+    ],
+)
+def test_an_unreadable_config_fails_every_check_with_the_reason(
+    tmp_path: Path, content, reason: str
+) -> None:
+    path = tmp_path / "config.yml"
+    if isinstance(content, bytes):
+        path.write_bytes(content)
+    else:
+        path.write_text(content)
+    proc = subprocess.run(
+        [sys.executable, str(_GRADERS / TASKS["identifiers-hfid"])],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=True,
+    )
+    result = json.loads(proc.stdout)
+    assert result["score"] == 0.0
+    assert all(reason in check["message"] for check in result["checks"]), result

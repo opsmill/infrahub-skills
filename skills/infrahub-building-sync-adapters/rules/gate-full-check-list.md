@@ -71,12 +71,14 @@ uv run towncrier create -c "Add a <System> source adapter." <PR>.added.md
   only reads.
 - **News fragment**: `changelog/<PR>.added.md`.
 - **Docs**: the page `docs/docs/adapters/<name>.mdx`, its
-  entry in `docs/sidebars.ts`, and its row in
-  `docs/docs/adapters/choosing-an-adapter.mdx`. Add
+  entry in `docs/sidebars.ts`, and one line each in the
+  adapter lists of
+  `docs/docs/adapters/choosing-an-adapter.mdx`,
+  `docs/docs/readme.mdx`, `README.md` and `AGENTS.md`. Add
   product names Vale rejects to
   `.vale/styles/spelling-exceptions.txt`.
 - **Spec documents**: re-read every file under
-  `dev/specs/<NNN>-<name>/` (or `specs/`) against the
+  `dev/specs/<NNN>-<name>-adapter/` against the
   code, and mark each numbered requirement met, partly
   met or not met.
 - **Scope**: the check in
@@ -106,7 +108,7 @@ approval point 3.
 - `uv run invoke docs.docusaurus`: built
 - `infrahub-sync list --directory examples/`, `infrahub-sync generate --name from-netinventory --directory examples/netinventory_to_infrahub/` and `infrahub-sync diff --name from-netinventory --directory examples/netinventory_to_infrahub/`: passed
 - News fragment: `changelog/415.added.md`
-- Docs: `docs/docs/adapters/netinventory.mdx`, entry in `docs/sidebars.ts`, row in `docs/docs/adapters/choosing-an-adapter.mdx`
+- Docs: `docs/docs/adapters/netinventory.mdx`, entry in `docs/sidebars.ts`, one line each in `docs/docs/adapters/choosing-an-adapter.mdx`, `docs/docs/readme.mdx`, `README.md` and `AGENTS.md`
 - Spec documents re-read against the code: `dev/specs/018-netinventory-adapter/spec.md`, `plan.md`, `data-model.md`, `quickstart.md`, `tasks.md`
 ```
 

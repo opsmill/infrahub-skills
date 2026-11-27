@@ -108,6 +108,9 @@ _PASS_PR = _FIXTURES / "pr-check-list" / "pass" / "PR_DESCRIPTION.md"
             ", row in `docs/docs/adapters/choosing-an-adapter.mdx`",
             "choosing-an-adapter row",
         ),
+        ("`docs/docs/readme.mdx`, ", "docs readme list"),
+        ("`README.md` and ", "README.md list"),
+        (" and `AGENTS.md`", "AGENTS.md list"),
     ],
 )
 def test_pr_checks_require_every_docs_item(dropped: str, item: str) -> None:
@@ -128,6 +131,54 @@ def test_pr_checks_require_a_result_after_each_command() -> None:
     ok, details = lib.check_pr_checks_complete({"pr_text": bare})
     assert not ok
     assert "no result written after" in details
+
+
+@pytest.mark.parametrize("heading", ["## Tests added", "## Latest changes"])
+def test_pr_checks_prefer_the_checks_run_heading(heading: str) -> None:
+    """A heading that names tests, or holds "test" inside a word, comes before
+    `## Checks run` and must not hide it."""
+    text = _PASS_PR.read_text().replace(
+        "## Checks run",
+        f"{heading}\n\n- `tests/adapters/test_servicenow.py`\n\n## Checks run",
+    )
+    ok, details = lib.check_pr_checks_complete({"pr_text": text})
+    assert ok, details
+
+
+def test_pr_checks_need_a_result_for_commands_joined_with_and() -> None:
+    """All the commands on one line, joined with "and", and no result."""
+    text = _PASS_PR.read_text()
+    commands = [
+        line[2:].split(": ", 1)[0]
+        for line in text.splitlines()
+        if line.startswith("- `") and ("uv run" in line or "infrahub-sync" in line)
+    ]
+    body = text.split("## Checks run", 1)
+    rest = [line for line in body[1].splitlines() if not line.startswith("- `")]
+    joined = (
+        body[0]
+        + "## Checks run\n\n- "
+        + " and ".join(commands)
+        + "\n"
+        + "\n".join(rest)
+    )
+    ok, details = lib.check_pr_checks_complete({"pr_text": joined})
+    assert not ok
+    assert "no result written after" in details
+
+
+def test_pr_checks_accept_a_status_mark_and_a_grouped_result() -> None:
+    text = _PASS_PR.read_text()
+    marked = (
+        text.replace("`uv run ty check .`: passed", "`uv run ty check .`: \u2705")
+        .replace("- `uv run rumdl check .`: passed\n", "")
+        .replace(
+            "`uv run invoke format`: no changes",
+            "`uv run invoke format` and `uv run rumdl check .`: no changes",
+        )
+    )
+    ok, details = lib.check_pr_checks_complete({"pr_text": marked})
+    assert ok, details
 
 
 def test_pr_checks_ignore_commands_that_are_only_printed() -> None:
@@ -251,11 +302,74 @@ _RETRY_MUTATIONS = {
         "                self.errors = errors\n                if errors > self.max_retries:",
         "shared-retry-budget",
     ),
+    # Review of PR #236: two budgets of different sizes.
+    "a larger budget for connection errors": (
+        "            except (requests.ConnectionError, requests.Timeout):\n                attempt += 1\n"
+        "                if attempt > self.max_retries:",
+        "            except (requests.ConnectionError, requests.Timeout):\n"
+        "                self.conn_attempt = getattr(self, 'conn_attempt', 0) + 1\n"
+        "                if self.conn_attempt > 15:",
+        "shared-retry-budget",
+    ),
+    # Review of PR #236: a jitter factor above 1 lifts the capped value past 60 s.
+    "jitter factor above 1": (
+        "random.uniform(0.5, 1.0)",
+        "random.uniform(0.5, 1.5)",
+        "backoff-capped-jitter",
+    ),
+    # Review of PR #236: the name is capped, then rebound to a value above the cap.
+    "jitter added to the capped name": (
+        "        return min(BACKOFF_CAP, 2 ** attempt) * random.uniform(0.5, 1.0)",
+        "        delay = min(BACKOFF_CAP, 2 ** attempt)\n"
+        "        delay = delay + random.uniform(0, 30)\n"
+        "        return delay",
+        "backoff-capped-jitter",
+    ),
+    "capped on one branch only": (
+        "        return min(BACKOFF_CAP, 2 ** attempt) * random.uniform(0.5, 1.0)",
+        "        if attempt > 3:\n"
+        "            delay = 2 ** attempt * random.uniform(0.5, 1.0)\n"
+        "        else:\n"
+        "            delay = min(BACKOFF_CAP, 2 ** attempt) * random.uniform(0.5, 1.0)\n"
+        "        return delay",
+        "backoff-capped-jitter",
+    ),
+}
+
+# Compliant clients written another way: every retry check passes.
+_RETRY_PASS_VARIANTS = {
+    "random imported under an alias": (
+        ("import random\n", "import random as rng\n"),
+        ("random.uniform(0.5, 1.0)", "rng.uniform(0.5, 1.0)"),
+    ),
+    "uniform imported under an alias": (
+        ("import random\n", "from random import uniform as draw\n"),
+        ("random.uniform(0.5, 1.0)", "draw(0.5, 1.0)"),
+    ),
+    "capped by an if, in statement order": (
+        (
+            "        return min(BACKOFF_CAP, 2 ** attempt) * random.uniform(0.5, 1.0)",
+            "        delay = 2 ** attempt * random.uniform(0.5, 1.0)\n"
+            "        if delay > BACKOFF_CAP:\n"
+            "            delay = BACKOFF_CAP\n"
+            "        return delay",
+        ),
+    ),
 }
 
 
 def test_retry_checks_pass_the_compliant_client(tmp_path: Path) -> None:
     assert all(_retry_checks(tmp_path, _RETRY_PASS).values())
+
+
+@pytest.mark.parametrize("case", list(_RETRY_PASS_VARIANTS))
+def test_retry_checks_pass_a_compliant_variant(tmp_path: Path, case: str) -> None:
+    source = _RETRY_PASS
+    for old, new in _RETRY_PASS_VARIANTS[case]:
+        assert source.count(old) == 1, f"the variant {case!r} no longer applies"
+        source = source.replace(old, new)
+    results = _retry_checks(tmp_path, source)
+    assert all(results.values()), results
 
 
 @pytest.mark.parametrize("case", list(_RETRY_MUTATIONS))
@@ -291,6 +405,42 @@ def test_retry_probe_refuses_writes_outside_the_answer_directory(
     report = lib.run_probe("_retry_probe.py", work)
     assert "PermissionError" in report.get("error", ""), report
     assert not target.exists()
+
+
+_OUTSIDE_CHANGES = {
+    "truncate": "os.truncate(OUT, 0)",
+    "chmod": "os.chmod(OUT, 0o600)",
+    "rename out": "open(IN, 'w').close(); os.rename(IN, OUT + '.moved')",
+    "replace over": "open(IN, 'w').close(); os.replace(IN, OUT)",
+    "hard link": "os.link(OUT, IN)",
+    "symlink": "os.symlink(IN, OUT + '.link')",
+    "remove": "os.remove(OUT)",
+    "relative to a directory descriptor": "os.mkdir('d', dir_fd=os.open(DIR, os.O_RDONLY))",
+    "udp send": "import socket; socket.socket(socket.AF_INET, socket.SOCK_DGRAM).sendto(b'x', ('127.0.0.1', 9))",
+}
+
+
+@pytest.mark.parametrize("case", list(_OUTSIDE_CHANGES))
+def test_retry_probe_refuses_changes_outside_the_answer_directory(
+    tmp_path: Path, case: str
+) -> None:
+    work = tmp_path / "work"
+    work.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("keep")
+    before = sorted(p.name for p in tmp_path.iterdir())
+    prelude = (
+        f"\nimport os\nOUT = {str(outside)!r}\nIN = {str(work / 'inside.txt')!r}\n"
+        f"DIR = {str(tmp_path)!r}\n"
+    )
+    (work / "servicenow_client.py").write_text(
+        _RETRY_PASS + prelude + _OUTSIDE_CHANGES[case] + "\n"
+    )
+    report = lib.run_probe("_retry_probe.py", work)
+    assert "PermissionError" in report.get("error", ""), report
+    assert outside.read_text() == "keep"
+    assert oct(outside.stat().st_mode & 0o777) != oct(0o600)
+    assert sorted(p.name for p in tmp_path.iterdir()) == before
 
 
 def _selected(rows: list[dict]) -> dict:

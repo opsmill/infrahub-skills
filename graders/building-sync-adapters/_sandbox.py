@@ -5,8 +5,10 @@ process. ``lib.run_probe`` starts them with an empty environment, so no API
 key or token is in reach. ``confine`` then installs an audit hook that refuses:
 
 - starting a process (``subprocess``, ``os.system``, ``os.exec*``, spawn, fork);
-- a network connection or a DNS lookup;
-- writing, renaming or removing a file outside ``writable_root``.
+- a network connection, a datagram send or a DNS lookup;
+- writing, truncating, renaming, linking, removing or changing the mode of
+  a file outside ``writable_root``, and any of these relative to a
+  directory descriptor, whose target the hook cannot resolve.
 
 An audit hook is not a security boundary: code that sets out to escape it can.
 It stops answer code from reaching the network, the runner's files or a
@@ -29,8 +31,29 @@ _SPAWN = (
     "os.forkpty",
     "pty.spawn",
 )
-_NETWORK = ("socket.connect", "socket.getaddrinfo", "socket.gethostbyname")
-_FILE_CHANGES = ("os.remove", "os.rename", "os.rmdir", "os.mkdir", "shutil.rmtree")
+_NETWORK = (
+    "socket.connect",
+    "socket.sendto",
+    "socket.sendmsg",
+    "socket.getaddrinfo",
+    "socket.gethostbyname",
+)
+# event: (indexes of the paths it changes, indexes of its directory descriptors)
+_FILE_CHANGES: dict[str, tuple[tuple[int, ...], tuple[int, ...]]] = {
+    "os.remove": ((0,), (1,)),
+    "os.rmdir": ((0,), (1,)),
+    "os.mkdir": ((0,), (2,)),
+    "os.truncate": ((0,), ()),
+    "os.chmod": ((0,), (2,)),
+    "os.chown": ((0,), (3,)),
+    # a symlink only names its target; writing through it reaches the open check
+    "os.symlink": ((1,), (2,)),
+    # a hard link to an outside file would let a write inside change it
+    "os.link": ((0, 1), (2, 3)),
+    # os.rename and os.replace: both the source and the destination
+    "os.rename": ((0, 1), (2, 3)),
+    "shutil.rmtree": ((0,), (1,)),
+}
 _WRITE_FLAGS = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_TRUNC
 
 
@@ -57,7 +80,22 @@ def confine(writable_root: Path) -> None:
             )
             if writes and not isinstance(path, int) and not inside(path):
                 raise PermissionError(f"the grader sandbox refuses a write to {path}")
-        if event in _FILE_CHANGES and args and not inside(args[0]):
-            raise PermissionError(f"the grader sandbox refuses {event} on {args[0]}")
+        if event in _FILE_CHANGES:
+            paths, dir_fds = _FILE_CHANGES[event]
+            for i in dir_fds:
+                if i < len(args) and args[i] not in (None, -1):
+                    raise PermissionError(
+                        f"the grader sandbox refuses {event} relative to a directory descriptor"
+                    )
+            for i in paths:
+                # an int is a descriptor, opened under the open check above
+                if (
+                    i < len(args)
+                    and not isinstance(args[i], int)
+                    and not inside(args[i])
+                ):
+                    raise PermissionError(
+                        f"the grader sandbox refuses {event} on {args[i]}"
+                    )
 
     sys.addaudithook(hook)

@@ -73,13 +73,13 @@
     {
       "id": 3,
       "prompt": "The ServiceNow source adapter for infrahub-sync is finished on branch\n`feat/servicenow-adapter`:\n\n- adapter: `infrahub_sync/adapters/servicenow.py`\n- tests: `tests/unit/adapters/test_servicenow.py`\n- example: `examples/servicenow_to_infrahub/`\n- spec: `dev/specs/017-servicenow-adapter/`\n\nLint and pytest pass locally, so it is ready. Write the PR description so I can\nopen the PR against `main`; reviewers want to see which checks were run.\n\nSave it to: PR_DESCRIPTION.md",
-      "expected_output": "A PR description with a checks section naming every repository check for an adapter PR, each command followed by its result: format, lint, ty, unit tests, rumdl, the docs build, infrahub-sync list, generate and diff on the example, the news fragment, the docs page, its sidebar entry and its choosing-an-adapter row, and the spec documents matched to the code.",
+      "expected_output": "A PR description with a checks section naming every repository check for an adapter PR, each command followed by its result: format, lint, ty, unit tests, rumdl, the docs build, infrahub-sync list, generate and diff on the example, the news fragment, the docs page, its sidebar entry, its line in each adapter list (choosing-an-adapter, docs/docs/readme.mdx, README.md and AGENTS.md), and the spec documents matched to the code.",
       "files": [],
       "expectations": [
         "The checks section names the docs build",
         "The checks section names the changelog news fragment",
         "The checks section names infrahub-sync list, generate and diff on the example",
-        "The checks section names the docs page, the sidebar entry and the choosing-an-adapter row",
+        "The checks section names the docs page, the sidebar entry, and the adapter lists in choosing-an-adapter, docs/docs/readme.mdx, README.md and AGENTS.md",
         "The checks section names the spec documents"
       ],
       "assertions": [
@@ -91,7 +91,7 @@
     },
     {
       "id": 4,
-      "prompt": "Our ServiceNow adapter's HTTP client has no retry logic yet:\n\n```python\nclass ServiceNowClient:\n    def __init__(self, session):\n        self.session = session\n\n    def get(self, url, params=None):\n        resp = self.session.get(url, params=params, timeout=60)\n        resp.raise_for_status()\n        return resp\n```\n\nThe customer's instance has a rate-limit rule on the Table API, and yesterday a\nsync run died on this response:\n\n```text\nRequest (GET):\n/api/now/table/cmdb_ci_netgear?sysparm_limit=1&sysparm_fields=sys_id\nResponse status: 429\nContent-Type: application/json;charset=UTF-8\nRetry-After: 1422\nX-RateLimit-Rule: d9e2f4bc5324df10a080f7e0a0490eb5\nX-RateLimit-Limit: 10\nX-RateLimit-Reset: 1794420000\n\n{\n \"error\": {\n  \"message\": \"Rate limit exceeded\",\n  \"detail\": \"Rate limit of 10 requests per hour for Table API exceeded\"\n },\n \"status\": \"failure\"\n}\n```\n\nMake the client resilient to throttling and to transient errors. Sleeping a bit\nand retrying on 429 should do.\n\nSave the complete module to: servicenow_client.py",
+      "prompt": "Our ServiceNow adapter's HTTP client has no retry logic yet:\n\n```python\nclass ServiceNowClient:\n    def __init__(self, session):\n        self.session = session\n\n    def get(self, url, params=None):\n        resp = self.session.get(url, params=params, timeout=60)\n        resp.raise_for_status()\n        return resp\n```\n\nThe customer's instance has a rate-limit rule on the Table API, and yesterday a\nsync run died on this response:\n\n```text\nRequest (GET):\n/api/now/table/cmdb_ci_netgear?sysparm_limit=1&sysparm_fields=sys_id\nResponse status: 429\nContent-Type: application/json;charset=UTF-8\nRetry-After: 1422\nX-RateLimit-Rule: d9e2f4bc5324df10a080f7e0a0490eb5\nX-RateLimit-Limit: 10\nX-RateLimit-Reset: 1794420000\n\n{\n \"error\": {\n  \"message\": \"Rate limit exceeded\",\n  \"detail\": \"Rate limit of 10 requests per hour for Table API exceeded\"\n },\n \"status\": \"failure\"\n}\n```\n\nMake the client resilient to throttling and to transient errors. Sleeping a bit\nand retrying on 429 should do. Keep the retries inside `ServiceNowClient.get`:\nthe session is shared with other code, so do not mount adapters on it.\n\nSave the complete module to: servicenow_client.py",
       "expected_output": "A client that retries 429, 502, 503 and 504 and dropped or timed-out connections from one budget, honors Retry-After, stops with an error when Retry-After exceeds 300 s, backs off exponentially with jitter capped at 60 s, and never retries TLS errors.",
       "files": [],
       "expectations": [

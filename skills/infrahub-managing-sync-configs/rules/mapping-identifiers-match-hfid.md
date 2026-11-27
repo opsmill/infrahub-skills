@@ -40,12 +40,16 @@ HFID become one node:
 Nothing reports the merge. The diff shows two creates,
 and Infrahub holds one node.
 
-A kind with no `human_friendly_id` is matched on its
-`default_filter` when it has one, and otherwise each
-create makes a new node. For such a kind, set
-`identifiers` to its `default_filter` attribute, or
-propose adding a `human_friendly_id` through
-`infrahub-managing-schemas`.
+A kind with no `human_friendly_id` needs one before a
+sync relies on repeat runs: propose adding it through
+`infrahub-managing-schemas`. Until it has one, Infrahub
+matches the kind on its `default_filter` when it has
+one, and otherwise each create makes a new node.
+Infrahub marks `default_filter` as deprecated in favor of
+`human_friendly_id`, so when the user keeps it, set
+`identifiers` to the `default_filter` attribute and check
+on the test branch that a second sync updates the nodes
+instead of creating new ones.
 
 ### How to apply
 

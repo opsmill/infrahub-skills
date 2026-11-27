@@ -27,16 +27,21 @@ _FENCE = re.compile(r"```[^\n]*\n(.*?)```", re.DOTALL)
 def load_yaml_file(path: Path) -> tuple[Any, str]:
     """Parse a YAML file; accept an answer whose YAML sits in fenced blocks."""
     if not path.exists():
-        return None, f"{path} not found"
-    raw = path.read_text()
+        return None, f"{path.name} not found"
+    try:
+        raw = path.read_text()
+    except (OSError, UnicodeDecodeError) as exc:
+        return None, f"{path.name} cannot be read: {exc}"
+    error = ""
     for candidate in [raw, *_FENCE.findall(raw)]:
         try:
             data = yaml.safe_load(candidate)
-        except yaml.YAMLError:
+        except yaml.YAMLError as exc:
+            error = error or f": {exc}".splitlines()[0]
             continue
         if isinstance(data, dict):
             return data, ""
-    return None, f"{path} does not parse as a YAML mapping"
+    return None, f"{path.name} does not parse as a YAML mapping{error}"
 
 
 # --------------------------------------------------------------------------
@@ -67,13 +72,17 @@ def schema_hfids(schema: dict) -> dict[str, list[str]]:
 
 
 def _mapped_fields(mapping: dict) -> set[str]:
-    """Field names of one schema_mapping entry that take their value from the source."""
+    """Field names of one schema_mapping entry that take their value from a source
+    field. A `static` value is a constant, and the adapters use it in place of
+    `mapping` when both are set, so such a field is not mapped from the source."""
     return {
         str(f.get("name"))
         for f in mapping.get("fields") or []
         if isinstance(f, dict)
         and f.get("name")
-        and (f.get("mapping") or f.get("static") is not None)
+        and isinstance(f.get("mapping"), str)
+        and f["mapping"].strip()
+        and not f.get("static")
     }
 
 
@@ -84,7 +93,7 @@ def check_identifiers_match_hfid(ctx: dict) -> tuple[bool, str]:
     if not isinstance(config, dict) or not isinstance(
         config.get("schema_mapping"), list
     ):
-        return False, "identifiers-match-hfid: no schema_mapping list in config.yml"
+        return False, "identifiers-match-hfid: " + _no_mapping(ctx)
     hfids = schema_hfids(ctx["schema"])
     problems = []
     for mapping in config["schema_mapping"]:
@@ -112,6 +121,11 @@ def check_identifiers_match_hfid(ctx: dict) -> tuple[bool, str]:
     return True, "identifiers-match-hfid: identifiers match every human_friendly_id"
 
 
+def _no_mapping(ctx: dict) -> str:
+    """Why there is no schema_mapping list: the load error, when the file did not load."""
+    return ctx.get("config_error") or "no schema_mapping list in config.yml"
+
+
 # The stable source ID the prompt asks to keep, per destination kind.
 _STABLE_ID = {"NetworkDevice": "netbox_id", "LocationSite": "netbox_id"}
 
@@ -122,7 +136,7 @@ def check_stable_id_is_a_field(ctx: dict) -> tuple[bool, str]:
     if not isinstance(config, dict) or not isinstance(
         config.get("schema_mapping"), list
     ):
-        return False, "stable-id-is-a-field: no schema_mapping list in config.yml"
+        return False, "stable-id-is-a-field: " + _no_mapping(ctx)
     problems = []
     entries = {
         m.get("name"): m for m in config["schema_mapping"] if isinstance(m, dict)
@@ -153,9 +167,14 @@ CHECKS: dict[str, Callable[[dict], tuple[bool, str]]] = {
 
 def build_context(workdir: Path) -> dict:
     """Load every artifact a task might produce; checks read what they need."""
-    config, _ = load_yaml_file(workdir / "config.yml")
+    config, error = load_yaml_file(workdir / "config.yml")
     schema = yaml.safe_load((DATA / "netbox_schema.yml").read_text())
-    return {"workdir": workdir, "config": config, "schema": schema}
+    return {
+        "workdir": workdir,
+        "config": config,
+        "config_error": error,
+        "schema": schema,
+    }
 
 
 def run_checks(check_names: list[str], workdir: Path = Path()) -> dict:

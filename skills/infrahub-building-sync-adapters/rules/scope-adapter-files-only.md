@@ -16,10 +16,14 @@ tags: scope, core, infrahub-sync, git, issue
 An adapter change touches only these files in the
 infrahub-sync checkout:
 
-- `infrahub_sync/adapters/<name>.py`;
-- its tests, `tests/adapters/test_<name>*.py`, and its
-  fixtures under `tests/fixtures/<name>/`;
-- its example under `examples/<name>*/`;
+- `infrahub_sync/adapters/<name>.py`, and
+  `infrahub_sync/adapters/<name>_client.py` when the HTTP
+  client is a module of its own;
+- its tests, `tests/adapters/test_<name>.py` and
+  `tests/adapters/test_<name>_*.py`, and its fixtures
+  under `tests/fixtures/<name>/`;
+- its example under `examples/<name>_*/` or
+  `examples/<name>-*/`;
 - its docs page `docs/docs/adapters/<name>.mdx`, and one
   line each in the adapter lists:
   `docs/docs/adapters/choosing-an-adapter.mdx`,
@@ -53,8 +57,9 @@ was reverted file by file.
 
 - **Need a helper?** Write it as a private function
   (`_next_link`, `_retry_after_seconds`) inside the
-  adapter module, and keep the HTTP client in that module
-  too.
+  adapter module. Keep the HTTP client in that module,
+  or in `<name>_client.py` next to it, as the Webex
+  adapter does.
 - **Want the shared version, or found a core bug?**
   Draft a core issue instead of a fix. Save it as a
   Markdown file at the top of the working directory (for
@@ -73,7 +78,7 @@ was reverted file by file.
 
 ```bash
 NAME="<name>"   # the adapter name
-git diff --name-only "<base>" | grep -vE "^(infrahub_sync/adapters/$NAME\.py|tests/adapters/test_$NAME[^/]*\.py|tests/fixtures/$NAME/.+|examples/$NAME[^/]*/.+|docs/docs/adapters/($NAME|choosing-an-adapter)\.mdx|docs/docs/readme\.mdx|docs/sidebars\.ts|README\.md|AGENTS\.md|\.vale/styles/spelling-exceptions\.txt|changelog/[^/]+\.md|dev/specs/[^/]*-$NAME-[^/]*/.+)$"
+git diff --name-only "<base>" | grep -vE "^(infrahub_sync/adapters/${NAME}(_client)?\.py|tests/adapters/test_${NAME}(_[^/]*)?\.py|tests/fixtures/${NAME}/.+|examples/${NAME}[-_][^/]*/.+|docs/docs/adapters/(${NAME}|choosing-an-adapter)\.mdx|docs/docs/readme\.mdx|docs/sidebars\.ts|README\.md|AGENTS\.md|\.vale/styles/spelling-exceptions\.txt|changelog/[^/]+\.md|dev/specs/[0-9]+-${NAME}-adapter/.+)$"
 ```
 
 `<base>` is the commit the adapter branch started from,

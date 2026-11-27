@@ -14,5 +14,5 @@ Adds `servicenow`, a source adapter that reads network gear and locations from t
 - `infrahub-sync generate --name from-netbox --directory examples/netbox_to_infrahub/`: passed
 - `infrahub-sync diff --name from-netbox --directory examples/netbox_to_infrahub/`: no changes
 - News fragment: `changelog/412.added.md`
-- Docs page `docs/docs/adapters/servicenow.mdx`, entry in `docs/sidebars.ts`, row in `docs/docs/adapters/choosing-an-adapter.mdx`
+- Docs page `docs/docs/adapters/servicenow.mdx`, entry in `docs/sidebars.ts`, row in `docs/docs/adapters/choosing-an-adapter.mdx`, one line each in `docs/docs/readme.mdx`, `README.md` and `AGENTS.md`
 - Spec documents re-read against the code: `dev/specs/017-servicenow-adapter/spec.md`, `plan.md`, `tasks.md`

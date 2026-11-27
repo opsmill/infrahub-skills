@@ -11,9 +11,10 @@ where infrahub-sync is installed. Stop at the first
 failure and tell the user what failed.
 
 ```bash
-# The installed infrahub-sync follows the main contract. A match means the
-# feature/v3-develop contract: stop and tell the user.
-grep -rn "BUILTIN_ADAPTER_CAPABILITIES" "$(python -c 'import infrahub_sync, os; print(os.path.dirname(infrahub_sync.__file__))')"
+# The installed infrahub-sync follows the main contract. Expected on main:
+# no output, and the line passes. Any output means the feature/v3-develop
+# contract: stop and tell the user.
+! grep -rn "BUILTIN_ADAPTER_CAPABILITIES" "$(python -c 'import infrahub_sync, os; print(os.path.dirname(infrahub_sync.__file__))')"
 
 # The source system has an adapter: its module is in the installed package.
 ls "$(python -c 'import infrahub_sync, os; print(os.path.dirname(infrahub_sync.__file__))')/adapters/"
@@ -141,6 +142,8 @@ cp sync/<project>/config.yml "$RUN"
 # and branch to <test-branch>. Add token only if generate fails to authenticate.
 
 # Show the effective target, and stop when the commands would not agree.
+# Each infrahub-sync command below runs only when this check passes.
+check_target() {
 python - "$RUN" <<'EOF'
 import os, sys, yaml
 settings = yaml.safe_load(open(sys.argv[1]))["destination"].get("settings") or {}
@@ -153,15 +156,15 @@ if not branch:
 if env and env.rstrip("/") != url.rstrip("/"):
     sys.exit("INFRAHUB_ADDRESS and destination.settings.url differ: stop")
 EOF
+}
 
-infrahub-sync generate --config-file "$RUN"
-infrahub-sync diff --config-file "$RUN"
+check_target && infrahub-sync generate --config-file "$RUN" && infrahub-sync diff --config-file "$RUN"
 
 # Approval point 3. Only after the user approves:
-infrahub-sync sync --config-file "$RUN"
+check_target && infrahub-sync sync --config-file "$RUN"
 
 # Expect no creates or updates, except for records changed in the source since the sync.
-infrahub-sync diff --config-file "$RUN"
+check_target && infrahub-sync diff --config-file "$RUN"
 
 rm "$RUN"   # it may hold the Infrahub token
 ```

@@ -10575,13 +10575,16 @@ tasks:
       an adapter PR, each command followed by its result: format, lint, ty, unit
       tests, rumdl, the docs build,
       infrahub-sync list, generate and diff on the example, the news fragment,
-      the docs page, its sidebar entry and its choosing-an-adapter row, and the
-      spec documents matched to the code.
+      the docs page, its sidebar entry, its line in each adapter list
+      (choosing-an-adapter, docs/docs/readme.mdx, README.md and AGENTS.md), and
+      the spec documents matched to the code.
     expectations:
       - The checks section names the docs build
       - The checks section names the changelog news fragment
       - The checks section names infrahub-sync list, generate and diff on the example
-      - The checks section names the docs page, the sidebar entry and the choosing-an-adapter row
+      - >-
+        The checks section names the docs page, the sidebar entry, and the adapter
+        lists in choosing-an-adapter, docs/docs/readme.mdx, README.md and AGENTS.md
       - The checks section names the spec documents
     assertions:
       - name: pr-checks-complete
@@ -10630,7 +10633,8 @@ tasks:
       ```
 
       Make the client resilient to throttling and to transient errors. Sleeping a bit
-      and retrying on 429 should do.
+      and retrying on 429 should do. Keep the retries inside `ServiceNowClient.get`:
+      the session is shared with other code, so do not mount adapters on it.
 
       Save the complete module to: servicenow_client.py
     graders:

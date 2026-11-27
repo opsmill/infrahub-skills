@@ -108,7 +108,7 @@ def _retry_after_seconds(value: str | None) -> float | None:
 
 
 def _backoff(attempt: int) -> float:
-    """Exponential backoff with full jitter, capped."""
+    """Exponential backoff with random jitter between 1 s and the capped delay."""
     return random.uniform(1.0, max(1.0, min(BACKOFF_CAP, BACKOFF_BASE * 2**attempt)))
 
 
@@ -157,9 +157,12 @@ captured 429 served by the fake from
 [test-fakes-from-captures.md](./test-fakes-from-captures.md),
 with `time.sleep` replaced, so the tests do not wait.
 
-If you build the policy on `urllib3.util.Retry` instead,
-check that it gives the same behavior, the stop above
-300 s and the TLS exclusion included.
+Write the retry loop by hand, as above. Do not build
+the policy on `urllib3.util.Retry` mounted through an
+`HTTPAdapter`. It waits for the `Retry-After` value,
+shortened to `retry_after_max` at most (urllib3 2.x),
+and has no setting that stops with an error instead, so
+it cannot meet the stop above 300 s.
 
 ### Incorrect
 

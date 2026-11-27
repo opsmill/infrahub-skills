@@ -38,7 +38,7 @@ tell "not observed" from "forgotten".
 | Key | Value |
 | --- | ----- |
 | `type` | `link_header` (a `Link` header with `rel="next"`), `body_link` (a next URL in the body, such as `@odata.nextLink`), `offset` (the client computes the next offset), `cursor`, or `none` |
-| `next_link_carries` | Every query parameter the captured next link repeats, except the one that moves the page (`offset`, `cursor`). Copy it from the captured link, not from the documentation. `[]` only when the captured link really carries no other parameter. |
+| `next_link_carries` | Every query parameter the captured next link repeats, except the one that moves the page (`offset`, `cursor`). Copy it from the captured link, not from the documentation. `[]` only when the captured link really carries no other parameter. When several captures of the endpoint carry different parameters, list every parameter that any captured next link repeats: a filter repeated only in the filtered capture still belongs in the list. |
 | `cursor_param` | Optional. The parameter that moves the page. |
 | `total_header` | Optional. A header that gives the total row count. |
 
@@ -67,6 +67,13 @@ When no throttled response was captured, write
 `rate_limit: {observed: false}`, with any rate-limit
 headers the captures carry. The default retry policy
 then applies unchanged.
+
+Record a throttled response only on the endpoint where
+it was captured. When its message says the limit covers
+more endpoints, for example the whole Table API, the
+other endpoints still get `observed: false`, with a YAML
+comment that names the wider scope and the capture it
+comes from.
 
 ### `field_quirks`
 
