@@ -13,21 +13,15 @@ Markdown documents.
 
 | Concept | Description |
 | ------- | ----------- |
-| **Plugin** | A packaged set of skills, hooks, and metadata distributed via `.claude-plugin/plugin.json` |
+| **Plugin** | A packaged set of skills and metadata distributed via `.claude-plugin/plugin.json` |
 | **Skill** | A self-contained unit of domain knowledge with rules, examples, and references |
 | **Rule** | An individual best practice or requirement within a skill, organized by category prefix |
-| **Hook** | A trigger that detects project context and activates skills automatically |
 | **Evaluation** | A test scenario that verifies a skill produces correct output |
 
 ## Component Architecture
 
 ```text
 Plugin (plugin.json)
-├── Hooks (hooks/hooks.json)
-│   └── SessionStart → hooks-handlers/session-start.sh
-│       └── Detects .infrahub.yml, infrahub.toml,
-│           schema files
-│
 ├── Skills (skills/)
 │   ├── infrahub-<verb>-<noun>/   ← one per skill
 │   │   ├── SKILL.md          ← Entry point
@@ -165,16 +159,18 @@ to a shared file, check whether the concern is
 genuinely cross-cutting or just convenient to put in
 one place.
 
-### Automatic Detection via Hooks
+### No hooks: skills trigger from their descriptions
 
-The SessionStart hook (`hooks-handlers/session-start.sh`)
-checks for Infrahub project markers and provides skill
-activation context, making the plugin
-zero-configuration for users. Detection looks for:
-
-- `.infrahub.yml` or `infrahub.toml` config files
-- Schema files with `version: "1.0"` and `nodes:` or
-  `generics:` keys
+The plugin ships no hook. Each skill's `description`
+decides when it loads, so the TRIGGER and DO NOT
+TRIGGER clauses carry the whole routing job. An
+earlier `SessionStart` hook detected Infrahub projects,
+but the Claude plugin directory holds or refuses
+command hooks whose script uses variables, wildcards,
+command substitution or a here-document, and project
+detection needs all of them. Do not add a hook back
+without checking the directory's
+[pre-submission checklist](https://claude.com/docs/plugins/pre-submission-checklist).
 
 ### Agent Skills Format
 

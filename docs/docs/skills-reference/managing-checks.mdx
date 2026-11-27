@@ -13,6 +13,7 @@ The Check Manager produces, modifies, and debugs Python validation checks that r
 - Blocking changes that would violate design intent (e.g., a BGP session referencing a decommissioned device)
 - Any validation that should block a proposed change from merging
 - Changing what an existing check validates, or working out why one fails, passes when it should not, or flags the wrong nodes
+- Editing a `.py` file under `checks/`, or a `.gql` file under `queries/` that a check in `.infrahub.yml` uses, even when your request does not mention checks
 
 ## What it produces
 

@@ -63,17 +63,21 @@ dataset could have caught it.
    discipline
    [validation-string-limits](../../infrahub-managing-schemas/rules/validation-string-limits.md)
    already applies to cap values.
+
 2. **Record how it was verified** in
    `verified_against`, naming the artifact introspected
    (for example, the filter generator in the pinned
    image) and the version it came from.
+
 3. **"Same form as the sibling" is not verification.**
    A sibling demonstrating the singular form is
    evidence for the singular form and nothing else.
+
 4. **The harness's own SDK is not authoritative.** The
    server parses its repository config with its own
    vendored copy, so the version that decides is the
    one in the image being audited.
+
 5. **A validation moved into the schema is shown, not
    asserted, to be equivalent.** Take the replaced
    pattern verbatim from the code being replaced rather
@@ -82,6 +86,7 @@ dataset could have caught it.
    Passing the test dataset is not evidence: generated
    data satisfies a narrowed pattern that imported data
    does not.
+
 6. **A finding that cannot verify its own proposal says
    so**, rather than presenting an unverified fix in a
    verified voice. `verified_against` records the failure
@@ -96,6 +101,7 @@ dataset could have caught it.
    say so in `verified_against` and keep the unverified
    syntax out of the replacement, per Check 7. The finding
    keeps the severity its rule declares.
+
 7. **Unverified syntax stays out of the replacement
    entirely, hedged or not.** Saying so in
    `verified_against` and then putting the unconfirmed

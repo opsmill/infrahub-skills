@@ -208,8 +208,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib import run_checks  # noqa: E402
 
 CHECKS = [
-    "schema-version",
     "<assertion-name-from-CHECKS>",
+    "schema-version",
     # ... other related baseline checks
 ]
 
@@ -217,10 +217,12 @@ if __name__ == "__main__":
     print(json.dumps(run_checks(CHECKS, Path("output.yml"))))
 ```
 
-Bundle the new assertion with related baseline
-assertions (schema version, naming, etc.) so the
-grader catches regressions in unrelated rules within
-the same task.
+Baseline checks catch regressions in neighbouring
+rules, but the score is the share of checks passed, so
+with five or more checks the new assertion can fail and
+the task still pass. Keep the task at four checks or
+fewer, or gate it where the library supports a gate; see
+[graders.md](../guidelines/graders.md#task-grader-scripts).
 
 For `infrahub-auditing-repo` yagni-* rules, don't add a
 new bespoke script — wire the shared parameterized
@@ -257,8 +259,9 @@ reports the rule as covered forever.
 ### 6. Sweep the Layers the Rule Contradicts
 
 If the rule corrects something the repo said before,
-the prose layer is not the only place the old claim
-lives. This is the one sweep command; every other page
+or adds a capability or exception to something the repo
+states as absolute, the prose layer is not the only
+place the old claim lives. This is the one sweep command; every other page
 and skill that sweeps points here. Fix every hit in the same
 change, except `evaluations/`, which step 7 regenerates
 from `eval.yaml`:
@@ -277,11 +280,25 @@ already agree with it. Use three kinds of term:
   sentence you found);
 - the opposite wording of the claim;
 - when the fix extends a list, a member already on it,
-  since a copy of the list never names the new one.
+  since a copy of the list never names the new one;
+- when the change adds a capability or exception, the
+  absolutes it breaks (`only`, `never`, `no other`,
+  `does not need`), in the skill, its docs page, and
+  the rule's frontmatter `description`.
 
 Then read every rule the changed one links to, and every
 rule linking to it. A linked rule that now says the
-opposite contains none of your terms.
+opposite contains none of your terms. Read the rest of
+the changed file too: its "What NOT to flag" list, its
+verdict table, and its examples can contradict the new
+text without sharing a word with it. When the rule adds
+a second input path (a pasted excerpt instead of a
+bundle), walk that path through every later `SKILL.md`
+step and every check of the task.
+
+Then re-run each check that grades the changed rule
+against the answers the rule now allows, per
+[rule-equals-test.md](../guidelines/rule-equals-test.md#when-the-grader-and-the-rule-disagree-decide-which-side-moves).
 
 The hits that get missed are the ones outside
 `skills/`: a grader still asserting a command the
@@ -306,24 +323,24 @@ job runs `sync-evals.py` and fails the pull request on
 any diff under `evaluations/`, so a stale JSON is a red
 build rather than silent drift.
 
-### 8. Run a Smoke Pass
+### 8. Run the Task
 
 ```bash
-skillgrade --smoke
+skillgrade --eval=<task-name> --trials=1
 ```
 
-A passing smoke run with your new rule means the AI
-follows the rule reliably under the skill's current
-prose. If smoke fails:
+A passing run means the AI follows the rule under the
+skill's current prose. `skillgrade --smoke` runs the
+whole suite and is rarely the question a single rule
+asks. If the task fails:
 
 - Re-read the rule file. If the *why* is buried, the
   AI may not internalize it.
 - Add a concrete example to the rule. Models learn
   from examples more reliably than from abstract
   imperatives.
-- Check whether the rule conflicts with another
-  rule in the same skill — sometimes a new rule
-  contradicts an example elsewhere.
+- Check whether the sweep in step 6 missed a rule
+  in the same skill that still says the opposite.
 
 ## Required Files Checklist
 
@@ -360,5 +377,6 @@ prose. If smoke fails:
   step 6 command
 - [ ] `python scripts/sync-evals.py` run and the
   regenerated `evaluations/*.json` committed
-- [ ] `skillgrade --smoke` passes (or smoke failures
-  inform a rule rewrite before merging)
+- [ ] `skillgrade --eval=<task-name> --trials=1`
+  passes (or its failure informs a rule rewrite
+  before merging)

@@ -200,12 +200,14 @@ missing. For each `generator_definitions` entry:
 
 1. **Is `watch` present at all?** A missing key means
    re-run-on-every-commit.
+
 2. **Is it the object form**, `watch: {files: [...]}`? A bare
    list or an unknown key under `watch` fails the import. A
    bare `watch:` with nothing under it does not fail — it
    parses to null and counts as no declaration at all, which
    is the version of this mistake you have to read for rather
    than wait for.
+
 3. **Does every entry resolve** to a Git-tracked file or
    directory? Infrahub expands each entry with `git ls-files`,
    so run the same check locally — no server needed:
@@ -217,14 +219,17 @@ missing. For each `generator_definitions` entry:
    An entry printing nothing is a typo, a gitignored path, or
    a symlink; it contributes nothing while still counting as
    a declaration.
+
 4. **Is the list complete?** Re-derive it from the current
    imports and compare. Two gaps recur: an import added after
    the `watch` block was written, and the Generator's own
    sibling query model, left out because it was once covered
    by the directory listing.
+
 5. **Is any entry broader than it needs to be** — a whole
    directory where two named modules would do? Not an error,
    but it costs precision on every commit.
+
 6. **Is `watch` only where it is accepted?** It is valid on
    `generator_definitions`, `python_transforms`, and
    `jinja2_transforms`; on `check_definitions` or

@@ -39,6 +39,7 @@ For each generic or node in the file, separately:
 1. **List its peers.** Every `peer:` on a relationship,
    plus every kind in `inherit_from`, `parent`,
    `children`, and `menu_placement`.
+
 2. **Classify each peer:**
 
    | Class | Cost |
@@ -49,6 +50,7 @@ For each generic or node in the file, separately:
 
 3. **Recurse.** A new peer's own peers count too. This is
    where a cheap-looking candidate turns expensive.
+
 4. **Decide per candidate.** A sibling with expensive
    peers is **not** a reason to reject a cheap candidate
    in the same file.

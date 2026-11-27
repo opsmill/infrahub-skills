@@ -225,8 +225,14 @@ export INFRAHUB_API_TOKEN="your-api-token"
    `INFRAHUB_ADDRESS` matches the actual server URL
 3. **Is the token valid?** Regenerate the API token
    from the Infrahub UI if needed
-4. **Is the network reachable?** Test with
-   `curl -s $INFRAHUB_ADDRESS/api/health`
+4. **Is the network reachable?** In a browser on the
+   same machine, open the server address that
+   `INFRAHUB_ADDRESS` holds, followed by `/api/health`,
+   for example `http://localhost:8000/api/health`. If the
+   page loads but `infrahubctl info` fails, check the SDK
+   configuration, the Python environment, and any proxy,
+   DNS or TLS settings that apply to the command line but
+   not to the browser
 
 ### Prevention
 
@@ -238,6 +244,7 @@ export INFRAHUB_API_TOKEN="your-api-token"
   `info` with a valid one, so before anything that
   writes, run the branch create/delete probe from
   Step 2 as well
+
 - For offline work (no server available), limit to
   local validation:
   - YAML linting and structure checks
@@ -246,6 +253,7 @@ export INFRAHUB_API_TOKEN="your-api-token"
     `.infrahub.yml`
   - Schema YAML format checks (correct keys, naming
     conventions)
+
 - Set `INFRAHUB_ADDRESS` and `INFRAHUB_API_TOKEN` in
   your shell profile for consistent config, and
   confirm both are actually exported before a write:
@@ -268,9 +276,7 @@ export INFRAHUB_API_TOKEN="your-api-token"
   reason a project has a working address and a missing
   token: the compose stack reads the file, your shell
   does not.
+
 - Wrap state-changing commands in a task runner that
   supplies credentials explicitly rather than relying
   on ambient configuration.
-
-Reference:
-[Infrahub CLI Docs](https://docs.infrahub.app)

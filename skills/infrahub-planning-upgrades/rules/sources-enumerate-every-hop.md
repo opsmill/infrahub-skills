@@ -65,10 +65,12 @@ straight through it.
    every body. Bodies are long, so skip the feature
    write-ups once the breaking, deprecation, and
    before-upgrading content is read.
+
 4. Stamp each row's `Release` with the single version
    that introduced the change, and name the change
    itself. A release with nothing breaking needs no
    row.
+
 5. Put the `Source` link to that release's notes, or
    to a deprecation guide the notes link to.
 

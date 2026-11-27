@@ -223,12 +223,14 @@ each Transformation:
 
 1. **Is `watch` present at all** on every `python_transforms`
    entry? A missing key means re-render-on-every-commit.
+
 2. **Is it the object form**, `watch: {files: [...]}`? A bare
    list or an unknown key under `watch` fails the import
    outright. A bare `watch:` with nothing under it does not
    fail — it parses to null and counts as no declaration at
    all, which is the version of this mistake you have to read
    for rather than wait for.
+
 3. **Does every entry resolve** to a Git-tracked file or
    directory? Infrahub expands each entry with `git ls-files`,
    so run the same check locally — no server needed:
@@ -240,14 +242,17 @@ each Transformation:
    An entry printing nothing is a typo, a gitignored path, or
    a symlink; it contributes nothing while still counting as
    a declaration.
+
 4. **Is the list complete?** Re-run the derivation above
    against the current code and compare. Two gaps recur:
    imports added after the `watch` block was written, and
    sibling modules left out because they were once covered by
    the directory listing.
+
 5. **Is any entry broader than it needs to be** — a whole
    directory where two named modules would do? Not an error,
    but it costs precision on every commit.
+
 6. **Is `watch` only on the sections that accept it?** On
    `check_definitions` or `artifact_definitions` it fails the
    repository import.

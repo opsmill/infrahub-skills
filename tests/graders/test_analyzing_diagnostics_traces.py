@@ -5,7 +5,8 @@ its folder under fixtures/analyzing-diagnostics/. The compliant cases must
 score 1.0; the violating cases must score below 1.0 and fail on the check of
 the rule, not on a neighbouring one.
 
-traces_analysis (check_traces_analysis.py, check `traces-slow-span`): the task
+traces_analysis (check_traces_analysis.py, checks `traces-slow-span` and
+`traces-self-time`): the task
 gives trace 0001 of a real bundle, a "Sync Git Repositories" task on
 infrahub-task-worker that took 10.74 s while its children took about 21 ms.
 
@@ -25,6 +26,16 @@ infrahub-task-worker that took 10.74 s while its children took about 21 ms.
 - fail-nearmiss-local-tempo: a correct analysis, but it starts a local Tempo
   and posts the traces to it. The skill reads the bundle files only (review of
   #243). A check that allows a local host passes it.
+- fail-selftime: names the span, the service and its duration, and nothing
+  about its children or self time.
+- fail-nearmiss-selftime-wrong: says "children" and "21 ms", but states 21 ms
+  as the self time. A check that only looks for the children's time passes it.
+- fail-nearmiss-selftime-split: "children" and "21 ms" in different
+  sentences, the 21 ms about another request. A check that reads the paragraph
+  rather than the sentence passes it.
+
+Each `fail-selftime*` fixture fails `traces-self-time` only; every other fail
+fixture fails `traces-slow-span`, and may fail `traces-self-time` too.
 
 traces_missing (check_traces_missing.py, check `recommends-traces`): a
 slowness that ended, and a bundle without a `traces` entry.
@@ -99,13 +110,22 @@ def test_compliant_fixture_scores_full(task: str, fixture: str) -> None:
     assert result["score"] == 1.0, result["details"]
 
 
+# Checks of the rule besides the main one, which a fail fixture may also fail.
+_ALSO_RULE = {"traces_analysis": ("traces-self-time",)}
+
+
 @pytest.mark.parametrize(("task", "fixture"), _fixtures("fail"))
 def test_violating_fixture_fails_on_the_rule(task: str, fixture: str) -> None:
     script, check = TASKS[task]
     result = _mod.run_checks(_task_checks(script), _FIXTURES / task / f"{fixture}.txt")
     assert result["score"] < 1.0, result["details"]
     failed = _failed(result)
-    assert len(failed) == 1 and failed[0].startswith(check), result["details"]
+    names = [f.split("(", 1)[0] for f in failed]
+    if fixture.startswith(("fail-selftime", "fail-nearmiss-selftime")):
+        assert names == ["traces-self-time"], result["details"]
+        return
+    assert names and names[0] == check, result["details"]
+    assert set(names[1:]) <= set(_ALSO_RULE.get(task, ())), result["details"]
 
 
 _KWARGS = {
@@ -172,3 +192,53 @@ def test_trace_service_in_a_comment_does_not_count() -> None:
 def test_recommends_traces(report: str, window: str, expected: bool) -> None:
     ok, msg = _mod.check_recommends_traces(report, window=window)
     assert ok is expected, msg
+
+
+_SELF_KWARGS = {
+    "span": "Sync Git Repositories",
+    "self_time": r"(?<![\d.,])10[.,]7(?:[0-3]\d*)?\s*(?:s|sec|seconds)\b|(?<![\d.,])107[0-3]\d(?:\.\d+)?\s*ms\b",
+    "children": r"\b(?:19|2[0-3])(?:[.,]\d+)?\s*ms\b",
+}
+
+
+@pytest.mark.parametrize(
+    ("report", "expected"),
+    [
+        ("Sync Git Repositories: the self time is 10.72 s.", True),
+        ("Sync Git Repositories. Self time: 10720 ms.", True),
+        ("Sync Git Repositories took 10.74 s. Its direct children take about 21 ms.", True),
+        ("| Span | Self time |\n| --- | --- |\n| Sync Git Repositories | 10.72 s |", True),
+        # A qualifier or a unit in the header still counts.
+        ("| Span | Self time (s) |\n| --- | --- |\n| Sync Git Repositories | ~10.72 s |", True),
+        # A bare number takes the unit from the header.
+        ("| Span | Self time (s) |\n| --- | --- |\n| Sync Git Repositories | 10.72 |", True),
+        ("| Span | Self time (ms) |\n| --- | --- |\n| Sync Git Repositories | 10720 |", True),
+        ("| Span | Self time (ms) |\n| --- | --- |\n| Sync Git Repositories | 10.72 |", False),
+        ("| Span | Self time |\n| --- | --- |\n| Sync Git Repositories | 10.72 |", False),
+        # A table of several spans passes on the slow span's row.
+        (
+            "| Span | Self time |\n| --- | --- |\n| Sync Git Repositories | 10.72 s |\n"
+            "| POST /graphql | 19 ms |",
+            True,
+        ),
+        # A stated self time decides, even next to the children's time.
+        ("Sync Git Repositories: its self time is 21 ms; its children take the rest.", False),
+        # 10.74 s is the duration, not the self time.
+        ("Sync Git Repositories: the self time is 10.74 s.", False),
+        # The children's time must sit in a sentence about children.
+        ("Sync Git Repositories has two children. Another request took 21 ms.", False),
+        # The right value for another span does not count.
+        ("Sync Git Repositories took 10.74 s.\n\nThe POST span has a self time of 10.72 s.", False),
+        ("| Span | Self time |\n| --- | --- |\n| POST /graphql | 10.72 s |", False),
+        # A self time only in a code block does not count.
+        ("Sync Git Repositories\n\n```text\nself time 10.72 s\n```", False),
+    ],
+)
+def test_self_time_reads_the_value(report: str, expected: bool) -> None:
+    ok, msg = _mod.check_traces_self_time(report, **_SELF_KWARGS)
+    assert ok is expected, msg
+
+
+def test_self_time_kwargs_match_the_task_grader() -> None:
+    checks = dict(c for c in _task_checks("check_traces_analysis.py") if isinstance(c, tuple))
+    assert checks["traces-self-time"] == _SELF_KWARGS

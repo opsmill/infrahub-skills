@@ -4151,6 +4151,10 @@ tasks:
           One paragraph or table row names "Sync Git Repositories",
           infrahub-task-worker and its duration of about 10.7 s, and no command
           starts, queries or posts to a Tempo or Grafana
+      - name: traces-self-time
+        check: >-
+          The report states the self time of "Sync Git Repositories" (about
+          10.72 s), or says in one sentence that its children take about 21 ms
 
   - name: analyzing-diagnostics-traces-missing
     trials: 3

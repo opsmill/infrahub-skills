@@ -2,7 +2,7 @@
 name: infrahub-managing-checks
 description: >-
   Creates, modifies and debugs Infrahub check definitions — Python validation logic, GraphQL queries, and YAML-driven tests for proposed change pipelines.
-  TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes, writing or running tests for a check, modifying or extending an existing check, debugging why a check fails, passes when it should not, or flags the wrong nodes.
+  TRIGGER when: writing validation checks, creating Python checks, building data quality guards for proposed changes, writing or running tests for a check, modifying or extending an existing check, debugging why a check fails, passes when it should not, or flags the wrong nodes, editing a `.py` file under `checks/` or a `.gql` file under `queries/` that a check in `.infrahub.yml` uses, in an Infrahub repository.
   DO NOT TRIGGER when: designing schemas, querying live data, building transforms or generators.
 argument-hint: "[check-name] [description...]"
 metadata:
@@ -21,14 +21,27 @@ errors, the proposed change cannot be merged.
 
 ## Project Context
 
-Infrahub config:
-!`cat .infrahub.yml 2>/dev/null || echo "No .infrahub.yml found"`
+Before writing a check, look at the project with
+read-only tools:
 
-Existing checks:
-!`find . -name "*.py" -path "*/checks/*" 2>/dev/null | head -20`
+- Read `.infrahub.yml` if it exists.
+- Find the existing checks: `.py` files under a
+  `checks/` directory.
+- Find the existing queries: `.gql` files under a
+  `queries/` directory.
 
-Existing queries:
-!`find . -name "*.gql" -path "*/queries/*" 2>/dev/null | head -20`
+These steps contact the Infrahub server, so they come
+after the read-only look at the project:
+
+- Before running any `infrahubctl` command, detect the
+  project's Python environment as
+  [../infrahub-common/rules/connectivity-python-environment.md](../infrahub-common/rules/connectivity-python-environment.md)
+  describes.
+- Before opening a pull request that changes a `.gql`
+  file, dry-run the query against the live schema on a
+  branch as
+  [../infrahub-common/rules/deployment-gql-dry-run.md](../infrahub-common/rules/deployment-gql-dry-run.md)
+  describes.
 
 ## When to Use
 
@@ -40,6 +53,9 @@ Existing queries:
   objects
 - Debugging check failures or understanding the check
   lifecycle
+- Editing any `.py` file under `checks/`, or a `.gql` file
+  under `queries/` that a check in `.infrahub.yml` uses,
+  even when the request does not mention checks
 
 ## Rule Categories
 

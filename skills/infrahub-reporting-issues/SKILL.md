@@ -238,7 +238,7 @@ For features, skip this step. For bugs, collect
   component.
 
 That's it. **Do not** collect file paths, project
-structure, logs verbatim, env dumps, `docker
+structure, logs verbatim, environment variable dumps, `docker
 compose ps` output, or anything that could leak
 internal state. The
 [environment-info-sanitization rule](rules/environment-info-sanitization.md)
