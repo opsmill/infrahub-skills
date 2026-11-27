@@ -118,7 +118,7 @@ version, and the export names which one it found.
 | Option | Meaning |
 | ------ | ------- |
 | `--url` | Base URL of the instance, without `/api` |
-| `--token` | API token; defaults to the `NETBOX_TOKEN` environment variable |
+| `--token` | API token. Leave it out: the script then asks for the token at the keyboard, which keeps it out of shell history and out of the conversation |
 | `--output-dir` | Writes `<dir>/device-types/<Manufacturer>/<slug>.yaml`, and with `--module-types` also `<dir>/module-types/<Manufacturer>/<model>.yaml` |
 | `--in-use` | Only device types with at least one device, and module types with at least one module. A record whose NetBox reports no count is kept, and the report says how many |
 | `--manufacturer` | Restrict to a manufacturer slug; repeatable |

@@ -190,8 +190,10 @@ the whole path.
 
 ### Export
 
+The user runs this in their own terminal, because the
+script asks for the API token at the keyboard:
+
 ```bash
-export NETBOX_TOKEN=...
 python "$SKILL/scripts/netbox_export_device_types.py" \
   --url https://netbox.example.com \
   --in-use --module-types \

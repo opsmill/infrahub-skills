@@ -73,12 +73,12 @@ A Markdown coverage report names everything the profile could not map. It is wri
 
 ## Exporting from a running NetBox
 
-When the device types live in your own instance rather than in the published library, a second bundled script fetches them and writes the same file format, so the two steps chain without a conversion in between. It needs [pynetbox](https://github.com/netbox-community/pynetbox) 7.0 or later, PyYAML, and a read-only API token.
+When the device types live in your own instance rather than in the published library, a second bundled script fetches them and writes the same file format, so the two steps chain without a conversion in between. It needs [pynetbox](https://github.com/netbox-community/pynetbox) 7.0 or later, [PyYAML](https://pyyaml.org/wiki/PyYAMLDocumentation), and a read-only API token. Install pynetbox and PyYAML the way your Python environment's package manager documents.
+
+Run the export in your own terminal. The script asks for the API token at the keyboard, so the token stays out of your shell history and out of the conversation with the AI assistant. In Claude Code, put `!` in front of the command to run it from the prompt.
 
 ```bash
-pip install 'pynetbox>=7.0' pyyaml
 SKILL=/path/to/infrahub-converting-netbox-device-types
-export NETBOX_TOKEN=...
 python "$SKILL/scripts/netbox_export_device_types.py" \
   --url https://netbox.example.com \
   --in-use \
