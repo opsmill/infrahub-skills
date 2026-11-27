@@ -58,12 +58,15 @@ instead of creating new ones.
    repository's `schemas/`. When the node has no
    `human_friendly_id`, take it from the first generic
    in its `inherit_from` that declares one.
+
 2. **Set `identifiers`** to the first segment of each HFID
    element. The fields of those names must be
    in the entry's `fields`.
+
 3. **Keep the source's stable ID as an ordinary field**
    (`object_id`, `webex_id`) when the schema has an
    attribute for it. It is not the key.
+
 4. **When the user wants the stable source ID as the
    key**, for example because records are renamed often,
    explain the trade-off:

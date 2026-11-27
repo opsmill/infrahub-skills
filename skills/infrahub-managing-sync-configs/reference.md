@@ -65,6 +65,7 @@ schema_mapping:
 - Source credentials come from environment variables,
   not from the file. The adapter's example lists the ones
   it reads.
+
 - The Infrahub address, token and branch are read in two
   places that do not agree:
   - `generate` takes `url`, `token` and `branch` from
@@ -80,6 +81,7 @@ schema_mapping:
   The live validation below runs from a run config that
   sets all three, so every command reads the same
   Infrahub branch.
+
 - `filters` and `transforms` on a `schema_mapping` entry
   work on the source record, before the diff. `filters`
   keeps only the records that pass every entry; the
@@ -107,6 +109,7 @@ schema_mapping:
 - `order` is optional on `main`. infrahub-sync computes
   the write order from the `reference` of each field.
   Set `order` only to override it.
+
 - A `reference` is resolved twice. The source adapter
   looks the peer up among the records it loaded for the
   referenced kind, so that kind needs its own
