@@ -1,0 +1,1 @@
+Added the harvesting-release-notes contributor skill, which reports the skill passages a release or range of Infrahub, SDK or MCP server releases changed, with version-gated fixes. The release-gate guidance in skill-authoring.md now covers changed behavior, and sync-evals.py reads contributor skill names.

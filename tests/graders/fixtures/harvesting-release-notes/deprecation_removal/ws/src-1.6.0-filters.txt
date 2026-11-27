@@ -1,0 +1,21 @@
+"""GraphQL attribute filters for node queries."""
+
+import warnings
+
+ATTRIBUTE_FILTERS = {
+    "value": "exact match",
+    "values": "match any of the given values",
+    "contains": "substring match",
+    "like": "substring match, deprecated: use contains",
+}
+
+
+def build_filter(attribute: str, operator: str, value: str) -> dict:
+    if operator == "like":
+        warnings.warn(
+            "__like is deprecated, use __contains", DeprecationWarning, stacklevel=2
+        )
+        operator = "contains"
+    if operator not in ATTRIBUTE_FILTERS:
+        raise ValueError(f'Unknown argument "{attribute}__{operator}"')
+    return {"attribute": attribute, "operator": operator, "value": value}

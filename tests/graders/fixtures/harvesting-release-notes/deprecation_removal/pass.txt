@@ -1,0 +1,18 @@
+# Release notes harvest: infrahub-v1.6.0 to infrahub-v1.7.0
+
+Releases read: infrahub-v1.6.0, infrahub-v1.6.1, infrahub-v1.7.0. The
+pre-release infrahub-v1.7.0b1 was skipped.
+
+### Finding 1
+
+- Repository: opsmill/infrahub
+- Severity: High
+- Affected: skills/acme-querying-inventory/rules/filters.md:9
+- Deprecated in: infrahub-v1.6.0
+- Removed in: infrahub-v1.7.0
+- Verified in: infrahub-v1.7.0:backend/infrahub/graphql/filters.py
+- Gate: `name__contains` is available from Infrahub 1.6 and required from 1.7. Before 1.7: `name__like` still works.
+
+## Not reported
+
+- infrahub-v1.7.0 removes `INFRAHUB_LEGACY_CACHE`. No skill passage mentions it.

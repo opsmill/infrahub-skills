@@ -10,6 +10,10 @@ whole tree into the sandbox, so the model found the skill anyway. Two tasks
 pointed at `.agents/skills/`, which holds only the contributor skills, and
 nothing failed.
 
+The rule guards shipped-skill tasks. Contributor skills live under
+`.agents/skills/`, so a task listed in `CONTRIBUTOR_SKILL_TASKS` may point at
+`.agents/skills/<name>/SKILL.md` instead, and only when that file exists.
+
 A task grader whose only call site is gone fails nothing either. One task ran
 the generic `check_yagni_rule.py` while its bespoke script, the only place the
 rule's cardinality assertion was wired, sat unreferenced on disk.
@@ -28,6 +32,9 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 
 SKILL_LINE = re.compile(r"Read the skill at\s+(\S+)")
+
+# Tasks that test a contributor skill, which lives under .agents/skills/.
+CONTRIBUTOR_SKILL_TASKS = frozenset({"harvest-release-notes-deprecation-removal"})
 
 
 @cache
@@ -59,7 +66,10 @@ def test_task_skill_path_exists(task: dict) -> None:
     path = skill_path(task.get("instruction", ""))
     assert path is not None, f"{task['name']}: no 'Read the skill at <path>' line"
     resolved = (ROOT / path).resolve()
-    assert resolved.is_relative_to((ROOT / "skills").resolve()), (
+    allowed = [(ROOT / "skills").resolve()]
+    if task["name"] in CONTRIBUTOR_SKILL_TASKS:
+        allowed.append((ROOT / ".agents" / "skills").resolve())
+    assert any(resolved.is_relative_to(base) for base in allowed), (
         f"{task['name']}: {path} is outside the shipped skills/ tree"
     )
     assert resolved.is_file(), f"{task['name']}: {path} does not exist"

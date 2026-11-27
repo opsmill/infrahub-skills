@@ -62,10 +62,13 @@ truncating.
 ## Was it already fixed upstream?
 
 If the guidance was correct for an older release and Infrahub has since
-changed, the fix is a version scoped rule, not a correction. Compare the
-claim against the pinned version and against the latest tag when they differ.
-When `develop` changes the behavior and no tag has the change yet, scope the
-claim to the latest tag and earlier, and say nothing about the next release.
+changed, the fix is a version scoped rule, not a correction: gate it in the
+form
+[`skill-authoring.md` § "Release-gate what you teach"](../../../dev/guidelines/skill-authoring.md#release-gate-what-you-teach)
+gives. Compare the claim against the pinned version and against the latest
+tag when they differ. When `develop` changes the behavior and no tag has the
+change yet, scope the claim to the latest tag and earlier, and say nothing
+about the next release.
 
 ## When a doc page contradicts the source
 

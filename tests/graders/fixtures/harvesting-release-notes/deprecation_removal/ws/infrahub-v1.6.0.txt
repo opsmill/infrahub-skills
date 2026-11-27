@@ -1,0 +1,36 @@
+# Infrahub - v1.6.0
+
+## Release highlights
+
+### Filter nodes by substring
+
+GraphQL node queries accept a new `<attribute>__contains` filter that
+matches any node whose attribute value contains the given string.
+
+```graphql
+query {
+  DcimDevice(name__contains: "leaf") {
+    edges { node { name { value } } }
+  }
+}
+```
+
+## Before you upgrade
+
+Back up the database before upgrading.
+
+## Breaking changes and required actions
+
+None in this release.
+
+## Deprecations
+
+- The `<attribute>__like` filter on GraphQL node queries is deprecated.
+  Use `<attribute>__contains` instead. `__like` will be removed in a
+  future release.
+
+## Full changelog
+
+- Added the `__contains` attribute filter.
+- Deprecated the `__like` attribute filter.
+- Fixed the sort order of the branch list.

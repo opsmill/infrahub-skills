@@ -1,0 +1,11 @@
+# Release notes harvest: infrahub-v1.6.0 to infrahub-v1.7.0
+
+### Finding 1
+
+- Repository: opsmill/infrahub
+- Severity: High
+- Affected: skills/acme-querying-inventory/rules/filters.md:9
+- Deprecated in: infrahub-v1.6.0
+- Removed in: infrahub-v1.7.0
+- Verified in: infrahub-v1.7.0:backend/infrahub/graphql/filters.py
+- Gate: Infrahub 1.6 and later: use `name__contains`. Infrahub 1.6 and earlier: `name__like` still works.
