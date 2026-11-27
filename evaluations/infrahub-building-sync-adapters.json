@@ -72,7 +72,7 @@
     },
     {
       "id": 3,
-      "prompt": "The ServiceNow source adapter for infrahub-sync is finished on branch\n`feat/servicenow-adapter`:\n\n- adapter: `infrahub_sync/adapters/servicenow.py`\n- tests: `tests/unit/adapters/test_servicenow.py`\n- example: `examples/servicenow_to_infrahub/`\n- spec: `dev/specs/017-servicenow-adapter/`\n\nLint and pytest pass locally, so it is ready. Write the PR description so I can\nopen the PR against `main`; reviewers want to see which checks were run.\n\nSave it to: PR_DESCRIPTION.md",
+      "prompt": "The ServiceNow source adapter for infrahub-sync is finished on branch\n`feat/servicenow-adapter`:\n\n- adapter: `infrahub_sync/adapters/servicenow.py`\n- tests: `tests/adapters/test_servicenow.py`\n- example: `examples/servicenow_to_infrahub/`\n- spec: `dev/specs/017-servicenow-adapter/`\n\nLint and pytest pass locally, so it is ready. Write the PR description so I can\nopen the PR against `main`; reviewers want to see which checks were run.\n\nSave it to: PR_DESCRIPTION.md",
       "expected_output": "A PR description with a checks section naming every repository check for an adapter PR, each command followed by its result: format, lint, ty, unit tests, rumdl, the docs build, infrahub-sync list, generate and diff on the example, the news fragment, the docs page, its sidebar entry, its line in each adapter list (choosing-an-adapter, docs/docs/readme.mdx, README.md and AGENTS.md), and the spec documents matched to the code.",
       "files": [],
       "expectations": [

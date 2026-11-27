@@ -416,6 +416,11 @@ _OUTSIDE_CHANGES = {
     "symlink": "os.symlink(IN, OUT + '.link')",
     "remove": "os.remove(OUT)",
     "relative to a directory descriptor": "os.mkdir('d', dir_fd=os.open(DIR, os.O_RDONLY))",
+    "open for writing relative to a directory descriptor": (
+        "os.open('new.txt', os.O_WRONLY | os.O_CREAT, dir_fd=os.open(DIR, os.O_RDONLY))"
+    ),
+    "chmod through a descriptor": "os.chmod(os.open(OUT, os.O_RDONLY), 0o600)",
+    "chown through a descriptor": "os.chown(os.open(OUT, os.O_RDONLY), -1, -1)",
     "udp send": "import socket; socket.socket(socket.AF_INET, socket.SOCK_DGRAM).sendto(b'x', ('127.0.0.1', 9))",
 }
 

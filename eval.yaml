@@ -10558,7 +10558,7 @@ tasks:
       `feat/servicenow-adapter`:
 
       - adapter: `infrahub_sync/adapters/servicenow.py`
-      - tests: `tests/unit/adapters/test_servicenow.py`
+      - tests: `tests/adapters/test_servicenow.py`
       - example: `examples/servicenow_to_infrahub/`
       - spec: `dev/specs/017-servicenow-adapter/`
 

@@ -160,8 +160,8 @@ with `time.sleep` replaced, so the tests do not wait.
 Write the retry loop by hand, as above. Do not build
 the policy on `urllib3.util.Retry` mounted through an
 `HTTPAdapter`. It waits for the `Retry-After` value,
-shortened to `retry_after_max` at most (urllib3 2.x),
-and has no setting that stops with an error instead, so
+shortened to `retry_after_max` at most (urllib3 2.6.3
+and later), and has no setting that stops with an error instead, so
 it cannot meet the stop above 300 s.
 
 ### Incorrect

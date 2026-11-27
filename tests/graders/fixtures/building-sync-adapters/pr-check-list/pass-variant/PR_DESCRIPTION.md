@@ -11,7 +11,7 @@ New source adapter for the ServiceNow Table API.
 | Formatting | `uv run invoke format` | clean |
 | Lint | `uv run invoke lint` | clean |
 | Types | `uv run ty check .` | clean |
-| Unit tests | `uv run pytest tests/unit/adapters/test_servicenow.py -v` | 42 passed |
+| Unit tests | `uv run pytest tests/adapters/test_servicenow.py -v` | 42 passed |
 | Markdown | `uv run rumdl check .` | clean |
 | Docs build | `cd docs && npm run build` | built |
 | Examples load | `infrahub-sync list --directory examples/` | lists from-servicenow |

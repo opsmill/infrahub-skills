@@ -8,7 +8,12 @@ key or token is in reach. ``confine`` then installs an audit hook that refuses:
 - a network connection, a datagram send or a DNS lookup;
 - writing, truncating, renaming, linking, removing or changing the mode of
   a file outside ``writable_root``, and any of these relative to a
-  directory descriptor, whose target the hook cannot resolve.
+  directory descriptor, whose target the hook cannot resolve;
+- changing the mode or the owner of a file through a descriptor, because a
+  read-only descriptor can point outside ``writable_root``.
+
+The ``open`` audit event carries no directory descriptor, so ``confine`` also
+replaces ``os.open`` with a wrapper that refuses a write relative to one.
 
 An audit hook is not a security boundary: code that sets out to escape it can.
 It stops answer code from reaching the network, the runner's files or a
@@ -54,6 +59,8 @@ _FILE_CHANGES: dict[str, tuple[tuple[int, ...], tuple[int, ...]]] = {
     "os.rename": ((0, 1), (2, 3)),
     "shutil.rmtree": ((0,), (1,)),
 }
+# a read-only descriptor of an outside file is enough to change its mode or owner
+_NO_FD = ("os.chmod", "os.chown")
 _WRITE_FLAGS = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_TRUNC
 
 
@@ -88,7 +95,12 @@ def confine(writable_root: Path) -> None:
                         f"the grader sandbox refuses {event} relative to a directory descriptor"
                     )
             for i in paths:
-                # an int is a descriptor, opened under the open check above
+                if i < len(args) and isinstance(args[i], int) and event in _NO_FD:
+                    raise PermissionError(
+                        f"the grader sandbox refuses {event} through a descriptor"
+                    )
+                # truncate needs a descriptor opened for writing, which the open
+                # check above already confined
                 if (
                     i < len(args)
                     and not isinstance(args[i], int)
@@ -99,3 +111,14 @@ def confine(writable_root: Path) -> None:
                     )
 
     sys.addaudithook(hook)
+
+    real_open = os.open
+
+    def confined_open(path, flags, mode=0o777, *, dir_fd=None):  # noqa: ANN001, ANN202
+        if dir_fd is not None and flags & _WRITE_FLAGS:
+            raise PermissionError(
+                "the grader sandbox refuses a write relative to a directory descriptor"
+            )
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    os.open = confined_open
