@@ -107,8 +107,10 @@ That is fine, and often the right answer. It is a
 
 2. Commit the fetched files into the repository, so a
    clean deploy loads them before your own schema.
+
 3. Load them **before** the schema that inherits from
    them. Order matters: the peer has to exist first.
+
 4. Record the provenance in one comment next to the
    shape that uses it, in the format
    [reuse-evaluate-per-generic.md](reuse-evaluate-per-generic.md)

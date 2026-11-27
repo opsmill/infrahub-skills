@@ -105,12 +105,14 @@ For each entry in the three eligible sections:
    `generator_definitions` entry carries `watch`. Absent means
    re-render-on-every-commit — flag it, including for an entry
    that turns out to need `files: []`.
+
 2. **Shape.** `watch` is a mapping whose only key is `files`,
    holding a list. The bare-list form (`watch: [a, b]`) and any
    other key fail the repository import. A bare `watch:` with
    nothing under it does **not** fail: it parses to null, so it
    counts as no declaration while reading as one. Flag it the
    same as a missing key — it is the harder of the two to see.
+
 3. **Completeness.** Read the entry point. Resolve every import
    to a repository path and confirm the list covers it —
    relative imports of siblings included, since those are not
@@ -120,6 +122,7 @@ For each entry in the three eligible sections:
    not tracked repository files and must not appear; a
    **generated** `protocols.py` committed in the repo is
    first-party and must.
+
 4. **Resolvability.** Infrahub expands each entry with
    `git ls-files`, so run the same check — it needs no server:
 
@@ -131,10 +134,12 @@ For each entry in the three eligible sections:
    symlink. It cannot extend the closure, yet still counts as a
    declaration, so it makes the list read as complete while
    contributing nothing.
+
 5. **Ineligible sections.** No `watch` on `check_definitions`
    or `artifact_definitions`. An artifact regenerates as a
    consequence of its transform's closure, so the fix lands on
    the transform entry.
+
 6. **Jinja2, only on an unfollowable reference.** Flag a
    `jinja2_transforms` entry only where a computed include
    leaves the closure incomplete. Walk the include graph to

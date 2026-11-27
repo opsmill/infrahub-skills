@@ -55,6 +55,7 @@ parent conversation. The user's question MUST be passed via arguments.
 
 - If invoked with arguments (e.g., `/infrahub:analyzing-data Which devices have no platform assigned?`),
   treat the arguments as the question to answer.
+
 - If invoked with **no arguments**, do **not** guess, do **not** use any example
   question from this file, and do **not** proceed. Return immediately with:
 

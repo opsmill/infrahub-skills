@@ -24,14 +24,17 @@ rule as covered forever.
    `skills/<skill>/rules/<category>-<concern>.md`, using
    an existing category prefix from the skill's
    `rules/_sections.md`.
+
 2. A link from `SKILL.md` **at the workflow step that
    needs it**, saying *when* to read it.
    `_sections.md` is a table of contents, not a load
    trigger — a rule reachable only from there gets read
    after the mistake.
+
 3. A check function in `graders/<skill>/lib.py`,
    registered in `CHECKS`, parsing the answer rather
    than substring-matching it (see `graders.md`).
+
 4. A task block in `eval.yaml` whose prompt naturally
    exercises the rule, run with the instruction's
    `Read the skill at ...` line **deleted**, not
@@ -68,6 +71,7 @@ rule as covered forever.
      prompt changes the score. Take the carve-out in
      § "When no task can score the rule", and say in
      the pull request which reading you are claiming.
+
 5. A task grader script at
    `graders/<skill>/check_<task>.py`, run against four
    fixtures: compliant, compliant refactored the way
@@ -78,6 +82,7 @@ rule as covered forever.
    together under the step-4 carve-out: a task
    grader's only call site is its task's `run:` line,
    so one written without a task is dead coverage.
+
 6. Old claims the rule contradicts swept from every
    surface that states one, with the command and the
    term choice in
@@ -88,6 +93,7 @@ rule as covered forever.
    it. Skip `evaluations/`, which step 7 regenerates.
    That regeneration is why a stale string left in
    `eval.yaml` gets copied there rather than caught.
+
 7. `python scripts/sync-evals.py`, with the regenerated
    `evaluations/*.json` committed alongside `eval.yaml`.
    CI fails when the two diverge.
