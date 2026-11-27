@@ -775,7 +775,8 @@ def test_exported_files_reload_as_the_library_format(tmp_path, tables):
 
 
 def test_cli_requires_a_token(tmp_path, monkeypatch):
-    monkeypatch.delenv("NETBOX_TOKEN", raising=False)
+    """With no --token and no terminal to ask at, the run stops."""
+    monkeypatch.setattr(_mod.sys.stdin, "isatty", lambda: False)
 
     code = main(["--url", "https://nb.example.com", "--output-dir", str(tmp_path)])
 
@@ -790,15 +791,34 @@ def test_cli_rejects_a_non_http_url(tmp_path):
     assert code == 1
 
 
-def test_cli_reads_the_token_from_the_environment(tmp_path, monkeypatch):
-    """A token on the command line lands in shell history; the env var does not."""
+def test_cli_ignores_a_token_in_the_environment(tmp_path, monkeypatch):
+    """The Claude plugin directory refuses a script that reads a credential
+    from the user's environment, so the old NETBOX_TOKEN default is gone."""
     monkeypatch.setenv("NETBOX_TOKEN", "from-env")
 
     args = _mod.build_parser().parse_args(
         ["--url", "https://x", "--output-dir", str(tmp_path)]
     )
 
-    assert args.token == "from-env"
+    assert args.token == ""
+
+
+def test_prompt_for_token_asks_at_a_terminal(monkeypatch):
+    """A token typed at the prompt stays out of shell history and the agent."""
+    monkeypatch.setattr(_mod.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(_mod.getpass, "getpass", lambda prompt: " typed \n")
+
+    assert _mod.prompt_for_token() == "typed"
+
+
+def test_prompt_for_token_does_not_ask_without_a_terminal(monkeypatch):
+    def fail(prompt):
+        raise AssertionError("getpass called with no terminal")
+
+    monkeypatch.setattr(_mod.sys.stdin, "isatty", lambda: False)
+    monkeypatch.setattr(_mod.getpass, "getpass", fail)
+
+    assert _mod.prompt_for_token() == ""
 
 
 # ---------------------------------------------------------------------------

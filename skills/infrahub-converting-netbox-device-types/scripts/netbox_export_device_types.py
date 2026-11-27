@@ -61,7 +61,7 @@ Usage
 -----
 ::
 
-    export NETBOX_TOKEN=...
+    # asks for the API token at the keyboard, so run it in a terminal
     python netbox_export_device_types.py \\
         --url https://netbox.example.com \\
         --output-dir ./device-types
@@ -86,7 +86,7 @@ Exit codes
 from __future__ import annotations
 
 import argparse
-import os
+import getpass
 import shutil
 import sys
 import tempfile
@@ -539,8 +539,8 @@ class NetBoxSource:
         rejected = status in (401, 403) if status is not None else "Invalid token" in text
         if rejected:
             return (
-                f"NetBox rejected the token. Check --token / NETBOX_TOKEN, and that "
-                f"it grants read access to {endpoint.split('.', 1)[0]}."
+                f"NetBox rejected the token. Check that it is valid and "
+                f"grants read access to {endpoint.split('.', 1)[0]}."
             )
         if self._is_missing_endpoint(exc):
             # Reached only before anything has answered, so the endpoint being
@@ -1468,6 +1468,22 @@ def export_tree(
 # --------------------------------------------------------------------------
 
 
+def prompt_for_token() -> str:
+    """Ask for the API token at the keyboard without echoing it.
+
+    The token is read here rather than from an environment variable, so it
+    never sits in the shell's environment, its history, or the conversation
+    of an agent that runs the script.
+
+    Returns:
+        The token, or an empty string when stdin is not a terminal, since
+        there is then no one to ask.
+    """
+    if not sys.stdin.isatty():
+        return ""
+    return getpass.getpass("NetBox API token: ").strip()
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the command-line argument parser."""
     parser = argparse.ArgumentParser(
@@ -1478,8 +1494,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--url", required=True, help="Base URL of the NetBox instance.")
     parser.add_argument(
         "--token",
-        default=os.environ.get("NETBOX_TOKEN", ""),
-        help="API token. Defaults to $NETBOX_TOKEN.",
+        default="",
+        help="API token. Leave it out to be asked for it at the keyboard, which "
+        "keeps it out of shell history and out of any agent's conversation.",
     )
     parser.add_argument(
         "--output-dir", required=True, type=Path, help="Directory to write into."
@@ -1546,13 +1563,17 @@ def main(argv: list[str] | None = None) -> int:
     """
     args = build_parser().parse_args(argv)
     try:
-        if not args.token:
-            raise ExportError("No API token. Pass --token or set NETBOX_TOKEN.")
+        token = args.token or prompt_for_token()
+        if not token:
+            raise ExportError(
+                "No API token. Run the script in a terminal to be asked for it, "
+                "or pass --token."
+            )
         if urllib.parse.urlparse(args.url).scheme not in ("http", "https"):
             raise ExportError(f"--url must be an http(s) URL, got {args.url!r}")
 
         source = NetBoxSource(
-            args.url, args.token, verify=not args.insecure, timeout=args.timeout
+            args.url, token, verify=not args.insecure, timeout=args.timeout
         )
         written, notes = export_tree(
             source,

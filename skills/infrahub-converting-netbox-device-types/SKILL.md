@@ -227,10 +227,17 @@ later, NetBox's Python client, and
 in the Python environment that runs it. Install both
 the way that environment's package manager documents.
 
+The script asks for a read-only NetBox API token at the
+keyboard and does not read one from the environment.
+Give the user the command to run in their own terminal,
+or with the `!` prefix in Claude Code, so the token
+never enters the conversation. Do not ask the user to
+paste the token, and do not pass it with `--token`,
+which puts it in the shell history.
+
 ```bash
 # SKILL is this skill's own directory, wherever it is installed
 SKILL=/path/to/infrahub-converting-netbox-device-types
-export NETBOX_TOKEN=...
 python "$SKILL/scripts/netbox_export_device_types.py" \
   --url https://netbox.example.com \
   --in-use \

@@ -1,0 +1,1 @@
+The NetBox export script no longer reads the `NETBOX_TOKEN` environment variable. Run it in your own terminal, or with the `!` prefix in Claude Code, and it asks for the API token at the keyboard, so the token stays out of your shell history and out of the conversation. The Claude plugin directory refuses a plugin script that reads a credential from the environment.
